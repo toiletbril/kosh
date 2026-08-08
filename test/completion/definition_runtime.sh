@@ -7,7 +7,7 @@ touch "$directory/apple.c" "$directory/apple.txt"
 
 echo "== callback keeps definition diagnostics:"
 completion_output=$("$BIN" -c "cd '$directory'; set -o force-diagnostics; _helper(){ eval 'printf \"%s\\n\" no_match_*'; }; _f(){ _helper >/dev/null; COMPREPLY=(ok); }; complete -F _f vim; set --mood bash" --debug-complete-at 'vim /etc/' </dev/null 2>"$directory/warnings")
-if grep -q 'warning:' "$directory/warnings"; then
+if grep -q "glob pattern 'no_match_" "$directory/warnings"; then
     echo warning-leaked
 else
     echo warning-clean

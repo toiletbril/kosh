@@ -1,2 +1,6 @@
 == unset of an array element is not glob-expanded under failglob:
+shit: 1:18: warning: An unquoted unset array index can expand as a filename glob.
+     1 |  a=(x y z); unset a[1]; echo "${a[@]}"
+       |                   ^~~~
+note: Quote the complete array element name.
 x z

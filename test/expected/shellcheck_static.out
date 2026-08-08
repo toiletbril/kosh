@@ -1358,6 +1358,10 @@
 [Word
   Unquoted "}"
 ]
+shit: 3:8: warning: A bare glob can expand to a filename that begins with '-'.
+     3 |    grep *.txt file
+       |         ^~~~~
+note: Prefix the glob with a directory or place -- before it.
 shit: 3:8: warning: The unquoted grep pattern can glob against the local files before grep sees it.
      3 |    grep *.txt file
        |         ^~~~~
@@ -1525,14 +1529,130 @@ shit: 78:1: warning: A useless cat.
     78 |  cat data/hello-d | cat
        |  ^~~
 note: Give the file to the next command directly instead of piping cat.
+shit: 94:3: warning: Commands after exec do not run when exec succeeds.
+    94 |    exec echo replaced; echo unreachable
+       |    ^~~~
+note: Remove exec or remove the unreachable commands.
+shit: 83:15: warning: A for loop over ls output breaks filenames at whitespace.
+    83 |    for file in $(ls *.mp3); do echo "$file"; done
+       |                ^~~~~~~~~~~
+note: Iterate over a glob or read a delimited filename stream.
+shit: 84:15: warning: A quoted for-loop glob remains one literal word.
+    84 |    for file in "*.mp3"; do echo "$file"; done
+       |                ^~~~~~~
+note: Leave the glob unquoted so it expands into loop values.
+shit: 86:16: warning: The unquoted find pattern expands before find sees it.
+    86 |    find . -name *.ogg
+       |                 ^~~~~
+note: Quote the pattern so find performs the match.
+shit: 86:16: warning: A bare glob can expand to a filename that begins with '-'.
+    86 |    find . -name *.ogg
+       |                 ^~~~~
+note: Prefix the glob with a directory or place -- before it.
+shit: 87:22: warning: The find result is inserted into shell source and can execute filename text.
+    87 |    find . -exec sh -c 'echo {}' \;
+       |                       ^~~~~~~~~
+note: Pass the result as an argument and reference it as $1.
+shit: 88:9: warning: An unquoted unset array index can expand as a filename glob.
+    88 |    unset values[0]
+       |          ^~~~~~~~~
+note: Quote the complete array element name.
+shit: 89:8: warning: A read operand is a variable name, not a variable value.
+    89 |    read $target
+       |         ^~~~~~~
+note: Drop the dollar sign from the variable name.
 shit: 89:3: warning: A read without -r mangles a backslash in the input.
     89 |    read $target
        |    ^~~~~~~~~~~~
 note: Add -r to read the line literally.
+shit: 92:10: warning: The printf format consumes more arguments than the command supplies.
+    92 |    printf '%s %s\n' one
+       |           ^~~~~~~~~
+note: Add the missing arguments or remove format directives.
+shit: 93:25: warning: The shell opens this redirection before sudo changes privileges.
+    93 |    sudo echo protected > output
+       |                          ^~~~~~
+note: Run a shell under sudo or pipe through sudo tee.
+shit: 97:22: warning: This pipeline read assignment is lost when the stage exits.
+    97 |    echo one | read -r pipeline_value
+       |                       ^~~~~~~~~~~~~~
+note: Feed the loop with a redirection or process substitution.
+shit: 98:8: warning: This read sees the value from before the pipeline.
+    98 |    echo "$pipeline_value"
+       |         ^~~~~~~~~~~~~~~~~
+note: Move the assignment outside the pipeline or avoid the pipeline subshell.
+shit: 99:3: warning: The > operator compares strings lexicographically.
+    99 |    [[ 10 > 7 ]]
+       |    ^~
+note: Use an arithmetic command or a numeric -lt or -gt operator.
+shit: 99:3: warning: This conditional compares two constant values.
+    99 |    [[ 10 > 7 ]]
+       |    ^~
+note: Remove the constant condition or compare runtime data.
+shit: 100:3: warning: This conditional compares two constant values.
+   100 |    [[ left < right ]]
+       |    ^~
+note: Remove the constant condition or compare runtime data.
+shit: 101:15: warning: A quoted regular expression is matched literally.
+   101 |    [[ value =~ 'v.*' ]]
+       |                ^~~~~
+note: Store the expression in a variable or leave it unquoted.
+shit: 102:9: warning: A file test on a glob checks only one expanded path.
+   102 |    [[ -e *.txt ]]
+       |          ^~~~~
+note: Expand the glob in a loop and test each path.
+shit: 103:6: warning: A conditional operator needs surrounding spaces.
+   103 |    [[ $left=$right ]]
+       |       ^~~~~~~~~~~~
+note: Place spaces around the comparison operator.
+shit: 104:9: warning: The operand is literal, so this string test is constant.
+   104 |    [[ -n literal ]]
+       |          ^~~~~~~
+note: Test a variable or drop the check.
+shit: 105:8: warning: Brace ranges are expanded before variables.
+   105 |    echo {1..$limit}
+       |         ^~~~~~~~~~~
+note: Use an arithmetic loop for a variable limit.
+shit: 105:8: warning: An unquoted variable can split into words and expand globs.
+   105 |    echo {1..$limit}
+       |         ^~~~~~~~~~~
+note: Quote the expansion to keep one argument.
+shit: 106:6: warning: The unquoted tr range can expand as a filename glob.
+   106 |    tr [A-Z] [a-z]
+       |       ^~~~~
+note: Quote the range.
+shit: 106:12: warning: The unquoted tr range can expand as a filename glob.
+   106 |    tr [A-Z] [a-z]
+       |             ^~~~~
+note: Quote the range.
 shit: 107:3: warning: This assignment to 'index' in a function has no local, so the value leaks to the global scope.
    107 |    index=0
        |    ^~~~~~~
 note: Declare it with local to keep it inside the function.
+shit: 108:21: warning: A redirection expansion can run in a child and lose its mutation.
+   108 |    echo redirected > "file$((index++))"
+       |                      ^~~~~~~~~~~~~~~~~~
+note: Update the variable before forming the redirect path.
+shit: 109:8: warning: An unquoted variable can split into words and expand globs.
+   109 |    echo $value
+       |         ^~~~~~
+note: Quote the expansion to keep one argument.
+shit: 110:8: warning: A quoted tilde stays literal instead of expanding to the home directory.
+   110 |    echo "~"
+       |         ^~~
+note: Leave the tilde unquoted or use a quoted $HOME expansion.
+shit: 111:8: warning: Single quotes prevent the expansion written inside them.
+   111 |    echo '$value'
+       |         ^~~~~~~~
+note: Use double quotes if the value should expand.
+shit: 113:8: warning: External input is evaluated as arithmetic code.
+   113 |    echo $((number + 1))
+       |         ^~~~~~~~~~~~~~~
+note: Validate the value as decimal digits before arithmetic.
+shit: 114:10: warning: An exported CDPATH can redirect cd commands in child scripts.
+   114 |    export CDPATH=.:~/project
+       |           ^~~~~~~~~~~~~~~~~~
+note: Keep CDPATH unexported or clear it before running scripts.
 done
 done
 done

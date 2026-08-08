@@ -131,7 +131,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 
   let const &name = m_assignment->key();
 
-  if (actx.pipeline_stage_depth > 0) {
+  if (actx.is_direct_pipeline_stage) {
     actx.warn(source_location(),
               "This pipeline assignment is lost when the stage exits",
               "Move the assignment outside the pipeline");
@@ -147,7 +147,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   if (let const bracket = name.view().find_character('['); bracket.has_value())
   {
     let const base = name.view().substring_of_length(0, *bracket);
-    if (actx.pipeline_stage_depth > 0) actx.pipeline_lost_names.add(base);
+    if (actx.is_direct_pipeline_stage) actx.pipeline_lost_names.add(base);
     if (name.length() > *bracket + 1 && name[name.length() - 1] == ']') {
       let const subscript = name.view().substring_of_length(
           *bracket + 1, name.length() - *bracket - 2);

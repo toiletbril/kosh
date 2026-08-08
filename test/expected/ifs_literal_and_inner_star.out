@@ -128,6 +128,22 @@
 [Word
   Unquoted "a-b"
 ]
+shit: 7:17: warning: An unquoted variable can split into words and expand globs.
+     7 |  printf '[%s]\n' $x a-b
+       |                  ^~
+note: Quote the expansion to keep one argument.
+shit: 10:17: warning: An unquoted variable can split into words and expand globs.
+    10 |  printf '[%s]\n' ${a[@]+"${b[*]}"}
+       |                  ^~~~~~~~~~~~~~~~~
+note: Quote the expansion to keep one argument.
+shit: 12:17: warning: An unquoted variable can split into words and expand globs.
+    12 |  printf '[%s]\n' ${a[@]+"${b[@]}"}
+       |                  ^~~~~~~~~~~~~~~~~
+note: Quote the expansion to keep one argument.
+shit: 13:8: warning: An unquoted variable can split into words and expand globs.
+    13 |  set -- ${a[@]+"${b[*]}"}
+       |         ^~~~~~~~~~~~~~~~~
+note: Quote the expansion to keep one argument.
 a-b c-d
 [p]
 [q]

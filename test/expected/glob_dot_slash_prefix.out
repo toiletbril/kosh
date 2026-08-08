@@ -102,6 +102,10 @@
 [Word
   Variable "directory"
 ]
+shit: 6:64: warning: A bare glob can expand to a filename that begins with '-'.
+     6 |  cd "$directory" && : > a.sh && : > b.sh && echo ./*.sh && echo *.sh
+       |                                                                 ^~~~
+note: Prefix the glob with a directory or place -- before it.
 ./a.sh ./b.sh
 a.sh b.sh
 [Code 0]

@@ -75,8 +75,6 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC2183", "printf has fewer arguments than its format consumes"         },
     {"SC2024", "sudo does not elevate shell redirections or glob expansion"  },
     {"SC2093", "commands after exec do not run when exec succeeds"           },
-    {"SC2015", "A && B || C also runs C when B fails"                        },
-    {"SC2164", "an unchecked cd can leave later commands in the wrong dir"   },
     {"SC2050", "a conditional compares two constant values"                  },
     {"SC2071", "a string operator performs a lexicographic comparison"       },
     {"SC2076", "a quoted regular expression is matched literally"            },

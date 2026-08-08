@@ -37,7 +37,7 @@ cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-static cold fn conditional_word_is_literal(const Token *token) wontthrow -> bool
+cold static fn conditional_word_is_literal(const Token *token) wontthrow -> bool
 {
   if (token == nullptr || token->kind() != Token::Kind::Word) return false;
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
@@ -49,7 +49,7 @@ static cold fn conditional_word_is_literal(const Token *token) wontthrow -> bool
   return true;
 }
 
-static cold fn conditional_word_has_glob(const Token *token) wontthrow -> bool
+cold static fn conditional_word_has_glob(const Token *token) wontthrow -> bool
 {
   if (token == nullptr || token->kind() != Token::Kind::Word) return false;
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
@@ -59,7 +59,7 @@ static cold fn conditional_word_has_glob(const Token *token) wontthrow -> bool
   return false;
 }
 
-static cold fn conditional_word_is_numeric_literal(const Token *token) throws
+cold static fn conditional_word_is_numeric_literal(const Token *token) throws
     -> bool
 {
   if (!conditional_word_is_literal(token)) return false;
@@ -70,7 +70,7 @@ static cold fn conditional_word_is_numeric_literal(const Token *token) throws
   return !view.is_empty() && view.is_all_decimal_digits();
 }
 
-static cold fn is_conditional_binary_operator(StringView op) wontthrow -> bool
+cold static fn is_conditional_binary_operator(StringView op) wontthrow -> bool
 {
   static const StringView OPERATORS[] = {
       "=",   "==",  "!=",  "=~",  "-eq", "-ne", "-lt",
@@ -146,7 +146,12 @@ cold fn ConditionalCommand::analyze(AnalysisContext &actx,
 
     let const left = m_elements[i - 1].word;
     let const right = m_elements[i + 1].word;
-    if (conditional_word_is_literal(left) && conditional_word_is_literal(right))
+    const bool is_pattern_operator =
+        operand.view() == "=~" ||
+        ((operand.view() == "=" || operand.view() == "==") &&
+         conditional_word_has_glob(right));
+    if (!is_pattern_operator && conditional_word_is_literal(left) &&
+        conditional_word_is_literal(right))
       actx.warn(element.word->source_location(),
                 "This conditional compares two constant values",
                 "Remove the constant condition or compare runtime data");

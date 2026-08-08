@@ -713,7 +713,9 @@ cold fn word_has_split_eligible_variable(const Word &word) wontthrow -> bool
   for (let const &segment : word.segments)
     if (segment.kind == WordSegment::Kind::VariableReference &&
         segment.is_split_eligible() && segment.text.view() != "@" &&
-        segment.text.view() != "*")
+        segment.text.view() != "*" && segment.text.view() != "?" &&
+        segment.text.view() != "#" && segment.text.view() != "$" &&
+        segment.text.view() != "!" && segment.text.view() != "-")
       return true;
 
   return false;
@@ -724,6 +726,24 @@ cold fn word_is_bare_glob(const Word &word) wontthrow -> bool
   return word.segments.count() == 1 &&
          word.segments[0].kind == WordSegment::Kind::UnquotedText &&
          word.segments[0].has_glob_metacharacter();
+}
+
+cold fn bare_glob_can_start_with_dash(const Word &word) wontthrow -> bool
+{
+  if (!word_is_bare_glob(word)) return false;
+  let const text = word.segments[0].text.view();
+  if (text.is_empty()) return false;
+  if (text[0] == '*' || text[0] == '?') return true;
+  if (text[0] != '[') return false;
+
+  let const close = text.find_character(']');
+  if (!close.has_value()) return false;
+  if (*close > 1 && (text[1] == '!' || text[1] == '^')) return true;
+  for (usize position = 1; position < *close; position++)
+    if (text[position] == '-' &&
+        (position == 1 || position + 1 == *close || text[position - 1] == '\\'))
+      return true;
+  return false;
 }
 
 cold fn printf_consumed_argument_count(StringView format) wontthrow -> usize
@@ -1008,7 +1028,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.warn(m_args[0]->source_location(),
               "An option-shaped word in command position is not a command",
               "Place the option after its command");
-  if (!command_raw.is_empty() && command_raw[0] == '$' &&
+  if (command_raw.length() > 1 && command_raw[0] == '$' &&
+      lexer::is_variable_name_start(command_raw[1]) &&
       command_raw.view().find_character('=').has_value())
     actx.warn(m_args[0]->source_location(),
               "An assignment name must not start with a dollar sign",
@@ -1025,7 +1046,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.warn(m_args[0]->source_location(),
               "A conditional operator needs surrounding spaces",
               "Place spaces around the comparison operator");
-  if (command_raw.view().starts_with(StringView{"["}) && m_args.count() > 1) {
+  if (command_raw.view().starts_with(StringView{"["}) &&
+      command_raw.view() != "[" && command_raw.view() != "[[" &&
+      m_args.count() > 1)
+  {
     let const last_raw = m_args.back()->raw_string();
     if (!last_raw.is_empty() && last_raw[last_raw.length() - 1] == ']')
       actx.warn(m_args[0]->source_location(),
@@ -1075,20 +1099,32 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     let const source_text =
         analysis_source_text(actx, m_args[i]->source_location());
 
-    if (source_text.length >= 2 &&
-        (source_text.starts_with(StringView{"\"~"}) ||
-         source_text.starts_with(StringView{"'~"})))
+    const bool is_quoted_home = source_text == "\"~\"" ||
+                                source_text == "'~'" ||
+                                source_text.starts_with(StringView{"\"~/"}) ||
+                                source_text.starts_with(StringView{"'~/"});
+    if (is_quoted_home)
       actx.warn(m_args[i]->source_location(),
                 "A quoted tilde stays literal instead of expanding to the "
                 "home directory",
                 "Leave the tilde unquoted or use a quoted $HOME expansion");
 
-    if (source_text.length >= 2 && source_text[0] == '\'' &&
-        (source_text.find_character('$').has_value() ||
-         source_text.find_character('`').has_value()))
-      actx.warn(m_args[i]->source_location(),
-                "Single quotes prevent the expansion written inside them",
-                "Use double quotes if the value should expand");
+    if (!command_is_shadowed && command_literal == "echo" &&
+        source_text.length >= 4 && source_text[0] == '\'' &&
+        source_text[1] == '$' && source_text[source_text.length - 1] == '\'')
+    {
+      let const name =
+          source_text.substring_of_length(2, source_text.length - 3);
+      bool is_simple_name =
+          !name.is_empty() && lexer::is_variable_name_start(name[0]);
+      for (usize position = 1; position < name.length && is_simple_name;
+           position++)
+        is_simple_name = lexer::is_variable_name(name[position]);
+      if (is_simple_name)
+        actx.warn(m_args[i]->source_location(),
+                  "Single quotes prevent the expansion written inside them",
+                  "Use double quotes if the value should expand");
+    }
 
     if (word.segments.count() == 1 &&
         word.segments[0].kind == WordSegment::Kind::VariableReference &&
@@ -1147,7 +1183,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   "A read operand is a variable name, not a variable value",
                   "Drop the dollar sign from the variable name");
 
-      if (actx.pipeline_stage_depth > 0 && !literal.view().starts_with("-")) {
+      if (actx.is_direct_pipeline_stage && !literal.view().starts_with("-")) {
         let const target = operand_target_name(literal.view());
         if (!target.is_empty()) {
           actx.warn(m_args[i]->source_location(),
@@ -1311,7 +1347,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
-      if (word_is_bare_glob(word))
+      if (bare_glob_can_start_with_dash(word))
         actx.warn(m_args[i]->source_location(),
                   "A bare glob can expand to a filename that begins with '-'",
                   "Prefix the glob with a directory or place -- before it");
@@ -2186,9 +2222,11 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       is_unconditional && m_commands.count() == 1;
   for (let const command : m_commands) {
     ASSERT(command != nullptr);
-    if (m_commands.count() > 1) actx.pipeline_stage_depth++;
+    const bool was_direct_pipeline_stage = actx.is_direct_pipeline_stage;
+    actx.is_direct_pipeline_stage =
+        m_commands.count() > 1 && command->as_simple_command() != nullptr;
     command->analyze(actx, stage_is_unconditional);
-    if (m_commands.count() > 1) actx.pipeline_stage_depth--;
+    actx.is_direct_pipeline_stage = was_direct_pipeline_stage;
   }
 
   /* cat feeding a single named file into the next stage runs an extra process,
@@ -2358,20 +2396,8 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
           actx.warn(simple->args()[0]->source_location(),
                     "Commands after exec do not run when exec succeeds",
                     "Remove exec or remove the unreachable commands");
-        if (name->view() == "cd" && i + 1 < m_nodes.count() &&
-            m_nodes[i + 1]->kind() == CompoundListCondition::Kind::None)
-          actx.warn(simple->args()[0]->source_location(),
-                    "An unchecked cd can leave later commands in the wrong "
-                    "directory",
-                    "Stop or return when cd fails");
       }
     }
-
-    if (i >= 2 && m_nodes[i - 1]->kind() == CompoundListCondition::Kind::And &&
-        m_nodes[i]->kind() == CompoundListCondition::Kind::Or)
-      actx.warn(m_nodes[i]->source_location(),
-                "A && B || C also runs C when B fails",
-                "Use an if statement for a true else branch");
   }
 
   for (let const node : m_nodes) {

@@ -29,6 +29,10 @@ shit: 1:1: warning: A read without -r mangles a backslash in the input.
      1 |  read n; echo $((n + 1))
        |  ^~~~~~
 note: Add -r to read the line literally.
+shit: 1:14: warning: External input is evaluated as arithmetic code.
+     1 |  read n; echo $((n + 1))
+       |               ^~~~~~~~~~
+note: Validate the value as decimal digits before arithmetic.
 [optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
 1
 === undecidable condition does not fold ===

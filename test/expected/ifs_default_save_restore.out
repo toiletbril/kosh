@@ -52,5 +52,9 @@
 [Word
   Variable "#"
 ]
+shit: 2:52: warning: An unquoted variable can split into words and expand globs.
+     2 |  o=$IFS; IFS=:; set -- x:y; IFS=$o; a="p q"; set -- $a; echo $#
+       |                                                     ^~
+note: Quote the expansion to keep one argument.
 2
 [Code 0]

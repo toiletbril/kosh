@@ -161,8 +161,8 @@ else
         BIN="$BIN" script -q "$directory/interactive" /bin/sh -c \
             'exec "$BIN" -i --rcfile /dev/null' >/dev/null 2>&1
 fi
-if strings "$directory/interactive" | grep -q '^interactive-letter$' &&
-    strings "$directory/interactive" | grep -q '^interactive-emacs$'
+if strings "$directory/interactive" | grep -q 'interactive-letter' &&
+    strings "$directory/interactive" | grep -q 'interactive-emacs'
 then
     echo interactive
 else
@@ -189,8 +189,8 @@ else
             "$directory/startup-state" /bin/sh -c \
             'exec "$BIN" -i -M bash --init-moods=shit' >/dev/null 2>&1
 fi
-if strings "$directory/startup-state" | grep -q '^snapshot-mood=bash$' &&
-    strings "$directory/startup-state" | grep -q '^snapshot-moods=shit$'
+if strings "$directory/startup-state" | grep -q 'snapshot-mood=bash' &&
+    strings "$directory/startup-state" | grep -q 'snapshot-moods=shit'
 then
     echo startup-state-isolated
 else

@@ -1120,6 +1120,8 @@ fn expand_prompt_template(StringView prompt, EvalContext &context) throws
 
 fn build_prompt(EvalContext &context) -> String
 {
+  let const full_pwd = Path::current_directory().text().clone();
+
   /* The user is stable for the session, so it is resolved once and reused. */
   static String CACHED_USER{shit::heap_allocator()};
   static bool was_user_resolved = false;

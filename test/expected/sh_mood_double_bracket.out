@@ -1,3 +1,7 @@
+shit: 1:7: warning: The operand is literal, so this string test is constant.
+     1 |  [[ -n x ]] && echo ran
+       |        ^
+note: Test a variable or drop the check.
 ran
 ran
 shit: 1:1: error: The [[ conditional is a bash extension that the sh mood does not provide.

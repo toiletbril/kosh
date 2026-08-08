@@ -34,6 +34,10 @@
 [Word
   Unquoted "not-reached"
 ]
+shit: 4:6: warning: A bare glob can expand to a filename that begins with '-'.
+     4 |  echo *.zzz_explicit_fatal
+       |       ^~~~~~~~~~~~~~~~~~~~
+note: Prefix the glob with a directory or place -- before it.
 shit: 4:6: error: The glob pattern '*.zzz_explicit_fatal' matched no file, it expands to its literal text, which is rarely intended.
      4 |  echo *.zzz_explicit_fatal
        |       ^~~~~~~~~~~~~~~~~~~~

@@ -77,6 +77,10 @@
 [Word
   Unquoted "continued"
 ]
+shit: 8:6: warning: A bare glob can expand to a filename that begins with '-'.
+     8 |  echo *.zzz_nomatch_downgrade
+       |       ^~~~~~~~~~~~~~~~~~~~~~~
+note: Prefix the glob with a directory or place -- before it.
 shit: 3:9: warning: The variable 'never_counted' is not set, it expands to empty.
      3 |  echo $((never_counted + 1))
        |          ^~~~~~~~~~~~~

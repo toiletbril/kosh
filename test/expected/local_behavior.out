@@ -9,12 +9,24 @@ shit: 1:1: error: Builtin `local`: Unable to declare a local variable outside a 
 note: `local` only works inside a function body.
 rc=1
 == local -i evaluates an integer assignment:
+shit: 1:27: warning: An unquoted variable can split into words and expand globs.
+     1 |  f(){ local -i n=3+4; echo $n; }; f
+       |                            ^~
+note: Quote the expansion to keep one argument.
 7
 == local -a declares an indexed array:
 xy
 == local -A declares an associative array:
 val
 == a local shadows an outer value and restores it:
+shit: 1:35: warning: An unquoted variable can split into words and expand globs.
+     1 |  v=outer; f(){ local v=inner; echo $v; }; f; echo $v
+       |                                    ^~
+note: Quote the expansion to keep one argument.
+shit: 1:50: warning: An unquoted variable can split into words and expand globs.
+     1 |  v=outer; f(){ local v=inner; echo $v; }; f; echo $v
+       |                                                   ^~
+note: Quote the expansion to keep one argument.
 inner
 outer
 == fresh name warns:

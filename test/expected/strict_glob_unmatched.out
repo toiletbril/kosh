@@ -23,6 +23,10 @@
 [Word
   Unquoted "not-reached"
 ]
+shit: 3:6: warning: A bare glob can expand to a filename that begins with '-'.
+     3 |  echo *.zzz_no_such_glob
+       |       ^~~~~~~~~~~~~~~~~~
+note: Prefix the glob with a directory or place -- before it.
 before
 shit: 3:6: error: The glob pattern '*.zzz_no_such_glob' matched no file, it expands to its literal text, which is rarely intended.
      3 |  echo *.zzz_no_such_glob

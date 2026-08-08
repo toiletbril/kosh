@@ -401,6 +401,14 @@ shit: 16:8: warning: The pipe feeds 'false', which never reads stdin, so the ups
 shit: 18:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
     18 |  false | true
        |          ^~~~
+shit: 20:17: warning: This pipeline read assignment is lost when the stage exits.
+    20 |  false | read -r x
+       |                  ^
+note: Feed the loop with a redirection or process substitution.
+shit: 22:19: warning: This pipeline read assignment is lost when the stage exits.
+    22 |  echo hi | read -r y
+       |                    ^
+note: Feed the loop with a redirection or process substitution.
 shit: 24:8: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
     24 |  true | true
        |         ^~~~

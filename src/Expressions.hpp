@@ -53,7 +53,7 @@ public:
 
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
 
-  usize pipeline_stage_depth{0};
+  bool is_direct_pipeline_stage{false};
   HashSet pipeline_lost_names{heap_allocator()};
   HashSet external_input_names{heap_allocator()};
 

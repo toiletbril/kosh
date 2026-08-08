@@ -259,6 +259,10 @@
 [Word
   Literal "~raw"
 ]
+shit: 2:3: warning: An unquoted variable can split into words and expand globs.
+     2 |  : pre"dq"'sq'$x${y}post
+       |    ^~~~~~~~~~~~~~~~~~~~~
+note: Quote the expansion to keep one argument.
 shit: 3:3: warning: An unquoted command substitution splits its output.
      3 |  : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~

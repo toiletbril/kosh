@@ -64,16 +64,52 @@
 shit: 2:1: error: Command 'nosuchcmd_xyz' was not found.
      2 |  nosuchcmd_xyz
        |  ^~~~~~~~~~~~~
+shit: 3:1: warning: An assignment name must not start with a dollar sign.
+     3 |  $name=value
+       |  ^~~~~~~~~~~
+note: Remove the dollar sign from the assignment name.
+shit: 4:6: warning: An assignment cannot contain spaces around equals.
+     4 |  name = value
+       |       ^
+note: Write NAME=value without spaces.
 shit: 4:1: error: Command 'name' was not found.
      4 |  name = value
        |  ^~~~
 note: Did you mean 'time'?
+shit: 5:1: warning: Test brackets and operands require separating spaces.
+     5 |  [grep needle file]
+       |  ^~~~~
+note: Add spaces after the opening bracket and before the close.
+shit: 5:1: warning: Test brackets do not run the command written inside them.
+     5 |  [grep needle file]
+       |  ^~~~~
+note: Run the command directly as the if condition.
 shit: 5:1: error: Malformed glob pattern, unterminated '['.
      5 |  [grep needle file]
        |  ^~~~~
+shit: 6:1: warning: Test brackets and operands require separating spaces.
+     6 |  [[left=right]]
+       |  ^~~~~~~~~~~~~~
+note: Add spaces after the opening bracket and before the close.
+shit: 6:1: warning: A conditional operator needs surrounding spaces.
+     6 |  [[left=right]]
+       |  ^~~~~~~~~~~~~~
+note: Place spaces around the comparison operator.
+shit: 7:1: warning: Parentheses start a subshell rather than a file or string test.
+     7 |  ( -f file )
+       |  ^
+note: Use [[ ... ]] or [ ... ] for the condition.
+shit: 7:3: warning: An option-shaped word in command position is not a command.
+     7 |  ( -f file )
+       |    ^~
+note: Place the option after its command.
 shit: 7:3: error: Command '-f' was not found.
      7 |  ( -f file )
        |    ^~
+shit: 8:1: warning: An option-shaped word in command position is not a command.
+     8 |  -n
+       |  ^~
+note: Place the option after its command.
 shit: 8:1: error: Command '-n' was not found.
      8 |  -n
        |  ^~

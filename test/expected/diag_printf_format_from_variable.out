@@ -24,6 +24,10 @@
 [Word
   Unquoted "after"
 ]
+shit: 3:8: warning: An unquoted variable can split into words and expand globs.
+     3 |  printf $fmt hi
+       |         ^~~~
+note: Quote the expansion to keep one argument.
 shit: 3:8: warning: The printf format comes from a variable, the data can inject format directives.
      3 |  printf $fmt hi
        |         ^~~~

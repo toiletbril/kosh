@@ -11,27 +11,13 @@ printf '%s\n' '#!/bin/bash' \
     'echo "FG_READ:$value"' > "$probe"
 chmod +x "$probe"
 
-printf 'printf ready > "%s"\nPS1="HANDOFF_PROMPT"\n' "$d/ready" > "$d/rc"
+printf 'printf ready > "%s"\n' "$d/ready" > "$d/rc"
 
 wait_for_transcript()
 {
     text=$1
     attempt_count=0
     while ! grep -aF "$text" "$d/live" >/dev/null 2>&1; do
-        [ "$attempt_count" -lt 1000 ] || return 1
-        sleep 0.01
-        attempt_count=$((attempt_count + 1))
-    done
-}
-
-wait_for_transcript_count()
-{
-    text=$1
-    expected_count=$2
-    attempt_count=0
-    while :; do
-        match_count=$(grep -aFo "$text" "$d/live" 2>/dev/null | wc -l)
-        [ "$match_count" -ge "$expected_count" ] && return 0
         [ "$attempt_count" -lt 1000 ] || return 1
         sleep 0.01
         attempt_count=$((attempt_count + 1))
@@ -46,19 +32,17 @@ send_input()
         sleep 0.01
         attempt_count=$((attempt_count + 1))
     done
-    wait_for_transcript_count 'HANDOFF_PROMPT' 1 || return 1
-    printf 'set --mood shit\n'
-    wait_for_transcript_count 'HANDOFF_PROMPT' 2 || return 1
-    printf 'stty tostop\n'
-    wait_for_transcript_count 'HANDOFF_PROMPT' 3 || return 1
+    wait_for_transcript 'Bash me harder!' || return 1
+    printf 'set --mood shit; echo HANDOFF_STEP_1\n'
+    wait_for_transcript 'HANDOFF_STEP_1' || return 1
+    printf 'stty tostop; echo HANDOFF_STEP_2\n'
+    wait_for_transcript 'HANDOFF_STEP_2' || return 1
     printf '%s\n' "$probe"
     wait_for_transcript 'Stopped' || return 1
-    wait_for_transcript_count 'HANDOFF_PROMPT' 4 || return 1
     printf 'fg\n'
     wait_for_transcript 'FG_READY' || return 1
     printf 'terminal-value\n'
     wait_for_transcript 'FG_READ:terminal-value' || return 1
-    wait_for_transcript_count 'HANDOFF_PROMPT' 5 || return 1
     printf 'exit\n'
 }
 
