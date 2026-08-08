@@ -61,6 +61,39 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC3043", "local is not in POSIX sh, the value stays global"            },
     {"SC3045", "printf -v is a bash extension absent from POSIX printf"      },
     {"SC3030", "mapfile and readarray are bash array builtins absent from sh"},
+    {"SC2086", "an unquoted variable can split and glob, quote it"           },
+    {"SC2045", "a for loop over ls output breaks filenames"                  },
+    {"SC2207", "an array built from command output splits and globs"         },
+    {"SC2061", "an unquoted find pattern expands before find sees it"        },
+    {"SC2035", "a bare glob can expand to an option-shaped filename"         },
+    {"SC2088", "a quoted tilde stays literal instead of naming the home"     },
+    {"SC2066", "a quoted for-loop glob stays literal"                        },
+    {"SC2184", "an unquoted unset array index can expand as a glob"          },
+    {"SC2229", "read expects a variable name without a dollar sign"          },
+    {"SC2048", "$* splits positional parameters, use quoted $@"              },
+    {"SC2156", "find -exec shell text must receive the filename as an arg"   },
+    {"SC2183", "printf has fewer arguments than its format consumes"         },
+    {"SC2024", "sudo does not elevate shell redirections or glob expansion"  },
+    {"SC2093", "commands after exec do not run when exec succeeds"           },
+    {"SC2015", "A && B || C also runs C when B fails"                        },
+    {"SC2164", "an unchecked cd can leave later commands in the wrong dir"   },
+    {"SC2050", "a conditional compares two constant values"                  },
+    {"SC2071", "a string operator performs a lexicographic comparison"       },
+    {"SC2076", "a quoted regular expression is matched literally"            },
+    {"SC2077", "a conditional operator needs surrounding spaces"             },
+    {"SC2144", "a file test on a glob checks only one expanded path"         },
+    {"SC2281", "an assignment name must not start with a dollar sign"        },
+    {"SC2283", "an assignment cannot contain spaces around equals"           },
+    {"SC1035", "test brackets and operands require separating spaces"        },
+    {"SC1014", "if runs a command directly, not from inside test brackets"   },
+    {"SC2204", "parentheses start a subshell rather than a file test"        },
+    {"SC2215", "an option-shaped word in command position is not a command"  },
+    {"SC2051", "brace ranges are expanded before variables"                  },
+    {"SC2060", "tr ranges must be quoted so the shell does not glob them"    },
+    {"SC2257", "redirection expansion can run in a child and lose mutation"  },
+    {"SC2030", "a pipeline assignment is lost when its stage exits"          },
+    {"SC2031", "a later read sees the value from before the pipeline"        },
+    {"SC2016", "single quotes prevent the expansion written inside them"     },
 };
 
 /* One shit strictness diagnostic, the advisories and downgraded strict errors
@@ -98,6 +131,9 @@ inline const strictness_warning STRICTNESS_WARNINGS[] = {
     {"posix-bashism",
      "a bashism such as <<<, |&, or for ((...)) tripped the POSIX parse, the "
      "error names the owning dialect"                                       },
+    {"byte-order-mark",
+     "a UTF-8 byte-order mark before the script interferes with the shebang "
+     "and first command"                                                    },
 };
 
 } // namespace shit

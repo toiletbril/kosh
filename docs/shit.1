@@ -254,6 +254,12 @@ detail location remain visible when available.
 .TP
 .B \-\-list\-diagnostics
 The checks reported by the analysis stage are listed. The shell then exits.
+The checks cover unsafe word splitting and globbing, misleading quoting,
+command-output iteration, test and conditional mistakes, redirection order and
+privilege boundaries, pipeline state loss, unvalidated arithmetic input,
+unreachable control flow, nonportable syntax, and dangerous file operations.
+The source is also checked for a UTF-8 byte-order mark before the shebang or
+first command.
 .SS Interactive operation
 .TP
 .BR \-T ", " \-\-no\-completion

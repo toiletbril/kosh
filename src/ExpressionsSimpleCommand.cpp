@@ -131,6 +131,13 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 
   let const &name = m_assignment->key();
 
+  if (actx.pipeline_stage_depth > 0) {
+    actx.warn(source_location(),
+              "This pipeline assignment is lost when the stage exits",
+              "Move the assignment outside the pipeline");
+    actx.pipeline_lost_names.add(name.view());
+  }
+
   /* A PATH assignment leaves the runtime search path unknown to the prepass, so
      a later command's not-found check stays quiet. */
   if (name.view() == "PATH") actx.should_silence_unresolved_commands = true;
@@ -140,6 +147,16 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   if (let const bracket = name.view().find_character('['); bracket.has_value())
   {
     let const base = name.view().substring_of_length(0, *bracket);
+    if (actx.pipeline_stage_depth > 0) actx.pipeline_lost_names.add(base);
+    if (name.length() > *bracket + 1 && name[name.length() - 1] == ']') {
+      let const subscript = name.view().substring_of_length(
+          *bracket + 1, name.length() - *bracket - 2);
+      if (actx.external_input_names.contains(subscript))
+        actx.warn(source_location(),
+                  "An array subscript from external input is evaluated as "
+                  "arithmetic code",
+                  "Validate the subscript as decimal digits before using it");
+    }
     actx.note_variable_assignment(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "

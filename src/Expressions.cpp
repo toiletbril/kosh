@@ -419,6 +419,12 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.should_print_optimizer_state = show_optimizer_state;
   actx.should_trace_optimizer = show_optimizer_state;
 
+  if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
+      static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
+    actx.warn(SourceLocation{0, 3},
+              "A UTF-8 byte-order mark precedes the script text",
+              "Save the script as UTF-8 without a byte-order mark");
+
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
      name without 'bash'. */
@@ -482,6 +488,33 @@ fn analyze_ast(const Expression *root, StringView source,
 }
 
 namespace expressions {
+
+pure fn analysis_source_text(const AnalysisContext &actx,
+                             SourceLocation location) wontthrow -> StringView
+{
+  if (location.position > actx.source.length ||
+      location.length > actx.source.length - location.position)
+    return {};
+  return actx.source.substring_of_length(location.position, location.length);
+}
+
+pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
+                                        StringView expression) wontthrow -> bool
+{
+  for (usize position = 0; position < expression.length;) {
+    if (!lexer::is_variable_name_start(expression[position])) {
+      position++;
+      continue;
+    }
+    let const start = position++;
+    while (position < expression.length &&
+           lexer::is_variable_name(expression[position]))
+      position++;
+    let const name = expression.substring_of_length(start, position - start);
+    if (actx.external_input_names.contains(name)) return true;
+  }
+  return false;
+}
 
 IfStatement::IfStatement(SourceLocation location, const Expression *condition,
                          const Expression *then, const Expression *otherwise)
@@ -673,6 +706,67 @@ cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
       return false;
     }
   return true;
+}
+
+cold fn word_has_split_eligible_variable(const Word &word) wontthrow -> bool
+{
+  for (let const &segment : word.segments)
+    if (segment.kind == WordSegment::Kind::VariableReference &&
+        segment.is_split_eligible() && segment.text.view() != "@" &&
+        segment.text.view() != "*")
+      return true;
+
+  return false;
+}
+
+cold fn word_is_bare_glob(const Word &word) wontthrow -> bool
+{
+  return word.segments.count() == 1 &&
+         word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+         word.segments[0].has_glob_metacharacter();
+}
+
+cold fn printf_consumed_argument_count(StringView format) wontthrow -> usize
+{
+  usize count = 0;
+  for (usize i = 0; i < format.length; i++) {
+    if (format[i] != '%' || i + 1 >= format.length) continue;
+    i++;
+    if (format[i] == '%') continue;
+
+    while (i < format.length &&
+           (format[i] == '-' || format[i] == '+' || format[i] == ' ' ||
+            format[i] == '#' || format[i] == '0'))
+      i++;
+    if (i >= format.length) break;
+    if (format[i] == '*') {
+      count++;
+      i++;
+    } else
+      while (i < format.length && (format[i] >= '0' && format[i] <= '9'))
+        i++;
+    if (i < format.length && format[i] == '.') {
+      i++;
+      if (i < format.length && format[i] == '*') {
+        count++;
+        i++;
+      } else
+        while (i < format.length && (format[i] >= '0' && format[i] <= '9'))
+          i++;
+    }
+    while (i < format.length &&
+           (format[i] == 'h' || format[i] == 'l' || format[i] == 'L' ||
+            format[i] == 'j' || format[i] == 'z' || format[i] == 't'))
+      i++;
+    if (i < format.length && format[i] == '(') {
+      while (i < format.length && format[i] != ')')
+        i++;
+      if (i + 1 < format.length) i++;
+    }
+    count++;
+  }
+
+  return count;
 }
 
 cold pure fn view_is_integer_literal(StringView view) wontthrow -> bool
@@ -909,6 +1003,50 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 .to_literal_string()
           : m_args[0]->raw_string();
 
+  let const command_raw = m_args[0]->raw_string();
+  if (!command_raw.is_empty() && command_raw[0] == '-')
+    actx.warn(m_args[0]->source_location(),
+              "An option-shaped word in command position is not a command",
+              "Place the option after its command");
+  if (!command_raw.is_empty() && command_raw[0] == '$' &&
+      command_raw.view().find_character('=').has_value())
+    actx.warn(m_args[0]->source_location(),
+              "An assignment name must not start with a dollar sign",
+              "Remove the dollar sign from the assignment name");
+  if ((command_raw.view().starts_with(StringView{"["}) &&
+       command_raw.view() != "[") ||
+      (command_raw.view().starts_with(StringView{"[["}) &&
+       command_raw.view() != "[["))
+    actx.warn(m_args[0]->source_location(),
+              "Test brackets and operands require separating spaces",
+              "Add spaces after the opening bracket and before the close");
+  if (command_raw.view().starts_with(StringView{"[["}) &&
+      command_raw.view().find_character('=').has_value())
+    actx.warn(m_args[0]->source_location(),
+              "A conditional operator needs surrounding spaces",
+              "Place spaces around the comparison operator");
+  if (command_raw.view().starts_with(StringView{"["}) && m_args.count() > 1) {
+    let const last_raw = m_args.back()->raw_string();
+    if (!last_raw.is_empty() && last_raw[last_raw.length() - 1] == ']')
+      actx.warn(m_args[0]->source_location(),
+                "Test brackets do not run the command written inside them",
+                "Run the command directly as the if condition");
+  }
+  if (m_args.count() >= 2 && m_args[1]->raw_string().view() == "=")
+    actx.warn(m_args[1]->source_location(),
+              "An assignment cannot contain spaces around equals",
+              "Write NAME=value without spaces");
+
+  for (usize i = 1; i < m_args.count(); i++) {
+    let const raw = m_args[i]->raw_string();
+    if (view_contains(raw.view(), StringView{".."}) &&
+        raw.view().find_character('{').has_value() &&
+        raw.view().find_character('$').has_value())
+      actx.warn(m_args[i]->source_location(),
+                "Brace ranges are expanded before variables",
+                "Use an arithmetic loop for a variable limit");
+  }
+
   /* An assignment builtin that sets PATH also leaves the runtime search path
      unknown to the prepass. */
   if (name.has_value() &&
@@ -930,6 +1068,255 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   let const command_is_shadowed =
       actx.defined_functions.contains(command_literal.view()) ||
       actx.known_aliases.contains(command_literal.view());
+
+  for (usize i = 1; i < m_args.count(); i++) {
+    if (m_args[i]->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
+    let const source_text =
+        analysis_source_text(actx, m_args[i]->source_location());
+
+    if (source_text.length >= 2 &&
+        (source_text.starts_with(StringView{"\"~"}) ||
+         source_text.starts_with(StringView{"'~"})))
+      actx.warn(m_args[i]->source_location(),
+                "A quoted tilde stays literal instead of expanding to the "
+                "home directory",
+                "Leave the tilde unquoted or use a quoted $HOME expansion");
+
+    if (source_text.length >= 2 && source_text[0] == '\'' &&
+        (source_text.find_character('$').has_value() ||
+         source_text.find_character('`').has_value()))
+      actx.warn(m_args[i]->source_location(),
+                "Single quotes prevent the expansion written inside them",
+                "Use double quotes if the value should expand");
+
+    if (word.segments.count() == 1 &&
+        word.segments[0].kind == WordSegment::Kind::VariableReference &&
+        word.segments[0].text.view() == "*" &&
+        !word.segments[0].is_in_double_quotes)
+      actx.warn(m_args[i]->source_location(),
+                "$* splits positional parameters and loses their boundaries",
+                "Use quoted \"$@\" to preserve each argument");
+
+    for (let const &segment : word.segments)
+      if (segment.kind == WordSegment::Kind::VariableReference &&
+          actx.pipeline_lost_names.contains(segment.text.view()))
+      {
+        actx.warn(m_args[i]->source_location(),
+                  "This read sees the value from before the pipeline",
+                  "Move the assignment outside the pipeline or avoid the "
+                  "pipeline subshell");
+        actx.pipeline_lost_names.remove(segment.text.view());
+        break;
+      }
+
+    for (let const &segment : word.segments)
+      if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
+          arithmetic_reads_external_input(actx, segment.text.view()))
+      {
+        actx.warn(m_args[i]->source_location(),
+                  "External input is evaluated as arithmetic code",
+                  "Validate the value as decimal digits before arithmetic");
+        break;
+      }
+  }
+
+  if (!command_is_shadowed && command_literal == "read") {
+    let should_skip_option_operand = false;
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      let const literal = word.to_literal_string();
+      if (should_skip_option_operand) {
+        should_skip_option_operand = false;
+        continue;
+      }
+      if (literal.view() == "-p" || literal.view() == "-t" ||
+          literal.view() == "-n" || literal.view() == "-N" ||
+          literal.view() == "-d" || literal.view() == "-u" ||
+          literal.view() == "-i")
+      {
+        should_skip_option_operand = true;
+        continue;
+      }
+      if (literal.view().starts_with("-")) continue;
+      if (word.segments.count() == 1 &&
+          word.segments[0].kind == WordSegment::Kind::VariableReference)
+        actx.warn(m_args[i]->source_location(),
+                  "A read operand is a variable name, not a variable value",
+                  "Drop the dollar sign from the variable name");
+
+      if (actx.pipeline_stage_depth > 0 && !literal.view().starts_with("-")) {
+        let const target = operand_target_name(literal.view());
+        if (!target.is_empty()) {
+          actx.warn(m_args[i]->source_location(),
+                    "This pipeline read assignment is lost when the stage "
+                    "exits",
+                    "Feed the loop with a redirection or process substitution");
+          actx.pipeline_lost_names.add(target);
+        }
+      }
+      if (!literal.view().starts_with("-")) {
+        let const target = operand_target_name(literal.view());
+        if (!target.is_empty()) actx.external_input_names.add(target);
+      }
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "export" &&
+      !args_have_short_flag(m_args, 'n'))
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      let const raw = m_args[i]->raw_string();
+      if (raw.view().starts_with(StringView{"CDPATH="}) ||
+          raw.view() == "CDPATH")
+        actx.warn(m_args[i]->source_location(),
+                  "An exported CDPATH can redirect cd commands in child "
+                  "scripts",
+                  "Keep CDPATH unexported or clear it before running scripts");
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "unset") {
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const raw = m_args[i]->raw_string();
+      let const source_text =
+          analysis_source_text(actx, m_args[i]->source_location());
+      if (raw.view().find_character('[').has_value() &&
+          raw.view().find_character(']').has_value() &&
+          (source_text.is_empty() ||
+           (source_text[0] != '\'' && source_text[0] != '"')))
+        actx.warn(m_args[i]->source_location(),
+                  "An unquoted unset array index can expand as a filename "
+                  "glob",
+                  "Quote the complete array element name");
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "find") {
+    for (usize i = 1; i + 1 < m_args.count(); i++) {
+      let const predicate = m_args[i]->raw_string();
+      if (predicate.view() == "-name" || predicate.view() == "-iname" ||
+          predicate.view() == "-path" || predicate.view() == "-ipath" ||
+          predicate.view() == "-regex")
+      {
+        if (m_args[i + 1]->kind() == Token::Kind::Word &&
+            word_is_bare_glob(
+                static_cast<const tokens::WordToken *>(m_args[i + 1])->word()))
+          actx.warn(m_args[i + 1]->source_location(),
+                    "The unquoted find pattern expands before find sees it",
+                    "Quote the pattern so find performs the match");
+      }
+
+      if (predicate.view() == "-exec" && i + 3 < m_args.count()) {
+        let const shell_name = m_args[i + 1]->raw_string();
+        let const shell_flag = m_args[i + 2]->raw_string();
+        let const script = m_args[i + 3]->raw_string();
+        if ((shell_name.view() == "sh" || shell_name.view() == "bash") &&
+            shell_flag.view() == "-c" &&
+            view_contains(script.view(), StringView{"{}"}))
+          actx.warn(m_args[i + 3]->source_location(),
+                    "The find result is inserted into shell source and can "
+                    "execute filename text",
+                    "Pass the result as an argument and reference it as $1");
+      }
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "tr") {
+    for (usize i = 1; i < m_args.count() && i <= 2; i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      if (word_is_bare_glob(word))
+        actx.warn(m_args[i]->source_location(),
+                  "The unquoted tr range can expand as a filename glob",
+                  "Quote the range");
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "let") {
+    for (usize i = 1; i < m_args.count(); i++) {
+      let const expression = m_args[i]->raw_string();
+      if (arithmetic_reads_external_input(actx, expression.view()))
+        actx.warn(m_args[i]->source_location(),
+                  "External input is evaluated as arithmetic code",
+                  "Validate the value as decimal digits before arithmetic");
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "printf") {
+    usize format_index = 1;
+    if (format_index < m_args.count() &&
+        m_args[format_index]->raw_string().view() == "-v")
+      format_index += 2;
+    if (format_index < m_args.count() &&
+        m_args[format_index]->kind() == Token::Kind::Word)
+    {
+      let const &format_word =
+          static_cast<const tokens::WordToken *>(m_args[format_index])->word();
+      if (word_is_fully_literal(format_word)) {
+        let const format = format_word.to_literal_string();
+        let const consumed = printf_consumed_argument_count(format.view());
+        let const available = m_args.count() - format_index - 1;
+        if (consumed > available)
+          actx.warn(m_args[format_index]->source_location(),
+                    "The printf format consumes more arguments than the "
+                    "command supplies",
+                    "Add the missing arguments or remove format directives");
+      }
+    }
+  }
+
+  if (!command_is_shadowed && command_literal == "sudo") {
+    for (let const &redirection : m_redirections)
+      if (redirection.target != nullptr)
+        actx.warn(redirection.target->source_location(),
+                  "The shell opens this redirection before sudo changes "
+                  "privileges",
+                  "Run a shell under sudo or pipe through sudo tee");
+    for (usize i = 1; i < m_args.count(); i++)
+      if (m_args[i]->kind() == Token::Kind::Word &&
+          word_is_bare_glob(
+              static_cast<const tokens::WordToken *>(m_args[i])->word()))
+        actx.warn(m_args[i]->source_location(),
+                  "The shell expands this glob before sudo changes "
+                  "privileges",
+                  "Run the glob expansion inside a shell under sudo");
+  }
+
+  if (!command_is_shadowed && !TEST_COMMANDS.contains(command_literal.view()) &&
+      !VARIABLE_TARGET_COMMANDS.contains(command_literal.view()))
+  {
+    let const command_is_assignment_builtin =
+        ASSIGNMENT_BUILTINS.contains(command_literal.view());
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      if (!word_has_split_eligible_variable(word)) continue;
+      if (command_is_assignment_builtin &&
+          word.get_assignment_split().has_value())
+        continue;
+      actx.warn(m_args[i]->source_location(),
+                "An unquoted variable can split into words and expand globs",
+                "Quote the expansion to keep one argument");
+    }
+  }
+
+  if (!command_is_shadowed) {
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      if (word_is_bare_glob(word))
+        actx.warn(m_args[i]->source_location(),
+                  "A bare glob can expand to a filename that begins with '-'",
+                  "Prefix the glob with a directory or place -- before it");
+    }
+  }
 
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
      so any later unresolved command must not be a hard failure. */
@@ -1393,6 +1780,24 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   "stderr stays on the terminal",
                   "Put the file redirect first as in '>file 2>&1'");
       }
+      if (redirection.target != nullptr &&
+          redirection.target->kind() == Token::Kind::Word)
+      {
+        let const &target_word =
+            static_cast<const tokens::WordToken *>(redirection.target)->word();
+        for (let const &segment : target_word.segments)
+          if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
+              (view_contains(segment.text.view(), StringView{"++"}) ||
+               view_contains(segment.text.view(), StringView{"--"}) ||
+               segment.text.view().find_character('=').has_value()))
+          {
+            actx.warn(redirection.target->source_location(),
+                      "A redirection expansion can run in a child and lose "
+                      "its mutation",
+                      "Update the variable before forming the redirect path");
+            break;
+          }
+      }
       if (redirection.kind == Redirection::Kind::ReadInput &&
           redirection.target != nullptr &&
           redirection.target->kind() == Token::Kind::Word)
@@ -1781,7 +2186,9 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       is_unconditional && m_commands.count() == 1;
   for (let const command : m_commands) {
     ASSERT(command != nullptr);
+    if (m_commands.count() > 1) actx.pipeline_stage_depth++;
     command->analyze(actx, stage_is_unconditional);
+    if (m_commands.count() > 1) actx.pipeline_stage_depth--;
   }
 
   /* cat feeding a single named file into the next stage runs an extra process,
@@ -1891,6 +2298,12 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
   if (m_commands.count() > 1) actx.constant_variables.clear();
 }
 
+fn Pipeline::as_simple_command() const wontthrow -> const SimpleCommand *
+{
+  if (m_commands.count() != 1 || m_commands[0] == nullptr) return nullptr;
+  return m_commands[0]->as_simple_command();
+}
+
 cold fn CompoundListCondition::analyze(AnalysisContext &actx,
                                        bool is_unconditional) const throws
     -> void
@@ -1928,6 +2341,37 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
   for (let const node : m_nodes) {
     ASSERT(node != nullptr);
     node->register_defined_functions(actx);
+  }
+
+  for (usize i = 0; i < m_nodes.count(); i++) {
+    ASSERT(m_nodes[i] != nullptr);
+    let const command = m_nodes[i]->command();
+    let const simple =
+        command != nullptr ? command->as_simple_command() : nullptr;
+    if (simple != nullptr && !simple->args().is_empty()) {
+      let const name = static_command_name(simple->args()[0]);
+      if (name.has_value() && !actx.defined_functions.contains(name->view()) &&
+          !actx.known_aliases.contains(name->view()))
+      {
+        if (name->view() == "exec" && simple->args().count() > 1 &&
+            i + 1 < m_nodes.count())
+          actx.warn(simple->args()[0]->source_location(),
+                    "Commands after exec do not run when exec succeeds",
+                    "Remove exec or remove the unreachable commands");
+        if (name->view() == "cd" && i + 1 < m_nodes.count() &&
+            m_nodes[i + 1]->kind() == CompoundListCondition::Kind::None)
+          actx.warn(simple->args()[0]->source_location(),
+                    "An unchecked cd can leave later commands in the wrong "
+                    "directory",
+                    "Stop or return when cd fails");
+      }
+    }
+
+    if (i >= 2 && m_nodes[i - 1]->kind() == CompoundListCondition::Kind::And &&
+        m_nodes[i]->kind() == CompoundListCondition::Kind::Or)
+      actx.warn(m_nodes[i]->source_location(),
+                "A && B || C also runs C when B fails",
+                "Use an if statement for a true else branch");
   }
 
   for (let const node : m_nodes) {

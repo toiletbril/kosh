@@ -53,6 +53,10 @@ public:
 
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
 
+  usize pipeline_stage_depth{0};
+  HashSet pipeline_lost_names{heap_allocator()};
+  HashSet external_input_names{heap_allocator()};
+
   /* The lookup is lazy, and null in a context with no live shell. */
   EvalContext *eval_context{nullptr};
 
@@ -380,6 +384,7 @@ public:
   ~CompoundListCondition() override;
 
   pure fn kind() const wontthrow -> Kind;
+  pure fn command() const wontthrow -> const Command *;
 
   /* True when the command this node holds carries a leading !, which set -e
      exempts from its exit. */
@@ -390,6 +395,7 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
@@ -451,6 +457,8 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+
+  fn as_simple_command() const wontthrow -> const SimpleCommand * override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -676,6 +684,9 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
+
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

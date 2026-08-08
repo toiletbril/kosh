@@ -37,6 +37,134 @@ cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
+static cold fn conditional_word_is_literal(const Token *token) wontthrow -> bool
+{
+  if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+  let const &word = static_cast<const tokens::WordToken *>(token)->word();
+  for (let const &segment : word.segments)
+    if (segment.kind != WordSegment::Kind::LiteralText &&
+        segment.kind != WordSegment::Kind::UnquotedText &&
+        segment.kind != WordSegment::Kind::DoubleQuotedText)
+      return false;
+  return true;
+}
+
+static cold fn conditional_word_has_glob(const Token *token) wontthrow -> bool
+{
+  if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+  let const &word = static_cast<const tokens::WordToken *>(token)->word();
+  for (let const &segment : word.segments)
+    if (segment.has_live_glob_chars() && segment.has_glob_metacharacter())
+      return true;
+  return false;
+}
+
+static cold fn conditional_word_is_numeric_literal(const Token *token) throws
+    -> bool
+{
+  if (!conditional_word_is_literal(token)) return false;
+  let const literal = token->raw_string();
+  let view = literal.view();
+  if (!view.is_empty() && (view[0] == '-' || view[0] == '+'))
+    view = view.substring(1);
+  return !view.is_empty() && view.is_all_decimal_digits();
+}
+
+static cold fn is_conditional_binary_operator(StringView op) wontthrow -> bool
+{
+  static const StringView OPERATORS[] = {
+      "=",   "==",  "!=",  "=~",  "-eq", "-ne", "-lt",
+      "-le", "-gt", "-ge", "-ef", "-nt", "-ot",
+  };
+  for (let const candidate : OPERATORS)
+    if (candidate == op) return true;
+  return false;
+}
+
+cold fn ConditionalCommand::analyze(AnalysisContext &actx,
+                                    bool is_unconditional) const throws -> void
+{
+  unused(is_unconditional);
+
+  using Kind = conditional_element::Kind;
+  for (usize i = 0; i < m_elements.count(); i++) {
+    let const &element = m_elements[i];
+    if (element.kind == Kind::Less || element.kind == Kind::Greater) {
+      let const op =
+          element.kind == Kind::Less ? StringView{"<"} : StringView{">"};
+      if ((i > 0 &&
+           conditional_word_is_numeric_literal(m_elements[i - 1].word)) ||
+          (i + 1 < m_elements.count() &&
+           conditional_word_is_numeric_literal(m_elements[i + 1].word)))
+        actx.warn(source_location(),
+                  "The " + op + " operator compares strings lexicographically",
+                  "Use an arithmetic command or a numeric -lt or -gt operator");
+      if (i > 0 && i + 1 < m_elements.count() &&
+          conditional_word_is_literal(m_elements[i - 1].word) &&
+          conditional_word_is_literal(m_elements[i + 1].word))
+        actx.warn(source_location(),
+                  "This conditional compares two constant values",
+                  "Remove the constant condition or compare runtime data");
+      continue;
+    }
+    if (element.kind != Kind::Operand || element.word == nullptr) continue;
+
+    let const operand = element.word->raw_string();
+    if (!is_conditional_binary_operator(operand.view()) &&
+        element.word->kind() == Token::Kind::Word)
+    {
+      let const &word =
+          static_cast<const tokens::WordToken *>(element.word)->word();
+      for (let const &segment : word.segments)
+        if (segment.kind == WordSegment::Kind::UnquotedText &&
+            segment.text.view().find_character('=').has_value())
+        {
+          actx.warn(element.word->source_location(),
+                    "A conditional operator needs surrounding spaces",
+                    "Place spaces around the comparison operator");
+          break;
+        }
+    }
+    if ((operand.view() == "-n" || operand.view() == "-z") &&
+        i + 1 < m_elements.count() &&
+        conditional_word_is_literal(m_elements[i + 1].word))
+      actx.warn(m_elements[i + 1].word->source_location(),
+                "The operand is literal, so this string test is constant",
+                "Test a variable or drop the check");
+
+    if ((operand.view() == "-e" || operand.view() == "-f" ||
+         operand.view() == "-d" || operand.view() == "-L") &&
+        i + 1 < m_elements.count() &&
+        conditional_word_has_glob(m_elements[i + 1].word))
+      actx.warn(m_elements[i + 1].word->source_location(),
+                "A file test on a glob checks only one expanded path",
+                "Expand the glob in a loop and test each path");
+
+    if (!is_conditional_binary_operator(operand.view()) || i == 0 ||
+        i + 1 >= m_elements.count())
+      continue;
+
+    let const left = m_elements[i - 1].word;
+    let const right = m_elements[i + 1].word;
+    if (conditional_word_is_literal(left) && conditional_word_is_literal(right))
+      actx.warn(element.word->source_location(),
+                "This conditional compares two constant values",
+                "Remove the constant condition or compare runtime data");
+
+    if (operand.view() == "=~" && right != nullptr) {
+      let const source_text =
+          analysis_source_text(actx, right->source_location());
+      if (!source_text.is_empty() &&
+          (source_text[0] == '\'' || source_text[0] == '"'))
+        actx.warn(right->source_location(),
+                  "A quoted regular expression is matched literally",
+                  "Store the expression in a variable or leave it unquoted");
+    }
+  }
+
+  actx.constant_variables.clear();
+}
+
 fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_current_location(source_location());
@@ -120,6 +248,10 @@ cold fn ArithmeticCommand::analyze(AnalysisContext &actx,
                                    bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
+  if (arithmetic_reads_external_input(actx, m_expression.view()))
+    actx.warn(source_location(),
+              "External input is evaluated as arithmetic code",
+              "Validate the value as decimal digits before arithmetic");
   /* The prepass does not parse the expression, which may assign any name, so
      every recorded constant is forgotten. */
   actx.constant_variables.clear();
@@ -201,6 +333,21 @@ cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
                                     bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
+  for (let const element : m_elements) {
+    if (element->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(element)->word();
+    for (let const &segment : word.segments)
+      if (segment.kind == WordSegment::Kind::CommandSubstitution &&
+          !segment.is_in_double_quotes)
+      {
+        actx.warn(element->source_location(),
+                  "An array built from command output splits words and "
+                  "expands globs",
+                  "Use mapfile or readarray to preserve output records");
+        break;
+      }
+  }
+
   /* The name is no longer a scalar literal, so the constant table forgets it.
    */
   actx.constant_variables.erase(m_name.view());
@@ -436,6 +583,27 @@ cold fn Subshell::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
+
+  let const end_position = source_end_position();
+  if (end_position > source_location().position + 1 &&
+      end_position <= actx.source.length)
+  {
+    let body = actx.source.substring_of_length(
+        source_location().position + 1,
+        end_position - source_location().position - 2);
+    while (!body.is_empty() &&
+           (body[0] == ' ' || body[0] == '\t' || body[0] == '\n'))
+      body = body.substring(1);
+    if (body.starts_with(StringView{"-e "}) ||
+        body.starts_with(StringView{"-f "}) ||
+        body.starts_with(StringView{"-d "}) ||
+        body.starts_with(StringView{"-n "}) ||
+        body.starts_with(StringView{"-z "}))
+      actx.warn(source_location(),
+                "Parentheses start a subshell rather than a file or string "
+                "test",
+                "Use [[ ... ]] or [ ... ] for the condition");
+  }
 
   /* An assignment in the body never changes a parent variable, so the body
      starts from an empty table and the outer constants are restored after. */

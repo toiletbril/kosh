@@ -213,6 +213,11 @@ fn CompoundListCondition::can_evaluate_in_process_substitution(
 
 pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
 
+pure fn CompoundListCondition::command() const wontthrow -> const Command *
+{
+  return m_cmd;
+}
+
 pure fn CompoundListCondition::is_negated() const wontthrow -> bool
 {
   ASSERT(m_cmd != nullptr);
@@ -1210,7 +1215,11 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
       while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
         start++;
       let const trimmed = body.substring(start);
-      if (trimmed.starts_with(StringView{"cat "}))
+      if (trimmed.starts_with(StringView{"ls "}) || trimmed == "ls")
+        actx.warn(t->source_location(),
+                  "A for loop over ls output breaks filenames at whitespace",
+                  "Iterate over a glob or read a delimited filename stream");
+      else if (trimmed.starts_with(StringView{"cat "}))
         actx.warn(t->source_location(),
                   "A for over the cat output iterates IFS-split words rather "
                   "than lines",
@@ -1220,6 +1229,25 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
                   "A for over the find output breaks a name with whitespace "
                   "apart",
                   "Use find -exec or a 'while read -r' loop over find -print0");
+    }
+
+    let const source_text = analysis_source_text(actx, t->source_location());
+    let word_is_literal = true;
+    for (let const &segment : word.segments)
+      if (segment.kind != WordSegment::Kind::LiteralText &&
+          segment.kind != WordSegment::Kind::UnquotedText &&
+          segment.kind != WordSegment::Kind::DoubleQuotedText)
+        word_is_literal = false;
+    if (source_text.length >= 2 &&
+        (source_text[0] == '\'' || source_text[0] == '"') && word_is_literal)
+    {
+      let const literal = word.to_literal_string();
+      if (literal.view().find_character('*').has_value() ||
+          literal.view().find_character('?').has_value() ||
+          literal.view().find_character('[').has_value())
+        actx.warn(t->source_location(),
+                  "A quoted for-loop glob remains one literal word",
+                  "Leave the glob unquoted so it expands into loop values");
     }
   }
 
