@@ -1,5 +1,0 @@
-#!/bin/env shit
-a() { local x=1; x=2; echo "$x"; }
-b() { declare -A m; m[k]=v; }
-c() { local s; s+=tail; }
-outer=1

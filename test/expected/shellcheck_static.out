@@ -1,0 +1,1544 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "grep" "*.txt" "file"]
+          [CompoundListCondition, None]
+            [SimpleCommand "grep" "*x" "file"]
+          [CompoundListCondition, None]
+            [ForLoop "f"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$f"]
+          [CompoundListCondition, None]
+            [ForLoop "f"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$f"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "find" "."]
+              [SimpleCommand "xargs" "echo"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "true"]
+              [SimpleCommand "echo" "discarded"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "command"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sort"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "wrapped $(echo inner)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "%s" "a $@ b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-z" "lit" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "a"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "count" "-eq" "notanumber" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "b"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$x" "=" "glob*" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "$(ls | grep x)" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [Dummy]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [Dummy]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "egrep" "pattern" "file"]
+          [CompoundListCondition, None]
+            [SimpleCommand "fgrep" "word" "file"]
+          [CompoundListCondition, None]
+            [SimpleCommand "expr" "1" "+" "2"]
+          [CompoundListCondition, None]
+            [SimpleCommand "let" "counter=counter+1"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$(date)"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ps"]
+              [SimpleCommand "grep" "init"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "grep" "conf"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "grep" "needle" "file"]
+              [SimpleCommand "wc" "-l"]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "outside=here"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$?" "-eq" "0" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "ok"]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "declared=$(date)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign x=1]
+  [CompoundListCondition, None]
+    [FunctionDefinition "g"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "y=2"]
+          [CompoundListCondition, None]
+            [Assign y=3]
+  [CompoundListCondition, None]
+    [FunctionDefinition "h"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign z=4]
+  [CompoundListCondition, None]
+    [Assign top=5]
+  [CompoundListCondition, None]
+    [FunctionDefinition "a"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "x=1"]
+          [CompoundListCondition, None]
+            [Assign x=2]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "b"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "declare" "-A" "m"]
+          [CompoundListCondition, None]
+            [Assign m[k]=v]
+  [CompoundListCondition, None]
+    [FunctionDefinition "c"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "s"]
+          [CompoundListCondition, None]
+            [Assign s+=tail]
+  [CompoundListCondition, None]
+    [Assign outer=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "1" "-eq" "2" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "a" "=" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "fmt\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "$1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s" "ok"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "--" "$1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "-r" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-f" "a" "-a" "-f" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "-z" "$x" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "-n" "$y" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "[" "!" "-a" "/nonexistent" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo hi)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "FOO=$(echo hi)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo hi)"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "cat" "data/hello-d"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "which" "sh"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "new_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [ForLoop "file"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$file"]
+          [CompoundListCondition, None]
+            [ForLoop "file"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$file"]
+          [CompoundListCondition, None]
+            [SimpleCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-name" "*.ogg"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-exec" "sh" "-c" "echo {}" ";"]
+          [CompoundListCondition, None]
+            [SimpleCommand "unset" "values[0]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "$target"]
+          [CompoundListCondition, None]
+            [ForLoop "argument"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$argument"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$*"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "%s %s\n" "one"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sudo" "echo" "protected"]
+          [CompoundListCondition, None]
+            [SimpleCommand "exec" "echo" "replaced"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "unreachable"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cd" "missing"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "wrong-directory"]
+          [CompoundListCondition, None]
+            [SimpleCommand "true"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "false"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "echo" "fallback"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "echo" "one"]
+              [SimpleCommand "read" "-r" "pipeline_value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$pipeline_value"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "{1..$limit}"]
+          [CompoundListCondition, None]
+            [SimpleCommand "tr" "[A-Z]" "[a-z]"]
+          [CompoundListCondition, None]
+            [Assign index=0]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "redirected"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "~"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-r" "number"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((number + 1))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "export" "CDPATH=.:~/project"]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "*x"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  CommandSubstitution "cat list"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "f"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  CommandSubstitution "find . -name x"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "f"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "discarded"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "out.log"
+]
+[Word
+  Unquoted "sort"
+]
+[Word
+  Unquoted "data"
+]
+[Word
+  Unquoted "data"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "wrapped "
+  CommandSubstitution "echo inner"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s"
+]
+[Word
+  DoubleQuoted "a "
+  Variable "@"
+  DoubleQuoted " b"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Unquoted "lit"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "count"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "notanumber"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  DoubleQuoted "glob*"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  CommandSubstitution "ls | grep x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "egrep"
+]
+[Word
+  Unquoted "pattern"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "fgrep"
+]
+[Word
+  Unquoted "word"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "let"
+]
+[Word
+  Unquoted "counter=counter+1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "date"
+]
+[Word
+  Unquoted "ps"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "init"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "conf"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "needle"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "outside=here"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "ok"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "declared="
+  CommandSubstitution "date"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "y=2"
+]
+[Word
+  Unquoted "y=3"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "h"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "z=4"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "top=5"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "x=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "m"
+]
+[Word
+  Unquoted "m[k]=v"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "s"
+]
+[Word
+  Unquoted "s+=tail"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "outer=1"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Literal "fmt\n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s"
+]
+[Word
+  Unquoted "ok"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "/nonexistent"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "FOO="
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "data/hello-d"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "which"
+]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "new_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  CommandSubstitution "ls *.mp3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  DoubleQuoted "*.mp3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "file"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "files="
+]
+[Word
+  CommandSubstitution "printf '%s\n' one two"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-name"
+]
+[Word
+  Unquoted "*.ogg"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-exec"
+]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "echo {}"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "values[0]"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Variable "target"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "argument"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "*"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "argument"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "*"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s %s\n"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "protected"
+]
+[Word
+  Unquoted "output"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "replaced"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreachable"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "missing"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "wrong-directory"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "fallback"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "pipeline_value"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "pipeline_value"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "value"
+]
+[Word
+  Unquoted "=~"
+]
+[Word
+  Literal "v.*"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+  Unquoted "="
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "literal"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "{1.."
+  Variable "limit"
+  Unquoted "}"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "[A-Z]"
+]
+[Word
+  Unquoted "[a-z]"
+]
+[Word
+  Unquoted "index=0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "redirected"
+]
+[Word
+  DoubleQuoted "file"
+  ArithmeticExpansion "index++"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "~"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "$value"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "number"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "number + 1"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "CDPATH=.:~/project"
+]
+[Word
+  Unquoted "}"
+]
+shit: 3:8: warning: The unquoted grep pattern can glob against the local files before grep sees it.
+     3 |    grep *.txt file
+       |         ^~~~~
+note: Quote the pattern.
+shit: 4:8: warning: A grep reads a regular expression, where a leading * has nothing to repeat, this pattern looks like a glob.
+     4 |    grep '*x' file
+       |         ^~~~
+shit: 5:12: warning: A for over the cat output iterates IFS-split words rather than lines.
+     5 |    for f in $(cat list); do echo "$f"; done
+       |             ^~~~~~~~~~~
+note: Read the lines with 'while IFS= read -r line' instead.
+shit: 6:12: warning: A for over the find output breaks a name with whitespace apart.
+     6 |    for f in $(find . -name x); do echo "$f"; done
+       |             ^~~~~~~~~~~~~~~~~
+note: Use find -exec or a 'while read -r' loop over find -print0.
+shit: 7:12: warning: An xargs splits the find output on whitespace and quotes.
+     7 |    find . | xargs echo
+       |             ^~~~~
+note: Pair find -print0 with xargs -0 or use find -exec.
+shit: 8:10: warning: The pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.
+     8 |    true | echo discarded
+       |           ^~~~
+shit: 13:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
+    13 |    command 2>&1 > out.log
+       |                   ^~~~~~~
+note: Put the file redirect first as in '>file 2>&1'.
+shit: 14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
+    14 |    sort < data > data
+       |                  ^~~~
+note: Write to a temporary and move it over.
+shit: 15:8: warning: A command substitution wraps a useless echo.
+    15 |    echo "wrapped $(echo inner)"
+       |         ^~~~~~~~~~~~~~~~~~~~~~~
+note: The text can be used directly without the subshell.
+shit: 16:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument.
+    16 |    printf '%s' "a $@ b"
+       |                ^~~~~~~~
+note: Use $* for one joined string or a separate "$@" word.
+shit: 21:8: warning: The operand is a literal, so this -z test is constant.
+    21 |    [ -z lit ] && echo a
+       |         ^~~
+note: Test a variable or drop the check.
+shit: 22:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
+    22 |    [ count -eq notanumber ] && echo b
+       |      ^~~~~
+shit: 22:15: warning: The numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
+    22 |    [ count -eq notanumber ] && echo b
+       |                ^~~~~~~~~~
+shit: 23:12: warning: [ and test compare strings byte for byte and never glob-match.
+    23 |    [ "$x" = "glob*" ] && echo c
+       |             ^~~~~~~
+note: Use a case or the [[ ]] form for the pattern.
+shit: 24:8: warning: The test buffers the whole grep output only to check it is nonempty.
+    24 |    [ -n "$(ls | grep x)" ] && echo d
+       |         ^~~~~~~~~~~~~~~~
+note: Run grep -q directly and test its exit status.
+shit: 28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+    28 |  case a in a) ;; esac
+       |       ^
+shit: 34:3: warning: The egrep command is deprecated.
+    34 |    egrep pattern file
+       |    ^~~~~
+note: Use grep -E for the extended regular expression match.
+shit: 35:3: warning: The fgrep command is deprecated.
+    35 |    fgrep word file
+       |    ^~~~~
+note: Use grep -F for the fixed string match.
+shit: 36:3: warning: An expr forks for arithmetic the shell does natively.
+    36 |    expr 1 + 2
+       |    ^~~~
+note: Use $((...)) for the calculation.
+shit: 38:3: warning: An echo of a command substitution prints what the command already prints.
+    38 |    echo "$(date)"
+       |    ^~~~
+note: Run the command on its own instead.
+shit: 39:8: warning: Grepping the ps output races the process table and matches the grep itself.
+    39 |    ps | grep init
+       |         ^~~~
+note: Use pgrep to match a process by name.
+shit: 40:8: warning: Grepping the ls listing mangles a name with a space or a newline.
+    40 |    ls | grep conf
+       |         ^~~~
+note: Match the names with a glob or with find instead.
+shit: 41:3: warning: Counting grep output with wc -l runs an extra process.
+    41 |    grep needle file | wc -l
+       |    ^~~~
+note: Use grep -c to count the matching lines directly.
+shit: 43:5: warning: A test reads an unquoted variable.
+    43 |    [ $? -eq 0 ] && echo ok
+       |      ^~
+note: Quote it to avoid an empty or split argument.
+shit: 43:5: warning: Testing $? checks the exit status indirectly.
+    43 |    [ $? -eq 0 ] && echo ok
+       |      ^~
+note: Test the command directly with if or && so an intervening command cannot clobber the status.
+shit: 44:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
+    44 |    local declared=$(date)
+       |          ^~~~~~~~~~~~~~~~
+note: Split the declaration and the assignment so a failure is seen.
+shit: 48:7: warning: This assignment to 'x' in a function has no local, so the value leaks to the global scope.
+    48 |  f() { x=1; }
+       |        ^~~
+note: Declare it with local to keep it inside the function.
+shit: 50:7: warning: This assignment to 'z' in a function has no local, so the value leaks to the global scope.
+    50 |  h() { z=4; }
+       |        ^~~
+note: Declare it with local to keep it inside the function.
+shit: 58:3: warning: A negated -eq is just -ne.
+    58 |  [ ! 1 -eq 2 ]
+       |    ^
+note: Drop the ! and use -ne.
+shit: 59:3: warning: A negated = is just !=.
+    59 |  [ ! a = b ]
+       |    ^
+note: Drop the ! and use !=.
+shit: 62:8: warning: The printf format comes from a variable, the data can inject format directives.
+    62 |  printf "$1"
+       |         ^~~~
+note: Use printf '%s' to print it.
+shit: 64:11: warning: The printf format comes from a variable, the data can inject format directives.
+    64 |  printf -- "$1"
+       |            ^~~~
+note: Use printf '%s' to print it.
+shit: 66:1: warning: A read without -r mangles a backslash in the input.
+    66 |  read x < /dev/null
+       |  ^~~~~~
+note: Add -r to read the line literally.
+shit: 69:8: warning: A test with -a or -o is obsolescent.
+    69 |  [ -f a -a -f b ]
+       |         ^~
+note: Join two tests with && or || instead.
+shit: 70:3: warning: A negated -z is just -n.
+    70 |  [ ! -z "$x" ]
+       |    ^
+note: Test with -n instead.
+shit: 71:3: warning: A negated -n is just -z.
+    71 |  [ ! -n "$y" ]
+       |    ^
+note: Test with -z instead.
+shit: 74:1: warning: An echo of a command substitution prints what the command already prints.
+    74 |  echo $(echo hi)
+       |  ^~~~
+note: Run the command on its own instead.
+shit: 74:6: warning: An unquoted command substitution splits its output.
+    74 |  echo $(echo hi)
+       |       ^~~~~~~~~~
+note: Quote it to keep one argument.
+shit: 74:6: warning: A command substitution wraps a useless echo.
+    74 |  echo $(echo hi)
+       |       ^~~~~~~~~~
+note: The text can be used directly without the subshell.
+shit: 75:8: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
+    75 |  export FOO=$(echo hi)
+       |         ^~~~~~~~~~~~~~
+note: Split the declaration and the assignment so a failure is seen.
+shit: 76:1: warning: An echo of a command substitution prints what the command already prints.
+    76 |  echo "$(echo hi)"
+       |  ^~~~
+note: Run the command on its own instead.
+shit: 76:6: warning: A command substitution wraps a useless echo.
+    76 |  echo "$(echo hi)"
+       |       ^~~~~~~~~~~~
+note: The text can be used directly without the subshell.
+shit: 78:1: warning: A useless cat.
+    78 |  cat data/hello-d | cat
+       |  ^~~
+note: Give the file to the next command directly instead of piping cat.
+shit: 89:3: warning: A read without -r mangles a backslash in the input.
+    89 |    read $target
+       |    ^~~~~~~~~~~~
+note: Add -r to read the line literally.
+shit: 107:3: warning: This assignment to 'index' in a function has no local, so the value leaks to the global scope.
+   107 |    index=0
+       |    ^~~~~~~
+note: Declare it with local to keep it inside the function.
+done
+done
+done
+done
+fmt
+okfmt
+hi
+hi
+[Code 0]

@@ -1,8 +1,0 @@
-#!/bin/env shit
-lint_only() {
-  [ -z lit ] && echo a
-  [ count -eq notanumber ] && echo b
-  [ "$x" = "glob*" ] && echo c
-  [ -n "$(ls | grep x)" ] && echo d
-}
-echo done

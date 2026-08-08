@@ -1,3 +1,0 @@
-#!/bin/env shit
-[ ! 1 -eq 2 ]
-[ ! a = b ]

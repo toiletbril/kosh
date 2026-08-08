@@ -1,4 +1,0 @@
-#!/bin/env shit
-echo $(echo hi)
-export FOO=$(echo hi)
-echo "$(echo hi)"

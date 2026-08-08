@@ -1,8 +1,0 @@
-#!/bin/env shit
-lint_only() {
-  command 2>&1 > out.log
-  sort < data > data
-  echo "wrapped $(echo inner)"
-  printf '%s' "a $@ b"
-}
-echo done

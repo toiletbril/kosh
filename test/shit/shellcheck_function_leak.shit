@@ -1,5 +1,0 @@
-#!/bin/env shit
-f() { x=1; }
-g() { local y=2; y=3; }
-h() { z=4; }
-top=5
