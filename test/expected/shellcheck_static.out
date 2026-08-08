@@ -194,6 +194,8 @@
   [CompoundListCondition, None]
     [SimpleCommand "which" "sh"]
   [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "sudo"]
+  [CompoundListCondition, None]
     [FunctionDefinition "new_diagnostics"]
       [BraceGroup]
         [CompoundList]
@@ -986,6 +988,24 @@
 ]
 [Word
   Unquoted "sh"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "sudo"
 ]
 [Word
   Unquoted "/dev/null"
