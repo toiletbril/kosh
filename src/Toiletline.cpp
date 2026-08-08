@@ -426,21 +426,6 @@ fn history_clear() -> bool
 
 static fn strip_ansi_color(StringView text) throws -> String;
 
-fn set_title(const String &title) -> void
-{
-  let const stripped = strip_ansi_color(title.view());
-  let const view = stripped.view();
-  let sanitized = String{shit::heap_allocator()};
-  for (usize i = 0; i < view.length; i++) {
-    let const byte = static_cast<unsigned char>(view[i]);
-    if (byte >= 0x20 && byte != 0x7f) {
-      sanitized.push(view[i]);
-    }
-  }
-
-  ::tl_set_title(sanitized.c_str());
-}
-
 fn enable_completion(shit::EvalContext &context) -> void
 {
   COMPLETION_CONTEXT = &context;
@@ -1135,9 +1120,6 @@ fn expand_prompt_template(StringView prompt, EvalContext &context) throws
 
 fn build_prompt(EvalContext &context) -> String
 {
-  let const full_pwd = Path::current_directory().text().clone();
-  set_title("shit @ " + full_pwd);
-
   /* The user is stable for the session, so it is resolved once and reused. */
   static String CACHED_USER{shit::heap_allocator()};
   static bool was_user_resolved = false;
@@ -1255,8 +1237,6 @@ struct input_result
   i32 code;
   String text;
 };
-
-fn set_title(const String &title) -> void { unused(title); }
 
 fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
 

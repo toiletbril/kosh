@@ -6,11 +6,12 @@ trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 probe="$d/stopped.bash"
 printf '%s\n' '#!/bin/bash' \
     'kill -STOP "$BASHPID"' \
+    'echo FG_READY' \
     'read value' \
     'echo "FG_READ:$value"' > "$probe"
 chmod +x "$probe"
 
-printf 'printf ready > "%s"\n' "$d/ready" > "$d/rc"
+printf 'printf ready > "%s"\nPS1="HANDOFF_PROMPT"\n' "$d/ready" > "$d/rc"
 
 wait_for_transcript()
 {
@@ -45,17 +46,19 @@ send_input()
         sleep 0.01
         attempt_count=$((attempt_count + 1))
     done
-    wait_for_transcript_count ']0;shit @' 1 || return 1
+    wait_for_transcript_count 'HANDOFF_PROMPT' 1 || return 1
+    printf 'set --mood shit\n'
+    wait_for_transcript_count 'HANDOFF_PROMPT' 2 || return 1
     printf 'stty tostop\n'
-    wait_for_transcript_count ']0;shit @' 2 || return 1
+    wait_for_transcript_count 'HANDOFF_PROMPT' 3 || return 1
     printf '%s\n' "$probe"
     wait_for_transcript 'Stopped' || return 1
-    wait_for_transcript_count ']0;shit @' 3 || return 1
+    wait_for_transcript_count 'HANDOFF_PROMPT' 4 || return 1
     printf 'fg\n'
-    wait_for_transcript ']0;fg' || return 1
+    wait_for_transcript 'FG_READY' || return 1
     printf 'terminal-value\n'
     wait_for_transcript 'FG_READ:terminal-value' || return 1
-    wait_for_transcript_count ']0;shit @' 4 || return 1
+    wait_for_transcript_count 'HANDOFF_PROMPT' 5 || return 1
     printf 'exit\n'
 }
 
@@ -77,7 +80,12 @@ if grep -q 'fg will give the terminal.*before it resumes job' "$d/log"; then
     ordering=passed
 fi
 
-case "$ordering:$output" in
-    passed:*FG_READ:terminal-value*) echo passed ;;
+title_output=absent
+if grep -aF ']0;' "$d/typescript" >/dev/null 2>&1; then
+    title_output=present
+fi
+
+case "$ordering:$title_output:$output" in
+    passed:absent:*FG_READ:terminal-value*) echo passed ;;
     *) grep 'fg ' "$d/log"; printf '%s\n' "$output"; echo failed ;;
 esac

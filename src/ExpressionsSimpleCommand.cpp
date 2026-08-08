@@ -11,7 +11,6 @@
 #include "Optimizer.hpp"
 #include "Platform.hpp"
 #include "Shitbox.hpp"
-#include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -1351,9 +1350,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     SET_AND_RETURN_EXIT_STATUS(cxt, function_ret);
   }
-
-  if (cxt.should_retitle_for_command())
-    toiletline::set_title(utils::merge_args_to_string(program_args));
 
   /* $_ reads the last argument of the previous command, captured here before
      the argument vector moves into the exec context. */

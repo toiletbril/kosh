@@ -1397,8 +1397,6 @@ public:
      command replaces the shell process instead of fork and wait. */
   fn set_terminal_exec_allowed(bool enabled) wontthrow -> void;
 
-  /* Whether a completion function is evaluating right now. The terminal retitle
-     reads it so a tab press never renames the window. */
   fn set_completion_function_running(bool running) wontthrow -> void
   {
     m_is_completion_function_running = running;
@@ -1418,14 +1416,6 @@ public:
   pure fn is_in_pipeline_stage() const wontthrow -> bool
   {
     return m_is_in_pipeline_stage;
-  }
-  /* Whether a dispatched command may retitle the window. Only a command the
-     user submitted at an interactive prompt qualifies, never a startup file,
-     an in-process subshell or substitution, or a completion-time run. */
-  pure fn should_retitle_for_command() const wontthrow -> bool
-  {
-    return shell_is_interactive() && startup_finished() && !in_subshell() &&
-           !is_completion_function_running();
   }
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
@@ -1583,8 +1573,6 @@ public:
   pure fn should_echo_expanded() const wontthrow -> bool;
   pure fn shell_is_interactive() const wontthrow -> bool;
 
-  /* False until the startup profile and rc files finish sourcing, so the
-     per-command terminal title is quiet while they run. */
   pure fn startup_finished() const wontthrow -> bool
   {
     return m_startup_finished;

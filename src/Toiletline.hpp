@@ -13,8 +13,6 @@ namespace toiletline {
 using shit::String;
 using shit::StringView;
 
-void set_title(const String &title);
-
 String default_prompt_template();
 
 String build_prompt(shit::EvalContext &context);
