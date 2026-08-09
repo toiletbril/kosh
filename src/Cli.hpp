@@ -166,14 +166,16 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const Flag *operand_value_flag = nullptr,
                    const ArrayList<SourceLocation> *arg_locations = nullptr,
                    ArrayList<SourceLocation> *operand_locations = nullptr,
-                   StringView program_name = StringView{}) throws
+                   StringView program_name = StringView{},
+                   bool should_accept_negative_number_operand = false) throws
     -> ArrayList<String>;
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv, usize base_position = 0,
                const Flag *operand_value_flag = nullptr,
                const ArrayList<SourceLocation> *arg_locations = nullptr,
                ArrayList<SourceLocation> *operand_locations = nullptr,
-               StringView program_name = StringView{}) throws
+               StringView program_name = StringView{},
+               bool should_accept_negative_number_operand = false) throws
     -> ArrayList<String>;
 
 fn join_command_line(int argc, const char *const *argv) throws -> String;

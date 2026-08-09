@@ -358,7 +358,8 @@ static fn run_script_contents(const String &script_contents,
                               EvalContext &context, BumpArena &ast_arena,
                               Maybe<StringView> filename = None,
                               Expression *precompiled_ast = nullptr,
-                              Expression **out_ast = nullptr) -> int
+                              Expression **out_ast = nullptr,
+                              Maybe<usize> history_event_number = None) -> int
 {
   i32 exit_code = EXIT_FAILURE;
 
@@ -460,6 +461,13 @@ static fn run_script_contents(const String &script_contents,
       exit_code = EXIT_SUCCESS;
     } else {
       LOG(Debug, "evaluating the chunk");
+      let const previous_history_event_number =
+          context.current_history_event_number();
+      context.set_current_history_event_number(history_event_number);
+      defer
+      {
+        context.set_current_history_event_number(previous_history_event_number);
+      };
       context.set_current_source(&script_contents, "the script");
       const auto command_start_ns = shit::os::monotonic_nanos();
       exit_code = static_cast<int>(ast->evaluate(context));
@@ -1356,6 +1364,7 @@ fn main(int argc, char **argv) -> int
 
   bool should_quit = FLAG_ONE_COMMAND.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
+  shit::Maybe<usize> history_event_number = shit::None;
 
   /* The path map is reset rather than seeded here, since the eager scan pays
      off only in interactive mode. */
@@ -1610,7 +1619,8 @@ fn main(int argc, char **argv) -> int
 
         loop
         {
-          let[code, input] = toiletline::get_input(prompt);
+          let[code, input, accepted_history_event_number] =
+              toiletline::get_input(prompt);
 
           switch (code) {
           case TL_PRESSED_TAB:
@@ -1651,6 +1661,7 @@ fn main(int argc, char **argv) -> int
 
           if (code == TL_PRESSED_ENTER && !input.is_empty()) {
             script_contents = steal(input);
+            history_event_number = accepted_history_event_number;
             break;
           }
         }
@@ -1716,7 +1727,8 @@ fn main(int argc, char **argv) -> int
 
     script_contents.normalize_crlf_line_endings();
     exit_code = run_script_contents(script_contents, context, ast_arena,
-                                    source_filename);
+                                    source_filename, nullptr, nullptr,
+                                    history_event_number);
 
     /* A child process reaches here when its exec() failed and printed the error
        itself. */

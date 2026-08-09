@@ -23,3 +23,5 @@ echo "== shopt names by prefix:"
 "$BIN" --debug-complete-at 'shopt glob' </dev/null
 echo "== read flags:"
 "$BIN" --debug-complete-at 'read -' </dev/null
+echo "== fc flags:"
+"$BIN" --debug-complete-at 'fc -' </dev/null

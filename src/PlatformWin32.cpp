@@ -2139,6 +2139,57 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return handle;
 }
 
+fn write_to_named_temp_file(const Path &directory, StringView prefix,
+                            StringView content) -> Maybe<Path>
+{
+  if (prefix.find_character('\\').has_value() ||
+      prefix.find_character('/').has_value())
+  {
+    return None;
+  }
+
+  let prefix_text = String{
+      prefix.substring_of_length(0, prefix.length < 3 ? prefix.length : 3)};
+  while (prefix_text.count() < 3)
+    prefix_text.push('x');
+
+  char temp_path[MAX_PATH];
+  HANDLE handle = INVALID_HANDLE_VALUE;
+  for (u32 attempt = 1; attempt <= 256; attempt++) {
+    let unique = static_cast<UINT>(
+        (GetCurrentProcessId() ^ GetTickCount() ^ attempt) & 0xffffU);
+    if (unique == 0) unique = 1;
+    if (GetTempFileNameA(directory.c_str(), prefix_text.c_str(), unique,
+                         temp_path) == 0)
+    {
+      continue;
+    }
+    handle = CreateFileA(temp_path, GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                         FILE_ATTRIBUTE_TEMPORARY, nullptr);
+    if (handle != INVALID_HANDLE_VALUE) break;
+  }
+  if (handle == INVALID_HANDLE_VALUE) return None;
+
+  usize written_size = 0;
+  while (written_size < content.count()) {
+    let const written = write_fd(handle, content.data + written_size,
+                                 content.count() - written_size);
+    if (!written.has_value() || *written == 0) {
+      unused(close_fd(handle));
+      unused(DeleteFileA(temp_path));
+      return None;
+    }
+    written_size += *written;
+  }
+
+  if (!close_fd(handle)) {
+    unused(DeleteFileA(temp_path));
+    return None;
+  }
+
+  return Path{StringView{temp_path}};
+}
+
 fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
 {
   unused(was_stopped);

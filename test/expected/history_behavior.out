@@ -33,4 +33,5 @@ cleared
 == history -r on a missing file errors:
 rc=1
 recall ok
+fc replacement ok
 search casefold ok

@@ -364,13 +364,15 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 fn EvalContext::run_source(StringView source, StringView origin,
                            return_handling handling,
                            Maybe<SourceLocation> call_site,
-                           Maybe<StringView> filename) throws -> i32
+                           Maybe<StringView> filename,
+                           bool should_record_history) throws -> i32
 {
   let normalized_source = String{source};
   normalized_source.normalize_crlf_line_endings();
   source = normalized_source.view();
 
   let const consume_return = handling == return_handling::Consume;
+  let const reject_return = handling == return_handling::Reject;
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
   LOG(Debug, "running source '%.*s' of %zu bytes at depth %zu",
@@ -395,8 +397,10 @@ fn EvalContext::run_source(StringView source, StringView origin,
   let const frame_is_sourced_file =
       filename.has_value() && !filename->is_empty();
   if (frame_is_sourced_file) m_sourced_file_frames++;
+  if (reject_return) m_rejected_return_source_frames++;
   defer
   {
+    if (reject_return) m_rejected_return_source_frames--;
     if (frame_is_sourced_file) m_sourced_file_frames--;
     m_source_frames.pop_back();
   };
@@ -426,6 +430,18 @@ fn EvalContext::run_source(StringView source, StringView origin,
     let const retained_source = new String{steal(normalized_source)};
     m_retained_sources.push(retained_source);
     source = retained_source->view();
+
+    let const previous_history_recording_root = m_history_recording_root;
+    let const previous_history_recording_source = m_history_recording_source;
+    if (should_record_history) {
+      m_history_recording_root = ast;
+      m_history_recording_source = source;
+    }
+    defer
+    {
+      m_history_recording_root = previous_history_recording_root;
+      m_history_recording_source = previous_history_recording_source;
+    };
 
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;

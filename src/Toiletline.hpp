@@ -1,3 +1,4 @@
+#include "ArrayList.hpp"
 #include "Common.hpp"
 #include "Path.hpp"
 #include "String.hpp"
@@ -36,6 +37,17 @@ bool history_write();
 bool history_read();
 bool history_clear();
 
+struct history_event
+{
+  usize number;
+  String command;
+};
+
+shit::ArrayList<history_event> history_events(shit::Allocator allocator);
+shit::Maybe<usize> history_append_event(StringView command);
+bool history_rewrite_event(usize number, StringView expected,
+                           StringView replacement);
+
 void enable_job_notifications(shit::EvalContext &context);
 
 void set_ghost_enabled(bool enabled);
@@ -73,6 +85,7 @@ struct input_result
 {
   i32 code;
   String text{shit::heap_allocator()};
+  shit::Maybe<usize> history_event_number{shit::None};
 };
 
 input_result get_input(const String &prompt);

@@ -1761,6 +1761,44 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   return fd;
 }
 
+fn write_to_named_temp_file(const Path &directory, StringView prefix,
+                            StringView content) throws -> Maybe<Path>
+{
+  if (prefix.find_character('/').has_value()) return None;
+  let file_name = String{heap_allocator(), prefix};
+  file_name += "_XXXXXX";
+  let const path_template_path =
+      PathBuilder{directory.text()}.append(file_name).build();
+  let path_template = ArrayList<char>{heap_allocator()};
+  path_template.reserve(path_template_path.count() + 1);
+  for (usize index = 0; index < path_template_path.count(); index++)
+    path_template.push(path_template_path.c_str()[index]);
+  path_template.push('\0');
+
+  const int fd = ::mkstemp(path_template.begin());
+  if (fd < 0) return None;
+
+  usize written_size = 0;
+  while (written_size < content.count()) {
+    let const written = ::write(fd, content.data + written_size,
+                                content.count() - written_size);
+    if (written < 0 && errno == EINTR) continue;
+    if (written <= 0) {
+      unused(::close(fd));
+      unused(::unlink(path_template.begin()));
+      return None;
+    }
+    written_size += static_cast<usize>(written);
+  }
+
+  if (::close(fd) != 0) {
+    unused(::unlink(path_template.begin()));
+    return None;
+  }
+
+  return Path{StringView{path_template.begin()}};
+}
+
 fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
 {
   ASSERT(pid >= 0);

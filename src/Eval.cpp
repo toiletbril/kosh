@@ -1320,6 +1320,18 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
   return m_current_origin;
 }
 
+fn EvalContext::set_current_history_event_number(Maybe<usize> number) wontthrow
+    -> void
+{
+  m_current_history_event_number = number;
+}
+
+pure fn EvalContext::current_history_event_number() const wontthrow
+    -> Maybe<usize>
+{
+  return m_current_history_event_number;
+}
+
 fn EvalContext::push_root_source_frame(const String *parent_source,
                                        SourceLocation call_site,
                                        bool is_only_root_source) throws -> void

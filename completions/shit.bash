@@ -112,6 +112,22 @@ force-diagnostics show-stats no-diagnostics show-memory login rcfile"
 
 complete -F _shit_set_complete set
 
+_shit_fc_complete()
+{
+    local current_word=${COMP_WORDS[COMP_CWORD]}
+    local previous_word=${COMP_WORDS[COMP_CWORD - 1]}
+    local switches="--help -e -l -n -r -s"
+
+    if [[ $previous_word == -e ]]; then
+        COMPREPLY=( $(compgen -c -- "$current_word") )
+        return
+    fi
+
+    COMPREPLY=( $(compgen -W "$switches" -- "$current_word") )
+}
+
+complete -F _shit_fc_complete fc
+
 _shitbox_utils="basename calc cat cp dirname du env find flock grep head killall ln \
 ls make mkdir mv nproc pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
 uniq unlink wc which whoami yes"

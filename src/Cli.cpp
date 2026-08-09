@@ -196,7 +196,9 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const Flag *operand_value_flag,
                    const ArrayList<SourceLocation> *arg_locations,
                    ArrayList<SourceLocation> *operand_locations,
-                   StringView program_name) throws -> ArrayList<String>
+                   StringView program_name,
+                   bool should_accept_negative_number_operand) throws
+    -> ArrayList<String>
 {
   let os_argv = ArrayList<const char *>{heap_allocator()};
   os_argv.reserve(args.count());
@@ -206,7 +208,8 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
 
   return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
                      base_position, operand_value_flag, arg_locations,
-                     operand_locations, program_name);
+                     operand_locations, program_name,
+                     should_accept_negative_number_operand);
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -262,7 +265,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const Flag *operand_value_flag,
                const ArrayList<SourceLocation> *arg_locations,
                ArrayList<SourceLocation> *operand_locations,
-               StringView program_name) throws -> ArrayList<String>
+               StringView program_name,
+               bool should_accept_negative_number_operand) throws
+    -> ArrayList<String>
 {
   ASSERT(argc >= 0);
 
@@ -339,7 +344,13 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
     /* argv[0] is the invocation name even when it opens with a dash, the login
        convention that spawns a shell as -bash, so it is never a flag bundle. */
-    if (should_ignore_rest || argv[i][0] != '-' || i == 0) {
+    let const argument = StringView{argv[i]};
+    let const is_negative_number_operand =
+        should_accept_negative_number_operand && argument.length > 1 &&
+        argument[0] == '-' && argument.substring(1).is_all_decimal_digits();
+    if (should_ignore_rest || argv[i][0] != '-' || i == 0 ||
+        is_negative_number_operand)
+    {
       /* The next operand is the script, after which every argument is a
          positional parameter for the script, the way `sh script -x` does. */
       const bool is_program_name = args.is_empty();

@@ -342,6 +342,8 @@ fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>;
 fn release_process_lock(descriptor lock) wontthrow -> void;
 
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
+fn write_to_named_temp_file(const Path &directory, StringView prefix,
+                            StringView content) throws -> Maybe<Path>;
 
 /* On a platform that leaves no temp file, such as POSIX, it holds nothing. */
 class TempFileSet

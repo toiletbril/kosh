@@ -47,6 +47,7 @@ enum class return_handling : u8
 {
   Propagate,
   Consume,
+  Reject,
 };
 
 enum class restricted_path_use : u8
@@ -908,9 +909,10 @@ public:
   }
   pure fn is_script_run() const wontthrow -> bool { return m_is_script_run; }
   pure fn in_function_scope() const wontthrow -> bool;
-  /* True while a dot-source or eval run is on the stack, so return knows it has
-     a sourced file to return from even outside a function. */
-  pure fn is_sourcing() const wontthrow -> bool { return m_source_depth > 0; }
+  pure fn is_sourcing() const wontthrow -> bool
+  {
+    return m_source_depth > m_rejected_return_source_frames;
+  }
   fn push_root_source_frame(const String *parent_source,
                             SourceLocation call_site,
                             bool is_only_root_source) throws -> void;
@@ -957,6 +959,14 @@ public:
   fn set_current_source(const String *source, String origin) wontthrow -> void;
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
+  fn set_current_history_event_number(Maybe<usize> number) wontthrow -> void;
+  pure fn current_history_event_number() const wontthrow -> Maybe<usize>;
+  pure fn history_recording_source_for(const Expression *root) const wontthrow
+      -> Maybe<StringView>
+  {
+    if (root != m_history_recording_root) return None;
+    return m_history_recording_source;
+  }
   /* A frame at error_location is dropped. */
   fn print_source_backtrace(Maybe<SourceLocation> error_location = None) throws
       -> void;
@@ -1518,7 +1528,8 @@ public:
   fn run_source(StringView source, StringView origin = "a sourced command",
                 return_handling handling = return_handling::Consume,
                 Maybe<SourceLocation> call_site = None,
-                Maybe<StringView> filename = None) throws -> i32;
+                Maybe<StringView> filename = None,
+                bool should_record_history = false) throws -> i32;
 
   /* Each throws a located error past the recursion cap. */
   fn enter_source(SourceLocation location) throws -> void;
@@ -1772,6 +1783,7 @@ protected:
      bounded so a runaway recursion errors with a located message rather than
      growing the native stack until the process is killed. */
   usize m_source_depth{0};
+  usize m_rejected_return_source_frames{0};
   usize m_function_call_depth{0};
   usize m_substitution_depth{0};
   usize m_parameter_expansion_depth{0};
@@ -1785,6 +1797,9 @@ protected:
   /* The source and name of the text being evaluated, for caret formatting. */
   const String *m_current_source{nullptr};
   String m_current_origin{heap_allocator()};
+  Maybe<usize> m_current_history_event_number{None};
+  const Expression *m_history_recording_root{nullptr};
+  StringView m_history_recording_source{};
 
   /* The location in m_current_source of the command being evaluated, read by
      $LINENO for its line and by the runtime warnings for their caret. The whole

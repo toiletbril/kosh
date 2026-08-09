@@ -64,3 +64,19 @@ rm -f "$file"
 trap 'echo caught' INT
 echo "p=$(trap -p INT)"
 echo "bare=$(trap -p TERM)"
+
+fc_file=$(mktemp)
+printf 'echo alpha\necho old-old\nfalse\n' > "$fc_file"
+history -c
+history -r "$fc_file"
+fc -ln -3 -1
+fc -lrn -3 -1
+fc -s old=new echo
+echo "fc-substitute=$?"
+fc -ln
+history -c
+history -r "$fc_file"
+fc -ln 3 3
+fc -e - false
+echo "fc-status=$?"
+rm -f "$fc_file"

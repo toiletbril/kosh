@@ -323,6 +323,13 @@ Missing paths retain the first unavailable component for the diagnostic span.
 
 ### Builtins and utilities
 
+The fc builtin reads decoded events from SHIT_HISTORY. The accepted interactive
+event number is retained on EvalContext, so ordinary selection excludes the
+active fc command. Listing keeps that event. Execution and editing replace it
+with the command that is run. Edited commands run in the current shell after a
+named temporary file is removed. The editor is selected from an explicit
+option, FCEDIT, EDITOR, and the mood default in that order.
+
 The assimilate transaction copies the running executable through scp. The
 remote transaction uses explicit shitbox utilities. The remote login shell must
 be POSIX-compatible and able to start the transferred executable.

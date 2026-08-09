@@ -639,6 +639,7 @@ follow the active compatibility mood unless a difference is stated here.
 .BR exit ,
 .BR export ,
 .BR false ,
+.BR fc ,
 .BR fg ,
 .BR getopts ,
 .BR history ,
@@ -774,6 +775,34 @@ option reads the history file. The
 option writes it. The
 .B \-c
 option clears the stored history.
+.TP
+.B "fc [\-e editor] [\-lnr] [first [last]]"
+The selected history events are edited and executed in the current shell. A
+decimal selector names an event number. A negative selector is relative to the
+current history position. A text selector finds the newest event with that
+prefix. The first and last selectors form an inclusive range. Without
+selectors, editing selects the previous event.
+.PP
+The
+.B \-l
+option lists events without executing them. A list without selectors contains
+up to the previous sixteen events. The
+.B \-n
+option omits event numbers, and the
+.B \-r
+option reverses the selected order.
+.PP
+The editor is selected by
+.B \-e
+and then by FCEDIT and EDITOR. The default is vi, or ed in POSIX mood. A dash
+as the editor skips editing and executes the selected event. The editor receives
+the temporary file path as its final argument.
+.PP
+The form
+.B "fc \-s [old=new ...] [command]"
+selects one event and applies each literal replacement in order. The result is
+printed to standard error and executed. The active fc event is replaced by the
+executed command. The return status is the status of the executed command.
 .TP
 .B bind
 Flags and operands are accepted without changing key bindings. The builtin
@@ -1172,6 +1201,11 @@ The value supplies default command-line options.
 .TP
 .B SHIT_HISTORY
 The value names the command history file. The default is ~/.shit_history.
+.TP
+.BR FCEDIT ", " EDITOR
+These variables select the editor used by
+.BR fc .
+FCEDIT takes precedence over EDITOR.
 .TP
 .B SHIT_DIRECTORY_HISTORY
 The value names the z frecency store. The default is

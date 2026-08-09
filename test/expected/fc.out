@@ -1,0 +1,1050 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign d=$TEST_TEMP_DIRECTORY/fc]
+  [CompoundListCondition, None]
+    [SimpleCommand "shitbox" "mkdir" "-p" "$d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "SHIT_HISTORY=$d/history"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "seed_fc_history"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "history" "-c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "echo alpha\necho old-old\nfalse\n"]
+          [CompoundListCondition, None]
+            [SimpleCommand "history" "-r" "$d/seed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== list ranges and order =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln" "-3" "-1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-lrn" "-3" "-1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln" "1" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln" "3" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln" "3" "1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-lrn" "3" "1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln" "--" "-1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== execute and substitute =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s" "old=new" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s" "old=middle" "middle=new" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-e" "-" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s" "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "write_explicit_fc"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "edited_value=explicit\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "write_fcedit_fc"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "edited_value=fcedit\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "write_editor_fc"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "edited_value=editor\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "vi"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "edited_value=vi\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "ed"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "edited_value=ed\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "fail_fc_editor"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "7"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "write_return_fc"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "return 7\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "write_history_fc"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "history -c\necho after-clear\nhistory\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== editor selection and current shell =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [Assign FCEDIT=write_fcedit_fc]
+  [CompoundListCondition, None]
+    [Assign EDITOR=write_editor_fc]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-e" "write_explicit_fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$edited_value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$edited_value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "FCEDIT"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$edited_value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "EDITOR"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$edited_value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "bash-posix"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$edited_value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "shit"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-e" "fail_fc_editor" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "editor-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-e" "write_return_fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "edit-return-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-e" "write_history_fc" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== multiline history =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "history" "-c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "echo first\necho second"]
+  [CompoundListCondition, None]
+    [SimpleCommand "history" "-r" "$d/seed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln" "-1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== selection errors =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s" "missing-prefix"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "missing-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s" "-0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "zero-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "seed_fc_history"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "return 7\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "history" "-c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "history" "-r" "$d/seed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "execute-return-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-v"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "invalid-option-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "history" "-c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-ln"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty-list-rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "fc" "-s"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty-execute-rc=$?"]
+[Word
+  Unquoted "d="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/fc"
+]
+[Word
+  Unquoted "shitbox"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "SHIT_HISTORY="
+  Variable "d"
+  Unquoted "/history"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "echo alpha\necho old-old\nfalse\n"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/seed"
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/seed"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "== list ranges and order =="
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "-3"
+]
+[Word
+  Unquoted "-1"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-lrn"
+]
+[Word
+  Unquoted "-3"
+]
+[Word
+  Unquoted "-1"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-lrn"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "-1"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "== execute and substitute =="
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "old=new"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "old=middle"
+]
+[Word
+  Unquoted "middle=new"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "write_explicit_fc"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "edited_value=explicit\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "write_fcedit_fc"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "edited_value=fcedit\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "write_editor_fc"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "edited_value=editor\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "vi"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "edited_value=vi\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "ed"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "edited_value=ed\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "fail_fc_editor"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "write_return_fc"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "return 7\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "write_history_fc"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "history -c\necho after-clear\nhistory\n"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "== editor selection and current shell =="
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "FCEDIT=write_fcedit_fc"
+]
+[Word
+  Unquoted "EDITOR=write_editor_fc"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "write_explicit_fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "edited_value"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "edited_value"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "FCEDIT"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "edited_value"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "EDITOR"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "edited_value"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "bash-posix"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "edited_value"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "shit"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "fail_fc_editor"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "editor-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "write_return_fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "edit-return-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "write_history_fc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "== multiline history =="
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "echo first\necho second"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/seed"
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/seed"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "-1"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "== selection errors =="
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "missing-prefix"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "missing-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "zero-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "seed_fc_history"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "return 7\n"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/seed"
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Variable "d"
+  DoubleQuoted "/seed"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "execute-return-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "invalid-option-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "history"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-ln"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty-list-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "fc"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty-execute-rc="
+  Variable "?"
+]
+== list ranges and order ==
+	 echo alpha
+	 echo old-old
+	 false
+	 false
+	 echo old-old
+	 echo alpha
+	 echo alpha
+	 echo old-old
+	 echo alpha
+	 echo old-old
+	 false
+	 echo alpha
+	 echo alpha
+	 false
+== execute and substitute ==
+echo new-new
+new-new
+rc=0
+	 echo alpha
+	 echo old-old
+	 echo new-new
+echo new-new
+new-new
+rc=0
+echo old-old
+old-old
+rc=0
+false
+rc=1
+== editor selection and current shell ==
+edited_value=explicit
+explicit
+edited_value=fcedit
+fcedit
+edited_value=editor
+editor
+edited_value=vi
+vi
+edited_value=ed
+ed
+editor-rc=1
+return 7
+edit-return-rc=7
+history -c
+echo after-clear
+history
+after-clear
+    1  echo after-clear
+    2  history
+== multiline history ==
+	 echo first
+echo second
+echo first
+echo second
+first
+second
+== selection errors ==
+shit: 111:7: error: Builtin `fc`: no command found.
+   111 |  fc -s missing-prefix
+       |        ^~~~~~~~~~~~~~
+missing-rc=1
+shit: 113:7: error: Builtin `fc`: no command found.
+   113 |  fc -s -0
+       |        ^~
+zero-rc=1
+return 7
+shit: fc:1:1: error: Builtin `return`: can only `return' from a function or sourced script.
+     1 |  return 7
+       |  ^~~~~~~~
+execute-return-rc=2
+shit: 121:4: error: Builtin `fc`: Unknown flag '-v'.
+   121 |  fc -v
+       |     ^~
+note: Use `--` before an operand that begins with a dash.

@@ -44,6 +44,7 @@ if ! BIN="$BIN" script -qec \
   'exec "$BIN" -c "test -t 0 && test -t 1"' \
   /dev/null >/dev/null 2>&1; then
   echo "recall ok"
+  echo "fc replacement ok"
   echo "search casefold ok"
   exit 0
 fi
@@ -76,7 +77,8 @@ done
 rm -f "$ready"
 rm -f "$input_status"
 out=$({
-  send_input_when_ready '\033[A' '\r' 'exit\r'
+  send_input_when_ready '\033[A' '\r' 'echo FC_ACTIVE_RECALL\r' \
+    'fc -s -1\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
   BIN="$BIN" READY="$ready" SHIT_HISTORY="$hist" \
@@ -88,6 +90,11 @@ case "$out" in
 *CMD_04200*) echo "recall ok" ;;
 *) echo "recall broken" ;;
 esac
+if grep -q 'fc -s' "$hist"; then
+  echo "fc replacement broken"
+else
+  echo "fc replacement ok"
+fi
 printf 'echo MiXeD_History_Marker\n' > "$search_hist"
 rm -f "$ready"
 rm -f "$input_status"

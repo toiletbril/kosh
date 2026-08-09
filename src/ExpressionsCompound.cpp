@@ -86,6 +86,32 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     const CompoundListCondition *n = m_nodes[index];
     ASSERT(n != nullptr);
 
+    if (n->kind() == CompoundListCondition::Kind::None) {
+      if (let const history_source = cxt.history_recording_source_for(this);
+          history_source.has_value())
+      {
+        usize history_end_index = index;
+        while (history_end_index + 1 < m_nodes.count() &&
+               m_nodes[history_end_index + 1]->kind() !=
+                   CompoundListCondition::Kind::None)
+        {
+          history_end_index++;
+        }
+
+        let const first_command = n->command();
+        let const start_position = first_command->source_location().position;
+        let const end_position =
+            m_nodes[history_end_index]->source_location().position;
+        if (start_position < end_position &&
+            end_position <= history_source->length)
+        {
+          unused(toiletline::history_append_event(
+              history_source->substring_of_length(
+                  start_position, end_position - start_position)));
+        }
+      }
+    }
+
     const bool is_last_node = index + 1 >= m_nodes.count();
     cxt.set_terminal_exec_allowed(was_terminal_exec_allowed && is_last_node);
 

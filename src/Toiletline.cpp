@@ -340,6 +340,7 @@ struct input_result
 {
   i32 code;
   String text;
+  shit::Maybe<usize> history_event_number{shit::None};
 };
 
 static char TL_BUFFER[ITL_STRING_MAX_LEN];
@@ -422,6 +423,128 @@ fn history_clear() -> bool
   shit::os::close_fd(opened.take());
   ::tl_history_load(path->c_str());
   return true;
+}
+
+struct history_event
+{
+  usize number;
+  String command;
+};
+
+fn history_events(shit::Allocator allocator) -> shit::ArrayList<history_event>
+{
+  let events = shit::ArrayList<history_event>{allocator};
+  if (!history_read() || ::itl_g_history_count == 0) return events;
+  if (!::itl_history_ensure_read_buffer()) return events;
+
+  let const first_number =
+      ::itl_g_history_total_count - ::itl_g_history_count + 1;
+  char decoded[ITL_STRING_MAX_LEN + 1];
+
+  for (usize index = 0; index < ::itl_g_history_count; index++) {
+    usize decoded_size = 0;
+    if (!::itl_history_decode_entry_buffered(
+            ::itl_history_index_to_offset(index), decoded, sizeof(decoded),
+            &decoded_size))
+    {
+      events.clear();
+      return events;
+    }
+
+    events.push(history_event{
+        first_number + index,
+        shit::String{allocator, shit::StringView{decoded, decoded_size}}
+    });
+  }
+
+  return events;
+}
+
+fn history_append_event(StringView command) -> shit::Maybe<usize>
+{
+  if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES)
+    return shit::None;
+
+  let const path = history_file_path();
+  if (!path.has_value()) return shit::None;
+  if (::itl_g_history_path == NULL) unused(::tl_history_load(path->c_str()));
+
+  itl_string_t *entry = ::itl_string_alloc();
+  defer { ITL_STRING_FREE(entry); };
+  if (!::itl_string_from_bytes(entry, command.data, command.length))
+    return shit::None;
+  if (!::itl_history_append_to_file(entry, false)) return shit::None;
+
+  return ::itl_g_last_history_event_number;
+}
+
+fn history_rewrite_event(usize number, StringView expected,
+                         StringView replacement) -> bool
+{
+  let const path = history_file_path();
+  if (!path.has_value() || !history_read()) return false;
+  if (::itl_g_history_count == 0) return false;
+
+  let const first_number =
+      ::itl_g_history_total_count - ::itl_g_history_count + 1;
+  if (number < first_number || number >= first_number + ::itl_g_history_count) {
+    return false;
+  }
+
+  let const index = number - first_number;
+  let const start_offset = ::itl_history_index_to_offset(index);
+  let const contents = path->read_entire_file();
+  if (!contents.has_value()) return false;
+  usize end_offset = start_offset;
+  while (end_offset < contents->count() && (*contents)[end_offset] != '\n')
+    end_offset++;
+  if (end_offset >= contents->count()) return false;
+  end_offset++;
+
+  char decoded[ITL_STRING_MAX_LEN + 1];
+  usize decoded_size = 0;
+  if (!::itl_history_ensure_read_buffer() ||
+      !::itl_history_decode_entry_buffered(start_offset, decoded,
+                                           sizeof(decoded), &decoded_size) ||
+      shit::StringView{decoded, decoded_size} != expected)
+  {
+    return false;
+  }
+
+  let rewritten = shit::String{shit::heap_allocator()};
+  rewritten.append(contents->substring_of_length(0, start_offset));
+
+  if (!replacement.is_empty()) {
+    if (replacement.length > ITL_HISTORY_ENTRY_MAX_BYTES) return false;
+    itl_string_t *entry = ::itl_string_alloc();
+    defer { ITL_STRING_FREE(entry); };
+    if (!::itl_string_from_bytes(entry, replacement.data, replacement.length))
+      return false;
+    itl_char_buf_t *encoded = ::itl_char_buf_alloc();
+    defer { ITL_CHAR_BUF_FREE(encoded); };
+    ::itl_char_buf_append_string_escaped(encoded, entry);
+    rewritten.append(shit::StringView{encoded->data, encoded->size});
+    rewritten.push('\n');
+  }
+
+  rewritten.append(contents->substring(end_offset));
+  let replacement_path = shit::os::write_to_named_temp_file(
+      path->parent(), ".shit_history_fc", rewritten.view());
+  if (!replacement_path.has_value()) return false;
+  defer { unused(shit::os::remove_file(replacement_path->text().view())); };
+
+  let const current_contents = path->read_entire_file();
+  if (!current_contents.has_value() ||
+      current_contents->view() != contents->view())
+  {
+    return false;
+  }
+  if (!shit::os::rename_path(replacement_path->text().view(),
+                             path->text().view()))
+  {
+    return false;
+  }
+  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
 }
 
 static fn strip_ansi_color(StringView text) throws -> String;
@@ -615,6 +738,7 @@ fn get_input(const String &prompt) -> input_result
   let const program_path_candidate_count_before =
       utils::debug_program_path_candidate_count();
 #endif
+  ::itl_g_last_history_event_number = 0;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   COMPLETION_BASE_DIRECTORY = nullptr;
   COMPLETION_RESULT = nullptr;
@@ -704,7 +828,11 @@ fn get_input(const String &prompt) -> input_result
                                      shit::os::last_system_error_message(),
                                  "Pass `-s` to read stdin without the editor"};
   }
-  return input_result{code, String{TL_BUFFER}};
+  let const history_event_number =
+      ::itl_g_last_history_event_number == 0
+          ? shit::Maybe<usize>{shit::None}
+          : shit::Maybe<usize>{::itl_g_last_history_event_number};
+  return input_result{code, String{TL_BUFFER}, history_event_number};
 }
 
 fn set_input(const String &input) -> void
@@ -1238,6 +1366,7 @@ struct input_result
 {
   i32 code;
   String text;
+  shit::Maybe<usize> history_event_number{shit::None};
 };
 
 fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
@@ -1257,6 +1386,32 @@ fn history_write() -> bool { return true; }
 fn history_read() -> bool { return true; }
 
 fn history_clear() -> bool { return true; }
+
+struct history_event
+{
+  usize number;
+  String command;
+};
+
+fn history_events(shit::Allocator allocator) -> shit::ArrayList<history_event>
+{
+  return shit::ArrayList<history_event>{allocator};
+}
+
+fn history_append_event(StringView command) -> shit::Maybe<usize>
+{
+  unused(command);
+  return shit::None;
+}
+
+fn history_rewrite_event(usize number, StringView expected,
+                         StringView replacement) -> bool
+{
+  unused(number);
+  unused(expected);
+  unused(replacement);
+  return false;
+}
 
 fn enable_job_notifications(shit::EvalContext &context) -> void
 {
