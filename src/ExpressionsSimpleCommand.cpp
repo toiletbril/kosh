@@ -839,6 +839,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                             program_args[0] == "exec" &&
                             command_word_function == nullptr;
 
+  if (is_bare_exec) {
+    for (let const &redir : m_redirections) {
+      if (redir.fd_allocation_name_token == nullptr)
+        cxt.snapshot_subshell_descriptor(redir.fd);
+      if (redir.can_dup_be_filename) cxt.snapshot_subshell_descriptor(2);
+    }
+  }
+
   /* A POSIX special builtin not shadowed by a function exits the shell on a
      redirection error and keeps a prefix assignment, so it is computed once and
      read on both paths. */

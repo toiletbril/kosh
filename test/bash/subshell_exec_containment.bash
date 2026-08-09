@@ -13,8 +13,11 @@ echo "stdin=$line"
 echo "stdout=visible"
 x=$( exec >/dev/null; echo inner )
 echo "subst=[$x]"
-( exec 5>"$dir/five" )
-{ echo leak >&5; } 2>/dev/null || echo "fd5=contained"
+exec 9>&-
+exec 3>/dev/null 4>/dev/null 5>/dev/null 6>/dev/null 7>/dev/null 8>/dev/null
+( exec 9>"$dir/nine" )
+{ echo leak >&9; } 2>/dev/null || echo "fd9=contained"
+exec 3>&- 4>&- 5>&- 6>&- 7>&- 8>&-
 ( exec 2>"$dir/two"; echo contained-err >&2 )
 echo "after-stderr=ok" >&2 2>/dev/null
 echo "stderr-file=$(cat "$dir/two")"
