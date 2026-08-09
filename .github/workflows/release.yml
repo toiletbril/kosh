@@ -71,10 +71,20 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-      - name: Create the GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          target_commitish: ${{ github.event.inputs.ref }}
-          files: dist/*
+      - name: Create the prerelease when it does not exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_REF: ${{ github.event.inputs.ref }}
+        run: |
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_REF" --title "$VERSION" --notes '<TBD>' \
+            --prerelease ||
+            gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null
+
+      - name: Attach the binaries to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$VERSION" dist/* --clobber --repo "$GITHUB_REPOSITORY"

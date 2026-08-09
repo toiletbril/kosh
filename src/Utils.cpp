@@ -3707,7 +3707,7 @@ fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
     let short_ref = merge_ref.view().substring(refs_prefix.length);
     if (short_ref.starts_with("heads/")) short_ref = short_ref.substring(6);
     let result = String{heap_allocator()};
-    result += "refs/remotes/";
+    result += remotes_prefix;
     result += remote_name.view();
     result += "/";
     result += short_ref;
@@ -3715,7 +3715,7 @@ fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
   }
 
   let result = String{heap_allocator()};
-  result += "refs/remotes/";
+  result += remotes_prefix;
   result += remote_name.view();
   result += "/";
   result += merge_ref.view();
