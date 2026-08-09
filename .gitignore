@@ -47,3 +47,7 @@ result-*
 # Arch packaging build output (makepkg)
 deploy/archlinux/*
 !deploy/archlinux/PKGBUILD
+
+# Alpine packaging build output (abuild)
+deploy/alpine/*
+!deploy/alpine/APKBUILD
