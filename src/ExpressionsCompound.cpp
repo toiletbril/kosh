@@ -1257,11 +1257,13 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
                          "This nested loop reuses the outer loop variable '" +
                              m_variable_name.view() + "'",
                          "Use a distinct variable for the nested loop",
-                         analyze_severity::Annoying);
+                         analyze_severity::Annoying, *outer_loop_location,
+                         "This outer loop owns the reused variable");
     actx.fail_shellcheck(2167, *outer_loop_location,
                          "This loop variable is overwritten by a nested loop",
                          "Use a distinct variable for the nested loop",
-                         analyze_severity::Annoying);
+                         analyze_severity::Annoying, source_location(),
+                         "This nested loop overwrites the variable");
   }
 
   let const had_outer_loop_variable = outer_loop_location != nullptr;
@@ -1510,7 +1512,9 @@ fn CaseClause::analyze(AnalysisContext &actx,
      '*' matches only a literal asterisk. */
   bool has_default_arm = false;
   let earlier_patterns = ArrayList<String>{heap_allocator()};
+  let earlier_pattern_locations = ArrayList<SourceLocation>{heap_allocator()};
   let earlier_shadow_prefixes = ArrayList<String>{heap_allocator()};
+  let earlier_shadow_locations = ArrayList<SourceLocation>{heap_allocator()};
   for (let const &item : m_items) {
     for (let const pattern : item.patterns) {
       if (pattern->kind() != Token::Kind::Word) continue;
@@ -1519,34 +1523,46 @@ fn CaseClause::analyze(AnalysisContext &actx,
       let const literal = pattern_word.to_literal_string();
       let const raw_pattern = pattern->raw_string();
       let is_duplicate = false;
-      for (let const &earlier : earlier_patterns) {
+      for (usize earlier_index = 0; earlier_index < earlier_patterns.count();
+           earlier_index++)
+      {
+        let const &earlier = earlier_patterns[earlier_index];
         if (raw_pattern.view() == earlier.view()) {
           actx.fail_shellcheck(
               2221, pattern->source_location(),
               "An earlier case pattern makes this pattern unreachable",
-              "Remove the duplicate pattern", analyze_severity::Annoying);
+              "Remove the duplicate pattern", analyze_severity::Annoying,
+              earlier_pattern_locations[earlier_index],
+              "This identical pattern matches first");
           is_duplicate = true;
           break;
         }
       }
       if (!is_duplicate) {
-        for (let const &prefix : earlier_shadow_prefixes) {
+        for (usize prefix_index = 0;
+             prefix_index < earlier_shadow_prefixes.count(); prefix_index++)
+        {
+          let const &prefix = earlier_shadow_prefixes[prefix_index];
           if (!literal.view().starts_with(prefix.view())) continue;
           actx.fail_shellcheck(
               2222, pattern->source_location(),
               "An earlier case pattern shadows this pattern",
               "Move the specific pattern before the broader pattern",
-              analyze_severity::Annoying);
+              analyze_severity::Annoying,
+              earlier_shadow_locations[prefix_index],
+              "This broader pattern shadows the later pattern");
           break;
         }
       }
       earlier_patterns.push(String{raw_pattern.view()});
+      earlier_pattern_locations.push(pattern->source_location());
       if (pattern_word.segments.count() == 1 &&
           pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
           !literal.is_empty() && literal[literal.count() - 1] == '*')
       {
         earlier_shadow_prefixes.push(
             String{literal.view().substring_of_length(0, literal.count() - 1)});
+        earlier_shadow_locations.push(pattern->source_location());
       }
       if (pattern_word.segments.count() == 1 &&
           pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&

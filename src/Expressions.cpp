@@ -205,8 +205,9 @@ fn Expression::operator delete(opaque *pointer) wontthrow -> void
 }
 
 cold fn AnalysisContext::warn(SourceLocation location, StringView message,
-                              StringView suggestion,
-                              diagnostic_tier tier) throws -> void
+                              StringView suggestion, diagnostic_tier tier,
+                              Maybe<SourceLocation> related_location,
+                              StringView related_message) throws -> void
 {
   if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
     return;
@@ -219,20 +220,30 @@ cold fn AnalysisContext::warn(SourceLocation location, StringView message,
     return;
   }
 
-  let const located =
-      WarningWithLocationAndDetails{location, message, suggestion};
-  show_message(located.to_string(source, eval_context));
+  if (related_location.has_value()) {
+    let const located = WarningWithLocation{location, message};
+    show_message(located.to_string(source, eval_context));
+
+    let const related = ErrorWithLocationAndDetails{
+        location, {}, *related_location, related_message, suggestion};
+    show_message(related.details_to_string(source, eval_context));
+  } else {
+    let const located =
+        WarningWithLocationAndDetails{location, message, suggestion};
+    show_message(located.to_string(source, eval_context));
+  }
   print_script_backtrace_if_rooted(location);
 }
 
-cold fn AnalysisContext::warn_shellcheck(u16 diagnostic_code,
-                                         SourceLocation location,
-                                         StringView message,
-                                         StringView suggestion) throws -> void
+cold fn AnalysisContext::warn_shellcheck(
+    u16 diagnostic_code, SourceLocation location, StringView message,
+    StringView suggestion, Maybe<SourceLocation> related_location,
+    StringView related_message) throws -> void
 {
   if (is_shellcheck_suppressed(diagnostic_code, location)) return;
 
-  warn(location, message, suggestion, shellcheck_tier(diagnostic_code));
+  warn(location, message, suggestion, shellcheck_tier(diagnostic_code),
+       related_location, related_message);
 }
 
 cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
@@ -262,8 +273,9 @@ cold fn AnalysisContext::print_script_backtrace_if_rooted(
 }
 
 cold fn AnalysisContext::fail(SourceLocation location, StringView message,
-                              StringView suggestion,
-                              analyze_severity severity) throws -> void
+                              StringView suggestion, analyze_severity severity,
+                              Maybe<SourceLocation> related_location,
+                              StringView related_message) throws -> void
 {
   let const tier =
       severity == analyze_severity::Annoying  ? diagnostic_tier::Annoying
@@ -278,7 +290,8 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
                                                                 : 3;
   if (!is_default_mood) {
     if (warning_level >= required_level)
-      warn(location, message, suggestion, tier);
+      warn(location, message, suggestion, tier, related_location,
+           related_message);
     return;
   }
 
@@ -287,24 +300,37 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
                                                                       : 3;
 
   if (warning_level >= demote_at_level) {
-    warn(location, message, suggestion, tier);
+    warn(location, message, suggestion, tier, related_location,
+         related_message);
     return;
   }
 
-  let const located =
-      ErrorWithLocationAndDetails{location, message, suggestion};
-  show_message(located.to_string(source, eval_context));
+  if (related_location.has_value()) {
+    let const located = ErrorWithLocation{location, message};
+    show_message(located.to_string(source, eval_context));
+
+    let const related = ErrorWithLocationAndDetails{
+        location, {}, *related_location, related_message, suggestion};
+    show_message(related.details_to_string(source, eval_context));
+  } else {
+    let const located =
+        ErrorWithLocationAndDetails{location, message, suggestion};
+    show_message(located.to_string(source, eval_context));
+  }
   print_script_backtrace_if_rooted(location);
   has_fatal = true;
 }
 
 cold fn AnalysisContext::fail_shellcheck(
     u16 diagnostic_code, SourceLocation location, StringView message,
-    StringView suggestion, analyze_severity severity) throws -> void
+    StringView suggestion, analyze_severity severity,
+    Maybe<SourceLocation> related_location, StringView related_message) throws
+    -> void
 {
   if (is_shellcheck_suppressed(diagnostic_code, location)) return;
 
-  fail(location, message, suggestion, severity);
+  fail(location, message, suggestion, severity, related_location,
+       related_message);
 }
 
 pure fn AnalysisContext::is_shellcheck_suppressed(
@@ -2311,7 +2337,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               "The command reads and truncates '" + read_target.view() +
                   "' at once, the truncation empties the input before "
                   "it is read",
-              "Write to a temporary and move it over");
+              "Write to a temporary and move it over",
+              read_token->source_location(),
+              "This redirect reads the file that is later truncated");
         }
       }
     }
@@ -2866,10 +2894,16 @@ fn CompoundList::analyze(AnalysisContext &actx,
         }
         if (name->view() == "exec" && simple->args().count() > 1 &&
             i + 1 < m_nodes.count())
+        {
+          let const next_command = m_nodes[i + 1]->command();
+          ASSERT(next_command != nullptr);
           actx.warn_shellcheck(
               2093, simple->args()[0]->source_location(),
               "Commands after exec do not run when exec succeeds",
-              "Remove exec or remove the unreachable commands");
+              "Remove exec or remove the unreachable commands",
+              next_command->source_location(),
+              "This is the first command skipped after exec");
+        }
       }
     }
 
@@ -2928,7 +2962,8 @@ fn CompoundList::analyze(AnalysisContext &actx,
       actx.warn_shellcheck(
           2129, repeated_append_location,
           "Several commands append to the same file separately",
-          "Apply one append redirection to a grouped command");
+          "Apply one append redirection to a grouped command", current_location,
+          "This later append belongs under the same redirection");
   }
 
   let saved_tested_command_names = actx.tested_command_names.clone();

@@ -251,7 +251,7 @@ class ErrorWithLocationAndDetails : public ErrorWithLocation
 public:
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               SourceLocation details_location,
-                              StringView details_message);
+                              StringView details_message, StringView note = {});
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               StringView note);
 

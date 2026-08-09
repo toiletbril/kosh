@@ -77,7 +77,7 @@ echo "$(echo hi)"
 
 cat data/hello-d | cat
 
-which sh >/dev/null 2>&1; command -v sudo >/dev/null 2>&1; command -v ssh >/dev/null 2>&1
+which sh >/dev/null 2>&1
 
 new_diagnostics() {
   for file in $(ls *.mp3); do echo "$file"; done
@@ -90,7 +90,7 @@ new_diagnostics() {
   for argument in $*; do echo "$argument"; done
   echo "$*"
   printf '%s %s\n' one
-  sudo echo protected > output
+  command -v sudo >/dev/null 2>&1 && sudo echo protected > output
   exec echo replaced; echo unreachable
   cd missing; echo wrong-directory
   true && false || echo fallback
@@ -127,7 +127,7 @@ annoying_style_diagnostics() {
 annoying_safety_diagnostics() {
   find . -exec echo {}
   [ value =~ expression ]
-  while read -r host; do ssh "$host" uptime; done
+  while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
   alias archive='mv $1 /backup'
   find . -name '*.bak' -o -name '*~' -delete
   echo $10

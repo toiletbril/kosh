@@ -194,10 +194,6 @@
   [CompoundListCondition, None]
     [SimpleCommand "which" "sh"]
   [CompoundListCondition, None]
-    [SimpleCommand "command" "-v" "sudo"]
-  [CompoundListCondition, None]
-    [SimpleCommand "command" "-v" "ssh"]
-  [CompoundListCondition, None]
     [FunctionDefinition "new_diagnostics"]
       [BraceGroup]
         [CompoundList]
@@ -231,6 +227,8 @@
           [CompoundListCondition, None]
             [SimpleCommand "printf" "%s %s\n" "one"]
           [CompoundListCondition, None]
+            [SimpleCommand "command" "-v" "sudo"]
+          [CompoundListCondition, &&]
             [SimpleCommand "sudo" "echo" "protected"]
           [CompoundListCondition, None]
             [SimpleCommand "exec" "echo" "replaced"]
@@ -317,6 +315,8 @@
                   [SimpleCommand "read" "-r" "host"]
               [CompoundList]
                 [CompoundListCondition, None]
+                  [SimpleCommand "command" "-v" "ssh"]
+                [CompoundListCondition, &&]
                   [SimpleCommand "ssh" "$host" "uptime"]
           [CompoundListCondition, None]
             [SimpleCommand "alias" "archive=mv $1 /backup"]
@@ -1091,42 +1091,6 @@
   Unquoted "1"
 ]
 [Word
-  Unquoted "command"
-]
-[Word
-  Unquoted "-v"
-]
-[Word
-  Unquoted "sudo"
-]
-[Word
-  Unquoted "/dev/null"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Unquoted "1"
-]
-[Word
-  Unquoted "command"
-]
-[Word
-  Unquoted "-v"
-]
-[Word
-  Unquoted "ssh"
-]
-[Word
-  Unquoted "/dev/null"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Unquoted "1"
-]
-[Word
   Unquoted "new_diagnostics"
 ]
 [Word
@@ -1269,6 +1233,24 @@
 ]
 [Word
   Unquoted "one"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
 ]
 [Word
   Unquoted "sudo"
@@ -1608,6 +1590,24 @@
   Unquoted "do"
 ]
 [Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
   Unquoted "ssh"
 ]
 [Word
@@ -1837,6 +1837,9 @@ note: Put the file redirect first as in '>file 2>&1'.
 shit: 14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
     14 |    sort < data > data
        |                  ^~~~
+shit: 14:10: note:
+    14 |    sort < data > data
+       |           ^~~~ This redirect reads the file that is later truncated.
 note: Write to a temporary and move it over.
 shit: 15:8: warning: A command substitution wraps a useless echo.
     15 |    echo "wrapped $(echo inner)"
@@ -1978,6 +1981,9 @@ note: Give the file to the next command directly instead of piping cat.
 shit: 94:3: warning: Commands after exec do not run when exec succeeds.
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
+shit: 94:23: note:
+    94 |    exec echo replaced; echo unreachable
+       |                        ^~~~~~~~~~~~~~~~ This is the first command skipped after exec.
 note: Remove exec or remove the unreachable commands.
 shit: 95:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
     95 |    cd missing; echo wrong-directory
@@ -2023,9 +2029,9 @@ shit: 92:10: warning: The printf format consumes more arguments than the command
     92 |    printf '%s %s\n' one
        |           ^~~~~~~~~
 note: Add the missing arguments or remove format directives.
-shit: 93:25: warning: The shell opens this redirection before sudo changes privileges.
-    93 |    sudo echo protected > output
-       |                          ^~~~~~
+shit: 93:60: warning: The shell opens this redirection before sudo changes privileges.
+    93 |    command -v sudo >/dev/null 2>&1 && sudo echo protected > output
+       |                                                             ^~~~~~
 note: Run a shell under sudo or pipe through sudo tee.
 shit: 97:22: warning: This pipeline read assignment is lost when the stage exits.
     97 |    echo one | read -r pipeline_value
@@ -2118,6 +2124,9 @@ note: Keep CDPATH unexported or clear it before running scripts.
 shit: 118:15: warning: Several commands append to the same file separately.
    118 |    echo one >> style.log
        |                ^~~~~~~~~
+shit: 120:17: note:
+   120 |    echo three >> style.log
+       |                  ^~~~~~~~~ This later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
 shit: 121:8: warning: Backticks are harder to nest than command substitutions.
    121 |    echo `date`
@@ -2159,9 +2168,9 @@ shit: 129:11: warning: The test builtin does not support the =~ regular expressi
    129 |    [ value =~ expression ]
        |            ^~
 note: Use [[ value =~ expression ]].
-shit: 130:26: warning: An ssh command in a while-read loop can consume the loop input.
-   130 |    while read -r host; do ssh "$host" uptime; done
-       |                           ^~~
+shit: 130:60: warning: An ssh command in a while-read loop can consume the loop input.
+   130 |    while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
+       |                                                             ^~~
 note: Redirect ssh input from /dev/null or pass -n.
 shit: 131:9: warning: An alias body cannot receive positional arguments.
    131 |    alias archive='mv $1 /backup'
@@ -2202,18 +2211,30 @@ note: Use $((...)) for arithmetic expansion.
 shit: 139:5: warning: This nested loop reuses the outer loop variable 'outer_index'.
    139 |      for outer_index in two; do echo "$outer_index"; done
        |      ^~~
+shit: 138:3: note:
+   138 |    for outer_index in one; do
+       |    ^~~ This outer loop owns the reused variable.
 note: Use a distinct variable for the nested loop.
 shit: 138:3: warning: This loop variable is overwritten by a nested loop.
    138 |    for outer_index in one; do
        |    ^~~
+shit: 139:5: note:
+   139 |      for outer_index in two; do echo "$outer_index"; done
+       |      ^~~ This nested loop overwrites the variable.
 note: Use a distinct variable for the nested loop.
 shit: 143:3: warning: An earlier case pattern makes this pattern unreachable.
    143 |    same) : ;;
        |    ^~~~
+shit: 142:3: note:
+   142 |    same) : ;;
+       |    ^~~~ This identical pattern matches first.
 note: Remove the duplicate pattern.
 shit: 147:3: warning: An earlier case pattern shadows this pattern.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
+shit: 146:3: note:
+   146 |    prefix*) : ;;
+       |    ^~~~~~~ This broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
 shit: 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
    141 |    case value in

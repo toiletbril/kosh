@@ -462,10 +462,11 @@ cold fn TraceWithLocation::severity_word() const wontthrow -> StringView
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
-    SourceLocation details_location, StringView details_message)
+    SourceLocation details_location, StringView details_message,
+    StringView note)
     : ErrorWithLocation(steal(location), message),
       m_details_location(steal(details_location)),
-      m_details_message(details_message)
+      m_details_message(details_message), m_note(note)
 {}
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
@@ -525,6 +526,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     details_line_position,
                                     m_details_message.view(), color, context);
+  result += trailing_details_to_string();
   return result;
 }
 

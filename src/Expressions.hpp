@@ -95,17 +95,23 @@ public:
 
   fn warn(SourceLocation location, StringView message,
           StringView suggestion = {},
-          diagnostic_tier tier = diagnostic_tier::Strict) throws -> void;
+          diagnostic_tier tier = diagnostic_tier::Strict,
+          Maybe<SourceLocation> related_location = None,
+          StringView related_message = {}) throws -> void;
   fn warn_shellcheck(u16 diagnostic_code, SourceLocation location,
-                     StringView message, StringView suggestion = {}) throws
-      -> void;
+                     StringView message, StringView suggestion = {},
+                     Maybe<SourceLocation> related_location = None,
+                     StringView related_message = {}) throws -> void;
   fn fail(SourceLocation location, StringView message,
           StringView suggestion = {},
-          analyze_severity severity = analyze_severity::Strict) throws -> void;
-  fn fail_shellcheck(
-      u16 diagnostic_code, SourceLocation location, StringView message,
-      StringView suggestion = {},
-      analyze_severity severity = analyze_severity::Strict) throws -> void;
+          analyze_severity severity = analyze_severity::Strict,
+          Maybe<SourceLocation> related_location = None,
+          StringView related_message = {}) throws -> void;
+  fn fail_shellcheck(u16 diagnostic_code, SourceLocation location,
+                     StringView message, StringView suggestion = {},
+                     analyze_severity severity = analyze_severity::Strict,
+                     Maybe<SourceLocation> related_location = None,
+                     StringView related_message = {}) throws -> void;
   pure fn is_shellcheck_suppressed(u16 diagnostic_code,
                                    SourceLocation location) const wontthrow
       -> bool;
