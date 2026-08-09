@@ -40,7 +40,7 @@ jobs:
 
       - name: Build release binary
         if: '!cancelled()'
-        run: make clean && make CXX=g++ MODE=rel shit
+        run: make clean && make CXX=g++ USE_LD= MODE=rel shit
 
       - name: Run benchmark
         if: '!cancelled()'
