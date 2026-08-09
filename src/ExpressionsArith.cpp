@@ -781,11 +781,17 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         allocate_redirection_descriptor(redir, r, cxt, source_location());
     switch (r.kind) {
     case redirection_outcome::Heredoc:
-    case redirection_outcome::OpenedFile:
+    case redirection_outcome::OpenedFile: {
+      if (os::descriptor_is_shell_fd(r.opened_fd, r.target_fd)) {
+        saved_descriptors.push(
+            os::saved_descriptor{.shell_fd = r.target_fd, .was_open = false});
+        break;
+      }
       saved_descriptors.push(
           os::save_and_replace_descriptor(r.target_fd, r.opened_fd));
       os::close_fd(r.opened_fd);
       break;
+    }
     case redirection_outcome::BothStreams: {
       const os::saved_descriptor saved_out =
           os::save_and_replace_descriptor(1, r.opened_fd);

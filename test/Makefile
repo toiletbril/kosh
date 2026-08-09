@@ -6,12 +6,6 @@ SHELL := /bin/bash
 TEST_ABSOLUTE_DIRECTORY_COMMAND := pwd
 endif
 
-TEST_HOST_MAKE ?= $(shell command -v "$(MAKE)")
-ifeq ($(strip $(TEST_HOST_MAKE)),)
-$(error The test make '$(MAKE)' could not be resolved)
-endif
-export TEST_HOST_MAKE
-
 DIFF_FLAGS := -u
 MODE ?= dbg
 IS_NONDEBUG_BUILD := $(if $(filter rel prof cov cosmo,$(MODE)),1,0)
@@ -23,7 +17,7 @@ TARGET ?= $(shell uname -s)
 endif
 
 ifeq ($(TARGET), Windows_NT)
-TEST_HOST_MAKE_FLAGS := -j1
+TEST_JOBS := 1
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 export TEST_PATH_ENVIRONMENT_NAME := Path
@@ -34,6 +28,7 @@ export TEST_PATH_SEPARATOR := :
 export TEST_NULL_DEVICE := /dev/null
 export TEST_PATH_ENVIRONMENT_NAME := PATH
 endif
+TEST_JOBS ?= $(shell ../scripts/cpu-count.sh)
 export TEST_HOST_PATH_SEPARATOR := :
 export TEST_TEMP_DIRECTORY := .test-work
 export TEST_MKTEMP_DIRECTORY := $(shell $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/.test-work
@@ -65,6 +60,9 @@ override BIN := $(shell \
 export BIN
 
 BIN_FLAGS := -AER
+FAILED_LIST := failed.diff
+export BIN_FLAGS DIFF_FLAGS FAILED_LIST TEST_JOBS
+export TEST_SHELL := $(SHELL)
 
 export SHIT_HISTORY := $(CURDIR)/.test_history
 export SHIT_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
@@ -79,11 +77,6 @@ export TEST_UNAME_DIRECTORY := $(shell \
 endif
 export PATH := $(CURDIR)/bin$(TEST_HOST_PATH_SEPARATOR)$(PATH)
 
-FAILED_LIST := failed.diff
-INPUT_FILES := $(wildcard shit/*.shit)
-
-TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
-
 %: expected/%.out
 	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-shit-test.sh $*
@@ -92,88 +85,27 @@ clean:
 	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
 	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
 
-TEST_SUITES := shit_tests cli_tests build_tests completion_tests highlight_tests
-ifneq ($(TARGET), Windows_NT)
-TEST_SUITES += diagnostic_tty_test compatdiff
-endif
-
 test: $(BIN)
-	+@start_time=$$(date +%s); \
-	"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) clean && \
-	"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) \
-		$(filter-out completion_tests,$(TEST_SUITES)) && \
-	"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) completion_tests && \
-	for serial_test_name in $(SERIAL_TEST_NAMES); do \
-		printf "	%-64s running\n" "$$serial_test_name"; \
-		"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) \
-			--no-print-directory "$$serial_test_name" || exit 1; \
-	done && \
-	touch $(FAILED_LIST) && \
-	cat $(FAILED_LIST) && \
-	test ! -s $(FAILED_LIST); \
-	test_status=$$?; \
-	elapsed_seconds=$$(($$(date +%s) - start_time)); \
-	printf "\nDebug test step completed in %s seconds\n" "$$elapsed_seconds"; \
-	if [ "$$elapsed_seconds" -gt 180 ]; then \
-		printf "Debug test step exceeded the 180 second soft limit\n"; \
-	fi; \
-	if [ "$$elapsed_seconds" -gt 300 ]; then \
-		printf "Debug test step exceeded the 300 second hard limit\n"; \
-		exit 1; \
-	fi; \
-	exit "$$test_status"
+	@$(SHELL) run-test-suite.sh all
 
-shit_tests: $(BIN) $(TEST_NAMES)
-
-CLI_INPUT := $(wildcard cli/*.sh)
-CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
-SERIAL_TEST_NAMES := cli_set_option_state cli_read_behavior
+shit_tests: $(BIN)
+	@$(SHELL) run-test-suite.sh shit
 
 cli_%: expected/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh '$(SHELL)' cli/$*.sh
 
-cli_tests: $(BIN) $(filter-out $(SERIAL_TEST_NAMES),$(CLI_NAMES))
-
-BUILD_INPUT := $(wildcard build/*.sh)
-BUILD_NAMES := $(BUILD_INPUT:build/%.sh=build_%)
+cli_tests: $(BIN)
+	@$(SHELL) run-test-suite.sh cli
 
 build_%: expected/%.out
-	@output_directory='$(TEST_TEMP_DIRECTORY)/results/build'; \
-		mkdir -p "$$output_directory"; \
-		output="$$output_directory/$*.out"; \
-		BIN='$(BIN)' '$(SHELL)' build/$*.sh > "$$output" 2>&1; \
-		if diff $(DIFF_FLAGS) $< "$$output" >/dev/null 2>&1; then \
-			printf "	%-64s ok\033[K\r" build/$*.sh; \
-		else \
-			diff $(DIFF_FLAGS) $< "$$output" | tee -a $(FAILED_LIST); \
-			printf "	%-64s FAILED :c\n" build/$*.sh; \
-		fi; \
-		rm -f "$$output"
+	@$(SHELL) run-build-test.sh '$(SHELL)' build/$*.sh
 
-build_tests: $(BUILD_NAMES)
-
-
-COMPLETION_INPUT := $(wildcard completion/*.sh)
-COMPLETION_NAMES := $(COMPLETION_INPUT:completion/%.sh=completion_%)
-SERIAL_COMPLETION_TEST_NAMES := completion_editor_append_hot_path
+build_tests: $(BIN)
+	@$(SHELL) run-test-suite.sh build
 
 completion_%: expected/%.out
-	@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
-		printf "	%-64s skipped, release binary\n" completion/$*.sh; \
-	else \
-		output_directory='$(TEST_TEMP_DIRECTORY)/results/completion'; \
-		mkdir -p "$$output_directory"; \
-		out="$$output_directory/$*.out"; \
-		BIN='$(BIN)' '$(SHELL)' completion/$*.sh > $$out 2>/dev/null; \
-		if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
-			printf "	%-64s ok\033[K\r" completion/$*.sh; \
-		else \
-			diff $(DIFF_FLAGS) $< $$out | tee -a $(FAILED_LIST); \
-			printf "	%-64s FAILED :c\n" completion/$*.sh; \
-		fi; \
-		rm -f $$out; \
-	fi
+	@$(SHELL) run-completion-test.sh '$(SHELL)' completion/$*.sh
 
 ifeq ($(TARGET), Windows_NT)
 WINDOWS_SKIPPED_TEST_NAMES := \
@@ -250,102 +182,41 @@ $(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES):
 endif
 
 completion_tests: $(BIN)
-	+@if [ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
-		printf "	%-64s skipped, release binary\n" completion; \
-	else \
-		"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) --no-print-directory \
-			$(filter-out $(SERIAL_COMPLETION_TEST_NAMES),$(COMPLETION_NAMES)) \
-			BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' \
-			FAILED_LIST='$(FAILED_LIST)' || exit 1; \
-		for serial_test_name in $(SERIAL_COMPLETION_TEST_NAMES); do \
-			printf "	%-64s running\n" "$$serial_test_name"; \
-			"$(TEST_HOST_MAKE)" $(TEST_HOST_MAKE_FLAGS) --no-print-directory \
-				"$$serial_test_name" || exit 1; \
-		done; \
-	fi
+	@$(SHELL) run-test-suite.sh completion
 
-
-HIGHLIGHT_INPUT := $(wildcard highlight/*.sh)
-HIGHLIGHT_NAMES := $(HIGHLIGHT_INPUT:highlight/%.sh=highlight_%)
 
 highlight_%: expected/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh '$(SHELL)' highlight/$*.sh
 
 highlight_tests: $(BIN)
-	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
-		$(SHELL) run-highlight-test.sh '$(SHELL)' $(HIGHLIGHT_INPUT)
+	@$(SHELL) run-test-suite.sh highlight
 
-DIAGNOSTIC_TTY_INPUT := \
-	interactive/long_warning_window.py \
-	interactive/cat_syntax_highlighting.py \
-	interactive/underline_term_support.py
+SKIPPED_TEST_NAMES := $(WINDOWS_SKIPPED_TEST_NAMES)
+SKIPPED_CLI_INPUT := $(patsubst cli_%,cli/%.sh,$(WINDOWS_SKIPPED_CLI_NAMES))
+SKIPPED_BUILD_INPUT :=
+SKIPPED_COMPLETION_INPUT := \
+	$(patsubst completion_%,completion/%.sh,$(WINDOWS_SKIPPED_COMPLETION_NAMES))
+UNREPRESENTABLE_COMPLETION_INPUT := \
+	$(patsubst completion_%,completion/%.sh,$(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES))
+ifeq ($(TARGET), Windows_NT)
+SKIP_CLI_ASSIMILATE := 1
+SKIP_CLI_BASH_XTRACEFD := 1
+SKIPPED_BUILD_INPUT := build/cpu_count.sh
+endif
+
+export SKIPPED_TEST_NAMES SKIPPED_CLI_INPUT SKIPPED_BUILD_INPUT
+export SKIPPED_COMPLETION_INPUT UNREPRESENTABLE_COMPLETION_INPUT
+export SKIP_CLI_ASSIMILATE SKIP_CLI_BASH_XTRACEFD
 
 diagnostic_tty_test: $(BIN)
-	@if command -v python3 >/dev/null 2>&1; then \
-		output_directory='$(TEST_TEMP_DIRECTORY)/results/interactive'; \
-		mkdir -p "$$output_directory"; \
-		for test_file in $(DIAGNOSTIC_TTY_INPUT); do \
-			if [ "$$test_file" = interactive/long_warning_window.py ] && \
-				[ '$(IS_NONDEBUG_BUILD)' = 1 ]; then \
-				printf "\t%-64s skipped, release binary\n" "$$test_file"; \
-				continue; \
-			fi; \
-			output="$$output_directory/$$(basename "$$test_file").out"; \
-			if python3 "$$test_file" "$(BIN)" >"$$output" 2>&1; then \
-				printf "\t%-64s ok\033[K\r" "$$test_file"; \
-			else \
-				cat "$$output"; \
-				printf "\t%-64s FAILED :c\n" "$$test_file"; \
-				rm -f "$$output"; \
-				exit 1; \
-			fi; \
-			rm -f "$$output"; \
-		done; \
-	else \
-		for test_file in $(DIAGNOSTIC_TTY_INPUT); do \
-			printf "\t%-64s skipped, python3 unavailable\n" "$$test_file"; \
-		done; \
-	fi
+	@$(SHELL) run-test-suite.sh interactive
 
 
 REFILL ?=
 
 refill:
-	for f in $${REFILL:-$(TEST_NAMES)}; do \
-		[ -f shit/$$f.shit ] || continue; \
-		printf "	%-64s $$f.out\n" $$f.shit; \
-		cat shit/$$f.shit | '$(BIN)' $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
-	done || true
-	for f in $${REFILL:-$(CLI_INPUT:cli/%.sh=%)}; do \
-		[ -f cli/$$f.sh ] || continue; \
-		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
-		case $$f in \
-		command_substitution_interrupt|fg_terminal_handoff|history_behavior|read_behavior|shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job) \
-			golden_timeout_seconds=60; \
-			if [ "$$f" = history_behavior ] || [ "$$f" = shitbox_timeout ]; then \
-				golden_timeout_seconds=120; \
-			fi; \
-			output="expected/.$$f.out.tmp"; \
-			CLI_TEST_TIMEOUT_SECONDS=$${CLI_TEST_TIMEOUT_SECONDS:-$$golden_timeout_seconds} \
-				BIN='$(BIN)' '$(SHELL)' \
-				./.run-bounded-cli-golden.sh cli/$$f.sh \
-				> "$$output" 2>&1 && \
-				mv "$$output" "expected/$$f.out" || \
-				{ status=$$?; rm -f "$$output"; exit $$status; } ;; \
-		*) BIN='$(BIN)' '$(SHELL)' cli/$$f.sh > expected/$$f.out 2>&1 ;; \
-		esac; \
-	done
-	if [ -z "$${REFILL:-}" ]; then \
-		for f in $(COMPLETION_INPUT:completion/%.sh=%); do \
-			printf "	%-64s $$f.out\n" completion/$$f.sh; \
-			BIN='$(BIN)' '$(SHELL)' completion/$$f.sh > expected/$$f.out 2>/dev/null; \
-		done || true; \
-		for f in $(HIGHLIGHT_INPUT:highlight/%.sh=%); do \
-			printf "	%-64s $$f.out\n" highlight/$$f.sh; \
-			BIN='$(BIN)' '$(SHELL)' highlight/$$f.sh > expected/$$f.out 2>/dev/null; \
-		done || true; \
-	fi
+	@REFILL='$(REFILL)' $(SHELL) run-refill.sh '$(SHELL)'
 
 
 ZSH ?= /bin/zsh
@@ -354,13 +225,10 @@ YASH ?= /bin/yash
 BASHP ?= /bin/bash
 DASH ?= /bin/dash
 
-SH_COMPAT := $(filter-out %_1.sh,$(wildcard sh/*.sh))
-BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
+export BASHP DASH
 
 compatdiff: $(BIN)
-	@BIN='$(BIN)' BASHP='$(BASHP)' DASH='$(DASH)' DIFF_FLAGS='$(DIFF_FLAGS)' \
-		FAILED_LIST='$(FAILED_LIST)' SH_COMPAT_FILES='$(SH_COMPAT)' \
-		BASH_COMPAT_FILES='$(BASH_COMPAT)' $(SHELL) run-compat-diff-test.sh
+	@$(SHELL) run-test-suite.sh compat
 
 dashdiff bashdiff mimicrydiff: compatdiff
 

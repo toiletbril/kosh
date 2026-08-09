@@ -53,13 +53,19 @@ records the binary output without judging it.
 Every golden lives directly below `test/expected`. The directory has no
 subdirectories. Golden-backed test names remain unique across every harness.
 
-The shit_tests, cli_tests, build_tests, compatdiff, and bench recipes live in
-scripts under test. POSIX hosts launch them with /bin/bash. Windows launches
-them with sh. The shit_tests and cli_tests scripts accept test names. A bare
-NAME target or cli_NAME target runs one test through the same script. The
-compatdiff runner compares explicit moods and mimicry against one shared
-reference result. The dashdiff, bashdiff, and mimicrydiff targets select that
-runner. The harness carries alternate goldens for documented macOS differences.
+Make discovers test inputs and keeps platform skip lists. Each Make recipe
+launches one runner under `test`. A runner never invokes Make. The suite runner
+starts the harness runners and bounds their parallel workers. Each harness
+runner owns its process setup, output capture, comparison, refill behavior, and
+cleanup. Auxiliary test shell scripts use two-space indentation.
+
+The native, CLI, build, completion, highlight, interactive, compatibility, and
+benchmark harnesses each have one runner. The native and CLI runners accept
+test names. A bare NAME target or cli_NAME target runs one test through the
+same runner. The compatibility runner compares explicit moods and mimicry
+against one shared reference result. The dashdiff, bashdiff, and mimicrydiff
+targets select that runner. The harness carries alternate goldens for
+documented macOS differences.
 
 Runner output files live below `.test-work/results`. The portable mktemp shim
 uses host filesystem operations and never starts the tested shell. Its exported

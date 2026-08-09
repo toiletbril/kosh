@@ -27,14 +27,14 @@ PB=$WORK/pb
 PS=$WORK/ps
 
 run_ref() {
-    if ! command -v "$1" >/dev/null; then return 0; fi
-    printf "  %-16s" "${2:-$1}"
-    ( time SCALE=$SCALE "$1" $3 >"$4" 2>&1 ) 2>&1
+  if ! command -v "$1" >/dev/null; then return 0; fi
+  printf "  %-16s" "${2:-$1}"
+  ( time SCALE=$SCALE "$1" $3 >"$4" 2>&1 ) 2>&1
 }
 
 compare() {
-    if cmp "$1" "$2"; then echo "output matches $3"
-    else echo "output differs from $3:"; diff "$1" "$2" | head -20; fi
+  if cmp "$1" "$2"; then echo "output matches $3"
+  else echo "output differs from $3:"; diff "$1" "$2" | head -20; fi
 }
 
 echo "configure.sh, wall-clock seconds at SCALE=$SCALE, lower is better:"

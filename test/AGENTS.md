@@ -43,6 +43,26 @@ option changes should occur inside one native test with `set --mood`, `set -o`,
 or a subshell. Keep a CLI process boundary only when the boundary is part of the
 contract.
 
+## Keep harness logic in runners
+
+Make discovers inputs, declares direct target dependencies, and keeps platform
+skip lists. A Make recipe launches the runner for its harness. A runner never
+invokes Make.
+
+Each harness has one `run-<harness>-test.sh` file when one process model can
+serve all of its cases. The runner creates the required directories, launches
+the test process, captures output, compares the flat golden, and removes its
+temporary output. Refill is a mode of the same runner. A second script must not
+copy a timeout list, argument parser, golden comparison, or cleanup path.
+
+`run-test-suite.sh` bounds parallel workers and starts each harness runner.
+`run-bounded-cli-golden.sh` owns process-tree timeouts for CLI cases that can
+block. `run-refill.sh` selects the normal harness runners in refill mode.
+
+Auxiliary shell scripts use two-space indentation. They receive configuration
+through exported test variables. They do not reconstruct Make variables or
+launch recursive Make processes.
+
 ## Keep one owner
 
 Search all test directories before adding a case. Search by builtin name,
