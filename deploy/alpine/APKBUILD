@@ -7,35 +7,42 @@ url="https://github.com/toiletbril/shit"
 arch="x86_64 aarch64"
 license="BSD-3-Clause"
 makedepends="build-base clang llvm lld musl-dev linux-headers git make"
+checkdepends="bash dash python3 util-linux-misc"
 
 # Pinned to the exact commit the "src/toiletline" submodule points to for
 # this release (see .gitmodules / `git submodule status`). GitHub's tarball
 # for a tag does not include submodule contents, so it's fetched separately
 # and dropped into place in prepare().
+_release_commit="42b39770324bc99d4f6b05ef910ce861d3e87b21"
 _toiletline_commit="024fa036a7306ed07751fe90fbd583c9a6c2086c"
 
 source="
-	$pkgname-$pkgver.tar.gz::https://github.com/toiletbril/shit/archive/refs/tags/$pkgver.tar.gz
-	toiletline-$_toiletline_commit.tar.gz::https://github.com/toiletbril/toiletline/archive/$_toiletline_commit.tar.gz
-	"
+  $pkgname-$pkgver.tar.gz::https://github.com/toiletbril/shit/archive/refs/tags/$pkgver.tar.gz
+  toiletline-$_toiletline_commit.tar.gz::https://github.com/toiletbril/toiletline/archive/$_toiletline_commit.tar.gz
+  "
 builddir="$srcdir/$pkgname-$pkgver"
 
 prepare() {
-	default_prepare
-	rm -rf "$builddir/src/toiletline"
-	cp -r "$srcdir/toiletline-$_toiletline_commit" "$builddir/src/toiletline"
+  default_prepare
+  rm -rf "$builddir/src/toiletline"
+  cp -r "$srcdir/toiletline-$_toiletline_commit" "$builddir/src/toiletline"
 }
 
 build() {
-	make MODE=rel
+  make MODE=rel COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux"
+}
+
+check() {
+  make MODE=rel COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux" \
+    BASHP=/bin/bash DASH=/usr/bin/dash test
 }
 
 package() {
-	install -Dm755 shit "$pkgdir/usr/bin/shit"
-	install -Dm644 docs/shit.1 "$pkgdir/usr/share/man/man1/shit.1"
-	install -Dm644 docs/shit.5 "$pkgdir/usr/share/man/man5/shit.5"
-	install -Dm644 completions/shit.bash "$pkgdir/usr/share/bash-completion/completions/shit"
-	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm755 shit "$pkgdir/usr/bin/shit"
+  install -Dm644 docs/shit.1 "$pkgdir/usr/share/man/man1/shit.1"
+  install -Dm644 docs/shit.5 "$pkgdir/usr/share/man/man5/shit.5"
+  install -Dm644 completions/shit.bash "$pkgdir/usr/share/bash-completion/completions/shit"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
 
 sha512sums="
