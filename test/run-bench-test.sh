@@ -163,19 +163,24 @@ run_pair() {
   printf '%s %s\n' "$REFERENCE_SECONDS" "$CANDIDATE_SECONDS" >>"$RESULTS"
 }
 
-median_column() {
+minimum_column() {
   local RESULTS=$1
   local COLUMN=$2
 
-  awk -v COLUMN="$COLUMN" '{ print $COLUMN }' "$RESULTS" | sort -n |
-    awk '{ VALUE[NR] = $1 } END { print VALUE[(NR + 1) / 2] }'
+  awk -v COLUMN="$COLUMN" '
+    NR == 1 || $COLUMN < MINIMUM { MINIMUM = $COLUMN }
+    END { print MINIMUM }
+  ' "$RESULTS"
 }
 
-median_speedup() {
+maximum_column() {
   local RESULTS=$1
+  local COLUMN=$2
 
-  awk '{ print $1 / $2 }' "$RESULTS" | sort -n |
-    awk '{ VALUE[NR] = $1 } END { print VALUE[(NR + 1) / 2] }'
+  awk -v COLUMN="$COLUMN" '
+    NR == 1 || $COLUMN > MAXIMUM { MAXIMUM = $COLUMN }
+    END { print MAXIMUM }
+  ' "$RESULTS"
 }
 
 benchmark_pair() {
@@ -187,9 +192,9 @@ benchmark_pair() {
   local RESULTS=$WORK/$MODE-results
   local SAMPLE_INDEX
   local ORDER
-  local REFERENCE_MEDIAN
-  local CANDIDATE_MEDIAN
-  local SPEEDUP_MEDIAN
+  local REFERENCE_MAXIMUM
+  local CANDIDATE_MINIMUM
+  local SPEEDUP
 
   if [ "$MODE" = sh ]; then
     REFERENCE_LABEL=$(basename "$DASH")
@@ -225,25 +230,27 @@ benchmark_pair() {
     run_pair "$MODE" "$ORDER" "$RESULTS"
   done
 
-  REFERENCE_MEDIAN=$(median_column "$RESULTS" 1)
-  CANDIDATE_MEDIAN=$(median_column "$RESULTS" 2)
-  SPEEDUP_MEDIAN=$(median_speedup "$RESULTS")
-  printf "  %-16s%s median\n" "$REFERENCE_LABEL" "$REFERENCE_MEDIAN"
-  printf "  %-16s%s median\n" "$CANDIDATE_LABEL" "$CANDIDATE_MEDIAN"
+  REFERENCE_MAXIMUM=$(maximum_column "$RESULTS" 1)
+  CANDIDATE_MINIMUM=$(minimum_column "$RESULTS" 2)
+  SPEEDUP=$(awk -v REFERENCE="$REFERENCE_MAXIMUM" \
+    -v CANDIDATE="$CANDIDATE_MINIMUM" \
+    'BEGIN { print REFERENCE / CANDIDATE }')
+  printf "  %-16s%s maximum\n" "$REFERENCE_LABEL" "$REFERENCE_MAXIMUM"
+  printf "  %-16s%s minimum\n" "$CANDIDATE_LABEL" "$CANDIDATE_MINIMUM"
   echo "output matches $REFERENCE_NAME"
-  echo "median paired speedup is $SPEEDUP_MEDIAN"
+  echo "best-case speedup is $SPEEDUP"
 
   if awk -v REQUIRED="$REQUIRED_SPEEDUP" \
     'BEGIN { exit !(REQUIRED + 0 > 0) }'
   then
     if [ "$MODE" = sh ]; then
-      awk -v SPEEDUP="$SPEEDUP_MEDIAN" -v REQUIRED="$REQUIRED_SPEEDUP" \
+      awk -v SPEEDUP="$SPEEDUP" -v REQUIRED="$REQUIRED_SPEEDUP" \
         'BEGIN { exit !(SPEEDUP + 0 > REQUIRED + 0) }' || {
           echo "shit is not faster than dash" >&2
           return 1
         }
     else
-      awk -v SPEEDUP="$SPEEDUP_MEDIAN" -v REQUIRED="$REQUIRED_SPEEDUP" \
+      awk -v SPEEDUP="$SPEEDUP" -v REQUIRED="$REQUIRED_SPEEDUP" \
         'BEGIN { exit !(SPEEDUP + 0 >= REQUIRED + 0) }' || {
           echo "shit is not at least $REQUIRED_SPEEDUP times faster" \
             "than bash" >&2
@@ -262,8 +269,8 @@ case "$BENCH_WARMUP_COUNT:$BENCH_SAMPLE_COUNT" in
     exit 1
     ;;
 esac
-if [ "$BENCH_SAMPLE_COUNT" -lt 1 ] || ((BENCH_SAMPLE_COUNT % 2 == 0)); then
-  echo "the benchmark sample count must be a positive odd integer" >&2
+if [ "$BENCH_SAMPLE_COUNT" -lt 1 ]; then
+  echo "the benchmark sample count must be a positive integer" >&2
   exit 1
 fi
 awk -v DASH_REQUIRED="$DASH_SPEEDUP_REQUIRED" \
