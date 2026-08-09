@@ -1,31 +1,34 @@
 #!/bin/bash
 
-test_shell=$1
+TEST_SHELL_COMMAND=$1
 
 if [ -n "${REFILL-}" ]; then
-  "$test_shell" run-shit-test.sh --refill $REFILL
-  for name in $REFILL; do
-    if [ -f "cli/$name.sh" ]; then
-      "$test_shell" run-cli-test.sh --refill "$test_shell" "cli/$name.sh"
+  "$TEST_SHELL_COMMAND" run-shit-test.sh --refill $REFILL
+  for TEST_NAME in $REFILL; do
+    if [ -f "cli/$TEST_NAME.sh" ]; then
+      "$TEST_SHELL_COMMAND" run-cli-test.sh --refill \
+        "$TEST_SHELL_COMMAND" "cli/$TEST_NAME.sh"
     fi
-    if [ -f "completion/$name.sh" ]; then
-      "$test_shell" run-completion-test.sh --refill "$test_shell" \
-        "completion/$name.sh"
+    if [ -f "completion/$TEST_NAME.sh" ]; then
+      "$TEST_SHELL_COMMAND" run-completion-test.sh --refill \
+        "$TEST_SHELL_COMMAND" "completion/$TEST_NAME.sh"
     fi
-    if [ -f "highlight/$name.sh" ]; then
-      "$test_shell" run-highlight-test.sh --refill "$test_shell" \
-        "highlight/$name.sh"
+    if [ -f "highlight/$TEST_NAME.sh" ]; then
+      "$TEST_SHELL_COMMAND" run-highlight-test.sh --refill \
+        "$TEST_SHELL_COMMAND" "highlight/$TEST_NAME.sh"
     fi
   done
   exit 0
 fi
 
-native_names=
-for test_file in shit/*.shit; do
-  name=${test_file#shit/}
-  native_names="$native_names ${name%.shit}"
+NATIVE_TEST_NAMES=
+for TEST_FILE in shit/*.shit; do
+  TEST_NAME=${TEST_FILE#shit/}
+  NATIVE_TEST_NAMES="$NATIVE_TEST_NAMES ${TEST_NAME%.shit}"
 done
-"$test_shell" run-shit-test.sh --refill $native_names
-"$test_shell" run-cli-test.sh --refill "$test_shell" cli/*.sh
-"$test_shell" run-completion-test.sh --refill "$test_shell" completion/*.sh
-"$test_shell" run-highlight-test.sh --refill "$test_shell" highlight/*.sh
+"$TEST_SHELL_COMMAND" run-shit-test.sh --refill $NATIVE_TEST_NAMES
+"$TEST_SHELL_COMMAND" run-cli-test.sh --refill "$TEST_SHELL_COMMAND" cli/*.sh
+"$TEST_SHELL_COMMAND" run-completion-test.sh --refill \
+  "$TEST_SHELL_COMMAND" completion/*.sh
+"$TEST_SHELL_COMMAND" run-highlight-test.sh --refill \
+  "$TEST_SHELL_COMMAND" highlight/*.sh

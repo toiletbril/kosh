@@ -1,69 +1,69 @@
 #!/bin/bash
-refill_mode=no
-test_status=0
+REFILL_MODE=no
+TEST_STATUS=0
 if [ "${1-}" = --refill ]; then
-  refill_mode=yes
+  REFILL_MODE=yes
   shift
 fi
 
-test_shell=$1
+TEST_SHELL_COMMAND=$1
 shift
 
-for f in "$@"; do
-  name=$(basename "$f" .sh)
-  case $name in
+for TEST_FILE in "$@"; do
+  TEST_NAME=$(basename "$TEST_FILE" .sh)
+  case $TEST_NAME in
   command_substitution_strategy|fg_terminal_handoff)
     if [ "${IS_NONDEBUG_BUILD:-0}" = 1 ]; then
-      printf "\t%-64s skipped, release binary\n" "cli/$name.sh"
+      printf "\t%-64s skipped, release binary\n" "cli/$TEST_NAME.sh"
       continue
     fi
     ;;
   esac
-  if [ "$refill_mode" = yes ]; then
-    out="expected/.$name.out.tmp"
+  if [ "$REFILL_MODE" = yes ]; then
+    OUTPUT="expected/.$TEST_NAME.out.tmp"
   else
-    output_directory="$TEST_TEMP_DIRECTORY/results/cli"
-    mkdir -p "$output_directory"
-    out="$output_directory/$name.out"
+    OUTPUT_DIRECTORY="$TEST_TEMP_DIRECTORY/results/cli"
+    mkdir -p "$OUTPUT_DIRECTORY"
+    OUTPUT="$OUTPUT_DIRECTORY/$TEST_NAME.out"
   fi
 
-  case $name in
+  case $TEST_NAME in
   command_substitution_interrupt|fg_terminal_handoff|history_behavior|read_behavior|\
     shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job)
-    golden_timeout_seconds=60
-    if [ "$name" = history_behavior ] || [ "$name" = shitbox_timeout ]; then
-      golden_timeout_seconds=120
+    GOLDEN_TIMEOUT_SECONDS=60
+    if [ "$TEST_NAME" = history_behavior ] || [ "$TEST_NAME" = shitbox_timeout ]; then
+      GOLDEN_TIMEOUT_SECONDS=120
     fi
-    CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$golden_timeout_seconds} \
-      BIN="$BIN" "$test_shell" ./run-bounded-cli-golden.sh "$f" \
-      > "$out" 2>&1
-    driver_status=$?
-    if [ "$refill_mode" = yes ] && [ "$driver_status" -ne 0 ]; then
-      rm -f "$out"
-      exit "$driver_status"
+    CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$GOLDEN_TIMEOUT_SECONDS} \
+      BIN="$BIN" "$TEST_SHELL_COMMAND" ./run-bounded-cli-golden.sh \
+      "$TEST_FILE" > "$OUTPUT" 2>&1
+    DRIVER_STATUS=$?
+    if [ "$REFILL_MODE" = yes ] && [ "$DRIVER_STATUS" -ne 0 ]; then
+      rm -f "$OUTPUT"
+      exit "$DRIVER_STATUS"
     fi
-    if [ "$refill_mode" = no ] && [ "$driver_status" -ne 0 ]; then
-      printf 'golden exited with status %s\n' "$driver_status" >> "$out"
+    if [ "$REFILL_MODE" = no ] && [ "$DRIVER_STATUS" -ne 0 ]; then
+      printf 'golden exited with status %s\n' "$DRIVER_STATUS" >> "$OUTPUT"
     fi
     ;;
   *)
-    BIN="$BIN" "$test_shell" "$f" > "$out" 2>&1
+    BIN="$BIN" "$TEST_SHELL_COMMAND" "$TEST_FILE" > "$OUTPUT" 2>&1
     ;;
   esac
-  if [ "$refill_mode" = yes ]; then
-    mv "$out" "expected/$name.out"
-    printf "\t%-64s cli/%s.out\n" "cli/$name.sh" "$name"
+  if [ "$REFILL_MODE" = yes ]; then
+    mv "$OUTPUT" "expected/$TEST_NAME.out"
+    printf "\t%-64s cli/%s.out\n" "cli/$TEST_NAME.sh" "$TEST_NAME"
     continue
   fi
 
-  if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1; then
-    printf "\t%-64s ok\033[K\r" "cli/$name.sh"
+  if diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" >/dev/null 2>&1; then
+    printf "\t%-64s ok\033[K\r" "cli/$TEST_NAME.sh"
   else
-    diff $DIFF_FLAGS "expected/$name.out" "$out" | tee -a "$FAILED_LIST"
-    printf "\t%-64s FAILED :c\n" "cli/$name.sh"
-    test_status=1
+    diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" | tee -a "$FAILED_LIST"
+    printf "\t%-64s FAILED :c\n" "cli/$TEST_NAME.sh"
+    TEST_STATUS=1
   fi
-  rm -f "$out"
+  rm -f "$OUTPUT"
 done
 
-exit "$test_status"
+exit "$TEST_STATUS"

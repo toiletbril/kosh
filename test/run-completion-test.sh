@@ -1,13 +1,13 @@
 #!/bin/bash
 
-refill_mode=no
-test_status=0
+REFILL_MODE=no
+TEST_STATUS=0
 if [ "${1-}" = --refill ]; then
-  refill_mode=yes
+  REFILL_MODE=yes
   shift
 fi
 
-test_shell=$1
+TEST_SHELL_COMMAND=$1
 shift
 
 if [ "${IS_NONDEBUG_BUILD:-0}" = 1 ]; then
@@ -15,31 +15,31 @@ if [ "${IS_NONDEBUG_BUILD:-0}" = 1 ]; then
   exit 0
 fi
 
-for test_file in "$@"; do
-  name=$(basename "$test_file" .sh)
-  if [ "$refill_mode" = yes ]; then
-    output="expected/.$name.out.tmp"
+for TEST_FILE in "$@"; do
+  TEST_NAME=$(basename "$TEST_FILE" .sh)
+  if [ "$REFILL_MODE" = yes ]; then
+    OUTPUT="expected/.$TEST_NAME.out.tmp"
   else
-    output_directory="$TEST_TEMP_DIRECTORY/results/completion"
-    mkdir -p "$output_directory"
-    output="$output_directory/$name.out"
+    OUTPUT_DIRECTORY="$TEST_TEMP_DIRECTORY/results/completion"
+    mkdir -p "$OUTPUT_DIRECTORY"
+    OUTPUT="$OUTPUT_DIRECTORY/$TEST_NAME.out"
   fi
 
-  BIN="$BIN" "$test_shell" "$test_file" > "$output" 2>/dev/null
-  if [ "$refill_mode" = yes ]; then
-    mv "$output" "expected/$name.out"
-    printf "\t%-64s %s.out\n" "completion/$name.sh" "$name"
+  BIN="$BIN" "$TEST_SHELL_COMMAND" "$TEST_FILE" > "$OUTPUT" 2>/dev/null
+  if [ "$REFILL_MODE" = yes ]; then
+    mv "$OUTPUT" "expected/$TEST_NAME.out"
+    printf "\t%-64s %s.out\n" "completion/$TEST_NAME.sh" "$TEST_NAME"
     continue
   fi
 
-  if diff $DIFF_FLAGS "expected/$name.out" "$output" >/dev/null 2>&1; then
-    printf "\t%-64s ok\033[K\r" "completion/$name.sh"
+  if diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" >/dev/null 2>&1; then
+    printf "\t%-64s ok\033[K\r" "completion/$TEST_NAME.sh"
   else
-    diff $DIFF_FLAGS "expected/$name.out" "$output" | tee -a "$FAILED_LIST"
-    printf "\t%-64s FAILED :c\n" "completion/$name.sh"
-    test_status=1
+    diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" | tee -a "$FAILED_LIST"
+    printf "\t%-64s FAILED :c\n" "completion/$TEST_NAME.sh"
+    TEST_STATUS=1
   fi
-  rm -f "$output"
+  rm -f "$OUTPUT"
 done
 
-exit "$test_status"
+exit "$TEST_STATUS"

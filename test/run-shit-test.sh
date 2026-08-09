@@ -1,39 +1,39 @@
 #!/bin/bash
-refill_mode=no
-test_status=0
+REFILL_MODE=no
+TEST_STATUS=0
 if [ "${1-}" = --refill ]; then
-  refill_mode=yes
+  REFILL_MODE=yes
   shift
 fi
 
-for name in "$@"; do
-  [ -f "shit/$name.shit" ] || continue
-  case $name in
-  shellcheck_static) test_bin_flags="$BIN_FLAGS -W" ;;
-  *) test_bin_flags="$BIN_FLAGS --no-annoying-diagnostics" ;;
+for TEST_NAME in "$@"; do
+  [ -f "shit/$TEST_NAME.shit" ] || continue
+  case $TEST_NAME in
+  shellcheck_static) TEST_BIN_FLAGS="$BIN_FLAGS -W" ;;
+  *) TEST_BIN_FLAGS="$BIN_FLAGS --no-annoying-diagnostics" ;;
   esac
-  if [ "$refill_mode" = yes ]; then
-    out="expected/.$name.out.tmp"
-    "$BIN" $test_bin_flags - < "shit/$name.shit" > "$out" 2>&1
-    mv "$out" "expected/$name.out"
-    printf "\t%-64s %s.out\n" "$name.shit" "$name"
+  if [ "$REFILL_MODE" = yes ]; then
+    OUTPUT="expected/.$TEST_NAME.out.tmp"
+    "$BIN" $TEST_BIN_FLAGS - < "shit/$TEST_NAME.shit" > "$OUTPUT" 2>&1
+    mv "$OUTPUT" "expected/$TEST_NAME.out"
+    printf "\t%-64s %s.out\n" "$TEST_NAME.shit" "$TEST_NAME"
     continue
   fi
 
-  output_directory="$TEST_TEMP_DIRECTORY/results/shit"
-  mkdir -p "$output_directory"
-  out="$output_directory/$name.out"
-  "$BIN" $test_bin_flags - < "shit/$name.shit" > "$out" 2>&1
-  if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1 || \
-    { [ -f "expected/${name}_1.out" ] && \
-      diff $DIFF_FLAGS "expected/${name}_1.out" "$out" >/dev/null 2>&1; }; then
-    printf "\t%-64s ok\033[K\r" "$name.shit"
+  OUTPUT_DIRECTORY="$TEST_TEMP_DIRECTORY/results/shit"
+  mkdir -p "$OUTPUT_DIRECTORY"
+  OUTPUT="$OUTPUT_DIRECTORY/$TEST_NAME.out"
+  "$BIN" $TEST_BIN_FLAGS - < "shit/$TEST_NAME.shit" > "$OUTPUT" 2>&1
+  if diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" >/dev/null 2>&1 || \
+    { [ -f "expected/${TEST_NAME}_1.out" ] && \
+      diff $DIFF_FLAGS "expected/${TEST_NAME}_1.out" "$OUTPUT" >/dev/null 2>&1; }; then
+    printf "\t%-64s ok\033[K\r" "$TEST_NAME.shit"
   else
-    diff $DIFF_FLAGS "expected/$name.out" "$out" | tee -a "$FAILED_LIST"
-    printf "\t%-64s FAILED :c\n" "$name.shit"
-    test_status=1
+    diff $DIFF_FLAGS "expected/$TEST_NAME.out" "$OUTPUT" | tee -a "$FAILED_LIST"
+    printf "\t%-64s FAILED :c\n" "$TEST_NAME.shit"
+    TEST_STATUS=1
   fi
-  rm -f "$out"
+  rm -f "$OUTPUT"
 done
 
-exit "$test_status"
+exit "$TEST_STATUS"

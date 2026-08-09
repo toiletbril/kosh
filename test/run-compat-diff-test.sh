@@ -1,87 +1,89 @@
 #!/bin/bash
 
 compare_one() {
-  local reference_shell=$1
-  local file=$2
-  local suffix=$3
-  local label=$4
-  local mood=$5
-  local explicit_output mimic_output reference_output alternative_file alternative_output
-  local explicit_matches=0 mimic_matches=0
+  local REFERENCE_SHELL=$1
+  local TEST_FILE=$2
+  local SUFFIX=$3
+  local REFERENCE_LABEL=$4
+  local MOOD=$5
+  local EXPLICIT_OUTPUT MIMIC_OUTPUT REFERENCE_OUTPUT ALTERNATIVE_FILE
+  local ALTERNATIVE_OUTPUT
+  local EXPLICIT_MATCHES=0 MIMIC_MATCHES=0
 
-  explicit_output="$("$BIN" --mood "$mood" "$file" 2>/dev/null; printf X)"
-  explicit_output=${explicit_output%X}
-  mimic_output="$("$BIN" -I -c "$file" 2>/dev/null; printf X)"
-  mimic_output=${mimic_output%X}
-  reference_output="$("$reference_shell" "$file" 2>/dev/null; printf X)"
-  reference_output=${reference_output%X}
+  EXPLICIT_OUTPUT="$("$BIN" --mood "$MOOD" "$TEST_FILE" 2>/dev/null; printf X)"
+  EXPLICIT_OUTPUT=${EXPLICIT_OUTPUT%X}
+  MIMIC_OUTPUT="$("$BIN" -I -c "$TEST_FILE" 2>/dev/null; printf X)"
+  MIMIC_OUTPUT=${MIMIC_OUTPUT%X}
+  REFERENCE_OUTPUT="$("$REFERENCE_SHELL" "$TEST_FILE" 2>/dev/null; printf X)"
+  REFERENCE_OUTPUT=${REFERENCE_OUTPUT%X}
 
-  if [ "$explicit_output" = "$reference_output" ]; then
-    explicit_matches=1
+  if [ "$EXPLICIT_OUTPUT" = "$REFERENCE_OUTPUT" ]; then
+    EXPLICIT_MATCHES=1
   fi
-  if [ "$mimic_output" = "$reference_output" ]; then
-    mimic_matches=1
+  if [ "$MIMIC_OUTPUT" = "$REFERENCE_OUTPUT" ]; then
+    MIMIC_MATCHES=1
   fi
 
-  alternative_file="${file%$suffix}_1$suffix"
-  if [ -f "$alternative_file" ] && \
-    { [ "$explicit_matches" -eq 0 ] || [ "$mimic_matches" -eq 0 ]; }
+  ALTERNATIVE_FILE="${TEST_FILE%$SUFFIX}_1$SUFFIX"
+  if [ -f "$ALTERNATIVE_FILE" ] && \
+    { [ "$EXPLICIT_MATCHES" -eq 0 ] || [ "$MIMIC_MATCHES" -eq 0 ]; }
   then
-    alternative_output="$("$reference_shell" "$alternative_file" 2>/dev/null; printf X)"
-    alternative_output=${alternative_output%X}
-    if [ "$explicit_output" = "$alternative_output" ]; then
-      explicit_matches=1
+    ALTERNATIVE_OUTPUT="$("$REFERENCE_SHELL" "$ALTERNATIVE_FILE" 2>/dev/null; printf X)"
+    ALTERNATIVE_OUTPUT=${ALTERNATIVE_OUTPUT%X}
+    if [ "$EXPLICIT_OUTPUT" = "$ALTERNATIVE_OUTPUT" ]; then
+      EXPLICIT_MATCHES=1
     fi
-    if [ "$mimic_output" = "$alternative_output" ]; then
-      mimic_matches=1
+    if [ "$MIMIC_OUTPUT" = "$ALTERNATIVE_OUTPUT" ]; then
+      MIMIC_MATCHES=1
     fi
   fi
 
-  if [ "$explicit_matches" -eq 1 ] && [ "$mimic_matches" -eq 1 ]; then
-    printf "\t%-64s ok\033[K\r" "$file"
+  if [ "$EXPLICIT_MATCHES" -eq 1 ] && [ "$MIMIC_MATCHES" -eq 1 ]; then
+    printf "\t%-64s ok\033[K\r" "$TEST_FILE"
     return
   fi
 
-  if [ "$explicit_matches" -eq 0 ]; then
-    diff $DIFF_FLAGS --label "$file (shit --mood $mood)" \
-      --label "$file ($label)" \
-      <(printf '%s' "$explicit_output") \
-      <(printf '%s' "$reference_output") >> "$FAILED_LIST"
+  if [ "$EXPLICIT_MATCHES" -eq 0 ]; then
+    diff $DIFF_FLAGS --label "$TEST_FILE (shit --mood $MOOD)" \
+      --label "$TEST_FILE ($REFERENCE_LABEL)" \
+      <(printf '%s' "$EXPLICIT_OUTPUT") \
+      <(printf '%s' "$REFERENCE_OUTPUT") >> "$FAILED_LIST"
   fi
-  if [ "$mimic_matches" -eq 0 ]; then
-    diff $DIFF_FLAGS --label "$file (shit -I)" \
-      --label "$file ($label)" \
-      <(printf '%s' "$mimic_output") \
-      <(printf '%s' "$reference_output") >> "$FAILED_LIST"
+  if [ "$MIMIC_MATCHES" -eq 0 ]; then
+    diff $DIFF_FLAGS --label "$TEST_FILE (shit -I)" \
+      --label "$TEST_FILE ($REFERENCE_LABEL)" \
+      <(printf '%s' "$MIMIC_OUTPUT") \
+      <(printf '%s' "$REFERENCE_OUTPUT") >> "$FAILED_LIST"
   fi
-  printf "\t%-64s FAILED :c\n" "$file"
+  printf "\t%-64s FAILED :c\n" "$TEST_FILE"
 }
 
-bash_skip_reason=
+BASH_SKIP_REASON=
 if ! command -v "$BASHP" >/dev/null 2>&1; then
-  bash_skip_reason="no $BASHP"
+  BASH_SKIP_REASON="no $BASHP"
 else
-  bash_version=$("$BASHP" -c 'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
-  bash_major=${bash_version%%.*}
-  bash_minor=${bash_version#*.}
-  if [ -z "$bash_major" ] || [ "$bash_major" -lt 5 ] || \
-    { [ "$bash_major" -eq 5 ] && [ "$bash_minor" -lt 3 ]; }
+  BASH_VERSION_TEXT=$("$BASHP" -c \
+    'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
+  BASH_MAJOR_VERSION=${BASH_VERSION_TEXT%%.*}
+  BASH_MINOR_VERSION=${BASH_VERSION_TEXT#*.}
+  if [ -z "$BASH_MAJOR_VERSION" ] || [ "$BASH_MAJOR_VERSION" -lt 5 ] || \
+    { [ "$BASH_MAJOR_VERSION" -eq 5 ] && [ "$BASH_MINOR_VERSION" -lt 3 ]; }
   then
-    bash_skip_reason="$BASHP is bash ${bash_version:-unknown}, need 5.3+"
+    BASH_SKIP_REASON="$BASHP is bash ${BASH_VERSION_TEXT:-unknown}, need 5.3+"
   fi
 fi
 
-if [ -z "$bash_skip_reason" ]; then
-  for file in $BASH_COMPAT_FILES; do
-    compare_one "$BASHP" "$file" .bash bash bash
+if [ -z "$BASH_SKIP_REASON" ]; then
+  for TEST_FILE in $BASH_COMPAT_FILES; do
+    compare_one "$BASHP" "$TEST_FILE" .bash bash bash
   done
 else
-  printf "\t%-64s skipped, %s\n" bashdiff "$bash_skip_reason"
+  printf "\t%-64s skipped, %s\n" bashdiff "$BASH_SKIP_REASON"
 fi
 
 if command -v "$DASH" >/dev/null 2>&1; then
-  for file in $SH_COMPAT_FILES; do
-    compare_one "$DASH" "$file" .sh dash sh
+  for TEST_FILE in $SH_COMPAT_FILES; do
+    compare_one "$DASH" "$TEST_FILE" .sh dash sh
   done
 else
   printf "\t%-64s skipped, no %s\n" dashdiff "$DASH"

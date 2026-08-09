@@ -1,14 +1,14 @@
 #!/bin/bash
 
-golden=$1
-timeout_seconds=${CLI_TEST_TIMEOUT_SECONDS:-60}
-golden_process=
-golden_session=
-host_system=$(uname -s)
-cleanup_is_armed=yes
-pending_exit_status=
+GOLDEN=$1
+TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-60}
+GOLDEN_PROCESS=
+GOLDEN_SESSION=
+HOST_SYSTEM=$(uname -s)
+CLEANUP_IS_ARMED=yes
+PENDING_EXIT_STATUS=
 
-case $timeout_seconds in
+case $TIMEOUT_SECONDS in
 ''|*[!0-9]*|0)
   printf 'invalid CLI golden timeout\n'
   exit 125
@@ -17,24 +17,24 @@ esac
 
 list_golden_session_processes()
 {
-  if [ "$host_system" = Linux ]; then
-    for process_stat_path in /proc/[0-9]*/stat; do
-      [ -r "$process_stat_path" ] || continue
-      IFS= read -r process_stat < "$process_stat_path" || continue
-      process_fields=${process_stat##*) }
-      set -- $process_fields
+  if [ "$HOST_SYSTEM" = Linux ]; then
+    for PROCESS_STAT_PATH in /proc/[0-9]*/stat; do
+      [ -r "$PROCESS_STAT_PATH" ] || continue
+      IFS= read -r PROCESS_STAT < "$PROCESS_STAT_PATH" || continue
+      PROCESS_FIELDS=${PROCESS_STAT##*) }
+      set -- $PROCESS_FIELDS
       [ "$#" -ge 4 ] || continue
       [ "$1" = Z ] && continue
-      [ "$4" = "$golden_session" ] || continue
-      process_id=${process_stat_path#/proc/}
-      printf '%s\n' "${process_id%/stat}"
+      [ "$4" = "$GOLDEN_SESSION" ] || continue
+      PROCESS_ID=${PROCESS_STAT_PATH#/proc/}
+      printf '%s\n' "${PROCESS_ID%/stat}"
     done
     return
   fi
 
-  if [ "$host_system" = Darwin ]; then
-    process_ids=$(ps -Ao pid= 2>/dev/null) || return 1
-    printf '%s\n' "$process_ids" | python3 -c '
+  if [ "$HOST_SYSTEM" = Darwin ]; then
+    PROCESS_IDS=$(ps -Ao pid= 2>/dev/null) || return 1
+    printf '%s\n' "$PROCESS_IDS" | python3 -c '
 import os
 import sys
 
@@ -51,20 +51,20 @@ for line in sys.stdin:
     continue
   if process_session == session:
     print(process)
-    ' "$golden_session"
+    ' "$GOLDEN_SESSION"
     return
   fi
 
-  if process_table=$(ps -Ao pid=,sess= 2>/dev/null); then
+  if PROCESS_TABLE=$(ps -Ao pid=,sess= 2>/dev/null); then
     :
-  elif process_table=$(ps -Ao pid=,sid= 2>/dev/null); then
+  elif PROCESS_TABLE=$(ps -Ao pid=,sid= 2>/dev/null); then
     :
   else
     return 1
   fi
-  printf '%s\n' "$process_table" | while read -r process_id process_session; do
-    if [ "$process_session" = "$golden_session" ]; then
-      printf '%s\n' "$process_id"
+  printf '%s\n' "$PROCESS_TABLE" | while read -r PROCESS_ID PROCESS_SESSION; do
+    if [ "$PROCESS_SESSION" = "$GOLDEN_SESSION" ]; then
+      printf '%s\n' "$PROCESS_ID"
     fi
   done
 }
@@ -73,48 +73,48 @@ terminate_golden_tree()
 {
   if [ "${OS-}" = Windows_NT ] &&
     command -v taskkill.exe >/dev/null 2>&1; then
-    [ -n "$golden_process" ] || return
-    taskkill.exe //PID "$golden_process" //T //F >/dev/null 2>&1 || true
-    kill -KILL "$golden_process" 2>/dev/null || true
+    [ -n "$GOLDEN_PROCESS" ] || return
+    taskkill.exe //PID "$GOLDEN_PROCESS" //T //F >/dev/null 2>&1 || true
+    kill -KILL "$GOLDEN_PROCESS" 2>/dev/null || true
     return
   fi
 
-  discovery_failed=no
-  session_processes=$(list_golden_session_processes) || {
-    discovery_failed=yes
-    session_processes=
+  DISCOVERY_FAILED=no
+  SESSION_PROCESSES=$(list_golden_session_processes) || {
+    DISCOVERY_FAILED=yes
+    SESSION_PROCESSES=
   }
-  if [ -n "$golden_process$session_processes" ]; then
-    kill -TERM $golden_process $session_processes 2>/dev/null || true
+  if [ -n "$GOLDEN_PROCESS$SESSION_PROCESSES" ]; then
+    kill -TERM $GOLDEN_PROCESS $SESSION_PROCESSES 2>/dev/null || true
   fi
   sleep 0.1
-  session_processes=$(list_golden_session_processes) || {
-    discovery_failed=yes
-    session_processes=
+  SESSION_PROCESSES=$(list_golden_session_processes) || {
+    DISCOVERY_FAILED=yes
+    SESSION_PROCESSES=
   }
-  if [ -n "$golden_process$session_processes" ]; then
-    kill -KILL $golden_process $session_processes 2>/dev/null || true
+  if [ -n "$GOLDEN_PROCESS$SESSION_PROCESSES" ]; then
+    kill -KILL $GOLDEN_PROCESS $SESSION_PROCESSES 2>/dev/null || true
   fi
-  [ "$discovery_failed" = no ]
+  [ "$DISCOVERY_FAILED" = no ]
 }
 
 cleanup_golden_tree()
 {
-  if [ "$cleanup_is_armed" = yes ] && [ -n "$golden_session" ]; then
+  if [ "$CLEANUP_IS_ARMED" = yes ] && [ -n "$GOLDEN_SESSION" ]; then
     if ! terminate_golden_tree; then
       printf 'golden session discovery failed\n'
     fi
-    if [ -n "$golden_process" ]; then
-      wait "$golden_process" 2>/dev/null || true
+    if [ -n "$GOLDEN_PROCESS" ]; then
+      wait "$GOLDEN_PROCESS" 2>/dev/null || true
     fi
   fi
 }
 
 request_exit()
 {
-  pending_exit_status=$1
-  if [ -n "$golden_session" ]; then
-    exit "$pending_exit_status"
+  PENDING_EXIT_STATUS=$1
+  if [ -n "$GOLDEN_SESSION" ]; then
+    exit "$PENDING_EXIT_STATUS"
   fi
 }
 
@@ -124,95 +124,95 @@ trap 'request_exit 143' TERM
 trap 'request_exit 129' HUP
 
 if [ "${OS-}" = Windows_NT ]; then
-  BIN=$BIN BOUNDED_GOLDEN=$golden BOUNDED_TIMEOUT_SECONDS=$timeout_seconds \
+  BIN=$BIN BOUNDED_GOLDEN=$GOLDEN BOUNDED_TIMEOUT_SECONDS=$TIMEOUT_SECONDS \
     SHIT_TEST_TIMEOUT_JOB_LIFETIME=leader \
     "$BIN" -p --mood sh -c \
     'shitbox timeout "$BOUNDED_TIMEOUT_SECONDS" "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; sh "$BOUNDED_GOLDEN"'\''' &
 elif command -v setsid >/dev/null 2>&1; then
-  BIN=$BIN setsid /bin/sh "$golden" &
+  BIN=$BIN setsid /bin/sh "$GOLDEN" &
 elif command -v perl >/dev/null 2>&1; then
   BIN=$BIN perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' \
-    /bin/sh "$golden" &
+    /bin/sh "$GOLDEN" &
 else
   printf 'cannot create a CLI golden session\n'
   exit 125
 fi
-golden_process=$!
-golden_session=$golden_process
-if [ -n "$pending_exit_status" ]; then
-  exit "$pending_exit_status"
+GOLDEN_PROCESS=$!
+GOLDEN_SESSION=$GOLDEN_PROCESS
+if [ -n "$PENDING_EXIT_STATUS" ]; then
+  exit "$PENDING_EXIT_STATUS"
 fi
 
 if [ "${OS-}" = Windows_NT ]; then
-  wait "$golden_process"
-  golden_status=$?
-  golden_process=
-  cleanup_is_armed=no
-  if [ "$golden_status" -eq 124 ]; then
+  wait "$GOLDEN_PROCESS"
+  GOLDEN_STATUS=$?
+  GOLDEN_PROCESS=
+  CLEANUP_IS_ARMED=no
+  if [ "$GOLDEN_STATUS" -eq 124 ]; then
     printf 'golden timed out\n'
   fi
-  exit "$golden_status"
+  exit "$GOLDEN_STATUS"
 fi
 
-attempt_count=0
-attempt_limit=$((timeout_seconds * 10))
-while kill -0 "$golden_process" 2>/dev/null &&
-  [ "$attempt_count" -lt "$attempt_limit" ]; do
+ATTEMPT_COUNT=0
+ATTEMPT_LIMIT=$((TIMEOUT_SECONDS * 10))
+while kill -0 "$GOLDEN_PROCESS" 2>/dev/null &&
+  [ "$ATTEMPT_COUNT" -lt "$ATTEMPT_LIMIT" ]; do
   sleep 0.1
-  attempt_count=$((attempt_count + 1))
+  ATTEMPT_COUNT=$((ATTEMPT_COUNT + 1))
 done
 
-if kill -0 "$golden_process" 2>/dev/null; then
+if kill -0 "$GOLDEN_PROCESS" 2>/dev/null; then
   printf 'golden timed out\n'
-  termination_status=0
-  terminate_golden_tree || termination_status=$?
-  wait "$golden_process" 2>/dev/null || true
-  golden_process=
-  cleanup_is_armed=no
-  if [ "$termination_status" -ne 0 ]; then
+  TERMINATION_STATUS=0
+  terminate_golden_tree || TERMINATION_STATUS=$?
+  wait "$GOLDEN_PROCESS" 2>/dev/null || true
+  GOLDEN_PROCESS=
+  CLEANUP_IS_ARMED=no
+  if [ "$TERMINATION_STATUS" -ne 0 ]; then
     printf 'golden session discovery failed\n'
     exit 125
   fi
   exit 124
 fi
 
-wait "$golden_process"
-golden_status=$?
-golden_process=
-attempt_count=0
-has_living_descendant=yes
-session_discovery_failed=no
-while [ "$has_living_descendant" = yes ] && [ "$attempt_count" -lt 1000 ]; do
-  has_living_descendant=no
+wait "$GOLDEN_PROCESS"
+GOLDEN_STATUS=$?
+GOLDEN_PROCESS=
+ATTEMPT_COUNT=0
+HAS_LIVING_DESCENDANT=yes
+SESSION_DISCOVERY_FAILED=no
+while [ "$HAS_LIVING_DESCENDANT" = yes ] && [ "$ATTEMPT_COUNT" -lt 1000 ]; do
+  HAS_LIVING_DESCENDANT=no
   if [ "${OS-}" != Windows_NT ]; then
-    session_processes=$(list_golden_session_processes) || {
-      session_discovery_failed=yes
+    SESSION_PROCESSES=$(list_golden_session_processes) || {
+      SESSION_DISCOVERY_FAILED=yes
       break
     }
-    for process_id in $session_processes; do
-      if [ -n "$process_id" ]; then
-        has_living_descendant=yes
+    for PROCESS_ID in $SESSION_PROCESSES; do
+      if [ -n "$PROCESS_ID" ]; then
+        HAS_LIVING_DESCENDANT=yes
         break
       fi
     done
   fi
-  if [ "$has_living_descendant" = yes ]; then
+  if [ "$HAS_LIVING_DESCENDANT" = yes ]; then
     sleep 0.01
-    attempt_count=$((attempt_count + 1))
+    ATTEMPT_COUNT=$((ATTEMPT_COUNT + 1))
   fi
 done
-if [ "$session_discovery_failed" = yes ]; then
+if [ "$SESSION_DISCOVERY_FAILED" = yes ]; then
   printf 'golden session discovery failed\n'
   terminate_golden_tree 2>/dev/null || true
-  cleanup_is_armed=no
+  CLEANUP_IS_ARMED=no
   exit 125
 fi
-if [ "$has_living_descendant" = yes ]; then
+if [ "$HAS_LIVING_DESCENDANT" = yes ]; then
   printf 'golden leaked processes\n'
   terminate_golden_tree
-  cleanup_is_armed=no
+  CLEANUP_IS_ARMED=no
   exit 125
 fi
 
-cleanup_is_armed=no
-exit "$golden_status"
+CLEANUP_IS_ARMED=no
+exit "$GOLDEN_STATUS"
