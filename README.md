@@ -29,10 +29,14 @@ It aims to be a complete, faster and portable Bash-compatible shell replacement
 for systems, runners or development machines that can benefit from it's speed
 and pedantic diagnostics.
 
+The shell is friendly to coding agents. Strict validation and source-located
+error messages provide clear feedback while shell commands are generated or
+repaired.
+
 The shell guarantees first tier support for Linux, macOS and Windows,
 preserving equivalent behavior on either of these systems.
 
-**Shit** is designed to work without absolutely no config whatsoever.
+The shell is designed to work without absolutely no config whatsoever.
 **shit**'s Linux binary is static and it does not use C++'s STL. **shit** also
 can work without coreutils, using it's own utilities.
 
