@@ -196,6 +196,8 @@
   [CompoundListCondition, None]
     [SimpleCommand "command" "-v" "sudo"]
   [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "ssh"]
+  [CompoundListCondition, None]
     [FunctionDefinition "new_diagnostics"]
       [BraceGroup]
         [CompoundList]
@@ -1096,6 +1098,24 @@
 ]
 [Word
   Unquoted "sudo"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "ssh"
 ]
 [Word
   Unquoted "/dev/null"
