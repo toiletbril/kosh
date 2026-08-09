@@ -1,20 +1,27 @@
 # Contributor: Alexey Andreyev <dev@aa13q.ru>
+# Maintainer: Alexey Andreyev <dev@aa13q.ru>
+maintainer="Alexey Andreyev <dev@aa13q.ru>"
 pkgname=shit
 pkgver=0.1.0
 pkgrel=0
 pkgdesc="Fast, portable, Bash-compatible interactive shell, interpreter and diagnostic tool"
 url="https://github.com/toiletbril/shit"
 arch="x86_64 aarch64"
-license="BSD-3-Clause"
-makedepends="build-base clang llvm lld musl-dev linux-headers git make"
+license="BSD-3-Clause AND MIT"
+depends="busybox"
+makedepends="build-base clang llvm lld linux-headers git"
 checkdepends="bash dash python3 util-linux-misc"
+install="$pkgname.post-install $pkgname.post-upgrade $pkgname.pre-deinstall"
+subpackages="$pkgname-doc $pkgname-bash-completion"
 
 # Pinned to the exact commit the "src/toiletline" submodule points to for
 # this release (see .gitmodules / `git submodule status`). GitHub's tarball
 # for a tag does not include submodule contents, so it's fetched separately
 # and dropped into place in prepare().
-_release_commit="42b39770324bc99d4f6b05ef910ce861d3e87b21"
+_release_commit="c2731c40d2cb3770f5fd3f6f7bfdc68d55f05483"
+_release_epoch=1785870591
 _toiletline_commit="024fa036a7306ed07751fe90fbd583c9a6c2086c"
+export SOURCE_DATE_EPOCH="$_release_epoch"
 
 source="
   $pkgname-$pkgver.tar.gz::https://github.com/toiletbril/shit/archive/refs/tags/$pkgver.tar.gz
@@ -29,12 +36,14 @@ prepare() {
 }
 
 build() {
-  make MODE=rel COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux"
+  make MODE=rel ENVCXXFLAGS="$CXXFLAGS $LDFLAGS" \
+    COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux"
 }
 
 check() {
-  make MODE=rel COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux" \
-    BASHP=/bin/bash DASH=/usr/bin/dash test
+  make MODE=rel ENVCXXFLAGS="$CXXFLAGS $LDFLAGS" \
+    COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux" BASHP=/bin/bash \
+    DASH=/usr/bin/dash test
 }
 
 package() {
@@ -43,6 +52,8 @@ package() {
   install -Dm644 docs/shit.5 "$pkgdir/usr/share/man/man5/shit.5"
   install -Dm644 completions/shit.bash "$pkgdir/usr/share/bash-completion/completions/shit"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 src/toiletline/LICENSE.txt \
+    "$pkgdir/usr/share/licenses/$pkgname/toiletline-LICENSE.txt"
 }
 
 sha512sums="
