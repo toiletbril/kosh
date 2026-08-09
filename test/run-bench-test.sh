@@ -2,8 +2,8 @@
 # Benchmark configure.sh, configure.bash, and configure.shit across the reference
 # shells and shit, reporting wall-clock seconds at the given scale and checking
 # that shit output matches the reference shell. The Makefile passes SCALE, BIN,
-# DASH, BASHP, ZSH, ASH, YASH, BENCH, BENCH_BASH, and BENCH_SHIT. Run from the
-# test directory. The bash time keyword formats the wall clock through
+# DASH, BASHP, ZSH, ASH, YASH, PYTHON, BENCH, BENCH_BASH, and BENCH_SHIT. Run
+# from the test directory. The bash time keyword formats the wall clock through
 # TIMEFORMAT.
 
 set -euo pipefail
@@ -255,11 +255,6 @@ benchmark_pair() {
 
 require_executable "$DASH"
 require_executable "$BASHP"
-require_executable "$ZSH"
-require_executable "$ASH"
-require_executable "$YASH"
-require_executable "$BIN"
-require_executable python3
 
 case "$BENCH_WARMUP_COUNT:$BENCH_SAMPLE_COUNT" in
   *[!0-9:]*|:*|*:)
@@ -284,10 +279,24 @@ awk -v DASH_REQUIRED="$DASH_SPEEDUP_REQUIRED" \
 echo "configure.sh, wall-clock seconds at SCALE=$SCALE, lower is better:"
 benchmark_pair sh
 run_timed "$(basename "$BASHP")" "$B" "$BASHP" "$BENCH"
-run_timed "$(basename "$ZSH")" "$Z" "$ZSH" --emulate sh "$BENCH"
-run_timed "$(basename "$ASH") $ASH_APPLET" "$G" \
-  "$ASH" "$ASH_APPLET" "$BENCH"
-run_timed "$(basename "$YASH")" "$L" "$YASH" "$BENCH"
+if command -v "$ZSH" >/dev/null 2>&1; then
+  run_timed "$(basename "$ZSH")" "$Z" "$ZSH" --emulate sh "$BENCH"
+else
+  printf "  %-16s%s\n" "$(basename "$ZSH")" \
+    "skipped, executable was not found"
+fi
+if command -v "$ASH" >/dev/null 2>&1; then
+  run_timed "$(basename "$ASH") ash" "$G" "$ASH" ash "$BENCH"
+else
+  printf "  %-16s%s\n" "$(basename "$ASH") ash" \
+    "skipped, executable was not found"
+fi
+if command -v "$YASH" >/dev/null 2>&1; then
+  run_timed "$(basename "$YASH")" "$L" "$YASH" "$BENCH"
+else
+  printf "  %-16s%s\n" "$(basename "$YASH")" \
+    "skipped, executable was not found"
+fi
 run_timed "$(basename "$BIN")+analysis" "$S" "$BIN" --mood sh -W "$BENCH"
 compare_outputs "$D" "$S" "dash with analysis"
 
@@ -303,7 +312,13 @@ run_timed "$(basename "$BIN")+analysis" "$ZS" "$BIN" "$BENCH_SHIT"
 compare_outputs "$ZB" "$ZS" "bash with analysis"
 
 echo "primes.bash, wall-clock seconds up to LIMIT=$PRIMES_LIMIT, lower is better:"
-run_timed "python3" "$PP" python3 "$PRIMES_PY" "$PRIMES_LIMIT"
+if command -v "$PYTHON" >/dev/null 2>&1; then
+  run_timed "$(basename "$PYTHON")" "$PP" \
+    "$PYTHON" "$PRIMES_PY" "$PRIMES_LIMIT"
+else
+  printf "  %-16s%s\n" "$(basename "$PYTHON")" \
+    "skipped, executable was not found"
+fi
 run_timed "$(basename "$BASHP")" "$PB" "$BASHP" "$PRIMES" "$PRIMES_LIMIT"
 run_timed "$(basename "$BIN")" "$PS" \
   "$BIN" --mood bash --no-diagnostics "$PRIMES" "$PRIMES_LIMIT"
@@ -311,4 +326,6 @@ compare_outputs "$PB" "$PS" "bash"
 run_timed "$(basename "$BIN")+analysis" "$PS" \
   "$BIN" --mood bash -W "$PRIMES" "$PRIMES_LIMIT"
 compare_outputs "$PB" "$PS" "bash with analysis"
-compare_outputs "$PB" "$PP" "python"
+if command -v "$PYTHON" >/dev/null 2>&1; then
+  compare_outputs "$PB" "$PP" "python"
+fi
