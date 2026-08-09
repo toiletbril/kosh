@@ -2045,13 +2045,13 @@ shit: 99:3: warning: The > operator compares strings lexicographically.
     99 |    [[ 10 > 7 ]]
        |    ^~
 note: Use an arithmetic command or a numeric -lt or -gt operator.
-shit: 99:3: warning: This conditional compares two constant values.
+shit: 99:3: warning: The '>' comparison has literal operands on both sides.
     99 |    [[ 10 > 7 ]]
-       |    ^~
+       |    ^~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-shit: 100:3: warning: This conditional compares two constant values.
+shit: 100:3: warning: The '<' comparison has literal operands on both sides.
    100 |    [[ left < right ]]
-       |    ^~
+       |    ^~~~~~~~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
 shit: 101:15: warning: A quoted regular expression is matched literally.
    101 |    [[ value =~ 'v.*' ]]

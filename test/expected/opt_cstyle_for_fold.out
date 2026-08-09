@@ -92,10 +92,6 @@
   DoubleQuoted "sum="
   Variable "sum"
 ]
-shit: 10:32: warning: The assignment of 'sum' wraps an arithmetic expansion.
-    10 |  for ((i = 1; i <= 4; i++)); do sum=$((sum + i)); done
-       |                                 ^~~~~~~~~~~~~~~~
-note: Use `let sum='sum + i'`.
 after_zero
 sum=10
 [Code 0]

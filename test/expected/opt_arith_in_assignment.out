@@ -25,10 +25,6 @@
 [Word
   Unquoted "prefix"
 ]
-shit: 2:1: warning: The assignment of 'total' wraps an arithmetic expansion.
-     2 |  total=$((6*7))
-       |  ^~~~~~~~~~~~~~
-note: Use `let total='6*7'`.
 shit: 3:6: warning: An unquoted variable can split into words and expand globs.
      3 |  echo $total
        |       ^~~~~~

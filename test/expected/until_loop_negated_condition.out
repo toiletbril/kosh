@@ -49,10 +49,6 @@
 [Word
   Unquoted "done"
 ]
-shit: 5:3: warning: The assignment of 'i' wraps an arithmetic expansion.
-     5 |    i=$((i + 1))
-       |    ^~~~~~~~~~~~
-note: Use `let i='i + 1'`.
 until 0
 until 1
 until 2

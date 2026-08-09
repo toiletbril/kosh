@@ -176,8 +176,8 @@ struct strictness_warning
 /* Sorted. */
 inline const strictness_warning STRICTNESS_WARNINGS[] = {
     {"arith-assign",
-     "an arithmetic assignment uses let, including NAME=$((...)) and the "
-     "mistaken array form NAME=((...))"                                     },
+     "the mistaken array form NAME=((...)) is used for arithmetic "
+     "assignment"                                                           },
     {"byte-order-mark",
      "a UTF-8 byte-order mark before the script interferes with the shebang "
      "and first command"                                                    },

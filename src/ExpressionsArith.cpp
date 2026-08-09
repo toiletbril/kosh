@@ -86,6 +86,12 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
 {
   unused(is_unconditional);
 
+  let conditional_location = source_location();
+  if (source_end_position() > conditional_location.position) {
+    conditional_location.length =
+        source_end_position() - conditional_location.position;
+  }
+
   using Kind = conditional_element::Kind;
   for (usize i = 0; i < m_elements.count(); i++) {
     let const &element = m_elements[i];
@@ -104,8 +110,8 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
           conditional_word_is_literal(m_elements[i - 1].word) &&
           conditional_word_is_literal(m_elements[i + 1].word))
         actx.warn_shellcheck(
-            2050, source_location(),
-            "This conditional compares two constant values",
+            2050, conditional_location,
+            "The '" + op + "' comparison has literal operands on both sides",
             "Remove the constant condition or compare runtime data");
       continue;
     }
@@ -158,8 +164,9 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
     if (!is_pattern_operator && conditional_word_is_literal(left) &&
         conditional_word_is_literal(right))
       actx.warn_shellcheck(
-          2050, element.word->source_location(),
-          "This conditional compares two constant values",
+          2050, conditional_location,
+          "The '" + operand.view() +
+              "' comparison has literal operands on both sides",
           "Remove the constant condition or compare runtime data");
 
     if (operand.view() == "=~" && right != nullptr) {

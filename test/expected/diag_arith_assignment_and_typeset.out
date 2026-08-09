@@ -87,10 +87,6 @@
 [Word
   Unquoted "2"
 ]
-shit: 2:1: warning: The assignment of 'total' wraps an arithmetic expansion.
-     2 |  total=$((6 * 7))
-       |  ^~~~~~~~~~~~~~~~
-note: Use `let total='6 * 7'`.
 shit: 4:1: warning: The typeset builtin is the ksh spelling of declare.
      4 |  typeset name=value
        |  ^~~~~~~

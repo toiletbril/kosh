@@ -78,10 +78,6 @@
   DoubleQuoted "summed="
   Variable "total"
 ]
-shit: 7:3: warning: The assignment of 'total' wraps an arithmetic expansion.
-     7 |    total=$(( total + n ))
-       |    ^~~~~~~~~~~~~~~~~~~~~~
-note: Use `let total='total + n'`.
 read=one two three
 straight through
 summed=12

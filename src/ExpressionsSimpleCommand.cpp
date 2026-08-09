@@ -141,38 +141,6 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                          "Wrap nonprinting prompt escapes in \\[ and \\]");
   }
 
-  if (!m_assignment->is_append()) {
-    const WordSegment *arithmetic_segment = nullptr;
-    usize arithmetic_segment_count = 0;
-    let has_other_segment = false;
-    for (let const &segment : m_assignment->value_word().segments) {
-      if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
-        arithmetic_segment = &segment;
-        arithmetic_segment_count++;
-      } else if (!segment.text.is_empty()) {
-        has_other_segment = true;
-      }
-    }
-
-    if (arithmetic_segment_count == 1 && !has_other_segment) {
-      let expression = arithmetic_segment->text.view();
-      while (!expression.is_empty() &&
-             (expression[0] == ' ' || expression[0] == '\t'))
-        expression = expression.substring(1);
-      while (!expression.is_empty() &&
-             (expression[expression.length - 1] == ' ' ||
-              expression[expression.length - 1] == '\t'))
-        expression = expression.substring_of_length(0, expression.length - 1);
-
-      if (!expression.is_empty())
-        actx.warn(source_location(),
-                  StringView{"The assignment of '"} + m_assignment->key() +
-                      "' wraps an arithmetic expansion",
-                  StringView{"Use `let "} + m_assignment->key() + "='" +
-                      expression + "'`");
-    }
-  }
-
   /* The fold reads the constant table, so it runs before the table records this
      assignment. */
   optimizer::optimize_node(this, actx);

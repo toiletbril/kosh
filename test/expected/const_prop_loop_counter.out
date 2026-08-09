@@ -99,14 +99,6 @@
   DoubleQuoted "i="
   Variable "i"
 ]
-shit: 3:25: warning: The assignment of 'count' wraps an arithmetic expansion.
-     3 |  for item in a b c d; do count=$((count + 1)); done
-       |                          ^~~~~~~~~~~~~~~~~~~~
-note: Use `let count='count + 1'`.
-shit: 6:26: warning: The assignment of 'i' wraps an arithmetic expansion.
-     6 |  until [ "$i" -ge 3 ]; do i=$((i + 1)); done
-       |                           ^~~~~~~~~~~~
-note: Use `let i='i + 1'`.
 count=4
 i=3
 [Code 0]

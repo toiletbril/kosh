@@ -1125,18 +1125,10 @@
   DoubleQuoted "backoff="
   Variable "?"
 ]
-shit: 18:32: warning: The assignment of 'sum' wraps an arithmetic expansion.
-    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
-       |                                 ^~~~~~~~~~~~~~~~
-note: Use `let sum='sum + i'`.
 shit: 30:23: warning: An unquoted variable can split into words and expand globs.
     30 |  echo $((y = 7)); echo $y
        |                        ^~
 note: Quote the expansion to keep one argument.
-shit: 45:6: warning: The assignment of 'x' wraps an arithmetic expansion.
-    45 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
-       |       ^~~~~~~~~~~~~~
-note: Use `let x='x + 3'`.
 shit: 45:27: warning: An unquoted variable can split into words and expand globs.
     45 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
        |                            ^~
@@ -1169,10 +1161,6 @@ shit: 65:43: warning: An unquoted variable can split into words and expand globs
     65 |  x=5; echo $((1 || (x=9) || (x=10))); echo $x
        |                                            ^~
 note: Quote the expansion to keep one argument.
-shit: 82:11: warning: The assignment of 'r' wraps an arithmetic expansion.
-    82 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
-       |            ^~~~~~~~~~~~~~~~~~~~~
-note: Use `let r='c ? 5 : (x=99)'`.
 shit: 82:39: warning: An unquoted variable can split into words and expand globs.
     82 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
        |                                        ^~
@@ -1181,10 +1169,6 @@ shit: 82:42: warning: An unquoted variable can split into words and expand globs
     82 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
        |                                           ^~
 note: Quote the expansion to keep one argument.
-shit: 83:11: warning: The assignment of 'r' wraps an arithmetic expansion.
-    83 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
-       |            ^~~~~~~~~~~~~~~~~~~~~
-note: Use `let r='c ? (x=77) : 5'`.
 shit: 83:39: warning: An unquoted variable can split into words and expand globs.
     83 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
        |                                        ^~
@@ -1193,10 +1177,6 @@ shit: 83:42: warning: An unquoted variable can split into words and expand globs
     83 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
        |                                           ^~
 note: Quote the expansion to keep one argument.
-shit: 84:11: warning: The assignment of 'r' wraps an arithmetic expansion.
-    84 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
-       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Use `let r='c ? (x=77) : (x=88)'`.
 shit: 84:44: warning: An unquoted variable can split into words and expand globs.
     84 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |                                             ^~
@@ -1205,10 +1185,6 @@ shit: 84:47: warning: An unquoted variable can split into words and expand globs
     84 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |                                                ^~
 note: Quote the expansion to keep one argument.
-shit: 85:11: warning: The assignment of 'r' wraps an arithmetic expansion.
-    85 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
-       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Use `let r='c ? (x=77) : (x=88)'`.
 shit: 85:44: warning: An unquoted variable can split into words and expand globs.
     85 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |                                             ^~
