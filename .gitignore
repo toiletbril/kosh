@@ -43,3 +43,7 @@ core.*
 # Nix
 result
 result-*
+
+# Arch packaging build output (makepkg)
+deploy/archlinux/*
+!deploy/archlinux/PKGBUILD
