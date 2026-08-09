@@ -399,9 +399,16 @@ fn find_option_by_name(StringView name) throws -> const set_option_descriptor *
   return position.has_value() ? &SET_OPTIONS[*position] : nullptr;
 }
 
+fn option_is_available(const EvalContext &cxt,
+                       const set_option_descriptor &option) wontthrow -> bool
+{
+  return option.id != shell_option_id::Physical || !cxt.is_posix_mode();
+}
+
 fn option_is_on(const EvalContext &cxt,
                 const set_option_descriptor &option) throws -> bool
 {
+  if (!option_is_available(cxt, option)) return false;
   switch (option.behavior) {
   case set_option_behavior::Stored: return cxt.shell_option_state(option.id);
   case set_option_behavior::Posix: return cxt.is_posix_option_on();
@@ -427,6 +434,12 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
                           bool enable,
                           bool should_step_warning_level = false) throws -> void
 {
+  if (!option_is_available(cxt, option))
+    throw Error{
+        "Unknown option '" + String{cxt.scratch_allocator(), option.name}
+          +
+        "'"
+    };
   if (option_is_startup_fact(option))
     throw Error{
         "Unable to change '" + String{cxt.scratch_allocator(), option.name}
@@ -478,7 +491,7 @@ fn list_options(const EvalContext &cxt) throws -> String
 {
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
-    if (!option.is_listed) continue;
+    if (!option.is_listed || !option_is_available(cxt, option)) continue;
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
     out += option.name;
     out += '\n';
@@ -491,7 +504,7 @@ fn list_options_columnar(const EvalContext &cxt) throws -> String
   const usize name_field_width = 15;
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
-    if (!option.is_listed) continue;
+    if (!option.is_listed || !option_is_available(cxt, option)) continue;
     out += option.name;
     for (usize pad = option.name.length; pad < name_field_width; pad++)
       out.push(' ');
@@ -515,6 +528,12 @@ fn apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
   if (option == nullptr)
     throw make_error_for_arg(ec, i,
                              StringView{"Unknown -o option '"} + name + "'");
+  if (!option_is_available(cxt, *option)) {
+    let error = make_error_for_arg(
+        ec, i, StringView{"Unknown -o option '"} + name + "'");
+    error.set_command_status(2);
+    throw error;
+  }
   apply_or_reject_option(cxt, *option, enable);
 }
 
@@ -524,6 +543,7 @@ fn format_option_table(const EvalContext *cxt,
   const usize name_field_width = include_alias_spellings ? 30 : 18;
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
+    if (cxt != nullptr && !option_is_available(*cxt, option)) continue;
     out += "  ";
     if (option.letter != '\0') {
       out.push('-');
@@ -659,7 +679,7 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool
 {
   const set_option_descriptor *option = find_option_by_name(name);
-  if (option == nullptr) return false;
+  if (option == nullptr || !option_is_available(cxt, *option)) return false;
   apply_or_reject_option(cxt, *option, enable);
   return true;
 }
@@ -823,12 +843,17 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
 
         let const option = find_option_by_letter(letter);
-        if (option == nullptr) {
+        if (option == nullptr || !option_is_available(cxt, *option)) {
           let invalid_option = String{heap_allocator()};
           invalid_option += arg[0];
           invalid_option += letter;
-          throw make_error_for_arg(
+          if (option == nullptr)
+            throw make_error_for_arg(
+                ec, i, StringView{"Unknown option '"} + invalid_option + "'");
+          let unavailable_error = make_error_for_arg(
               ec, i, StringView{"Unknown option '"} + invalid_option + "'");
+          unavailable_error.set_command_status(2);
+          throw unavailable_error;
         }
         apply_or_reject_option(cxt, *option, enable, true);
       }

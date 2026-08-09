@@ -178,11 +178,29 @@ public:
   cold fn reserve(usize needed) throws -> void
   {
     if (needed <= m_capacity) return;
-    usize new_capacity = m_capacity == 0   ? 16
-                         : m_capacity < 64 ? m_capacity * 4
-                                           : m_capacity * 2;
-    while (new_capacity < needed)
+    constexpr usize INITIAL_ALLOCATION_BYTES = 256;
+    constexpr usize MAXIMUM_INITIAL_ELEMENT_COUNT = 16;
+    constexpr usize INITIAL_ELEMENT_COUNT =
+        sizeof(T) >= INITIAL_ALLOCATION_BYTES
+            ? 1
+            : (INITIAL_ALLOCATION_BYTES / sizeof(T) <
+                       MAXIMUM_INITIAL_ELEMENT_COUNT
+                   ? INITIAL_ALLOCATION_BYTES / sizeof(T)
+                   : MAXIMUM_INITIAL_ELEMENT_COUNT);
+    usize new_capacity = INITIAL_ELEMENT_COUNT;
+    if (m_capacity != 0) {
+      let const growth =
+          m_capacity < 64 ? static_cast<usize>(4) : static_cast<usize>(2);
+      new_capacity =
+          m_capacity > SIZE_MAX / growth ? needed : m_capacity * growth;
+    }
+    while (new_capacity < needed) {
+      if (new_capacity > SIZE_MAX / 2) {
+        new_capacity = needed;
+        break;
+      }
       new_capacity *= 2;
+    }
     let const fresh = m_allocator.alloc_array<T>(new_capacity);
     relocate_to(fresh);
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);

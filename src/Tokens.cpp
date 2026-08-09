@@ -444,9 +444,6 @@ pure fn Assignment::value_word() const wontthrow -> const Word &
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(steal(word))
 {
-  /* The token may live in the function arena that never resets, so the lexer's
-     over-reserved segment slack is returned. */
-  m_word.segments.shrink_to_fit();
   m_value = m_word.to_literal_string();
 }
 

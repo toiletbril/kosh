@@ -81,8 +81,8 @@ cold static fn is_conditional_binary_operator(StringView op) wontthrow -> bool
   return false;
 }
 
-cold fn ConditionalCommand::analyze(AnalysisContext &actx,
-                                    bool is_unconditional) const throws -> void
+fn ConditionalCommand::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
 
@@ -193,6 +193,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
   LOG(Debug, "the [[ ]] conditional yielded status %lld",
       static_cast<long long>(status));
+  cxt.publish_single_pipe_status(static_cast<i32>(status));
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
@@ -237,6 +238,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_current_location(source_location());
 
   if (is_blank_clause(m_expression.view())) {
+    cxt.publish_single_pipe_status(1);
     SET_AND_RETURN_EXIT_STATUS(cxt, 1);
   }
 
@@ -253,11 +255,12 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     relocate_error(e, source_location());
   }
   const i64 status = value != 0 ? 0 : 1;
+  cxt.publish_single_pipe_status(static_cast<i32>(status));
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
-cold fn ArithmeticCommand::analyze(AnalysisContext &actx,
-                                   bool is_unconditional) const throws -> void
+fn ArithmeticCommand::analyze(AnalysisContext &actx,
+                              bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
   if (arithmetic_reads_external_input(actx, m_expression.view()))
@@ -269,8 +272,8 @@ cold fn ArithmeticCommand::analyze(AnalysisContext &actx,
   actx.constant_variables.clear();
 }
 
-cold fn SelectLoop::analyze(AnalysisContext &actx,
-                            bool is_unconditional) const throws -> void
+fn SelectLoop::analyze(AnalysisContext &actx,
+                       bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
@@ -338,11 +341,24 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
       m_name.c_str());
   cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);
-  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+  let ran_substitution = false;
+  for (let const element : m_elements) {
+    if (element->kind() != Token::Kind::Word) continue;
+    if (static_cast<const tokens::WordToken *>(element)
+            ->word()
+            .runs_substitution())
+    {
+      ran_substitution = true;
+      break;
+    }
+  }
+  if (!ran_substitution) cxt.set_last_exit_status(0);
+  cxt.publish_single_pipe_status(cxt.last_exit_status());
+  return cxt.last_exit_status();
 }
 
-cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
-                                    bool is_unconditional) const throws -> void
+fn ArrayAssignCommand::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
   for (let const element : m_elements) {
@@ -414,8 +430,8 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
-cold fn CStyleForLoop::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const throws -> void
+fn CStyleForLoop::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
@@ -566,7 +582,10 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
       let const source = cxt.current_source();
       show_message(error.to_string(
           source != nullptr ? source->view() : StringView{}, &cxt));
+      if (cxt.is_posix_mode())
+        status = static_cast<i32>(error.command_status());
     }
+    cxt.publish_single_pipe_status(status);
     SET_AND_RETURN_EXIT_STATUS(cxt, status);
   }
 
@@ -579,6 +598,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
       let const source = cxt.current_source();
       show_message(error.to_string(
           source != nullptr ? source->view() : StringView{}, &cxt));
+      if (cxt.is_posix_mode())
+        status = static_cast<i32>(error.command_status());
     } catch (...) {
       LOG(Debug, "the subshell child swallowed an unknown error");
     }
@@ -589,11 +610,12 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   let was_stopped = false;
   let const status = os::wait_and_monitor_process(child, &was_stopped);
   unused(was_stopped);
+  cxt.publish_single_pipe_status(status);
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
-cold fn Subshell::analyze(AnalysisContext &actx,
-                          bool is_unconditional) const throws -> void
+fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -622,9 +644,17 @@ cold fn Subshell::analyze(AnalysisContext &actx,
   /* An assignment in the body never changes a parent variable, so the body
      starts from an empty table and the outer constants are restored after. */
   let saved_constants = actx.constant_variables.clone();
+  let saved_defined_functions = actx.defined_functions.clone();
+  let saved_known_aliases = actx.known_aliases.clone();
+  let const had_registered_definitions =
+      actx.has_registered_definitions_in_scope;
   actx.constant_variables.clear();
+  actx.has_registered_definitions_in_scope = false;
   m_body->analyze(actx, is_unconditional);
   actx.constant_variables = steal(saved_constants);
+  actx.defined_functions = steal(saved_defined_functions);
+  actx.known_aliases = steal(saved_known_aliases);
+  actx.has_registered_definitions_in_scope = had_registered_definitions;
 }
 
 FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
@@ -688,8 +718,8 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
-cold fn FunctionDefinition::analyze(AnalysisContext &actx,
-                                    bool is_unconditional) const throws -> void
+fn FunctionDefinition::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -718,14 +748,22 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
   /* The body runs later when the function is called, so it is analyzed from an
      empty constant table with the outer constants restored after. */
   let saved_constants = actx.constant_variables.clone();
+  let saved_defined_functions = actx.defined_functions.clone();
+  let saved_known_aliases = actx.known_aliases.clone();
   actx.constant_variables.clear();
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = HashSet{heap_allocator()};
+  let const had_registered_definitions =
+      actx.has_registered_definitions_in_scope;
+  actx.has_registered_definitions_in_scope = false;
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
   actx.function_scope_depth--;
+  actx.has_registered_definitions_in_scope = had_registered_definitions;
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
+  actx.defined_functions = steal(saved_defined_functions);
+  actx.known_aliases = steal(saved_known_aliases);
 }
 
 cold fn FunctionDefinition::register_defined_functions(
@@ -758,8 +796,8 @@ cold fn RedirectedCommand::to_ast_string(usize layer) const throws -> String
          m_child->to_ast_string(layer + 1);
 }
 
-cold fn RedirectedCommand::analyze(AnalysisContext &actx,
-                                   bool is_unconditional) const throws -> void
+fn RedirectedCommand::analyze(AnalysisContext &actx,
+                              bool is_unconditional) const throws -> void
 {
   ASSERT(m_child != nullptr);
 

@@ -329,12 +329,8 @@ static pure fn trim_arithmetic_whitespace(StringView text) wontthrow
   return text.trim_blanks();
 }
 
-/* The constant result of an algebraic identity on a single binary operator,
-   only x*0, 0*x, and x-x. A bare variable operand folds only when nounset is
-   provably off in the live shell, since reading an unset name under set -u is
-   an error this fold would swallow. */
 static fn try_algebraic_simplify(StringView expression,
-                                 const AnalysisContext &actx) wontthrow
+                                 const AnalysisContext &) wontthrow
     -> Maybe<i64>
 {
   let const expr = trim_arithmetic_whitespace(expression);
@@ -366,28 +362,8 @@ static fn try_algebraic_simplify(StringView expression,
       trim_arithmetic_whitespace(expr.substring(operator_position + 1));
   if (lhs.length == 0 || rhs.length == 0) return None;
 
-  /* A side-effecting operand such as x++ would make x - x non-zero, so only a
-     plain name or integer qualifies. */
-  let const operand_is_plain = [](StringView operand) wontthrow -> bool {
-    for (usize i = 0; i < operand.length; i++) {
-      if (!lexer::is_variable_name(operand[i])) return false;
-    }
-    return true;
-  };
-  if (!operand_is_plain(lhs) || !operand_is_plain(rhs)) return None;
-
-  let const nounset_is_off =
-      actx.eval_context != nullptr && !actx.eval_context->error_unset();
-  let const operand_reads_variable = [](StringView operand) wontthrow -> bool {
-    return operand.length > 0 && lexer::is_variable_name_start(operand[0]);
-  };
-  if (!nounset_is_off &&
-      (operand_reads_variable(lhs) || operand_reads_variable(rhs)))
-  {
-    LOG(All, "the algebraic simplify declines a variable operand, nounset may "
-             "be on");
+  if (!is_plain_integer_literal(lhs) || !is_plain_integer_literal(rhs))
     return None;
-  }
 
   if (op == '*') {
     if (lhs == StringView{"0"} || rhs == StringView{"0"}) {

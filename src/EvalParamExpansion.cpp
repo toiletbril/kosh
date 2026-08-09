@@ -348,13 +348,15 @@ fn EvalContext::expand_modifier_word_worker(
       /* A nested reference obeys set -u the way a top level reference does. A
          stored name resolves without the extra dynamic-value lookup and copy.
        */
-      const String *stored = lookup_shell_variable(name);
-      if (stored == nullptr && !get_variable_value(name).has_value())
-        report_unset_reference(name);
-      if (stored != nullptr)
+      let const *stored = lookup_shell_variable(name);
+      if (stored != nullptr) {
         do_emit_run(stored->view(), !is_in_double_quote);
-      else
-        do_emit_run(expand_variable(name), !is_in_double_quote);
+      } else {
+        let value = get_variable_value(name);
+        if (!value.has_value()) report_unset_reference(name);
+        do_emit_run(value.has_value() ? value->view() : StringView{},
+                    !is_in_double_quote);
+      }
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
       /* Arithmetic $((...)), scanned to the matching )). A quote run keeps its
@@ -533,18 +535,7 @@ hot fn EvalContext::apply_parameter_expansion(
       const StringView subscript =
           name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
       if (subscript == "@" || subscript == "*") {
-        if ((array_name == "FUNCNAME" || array_name == "BASH_LINENO") &&
-            bash_dynamic_variables_enabled()) [[unlikely]]
-        {
-          return String::from(funcname_frame_count(), scratch_allocator());
-        }
-        if (is_associative_array(array_name))
-          return String::from(associative_keys(array_name).count(),
-                              scratch_allocator());
-        if (lookup_indexed_array(array_name) != nullptr)
-          return String::from(collect_array_elements(array_name).count(),
-                              scratch_allocator());
-        return String::from(get_variable_value(array_name).has_value() ? 1 : 0,
+        return String::from(array_element_count(array_name),
                             scratch_allocator());
       }
       let subscript_location = SourceLocation{};
@@ -663,8 +654,12 @@ hot fn EvalContext::apply_parameter_expansion(
   if (rest.is_empty()) {
     /* A plain reference reports under set -u, a modifier form such as ${x:-w}
        handles the unset case itself. */
-    if (!get_variable_value(name).has_value()) report_unset_reference(name);
-    return expand_variable(name);
+    if (let const *stored = lookup_shell_variable(name); stored != nullptr)
+      return String{scratch_allocator(), stored->view()};
+    let value = get_variable_value(name);
+    if (!value.has_value()) report_unset_reference(name);
+    return value.has_value() ? String{scratch_allocator(), value->view()}
+                             : String{scratch_allocator()};
   }
 
   /* A leading colon makes the test forms treat an empty value as unset. */

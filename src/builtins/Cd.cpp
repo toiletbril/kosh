@@ -56,7 +56,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw ErrorWithLocation{ec.source_location(),
                             "cd is forbidden in a restricted shell"};
 
-  let is_physical = cxt.shell_option_state(shell_option_id::Physical);
+  let is_physical =
+      !cxt.is_posix_mode() && cxt.shell_option_state(shell_option_id::Physical);
   usize operand_index = 1;
   while (operand_index < ec.args().count()) {
     const StringView option = ec.args()[operand_index].view();

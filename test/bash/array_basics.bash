@@ -361,3 +361,22 @@ echo "unset-far: [${a[999999999]}]"
 b[268435456]=x
 b[268435457]=y
 echo "two-sparse: ${b[268435456]}${b[268435457]}"
+c=()
+c[5]=five
+c[10]=ten
+echo "sparse-count: ${#c[@]} last=${c[-1]}"
+unset 'c[5]'
+echo "sparse-count-after-unset: ${#c[@]}"
+
+scalar_indexed=value
+declare -a scalar_indexed
+declare -p scalar_indexed
+scalar_associative=value
+declare -A scalar_associative
+declare -p scalar_associative
+conversion_indexed=(one two)
+declare -A conversion_indexed 2>/dev/null
+echo "indexed-conversion=$? value=${conversion_indexed[*]}"
+declare -A conversion_associative=([key]=value)
+declare -a conversion_associative 2>/dev/null
+echo "associative-conversion=$? value=${conversion_associative[key]}"

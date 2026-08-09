@@ -6,12 +6,18 @@
 # test directory. The bash time keyword formats the wall clock through
 # TIMEFORMAT.
 
-export TIMEFORMAT="  %R"
+set -euo pipefail
+
+export TIMEFORMAT="%R"
 
 WORK=$TEST_TEMP_DIRECTORY/bench
-rm -rf "$WORK"
+cleanup_benchmark_work() {
+  if [ -n "${WORK-}" ]; then /bin/rm -rf "$WORK"; fi
+}
+
+cleanup_benchmark_work
 mkdir -p "$WORK"
-trap 'rm -rf "$WORK"' EXIT
+trap cleanup_benchmark_work EXIT
 D=$WORK/d
 B=$WORK/b
 Z=$WORK/z
@@ -25,46 +31,284 @@ ZS=$WORK/zs
 PP=$WORK/pp
 PB=$WORK/pb
 PS=$WORK/ps
+TIME_OUTPUT=$WORK/time
+ERROR_OUTPUT=$WORK/error
+DIFF_OUTPUT=$WORK/diff
 
-run_ref() {
-  if ! command -v "$1" >/dev/null; then return 0; fi
-  printf "  %-16s" "${2:-$1}"
-  ( time SCALE=$SCALE "$1" $3 >"$4" 2>&1 ) 2>&1
+require_executable() {
+  local EXECUTABLE=$1
+
+  if command -v "$EXECUTABLE" >/dev/null 2>&1; then return 0; fi
+
+  echo "required benchmark executable '$EXECUTABLE' was not found" >&2
+  return 1
 }
 
-compare() {
-  if cmp "$1" "$2"; then echo "output matches $3"
-  else echo "output differs from $3:"; diff "$1" "$2" | head -20; fi
+measure_command() {
+  local OUTPUT=$1
+  local STATUS
+  local TIMING
+  shift
+
+  if { time SCALE="$SCALE" "$@" >"$OUTPUT" 2>"$ERROR_OUTPUT"; } \
+    2>"$TIME_OUTPUT"
+  then
+    STATUS=0
+  else
+    STATUS=$?
+  fi
+  if [ "$STATUS" -ne 0 ]; then
+    echo "benchmark command failed with status $STATUS" >&2
+    printf '  command' >&2
+    printf ' %q' "$@" >&2
+    printf '\n' >&2
+    sed -n '1,20p' "$OUTPUT" >&2
+    sed -n '1,20p' "$ERROR_OUTPUT" >&2
+    return "$STATUS"
+  fi
+
+  TIMING=$(<"$TIME_OUTPUT")
+  case "$TIMING" in
+    ''|*[!0-9.]*)
+      echo "benchmark command produced an invalid timing '$TIMING'" >&2
+      return 1
+      ;;
+  esac
+  awk -v TIMING="$TIMING" 'BEGIN { exit !(TIMING + 0 > 0) }'
+  LAST_TIMING=$TIMING
 }
+
+run_timed() {
+  local LABEL=$1
+  local OUTPUT=$2
+  shift 2
+
+  measure_command "$OUTPUT" "$@"
+  printf "  %-16s%s\n" "$LABEL" "$LAST_TIMING"
+}
+
+compare_outputs() {
+  local EXPECTED=$1
+  local ACTUAL=$2
+  local REFERENCE_NAME=$3
+  local REPORT_MATCH=${4:-yes}
+
+  if cmp -s "$EXPECTED" "$ACTUAL"; then
+    if [ "$REPORT_MATCH" = yes ]; then echo "output matches $REFERENCE_NAME"; fi
+    return 0
+  fi
+
+  diff -u "$EXPECTED" "$ACTUAL" >"$DIFF_OUTPUT" || true
+  echo "output differs from $REFERENCE_NAME:"
+  sed -n '1,20p' "$DIFF_OUTPUT"
+  return 1
+}
+
+run_mode_command() {
+  local MODE=$1
+  local IMPLEMENTATION=$2
+
+  case "$MODE:$IMPLEMENTATION" in
+    sh:reference)
+      measure_command "$D" "$DASH" "$BENCH"
+      ;;
+    sh:candidate)
+      measure_command "$S" "$BIN" --mood sh --no-diagnostics "$BENCH"
+      ;;
+    bash:reference)
+      measure_command "$BB" "$BASHP" "$BENCH_BASH"
+      ;;
+    bash:candidate)
+      measure_command "$SB" "$BIN" --mood bash --no-diagnostics "$BENCH_BASH"
+      ;;
+    *)
+      echo "unknown benchmark mode '$MODE:$IMPLEMENTATION'" >&2
+      return 1
+      ;;
+  esac
+}
+
+run_pair() {
+  local MODE=$1
+  local ORDER=$2
+  local RESULTS=$3
+  local EXPECTED
+  local ACTUAL
+  local REFERENCE_NAME
+  local REFERENCE_SECONDS
+  local CANDIDATE_SECONDS
+
+  if [ "$ORDER" = reference-first ]; then
+    run_mode_command "$MODE" reference
+    REFERENCE_SECONDS=$LAST_TIMING
+    run_mode_command "$MODE" candidate
+    CANDIDATE_SECONDS=$LAST_TIMING
+  else
+    run_mode_command "$MODE" candidate
+    CANDIDATE_SECONDS=$LAST_TIMING
+    run_mode_command "$MODE" reference
+    REFERENCE_SECONDS=$LAST_TIMING
+  fi
+
+  if [ "$MODE" = sh ]; then
+    EXPECTED=$D
+    ACTUAL=$S
+    REFERENCE_NAME=dash
+  else
+    EXPECTED=$BB
+    ACTUAL=$SB
+    REFERENCE_NAME=bash
+  fi
+  compare_outputs "$EXPECTED" "$ACTUAL" "$REFERENCE_NAME" no
+  printf '%s %s\n' "$REFERENCE_SECONDS" "$CANDIDATE_SECONDS" >>"$RESULTS"
+}
+
+median_column() {
+  local RESULTS=$1
+  local COLUMN=$2
+
+  awk -v COLUMN="$COLUMN" '{ print $COLUMN }' "$RESULTS" | sort -n |
+    awk '{ VALUE[NR] = $1 } END { print VALUE[(NR + 1) / 2] }'
+}
+
+median_speedup() {
+  local RESULTS=$1
+
+  awk '{ print $1 / $2 }' "$RESULTS" | sort -n |
+    awk '{ VALUE[NR] = $1 } END { print VALUE[(NR + 1) / 2] }'
+}
+
+benchmark_pair() {
+  local MODE=$1
+  local REFERENCE_LABEL
+  local CANDIDATE_LABEL
+  local REFERENCE_NAME
+  local REQUIRED_SPEEDUP
+  local RESULTS=$WORK/$MODE-results
+  local SAMPLE_INDEX
+  local ORDER
+  local REFERENCE_MEDIAN
+  local CANDIDATE_MEDIAN
+  local SPEEDUP_MEDIAN
+
+  if [ "$MODE" = sh ]; then
+    REFERENCE_LABEL=$(basename "$DASH")
+    REFERENCE_NAME=dash
+    REQUIRED_SPEEDUP=$DASH_SPEEDUP_REQUIRED
+  else
+    REFERENCE_LABEL=$(basename "$BASHP")
+    REFERENCE_NAME=bash
+    REQUIRED_SPEEDUP=$BASH_SPEEDUP_REQUIRED
+  fi
+  CANDIDATE_LABEL=$(basename "$BIN")
+
+  for ((SAMPLE_INDEX = 1;
+        SAMPLE_INDEX <= BENCH_WARMUP_COUNT;
+        SAMPLE_INDEX++)); do
+    if ((SAMPLE_INDEX % 2 == 1)); then
+      ORDER=reference-first
+    else
+      ORDER=candidate-first
+    fi
+    run_pair "$MODE" "$ORDER" /dev/null
+  done
+
+  : >"$RESULTS"
+  for ((SAMPLE_INDEX = 1;
+        SAMPLE_INDEX <= BENCH_SAMPLE_COUNT;
+        SAMPLE_INDEX++)); do
+    if ((SAMPLE_INDEX % 2 == 1)); then
+      ORDER=reference-first
+    else
+      ORDER=candidate-first
+    fi
+    run_pair "$MODE" "$ORDER" "$RESULTS"
+  done
+
+  REFERENCE_MEDIAN=$(median_column "$RESULTS" 1)
+  CANDIDATE_MEDIAN=$(median_column "$RESULTS" 2)
+  SPEEDUP_MEDIAN=$(median_speedup "$RESULTS")
+  printf "  %-16s%s median\n" "$REFERENCE_LABEL" "$REFERENCE_MEDIAN"
+  printf "  %-16s%s median\n" "$CANDIDATE_LABEL" "$CANDIDATE_MEDIAN"
+  echo "output matches $REFERENCE_NAME"
+  echo "median paired speedup is $SPEEDUP_MEDIAN"
+
+  if awk -v REQUIRED="$REQUIRED_SPEEDUP" \
+    'BEGIN { exit !(REQUIRED + 0 > 0) }'
+  then
+    if [ "$MODE" = sh ]; then
+      awk -v SPEEDUP="$SPEEDUP_MEDIAN" -v REQUIRED="$REQUIRED_SPEEDUP" \
+        'BEGIN { exit !(SPEEDUP + 0 > REQUIRED + 0) }' || {
+          echo "shit is not faster than dash" >&2
+          return 1
+        }
+    else
+      awk -v SPEEDUP="$SPEEDUP_MEDIAN" -v REQUIRED="$REQUIRED_SPEEDUP" \
+        'BEGIN { exit !(SPEEDUP + 0 >= REQUIRED + 0) }' || {
+          echo "shit is not at least $REQUIRED_SPEEDUP times faster" \
+            "than bash" >&2
+          return 1
+        }
+    fi
+  fi
+}
+
+require_executable "$DASH"
+require_executable "$BASHP"
+require_executable "$ZSH"
+require_executable "$ASH"
+require_executable "$YASH"
+require_executable "$BIN"
+require_executable python3
+
+case "$BENCH_WARMUP_COUNT:$BENCH_SAMPLE_COUNT" in
+  *[!0-9:]*|:*|*:)
+    echo "benchmark sample counts must be nonnegative integers" >&2
+    exit 1
+    ;;
+esac
+if [ "$BENCH_SAMPLE_COUNT" -lt 1 ] || ((BENCH_SAMPLE_COUNT % 2 == 0)); then
+  echo "the benchmark sample count must be a positive odd integer" >&2
+  exit 1
+fi
+awk -v DASH_REQUIRED="$DASH_SPEEDUP_REQUIRED" \
+  -v BASH_REQUIRED="$BASH_SPEEDUP_REQUIRED" \
+  'BEGIN {
+    NUMBER = "^[0-9]+([.][0-9]+)?$"
+    exit !(DASH_REQUIRED ~ NUMBER && BASH_REQUIRED ~ NUMBER)
+  }' || {
+    echo "benchmark speedup thresholds must be nonnegative numbers" >&2
+    exit 1
+  }
 
 echo "configure.sh, wall-clock seconds at SCALE=$SCALE, lower is better:"
-run_ref "$DASH"  "$(basename "$DASH")"  "$BENCH" "$D"
-run_ref "$BASHP" "$(basename "$BASHP")" "$BENCH" "$B"
-run_ref "$ZSH"   "$(basename "$ZSH")"   "$BENCH" "$Z"
-run_ref "$ASH"   "$(basename "$ASH")"   "$BENCH" "$G"
-run_ref "$YASH"  "$(basename "$YASH")"  "$BENCH" "$L"
-printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$SCALE $BIN --mood sh $BENCH >"$S" 2>&1 ) 2>&1
-compare "$D" "$S" "dash"
-printf "  %-16s" "$(basename "$BIN")+analysis"; ( time SCALE=$SCALE $BIN --mood sh -W $BENCH >"$S" 2>/dev/null ) 2>&1
-compare "$D" "$S" "dash with analysis"
+benchmark_pair sh
+run_timed "$(basename "$BASHP")" "$B" "$BASHP" "$BENCH"
+run_timed "$(basename "$ZSH")" "$Z" "$ZSH" --emulate sh "$BENCH"
+run_timed "$(basename "$ASH") $ASH_APPLET" "$G" \
+  "$ASH" "$ASH_APPLET" "$BENCH"
+run_timed "$(basename "$YASH")" "$L" "$YASH" "$BENCH"
+run_timed "$(basename "$BIN")+analysis" "$S" "$BIN" --mood sh -W "$BENCH"
+compare_outputs "$D" "$S" "dash with analysis"
 
 echo "configure.bash, wall-clock seconds at SCALE=$SCALE, lower is better:"
-printf "  %-16s" "$(basename "$BASHP")"; ( time SCALE=$SCALE $BASHP $BENCH_BASH >"$BB" 2>&1 ) 2>&1
-printf "  %-16s" "$(basename "$BIN")";  ( time SCALE=$SCALE $BIN --mood bash $BENCH_BASH >"$SB" 2>&1 ) 2>&1
-compare "$BB" "$SB" "bash"
-printf "  %-16s" "$(basename "$BIN")+analysis"; ( time SCALE=$SCALE $BIN --mood bash -W $BENCH_BASH >"$SB" 2>/dev/null ) 2>&1
-compare "$BB" "$SB" "bash with analysis"
+benchmark_pair bash
+run_timed "$(basename "$BIN")+analysis" "$SB" \
+  "$BIN" --mood bash -W "$BENCH_BASH"
+compare_outputs "$BB" "$SB" "bash with analysis"
 
 echo "configure.shit, wall-clock seconds at SCALE=$SCALE, lower is better:"
-printf "  %-16s" "$(basename "$BASHP")"; ( time SCALE=$SCALE $BASHP $BENCH_SHIT >"$ZB" 2>&1 ) 2>&1
-printf "  %-16s" "$(basename "$BIN")+analysis"; ( time SCALE=$SCALE $BIN $BENCH_SHIT >"$ZS" 2>/dev/null ) 2>&1
-compare "$ZB" "$ZS" "bash with analysis"
+run_timed "$(basename "$BASHP")" "$ZB" "$BASHP" "$BENCH_SHIT"
+run_timed "$(basename "$BIN")+analysis" "$ZS" "$BIN" "$BENCH_SHIT"
+compare_outputs "$ZB" "$ZS" "bash with analysis"
 
 echo "primes.bash, wall-clock seconds up to LIMIT=$PRIMES_LIMIT, lower is better:"
-printf "  %-16s" "python3"; ( time python3 $PRIMES_PY $PRIMES_LIMIT >"$PP" 2>&1 ) 2>&1
-printf "  %-16s" "$(basename "$BASHP")"; ( time $BASHP $PRIMES $PRIMES_LIMIT >"$PB" 2>&1 ) 2>&1
-printf "  %-16s" "$(basename "$BIN")";  ( time $BIN --mood bash $PRIMES $PRIMES_LIMIT >"$PS" 2>&1 ) 2>&1
-compare "$PB" "$PS" "bash"
-printf "  %-16s" "$(basename "$BIN")+analysis"; ( time $BIN --mood bash -W $PRIMES $PRIMES_LIMIT >"$PS" 2>/dev/null ) 2>&1
-compare "$PB" "$PS" "bash with analysis"
-compare "$PB" "$PP" "python"
+run_timed "python3" "$PP" python3 "$PRIMES_PY" "$PRIMES_LIMIT"
+run_timed "$(basename "$BASHP")" "$PB" "$BASHP" "$PRIMES" "$PRIMES_LIMIT"
+run_timed "$(basename "$BIN")" "$PS" \
+  "$BIN" --mood bash --no-diagnostics "$PRIMES" "$PRIMES_LIMIT"
+compare_outputs "$PB" "$PS" "bash"
+run_timed "$(basename "$BIN")+analysis" "$PS" \
+  "$BIN" --mood bash -W "$PRIMES" "$PRIMES_LIMIT"
+compare_outputs "$PB" "$PS" "bash with analysis"
+compare_outputs "$PB" "$PP" "python"

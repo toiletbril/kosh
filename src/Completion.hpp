@@ -138,6 +138,9 @@ private:
   shell_lexical_state m_sequential_state{heap_allocator()};
   usize m_next_checkpoint_threshold{0};
   ArrayList<highlight_span> m_spans{heap_allocator()};
+  usize m_cached_line_start{0};
+  usize m_cached_line_end{0};
+  bool m_has_cached_line{false};
 };
 
 fn highlight_line(StringView line, EvalContext &context) throws

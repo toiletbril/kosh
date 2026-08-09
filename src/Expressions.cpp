@@ -398,8 +398,8 @@ fn window_function_body_error(EvalContext &cxt,
   return resolved.text->view();
 }
 
-cold fn Expression::analyze(AnalysisContext &actx,
-                            bool is_unconditional) const throws -> void
+fn Expression::analyze(AnalysisContext &actx,
+                       bool is_unconditional) const throws -> void
 {
   unused(actx);
   unused(is_unconditional);
@@ -1118,8 +1118,8 @@ fn operand_target_name(StringView text) wontthrow -> StringView
   return text.substring_of_length(0, end);
 }
 
-cold fn SimpleCommand::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const throws -> void
+fn SimpleCommand::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
 
@@ -2671,8 +2671,8 @@ cold fn SimpleCommand::try_static_condition_verdict(
   return optimizer::simple_command_static_verdict(m_args, actx);
 }
 
-cold fn Pipeline::analyze(AnalysisContext &actx,
-                          bool is_unconditional) const throws -> void
+fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   /* A multi-stage pipeline runs each stage in a forked child, so a stage
      assignment must not be recorded as a straight-line constant. A single
@@ -2805,9 +2805,8 @@ fn Pipeline::as_simple_command() const wontthrow -> const SimpleCommand *
   return m_commands[0]->as_simple_command();
 }
 
-cold fn CompoundListCondition::analyze(AnalysisContext &actx,
-                                       bool is_unconditional) const throws
-    -> void
+fn CompoundListCondition::analyze(AnalysisContext &actx,
+                                  bool is_unconditional) const throws -> void
 {
   ASSERT(m_cmd != nullptr);
 
@@ -2833,15 +2832,17 @@ cold fn CompoundListCondition::try_static_condition_verdict(
   return m_cmd->try_static_condition_verdict(actx);
 }
 
-cold fn CompoundList::analyze(AnalysisContext &actx,
-                              bool is_unconditional) const throws -> void
+fn CompoundList::analyze(AnalysisContext &actx,
+                         bool is_unconditional) const throws -> void
 {
-  /* A function defined by a later sibling resolves a call earlier in the same
-     list, so every top-level function name is registered before the ordered
-     walk. */
-  for (let const node : m_nodes) {
-    ASSERT(node != nullptr);
-    node->register_defined_functions(actx);
+  let const owns_definition_registration =
+      !actx.has_registered_definitions_in_scope;
+  if (owns_definition_registration) {
+    actx.has_registered_definitions_in_scope = true;
+    for (let const node : m_nodes) {
+      ASSERT(node != nullptr);
+      node->register_defined_functions(actx);
+    }
   }
 
   for (usize i = 0; i < m_nodes.count(); i++) {
@@ -2930,8 +2931,12 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
           "Apply one append redirection to a grouped command");
   }
 
+  let saved_tested_command_names = actx.tested_command_names.clone();
   for (let const node : m_nodes) {
     ASSERT(node != nullptr);
+
+    if (node->kind() != CompoundListCondition::Kind::And)
+      actx.tested_command_names = saved_tested_command_names.clone();
 
     /* A semicolon or newline node runs whenever the list runs, an && or || node
        is conditional. */
@@ -2939,6 +2944,10 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
         is_unconditional && node->kind() == CompoundListCondition::Kind::None;
     node->analyze(actx, node_unconditional);
   }
+  if (!actx.should_retain_tested_command_names)
+    actx.tested_command_names = steal(saved_tested_command_names);
+  if (owns_definition_registration)
+    actx.has_registered_definitions_in_scope = false;
 }
 
 cold fn CompoundList::register_defined_functions(
@@ -2960,8 +2969,8 @@ cold fn CompoundList::try_static_condition_verdict(
   return m_nodes[0]->try_static_condition_verdict(actx);
 }
 
-cold fn IfStatement::analyze(AnalysisContext &actx,
-                             bool is_unconditional) const throws -> void
+fn IfStatement::analyze(AnalysisContext &actx,
+                        bool is_unconditional) const throws -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);

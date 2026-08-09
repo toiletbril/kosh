@@ -1619,10 +1619,17 @@ fn shell_highlight_cache::spans_for(StringView source, usize line_start,
     m_checkpoints.clear();
     m_spans.clear();
     m_sequential_state = shell_lexical_state{heap_allocator()};
+    m_has_cached_line = false;
 
     let state = shell_lexical_state{heap_allocator()};
     m_checkpoints.push(state);
     m_next_checkpoint_threshold = DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
+  }
+
+  if (m_has_cached_line && line_start == m_cached_line_start &&
+      line_end == m_cached_line_end)
+  {
+    return &m_spans;
   }
 
   let const do_advance_with_checkpoints = [&](shell_lexical_state &state,
@@ -1682,6 +1689,9 @@ fn shell_highlight_cache::spans_for(StringView source, usize line_start,
   m_spans.reserve(generated.count());
   for (let const &span : generated)
     m_spans.push(span);
+  m_cached_line_start = line_start;
+  m_cached_line_end = line_end;
+  m_has_cached_line = true;
   if (line_state != &m_sequential_state)
     m_sequential_state = steal(lexical_state);
   let state_target = line_end;

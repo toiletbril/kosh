@@ -769,15 +769,17 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
 hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   cxt.set_terminal_exec_allowed(false);
+  let const can_skip_condition_commands =
+      !cxt.has_debug_trap() && !cxt.should_echo_expanded();
 
-  if (m_is_fully_eliminated) {
+  if (m_is_fully_eliminated && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated if as a no-op");
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
   /* An index past the last branch means every condition failed, so the else
      body runs or the if yields 0. */
-  if (m_folded_branch.has_value()) {
+  if (m_folded_branch.has_value() && can_skip_condition_commands) {
     LOG(Debug,
         "running the folded if branch %zu of %zu without testing conditions",
         *m_folded_branch, m_branches.count());
@@ -807,8 +809,8 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
-cold fn IfClause::analyze(AnalysisContext &actx,
-                          bool is_unconditional) const throws -> void
+fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   /* The fold reads the constant table while it still holds the values recorded
      before this if, so it runs before any child analyze mutates the table. */
@@ -817,12 +819,19 @@ cold fn IfClause::analyze(AnalysisContext &actx,
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional. */
   let is_first_branch = true;
+  let saved_tested_command_names = actx.tested_command_names.clone();
   for (usize i = 0; i < m_branches.count(); i++) {
     let const & [ condition, body ] = m_branches[i];
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
+    actx.tested_command_names = saved_tested_command_names.clone();
+    let const was_retaining_tested_command_names =
+        actx.should_retain_tested_command_names;
+    actx.should_retain_tested_command_names = true;
     condition->analyze(actx, is_unconditional && is_first_branch);
+    actx.should_retain_tested_command_names =
+        was_retaining_tested_command_names;
     let const is_dead_branch =
         has_folded_branch() && folded_branch_index() != i;
     let const was_silenced = actx.should_silence_unresolved_commands;
@@ -836,8 +845,10 @@ cold fn IfClause::analyze(AnalysisContext &actx,
       has_folded_branch() && folded_branch_index() != m_branches.count();
   let const was_else_silenced = actx.should_silence_unresolved_commands;
   if (else_is_dead) actx.should_silence_unresolved_commands = true;
+  actx.tested_command_names = saved_tested_command_names.clone();
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
   actx.should_silence_unresolved_commands = was_else_silenced;
+  actx.tested_command_names = steal(saved_tested_command_names);
 
   /* A branch ran conditionally and may have reassigned a name, so a value
      recorded before this if is no longer proven after it. */
@@ -950,7 +961,11 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   LOG(Debug, "entering the %s loop%s", m_is_until ? "until" : "while",
       m_folded_to_skip ? ", folded to skip the body" : "");
 
-  if (m_folded_to_skip || m_is_fully_eliminated) {
+  let const can_skip_condition_commands =
+      !cxt.has_debug_trap() && !cxt.should_echo_expanded();
+  if ((m_folded_to_skip || m_is_fully_eliminated) &&
+      can_skip_condition_commands)
+  {
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
@@ -986,8 +1001,8 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
-cold fn WhileLoop::analyze(AnalysisContext &actx,
-                           bool is_unconditional) const throws -> void
+fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1228,8 +1243,8 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
-cold fn ForLoop::analyze(AnalysisContext &actx,
-                         bool is_unconditional) const throws -> void
+fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1481,8 +1496,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   return result;
 }
 
-cold fn CaseClause::analyze(AnalysisContext &actx,
-                            bool is_unconditional) const throws -> void
+fn CaseClause::analyze(AnalysisContext &actx,
+                       bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
   for (let const &item : m_items) {
@@ -1603,8 +1618,8 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
   return m_body->evaluate(cxt);
 }
 
-cold fn BraceGroup::analyze(AnalysisContext &actx,
-                            bool is_unconditional) const throws -> void
+fn BraceGroup::analyze(AnalysisContext &actx,
+                       bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 

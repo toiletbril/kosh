@@ -58,6 +58,10 @@ test: shit
 	echo Launching tests...
 	$(MAKE) $(AUTO_JOBS) -C test test
 
+bench: shit
+	echo Launching benchmarks...
+	$(MAKE) -C test bench
+
 refill_tests: shit
 	echo Refilling tests...
 	$(MAKE) $(AUTO_JOBS) -C test refill
@@ -67,4 +71,4 @@ clean:
 	$(MAKE) $(AUTO_JOBS) -C src clean
 	$(MAKE) $(AUTO_JOBS) -C test clean
 
-.PHONY: all shit install uninstall tidy fmt test refill_tests clean
+.PHONY: all shit install uninstall tidy fmt test bench refill_tests clean

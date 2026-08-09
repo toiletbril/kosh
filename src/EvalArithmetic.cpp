@@ -975,24 +975,18 @@ static fn arith_read_variable(EvalContext *context, StringView name) throws
     -> i64
 {
   ASSERT(context != nullptr);
-  if (let const *cached = context->arith_value_cache_find(name);
-      cached != nullptr)
-    return *cached;
-  let const result = [&]() throws -> i64 {
-    if (let const *stored = context->lookup_shell_variable(name);
-        stored != nullptr)
-    {
-      return evaluate_named_value_operand(context, stored->view());
-    }
-    let const value = context->get_variable_value(name);
-    if (!value.has_value()) {
-      context->report_unset_reference(name);
-      return 0;
-    }
-    return evaluate_named_value_operand(context, value->view());
-  }();
-  context->arith_value_cache_set(name, result);
-  return result;
+  if (let const *stored = context->lookup_shell_variable(name);
+      stored != nullptr)
+  {
+    return evaluate_named_value_operand(context, stored->view());
+  }
+  let const value = context->get_variable_value(name);
+  if (!value.has_value()) {
+    context->report_unset_reference(name);
+    return 0;
+  }
+
+  return evaluate_named_value_operand(context, value->view());
 }
 
 /* A precedence-climbing evaluator over the cached token stream for a simple

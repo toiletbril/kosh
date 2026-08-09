@@ -346,9 +346,8 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
       m_location.position, m_location.length);
 }
 
-cold fn ErrorWithLocation::to_string(StringView source,
-                                     EvalContext *context) const throws
-    -> String
+fn ErrorWithLocation::to_string(StringView source,
+                                EvalContext *context) const throws -> String
 {
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;

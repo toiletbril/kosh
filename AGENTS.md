@@ -41,8 +41,8 @@ complete mode catalog, cross-compilation targets, and PREFIX installation.
 
 ## Test and golden workflow
 
-Run `make test` for the main and completion suites. Run
-`make -C test bench` for the benchmark. Wrap an interactive launch in a timeout.
+Run `make test` for the main and completion suites. Run `make bench` for the
+benchmark. Wrap an interactive launch in a timeout.
 The debug test step reports its elapsed time. It warns after 180 seconds and
 fails after 300 seconds.
 

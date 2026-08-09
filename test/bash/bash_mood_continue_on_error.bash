@@ -49,6 +49,18 @@ pipe_status_function
 printf 'function=%s\n' "${PIPESTATUS[*]}"
 substitution_result=$(printf captured)
 printf 'substitution=%s result=%s\n' "${PIPESTATUS[*]}" "$substitution_result"
+false
+assignment=ok
+printf 'assignment=%s\n' "${PIPESTATUS[*]}"
+false
+array_assignment=(one)
+printf 'array-assignment=%s\n' "${PIPESTATUS[*]}"
+(( 0 ))
+printf 'arithmetic=%s\n' "${PIPESTATUS[*]}"
+[[ no = yes ]]
+printf 'conditional=%s\n' "${PIPESTATUS[*]}"
+(exit 7)
+printf 'subshell=%s\n' "${PIPESTATUS[*]}"
 
 case b in
     ["a"-c]) printf 'quoted-lower-range=match\n' ;;

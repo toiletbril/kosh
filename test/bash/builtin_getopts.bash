@@ -80,3 +80,9 @@ fc -ln 3 3
 fc -e - false
 echo "fc-status=$?"
 rm -f "$fc_file"
+
+read -rr repeated_raw <<< 'a\b'
+printf 'repeated-raw=%s\n' "$repeated_raw"
+read -r -Z 2>/dev/null || :
+read parser_state <<< 'a\b'
+printf 'parser-state=%s\n' "$parser_state"

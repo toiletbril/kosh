@@ -471,6 +471,7 @@ struct eval_state_snapshot
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
+  u64 annoying_diagnostics_mutation_revision;
   shell_option_mutations option_mutations;
 };
 
@@ -634,6 +635,7 @@ public:
   fn associative_values(StringView name) const throws -> ArrayList<String>;
   fn clear_associative_array(StringView name) throws -> void;
 
+  fn array_element_count(StringView name) const throws -> usize;
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
@@ -683,16 +685,6 @@ public:
       -> const String *
   {
     return m_shell_variables.find(name);
-  }
-
-  hot fn arith_value_cache_find(StringView name) const wontthrow -> const i64 *
-  {
-    return m_arith_value_cache.find(name);
-  }
-
-  hot fn arith_value_cache_set(StringView name, i64 value) throws -> void
-  {
-    m_arith_value_cache.set(name, value);
   }
 
   hot pure fn has_variable_name(StringView name) const wontthrow -> bool
@@ -1723,7 +1715,6 @@ protected:
 
   mutable BumpArena m_scratch_arena{};
   StringMap<String> m_shell_variables{heap_allocator()};
-  StringMap<i64> m_arith_value_cache{heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   StringMap<completion_spec> m_completion_specs{heap_allocator()};
   Maybe<completion_spec> m_default_completion_spec{};

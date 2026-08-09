@@ -36,75 +36,16 @@ jobs:
         run: make shit
 
       - name: Run golden tests
-        run: make -C test test
+        run: make test
 
       - name: Build release binary
-        if: '!cancelled()'
         run: make clean && make CXX=g++ USE_LD= MODE=rel shit
 
       - name: Run benchmark
-        if: '!cancelled()'
-        run: SCALE=200 make MODE=rel -C test bench
-
-      - name: Assert shit is faster than dash
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          ./shit --version
-          cd test
-          run_min() {
-            min=""
-            for i in 1 2 3 4 5; do
-              t=$( { TIMEFORMAT=%R; time SCALE=200 "$@" bench/configure.sh \
-                     >/dev/null 2>&1; } 2>&1 )
-              rc=$?
-              if [ "$rc" -ne 0 ] || [ -z "$t" ]; then
-                echo "timing failed for '$*'" >&2
-                return 1
-              fi
-              min=$(awk -v a="$t" -v b="$min" \
-                    'BEGIN { if (b == "" || a < b) print a; else print b }')
-            done
-            echo "$min"
-          }
-          dash_seconds=$(run_min dash) || exit 1
-          shit_seconds=$(run_min ../shit --no-diagnostics) || exit 1
-          echo "dash=$dash_seconds shit=$shit_seconds"
-          case "$dash_seconds" in ''|*[!0-9.]*) echo "bad dash timing"; exit 1;; esac
-          case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac
-          awk -v s="$shit_seconds" -v d="$dash_seconds" \
-              'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
-            || { echo "shit is not faster than dash"; exit 1; }
-
-      - name: Assert release shit is faster than bash by at least 5 times
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          ./shit --version
-          cd test
-          run_min() {
-            min=""
-            for i in 1 2 3 4 5; do
-              t=$( { TIMEFORMAT=%R; time SCALE=200 "$@" bench/configure.bash \
-                     >/dev/null 2>&1; } 2>&1 )
-              rc=$?
-              if [ "$rc" -ne 0 ] || [ -z "$t" ]; then
-                echo "timing failed for '$*'" >&2
-                return 1
-              fi
-              min=$(awk -v a="$t" -v b="$min" \
-                    'BEGIN { if (b == "" || a < b) print a; else print b }')
-            done
-            echo "$min"
-          }
-          bash_seconds=$(run_min bash) || exit 1
-          shit_seconds=$(run_min ../shit --mood bash) || exit 1
-          echo "bash=$bash_seconds shit=$shit_seconds"
-          case "$bash_seconds" in ''|*[!0-9.]*) echo "bad bash timing"; exit 1;; esac
-          case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac
-          awk -v s="$shit_seconds" -v b="$bash_seconds" \
-              'BEGIN { exit !(s + 0 > 0 && s * 5 <= b + 0) }' \
-            || { echo "shit is not at least 5 times faster than bash"; exit 1; }
+        run: >-
+          SCALE=200 BENCH_WARMUP_COUNT=2 BENCH_SAMPLE_COUNT=7
+          DASH_SPEEDUP_REQUIRED=1 BASH_SPEEDUP_REQUIRED=5
+          make MODE=rel bench
 
       - name: Build release binary with code coverage
         if: '!cancelled()'

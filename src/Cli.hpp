@@ -92,6 +92,7 @@ public:
   FlagBool(char short_name, StringView long_name, flag_section section,
            StringView description);
 
+  fn enable() wontthrow -> void;
   fn toggle() throws -> void;
   pure fn is_enabled() const wontthrow -> bool;
 

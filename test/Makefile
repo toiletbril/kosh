@@ -220,7 +220,8 @@ refill:
 
 
 ZSH ?= /bin/zsh
-ASH ?= /bin/busybox ash
+ASH ?= /bin/busybox
+ASH_APPLET ?= ash
 YASH ?= /bin/yash
 BASHP ?= /bin/bash
 DASH ?= /bin/dash
@@ -240,12 +241,21 @@ PRIMES := bench/primes.bash
 PRIMES_PY := bench/primes.py
 PRIMES_LIMIT ?= 100000
 SCALE ?= 100
+BENCH_WARMUP_COUNT ?= 0
+BENCH_SAMPLE_COUNT ?= 1
+DASH_SPEEDUP_REQUIRED ?= 0
+BASH_SPEEDUP_REQUIRED ?= 0
 
 bench:
 	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASHP='$(BASHP)' ZSH='$(ZSH)' \
-		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' BENCH_BASH='$(BENCH_BASH)' \
-		BENCH_SHIT='$(BENCH_SHIT)' PRIMES='$(PRIMES)' PRIMES_PY='$(PRIMES_PY)' \
-		PRIMES_LIMIT='$(PRIMES_LIMIT)' $(SHELL) run-bench-test.sh
+		ASH='$(ASH)' ASH_APPLET='$(ASH_APPLET)' YASH='$(YASH)' BENCH='$(BENCH)' \
+		BENCH_BASH='$(BENCH_BASH)' BENCH_SHIT='$(BENCH_SHIT)' PRIMES='$(PRIMES)' \
+		PRIMES_PY='$(PRIMES_PY)' PRIMES_LIMIT='$(PRIMES_LIMIT)' \
+		BENCH_WARMUP_COUNT='$(BENCH_WARMUP_COUNT)' \
+		BENCH_SAMPLE_COUNT='$(BENCH_SAMPLE_COUNT)' \
+		DASH_SPEEDUP_REQUIRED='$(DASH_SPEEDUP_REQUIRED)' \
+		BASH_SPEEDUP_REQUIRED='$(BASH_SPEEDUP_REQUIRED)' \
+		$(SHELL) run-bench-test.sh
 
 .PHONY: test clean shit_tests refill compatdiff dashdiff bashdiff mimicrydiff bench \
 		build_tests completion_tests completion_refill cli_tests highlight_tests

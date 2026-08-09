@@ -154,11 +154,14 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   if (is_append) {
     if (let const *array = lookup_indexed_array(name))
       running_index = array->count();
-    let const sparse = collect_sparse_array_entries(m_sparse_array_values, name,
-                                                    scratch_allocator());
-    if (!sparse.is_empty()) {
-      let const next_after_sparse = sparse[sparse.count() - 1].index + 1;
-      if (next_after_sparse > running_index) running_index = next_after_sparse;
+    if (m_sparse_array_names.contains(name)) {
+      let const sparse = collect_sparse_array_entries(
+          m_sparse_array_values, name, scratch_allocator());
+      if (!sparse.is_empty()) {
+        let const next_after_sparse = sparse[sparse.count() - 1].index + 1;
+        if (next_after_sparse > running_index)
+          running_index = next_after_sparse;
+      }
     }
   } else {
     set_indexed_array(name, ArrayList<String>{heap_allocator()});
@@ -331,8 +334,12 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
 
   LOG(Debug, "declaring '%.*s' as an associative array",
       static_cast<int>(name.length), name.data);
+  let scalar = Maybe<String>{};
+  if (let const *stored = m_shell_variables.find(name); stored != nullptr)
+    scalar = *stored;
   m_associative_names.add(name);
   m_shell_variables.erase(name);
+  if (scalar.has_value()) set_associative_element(name, "0", scalar->view());
 }
 
 fn EvalContext::set_associative_element(StringView name, StringView key,
@@ -483,7 +490,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
 
   let previous_sparse_indices = ArrayList<usize>{heap_allocator()};
   let previous_sparse_values = ArrayList<String>{heap_allocator()};
-  if (m_sparse_array_values.count() != 0)
+  if (m_sparse_array_names.contains(name))
     for (const sparse_array_entry &entry : collect_sparse_array_entries(
              m_sparse_array_values, name, heap_allocator()))
     {
@@ -535,14 +542,58 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
   if (let const *array = m_indexed_arrays.find(name))
     base = static_cast<i64>(array->count());
 
-  for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
-                        [&](usize index, const String &value) throws {
-                          unused(value);
-                          let const past_index = static_cast<i64>(index) + 1;
-                          if (past_index > base) base = past_index;
-                        });
+  if (m_sparse_array_names.contains(name)) {
+    for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
+                          [&](usize index, const String &value) throws {
+                            unused(value);
+                            let const past_index =
+                                index >= static_cast<usize>(INT64_MAX)
+                                    ? INT64_MAX
+                                    : static_cast<i64>(index) + 1;
+                            if (past_index > base) base = past_index;
+                          });
+  }
 
   return base;
+}
+
+fn EvalContext::array_element_count(StringView name) const throws -> usize
+{
+  if ((name == "FUNCNAME" || name == "BASH_LINENO") &&
+      bash_dynamic_variables_enabled()) [[unlikely]]
+  {
+    return funcname_frame_count();
+  }
+
+  if (is_associative_array(name)) {
+    usize element_count = 0;
+    let const prefix = associative_composite_key(name, "", scratch_allocator());
+    m_associative_values.for_each(
+        [&](StringView composite, const String &value) {
+          unused(value);
+          if (composite.starts_with(prefix.view())) element_count++;
+        });
+
+    return element_count;
+  }
+
+  usize element_count = 0;
+  if (let const *array = lookup_indexed_array(name); array != nullptr)
+    element_count = array->count();
+
+  if (m_sparse_array_names.contains(name)) {
+    for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
+                          [&](usize index, const String &value) throws {
+                            unused(index);
+                            unused(value);
+                            element_count++;
+                          });
+  }
+
+  if (element_count == 0 && get_variable_value(name).has_value())
+    element_count = 1;
+
+  return element_count;
 }
 
 fn EvalContext::apply_array_subscript(
@@ -712,7 +763,7 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     out.reserve(array->count());
     for (const String &element : *array)
       out.push_managed(element.view());
-    if (m_sparse_array_values.count() != 0) {
+    if (m_sparse_array_names.contains(name)) {
       let sparse = collect_sparse_array_entries(m_sparse_array_values, name,
                                                 scratch_allocator());
       for (sparse_array_entry &entry : sparse)
@@ -729,7 +780,7 @@ fn EvalContext::array_element_is_set(StringView name,
                                      StringView subscript) throws -> bool
 {
   if (subscript == "@" || subscript == "*") {
-    return !collect_array_elements(name).is_empty();
+    return array_element_count(name) != 0;
   }
   if (is_associative_array(name)) {
     const String key = expand_modifier_word(subscript);
@@ -792,9 +843,11 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
     out.reserve(array->count());
     for (usize i = 0; i < array->count(); i++)
       out.push(String::from(i, heap_allocator()));
-    for (const sparse_array_entry &entry : collect_sparse_array_entries(
-             m_sparse_array_values, name, scratch_allocator()))
-      out.push(String::from(entry.index, heap_allocator()));
+    if (m_sparse_array_names.contains(name)) {
+      for (const sparse_array_entry &entry : collect_sparse_array_entries(
+               m_sparse_array_values, name, scratch_allocator()))
+        out.push(String::from(entry.index, heap_allocator()));
+    }
     return out;
   }
   if (get_variable_value(name).has_value())

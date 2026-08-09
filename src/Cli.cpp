@@ -52,6 +52,8 @@ FlagBool::FlagBool(char short_name, StringView long_name, flag_section section,
 
 fn FlagBool::toggle() throws -> void { m_value = !m_value; }
 
+fn FlagBool::enable() wontthrow -> void { m_value = true; }
+
 pure fn FlagBool::is_enabled() const wontthrow -> bool { return m_value; }
 
 fn FlagBool::reset() throws -> void
@@ -157,6 +159,7 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
                     const char **value_start) throws -> bool
 {
   usize longest_length = 0;
+  let const flag_start_length = std::strlen(flag_start);
 
   *value_start = nullptr;
   *result_flag = nullptr;
@@ -174,6 +177,8 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 
         /* strncmp stops at the argument's NUL, so a short argument such as --f
            against the flag --foobar does not read past it. */
+        if (flag_length > flag_start_length) continue;
+
         let const after_name = flag_start[flag_length];
         if (flag_length > longest_length &&
             std::strncmp(flags[i]->long_name().data, flag_start, flag_length) ==
@@ -200,16 +205,23 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    bool should_accept_negative_number_operand) throws
     -> ArrayList<String>
 {
+  reset_flags(flags);
+
   let os_argv = ArrayList<const char *>{heap_allocator()};
   os_argv.reserve(args.count());
 
   for (let const &arg : args)
     os_argv.push(arg.c_str());
 
-  return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
-                     base_position, operand_value_flag, arg_locations,
-                     operand_locations, program_name,
-                     should_accept_negative_number_operand);
+  try {
+    return parse_flags(flags, static_cast<int>(os_argv.count()),
+                       os_argv.begin(), base_position, operand_value_flag,
+                       arg_locations, operand_locations, program_name,
+                       should_accept_negative_number_operand);
+  } catch (...) {
+    reset_flags(flags);
+    throw;
+  }
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -399,9 +411,18 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
         case Flag::Kind::Bool: {
           let const bool_flag = static_cast<FlagBool *>(flag);
 
-          bool_flag->toggle();
+          if (is_long && *value_offset != '\0') {
+            throw ErrorWithLocation{
+                argument_location(argv, static_cast<usize>(i), base_position,
+                                  arg_locations),
+                prefixed_message(program_name, "The flag '" +
+                                                   flag_name(flag, is_long) +
+                                                   "' does not take a value")};
+          }
+
+          bool_flag->enable();
           bool_flag->set_position(++position);
-          LOG(All, "toggled the flag '%s'",
+          LOG(All, "enabled the flag '%s'",
               flag_name(bool_flag, is_long).c_str());
 
           if (!is_long && *value_offset != '\0') {

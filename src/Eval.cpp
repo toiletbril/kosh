@@ -106,7 +106,6 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
   if (name == "PATH") m_program_resolver.assign_path(String{value});
-  m_arith_value_cache.erase(name);
   m_shell_variables.set(name, value);
   if (m_exported_names.contains(name)) {
     if (m_subshell_depth > 0)
@@ -325,7 +324,11 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
       !m_sparse_array_names.contains("PIPESTATUS"))
   {
     m_shell_variables.erase("PIPESTATUS");
-    (*values)[0] = String::from(status, values->allocator());
+    char status_text_buffer[32];
+    let const status_text = utils::int_to_text_into(status, status_text_buffer,
+                                                    sizeof(status_text_buffer));
+    if ((*values)[0] != status_text)
+      (*values)[0] = String{values->allocator(), status_text};
     return;
   }
 
@@ -1785,6 +1788,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_mood_mutation_revision,
                              m_warning_mutation_revision,
                              m_diagnostics_mutation_revision,
+                             m_annoying_diagnostics_mutation_revision,
                              m_shell_option_mutations};
 }
 
@@ -1813,6 +1817,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_mood_mutation_revision = snapshot.mood_mutation_revision;
   m_warning_mutation_revision = snapshot.warning_mutation_revision;
   m_diagnostics_mutation_revision = snapshot.diagnostics_mutation_revision;
+  m_annoying_diagnostics_mutation_revision =
+      snapshot.annoying_diagnostics_mutation_revision;
   m_shell_option_mutations = snapshot.option_mutations;
 
   m_readonly_names = steal(snapshot.readonly_names);

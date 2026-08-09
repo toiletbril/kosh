@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Parser.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../Toiletline.hpp"
@@ -318,18 +319,6 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
                            Maybe<usize> active_index, i64 first_index,
                            i64 last_index) throws -> i32
 {
-  if (active_index.has_value()) {
-    let const &active = events[*active_index];
-    if (!toiletline::history_rewrite_event(active.number, active.command.view(),
-                                           {}))
-    {
-      report_soft_builtin_error(ec, cxt, ec.source_location(),
-                                "cannot replace the history event");
-      return 1;
-    }
-    cxt.set_current_history_event_number(None);
-  }
-
   let const source =
       selected_source(events, first_index, last_index, options.should_reverse,
                       cxt.scratch_allocator());
@@ -372,6 +361,33 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
   if (edited->is_empty()) return 0;
+
+  edited->normalize_crlf_line_endings();
+  let const ast_mark = AST_ARENA->mark();
+  let const function_mark = FUNCTION_ARENA->mark();
+  {
+    defer
+    {
+      FUNCTION_ARENA->release(function_mark);
+      AST_ARENA->release(ast_mark);
+    };
+    let parser = Parser{
+        Lexer{String{edited->view()}, *AST_ARENA, false, None, cxt.mood()}
+    };
+    unused(parser.construct_ast());
+  }
+
+  if (active_index.has_value()) {
+    let const &active = events[*active_index];
+    if (!toiletline::history_rewrite_event(active.number, active.command.view(),
+                                           {}))
+    {
+      report_soft_builtin_error(ec, cxt, ec.source_location(),
+                                "Unable to replace the active history event");
+      return 1;
+    }
+    cxt.set_current_history_event_number(None);
+  }
 
   ec.print_to_stderr(edited->view());
   if (edited->back() != '\n') ec.print_to_stderr("\n");

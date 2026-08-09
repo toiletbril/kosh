@@ -79,6 +79,8 @@ public:
   bool should_silence_unresolved_commands{false};
 
   HashSet tested_command_names{heap_allocator()};
+  bool should_retain_tested_command_names{false};
+  bool has_registered_definitions_in_scope{false};
 
   bool should_trace_optimizer{false};
   usize optimizer_folded_arithmetic{0};

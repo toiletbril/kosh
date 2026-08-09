@@ -6,6 +6,12 @@ d=$(mktemp -d)
 mkdir -p "$d/real"
 ln -sfn "$d/real" "$d/link"
 echo "physical=$(cd -P "$d/link" && pwd | grep -o '/real$')"
+(set -P) 2>/dev/null
+echo "set-physical=$?"
+(set +P) 2>/dev/null
+echo "unset-physical=$?"
+(set -o physical) 2>/dev/null
+echo "set-long-physical=$?"
 file=$(mktemp)
 printf 'echo "in=$1"\n' > "$file"
 set -- keep

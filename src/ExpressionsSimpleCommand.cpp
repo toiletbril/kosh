@@ -88,8 +88,8 @@ fn AssignCommand::as_assign_command() const wontthrow -> const AssignCommand *
   return this;
 }
 
-cold fn AssignCommand::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const throws -> void
+fn AssignCommand::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
 {
   ASSERT(m_assignment != nullptr);
 
@@ -298,6 +298,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       cxt.assign_array_element(array_name, subscript, value.view(),
                                m_assignment->is_append());
       if (!value_ran_substitution) cxt.set_last_exit_status(0);
+      cxt.publish_single_pipe_status(cxt.last_exit_status());
       return cxt.last_exit_status();
     }
 
@@ -321,6 +322,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       cxt.mark_exported(key);
     }
     if (!value_ran_substitution) cxt.set_last_exit_status(0);
+    cxt.publish_single_pipe_status(cxt.last_exit_status());
     return cxt.last_exit_status();
   } catch (const ErrorWithLocation &) {
     throw;
@@ -1196,11 +1198,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (let const &assignment : m_array_args)
       for (let const token : assignment.elements)
         ran_substitution = ran_substitution || do_token_ran_substitution(token);
-    /* When a substitution ran, its own last command already set PIPESTATUS. */
-    if (!ran_substitution) {
-      cxt.set_last_exit_status(0);
-      cxt.publish_single_pipe_status(0);
-    }
+    if (!ran_substitution) cxt.set_last_exit_status(0);
+    cxt.publish_single_pipe_status(cxt.last_exit_status());
     return cxt.last_exit_status();
   }
 
@@ -1370,7 +1369,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
          definition_info->defining_runtime.warning_level !=
              cxt.warning_level() ||
          definition_info->defining_runtime.are_diagnostics_disabled !=
-             cxt.diagnostics_disabled());
+             cxt.diagnostics_disabled() ||
+         definition_info->defining_runtime.are_annoying_diagnostics_enabled !=
+             cxt.annoying_diagnostics_enabled());
     Maybe<function_runtime_state> saved_runtime_state = None;
     if (needs_state_swap) {
       saved_runtime_state =
@@ -1428,6 +1429,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
     }
 
+    cxt.publish_single_pipe_status(static_cast<i32>(function_ret));
     SET_AND_RETURN_EXIT_STATUS(cxt, function_ret);
   }
 

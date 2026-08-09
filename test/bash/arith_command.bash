@@ -117,6 +117,14 @@ echo "assoc: $((m[k]+5))"
 n=$(( a[0] + a[1] ))
 echo "captured: $n"
 
+counter=0
+expression='counter++'
+echo "recursive: $((expression-expression)) counter=$counter"
+cached=9
+echo "cached-before: $((cached))"
+unset cached
+echo "cached-after: $((cached))"
+
 # Bash bitwise arithmetic operators inside $(( )), checked byte-for-byte against
 # bash. Covers complement, and, or, xor, and the two shifts, with negative
 # operands and a precedence mix.

@@ -118,6 +118,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
+  if (should_make_associative && should_make_indexed) {
+    report_soft_builtin_error(ec, cxt, ec.source_location(),
+                              "'-a' and '-A' cannot be used together");
+    return 2;
+  }
+
   /* A missing name turns the status to 1, silently for -F the way bash answers
      an existence probe, with a message for -f. */
   if (should_restrict_to_functions) {
@@ -325,6 +331,23 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
+    if (should_make_associative && cxt.lookup_indexed_array(name) != nullptr) {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                StringView{"Unable to convert '"} + name +
+                                    "' from an indexed array to an "
+                                    "associative array");
+      status = 1;
+      continue;
+    }
+    if (should_make_indexed && cxt.is_associative_array(name)) {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                StringView{"Unable to convert '"} + name +
+                                    "' from an associative array to an "
+                                    "indexed array");
+      status = 1;
+      continue;
+    }
+
     if (!should_be_global) cxt.declare_local(name);
 
     /* The attribute applies before the assignment, so declare -i x+=3 already
@@ -340,10 +363,18 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else if (should_make_associative) {
       LOG(All, "declare making '%.*s' an associative array",
           static_cast<int>(name.length), name.data);
+      if (equals.has_value()) cxt.set_shell_variable(name, value);
       cxt.declare_associative_array(name);
     } else if (should_make_indexed) {
-      if (cxt.lookup_indexed_array(name) == nullptr)
-        cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
+      if (cxt.lookup_indexed_array(name) == nullptr) {
+        let values = ArrayList<String>{heap_allocator()};
+        if (equals.has_value())
+          values.push(String{heap_allocator(), value});
+        else if (let const *scalar = cxt.lookup_shell_variable(name);
+                 scalar != nullptr)
+          values.push(String{heap_allocator(), scalar->view()});
+        cxt.set_indexed_array(name, steal(values));
+      }
     } else if (equals.has_value()) {
       if (is_append) {
         /* An integer name joins the appended expression as arithmetic. */
