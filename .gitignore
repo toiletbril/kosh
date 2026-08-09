@@ -46,3 +46,15 @@ core.*
 # Nix
 result
 result-*
+
+# Arch packaging build output (makepkg)
+deploy/archlinux/*
+!deploy/archlinux/PKGBUILD
+!deploy/archlinux/shit-shell.install
+
+# Alpine packaging build output (abuild)
+deploy/alpine/*
+!deploy/alpine/APKBUILD
+!deploy/alpine/shit.post-install
+!deploy/alpine/shit.post-upgrade
+!deploy/alpine/shit.pre-deinstall

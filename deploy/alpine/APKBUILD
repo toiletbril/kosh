@@ -1,0 +1,63 @@
+# Contributor: Alexey Andreyev <dev@aa13q.ru>
+# Maintainer: Alexey Andreyev <dev@aa13q.ru>
+maintainer="Alexey Andreyev <dev@aa13q.ru>"
+pkgname=shit
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="Fast, portable, Bash-compatible interactive shell, interpreter and diagnostic tool"
+url="https://github.com/toiletbril/shit"
+arch="x86_64 aarch64"
+license="BSD-3-Clause AND MIT"
+depends="busybox"
+makedepends="build-base clang llvm lld linux-headers git"
+checkdepends="bash dash python3 util-linux-misc"
+install="$pkgname.post-install $pkgname.post-upgrade $pkgname.pre-deinstall"
+subpackages="$pkgname-doc $pkgname-bash-completion"
+
+# Pinned to the exact commit the "src/toiletline" submodule points to for
+# this release (see .gitmodules / `git submodule status`). GitHub's tarball
+# for a tag does not include submodule contents, so it's fetched separately
+# and dropped into place in prepare().
+_release_commit="c2731c40d2cb3770f5fd3f6f7bfdc68d55f05483"
+_release_epoch=1785870591
+_source_directory="toiletbril-shit-c2731c4"
+_toiletline_commit="024fa036a7306ed07751fe90fbd583c9a6c2086c"
+export SOURCE_DATE_EPOCH="$_release_epoch"
+
+source="
+  $pkgname-$pkgver.tar.gz::https://api.github.com/repos/toiletbril/shit/tarball/$pkgver
+  toiletline-$_toiletline_commit.tar.gz::https://github.com/toiletbril/toiletline/archive/$_toiletline_commit.tar.gz
+  "
+builddir="$srcdir/$_source_directory"
+
+prepare() {
+  default_prepare
+  rm -rf "$builddir/src/toiletline"
+  cp -r "$srcdir/toiletline-$_toiletline_commit" "$builddir/src/toiletline"
+}
+
+build() {
+  make MODE=rel ENVCXXFLAGS="$CXXFLAGS $LDFLAGS" \
+    COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux"
+}
+
+check() {
+  make MODE=rel ENVCXXFLAGS="$CXXFLAGS $LDFLAGS" \
+    COMMIT_HASH="$_release_commit" OS_INFO="Alpine Linux" BASHP=/bin/bash \
+    DASH=/usr/bin/dash test
+}
+
+package() {
+  install -Dm755 shit "$pkgdir/usr/bin/shit"
+  install -Dm644 docs/shit.1 "$pkgdir/usr/share/man/man1/shit.1"
+  install -Dm644 docs/shit.5 "$pkgdir/usr/share/man/man5/shit.5"
+  install -Dm644 completions/shit.bash "$pkgdir/usr/share/bash-completion/completions/shit"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 src/toiletline/LICENSE.txt \
+    "$pkgdir/usr/share/licenses/$pkgname/toiletline-LICENSE.txt"
+}
+
+sha512sums="
+387f835c2fda2e2fe03f89779197e8c5658ca4c0c573a8641d2771371097dfcc6d8df3f66be517fd1628928fcb52a0509770cc80e9861777ddd10659832fca27  shit-0.1.0.tar.gz
+c53820b0ed058776c213ecf4c7bdf11fb095d9b24c261bd503f4a655b7417ddef943cbc732c6b6aa4883fa89cd677b90b8a7ac29cef6a5d2ae9449606cf81763  toiletline-024fa036a7306ed07751fe90fbd583c9a6c2086c.tar.gz
+"
