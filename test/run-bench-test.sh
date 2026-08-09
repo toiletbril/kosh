@@ -68,13 +68,15 @@ measure_command() {
   fi
 
   TIMING=$(<"$TIME_OUTPUT")
-  case "$TIMING" in
-    ''|*[!0-9.]*)
-      echo "benchmark command produced an invalid timing '$TIMING'" >&2
-      return 1
-      ;;
-  esac
-  awk -v TIMING="$TIMING" 'BEGIN { exit !(TIMING + 0 > 0) }'
+  if [[ ! $TIMING =~ ^[0-9]+[.][0-9]{3}$ ]]; then
+    echo "benchmark command produced an invalid timing '$TIMING'" >&2
+    return 1
+  fi
+  LAST_TIMING_MILLISECONDS=$((10#${TIMING/./}))
+  if ((LAST_TIMING_MILLISECONDS == 0)); then
+    echo "benchmark command produced an invalid timing '$TIMING'" >&2
+    return 1
+  fi
   LAST_TIMING=$TIMING
 }
 
@@ -131,23 +133,24 @@ run_mode_command() {
 run_pair() {
   local MODE=$1
   local ORDER=$2
-  local RESULTS=$3
   local EXPECTED
   local ACTUAL
   local REFERENCE_NAME
-  local REFERENCE_SECONDS
-  local CANDIDATE_SECONDS
 
   if [ "$ORDER" = reference-first ]; then
     run_mode_command "$MODE" reference
-    REFERENCE_SECONDS=$LAST_TIMING
+    PAIR_REFERENCE_TIMING=$LAST_TIMING
+    PAIR_REFERENCE_MILLISECONDS=$LAST_TIMING_MILLISECONDS
     run_mode_command "$MODE" candidate
-    CANDIDATE_SECONDS=$LAST_TIMING
+    PAIR_CANDIDATE_TIMING=$LAST_TIMING
+    PAIR_CANDIDATE_MILLISECONDS=$LAST_TIMING_MILLISECONDS
   else
     run_mode_command "$MODE" candidate
-    CANDIDATE_SECONDS=$LAST_TIMING
+    PAIR_CANDIDATE_TIMING=$LAST_TIMING
+    PAIR_CANDIDATE_MILLISECONDS=$LAST_TIMING_MILLISECONDS
     run_mode_command "$MODE" reference
-    REFERENCE_SECONDS=$LAST_TIMING
+    PAIR_REFERENCE_TIMING=$LAST_TIMING
+    PAIR_REFERENCE_MILLISECONDS=$LAST_TIMING_MILLISECONDS
   fi
 
   if [ "$MODE" = sh ]; then
@@ -160,27 +163,6 @@ run_pair() {
     REFERENCE_NAME=bash
   fi
   compare_outputs "$EXPECTED" "$ACTUAL" "$REFERENCE_NAME" no
-  printf '%s %s\n' "$REFERENCE_SECONDS" "$CANDIDATE_SECONDS" >>"$RESULTS"
-}
-
-minimum_column() {
-  local RESULTS=$1
-  local COLUMN=$2
-
-  awk -v COLUMN="$COLUMN" '
-    NR == 1 || $COLUMN < MINIMUM { MINIMUM = $COLUMN }
-    END { print MINIMUM }
-  ' "$RESULTS"
-}
-
-maximum_column() {
-  local RESULTS=$1
-  local COLUMN=$2
-
-  awk -v COLUMN="$COLUMN" '
-    NR == 1 || $COLUMN > MAXIMUM { MAXIMUM = $COLUMN }
-    END { print MAXIMUM }
-  ' "$RESULTS"
 }
 
 benchmark_pair() {
@@ -189,12 +171,13 @@ benchmark_pair() {
   local CANDIDATE_LABEL
   local REFERENCE_NAME
   local REQUIRED_SPEEDUP
-  local RESULTS=$WORK/$MODE-results
   local SAMPLE_INDEX
   local ORDER
   local REFERENCE_MAXIMUM
+  local REFERENCE_MAXIMUM_MILLISECONDS
   local CANDIDATE_MINIMUM
-  local SPEEDUP
+  local CANDIDATE_MINIMUM_MILLISECONDS
+  local SPEEDUP_THOUSANDTHS
 
   if [ "$MODE" = sh ]; then
     REFERENCE_LABEL=$(basename "$DASH")
@@ -215,10 +198,9 @@ benchmark_pair() {
     else
       ORDER=candidate-first
     fi
-    run_pair "$MODE" "$ORDER" /dev/null
+    run_pair "$MODE" "$ORDER"
   done
 
-  : >"$RESULTS"
   for ((SAMPLE_INDEX = 1;
         SAMPLE_INDEX <= BENCH_SAMPLE_COUNT;
         SAMPLE_INDEX++)); do
@@ -227,35 +209,45 @@ benchmark_pair() {
     else
       ORDER=candidate-first
     fi
-    run_pair "$MODE" "$ORDER" "$RESULTS"
+    run_pair "$MODE" "$ORDER"
+
+    if ((SAMPLE_INDEX == 1 ||
+         PAIR_REFERENCE_MILLISECONDS > REFERENCE_MAXIMUM_MILLISECONDS)); then
+      REFERENCE_MAXIMUM=$PAIR_REFERENCE_TIMING
+      REFERENCE_MAXIMUM_MILLISECONDS=$PAIR_REFERENCE_MILLISECONDS
+    fi
+    if ((SAMPLE_INDEX == 1 ||
+         PAIR_CANDIDATE_MILLISECONDS < CANDIDATE_MINIMUM_MILLISECONDS)); then
+      CANDIDATE_MINIMUM=$PAIR_CANDIDATE_TIMING
+      CANDIDATE_MINIMUM_MILLISECONDS=$PAIR_CANDIDATE_MILLISECONDS
+    fi
   done
 
-  REFERENCE_MAXIMUM=$(maximum_column "$RESULTS" 1)
-  CANDIDATE_MINIMUM=$(minimum_column "$RESULTS" 2)
-  SPEEDUP=$(awk -v REFERENCE="$REFERENCE_MAXIMUM" \
-    -v CANDIDATE="$CANDIDATE_MINIMUM" \
-    'BEGIN { print REFERENCE / CANDIDATE }')
+  SPEEDUP_THOUSANDTHS=$((
+    REFERENCE_MAXIMUM_MILLISECONDS * 1000 /
+    CANDIDATE_MINIMUM_MILLISECONDS
+  ))
   printf "  %-16s%s maximum\n" "$REFERENCE_LABEL" "$REFERENCE_MAXIMUM"
   printf "  %-16s%s minimum\n" "$CANDIDATE_LABEL" "$CANDIDATE_MINIMUM"
   echo "output matches $REFERENCE_NAME"
-  echo "best-case speedup is $SPEEDUP"
+  printf 'best-case speedup is %d.%03d\n' \
+    "$((SPEEDUP_THOUSANDTHS / 1000))" \
+    "$((SPEEDUP_THOUSANDTHS % 1000))"
 
-  if awk -v REQUIRED="$REQUIRED_SPEEDUP" \
-    'BEGIN { exit !(REQUIRED + 0 > 0) }'
-  then
+  if ((REQUIRED_SPEEDUP > 0)); then
     if [ "$MODE" = sh ]; then
-      awk -v SPEEDUP="$SPEEDUP" -v REQUIRED="$REQUIRED_SPEEDUP" \
-        'BEGIN { exit !(SPEEDUP + 0 > REQUIRED + 0) }' || {
-          echo "shit is not faster than dash" >&2
-          return 1
-        }
+      if ((REFERENCE_MAXIMUM_MILLISECONDS <=
+           CANDIDATE_MINIMUM_MILLISECONDS * REQUIRED_SPEEDUP)); then
+        echo "shit is not faster than dash" >&2
+        return 1
+      fi
     else
-      awk -v SPEEDUP="$SPEEDUP" -v REQUIRED="$REQUIRED_SPEEDUP" \
-        'BEGIN { exit !(SPEEDUP + 0 >= REQUIRED + 0) }' || {
-          echo "shit is not at least $REQUIRED_SPEEDUP times faster" \
-            "than bash" >&2
-          return 1
-        }
+      if ((REFERENCE_MAXIMUM_MILLISECONDS <
+           CANDIDATE_MINIMUM_MILLISECONDS * REQUIRED_SPEEDUP)); then
+        echo "shit is not at least $REQUIRED_SPEEDUP times faster" \
+          "than bash" >&2
+        return 1
+      fi
     fi
   fi
 }
@@ -273,15 +265,12 @@ if [ "$BENCH_SAMPLE_COUNT" -lt 1 ]; then
   echo "the benchmark sample count must be a positive integer" >&2
   exit 1
 fi
-awk -v DASH_REQUIRED="$DASH_SPEEDUP_REQUIRED" \
-  -v BASH_REQUIRED="$BASH_SPEEDUP_REQUIRED" \
-  'BEGIN {
-    NUMBER = "^[0-9]+([.][0-9]+)?$"
-    exit !(DASH_REQUIRED ~ NUMBER && BASH_REQUIRED ~ NUMBER)
-  }' || {
-    echo "benchmark speedup thresholds must be nonnegative numbers" >&2
+case "$DASH_SPEEDUP_REQUIRED:$BASH_SPEEDUP_REQUIRED" in
+  *[!0-9:]*|:*|*:)
+    echo "benchmark speedup thresholds must be nonnegative integers" >&2
     exit 1
-  }
+    ;;
+esac
 
 echo "configure.sh, wall-clock seconds at SCALE=$SCALE, lower is better:"
 benchmark_pair sh

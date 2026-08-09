@@ -78,6 +78,9 @@ allocation root is absolute and uses native path syntax on every host.
 
 The benchmark uses `+analysis` for analysis-enabled runs. Compatibility rows
 retain their mood and enable analysis with `-W`.
+The local benchmark uses one measured run by default. CI gives each executable
+seven measured runs. The speed gate compares the slowest reference time with
+the fastest candidate time.
 
 Every rm test invokes the shitbox rm with `--dry-run`. This rule applies to
 shitbox_rm and every new rm test. Temporary directory cleanup uses the system rm
