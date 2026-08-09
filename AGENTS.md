@@ -173,10 +173,11 @@ and `$-`. Its compile-time name map retains binary search.
 `apply_strictness_for_mood` owns mood strictness. An explicit nounset, pipefail,
 or failglob setting survives a mood change. `command_word_is_glob` owns the
 command-position glob check. The runtime diagnostic levels distinguish strict,
-lenient, and annoying diagnostics. The named levels are `force-warnings`,
-`force-diagnostics`, and `force-annoying-diagnostics`. `no-diagnostics`
-skips analysis, while `--no-annoying-diagnostics` suppresses only the annoying
-tier.
+lenient, and annoying diagnostics. The `-W`, `-WW`, and `-WWW` forms select the
+level. An explicit `set --mood` clears that selection. The
+`annoying-diagnostics` set option controls the annoying tier, and
+`no-diagnostics` skips analysis. The `--no-annoying-diagnostics` flag disables
+the annoying tier at startup.
 
 Restricted behavior uses one shared context state. Variable changes, directory
 changes, slash-bearing command and source operands, output redirections, exec,

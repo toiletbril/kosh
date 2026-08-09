@@ -449,8 +449,8 @@ static fn run_script_contents(const String &script_contents,
           &context, context.warning_level(),
           context.warnings_enabled() && context.shell_is_interactive(),
           context.mood() == mimic_mood::Default,
-          !FLAG_SUPPRESS_ANNOYING_DIAGNOSTICS.is_enabled(),
-          shellcheck_suppressions, FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+          context.annoying_diagnostics_enabled(), shellcheck_suppressions,
+          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",
@@ -1266,6 +1266,8 @@ fn main(int argc, char **argv) -> int
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
   context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled());
+  context.set_annoying_diagnostics_enabled(
+      !FLAG_SUPPRESS_ANNOYING_DIAGNOSTICS.is_enabled());
   context.set_source_traces_enabled(!FLAG_NO_TRACES.is_enabled());
   context.set_shell_option_state(shit::shell_option_id::Privileged,
                                  FLAG_PRIVILEGED.is_enabled());

@@ -5,8 +5,8 @@ echo "== set switches:"
 "$BIN" --debug-complete-at 'set -' </dev/null
 echo "== set -o names by prefix:"
 "$BIN" --debug-complete-at 'set -o no' </dev/null
-echo "== set level three name:"
-"$BIN" --debug-complete-at 'set -o force-a' </dev/null
+echo "== set annoying diagnostics name:"
+"$BIN" --debug-complete-at 'set -o annoying-' </dev/null
 echo "== shit binary flags:"
 "$BIN" --debug-complete-at 'shit --b' </dev/null
 echo "== shit no-traces flag:"

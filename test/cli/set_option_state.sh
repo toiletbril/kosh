@@ -91,15 +91,16 @@ fi
 set -o no-diagnostics
 function apply_definition_state {
     set --mood bash
-    set +o force-warnings
+    set +W
     set -o no-diagnostics
 }
 set +o no-diagnostics
-set -o force-warnings
+set -W
 set --mood shit
 apply_definition_state
+case $- in *W*) warning_level_clear=no;; *) warning_level_clear=yes;; esac
 if [[ "$(set --mood)" = bash ]] &&
-   [[ ! -o force-warnings ]] && [[ -o no-diagnostics ]]; then
+   [[ "$warning_level_clear" = yes ]] && [[ -o no-diagnostics ]]; then
     echo function-runtime-state-persisted
 else
     echo function-runtime-state-lost
@@ -126,17 +127,38 @@ else
 fi
 '
 "$BIN" -M bash -c '
+function enable_no_diagnostics { set -o no-diagnostics; }
+set +o annoying-diagnostics
+enable_no_diagnostics
+if [[ ! -o annoying-diagnostics ]] && [[ -o no-diagnostics ]]; then
+    echo diagnostic-options-independent
+else
+    echo diagnostic-options-crossed
+fi
+'
+"$BIN" -M bash -c '
+function disable_annoying_diagnostics { set +o annoying-diagnostics; }
+set -o annoying-diagnostics
+disable_annoying_diagnostics
+if [[ ! -o annoying-diagnostics ]]; then
+    echo annoying-option-persisted
+else
+    echo annoying-option-lost
+fi
+'
+"$BIN" -M bash -c '
 function isolate_revision_state {
     ignored=$(set --mood sh
-        set -o force-warnings
+        set -W
         set -o no-diagnostics)
 }
 set --mood shit
-set +o force-warnings
+set +W
 set +o no-diagnostics
 isolate_revision_state
+case $- in *W*) warning_level_clear=no;; *) warning_level_clear=yes;; esac
 if [[ "$(set --mood)" = shit ]] &&
-   [[ ! -o force-warnings ]] && [[ ! -o no-diagnostics ]]; then
+   [[ "$warning_level_clear" = yes ]] && [[ ! -o no-diagnostics ]]; then
     echo substitution-revisions-isolated
 else
     echo substitution-revisions-leaked

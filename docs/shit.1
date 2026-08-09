@@ -242,7 +242,9 @@ enables strict diagnostics as warnings,
 .B \-WW
 also enables lenient diagnostics, and
 .B \-WWW
-also enables annoying diagnostics.
+also enables annoying diagnostics. An explicit
+.B set \-\-mood
+change clears the active level.
 .TP
 .B \-\-no\-annoying\-diagnostics
 The annoying tier is suppressed. Strict and lenient analysis is unchanged.
@@ -746,15 +748,18 @@ and
 forms control errtrace, physical directory resolution, functrace, and brace
 expansion. The custom forms
 .BR "set \-\-mood" " and " "set \-\-init\-moods"
-use the same mood table as the command-line options. The options
-.BR force-warnings ,
-.BR force-diagnostics ,
-.BR force-annoying-diagnostics ,
+use the same mood table as the command-line options. The
+.BR \-W ,
+.BR \-WW ,
+and
+.B \-WWW
+forms control the diagnostic level. The options
+.BR annoying-diagnostics ,
 .BR no-diagnostics ,
 and
 .B shitbox
-control diagnostics and bundled command lookup. Runtime snapshots restore set
-state after an in-process substitution.
+control the annoying tier, the analysis stage, and bundled command lookup.
+Runtime snapshots restore set state after an in-process substitution.
 .TP
 .B enable
 Every builtin remains enabled. The

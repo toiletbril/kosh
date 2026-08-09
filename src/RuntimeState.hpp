@@ -50,6 +50,7 @@ public:
   mimic_mood mood{mimic_mood::Default};
   u8 warning_level{0};
   bool are_diagnostics_disabled{false};
+  bool are_annoying_diagnostics_enabled{true};
   u64 shell_options{option_mask(shell_option_id::Failglob) |
                     option_mask(shell_option_id::Hashall) |
                     option_mask(shell_option_id::Braceexpand)};

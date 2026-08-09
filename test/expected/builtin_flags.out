@@ -41,8 +41,8 @@ noexec
 noglob
 notify
 nounset
-== set level three name:
-force-annoying-diagnostics
+== set annoying diagnostics name:
+annoying-diagnostics
 == shit binary flags:
 == shit no-traces flag:
 --no-traces

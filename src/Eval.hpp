@@ -273,6 +273,7 @@ struct function_runtime_state
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
+  u64 annoying_diagnostics_mutation_revision;
   bool was_mood_set_explicitly;
 };
 
@@ -1232,6 +1233,8 @@ public:
     set_warning_level(defining_runtime.warning_level);
     m_runtime.are_diagnostics_disabled =
         defining_runtime.are_diagnostics_disabled;
+    m_runtime.are_annoying_diagnostics_enabled =
+        defining_runtime.are_annoying_diagnostics_enabled;
     apply_strictness_for_mood();
     return function_runtime_state{previous,
                                   RuntimeState::capture(*this),
@@ -1240,6 +1243,7 @@ public:
                                   m_mood_mutation_revision,
                                   m_warning_mutation_revision,
                                   m_diagnostics_mutation_revision,
+                                  m_annoying_diagnostics_mutation_revision,
                                   m_mood_set_explicitly};
   }
 
@@ -1254,6 +1258,8 @@ public:
       m_mood_mutation_revision = state.mood_mutation_revision;
       m_warning_mutation_revision = state.warning_mutation_revision;
       m_diagnostics_mutation_revision = state.diagnostics_mutation_revision;
+      m_annoying_diagnostics_mutation_revision =
+          state.annoying_diagnostics_mutation_revision;
       m_mood_set_explicitly = state.was_mood_set_explicitly;
       return;
     }
@@ -1294,6 +1300,10 @@ public:
       m_runtime.warning_level = finished.warning_level;
     if (state.diagnostics_mutation_revision != m_diagnostics_mutation_revision)
       m_runtime.are_diagnostics_disabled = finished.are_diagnostics_disabled;
+    if (state.annoying_diagnostics_mutation_revision !=
+        m_annoying_diagnostics_mutation_revision)
+      m_runtime.are_annoying_diagnostics_enabled =
+          finished.are_annoying_diagnostics_enabled;
   }
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
@@ -1339,6 +1349,10 @@ public:
   fn note_diagnostics_option_mutation() wontthrow -> void
   {
     m_diagnostics_mutation_revision++;
+  }
+  fn note_annoying_diagnostics_option_mutation() wontthrow -> void
+  {
+    m_annoying_diagnostics_mutation_revision++;
   }
 
   fn set_mimicry(bool enabled) wontthrow -> void
@@ -1661,6 +1675,14 @@ public:
   {
     return m_runtime.are_diagnostics_disabled;
   }
+  fn set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void
+  {
+    m_runtime.are_annoying_diagnostics_enabled = enabled;
+  }
+  pure fn annoying_diagnostics_enabled() const wontthrow -> bool
+  {
+    return m_runtime.are_annoying_diagnostics_enabled;
+  }
 
   /* The startup facts set -o reports read-only, mirrored from the invocation
      flags once at startup and fixed for the session. */
@@ -1834,6 +1856,7 @@ protected:
   u64 m_mood_mutation_revision{0};
   u64 m_warning_mutation_revision{0};
   u64 m_diagnostics_mutation_revision{0};
+  u64 m_annoying_diagnostics_mutation_revision{0};
   shell_option_mutations m_shell_option_mutations{};
   /* One bit per suppressible_warning value. */
   u32 m_suppressed_warnings{0};

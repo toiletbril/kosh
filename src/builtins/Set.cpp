@@ -37,9 +37,8 @@ enum class set_option_behavior : u8
   Posix,
   Vi,
   Emacs,
-  WarningLevelOne,
-  WarningLevelTwo,
-  WarningLevelThree,
+  WarningLevel,
+  AnnoyingDiagnostics,
   NoDiagnostics,
   Login,
   Rcfile,
@@ -184,14 +183,15 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      '\0', "show-exit-code",
      "Print the exit code after each command.", {},
      false, false},
-    {shell_option_id::Count, set_option_behavior::WarningLevelOne, 'W',
-     "force-warnings", "Use diagnostic warning level one, the same as -W."},
+    {shell_option_id::Count,
+     set_option_behavior::WarningLevel,
+     'W', {},
+     "Step through the diagnostic tiers with -W, -WW, and -WWW.", {},
+     false, false},
     {shell_option_id::Mimicry, set_option_behavior::Stored, 'I', "mimicry",
      "Mimic the shell named by a script's shebang."},
-    {shell_option_id::Count, set_option_behavior::WarningLevelTwo, '\0',
-     "force-diagnostics", "Use diagnostic warning level two, the same as -WW."},
-    {shell_option_id::Count, set_option_behavior::WarningLevelThree, '\0',
-     "force-annoying-diagnostics", "Use diagnostic warning level three, the same as -WWW."},
+    {shell_option_id::Count, set_option_behavior::AnnoyingDiagnostics, '\0',
+     "annoying-diagnostics", "Report the annoying diagnostic tier."},
     {shell_option_id::ShowStats,
      set_option_behavior::Stored,
      'S', "show-stats",
@@ -218,9 +218,11 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
 
 consteval fn set_option_name_count() wontthrow -> usize
 {
-  usize result = countof(SET_OPTIONS);
-  for (let const &option : SET_OPTIONS)
+  usize result = 0;
+  for (let const &option : SET_OPTIONS) {
+    if (!option.name.is_empty()) result++;
     if (!option.alias.is_empty()) result++;
+  }
   return result;
 }
 
@@ -239,9 +241,10 @@ consteval fn make_set_option_name_table() wontthrow
        option_position++)
   {
     let const &option = SET_OPTIONS[option_position];
-    result.entries[entry_position++] = {
-        PackedStringKey::from_literal(option.name.data),
-        static_cast<u8>(option_position)};
+    if (!option.name.is_empty())
+      result.entries[entry_position++] = {
+          PackedStringKey::from_literal(option.name.data),
+          static_cast<u8>(option_position)};
     if (!option.alias.is_empty())
       result.entries[entry_position++] = {
           PackedStringKey::from_literal(option.alias.data),
@@ -255,9 +258,13 @@ consteval fn set_option_descriptors_are_valid() wontthrow -> bool
   if (countof(SET_OPTIONS) > 0xff) return false;
   for (usize left = 0; left < countof(SET_OPTIONS); left++) {
     let const &left_option = SET_OPTIONS[left];
-    if (left_option.name.is_empty() ||
-        left_option.name.length > PackedStringKey::BYTE_CAPACITY)
+    if (left_option.name.is_empty() &&
+        (left_option.behavior != set_option_behavior::WarningLevel ||
+         left_option.letter == '\0'))
+    {
       return false;
+    }
+    if (left_option.name.length > PackedStringKey::BYTE_CAPACITY) return false;
     if (!left_option.alias.is_empty() &&
         left_option.alias.length > PackedStringKey::BYTE_CAPACITY)
       return false;
@@ -400,9 +407,9 @@ fn option_is_on(const EvalContext &cxt,
   case set_option_behavior::Posix: return cxt.is_posix_option_on();
   case set_option_behavior::Vi: return cxt.vi_mode();
   case set_option_behavior::Emacs: return cxt.emacs_mode();
-  case set_option_behavior::WarningLevelOne: return cxt.warning_level() == 1;
-  case set_option_behavior::WarningLevelTwo: return cxt.warning_level() == 2;
-  case set_option_behavior::WarningLevelThree: return cxt.warning_level() == 3;
+  case set_option_behavior::WarningLevel: return cxt.warning_level() > 0;
+  case set_option_behavior::AnnoyingDiagnostics:
+    return cxt.annoying_diagnostics_enabled();
   case set_option_behavior::NoDiagnostics: return cxt.diagnostics_disabled();
   case set_option_behavior::Login: return cxt.is_login_shell();
   case set_option_behavior::Rcfile: return cxt.has_custom_rcfile();
@@ -441,20 +448,16 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
   case set_option_behavior::Posix: cxt.set_posix_mode_via_option(enable); break;
   case set_option_behavior::Vi: cxt.set_vi_mode(enable); break;
   case set_option_behavior::Emacs: cxt.set_emacs_mode(enable); break;
-  case set_option_behavior::WarningLevelOne:
+  case set_option_behavior::WarningLevel:
     cxt.note_warning_option_mutation();
     if (should_step_warning_level)
       cxt.set_warnings_enabled(enable);
     else
       cxt.set_warning_level(enable ? 1 : 0);
     break;
-  case set_option_behavior::WarningLevelTwo:
-    cxt.note_warning_option_mutation();
-    cxt.set_warning_level(enable ? 2 : 0);
-    break;
-  case set_option_behavior::WarningLevelThree:
-    cxt.note_warning_option_mutation();
-    cxt.set_warning_level(enable ? 3 : 0);
+  case set_option_behavior::AnnoyingDiagnostics:
+    cxt.note_annoying_diagnostics_option_mutation();
+    cxt.set_annoying_diagnostics_enabled(enable);
     break;
   case set_option_behavior::NoDiagnostics:
     cxt.note_diagnostics_option_mutation();
@@ -522,9 +525,7 @@ fn format_option_table(const EvalContext *cxt,
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
     out += "  ";
-    if (option.behavior == set_option_behavior::WarningLevelTwo) {
-      out += "-WW ";
-    } else if (option.letter != '\0') {
+    if (option.letter != '\0') {
       out.push('-');
       out.push(option.letter);
       out += "  ";
@@ -556,6 +557,7 @@ fn format_option_switches_help() throws -> String
   section += "\n  The -o long names:\n";
   let listed_names = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
+    if (option.name.is_empty()) continue;
     if (!listed_names.is_empty()) listed_names += ", ";
     listed_names += option.name;
     if (!option.alias.is_empty()) {
@@ -584,13 +586,13 @@ fn shell_option_names(bool include_alias_spellings) throws
   static ArrayList<StringView> canonical = [] throws {
     let names = ArrayList<StringView>{heap_allocator()};
     for (let const &option : SET_OPTIONS)
-      names.push(option.name);
+      if (!option.name.is_empty()) names.push(option.name);
     return names;
   }();
   static ArrayList<StringView> with_aliases = [] throws {
     let names = ArrayList<StringView>{heap_allocator()};
     for (let const &option : SET_OPTIONS) {
-      names.push(option.name);
+      if (!option.name.is_empty()) names.push(option.name);
       if (!option.alias.is_empty()) names.push(option.alias);
     }
     return names;
@@ -640,7 +642,7 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String
       if (cxt.shell_is_interactive()) letters.push('i');
       continue;
     }
-    if (option.behavior == set_option_behavior::WarningLevelOne) {
+    if (option.behavior == set_option_behavior::WarningLevel) {
       for (u8 warning_level = 0; warning_level < cxt.warning_level();
            warning_level++)
         letters.push('W');
@@ -730,6 +732,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             String{cxt.scratch_allocator(), "Unknown --mood value '"} + *value +
                 "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
       cxt.set_mood(*parsed);
+      cxt.note_warning_option_mutation();
+      cxt.set_warning_level(0);
       cxt.apply_strictness_for_mood();
       cxt.note_explicit_mood();
       continue;

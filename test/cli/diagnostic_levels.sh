@@ -9,53 +9,29 @@ echo '== command flag ordering:'
 
 echo '== set diagnostic levels:'
 "$BIN" -M bash -c '
-if [[ ! -o force-warnings ]] &&
-  [[ ! -o force-diagnostics ]] &&
-  [[ ! -o force-annoying-diagnostics ]]
-then
-  echo default-level
-fi
-set -o force-warnings
-set -o force-warnings
-if [[ -o force-warnings ]] &&
-  [[ ! -o force-diagnostics ]] &&
-  [[ ! -o force-annoying-diagnostics ]]
-then
-  echo named-level-one
-fi
-set -o force-diagnostics
-if [[ ! -o force-warnings ]] &&
-  [[ -o force-diagnostics ]] &&
-  [[ ! -o force-annoying-diagnostics ]]
-then
-  case $- in *WW*) echo named-level-two;; esac
-fi
-set -o force-annoying-diagnostics
-if [[ ! -o force-warnings ]] &&
-  [[ ! -o force-diagnostics ]] &&
-  [[ -o force-annoying-diagnostics ]]
-then
-  case $- in *WWW*) echo named-level-three;; esac
-fi
-set +o force-annoying-diagnostics
-if [[ ! -o force-warnings ]] &&
-  [[ ! -o force-diagnostics ]] &&
-  [[ ! -o force-annoying-diagnostics ]]
-then
-  echo disabled-level-three
-fi
+case $- in *W*) :;; *) echo default-level;; esac
+set -W
+case $- in *WW*) :;; *W*) echo short-level-one;; esac
+set -W
+case $- in *WWW*) :;; *WW*) echo short-level-two;; esac
+set -W
+case $- in *WWW*) echo short-level-three;; esac
+[[ -o annoying-diagnostics ]] && echo annoying-diagnostics-on
+set +o annoying-diagnostics
+[[ -o annoying-diagnostics ]] || echo annoying-diagnostics-off
+set -o annoying-diagnostics
+[[ -o annoying-diagnostics ]] && echo annoying-diagnostics-restored
+set --mood shit
+case $- in *W*) :;; *) echo mood-reset-level;; esac
 set -WWW
-if [[ -o force-annoying-diagnostics ]]; then
-  echo short-level-three
-fi
+case $- in *WWW*) echo bundled-level-three;; esac
 set +W
-if [[ ! -o force-warnings ]] &&
-  [[ ! -o force-diagnostics ]] &&
-  [[ ! -o force-annoying-diagnostics ]]
-then
-  echo disabled-short-level
-fi
+case $- in *W*) :;; *) echo disabled-short-level;; esac
 '
+for removed_name in warnings force-warnings force-diagnostics force-annoying-diagnostics; do
+  "$BIN" -M bash -c "set -o $removed_name" >/dev/null 2>&1
+  echo "legacy-name-$removed_name=$?"
+done
 
 "$BIN" -W -c 'echo [abc' >/dev/null 2>&1
 echo "level-one-strict=$?"
@@ -71,6 +47,15 @@ echo "annoying-default=$?"
 echo "annoying-level-one=$?"
 "$BIN" --no-annoying-diagnostics -c "$annoying_source" >/dev/null 2>&1
 echo "annoying-suppressed=$?"
+runtime_annoying_output=$("$BIN" -W \
+  -c 'set +o annoying-diagnostics' -c "$annoying_source" 2>&1)
+echo "annoying-runtime-suppressed=$(printf '%s\n' "$runtime_annoying_output" |
+  grep -c 'This cd is unchecked')"
+runtime_annoying_output=$("$BIN" -W \
+  -c 'set +o annoying-diagnostics; set -o annoying-diagnostics' \
+  -c "$annoying_source" 2>&1)
+echo "annoying-runtime-restored=$(printf '%s\n' "$runtime_annoying_output" |
+  grep -c 'This cd is unchecked')"
 
 lenient_source='diagnostic_levels_missing_command; echo survived'
 "$BIN" -W -c "$lenient_source" >/dev/null 2>&1
@@ -136,7 +121,7 @@ echo "local-directive-warnings=$(printf '%s\n' "$local_directive_output" |
 send_runtime_input()
 {
   sleep 0.1
-  printf '%s\n' 'set -o force-diagnostics'
+  printf '%s\n' 'set -WW'
   sleep 0.1
   printf '%s\n' 'echo "[$LATER_DIAGNOSTIC]"; LATER_DIAGNOSTIC=x'
   sleep 0.1

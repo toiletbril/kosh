@@ -86,8 +86,8 @@ _shit_set_complete()
     local option_names="allexport export-all notify errexit error-exit noglob no-glob \
 hashall keyword monitor noexec no-exec nounset no-unset verbose xtrace braceexpand \
 noclobber no-clobber errtrace physical functrace pipefail failglob shitbox vi emacs \
-posix show-ast show-lexed-words show-exit-code force-warnings mimicry \
-force-diagnostics force-annoying-diagnostics show-stats no-diagnostics show-memory login rcfile"
+posix show-ast show-lexed-words show-exit-code mimicry annoying-diagnostics \
+show-stats no-diagnostics show-memory login rcfile"
     local switches="--help --options --mood --init-moods -o +o -M -L \
 -a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -WW -WWW -I -S -G \
 +a +b +e +f +h +k +m +n +u +v +x +B +C +E +P +T +A +R +W +WW +WWW +I +S +G"

@@ -32,10 +32,8 @@ shitbox        	off
 vi             	off
 emacs          	off
 posix          	off
-force-warnings 	off
 mimicry        	off
-force-diagnostics	off
-force-annoying-diagnostics	off
+annoying-diagnostics	on
 no-diagnostics 	off
 == bash mood relaxes nounset:
 []

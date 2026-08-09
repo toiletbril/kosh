@@ -24,6 +24,8 @@ strict-markers-persisted
 function-runtime-state-persisted
 function-posix-persisted
 function-posix-noop-stayed
+diagnostic-options-independent
+annoying-option-persisted
 substitution-revisions-isolated
 == command strings publish c in dollar dash:
 command-string
