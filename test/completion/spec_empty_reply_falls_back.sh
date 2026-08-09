@@ -6,11 +6,11 @@
 dir=$(mktemp -d)
 touch "$dir/fallback_probe.txt"
 echo "== empty COMPREPLY falls to files:"
-"$BIN" -c "cd '$dir'; _f(){ COMPREPLY=(); }; complete -F _f cp" --debug-complete-at 'cp fallb' </dev/null
+"$BIN" -c "cd '$dir' || exit; _f(){ COMPREPLY=(); }; complete -F _f cp" --debug-complete-at 'cp fallb' </dev/null
 echo "== retry status 124 falls to files:"
-"$BIN" -c "cd '$dir'; _f(){ return 124; }; complete -F _f cp" --debug-complete-at 'cp fallb' </dev/null
+"$BIN" -c "cd '$dir' || exit; _f(){ return 124; }; complete -F _f cp" --debug-complete-at 'cp fallb' </dev/null
 echo "== dash-only reply on an operand falls to files:"
-"$BIN" -c "cd '$dir'; _f(){ COMPREPLY=(--archive); }; complete -F _f cp" --debug-complete-at 'cp fallb' </dev/null
+"$BIN" -c "cd '$dir' || exit; _f(){ COMPREPLY=(--archive); }; complete -F _f cp" --debug-complete-at 'cp fallb' </dev/null
 echo "== the dash token keeps the spec options:"
-"$BIN" -c "cd '$dir'; _f(){ COMPREPLY=(--archive --backup); }; complete -F _f cp" --debug-complete-at 'cp --ar' </dev/null
+"$BIN" -c "cd '$dir' || exit; _f(){ COMPREPLY=(--archive --backup); }; complete -F _f cp" --debug-complete-at 'cp --ar' </dev/null
 rm -rf "$dir"

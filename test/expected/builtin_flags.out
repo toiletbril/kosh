@@ -41,9 +41,13 @@ noexec
 noglob
 notify
 nounset
+== set level three name:
+force-annoying-diagnostics
 == shit binary flags:
 == shit no-traces flag:
 --no-traces
+== shit no-annoying flag:
+--no-annoying-diagnostics
 == declare letters:
 --help
 -A

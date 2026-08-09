@@ -1,13 +1,13 @@
 #!/bin/env shit
-set -W
+set -WWW
 echo $((never_counted + 1))
 echo continued
 
 
-set -W
+set -WWW
 echo *.zzz_nomatch_downgrade
 echo continued
 
-set -W
+set -WWW
 echo "value=$never_piped" | cat
 echo continued

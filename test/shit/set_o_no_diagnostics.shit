@@ -1,5 +1,5 @@
 #!/bin/env shit
-set -W
+set -WWW
 echo "first=$never_a"
 set -o no-diagnostics
 echo "second=$never_b"

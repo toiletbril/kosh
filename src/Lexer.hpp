@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "Containers.hpp"
+#include "Diagnostics.hpp"
 #include "MimicMood.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
@@ -99,6 +100,11 @@ public:
   fn set_arena(BumpArena &arena) wontthrow -> void;
   fn advance_past_last_peek() throws -> usize;
 
+  fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
+      -> void;
+  fn take_shellcheck_directives() throws
+      -> ArrayList<shellcheck_directive_span>;
+
   fn register_heredoc(StringView delimiter, bool should_strip_tabs) throws
       -> const heredoc_contents *;
 
@@ -134,6 +140,9 @@ protected:
   usize m_last_collected_word_position{static_cast<usize>(-1)};
 
   bool m_last_shell_token_was_newline{false};
+  bool m_should_collect_shellcheck_directives{false};
+  ArrayList<shellcheck_directive_span> m_pending_shellcheck_directives{
+      heap_allocator()};
   /* Each body is allocated in the arena, so its address is stable and it
      outlives the lexer. A parsed redirection holds a pointer into one, and the
      arena reclaims the body when it reclaims the nodes that point at it. */
@@ -147,7 +156,7 @@ protected:
   fn lex_expression_token() throws -> Token *;
   fn lex_shell_token() throws -> Token *;
 
-  fn skip_whitespace() wontthrow -> void;
+  fn skip_whitespace() throws -> void;
   fn advance_forward(usize offset) wontthrow -> usize;
   fn chop_character(usize offset = 0) wontthrow -> char;
 

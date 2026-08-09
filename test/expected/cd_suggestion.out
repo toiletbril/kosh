@@ -111,7 +111,7 @@ symlink-target
 raw traversal missing=1 caret=1 executed=0
 == CDPATH physical traversal preserves symlink semantics:
 shit: 1:15: error: The directory 'link/../sibling' does not exist.
-     1 |  cd -P link/../sibling; pwd
+     1 |  cd -P link/../sibling && pwd
        |                ^~~~~~~
 note: Check the spelling or create it with `mkdir -p`.
 == native separator:

@@ -205,6 +205,21 @@ pure fn Lexer::source() const wontthrow -> StringView
   return m_source.view();
 }
 
+fn Lexer::set_should_collect_shellcheck_directives(
+    bool should_collect) wontthrow -> void
+{
+  m_should_collect_shellcheck_directives = should_collect;
+}
+
+fn Lexer::take_shellcheck_directives() throws
+    -> ArrayList<shellcheck_directive_span>
+{
+  let directives = steal(m_pending_shellcheck_directives);
+  m_pending_shellcheck_directives =
+      ArrayList<shellcheck_directive_span>{heap_allocator()};
+  return directives;
+}
+
 pure fn Lexer::is_at_source_end() const wontthrow -> bool
 {
   return m_cursor_position >= m_source.length();
@@ -449,7 +464,7 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
   return t;
 }
 
-hot flatten alwaysinline fn Lexer::skip_whitespace() wontthrow -> void
+hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
 {
   usize i = 0;
   loop
@@ -464,8 +479,28 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() wontthrow -> void
     }
     /* The newline is left in place so it still terminates the command. */
     if (chop_character(i) == '#') {
+      let const comment_start = i;
       while (chop_character(i) != '\n' && chop_character(i) != lexer::CEOF)
         i++;
+      if (m_should_collect_shellcheck_directives) {
+        let comment = m_source.view().substring_of_length(
+            m_cursor_position + comment_start, i - comment_start);
+        usize content_position = 1;
+        while (content_position < comment.length &&
+               (comment[content_position] == ' ' ||
+                comment[content_position] == '\t'))
+        {
+          content_position++;
+        }
+        let const directive_text = comment.substring(content_position);
+        if (directive_text.starts_with(StringView{"shellcheck"}) &&
+            (directive_text.length == 10 || directive_text[10] == ' ' ||
+             directive_text[10] == '\t'))
+        {
+          m_pending_shellcheck_directives.push(shellcheck_directive_span{
+              m_cursor_position + comment_start, i - comment_start});
+        }
+      }
       continue;
     }
     break;

@@ -31,6 +31,10 @@ namespace expressions {
 
 pure fn analysis_source_text(const AnalysisContext &actx,
                              SourceLocation location) wontthrow -> StringView;
+pure fn analysis_source_span(const AnalysisContext &actx,
+                             const Expression &expression) wontthrow
+    -> StringView;
+pure fn view_contains(StringView view, StringView needle) wontthrow -> bool;
 pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
                                         StringView expression) wontthrow
     -> bool;

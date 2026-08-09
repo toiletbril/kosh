@@ -9,6 +9,6 @@ shit: 1:0: trace:
      1 |  . OUTER
        |    ^~~~~~~~~~~~~~~~~~~
 shit: 1:0: trace:
-     1 |  SHIT -W -c '. OUTER'
+     1 |  SHIT -WWW -c '. OUTER'
 0
 rc=0

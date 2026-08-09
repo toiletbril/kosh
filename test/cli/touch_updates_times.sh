@@ -12,7 +12,11 @@ sleep 1.1
 "$BIN" -c "shitbox touch '$dir/f'" </dev/null
 after=$(stat_mtime "$dir/f")
 echo "== touch advances the modification time of an existing file:"
-[ "$after" -gt "$before" ] && echo advanced || echo unchanged
+if [ "$after" -gt "$before" ]; then
+  echo advanced
+else
+  echo unchanged
+fi
 echo "== touch -c still does not create a missing file:"
 "$BIN" -c "shitbox touch -c '$dir/ghost'" </dev/null
-"$BIN" -c "[ -e '$dir/ghost' ] && echo ghost-exists || echo ghost-missing" </dev/null
+"$BIN" -c "if [ -e '$dir/ghost' ]; then echo ghost-exists; else echo ghost-missing; fi" </dev/null

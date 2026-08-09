@@ -1,6 +1,6 @@
-== -W warns during init:
+== -WWW warns during init:
 1
 == --no-init-diagnostics silences init:
 0
-== -W stays active for the session:
+== -WWW stays active for the session:
 1

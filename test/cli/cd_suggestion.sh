@@ -87,7 +87,7 @@ echo '== cd preserves missing dot-dot component:'
 "$BIN" -c 'cd missing/../existing' 2>&1 | sed 's|\\|/|g'
 
 echo '== logical cd preserves symlink traversal:'
-"$BIN" -c 'cd -L link/../sibling; pwd' 2>&1 |
+"$BIN" -c 'cd -L link/../sibling && pwd' 2>&1 |
     sed -e 's|\\|/|g' -e "s|$d|<tmp>|g"
 
 echo '== analyzed trailing separator preserves missing dot-dot component:'
@@ -104,7 +104,7 @@ echo '== command path preserves symlink traversal:'
 "$BIN" -c './link/../other' 2>&1 | sed 's|\\|/|g'
 
 echo '== CDPATH logical traversal preserves symlink traversal:'
-CDPATH="$d/cdpath" "$BIN" -c 'cd link/../sibling >/dev/null; pwd' 2>&1 |
+CDPATH="$d/cdpath" "$BIN" -c 'cd link/../sibling >/dev/null && pwd' 2>&1 |
     sed -e 's|\\|/|g' -e "s|$d|<tmp>|g"
 
 if [ "${OS-}" = Windows_NT ]; then
@@ -120,7 +120,7 @@ printf 'raw traversal missing=%s caret=%s executed=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'should-not-run')"
 
 echo '== CDPATH physical traversal preserves symlink semantics:'
-CDPATH="$d/cdpath" "$BIN" -c 'cd -P link/../sibling; pwd' 2>&1 |
+CDPATH="$d/cdpath" "$BIN" -c 'cd -P link/../sibling && pwd' 2>&1 |
     sed -e 's|\\|/|g' -e "s|$d|<tmp>|g"
 
 if [ "${OS-}" = Windows_NT ]; then

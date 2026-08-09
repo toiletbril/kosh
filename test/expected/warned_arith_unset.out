@@ -1,18 +1,18 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "-W"]
+    [SimpleCommand "set" "-WWW"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((never_counted + 1))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "continued"]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "-W"]
+    [SimpleCommand "set" "-WWW"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "*.zzz_nomatch_downgrade"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "continued"]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "-W"]
+    [SimpleCommand "set" "-WWW"]
   [CompoundListCondition, None]
     [Pipeline]
       [SimpleCommand "echo" "value=$never_piped"]
@@ -23,7 +23,7 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-W"
+  Unquoted "-WWW"
 ]
 [Word
   Unquoted "echo"
@@ -41,7 +41,7 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-W"
+  Unquoted "-WWW"
 ]
 [Word
   Unquoted "echo"
@@ -59,7 +59,7 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-W"
+  Unquoted "-WWW"
 ]
 [Word
   Unquoted "echo"
@@ -77,10 +77,6 @@
 [Word
   Unquoted "continued"
 ]
-shit: 8:6: warning: A bare glob can expand to a filename that begins with '-'.
-     8 |  echo *.zzz_nomatch_downgrade
-       |       ^~~~~~~~~~~~~~~~~~~~~~~
-note: Prefix the glob with a directory or place -- before it.
 shit: 3:9: warning: The variable 'never_counted' is not set, it expands to empty.
      3 |  echo $((never_counted + 1))
        |          ^~~~~~~~~~~~~

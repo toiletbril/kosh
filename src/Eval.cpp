@@ -486,8 +486,8 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   let const empty_expansion_note =
       "Replace it with ${" + String{name} + "-} if empty expansion is desired";
 
-  if (error_unset() &&
-      (m_runtime.error_unset_explicit || !warnings_enabled()) &&
+  let const should_demote = strict_diagnostics_are_warnings();
+  if (error_unset() && (m_runtime.error_unset_explicit || !should_demote) &&
       !is_warning_suppressed(suppressible_warning::UnsetTestOperand))
   {
     let const message = "Unable to expand '" + String{name} +
@@ -508,7 +508,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   if (is_completion_function_running()) return;
   if (is_warning_suppressed(suppressible_warning::UnsetTestOperand)) return;
 
-  if (error_unset() || (warnings_enabled() && warnings_reach_every_mood())) {
+  if (error_unset() || should_demote) {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
                                 "' is not set, it expands to empty",
@@ -520,13 +520,14 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
                               SourceLocation location, StringView message,
                               StringView note) throws -> void
 {
-  if (fatal && (explicitly_requested || !warnings_enabled())) {
+  let const should_demote = strict_diagnostics_are_warnings();
+  if (fatal && (explicitly_requested || !should_demote)) {
     if (note.is_empty()) throw ErrorWithLocation{location, message};
     throw ErrorWithLocationAndDetails{location, message, note};
   }
   if (is_completion_function_running()) return;
-  if ((fatal || (warnings_enabled() && warnings_reach_every_mood())) &&
-      !diagnostics_disabled() && m_current_source != nullptr)
+  if ((fatal || should_demote) && !diagnostics_disabled() &&
+      m_current_source != nullptr)
   {
     try {
       let warning = WarningWithLocationAndDetails{location, message, note};

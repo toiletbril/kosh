@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "-W"]
+    [SimpleCommand "set" "-WWW"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "first=$never_a"]
   [CompoundListCondition, None]
@@ -13,7 +13,7 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-W"
+  Unquoted "-WWW"
 ]
 [Word
   Unquoted "echo"

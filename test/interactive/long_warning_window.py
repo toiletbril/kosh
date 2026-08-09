@@ -45,7 +45,7 @@ if pid == 0:
             log_path,
             "-M",
             "bash",
-            "-W",
+            "-WWW",
             "-n",
             "-c",
             source,

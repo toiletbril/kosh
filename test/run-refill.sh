@@ -5,8 +5,17 @@ test_shell=$1
 if [ -n "${REFILL-}" ]; then
   "$test_shell" run-shit-test.sh --refill $REFILL
   for name in $REFILL; do
-    [ -f "cli/$name.sh" ] || continue
-    "$test_shell" run-cli-test.sh --refill "$test_shell" "cli/$name.sh"
+    if [ -f "cli/$name.sh" ]; then
+      "$test_shell" run-cli-test.sh --refill "$test_shell" "cli/$name.sh"
+    fi
+    if [ -f "completion/$name.sh" ]; then
+      "$test_shell" run-completion-test.sh --refill "$test_shell" \
+        "completion/$name.sh"
+    fi
+    if [ -f "highlight/$name.sh" ]; then
+      "$test_shell" run-highlight-test.sh --refill "$test_shell" \
+        "highlight/$name.sh"
+    fi
   done
   exit 0
 fi

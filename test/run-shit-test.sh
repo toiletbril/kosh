@@ -8,9 +8,13 @@ fi
 
 for name in "$@"; do
   [ -f "shit/$name.shit" ] || continue
+  case $name in
+  shellcheck_static) test_bin_flags="$BIN_FLAGS -W" ;;
+  *) test_bin_flags="$BIN_FLAGS --no-annoying-diagnostics" ;;
+  esac
   if [ "$refill_mode" = yes ]; then
     out="expected/.$name.out.tmp"
-    "$BIN" $BIN_FLAGS - < "shit/$name.shit" > "$out" 2>&1
+    "$BIN" $test_bin_flags - < "shit/$name.shit" > "$out" 2>&1
     mv "$out" "expected/$name.out"
     printf "\t%-64s %s.out\n" "$name.shit" "$name"
     continue
@@ -19,7 +23,7 @@ for name in "$@"; do
   output_directory="$TEST_TEMP_DIRECTORY/results/shit"
   mkdir -p "$output_directory"
   out="$output_directory/$name.out"
-  "$BIN" $BIN_FLAGS - < "shit/$name.shit" > "$out" 2>&1
+  "$BIN" $test_bin_flags - < "shit/$name.shit" > "$out" 2>&1
   if diff $DIFF_FLAGS "expected/$name.out" "$out" >/dev/null 2>&1 || \
     { [ -f "expected/${name}_1.out" ] && \
       diff $DIFF_FLAGS "expected/${name}_1.out" "$out" >/dev/null 2>&1; }; then

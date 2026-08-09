@@ -39,6 +39,7 @@ enum class set_option_behavior : u8
   Emacs,
   WarningLevelOne,
   WarningLevelTwo,
+  WarningLevelThree,
   NoDiagnostics,
   Login,
   Rcfile,
@@ -189,6 +190,8 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      "Mimic the shell named by a script's shebang."},
     {shell_option_id::Count, set_option_behavior::WarningLevelTwo, '\0',
      "force-diagnostics", "Use diagnostic warning level two, the same as -WW."},
+    {shell_option_id::Count, set_option_behavior::WarningLevelThree, '\0',
+     "force-annoying-diagnostics", "Use diagnostic warning level three, the same as -WWW."},
     {shell_option_id::ShowStats,
      set_option_behavior::Stored,
      'S', "show-stats",
@@ -399,6 +402,7 @@ fn option_is_on(const EvalContext &cxt,
   case set_option_behavior::Emacs: return cxt.emacs_mode();
   case set_option_behavior::WarningLevelOne: return cxt.warning_level() == 1;
   case set_option_behavior::WarningLevelTwo: return cxt.warning_level() == 2;
+  case set_option_behavior::WarningLevelThree: return cxt.warning_level() == 3;
   case set_option_behavior::NoDiagnostics: return cxt.diagnostics_disabled();
   case set_option_behavior::Login: return cxt.is_login_shell();
   case set_option_behavior::Rcfile: return cxt.has_custom_rcfile();
@@ -447,6 +451,10 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
   case set_option_behavior::WarningLevelTwo:
     cxt.note_warning_option_mutation();
     cxt.set_warning_level(enable ? 2 : 0);
+    break;
+  case set_option_behavior::WarningLevelThree:
+    cxt.note_warning_option_mutation();
+    cxt.set_warning_level(enable ? 3 : 0);
     break;
   case set_option_behavior::NoDiagnostics:
     cxt.note_diagnostics_option_mutation();

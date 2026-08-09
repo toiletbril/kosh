@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Diagnostics.hpp"
 #include "Eval.hpp"
 #include "Tokens.hpp"
 
@@ -22,6 +23,7 @@ class CStyleForLoop;
 
 enum class analyze_severity : u8
 {
+  Annoying,
   Lenient,
   Strict,
 };
@@ -32,6 +34,9 @@ public:
   StringView source;
   bool has_fatal{false};
   u8 warning_level{0};
+  bool is_default_mood{true};
+  bool should_emit_annoying_diagnostics{true};
+  const ArrayList<shellcheck_suppression> *shellcheck_suppressions{nullptr};
   bool has_seen_runtime_definer{false};
   HashSet defined_functions{heap_allocator()};
   HashSet known_aliases{heap_allocator()};
@@ -54,8 +59,12 @@ public:
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
 
   bool is_direct_pipeline_stage{false};
+  bool is_inside_loop_condition{false};
+  bool loop_condition_reads_input{false};
+  bool is_inside_read_loop{false};
   HashSet pipeline_lost_names{heap_allocator()};
   HashSet external_input_names{heap_allocator()};
+  StringMap<SourceLocation> active_loop_variables{heap_allocator()};
 
   /* The lookup is lazy, and null in a context with no live shell. */
   EvalContext *eval_context{nullptr};
@@ -83,10 +92,21 @@ public:
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
   fn warn(SourceLocation location, StringView message,
-          StringView suggestion = {}) throws -> void;
+          StringView suggestion = {},
+          diagnostic_tier tier = diagnostic_tier::Strict) throws -> void;
+  fn warn_shellcheck(u16 diagnostic_code, SourceLocation location,
+                     StringView message, StringView suggestion = {}) throws
+      -> void;
   fn fail(SourceLocation location, StringView message,
           StringView suggestion = {},
           analyze_severity severity = analyze_severity::Strict) throws -> void;
+  fn fail_shellcheck(
+      u16 diagnostic_code, SourceLocation location, StringView message,
+      StringView suggestion = {},
+      analyze_severity severity = analyze_severity::Strict) throws -> void;
+  pure fn is_shellcheck_suppressed(u16 diagnostic_code,
+                                   SourceLocation location) const wontthrow
+      -> bool;
   fn note_variable_assignment(StringView name) throws -> void;
   fn note_variable_read(StringView name, SourceLocation location,
                         bool is_top_level_unconditional) throws -> void;
@@ -100,7 +120,9 @@ public:
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
                EvalContext *eval_context, u8 warning_level,
-               bool silence_unresolved_commands,
+               bool silence_unresolved_commands, bool is_default_mood,
+               bool should_emit_annoying_diagnostics,
+               const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
                bool show_optimizer_state = false) throws -> bool;
 
 class Expression
@@ -340,6 +362,7 @@ public:
   fn is_simple_command() const wontthrow -> bool override;
 
   pure fn args() const wontthrow -> const ArrayList<const Token *> &;
+  pure fn redirections() const wontthrow -> const ArrayList<Redirection> &;
 
   fn to_string() const throws -> String override;
 

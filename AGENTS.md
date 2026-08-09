@@ -67,6 +67,11 @@ against one shared reference result. The dashdiff, bashdiff, and mimicrydiff
 targets select that runner. The harness carries alternate goldens for
 documented macOS differences.
 
+The native runner suppresses annoying diagnostics outside
+`shellcheck_static`. That canonical test owns the complete annoying diagnostic
+catalog. A test for another parser or evaluator contract uses strict input and
+does not duplicate diagnostic output.
+
 Runner output files live below `.test-work/results`. The portable mktemp shim
 uses host filesystem operations and never starts the tested shell. Its exported
 allocation root is absolute and uses native path syntax on every host.
@@ -167,8 +172,11 @@ and `$-`. Its compile-time name map retains binary search.
 
 `apply_strictness_for_mood` owns mood strictness. An explicit nounset, pipefail,
 or failglob setting survives a mood change. `command_word_is_glob` owns the
-command-position glob check. The runtime diagnostic levels distinguish
-`force-warnings`, `force-diagnostics`, and `no-diagnostics`.
+command-position glob check. The runtime diagnostic levels distinguish strict,
+lenient, and annoying diagnostics. The named levels are `force-warnings`,
+`force-diagnostics`, and `force-annoying-diagnostics`. `no-diagnostics`
+skips analysis, while `--no-annoying-diagnostics` suppresses only the annoying
+tier.
 
 Restricted behavior uses one shared context state. Variable changes, directory
 changes, slash-bearing command and source operands, output redirections, exec,
@@ -290,6 +298,12 @@ Diagnostic highlighting stores lexical checkpoints at line boundaries near
 copying their lexical containers. Checkpoints retain function definitions.
 Random lookup resumes at the nearest checkpoint. A source identity change
 invalidates checkpoints and cached spans.
+
+The analysis stage accepts ShellCheck `disable` comments. A leading directive
+applies to the complete file. A later directive applies to the next complete
+and-or command. Numbered checks use the shared suppression lookup. Native
+strictness diagnostics, parser errors, and runtime errors are not suppressed by
+these comments.
 
 src/Toiletline.cpp connects the editor and evaluator. The vendored editor lives
 in src/toiletline/toiletline.h. The completion bridge retains its result until

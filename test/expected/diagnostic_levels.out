@@ -1,14 +1,33 @@
 == command flag ordering:
 level-one-after-command
 level-two-after-command
+level-three-after-command
 == set diagnostic levels:
 default-level
 named-level-one
 named-level-two
-disabled-level-two
-short-level-two
+named-level-three
+disabled-level-three
+short-level-three
 disabled-short-level
 level-one-strict=1
-level-two-strict=0
+level-two-strict=1
+level-three-strict=0
+annoying-default=1
+annoying-level-one=0
+annoying-suppressed=0
+lenient-level-one=1
+lenient-level-two=0
+compat-level-one-lenient=0
+compat-level-two-lenient=1
+compat-level-two-annoying=0
+compat-level-three-annoying=1
+compat-level-two-obsolete=0
+compat-level-three-obsolete=1
+compat-level-two-recursion=0
+compat-level-three-recursion=1
+file-directive
+file-directive-errors=0
+local-directive-warnings=2
 runtime-level-two-warnings=1
 diagnostic-colors=ok

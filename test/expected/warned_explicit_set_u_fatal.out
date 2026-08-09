@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "-W"]
+    [SimpleCommand "set" "-WWW"]
   [CompoundListCondition, None]
     [SimpleCommand "set" "-u"]
   [CompoundListCondition, None]
@@ -11,7 +11,7 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-W"
+  Unquoted "-WWW"
 ]
 [Word
   Unquoted "set"

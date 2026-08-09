@@ -12,6 +12,6 @@ probe_fn() {
   echo "line=$LINENO"
 }
 EOF
-"$BIN" -W -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|" | ./normalize-trace.sh "$BIN"
+"$BIN" -WWW -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|" | ./normalize-trace.sh "$BIN"
 "$BIN" -c 'shitbox unlink "$1"' cleanup "$lib"
 echo "rc=$?"

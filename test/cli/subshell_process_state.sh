@@ -11,7 +11,7 @@ trap '[ -n "$directory" ] && /bin/rm -rf "$directory"' EXIT
 /bin/mkdir -p "$directory/original" "$directory/sibling"
 : > "$directory/original/marker"
 SUBSHELL_DIRECTORY=$directory "$BIN" -c '
-cd "$SUBSHELL_DIRECTORY/original"
+cd "$SUBSHELL_DIRECTORY/original" || exit 1
 (chmod 000 .; cd "$SUBSHELL_DIRECTORY/sibling")
 chmod 700 "$SUBSHELL_DIRECTORY/original"
 [[ -f marker ]] && echo permission-directory-restored

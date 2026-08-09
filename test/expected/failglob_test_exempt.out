@@ -154,22 +154,6 @@
 [Word
   Variable "d"
 ]
-shit: 4:6: warning: A bare glob can expand to a filename that begins with '-'.
-     4 |  [ -e *.zzz ] && echo bracket-exists || echo bracket-no-match
-       |       ^~~~~
-note: Prefix the glob with a directory or place -- before it.
-shit: 5:9: warning: A bare glob can expand to a filename that begins with '-'.
-     5 |  test -e *.zzz && echo test-exists || echo test-no-match
-       |          ^~~~~
-note: Prefix the glob with a directory or place -- before it.
-shit: 7:6: warning: A bare glob can expand to a filename that begins with '-'.
-     7 |  [ -e *.zzz ] && echo bracket-exists || echo bracket-no-match
-       |       ^~~~~
-note: Prefix the glob with a directory or place -- before it.
-shit: 8:9: warning: A bare glob can expand to a filename that begins with '-'.
-     8 |  test -e *.zzz && echo test-exists || echo test-no-match
-       |          ^~~~~
-note: Prefix the glob with a directory or place -- before it.
 bracket-no-match
 test-no-match
 bracket-exists

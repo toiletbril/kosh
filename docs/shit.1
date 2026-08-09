@@ -228,18 +228,24 @@ The option is accepted without effect for compatibility.
 The option is accepted without effect for compatibility.
 .SS Diagnostics
 .TP
-.B \-W[W...]
-The analysis stage runs. One
+.BR \-W ", " \-WW ", " \-WWW
+The analysis stage has strict, lenient, and annoying tiers. In the default
+mood,
 .B \-W
-demotes a lenient analysis error to a warning. An unresolved command and a
-variable read before assignment are lenient errors. A strict analysis error
-remains fatal. The form
+demotes annoying errors to warnings,
 .B \-WW
-demotes every analysis error to a warning. Runtime warnings are reported in the
-default mood under
+also demotes lenient errors, and
+.B \-WWW
+also demotes strict errors. In another mood,
 .B \-W
-and in every mood under
-.BR \-WW .
+enables strict diagnostics as warnings,
+.B \-WW
+also enables lenient diagnostics, and
+.B \-WWW
+also enables annoying diagnostics.
+.TP
+.B \-\-no\-annoying\-diagnostics
+The annoying tier is suppressed. Strict and lenient analysis is unchanged.
 .TP
 .B \-\-no\-diagnostics
 The analysis stage is skipped. No warning or pre-run diagnostic is reported.
@@ -743,6 +749,7 @@ expansion. The custom forms
 use the same mood table as the command-line options. The options
 .BR force-warnings ,
 .BR force-diagnostics ,
+.BR force-annoying-diagnostics ,
 .BR no-diagnostics ,
 and
 .B shitbox
@@ -1184,6 +1191,26 @@ Errors, warnings, and analysis diagnostics include source locations when a
 mapping exists. A diagnostic may include a source line, caret, detail location,
 and trailing note. The complete source line is highlighted before terminal
 clipping.
+.PP
+In the default mood, the analysis stage rejects every construct that it proves
+is non-strict or nondeterministic. Advisory and style findings remain warnings.
+The annoying tier contains additional safety checks and style findings that can
+produce excessive reports in existing scripts.
+.PP
+A comment of the form
+.B # shellcheck disable=SC2086,SC2046
+suppresses the named numbered checks. The optional
+.B SC
+prefix may be omitted. The value may be quoted, repeated, set to
+.BR all ,
+or contain a half-open range such as
+.BR SC2000-SC2100 .
+A directive before the first command applies to the complete file. A later
+directive applies to the next complete and-or command. A directive after
+.BR && ,
+.BR || ,
+or a pipe does not apply. These comments do not suppress native strictness,
+parser, or runtime diagnostics.
 .PP
 Eval, command substitution, function substitution, and process substitution add
 their call sites to a source backtrace. A frame is printed once while its source

@@ -38,13 +38,22 @@ SHIT_IDENTITY=forged "$BIN" -c '
     identity=$SHIT_IDENTITY
     case $identity in
         *[!0-9a-f]*|"") valid=0 ;;
-        *) [ "${#identity}" -eq 8 ] && valid=1 || valid=0 ;;
+        *)
+            if [ "${#identity}" -eq 8 ]; then
+                valid=1
+            else
+                valid=0
+            fi
+            ;;
     esac
     shitbox env > "$IDENTITY_TEST_DIRECTORY/environment-output"
     exported_line=$(shitbox grep "SHIT_IDENTITY=$identity" \
         "$IDENTITY_TEST_DIRECTORY/environment-output")
-    [ "$exported_line" = "SHIT_IDENTITY=$identity" ] &&
-        exported=1 || exported=0
+    if [ "$exported_line" = "SHIT_IDENTITY=$identity" ]; then
+        exported=1
+    else
+        exported=0
+    fi
     readonly -p > "$IDENTITY_TEST_DIRECTORY/readonly-output"
     readonly_line=$(shitbox grep "readonly SHIT_IDENTITY=" \
         "$IDENTITY_TEST_DIRECTORY/readonly-output")

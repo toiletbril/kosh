@@ -37,13 +37,13 @@ _shit_complete()
 --no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
 --restricted --privileged --clean --posix --mood \
 --init-moods --mimicry --dumb --list-diagnostics \
---no-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
+--no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-shitbox \
 --show-ast \
 --show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \
 --debug-logging --debug-logging-file"
 
-    local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -r -p -M -L -I -W -WW \
+    local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -r -p -M -L -I -W -WW -WWW \
 -T -A -E -R -X"
 
     if [[ $current_word == --* ]]; then
@@ -87,10 +87,10 @@ _shit_set_complete()
 hashall keyword monitor noexec no-exec nounset no-unset verbose xtrace braceexpand \
 noclobber no-clobber errtrace physical functrace pipefail failglob shitbox vi emacs \
 posix show-ast show-lexed-words show-exit-code force-warnings mimicry \
-force-diagnostics show-stats no-diagnostics show-memory login rcfile"
+force-diagnostics force-annoying-diagnostics show-stats no-diagnostics show-memory login rcfile"
     local switches="--help --options --mood --init-moods -o +o -M -L \
--a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -WW -I -S -G \
-+a +b +e +f +h +k +m +n +u +v +x +B +C +E +P +T +A +R +W +WW +I +S +G"
+-a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -WW -WWW -I -S -G \
++a +b +e +f +h +k +m +n +u +v +x +B +C +E +P +T +A +R +W +WW +WWW +I +S +G"
 
     case $previous_word in
         -o|+o)

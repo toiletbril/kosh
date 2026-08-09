@@ -999,11 +999,21 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
 
   optimizer::optimize_node(this, actx);
 
+  let const was_inside_loop_condition = actx.is_inside_loop_condition;
+  let const prior_loop_condition_reads_input = actx.loop_condition_reads_input;
+  actx.is_inside_loop_condition = true;
+  actx.loop_condition_reads_input = false;
   m_condition->analyze(actx, is_unconditional);
+  let const loop_condition_reads_input = actx.loop_condition_reads_input;
+  actx.is_inside_loop_condition = was_inside_loop_condition;
+  actx.loop_condition_reads_input = prior_loop_condition_reads_input;
 
   let const was_silenced = actx.should_silence_unresolved_commands;
+  let const was_inside_read_loop = actx.is_inside_read_loop;
+  if (loop_condition_reads_input) actx.is_inside_read_loop = true;
   if (is_folded_to_skip()) actx.should_silence_unresolved_commands = true;
   m_body->analyze(actx, false);
+  actx.is_inside_read_loop = was_inside_read_loop;
   actx.should_silence_unresolved_commands = was_silenced;
 }
 
@@ -1225,6 +1235,33 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
 
   unused(is_unconditional);
 
+  let const outer_loop_location =
+      actx.active_loop_variables.find(m_variable_name.view());
+  if (outer_loop_location != nullptr) {
+    actx.fail_shellcheck(2165, source_location(),
+                         "This nested loop reuses the outer loop variable '" +
+                             m_variable_name.view() + "'",
+                         "Use a distinct variable for the nested loop",
+                         analyze_severity::Annoying);
+    actx.fail_shellcheck(2167, *outer_loop_location,
+                         "This loop variable is overwritten by a nested loop",
+                         "Use a distinct variable for the nested loop",
+                         analyze_severity::Annoying);
+  }
+
+  let const had_outer_loop_variable = outer_loop_location != nullptr;
+  let saved_outer_loop_location = SourceLocation{};
+  if (had_outer_loop_variable) saved_outer_loop_location = *outer_loop_location;
+  actx.active_loop_variables.set(m_variable_name.view(), source_location());
+  defer
+  {
+    if (had_outer_loop_variable)
+      actx.active_loop_variables.set(m_variable_name.view(),
+                                     saved_outer_loop_location);
+    else
+      actx.active_loop_variables.erase(m_variable_name.view());
+  };
+
   /* A for over $(cat file) is shellcheck SC2013 and over $(find ...) is
      SC2044. */
   for (let const t : m_words) {
@@ -1242,19 +1279,22 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
         start++;
       let const trimmed = body.substring(start);
       if (trimmed.starts_with(StringView{"ls "}) || trimmed == "ls")
-        actx.warn(t->source_location(),
-                  "A for loop over ls output breaks filenames at whitespace",
-                  "Iterate over a glob or read a delimited filename stream");
+        actx.warn_shellcheck(
+            2045, t->source_location(),
+            "A for loop over ls output breaks filenames at whitespace",
+            "Iterate over a glob or read a delimited filename stream");
       else if (trimmed.starts_with(StringView{"cat "}))
-        actx.warn(t->source_location(),
-                  "A for over the cat output iterates IFS-split words rather "
-                  "than lines",
-                  "Read the lines with 'while IFS= read -r line' instead");
+        actx.warn_shellcheck(
+            2013, t->source_location(),
+            "A for over the cat output iterates IFS-split words rather "
+            "than lines",
+            "Read the lines with 'while IFS= read -r line' instead");
       else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
-        actx.warn(t->source_location(),
-                  "A for over the find output breaks a name with whitespace "
-                  "apart",
-                  "Use find -exec or a 'while read -r' loop over find -print0");
+        actx.warn_shellcheck(
+            2044, t->source_location(),
+            "A for over the find output breaks a name with whitespace "
+            "apart",
+            "Use find -exec or a 'while read -r' loop over find -print0");
     }
 
     let const source_text = analysis_source_text(actx, t->source_location());
@@ -1271,9 +1311,10 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
       if (literal.view().find_character('*').has_value() ||
           literal.view().find_character('?').has_value() ||
           literal.view().find_character('[').has_value())
-        actx.warn(t->source_location(),
-                  "A quoted for-loop glob remains one literal word",
-                  "Leave the glob unquoted so it expands into loop values");
+        actx.warn_shellcheck(
+            2066, t->source_location(),
+            "A quoted for-loop glob remains one literal word",
+            "Leave the glob unquoted so it expands into loop values");
     }
   }
 
@@ -1453,11 +1494,45 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
      unquoted * glob, a single UnquotedText segment whose text is *. A quoted
      '*' matches only a literal asterisk. */
   bool has_default_arm = false;
+  let earlier_patterns = ArrayList<String>{heap_allocator()};
+  let earlier_shadow_prefixes = ArrayList<String>{heap_allocator()};
   for (let const &item : m_items) {
     for (let const pattern : item.patterns) {
       if (pattern->kind() != Token::Kind::Word) continue;
       let const &pattern_word =
           static_cast<const tokens::WordToken *>(pattern)->word();
+      let const literal = pattern_word.to_literal_string();
+      let const raw_pattern = pattern->raw_string();
+      let is_duplicate = false;
+      for (let const &earlier : earlier_patterns) {
+        if (raw_pattern.view() == earlier.view()) {
+          actx.fail_shellcheck(
+              2221, pattern->source_location(),
+              "An earlier case pattern makes this pattern unreachable",
+              "Remove the duplicate pattern", analyze_severity::Annoying);
+          is_duplicate = true;
+          break;
+        }
+      }
+      if (!is_duplicate) {
+        for (let const &prefix : earlier_shadow_prefixes) {
+          if (!literal.view().starts_with(prefix.view())) continue;
+          actx.fail_shellcheck(
+              2222, pattern->source_location(),
+              "An earlier case pattern shadows this pattern",
+              "Move the specific pattern before the broader pattern",
+              analyze_severity::Annoying);
+          break;
+        }
+      }
+      earlier_patterns.push(String{raw_pattern.view()});
+      if (pattern_word.segments.count() == 1 &&
+          pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+          !literal.is_empty() && literal[literal.count() - 1] == '*')
+      {
+        earlier_shadow_prefixes.push(
+            String{literal.view().substring_of_length(0, literal.count() - 1)});
+      }
       if (pattern_word.segments.count() == 1 &&
           pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
           pattern_word.segments[0].text.view() == "*")
@@ -1470,10 +1545,11 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
   }
   if (!has_default_arm) {
     ASSERT(m_word != nullptr);
-    actx.warn(m_word->source_location(),
-              "This case has no default *) branch, a value no pattern "
-              "matches "
-              "is silently ignored");
+    actx.warn_shellcheck(
+        2249, m_word->source_location(),
+        "This case has no default *) branch, a value no pattern "
+        "matches "
+        "is silently ignored");
   }
 
   /* An arm body runs conditionally and may reassign a name, so a value recorded

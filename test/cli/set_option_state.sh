@@ -202,7 +202,7 @@ echo "== command substitution preserves directory identity:"
     "$directory/snapshot-parent/sibling"
 : > "$directory/snapshot-parent/original/from-original"
 SNAPSHOT_PARENT="$directory/snapshot-parent" "$BIN" -c '
-    cd "$SNAPSHOT_PARENT/original"
+    cd "$SNAPSHOT_PARENT/original" || exit
     ignored=$(mv "$SNAPSHOT_PARENT/original" "$SNAPSHOT_PARENT/renamed"
         cd "$SNAPSHOT_PARENT/sibling")
     [[ -f from-original ]] && [[ "$PWD" = "$SNAPSHOT_PARENT/original" ]] &&
@@ -214,7 +214,7 @@ echo "== command substitution restores a permission-revoked directory:"
     "$directory/snapshot-permissions/sibling"
 : > "$directory/snapshot-permissions/original/from-original"
 SNAPSHOT_PARENT="$directory/snapshot-permissions" "$BIN" -c '
-    cd "$SNAPSHOT_PARENT/original"
+    cd "$SNAPSHOT_PARENT/original" || exit
     ignored=$(chmod 000 .
         cd "$SNAPSHOT_PARENT/sibling")
     second=$(printf ok)
@@ -228,7 +228,7 @@ echo "== command substitution enters from an execute-only directory:"
 /bin/mkdir -p "$directory/snapshot-execute-only"
 chmod 111 "$directory/snapshot-execute-only"
 SNAPSHOT_DIRECTORY="$directory/snapshot-execute-only" "$BIN" -c '
-    cd "$SNAPSHOT_DIRECTORY"
+    cd "$SNAPSHOT_DIRECTORY" || exit
     value=$(printf ok)
     [[ "$value" = ok ]] && echo execute-only-directory-preserved
 '
@@ -294,19 +294,19 @@ CDPATH="$directory/missing$path_delimiter$directory/cdpath-root" \
     'cd child >/dev/null && [[ -f cdpath-marker ]] && echo native-cdpath'
 DOT_OPERAND=".${path_separator}local" START_DIRECTORY="$directory" \
     CDPATH="$directory/cdpath-root" "$BIN" -c \
-    'cd "$START_DIRECTORY"; cd "$DOT_OPERAND"; [[ -f local-marker ]] && echo native-dot-relative'
+    'cd "$START_DIRECTORY" || exit; cd "$DOT_OPERAND" || exit; [[ -f local-marker ]] && echo native-dot-relative'
 ABSOLUTE_OPERAND="$directory/absolute" "$BIN" -c \
-    'cd "$ABSOLUTE_OPERAND"; [[ -f absolute-marker ]] && echo native-absolute'
+    'cd "$ABSOLUTE_OPERAND" || exit; [[ -f absolute-marker ]] && echo native-absolute'
 if [ "${OS-}" = Windows_NT ]; then
     native_directory=$(START_DIRECTORY="$directory" "$BIN" -c \
-        'cd "$START_DIRECTORY"; pwd -P')
+        'cd "$START_DIRECTORY" && pwd -P')
     drive_prefix=${native_directory%%:*}:
     if ! DRIVE_ONLY="$drive_prefix" DRIVE_RELATIVE="${drive_prefix}local" \
         START_DIRECTORY="$directory" "$BIN" -c '
-        cd "$START_DIRECTORY"
-        cd "$DRIVE_ONLY"
+        cd "$START_DIRECTORY" || exit
+        cd "$DRIVE_ONLY" || exit
         [[ -d local ]]
-        cd "$DRIVE_RELATIVE"
+        cd "$DRIVE_RELATIVE" || exit
         [[ -f local-marker ]]
     '
     then

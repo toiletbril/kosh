@@ -24,6 +24,7 @@ public:
       -> Expression *;
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
+  fn take_shellcheck_suppressions() throws -> ArrayList<shellcheck_suppression>;
 
 private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;
@@ -41,6 +42,8 @@ private:
   usize m_if_condition_depth{0};
   usize m_parentheses_depth{0};
   bool m_should_stop_after_top_level_unit{false};
+  bool m_has_parsed_source_command{false};
+  ArrayList<shellcheck_suppression> m_shellcheck_suppressions{heap_allocator()};
 
   mustuse fn parse_simple_command() throws -> Command *;
 

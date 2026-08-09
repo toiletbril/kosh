@@ -35,11 +35,11 @@ unset SHIT_FLAGS
 dir=$(mktemp -d)
 : > "$dir/keep"
 echo "== rm -rf . is refused (count of the refusal):"
-"$BIN" -c "cd '$dir'; shitbox rm -rf --dry-run ." </dev/null 2>&1 | grep -c "refusing to remove"
+"$BIN" -c "cd '$dir' || exit; shitbox rm -rf --dry-run ." </dev/null 2>&1 | grep -c "refusing to remove"
 echo "== rm -rf .. is refused (count):"
-"$BIN" -c "cd '$dir'; shitbox rm -rf --dry-run .." </dev/null 2>&1 | grep -c "refusing to remove"
+"$BIN" -c "cd '$dir' || exit; shitbox rm -rf --dry-run .." </dev/null 2>&1 | grep -c "refusing to remove"
 echo "== the directory contents survive:"
-"$BIN" -c "[ -e '$dir/keep' ] && echo keep-survives || echo keep-gone" </dev/null
+"$BIN" -c "if [ -e '$dir/keep' ]; then echo keep-survives; else echo keep-gone; fi" </dev/null
 [ -n "$dir" ] && rm -rf "$dir"
 
 unset SHIT_FLAGS
@@ -55,6 +55,6 @@ echo "== rm -rf / is refused (count of the refusal):"
 echo "== rm -rf // is refused (count):"
 "$BIN" -c "shitbox rm -rf --dry-run //" </dev/null 2>&1 | grep -c "refusing to remove the root"
 echo "== a normal file is reported for removal under --dry-run, and survives:"
-"$BIN" -c "cd '$dir'; shitbox rm --dry-run keep" </dev/null 2>&1
-"$BIN" -c "[ -e '$dir/keep' ] && echo keep-survives || echo keep-removed" </dev/null
+"$BIN" -c "cd '$dir' || exit; shitbox rm --dry-run keep" </dev/null 2>&1
+"$BIN" -c "if [ -e '$dir/keep' ]; then echo keep-survives; else echo keep-removed; fi" </dev/null
 [ -n "$dir" ] && rm -rf "$dir"

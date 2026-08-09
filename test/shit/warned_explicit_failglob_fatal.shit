@@ -1,5 +1,5 @@
 #!/bin/env shit
-set -W
+set -WWW
 set -o failglob
 echo *.zzz_explicit_fatal
 echo not-reached

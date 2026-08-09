@@ -39,6 +39,12 @@ pure fn Parser::debug_words() const wontthrow -> const ArrayList<Word> &
   return m_lexer.debug_words();
 }
 
+fn Parser::take_shellcheck_suppressions() throws
+    -> ArrayList<shellcheck_suppression>
+{
+  return steal(m_shellcheck_suppressions);
+}
+
 hot pure static fn kind_in(Token::Kind kind,
                            std::initializer_list<Token::Kind> set) wontthrow
     -> bool
@@ -182,8 +188,10 @@ flatten fn Parser::construct_ast() throws -> Expression *
 
 fn Parser::construct_next_top_level_ast() throws -> Expression *
 {
-  if (m_lexer.peek_shell_token()->kind() == Token::Kind::EndOfFile)
-    return nullptr;
+  m_lexer.set_should_collect_shellcheck_directives(true);
+  let const first_token = m_lexer.peek_shell_token();
+  m_lexer.set_should_collect_shellcheck_directives(false);
+  if (first_token->kind() == Token::Kind::EndOfFile) return nullptr;
 
   m_should_stop_after_top_level_unit = true;
   defer { m_should_stop_after_top_level_unit = false; };
@@ -252,7 +260,9 @@ cold fn Parser::construct_ast(ArrayList<String> &errors,
 
   loop
   {
+    m_lexer.set_should_collect_shellcheck_directives(true);
     Token *token = m_lexer.peek_shell_token();
+    m_lexer.set_should_collect_shellcheck_directives(false);
     ASSERT(token != nullptr);
     last_location = token->source_location();
     if (token->kind() == Token::Kind::EndOfFile) break;
@@ -319,6 +329,14 @@ hot fn Parser::parse_command_list(
   bool should_negate_pending = false;
   bool should_time_pending = false;
   bool is_time_posix_format = false;
+  Maybe<usize> active_shellcheck_suppression{};
+
+  let do_finish_shellcheck_suppression = [&](usize end_position) {
+    if (!active_shellcheck_suppression.has_value()) return;
+    m_shellcheck_suppressions[*active_shellcheck_suppression].end_position =
+        end_position;
+    active_shellcheck_suppression = None;
+  };
 
   let do_finish_pending = [&](Command *pending, const Token *at) throws {
     if (should_negate_pending) {
@@ -339,8 +357,40 @@ hot fn Parser::parse_command_list(
       /* A leading time keyword times the command or pipeline that follows. bash
          allows it before the ! negation, and -p or --posix selects the POSIX
          report. */
+      let const should_collect_directives =
+          next_cond == CompoundListCondition::Kind::None;
+      m_lexer.set_should_collect_shellcheck_directives(
+          should_collect_directives);
       Token *maybe_time = m_lexer.peek_shell_token();
+      let directives = m_lexer.take_shellcheck_directives();
+      m_lexer.set_should_collect_shellcheck_directives(false);
       ASSERT(maybe_time != nullptr);
+      while (!directives.is_empty() &&
+             maybe_time->kind() == Token::Kind::Newline)
+      {
+        m_lexer.advance_past_last_peek();
+        m_lexer.set_should_collect_shellcheck_directives(true);
+        maybe_time = m_lexer.peek_shell_token();
+        let following_directives = m_lexer.take_shellcheck_directives();
+        m_lexer.set_should_collect_shellcheck_directives(false);
+        for (let const &directive : following_directives)
+          directives.push(directive);
+      }
+      let const is_source_command =
+          maybe_time->kind() != Token::Kind::Newline &&
+          maybe_time->kind() != Token::Kind::EndOfFile;
+      let const is_first_source_command =
+          is_source_command && !m_has_parsed_source_command;
+      if (is_source_command) m_has_parsed_source_command = true;
+      if (!directives.is_empty()) {
+        m_shellcheck_suppressions.push(shellcheck_suppression{
+            maybe_time->source_location().position,
+            is_first_source_command ? static_cast<usize>(-1)
+                                    : maybe_time->source_location().position,
+            steal(directives)});
+        if (!is_first_source_command)
+          active_shellcheck_suppression = m_shellcheck_suppressions.count() - 1;
+      }
       if (maybe_time->kind() == Token::Kind::Time) {
         m_lexer.advance_past_last_peek();
         should_time_pending = true;
@@ -368,6 +418,7 @@ hot fn Parser::parse_command_list(
 
     /* A terminator keyword is left for the caller to consume. */
     if (is_list_terminator(token, terminators)) {
+      do_finish_shellcheck_suppression(token->source_location().position);
       if (lhs != nullptr) {
         do_finish_pending(lhs, token);
       } else if (next_cond != CompoundListCondition::Kind::None) {
@@ -400,6 +451,11 @@ hot fn Parser::parse_command_list(
     case Token::Kind::Newline:
     case Token::Kind::EndOfFile:
     case Token::Kind::Semicolon: {
+      if (token->kind() != Token::Kind::DoublePipe &&
+          token->kind() != Token::Kind::DoubleAmpersand)
+      {
+        do_finish_shellcheck_suppression(token->source_location().position);
+      }
       m_lexer.advance_past_last_peek();
 
       if (lhs != nullptr) {

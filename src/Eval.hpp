@@ -1036,13 +1036,11 @@ public:
   {
     return (m_suppressed_warnings & (u32{1} << static_cast<u32>(which))) != 0;
   }
-  /* -W keeps a run going past a strict error by reporting it as a warning. The
-     runtime checks below read this mirror so set -W flips it mid-run. */
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
     if (!enabled)
       m_runtime.warning_level = 0;
-    else if (m_runtime.warning_level < 2)
+    else if (m_runtime.warning_level < 3)
       m_runtime.warning_level++;
   }
   fn note_warning_option_mutation() wontthrow -> void
@@ -1061,10 +1059,11 @@ public:
   {
     m_runtime.warning_level = level;
   }
-  pure fn warnings_reach_every_mood() const wontthrow -> bool
+  pure fn strict_diagnostics_are_warnings() const wontthrow -> bool
   {
-    return m_runtime.warning_level >= 2 ||
-           m_runtime.mood == mimic_mood::Default;
+    if (m_runtime.mood == mimic_mood::Default)
+      return m_runtime.warning_level >= 3;
+    return m_runtime.warning_level >= 1;
   }
   /* A reference to an unset variable, fatal under set -u, downgraded to a
      warning under -W unless the set -u was explicit, else expanded to empty. */

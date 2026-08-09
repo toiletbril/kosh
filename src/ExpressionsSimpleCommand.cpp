@@ -93,6 +93,54 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 {
   ASSERT(m_assignment != nullptr);
 
+  for (let const &segment : m_assignment->value_word().segments) {
+    if (segment.kind == WordSegment::Kind::VariableReference &&
+        segment.text.view() == "@")
+    {
+      actx.fail_shellcheck(
+          2124, source_location(),
+          "A scalar assignment from $@ loses argument boundaries",
+          "Assign one value or use an array", analyze_severity::Annoying);
+      break;
+    }
+    if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
+        segment.text.view().find_character('$').has_value())
+    {
+      actx.warn_shellcheck(2004, source_location(),
+                           "Arithmetic variables do not need a dollar sign",
+                           "Use the variable name directly inside arithmetic");
+    }
+  }
+
+  let const raw_assignment = m_assignment->raw_string();
+  let const first_colon = raw_assignment.view().find_character(':');
+  if (m_assignment->key().view() == "PATH" &&
+      (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
+       raw_assignment.view().starts_with(StringView{"PATH+=~/"}) ||
+       (first_colon.has_value() && raw_assignment.view()
+                                       .substring(*first_colon + 1)
+                                       .starts_with(StringView{"~/"}))))
+  {
+    actx.fail_shellcheck(
+        2147, source_location(), "A tilde inside PATH remains literal",
+        "Expand HOME before assigning PATH", analyze_severity::Annoying);
+  }
+
+  let const prompt_has_control_escape =
+      view_contains(raw_assignment.view(), StringView{"\\e"}) ||
+      view_contains(raw_assignment.view(), StringView{"\\033"}) ||
+      view_contains(raw_assignment.view(), StringView{"\\x1b"});
+  let const prompt_has_display_guards =
+      view_contains(raw_assignment.view(), StringView{"\\["}) &&
+      view_contains(raw_assignment.view(), StringView{"\\]"});
+  if (m_assignment->key().view() == "PS1" && prompt_has_control_escape &&
+      !prompt_has_display_guards)
+  {
+    actx.warn_shellcheck(2025, source_location(),
+                         "PS1 control escapes need balanced display guards",
+                         "Wrap nonprinting prompt escapes in \\[ and \\]");
+  }
+
   if (!m_assignment->is_append()) {
     const WordSegment *arithmetic_segment = nullptr;
     usize arithmetic_segment_count = 0;
@@ -132,9 +180,10 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   let const &name = m_assignment->key();
 
   if (actx.is_direct_pipeline_stage) {
-    actx.warn(source_location(),
-              "This pipeline assignment is lost when the stage exits",
-              "Move the assignment outside the pipeline");
+    actx.warn_shellcheck(
+        2030, source_location(),
+        "This pipeline assignment is lost when the stage exits",
+        "Move the assignment outside the pipeline");
     actx.pipeline_lost_names.add(name.view());
   }
 
@@ -669,6 +718,12 @@ pure fn SimpleCommand::args() const wontthrow
     -> const ArrayList<const Token *> &
 {
   return m_args;
+}
+
+pure fn SimpleCommand::redirections() const wontthrow
+    -> const ArrayList<Redirection> &
+{
+  return m_redirections;
 }
 
 fn SimpleCommand::as_simple_command() const wontthrow -> const SimpleCommand *

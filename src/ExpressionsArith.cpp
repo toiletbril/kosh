@@ -96,15 +96,17 @@ cold fn ConditionalCommand::analyze(AnalysisContext &actx,
            conditional_word_is_numeric_literal(m_elements[i - 1].word)) ||
           (i + 1 < m_elements.count() &&
            conditional_word_is_numeric_literal(m_elements[i + 1].word)))
-        actx.warn(source_location(),
-                  "The " + op + " operator compares strings lexicographically",
-                  "Use an arithmetic command or a numeric -lt or -gt operator");
+        actx.warn_shellcheck(
+            2071, source_location(),
+            "The " + op + " operator compares strings lexicographically",
+            "Use an arithmetic command or a numeric -lt or -gt operator");
       if (i > 0 && i + 1 < m_elements.count() &&
           conditional_word_is_literal(m_elements[i - 1].word) &&
           conditional_word_is_literal(m_elements[i + 1].word))
-        actx.warn(source_location(),
-                  "This conditional compares two constant values",
-                  "Remove the constant condition or compare runtime data");
+        actx.warn_shellcheck(
+            2050, source_location(),
+            "This conditional compares two constant values",
+            "Remove the constant condition or compare runtime data");
       continue;
     }
     if (element.kind != Kind::Operand || element.word == nullptr) continue;
@@ -119,26 +121,29 @@ cold fn ConditionalCommand::analyze(AnalysisContext &actx,
         if (segment.kind == WordSegment::Kind::UnquotedText &&
             segment.text.view().find_character('=').has_value())
         {
-          actx.warn(element.word->source_location(),
-                    "A conditional operator needs surrounding spaces",
-                    "Place spaces around the comparison operator");
+          actx.warn_shellcheck(
+              2077, element.word->source_location(),
+              "A conditional operator needs surrounding spaces",
+              "Place spaces around the comparison operator");
           break;
         }
     }
     if ((operand.view() == "-n" || operand.view() == "-z") &&
         i + 1 < m_elements.count() &&
         conditional_word_is_literal(m_elements[i + 1].word))
-      actx.warn(m_elements[i + 1].word->source_location(),
-                "The operand is literal, so this string test is constant",
-                "Test a variable or drop the check");
+      actx.warn_shellcheck(
+          2157, m_elements[i + 1].word->source_location(),
+          "The operand is literal, so this string test is constant",
+          "Test a variable or drop the check");
 
     if ((operand.view() == "-e" || operand.view() == "-f" ||
          operand.view() == "-d" || operand.view() == "-L") &&
         i + 1 < m_elements.count() &&
         conditional_word_has_glob(m_elements[i + 1].word))
-      actx.warn(m_elements[i + 1].word->source_location(),
-                "A file test on a glob checks only one expanded path",
-                "Expand the glob in a loop and test each path");
+      actx.warn_shellcheck(
+          2144, m_elements[i + 1].word->source_location(),
+          "A file test on a glob checks only one expanded path",
+          "Expand the glob in a loop and test each path");
 
     if (!is_conditional_binary_operator(operand.view()) || i == 0 ||
         i + 1 >= m_elements.count())
@@ -152,18 +157,20 @@ cold fn ConditionalCommand::analyze(AnalysisContext &actx,
          conditional_word_has_glob(right));
     if (!is_pattern_operator && conditional_word_is_literal(left) &&
         conditional_word_is_literal(right))
-      actx.warn(element.word->source_location(),
-                "This conditional compares two constant values",
-                "Remove the constant condition or compare runtime data");
+      actx.warn_shellcheck(
+          2050, element.word->source_location(),
+          "This conditional compares two constant values",
+          "Remove the constant condition or compare runtime data");
 
     if (operand.view() == "=~" && right != nullptr) {
       let const source_text =
           analysis_source_text(actx, right->source_location());
       if (!source_text.is_empty() &&
           (source_text[0] == '\'' || source_text[0] == '"'))
-        actx.warn(right->source_location(),
-                  "A quoted regular expression is matched literally",
-                  "Store the expression in a variable or leave it unquoted");
+        actx.warn_shellcheck(
+            2076, right->source_location(),
+            "A quoted regular expression is matched literally",
+            "Store the expression in a variable or leave it unquoted");
     }
   }
 
@@ -345,10 +352,11 @@ cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
       if (segment.kind == WordSegment::Kind::CommandSubstitution &&
           !segment.is_in_double_quotes)
       {
-        actx.warn(element->source_location(),
-                  "An array built from command output splits words and "
-                  "expands globs",
-                  "Use mapfile or readarray to preserve output records");
+        actx.warn_shellcheck(
+            2207, element->source_location(),
+            "An array built from command output splits words and "
+            "expands globs",
+            "Use mapfile or readarray to preserve output records");
         break;
       }
   }
@@ -604,10 +612,11 @@ cold fn Subshell::analyze(AnalysisContext &actx,
         body.starts_with(StringView{"-d "}) ||
         body.starts_with(StringView{"-n "}) ||
         body.starts_with(StringView{"-z "}))
-      actx.warn(source_location(),
-                "Parentheses start a subshell rather than a file or string "
-                "test",
-                "Use [[ ... ]] or [ ... ] for the condition");
+      actx.warn_shellcheck(
+          2204, source_location(),
+          "Parentheses start a subshell rather than a file or string "
+          "test",
+          "Use [[ ... ]] or [ ... ] for the condition");
   }
 
   /* An assignment in the body never changes a parent variable, so the body
@@ -686,6 +695,25 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
 
   unused(is_unconditional);
   actx.defined_functions.add(m_name);
+
+  let body_source = analysis_source_span(actx, *m_body).trim_blanks();
+  if (!body_source.is_empty() &&
+      (body_source[0] == '{' || body_source[0] == '('))
+  {
+    body_source = body_source.substring(1).trim_blanks();
+  }
+  if (body_source.starts_with(m_name.view()) &&
+      body_source.length > m_name.count() &&
+      (body_source[m_name.count()] == ' ' ||
+       body_source[m_name.count()] == '\t' ||
+       body_source[m_name.count()] == '\n' ||
+       body_source[m_name.count()] == ';'))
+  {
+    actx.fail_shellcheck(2264, m_body->source_location(),
+                         "This function wrapper calls itself recursively",
+                         "Use command before the wrapped command name",
+                         analyze_severity::Annoying);
+  }
 
   /* The body runs later when the function is called, so it is analyzed from an
      empty constant table with the outer constants restored after. */

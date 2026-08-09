@@ -25,6 +25,6 @@ printf 'x' > "$dir/.hidden"
 "$BIN" -c "shitbox ls -A -1 '$dir'" </dev/null
 echo "== touch creates a missing file, -c leaves it missing:"
 "$BIN" -c "shitbox touch '$dir/made.txt'" </dev/null
-"$BIN" -c "[ -e '$dir/made.txt' ] && echo made-exists || echo made-missing" </dev/null
+"$BIN" -c "if [ -e '$dir/made.txt' ]; then echo made-exists; else echo made-missing; fi" </dev/null
 "$BIN" -c "shitbox touch -c '$dir/ghost.txt'" </dev/null
-"$BIN" -c "[ -e '$dir/ghost.txt' ] && echo ghost-exists || echo ghost-missing" </dev/null
+"$BIN" -c "if [ -e '$dir/ghost.txt' ]; then echo ghost-exists; else echo ghost-missing; fi" </dev/null

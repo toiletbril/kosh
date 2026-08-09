@@ -88,13 +88,16 @@ FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Make shit extremely dumb. Equivalent to --mood sh -T --no-diagnostics.");
 
 FLAG(WARNINGS, RepeatedBool, 'W', "", Shit,
-     "Demote a lenient analysis error to a warning and proceed, a repeated -WW "
-     "demotes the strict ones too.");
+     "In the default mood, demote annoying, lenient, then strict diagnostics "
+     "as W is repeated. In other moods, enable those tiers in reverse order.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
      "Skip the analysis stage. No warnings or pre-run diagnostics are "
      "reported.");
+FLAG(SUPPRESS_ANNOYING_DIAGNOSTICS, Bool, '\0', "no-annoying-diagnostics", Shit,
+     "Suppress the annoying diagnostic tier while retaining strict and "
+     "lenient analysis.");
 FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
      "Suppress diagnostics only while the startup files source, then restore "
      "them for the prompt.");
@@ -372,6 +375,9 @@ static fn run_script_contents(const String &script_contents,
     ast_arena.reset();
     context.reset_scratch_arena();
 
+    let shellcheck_suppressions =
+        ArrayList<shellcheck_suppression>{heap_allocator()};
+
     /* A precompiled tree lives in a caller-owned arena that outlives this call.
      */
     Expression *ast = precompiled_ast;
@@ -406,6 +412,7 @@ static fn run_script_contents(const String &script_contents,
           print("\n");
         }
       }
+      shellcheck_suppressions = p.take_shellcheck_suppressions();
     }
 
     /* POSIX and bash mode skip the analysis stage, -W forces it on as warnings,
@@ -441,7 +448,9 @@ static fn run_script_contents(const String &script_contents,
           ast, script_contents, context.function_names(), context.alias_names(),
           &context, context.warning_level(),
           context.warnings_enabled() && context.shell_is_interactive(),
-          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+          context.mood() == mimic_mood::Default,
+          !FLAG_SUPPRESS_ANNOYING_DIAGNOSTICS.is_enabled(),
+          shellcheck_suppressions, FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",
@@ -1273,7 +1282,7 @@ fn main(int argc, char **argv) -> int
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
   let const warnings_specified_count = FLAG_WARNINGS.count();
   context.set_warning_level(static_cast<u8>(
-      warnings_specified_count > 2 ? 2 : warnings_specified_count));
+      warnings_specified_count > 3 ? 3 : warnings_specified_count));
   context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());

@@ -282,6 +282,96 @@
             [SimpleCommand "echo" "$((number + 1))"]
           [CompoundListCondition, None]
             [SimpleCommand "export" "CDPATH=.:~/project"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "annoying_style_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "one"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "three"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$(date)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$(($number + 1))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "x$value" "=" "xvalue" "]"]
+          [CompoundListCondition, None]
+            [Assign PS1=\e[31m> ]
+  [CompoundListCondition, None]
+    [FunctionDefinition "annoying_safety_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-exec" "echo" "{}"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "value" "=~" "expression" "]"]
+          [CompoundListCondition, None]
+            [WhileLoop]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "read" "-r" "host"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "ssh" "$host" "uptime"]
+          [CompoundListCondition, None]
+            [SimpleCommand "alias" "archive=mv $1 /backup"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-name" "*.bak" "-o" "-name" "*~" "-delete"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$10"]
+          [CompoundListCondition, None]
+            [SimpleCommand "$(printf command)"]
+          [CompoundListCondition, None]
+            [Assign arguments=$@]
+          [CompoundListCondition, None]
+            [Assign PATH=$PATH:~/bin]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$[1+2]"]
+          [CompoundListCondition, None]
+            [ForLoop "outer_index"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [ForLoop "outer_index"]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "echo" "$outer_index"]
+          [CompoundListCondition, None]
+            [CaseClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "recursive_wrapper"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "recursive_wrapper" "$@"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "directive_scope"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$suppressed"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$reported"]
 [Word
   Unquoted "lint_only"
 ]
@@ -1378,6 +1468,322 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "annoying_style_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "style.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "style.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "three"
+]
+[Word
+  Unquoted "style.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "date"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "$number + 1"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "x"
+  Variable "value"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "xvalue"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "PS1="
+  Literal "\e[31m> "
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "annoying_safety_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-exec"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "{}"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "value"
+]
+[Word
+  Unquoted "=~"
+]
+[Word
+  Unquoted "expression"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "host"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Variable "host"
+]
+[Word
+  Unquoted "uptime"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "archive="
+  Literal "mv $1 /backup"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-name"
+]
+[Word
+  Literal "*.bak"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "-name"
+]
+[Word
+  Literal "*~"
+]
+[Word
+  Unquoted "-delete"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "1"
+  Unquoted "0"
+]
+[Word
+  CommandSubstitution "printf command"
+]
+[Word
+  Unquoted "arguments="
+  Variable "@"
+]
+[Word
+  Unquoted "PATH="
+  Variable "PATH"
+  DoubleQuoted ":~/bin"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "$[1+2]"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "outer_index"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "outer_index"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "outer_index"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "value"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "same"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "same"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "*"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "literal-after-star"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "prefix*"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "prefix-value"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "recursive_wrapper"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "recursive_wrapper"
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "directive_scope"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "suppressed"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "reported"
+]
+[Word
+  Unquoted "}"
+]
 shit: 3:8: warning: A bare glob can expand to a filename that begins with '-'.
      3 |    grep *.txt file
        |         ^~~~~
@@ -1553,6 +1959,14 @@ shit: 94:3: warning: Commands after exec do not run when exec succeeds.
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
 note: Remove exec or remove the unreachable commands.
+shit: 95:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+    95 |    cd missing; echo wrong-directory
+       |    ^~
+note: Stop or return when cd fails.
+shit: 96:17: warning: A && B || C also runs C when B fails.
+    96 |    true && false || echo fallback
+       |                  ^~
+note: Use an if statement when C is the else branch.
 shit: 83:15: warning: A for loop over ls output breaks filenames at whitespace.
     83 |    for file in $(ls *.mp3); do echo "$file"; done
        |                ^~~~~~~~~~~
@@ -1637,6 +2051,14 @@ shit: 105:8: warning: An unquoted variable can split into words and expand globs
    105 |    echo {1..$limit}
        |         ^~~~~~~~~~~
 note: Quote the expansion to keep one argument.
+shit: 106:6: warning: Brackets around a tr range add literal bracket bytes.
+   106 |    tr [A-Z] [a-z]
+       |       ^~~~~
+note: Use a quoted range without brackets.
+shit: 106:12: warning: Brackets around a tr range add literal bracket bytes.
+   106 |    tr [A-Z] [a-z]
+       |             ^~~~~
+note: Use a quoted range without brackets.
 shit: 106:6: warning: The unquoted tr range can expand as a filename glob.
    106 |    tr [A-Z] [a-z]
        |       ^~~~~
@@ -1673,6 +2095,117 @@ shit: 114:10: warning: An exported CDPATH can redirect cd commands in child scri
    114 |    export CDPATH=.:~/project
        |           ^~~~~~~~~~~~~~~~~~
 note: Keep CDPATH unexported or clear it before running scripts.
+shit: 118:15: warning: Several commands append to the same file separately.
+   118 |    echo one >> style.log
+       |                ^~~~~~~~~
+note: Apply one append redirection to a grouped command.
+shit: 121:8: warning: Backticks are harder to nest than command substitutions.
+   121 |    echo `date`
+       |         ^~~~~~
+note: Use $(...) for command substitution.
+shit: 121:3: warning: An echo of a command substitution prints what the command already prints.
+   121 |    echo `date`
+       |    ^~~~
+note: Run the command on its own instead.
+shit: 121:8: warning: An unquoted command substitution splits its output.
+   121 |    echo `date`
+       |         ^~~~~~
+note: Quote it to keep one argument.
+shit: 122:8: warning: Arithmetic variables do not need a dollar sign.
+   122 |    echo $(($number + 1))
+       |         ^~~~~~~~~~~~~~~~
+note: Use the variable name directly inside arithmetic.
+shit: 122:8: warning: External input is evaluated as arithmetic code.
+   122 |    echo $(($number + 1))
+       |         ^~~~~~~~~~~~~~~~
+note: Validate the value as decimal digits before arithmetic.
+shit: 123:5: warning: The x-prefix test workaround is obsolete.
+   123 |    [ x"$value" = xvalue ]
+       |      ^~~~~~~~~
+note: Quote the variable directly.
+shit: 124:3: warning: PS1 control escapes need balanced display guards.
+   124 |    PS1='\e[31m> '
+       |    ^~~~~~~~~~~~~~
+note: Wrap nonprinting prompt escapes in \[ and \].
+shit: 124:3: warning: This assignment to 'PS1' in a function has no local, so the value leaks to the global scope.
+   124 |    PS1='\e[31m> '
+       |    ^~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+shit: 128:10: warning: The find -exec action has no terminating ';' or '+'.
+   128 |    find . -exec echo {}
+       |           ^~~~~
+note: Terminate the action with an escaped semicolon or plus.
+shit: 129:11: warning: The test builtin does not support the =~ regular expression operator.
+   129 |    [ value =~ expression ]
+       |            ^~
+note: Use [[ value =~ expression ]].
+shit: 130:26: warning: An ssh command in a while-read loop can consume the loop input.
+   130 |    while read -r host; do ssh "$host" uptime; done
+       |                           ^~~
+note: Redirect ssh input from /dev/null or pass -n.
+shit: 131:9: warning: An alias body cannot receive positional arguments.
+   131 |    alias archive='mv $1 /backup'
+       |          ^~~~~~~~~~~~~~~~~~~~~~~
+note: Use a function when the wrapper needs arguments.
+shit: 132:24: warning: The find expression uses -o without grouping its actions.
+   132 |    find . -name '*.bak' -o -name '*~' -delete
+       |                         ^~
+note: Group each side with escaped parentheses.
+shit: 133:8: warning: A positional parameter above nine needs braces.
+   133 |    echo $10
+       |         ^~~
+note: Write ${10} to select positional parameter 10.
+shit: 133:8: warning: An unquoted variable can split into words and expand globs.
+   133 |    echo $10
+       |         ^~~
+note: Quote the expansion to keep one argument.
+shit: 134:3: warning: A command substitution in command position executes its output.
+   134 |    $(printf command)
+       |    ^~~~~~~~~~~~~~~~~
+note: Run the command inside the substitution directly.
+shit: 135:3: warning: A scalar assignment from $@ loses argument boundaries.
+   135 |    arguments="$@"
+       |    ^~~~~~~~~~~~~~
+note: Assign one value or use an array.
+shit: 135:3: warning: This assignment to 'arguments' in a function has no local, so the value leaks to the global scope.
+   135 |    arguments="$@"
+       |    ^~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+shit: 136:3: warning: A tilde inside PATH remains literal.
+   136 |    PATH="$PATH:~/bin"
+       |    ^~~~~~~~~~~~~~~~~~
+note: Expand HOME before assigning PATH.
+shit: 137:8: warning: $[...] is the obsolete arithmetic expansion spelling.
+   137 |    echo $[1+2]
+       |         ^~~~~~
+note: Use $((...)) for arithmetic expansion.
+shit: 139:5: warning: This nested loop reuses the outer loop variable 'outer_index'.
+   139 |      for outer_index in two; do echo "$outer_index"; done
+       |      ^~~
+note: Use a distinct variable for the nested loop.
+shit: 138:3: warning: This loop variable is overwritten by a nested loop.
+   138 |    for outer_index in one; do
+       |    ^~~
+note: Use a distinct variable for the nested loop.
+shit: 143:3: warning: An earlier case pattern makes this pattern unreachable.
+   143 |    same) : ;;
+       |    ^~~~
+note: Remove the duplicate pattern.
+shit: 147:3: warning: An earlier case pattern shadows this pattern.
+   147 |    prefix-value) : ;;
+       |    ^~~~~~~~~~~~
+note: Move the specific pattern before the broader pattern.
+shit: 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+   141 |    case value in
+       |         ^~~~~
+shit: 151:21: warning: This function wrapper calls itself recursively.
+   151 |  recursive_wrapper() { recursive_wrapper "$@"; }
+       |                      ^
+note: Use command before the wrapped command name.
+shit: 156:8: warning: An unquoted variable can split into words and expand globs.
+   156 |    echo $reported
+       |         ^~~~~~~~~
+note: Quote the expansion to keep one argument.
 done
 done
 done

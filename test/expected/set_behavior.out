@@ -35,6 +35,7 @@ posix          	off
 force-warnings 	off
 mimicry        	off
 force-diagnostics	off
+force-annoying-diagnostics	off
 no-diagnostics 	off
 == bash mood relaxes nounset:
 []

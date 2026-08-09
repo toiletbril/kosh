@@ -5,19 +5,23 @@ echo "== set switches:"
 "$BIN" --debug-complete-at 'set -' </dev/null
 echo "== set -o names by prefix:"
 "$BIN" --debug-complete-at 'set -o no' </dev/null
+echo "== set level three name:"
+"$BIN" --debug-complete-at 'set -o force-a' </dev/null
 echo "== shit binary flags:"
 "$BIN" --debug-complete-at 'shit --b' </dev/null
 echo "== shit no-traces flag:"
 "$BIN" --debug-complete-at 'shit --no-t' </dev/null
+echo "== shit no-annoying flag:"
+"$BIN" --debug-complete-at 'shit --no-a' </dev/null
 echo "== declare letters:"
 "$BIN" --debug-complete-at 'declare -' </dev/null
 echo "== kill signal names:"
 signal_names=$("$BIN" --debug-complete-at 'kill -' </dev/null)
 printf '%s\n' "$signal_names" | grep -E '^-(HUP|INT|KILL|QUIT|TERM)$'
 if [ "${OS-}" != Windows_NT ]; then
-    for signal_name in ABRT ALRM CONT PIPE STOP TSTP USR1 USR2; do
-        printf '%s\n' "$signal_names" | grep -q "^-$signal_name$"
-    done
+  for signal_name in ABRT ALRM CONT PIPE STOP TSTP USR1 USR2; do
+    printf '%s\n' "$signal_names" | grep -q "^-$signal_name$"
+  done
 fi
 echo "== shopt names by prefix:"
 "$BIN" --debug-complete-at 'shopt glob' </dev/null
