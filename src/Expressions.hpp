@@ -21,13 +21,6 @@ class ForLoop;
 class CStyleForLoop;
 } /* namespace expressions */
 
-enum class analyze_severity : u8
-{
-  Annoying,
-  Lenient,
-  Strict,
-};
-
 class AnalysisContext
 {
 public:
@@ -104,12 +97,11 @@ public:
                      StringView related_message = {}) throws -> void;
   fn fail(SourceLocation location, StringView message,
           StringView suggestion = {},
-          analyze_severity severity = analyze_severity::Strict,
+          diagnostic_tier tier = diagnostic_tier::Strict,
           Maybe<SourceLocation> related_location = None,
           StringView related_message = {}) throws -> void;
   fn fail_shellcheck(u16 diagnostic_code, SourceLocation location,
                      StringView message, StringView suggestion = {},
-                     analyze_severity severity = analyze_severity::Strict,
                      Maybe<SourceLocation> related_location = None,
                      StringView related_message = {}) throws -> void;
   pure fn is_shellcheck_suppressed(u16 diagnostic_code,
@@ -603,9 +595,9 @@ protected:
 class ForLoop : public CompoundCommand
 {
 public:
-  ForLoop(SourceLocation location, StringView variable_name,
-          ArrayList<const Token *> &&words, bool has_in_clause,
-          const Expression *body);
+  ForLoop(SourceLocation location, SourceLocation variable_location,
+          StringView variable_name, ArrayList<const Token *> &&words,
+          bool has_in_clause, const Expression *body);
   ~ForLoop() override;
 
   fn to_string() const throws -> String override;
@@ -624,6 +616,7 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   String m_variable_name;
+  SourceLocation m_variable_location;
   ArrayList<const Token *> m_words{heap_allocator()};
   bool m_has_in_clause;
   const Expression *m_body;

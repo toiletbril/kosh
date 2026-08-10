@@ -1166,11 +1166,12 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
-ForLoop::ForLoop(SourceLocation location, StringView variable_name,
-                 ArrayList<const Token *> &&words, bool has_in_clause,
-                 const Expression *body)
+ForLoop::ForLoop(SourceLocation location, SourceLocation variable_location,
+                 StringView variable_name, ArrayList<const Token *> &&words,
+                 bool has_in_clause, const Expression *body)
     : CompoundCommand(location), m_variable_name(variable_name),
-      m_has_in_clause(has_in_clause), m_body(body)
+      m_variable_location(variable_location), m_has_in_clause(has_in_clause),
+      m_body(body)
 {
   m_words = steal(words);
 }
@@ -1253,23 +1254,25 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let const outer_loop_location =
       actx.active_loop_variables.find(m_variable_name.view());
   if (outer_loop_location != nullptr) {
-    actx.fail_shellcheck(2165, source_location(),
-                         "This nested loop reuses the outer loop variable '" +
-                             m_variable_name.view() + "'",
-                         "Use a distinct variable for the nested loop",
-                         analyze_severity::Annoying, *outer_loop_location,
-                         "This outer loop owns the reused variable");
+    actx.fail_shellcheck(
+        2165, m_variable_location,
+        "The nested inner loop reuses the outer loop variable '" +
+            m_variable_name.view() + "'",
+        "Use a distinct variable for the nested loop", *outer_loop_location,
+        "the outer loop first binds '" + m_variable_name.view() + "' here");
     actx.fail_shellcheck(2167, *outer_loop_location,
-                         "This loop variable is overwritten by a nested loop",
+                         "The outer loop variable '" + m_variable_name.view() +
+                             "' is overwritten by the nested inner loop",
                          "Use a distinct variable for the nested loop",
-                         analyze_severity::Annoying, source_location(),
-                         "This nested loop overwrites the variable");
+                         m_variable_location,
+                         "the nested inner loop binds '" +
+                             m_variable_name.view() + "' again here");
   }
 
   let const had_outer_loop_variable = outer_loop_location != nullptr;
   let saved_outer_loop_location = SourceLocation{};
   if (had_outer_loop_variable) saved_outer_loop_location = *outer_loop_location;
-  actx.active_loop_variables.set(m_variable_name.view(), source_location());
+  actx.active_loop_variables.set(m_variable_name.view(), m_variable_location);
   defer
   {
     if (had_outer_loop_variable)
@@ -1531,9 +1534,9 @@ fn CaseClause::analyze(AnalysisContext &actx,
           actx.fail_shellcheck(
               2221, pattern->source_location(),
               "An earlier case pattern makes this pattern unreachable",
-              "Remove the duplicate pattern", analyze_severity::Annoying,
+              "Remove the duplicate pattern",
               earlier_pattern_locations[earlier_index],
-              "This identical pattern matches first");
+              "this identical pattern matches first");
           is_duplicate = true;
           break;
         }
@@ -1548,9 +1551,8 @@ fn CaseClause::analyze(AnalysisContext &actx,
               2222, pattern->source_location(),
               "An earlier case pattern shadows this pattern",
               "Move the specific pattern before the broader pattern",
-              analyze_severity::Annoying,
               earlier_shadow_locations[prefix_index],
-              "This broader pattern shadows the later pattern");
+              "this broader pattern shadows the later pattern");
           break;
         }
       }

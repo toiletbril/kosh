@@ -3,4 +3,4 @@ shit: 2:6: error: Unterminated $'...' string.
        |       ^~~~~
 shit: 2:11: note:
      2 |  echo $'abc
-       |            ^ Expected ' here.
+       |            ^ expected ' here.

@@ -324,10 +324,6 @@
 [Word
   Unquoted "b"
 ]
-shit: 11:7: warning: The operand is literal, so this string test is constant.
-    11 |  [[ -n x && abc == a* ]] && echo yes
-       |        ^
-note: Test a variable or drop the check.
 a
 a
 b

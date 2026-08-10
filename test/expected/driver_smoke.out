@@ -1,5 +1,7 @@
 == command prefix:
 export
+== recent builtin prefix:
+fc
 == spec words filter by prefix:
 fetch
 fold

@@ -224,30 +224,6 @@
 [Word
   Unquoted "no-missing"
 ]
-shit: 4:1: warning: The '==' comparison has literal operands on both sides.
-     4 |  [[ "a*b" == "a*b" ]] && echo quoted-literal
-       |  ^~~~~~~~~~~~~~~~~~~~
-note: Remove the constant condition or compare runtime data.
-shit: 5:7: warning: The operand is literal, so this string test is constant.
-     5 |  [[ -n "x" && ( -z "" || "a" == "a" ) ]] && echo grouped
-       |        ^~~
-note: Test a variable or drop the check.
-shit: 5:19: warning: The operand is literal, so this string test is constant.
-     5 |  [[ -n "x" && ( -z "" || "a" == "a" ) ]] && echo grouped
-       |                    ^~
-note: Test a variable or drop the check.
-shit: 5:1: warning: The '==' comparison has literal operands on both sides.
-     5 |  [[ -n "x" && ( -z "" || "a" == "a" ) ]] && echo grouped
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Remove the constant condition or compare runtime data.
-shit: 6:1: warning: The '-gt' comparison has literal operands on both sides.
-     6 |  [[ 10 -gt 5 && 3 -le 3 ]] && echo numeric
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~
-note: Remove the constant condition or compare runtime data.
-shit: 6:1: warning: The '-le' comparison has literal operands on both sides.
-     6 |  [[ 10 -gt 5 && 3 -le 3 ]] && echo numeric
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~
-note: Remove the constant condition or compare runtime data.
 glob-yes
 quoted-literal
 grouped

@@ -275,7 +275,16 @@ shit: 14:3: warning: An unquoted command substitution splits its output.
     14 |  : $(:)$(:)
        |    ^~~~~~~~
 note: Quote it to keep one argument.
-shit: 2:14: error: Unable to expand 'x' because the parameter is not set.
+shit: 2:14: warning: The variable 'x' is not set, it expands to empty.
      2 |  : pre"dq"'sq'$x${y}post
        |               ^~
 note: Replace it with ${x-} if empty expansion is desired.
+shit: 2:16: warning: The variable 'y' is not set, it expands to empty.
+     2 |  : pre"dq"'sq'$x${y}post
+       |                 ^~~~
+note: Replace it with ${y-} if empty expansion is desired.
+shit: 3:5: warning: The variable 'b' is not set, it expands to empty.
+     3 |  : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
+       |      ^~
+note: Replace it with ${b-} if empty expansion is desired.
+[Code 0]

@@ -3,4 +3,4 @@ shit: 2:6: error: Unterminated arithmetic expansion.
        |       ^~~~~~~~
 shit: 2:14: note:
      2 |  echo $((1 + 2
-       |               ^ Expected )) here.
+       |               ^ expected )) here.

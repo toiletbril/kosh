@@ -35,10 +35,6 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:3: warning: A negated -eq is just -ne.
-     2 |  [ ! 3 -eq 4 ] && echo notequal
-       |    ^
-note: Drop the ! and use -ne.
 notequal
 after
 [Code 0]

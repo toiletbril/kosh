@@ -213,9 +213,12 @@ cold fn AnalysisContext::warn(SourceLocation location, StringView message,
     return;
   }
 
-  let const required_level = tier == diagnostic_tier::Strict    ? 1
-                             : tier == diagnostic_tier::Lenient ? 2
-                                                                : 3;
+  u8 required_level = 0;
+  switch (tier) {
+  case diagnostic_tier::Strict: required_level = 1; break;
+  case diagnostic_tier::Lenient: required_level = 2; break;
+  case diagnostic_tier::Annoying: required_level = 3; break;
+  }
   if (!is_default_mood && warning_level < required_level) {
     return;
   }
@@ -242,7 +245,7 @@ cold fn AnalysisContext::warn_shellcheck(
 {
   if (is_shellcheck_suppressed(diagnostic_code, location)) return;
 
-  warn(location, message, suggestion, shellcheck_tier(diagnostic_code),
+  fail(location, message, suggestion, shellcheck_tier(diagnostic_code),
        related_location, related_message);
 }
 
@@ -273,21 +276,20 @@ cold fn AnalysisContext::print_script_backtrace_if_rooted(
 }
 
 cold fn AnalysisContext::fail(SourceLocation location, StringView message,
-                              StringView suggestion, analyze_severity severity,
+                              StringView suggestion, diagnostic_tier tier,
                               Maybe<SourceLocation> related_location,
                               StringView related_message) throws -> void
 {
-  let const tier =
-      severity == analyze_severity::Annoying  ? diagnostic_tier::Annoying
-      : severity == analyze_severity::Lenient ? diagnostic_tier::Lenient
-                                              : diagnostic_tier::Strict;
   if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
     return;
   }
 
-  let const required_level = tier == diagnostic_tier::Strict    ? 1
-                             : tier == diagnostic_tier::Lenient ? 2
-                                                                : 3;
+  u8 required_level = 0;
+  switch (tier) {
+  case diagnostic_tier::Strict: required_level = 1; break;
+  case diagnostic_tier::Lenient: required_level = 2; break;
+  case diagnostic_tier::Annoying: required_level = 3; break;
+  }
   if (!is_default_mood) {
     if (warning_level >= required_level)
       warn(location, message, suggestion, tier, related_location,
@@ -295,9 +297,12 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
     return;
   }
 
-  let const demote_at_level = severity == analyze_severity::Annoying  ? 1
-                              : severity == analyze_severity::Lenient ? 2
-                                                                      : 3;
+  u8 demote_at_level = 0;
+  switch (tier) {
+  case diagnostic_tier::Annoying: demote_at_level = 1; break;
+  case diagnostic_tier::Lenient: demote_at_level = 2; break;
+  case diagnostic_tier::Strict: demote_at_level = 3; break;
+  }
 
   if (warning_level >= demote_at_level) {
     warn(location, message, suggestion, tier, related_location,
@@ -323,14 +328,13 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
 
 cold fn AnalysisContext::fail_shellcheck(
     u16 diagnostic_code, SourceLocation location, StringView message,
-    StringView suggestion, analyze_severity severity,
-    Maybe<SourceLocation> related_location, StringView related_message) throws
-    -> void
+    StringView suggestion, Maybe<SourceLocation> related_location,
+    StringView related_message) throws -> void
 {
   if (is_shellcheck_suppressed(diagnostic_code, location)) return;
 
-  fail(location, message, suggestion, severity, related_location,
-       related_message);
+  fail(location, message, suggestion, shellcheck_tier(diagnostic_code),
+       related_location, related_message);
 }
 
 pure fn AnalysisContext::is_shellcheck_suppressed(
@@ -369,7 +373,7 @@ cold fn AnalysisContext::note_variable_assignment(StringView name) throws
     fail(*read_location,
          StringView{"The variable '"} + name +
              "' is read before it is assigned",
-         StringView{}, analyze_severity::Lenient);
+         StringView{}, diagnostic_tier::Lenient);
     reads_before_assignment.erase(name);
   }
 }
@@ -657,7 +661,7 @@ fn analyze_ast(const Expression *root, StringView source,
 
   if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
-    actx.warn(SourceLocation{0, 3},
+    actx.fail(SourceLocation{0, 3},
               "A UTF-8 byte-order mark precedes the script text",
               "Save the script as UTF-8 without a byte-order mark");
 
@@ -1220,7 +1224,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
       let location = assignment.location;
       location.length = outer_close_position + 1 - location.position;
-      actx.warn(location,
+      actx.fail(location,
                 StringView{"The assignment of '"} + assignment.name +
                     "' uses array syntax instead of arithmetic",
                 StringView{"Use `let '"} + assignment.name + "=" + expression +
@@ -1273,8 +1277,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.fail_shellcheck(
         2095, m_args[0]->source_location(),
         "An ssh command in a while-read loop can consume the loop input",
-        "Redirect ssh input from /dev/null or pass -n",
-        analyze_severity::Annoying);
+        "Redirect ssh input from /dev/null or pass -n");
   }
 
   if (!command_is_shadowed && TEST_COMMANDS.contains(command_literal.view())) {
@@ -1284,8 +1287,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.fail_shellcheck(2074, m_args[i]->source_location(),
                              "The test builtin does not support the =~ regular "
                              "expression operator",
-                             "Use [[ value =~ expression ]]",
-                             analyze_severity::Annoying);
+                             "Use [[ value =~ expression ]]");
     }
   }
 
@@ -1316,15 +1318,13 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.fail_shellcheck(
           2067, *exec_location,
           "The find -exec action has no terminating ';' or '+'",
-          "Terminate the action with an escaped semicolon or plus",
-          analyze_severity::Annoying);
+          "Terminate the action with an escaped semicolon or plus");
     }
     if (has_or && has_action && !has_group && or_location.has_value()) {
       actx.fail_shellcheck(
           2146, *or_location,
           "The find expression uses -o without grouping its actions",
-          "Group each side with escaped parentheses",
-          analyze_severity::Annoying);
+          "Group each side with escaped parentheses");
     }
   }
 
@@ -1338,8 +1338,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.fail_shellcheck(
             2142, m_args[i]->source_location(),
             "An alias body cannot receive positional arguments",
-            "Use a function when the wrapper needs arguments",
-            analyze_severity::Annoying);
+            "Use a function when the wrapper needs arguments");
       }
     }
   }
@@ -1367,7 +1366,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.fail_shellcheck(
             2021, m_args[i]->source_location(),
             "Brackets around a tr range add literal bracket bytes",
-            "Use a quoted range without brackets", analyze_severity::Annoying);
+            "Use a quoted range without brackets");
       }
     }
   }
@@ -1412,8 +1411,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       }
       actx.fail_shellcheck(1037, m_args[i]->source_location(),
                            "A positional parameter above nine needs braces",
-                           "Write ${10} to select positional parameter 10",
-                           analyze_severity::Annoying);
+                           "Write ${10} to select positional parameter 10");
       break;
     }
   }
@@ -1427,8 +1425,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.fail_shellcheck(
           2091, m_args[0]->source_location(),
           "A command substitution in command position executes its output",
-          "Run the command inside the substitution directly",
-          analyze_severity::Annoying);
+          "Run the command inside the substitution directly");
     }
   }
 
@@ -1581,10 +1578,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
           arithmetic_reads_external_input(actx, segment.text.view()))
       {
-        actx.warn_shellcheck(
-            2229, m_args[i]->source_location(),
-            "External input is evaluated as arithmetic code",
-            "Validate the value as decimal digits before arithmetic");
+        actx.fail(m_args[i]->source_location(),
+                  "External input is evaluated as arithmetic code",
+                  "Validate the value as decimal digits before arithmetic");
         break;
       }
   }
@@ -1716,7 +1712,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     for (usize i = 1; i < m_args.count(); i++) {
       let const expression = m_args[i]->raw_string();
       if (arithmetic_reads_external_input(actx, expression.view()))
-        actx.warn(m_args[i]->source_location(),
+        actx.fail(m_args[i]->source_location(),
                   "External input is evaluated as arithmetic code",
                   "Validate the value as decimal digits before arithmetic");
     }
@@ -1803,8 +1799,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.fail_shellcheck(
             2035, m_args[i]->source_location(),
             "A bare glob can expand to a filename that begins with '-'",
-            "Prefix the glob with a directory or place -- before it",
-            analyze_severity::Annoying);
+            "Prefix the glob with a directory or place -- before it");
     }
   }
 
@@ -1957,9 +1952,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           "A local outside a function has no scope to bind",
           "Declare the variable plainly or move it into a function");
     else if (command_literal == "typeset" && !actx.shebang_is_posix_sh)
-      actx.warn_shellcheck(2005, m_args[0]->source_location(),
-                           "The typeset builtin is the ksh spelling of declare",
-                           "Write declare for the clearer bash name");
+      actx.fail(m_args[0]->source_location(),
+                "The typeset builtin is the ksh spelling of declare",
+                "Write declare for the clearer bash name",
+                diagnostic_tier::Annoying);
   }
 
   if (command_literal == "echo" && !command_is_shadowed &&
@@ -2339,7 +2335,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                   "it is read",
               "Write to a temporary and move it over",
               read_token->source_location(),
-              "This redirect reads the file that is later truncated");
+              "this redirect reads the file that is later truncated");
         }
       }
     }
@@ -2460,8 +2456,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
     /* The operand-shape lints over the closed operand range. A -z or -n on a
        literal operand is SC2157, a numeric comparison against a non-numeric
-       literal is SC2170, a = or == against a glob literal is SC2081, a grep
-       inside a test substitution is SC2143. */
+       literal is SC2170, and a = or == against a glob literal is SC2081. */
     for (usize i = 1; i < operand_end; i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
@@ -2518,20 +2513,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       }
 
-      for (let const &segment : word.segments) {
-        if (segment.kind != WordSegment::Kind::CommandSubstitution) continue;
-        if (view_contains(segment.text.view(), StringView{"grep"}) &&
-            !view_contains(segment.text.view(), StringView{"grep -c"}))
-        {
-          actx.warn_shellcheck(
-              2143, m_args[i]->source_location(),
-              "The test buffers the whole grep output only to check it is "
-              "nonempty",
-              "Run grep -q directly and test its exit status");
-          break;
-        }
-      }
-
       /* A test against $? checks the exit status indirectly, shellcheck
          SC2181. */
       if (word.segments.count() == 1 &&
@@ -2569,7 +2550,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               StringView{"The assignment prefix does not affect this "
                          "command, '"} +
               segment.text + StringView{"' is read before it is set"};
-          actx.warn(m_args[i]->source_location(), message);
+          actx.fail(m_args[i]->source_location(), message, {},
+                    diagnostic_tier::Lenient);
           break;
         }
       }
@@ -2615,7 +2597,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(diagnostic_location, message, suggestion_note.view());
     else
       actx.fail(diagnostic_location, message, suggestion_note.view(),
-                analyze_severity::Lenient);
+                diagnostic_tier::Lenient);
   }
 
   /* A recorded constant survives only across an environment-neutral command
@@ -2889,8 +2871,7 @@ fn CompoundList::analyze(AnalysisContext &actx,
           actx.fail_shellcheck(2164, simple->args()[0]->source_location(),
                                "This cd is unchecked, so later commands can "
                                "run in the wrong directory",
-                               "Stop or return when cd fails",
-                               analyze_severity::Annoying);
+                               "Stop or return when cd fails");
         }
         if (name->view() == "exec" && simple->args().count() > 1 &&
             i + 1 < m_nodes.count())
@@ -2902,7 +2883,7 @@ fn CompoundList::analyze(AnalysisContext &actx,
               "Commands after exec do not run when exec succeeds",
               "Remove exec or remove the unreachable commands",
               next_command->source_location(),
-              "This is the first command skipped after exec");
+              "this is the first command skipped after exec");
         }
       }
     }
@@ -2963,7 +2944,7 @@ fn CompoundList::analyze(AnalysisContext &actx,
           2129, repeated_append_location,
           "Several commands append to the same file separately",
           "Apply one append redirection to a grouped command", current_location,
-          "This later append belongs under the same redirection");
+          "this later append belongs under the same redirection");
   }
 
   let saved_tested_command_names = actx.tested_command_names.clone();

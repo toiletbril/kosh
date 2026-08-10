@@ -1477,7 +1477,8 @@ hot fn Parser::parse_for() throws -> Command *
   }
 
   let loop_node = m_lexer.arena().create<ForLoop>(
-      location, variable_name.view(), steal(words), has_in_clause, body);
+      location, name_token->source_location(), variable_name.view(),
+      steal(words), has_in_clause, body);
   const SourceLocation done_location = done_token->source_location();
   loop_node->set_source_end_position(done_location.position +
                                      done_location.length);
@@ -1519,7 +1520,7 @@ hot fn Parser::parse_select() throws -> Command *
   if (do_token->kind() != Token::Kind::Do) {
     throw ErrorWithLocationAndDetails{location, "Unterminated select loop",
                                       do_token->source_location(),
-                                      "Expected 'do'"};
+                                      "expected 'do'"};
   }
 
   Expression *body = parse_command_list({Token::Kind::Done});
@@ -1635,7 +1636,7 @@ hot fn Parser::parse_case() throws -> Command *
         } else {
           throw ErrorWithLocationAndDetails{
               location, "Unterminated case", pattern_location,
-              "Expected a pattern to start an arm, or 'esac' to end the case"};
+              "expected a pattern to start an arm, or 'esac' to end the case"};
         }
       }
 
@@ -1749,7 +1750,7 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated subshell",
-                                      close->source_location(), "Expected ')'"};
+                                      close->source_location(), "expected ')'"};
   }
 
   let subshell =
@@ -1780,7 +1781,7 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
     if (t->kind() == Token::Kind::EndOfFile) {
       throw ErrorWithLocationAndDetails{open->source_location(),
                                         "Unterminated '(('",
-                                        t->source_location(), "Expected '))'"};
+                                        t->source_location(), "expected '))'"};
     }
     if (t->kind() == Token::Kind::LeftParen) {
       depth++;
@@ -1803,7 +1804,7 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
       }
       throw ErrorWithLocationAndDetails{open->source_location(),
                                         "Unterminated '(('",
-                                        t->source_location(), "Expected '))'"};
+                                        t->source_location(), "expected '))'"};
     }
   }
 
@@ -1871,7 +1872,7 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
   if (do_token->kind() != Token::Kind::Do) {
     throw ErrorWithLocationAndDetails{location, "Unterminated for loop",
                                       do_token->source_location(),
-                                      "Expected 'do'"};
+                                      "expected 'do'"};
   }
 
   Expression *body = parse_command_list({Token::Kind::Done});
@@ -1915,7 +1916,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
     if (t->kind() == Token::Kind::EndOfFile) {
       throw ErrorWithLocationAndDetails{open->source_location(),
                                         "Unterminated '[['",
-                                        t->source_location(), "Expected ']]'"};
+                                        t->source_location(), "expected ']]'"};
     }
 
     using Kind = conditional_element::Kind;
@@ -2190,7 +2191,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     if (after->kind() != Token::Kind::Fi) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated If condition",
-          after->source_location(), "Expected 'Fi' here"};
+          after->source_location(), "expected 'Fi' here"};
     }
 
     m_if_condition_depth--;
@@ -2217,7 +2218,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated parenthesis",
-          rp->source_location(), "Expected a closing parenthesis here"};
+          rp->source_location(), "expected a closing parenthesis here"};
     }
   } break;
 

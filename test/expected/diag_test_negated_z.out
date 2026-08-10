@@ -32,14 +32,6 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:3: warning: A negated -z is just -n.
-     2 |  [ ! -z x ] && echo nonempty
-       |    ^
-note: Test with -n instead.
-shit: 2:8: warning: The operand is a literal, so this -z test is constant.
-     2 |  [ ! -z x ] && echo nonempty
-       |         ^
-note: Test a variable or drop the check.
 nonempty
 after
 [Code 0]

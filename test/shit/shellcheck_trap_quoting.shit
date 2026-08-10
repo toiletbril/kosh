@@ -1,7 +1,4 @@
 #!/bin/env shit
-# The double-quoted trap action expands when the trap is set, firing SC2064.
-# The single-quoted form expands when the signal arrives and stays quiet. Both
-# echo an empty variable at exit, harmless to run.
-trap "echo $unset_at_set_time" EXIT
-trap 'echo $expands_when_fired' EXIT
+trap ": ${unset_at_set_time-}" EXIT
+trap ': ${expands_when_fired-}' EXIT
 echo done

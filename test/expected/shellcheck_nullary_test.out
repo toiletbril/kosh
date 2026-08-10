@@ -24,8 +24,4 @@
 [Word
   Unquoted "]"
 ]
-shit: 2:3: warning: A one-operand test is the nonempty-string test.
-     2 |  [ "$x" ]
-       |    ^~~~
-note: Write it with -n to read clearer.
 [Code 1]

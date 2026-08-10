@@ -430,7 +430,7 @@ hot flatten fn Lexer::lex_expression_token() throws -> Token *
     else [[unlikely]]
       throw ErrorWithLocationAndDetails{
           here(m_cursor_position, 1), "Unexpected character",
-          "The character is not valid in an unquoted word here"};
+          "the character is not valid in an unquoted word here"};
   }
 
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
@@ -451,7 +451,7 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
     } else [[unlikely]] {
       throw ErrorWithLocationAndDetails{
           here(m_cursor_position, 1), "Unexpected character",
-          "The character is not valid in an unquoted word here"};
+          "the character is not valid in an unquoted word here"};
     }
   } else {
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
@@ -775,7 +775,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position, byte_count),
                 "Unterminated $'...' string",
-                here(m_cursor_position + byte_count, 1), "Expected ' here"};
+                here(m_cursor_position + byte_count, 1), "expected ' here"};
           }
           byte_count++;
           if (c == '\'') break;
@@ -826,7 +826,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
               throw ErrorWithLocationAndDetails{
                   here(m_cursor_position, byte_count),
                   "Unterminated arithmetic expansion",
-                  here(m_cursor_position + byte_count, 1), "Expected )) here"};
+                  here(m_cursor_position + byte_count, 1), "expected )) here"};
             }
             /* A backslash escape, a quoted span, a backtick run, and a nested
                $(...) are copied as balanced units so a ) inside them is text.
@@ -956,7 +956,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position, byte_count),
                 "Unterminated command substitution",
-                here(m_cursor_position + byte_count, 1), "Expected ) here"};
+                here(m_cursor_position + byte_count, 1), "expected ) here"};
           }
           byte_count++;
 
@@ -1125,7 +1125,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position + byte_count, 1),
                 "Unterminated variable expansion",
-                here(m_cursor_position + byte_count, 1), "Expected } here"};
+                here(m_cursor_position + byte_count, 1), "expected } here"};
           }
           byte_count++;
 
@@ -1293,7 +1293,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           throw ErrorWithLocationAndDetails{
               here(m_cursor_position + relative_open_backtick_pos, 1),
               "Unterminated command substitution",
-              here(m_cursor_position + byte_count, 1), "Expected ` here"};
+              here(m_cursor_position + byte_count, 1), "expected ` here"};
         }
         if (c == '`') {
           byte_count++;
@@ -1341,7 +1341,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   if (should_escape) [[unlikely]] {
     throw ErrorWithLocationAndDetails{
         here(m_cursor_position + byte_count - 1, 1), "Nothing to escape",
-        here(m_cursor_position + byte_count, 1), "Expected a character here"};
+        here(m_cursor_position + byte_count, 1), "expected a character here"};
   }
 
   const let actual_cursor_position = m_cursor_position;
@@ -1553,7 +1553,7 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
     if (c == lexer::CEOF) [[unlikely]] {
       throw ErrorWithLocationAndDetails{
           here(open_position, byte_count), "Unterminated process substitution",
-          here(open_position + byte_count, 1), "Expected ) here"};
+          here(open_position + byte_count, 1), "expected ) here"};
     }
     byte_count++;
 

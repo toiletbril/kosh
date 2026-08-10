@@ -1,6 +1,7 @@
 #!/bin/sh
 
 unset SHIT_FLAGS
+export SHIT_FLAGS=--no-diagnostics
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 
 d=$(mktemp -d) || exit 1

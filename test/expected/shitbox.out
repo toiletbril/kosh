@@ -38,4 +38,9 @@ mv
 -a
 -h
 -l
+== bare utility names in the default mood:
+whoami
+== bare utility names stay hidden in bash mood:
+== bare utility names appear after set -o shitbox:
+whoami
 == a PATH program keeps its own flags:

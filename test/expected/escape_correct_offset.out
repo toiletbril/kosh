@@ -8,7 +8,9 @@
   Unquoted "[d]*"
   Literal "*"
 ]
-shit: 2:6: error: The glob pattern '[d]**' matched no file, it expands to its literal text, which is rarely intended.
+shit: 2:6: warning: The glob pattern '[d]**' matched no file, it expands to its literal text, which is rarely intended.
      2 |  echo [d]*\*
        |       ^~~~~~
 note: Probe for matches with compgen -G '[d]**' or relax with set +o failglob.
+[d]**
+[Code 0]

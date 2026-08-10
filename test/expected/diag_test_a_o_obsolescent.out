@@ -38,10 +38,6 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:9: warning: A test with -a or -o is obsolescent.
-     2 |  [ -f /a -o -f /b ] || echo none
-       |          ^~
-note: Join two tests with && or || instead.
 none
 after
 [Code 0]

@@ -17,8 +17,5 @@ rc=1
 rc=1
 == read -q at EOF returns one:
 rc=1
-query=142
-count=142 value=[a]
-continued=142 value=[a]
 invalid=1
 eof=1 value=[]

@@ -674,33 +674,6 @@
   DoubleQuoted "marks="
   Variable "marks"
 ]
-shit: 5:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-     5 |  case b in
-       |       ^
-shit: 10:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    10 |  case hi in
-       |       ^~
-shit: 16:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    16 |  case x in #comment
-       |       ^
-shit: 22:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    22 |  case b in
-       |       ^
-shit: 30:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    30 |  case a in a) ;; esac
-       |       ^
-shit: 33:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    33 |  case a in (a) echo match;; esac
-       |       ^
-shit: 36:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    36 |  case a in a|b) echo match;; esac
-       |       ^
-shit: 37:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    37 |  case b in a|b) echo match;; esac
-       |       ^
-shit: 40:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
-    40 |  case x in a) echo hi;; esac
-       |       ^
 match
 b
 c

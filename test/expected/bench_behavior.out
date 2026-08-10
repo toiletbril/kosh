@@ -33,10 +33,6 @@ shit: 1:18: error: --duration is too large.
 shit: 1:7: error: --runs expects a number, got 'nope'.
      1 |  bench "--runs=nope" true
        |        ^~~~~~~~~~~~~
-shit: 1:18: warning: An unquoted variable can split into words and expand globs.
-     1 |  runs=nope; bench --runs=$runs true
-       |                   ^~~~~~~~~~~~
-note: Quote the expansion to keep one argument.
 shit: 1:18: error: --runs expects a number, got 'nope'.
      1 |  runs=nope; bench --runs=$runs true
        |                   ^~~~~~~~~~~~

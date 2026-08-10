@@ -24,7 +24,10 @@
   Unquoted "not-reached"
 ]
 before
-shit: 3:7: error: Unable to expand 'nope' because the parameter is not set.
+shit: 3:7: warning: The variable 'nope' is not set, it expands to empty.
      3 |  echo "${nope}"
        |        ^~~~~~~
 note: Replace it with ${nope-} if empty expansion is desired.
+
+not-reached
+[Code 0]

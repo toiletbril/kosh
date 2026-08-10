@@ -266,6 +266,10 @@ The checks cover unsafe word splitting and globbing, misleading quoting,
 command-output iteration, test and conditional mistakes, redirection order and
 privilege boundaries, pipeline state loss, unvalidated arithmetic input,
 unreachable control flow, nonportable syntax, and dangerous file operations.
+The catalog contains roughly 50 strict checks, 20 lenient checks, and 30
+annoying checks derived from ShellCheck. About a dozen native checks cover
+shell-specific strictness and runtime state. The default mood rejects analyzed
+code until every reported error is demoted or corrected.
 The source is also checked for a UTF-8 byte-order mark before the shebang or
 first command.
 .SS Interactive operation

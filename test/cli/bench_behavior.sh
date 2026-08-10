@@ -1,4 +1,5 @@
 unset SHIT_FLAGS
+export SHIT_FLAGS=--no-diagnostics
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 if [ "${OS-}" = Windows_NT ]; then

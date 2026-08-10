@@ -14,7 +14,7 @@ shit: TMPDIR/error-state:3:1: error: Unterminated subshell.
        |  ^
 shit: TMPDIR/error-state:3:2: note:
      3 |  (
-       |   ^ Expected ')'.
+       |   ^ expected ')'.
 trap-status=1
 error-state rc=1
 shit: 1:1: error: Cannot execute `TMPDIR/binary` as a shell script.

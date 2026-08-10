@@ -17,7 +17,9 @@ note: Quote the expansion to keep one argument.
 shit: 2:12: warning: The assignment prefix does not affect this command, 'VAR' is read before it is set.
      2 |  VAR=1 echo $VAR
        |             ^~~~
-shit: 2:12: error: Unable to expand 'VAR' because the parameter is not set.
+shit: 2:12: warning: The variable 'VAR' is not set, it expands to empty.
      2 |  VAR=1 echo $VAR
        |             ^~~~
 note: Replace it with ${VAR-} if empty expansion is desired.
+
+[Code 0]

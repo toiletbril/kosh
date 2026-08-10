@@ -61,10 +61,6 @@ shit: 5:1: warning: An echo of a command substitution prints what the command al
      5 |  echo "`echo \"$PRG\"`"
        |  ^~~~
 note: Run the command on its own instead.
-shit: 5:6: warning: A command substitution wraps a useless echo.
-     5 |  echo "`echo \"$PRG\"`"
-       |       ^~~~~~~~~~~~~~~~~
-note: The text can be used directly without the subshell.
 shit: 6:1: warning: An echo of a command substitution prints what the command already prints.
      6 |  echo "`printf %s \"$PRG\"`"
        |  ^~~~

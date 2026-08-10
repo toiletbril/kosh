@@ -32,14 +32,6 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:3: warning: A negated -n is just -z.
-     2 |  [ ! -n "" ] && echo empty
-       |    ^
-note: Test with -z instead.
-shit: 2:8: warning: The operand is a literal, so this -n test is constant.
-     2 |  [ ! -n "" ] && echo empty
-       |         ^~
-note: Test a variable or drop the check.
 empty
 after
 [Code 0]

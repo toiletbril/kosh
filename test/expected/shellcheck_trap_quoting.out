@@ -1,16 +1,16 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "trap" "echo $unset_at_set_time" "EXIT"]
+    [SimpleCommand "trap" ": $unset_at_set_time-" "EXIT"]
   [CompoundListCondition, None]
-    [SimpleCommand "trap" "echo $expands_when_fired" "EXIT"]
+    [SimpleCommand "trap" ": ${expands_when_fired-}" "EXIT"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "trap"
 ]
 [Word
-  DoubleQuoted "echo "
-  Variable "unset_at_set_time"
+  DoubleQuoted ": "
+  Variable "unset_at_set_time-"
 ]
 [Word
   Unquoted "EXIT"
@@ -19,7 +19,7 @@
   Unquoted "trap"
 ]
 [Word
-  Literal "echo $expands_when_fired"
+  Literal ": ${expands_when_fired-}"
 ]
 [Word
   Unquoted "EXIT"
@@ -30,11 +30,9 @@
 [Word
   Unquoted "done"
 ]
-shit: 5:6: warning: The double-quoted trap action expands now, when the trap is set, not when it fires.
-     5 |  trap "echo $unset_at_set_time" EXIT
+shit: 2:6: warning: The double-quoted trap action expands now, when the trap is set, not when it fires.
+     2 |  trap ": ${unset_at_set_time-}" EXIT
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~
 note: Single-quote it so it expands as the signal arrives.
-shit: 5:12: error: Unable to expand 'unset_at_set_time' because the parameter is not set.
-     5 |  trap "echo $unset_at_set_time" EXIT
-       |             ^~~~~~~~~~~~~~~~~~
-note: Replace it with ${unset_at_set_time-} if empty expansion is desired.
+done
+[Code 0]

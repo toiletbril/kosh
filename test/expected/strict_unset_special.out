@@ -24,7 +24,10 @@
   Unquoted "not-reached"
 ]
 before
-shit: 3:7: error: Unable to expand '1' because the parameter is not set.
+shit: 3:7: warning: The variable '1' is not set, it expands to empty.
      3 |  echo "$1"
        |        ^~
 note: Replace it with ${1-} if empty expansion is desired.
+
+not-reached
+[Code 0]

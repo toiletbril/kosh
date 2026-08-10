@@ -1,4 +1,5 @@
 unset SHIT_FLAGS
+export SHIT_FLAGS=--no-diagnostics
 # local declares a function-scoped variable and rejects use outside a function.
 # The attribute flags declare an integer, an indexed array, and an associative
 # array, the same letters declare takes.

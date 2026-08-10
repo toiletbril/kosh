@@ -40,11 +40,12 @@
 [Word
   Unquoted "not-reached"
 ]
-shit: 3:7: error: Unable to expand 'missing_target' because the parameter is not set.
+shit: 3:2: warning: The variable 'missing_target' is not set, it expands to empty.
      3 |  (echo "${!ref}")
-       |        ^~~~~~~~~
+       |   ^~~~~~~~~~~~~~
 note: Replace it with ${missing_target-} if empty expansion is desired.
-target-form=2
+
+target-form=0
 shit: 5:6: error: Unable to expand 'nope' because the parameter is not set.
      5 |  echo "${!nope}"
        |       ^~~~~~~~~~

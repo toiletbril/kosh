@@ -40,7 +40,7 @@ echo "level-two-strict=$?"
 "$BIN" -WWW -c 'echo [abc' >/dev/null 2>&1
 echo "level-three-strict=$?"
 
-annoying_source='f(){ cd missing; echo wrong-directory; }; wrapper(){ wrapper "$@"; }; echo survived'
+annoying_source='f(){ diagnostic_level_leak=1; cd missing; echo wrong-directory; }; echo survived'
 "$BIN" -c "$annoying_source" >/dev/null 2>&1
 echo "annoying-default=$?"
 "$BIN" -W -c "$annoying_source" >/dev/null 2>&1
@@ -125,6 +125,10 @@ send_runtime_input()
   sleep 0.1
   printf '%s\n' 'echo "[$LATER_DIAGNOSTIC]"; LATER_DIAGNOSTIC=x'
   sleep 0.1
+  printf '%s\n' 'set -WWW'
+  sleep 0.1
+  printf '%s\n' 'case value in same) :;; same) :;; esac'
+  sleep 0.1
   printf '%s\n' 'cd diagnostic-levels-missing'
   sleep 0.1
   printf '%s\n' "eval 'diagnostic_levels_missing_command'"
@@ -154,6 +158,8 @@ grep -Fq "$(printf '\033[1;91merror\033[0m')" \
 grep -Fq "$(printf '\033[1;91m^~~~~~~~~~~~~~~~~~~~~~~~~\033[0m')" \
   "$temporary_directory/typescript" || exit 1
 grep -Fq "$(printf '\033[36mnote\033[0m')" \
+  "$temporary_directory/typescript" || exit 1
+grep -Fq "$(printf '\033[36m^~~~ ')" \
   "$temporary_directory/typescript" || exit 1
 grep -Fq "$(printf '\033[36mtrace\033[0m')" \
   "$temporary_directory/typescript" || exit 1

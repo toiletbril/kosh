@@ -24,7 +24,7 @@ echo "=== until true is eliminated ==="
 "$BIN" --show-optimizer-state -c 'until true; do echo never; done; echo after'
 
 echo "=== runtime variable does not fold ==="
-printf '' | "$BIN" --show-optimizer-state -c 'read n; echo $((n + 1))' 2>&1 | ./normalize-trace.sh "$BIN"
+"$BIN" --show-optimizer-state -c 'n="$(printf 0)"; echo $((n + 1))' 2>&1 | ./normalize-trace.sh "$BIN"
 
 echo "=== undecidable condition does not fold ==="
 "$BIN" --show-optimizer-state -c 'if [ -f /nonexistent_optimizer_probe ]; then echo a; fi; echo done'

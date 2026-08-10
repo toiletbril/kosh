@@ -100,7 +100,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       actx.fail_shellcheck(
           2124, source_location(),
           "A scalar assignment from $@ loses argument boundaries",
-          "Assign one value or use an array", analyze_severity::Annoying);
+          "Assign one value or use an array");
       break;
     }
     if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
@@ -121,9 +121,9 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                                        .substring(*first_colon + 1)
                                        .starts_with(StringView{"~/"}))))
   {
-    actx.fail_shellcheck(
-        2147, source_location(), "A tilde inside PATH remains literal",
-        "Expand HOME before assigning PATH", analyze_severity::Annoying);
+    actx.fail_shellcheck(2147, source_location(),
+                         "A tilde inside PATH remains literal",
+                         "Expand HOME before assigning PATH");
   }
 
   let const prompt_has_control_escape =
@@ -169,7 +169,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       let const subscript = name.view().substring_of_length(
           *bracket + 1, name.length() - *bracket - 2);
       if (actx.external_input_names.contains(subscript))
-        actx.warn(source_location(),
+        actx.fail(source_location(),
                   "An array subscript from external input is evaluated as "
                   "arithmetic code",
                   "Validate the subscript as decimal digits before using it");
@@ -185,20 +185,18 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 
   actx.note_variable_assignment(name.view());
 
-  /* The shellcheck SC2030-style warning for a scalar assignment inside a
-     function body with no prior local, which leaks the value to the global
-     scope. */
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
       !actx.function_local_names.contains(name.view()) &&
       !actx.global_assigned_names.contains(name.view()) &&
       !(actx.eval_context != nullptr &&
         actx.eval_context->get_variable_value(name.view()).has_value()))
   {
-    actx.warn(source_location(),
+    actx.fail(source_location(),
               StringView{"This assignment to '"} + name +
                   "' in a function has no local, so the value leaks to the "
                   "global scope",
-              "Declare it with local to keep it inside the function");
+              "Declare it with local to keep it inside the function",
+              diagnostic_tier::Annoying);
   }
 
   if (actx.function_scope_depth == 0 && is_unconditional &&

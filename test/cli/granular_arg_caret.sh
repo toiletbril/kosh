@@ -7,7 +7,7 @@ echo "== kill points at the bad pid, not the whole kill line:"
 echo "== break points at the bad count, not the whole break line:"
 "$BIN" -c 'for i in 1 2; do break 0; done' 2>&1 | grep -A1 'error:'
 echo "== exit points at the bad status, not the whole exit line:"
-"$BIN" -c 'exit notanumber' 2>&1 | grep -A1 'Builtin `exit`'
+"$BIN" --no-diagnostics -c 'exit notanumber' 2>&1 | grep -A1 'Builtin `exit`'
 echo "== umask points at the bad mask, not the whole umask line:"
 "$BIN" -c 'umask 0999' 2>&1 | grep -A1 'error:'
 echo "== set points at the bad option, not the whole set line:"

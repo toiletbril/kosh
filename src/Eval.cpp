@@ -969,6 +969,8 @@ fn EvalContext::append_dynamic_variable_names(
 {
   out.push(StringView{"IFS"});
   out.push(StringView{"LINENO"});
+  out.push(StringView{"SHIT_GIT_AHEAD"});
+  out.push(StringView{"SHIT_GIT_BEHIND"});
   out.push(StringView{"SHIT_GIT_BRANCH"});
   out.push(StringView{"SHIT_IDENTITY"});
 

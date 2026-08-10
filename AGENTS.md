@@ -303,6 +303,15 @@ copying their lexical containers. Checkpoints retain function definitions.
 Random lookup resumes at the nearest checkpoint. A source identity change
 invalidates checkpoints and cached spans.
 
+The diagnostic catalog owns each numbered check's strict, lenient, or annoying
+tier. The default mood rejects every enabled tier. Compatibility moods expose
+the tiers as warnings through `-W`, `-WW`, and `-WWW`. Related-location notes
+use cyan carets, and every secondary detail begins with a lowercase byte.
+
+Variable completion includes the dynamic variables available in the active
+mood. Builtin command completion includes every builtin. Bare shitbox utility
+completion is active in the default mood and when the shitbox option is enabled.
+
 The analysis stage accepts ShellCheck `disable` comments. A leading directive
 applies to the complete file. A later directive applies to the next complete
 and-or command. Numbered checks use the shared suppression lookup. Native

@@ -1839,7 +1839,7 @@ shit: 14:17: warning: The command reads and truncates 'data' at once, the trunca
        |                  ^~~~
 shit: 14:10: note:
     14 |    sort < data > data
-       |           ^~~~ This redirect reads the file that is later truncated.
+       |           ^~~~ this redirect reads the file that is later truncated.
 note: Write to a temporary and move it over.
 shit: 15:8: warning: A command substitution wraps a useless echo.
     15 |    echo "wrapped $(echo inner)"
@@ -1863,10 +1863,6 @@ shit: 23:12: warning: [ and test compare strings byte for byte and never glob-ma
     23 |    [ "$x" = "glob*" ] && echo c
        |             ^~~~~~~
 note: Use a case or the [[ ]] form for the pattern.
-shit: 24:8: warning: The test buffers the whole grep output only to check it is nonempty.
-    24 |    [ -n "$(ls | grep x)" ] && echo d
-       |         ^~~~~~~~~~~~~~~~
-note: Run grep -q directly and test its exit status.
 shit: 28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
     28 |  case a in a) ;; esac
        |       ^
@@ -1983,7 +1979,7 @@ shit: 94:3: warning: Commands after exec do not run when exec succeeds.
        |    ^~~~
 shit: 94:23: note:
     94 |    exec echo replaced; echo unreachable
-       |                        ^~~~~~~~~~~~~~~~ This is the first command skipped after exec.
+       |                        ^~~~~~~~~~~~~~~~ this is the first command skipped after exec.
 note: Remove exec or remove the unreachable commands.
 shit: 95:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
     95 |    cd missing; echo wrong-directory
@@ -2126,7 +2122,7 @@ shit: 118:15: warning: Several commands append to the same file separately.
        |                ^~~~~~~~~
 shit: 120:17: note:
    120 |    echo three >> style.log
-       |                  ^~~~~~~~~ This later append belongs under the same redirection.
+       |                  ^~~~~~~~~ this later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
 shit: 121:8: warning: Backticks are harder to nest than command substitutions.
    121 |    echo `date`
@@ -2208,33 +2204,33 @@ shit: 137:8: warning: $[...] is the obsolete arithmetic expansion spelling.
    137 |    echo $[1+2]
        |         ^~~~~~
 note: Use $((...)) for arithmetic expansion.
-shit: 139:5: warning: This nested loop reuses the outer loop variable 'outer_index'.
+shit: 139:9: warning: The nested inner loop reuses the outer loop variable 'outer_index'.
    139 |      for outer_index in two; do echo "$outer_index"; done
-       |      ^~~
-shit: 138:3: note:
+       |          ^~~~~~~~~~~
+shit: 138:7: note:
    138 |    for outer_index in one; do
-       |    ^~~ This outer loop owns the reused variable.
+       |        ^~~~~~~~~~~ the outer loop first binds 'outer_index' here.
 note: Use a distinct variable for the nested loop.
-shit: 138:3: warning: This loop variable is overwritten by a nested loop.
+shit: 138:7: warning: The outer loop variable 'outer_index' is overwritten by the nested inner loop.
    138 |    for outer_index in one; do
-       |    ^~~
-shit: 139:5: note:
+       |        ^~~~~~~~~~~
+shit: 139:9: note:
    139 |      for outer_index in two; do echo "$outer_index"; done
-       |      ^~~ This nested loop overwrites the variable.
+       |          ^~~~~~~~~~~ the nested inner loop binds 'outer_index' again here.
 note: Use a distinct variable for the nested loop.
 shit: 143:3: warning: An earlier case pattern makes this pattern unreachable.
    143 |    same) : ;;
        |    ^~~~
 shit: 142:3: note:
    142 |    same) : ;;
-       |    ^~~~ This identical pattern matches first.
+       |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
 shit: 147:3: warning: An earlier case pattern shadows this pattern.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
 shit: 146:3: note:
    146 |    prefix*) : ;;
-       |    ^~~~~~~ This broader pattern shadows the later pattern.
+       |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
 shit: 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
    141 |    case value in

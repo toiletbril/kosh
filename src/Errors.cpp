@@ -49,7 +49,7 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
   return diagnostic_color{colors::ansi::CYAN,
                           {},
                           colors::ansi::CYAN,
-                          colors::ansi::YELLOW,
+                          colors::ansi::CYAN,
                           colors::ansi::RESET};
 }
 

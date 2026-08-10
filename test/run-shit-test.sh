@@ -9,8 +9,8 @@ fi
 for TEST_NAME in "$@"; do
   [ -f "shit/$TEST_NAME.shit" ] || continue
   case $TEST_NAME in
-  shellcheck_static) TEST_BIN_FLAGS="$BIN_FLAGS -W" ;;
-  *) TEST_BIN_FLAGS="$BIN_FLAGS --no-annoying-diagnostics" ;;
+  shellcheck_static) TEST_BIN_FLAGS="$BIN_FLAGS -WWW" ;;
+  *) TEST_BIN_FLAGS="$BIN_FLAGS -WWW --no-annoying-diagnostics" ;;
   esac
   if [ "$REFILL_MODE" = yes ]; then
     OUTPUT="expected/.$TEST_NAME.out.tmp"

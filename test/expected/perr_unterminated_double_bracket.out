@@ -3,4 +3,4 @@ shit: 2:1: error: Unterminated '[['.
        |  ^~
 shit: 2:10: note:
      2 |  [[ a == b
-       |           ^ Expected ']]'.
+       |           ^ expected ']]'.

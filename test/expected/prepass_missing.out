@@ -61,7 +61,7 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:1: error: Command 'nosuchcmd_xyz' was not found.
+shit: 2:1: warning: Command 'nosuchcmd_xyz' was not found.
      2 |  nosuchcmd_xyz
        |  ^~~~~~~~~~~~~
 shit: 3:1: warning: An assignment name must not start with a dollar sign.
@@ -72,7 +72,7 @@ shit: 4:6: warning: An assignment cannot contain spaces around equals.
      4 |  name = value
        |       ^
 note: Write NAME=value without spaces.
-shit: 4:1: error: Command 'name' was not found.
+shit: 4:1: warning: Command 'name' was not found.
      4 |  name = value
        |  ^~~~
 note: Did you mean 'time'?
@@ -84,7 +84,7 @@ shit: 5:1: warning: Test brackets do not run the command written inside them.
      5 |  [grep needle file]
        |  ^~~~~
 note: Run the command directly as the if condition.
-shit: 5:1: error: Malformed glob pattern, unterminated '['.
+shit: 5:1: warning: Malformed glob pattern, unterminated '['.
      5 |  [grep needle file]
        |  ^~~~~
 shit: 6:1: warning: Test brackets and operands require separating spaces.
@@ -103,14 +103,34 @@ shit: 7:3: warning: An option-shaped word in command position is not a command.
      7 |  ( -f file )
        |    ^~
 note: Place the option after its command.
-shit: 7:3: error: Command '-f' was not found.
+shit: 7:3: warning: Command '-f' was not found.
      7 |  ( -f file )
        |    ^~
 shit: 8:1: warning: An option-shaped word in command position is not a command.
      8 |  -n
        |  ^~
 note: Place the option after its command.
-shit: 8:1: error: Command '-n' was not found.
+shit: 8:1: warning: Command '-n' was not found.
      8 |  -n
        |  ^~
-[Code 1]
+shit: 2:1: error: Command 'nosuchcmd_xyz' was not found.
+     2 |  nosuchcmd_xyz
+       |  ^~~~~~~~~~~~~
+shit: 3:1: warning: The variable 'name' is not set, it expands to empty.
+     3 |  $name=value
+       |  ^~~~~
+note: Replace it with ${name-} if empty expansion is desired.
+shit: 3:1: error: Command '=value' was not found.
+     3 |  $name=value
+       |  ^~~~~~~~~~~
+shit: 4:1: error: Command 'name' was not found.
+     4 |  name = value
+       |  ^~~~
+note: Did you mean `time`?
+shit: 5:1: error: Command '[grep' was not found.
+     5 |  [grep needle file]
+       |  ^~~~~
+shit: 6:1: error: A glob pattern in command position is rarely intended as a command name.
+     6 |  [[left=right]]
+       |  ^~~~~~~~~~~~~~
+note: Quote it to run a literal name, or list the matches with compgen -G.

@@ -3,4 +3,4 @@ shit: 2:6: error: Unterminated command substitution.
        |       ^~~~~~~~~
 shit: 2:15: note:
      2 |  echo $(echo hi
-       |                ^ Expected ) here.
+       |                ^ expected ) here.

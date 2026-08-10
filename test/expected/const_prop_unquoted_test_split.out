@@ -379,50 +379,18 @@ shit: 10:6: warning: A test reads an unquoted variable.
     10 |  if [ $k ]; then echo ws_unquoted_yes; else echo ws_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-shit: 10:6: warning: A one-operand test is the nonempty-string test.
-    10 |  if [ $k ]; then echo ws_unquoted_yes; else echo ws_unquoted_no; fi
-       |       ^~
-note: Write it with -n to read clearer.
-shit: 11:6: warning: A one-operand test is the nonempty-string test.
-    11 |  if [ "$k" ]; then echo ws_quoted_yes; else echo ws_quoted_no; fi
-       |       ^~~~
-note: Write it with -n to read clearer.
 shit: 15:6: warning: A test reads an unquoted variable.
     15 |  if [ $e ]; then echo empty_unquoted_yes; else echo empty_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-shit: 15:6: warning: A one-operand test is the nonempty-string test.
-    15 |  if [ $e ]; then echo empty_unquoted_yes; else echo empty_unquoted_no; fi
-       |       ^~
-note: Write it with -n to read clearer.
-shit: 16:6: warning: A one-operand test is the nonempty-string test.
-    16 |  if [ "$e" ]; then echo empty_quoted_yes; else echo empty_quoted_no; fi
-       |       ^~~~
-note: Write it with -n to read clearer.
 shit: 21:6: warning: A test reads an unquoted variable.
     21 |  if [ $m ]; then echo multi_unquoted_yes; else echo multi_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-shit: 21:6: warning: A one-operand test is the nonempty-string test.
-    21 |  if [ $m ]; then echo multi_unquoted_yes; else echo multi_unquoted_no; fi
-       |       ^~
-note: Write it with -n to read clearer.
-shit: 22:6: warning: A one-operand test is the nonempty-string test.
-    22 |  if [ "$m" ]; then echo multi_quoted_yes; else echo multi_quoted_no; fi
-       |       ^~~~
-note: Write it with -n to read clearer.
 shit: 26:6: warning: A test reads an unquoted variable.
     26 |  if [ $s ]; then echo single_unquoted_yes; else echo single_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-shit: 26:6: warning: A one-operand test is the nonempty-string test.
-    26 |  if [ $s ]; then echo single_unquoted_yes; else echo single_unquoted_no; fi
-       |       ^~
-note: Write it with -n to read clearer.
-shit: 27:6: warning: A one-operand test is the nonempty-string test.
-    27 |  if [ "$s" ]; then echo single_quoted_yes; else echo single_quoted_no; fi
-       |       ^~~~
-note: Write it with -n to read clearer.
 ws_unquoted_no
 ws_quoted_yes
 empty_unquoted_no

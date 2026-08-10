@@ -271,7 +271,7 @@ fn ArithmeticCommand::analyze(AnalysisContext &actx,
 {
   unused(is_unconditional);
   if (arithmetic_reads_external_input(actx, m_expression.view()))
-    actx.warn(source_location(),
+    actx.fail(source_location(),
               "External input is evaluated as arithmetic code",
               "Validate the value as decimal digits before arithmetic");
   /* The prepass does not parse the expression, which may assign any name, so
@@ -748,8 +748,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   {
     actx.fail_shellcheck(2264, m_body->source_location(),
                          "This function wrapper calls itself recursively",
-                         "Use command before the wrapped command name",
-                         analyze_severity::Annoying);
+                         "Use command before the wrapped command name");
   }
 
   /* The body runs later when the function is called, so it is analyzed from an

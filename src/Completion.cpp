@@ -1718,8 +1718,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   let const is_posix_completion = context.mood() == mimic_mood::Posix;
 
-  if (token_is_variable(open_quote_content_token) &&
-      leading_variable_is_active && !is_posix_completion)
+  if (token_is_variable(open_quote_content_token) && leading_variable_is_active)
   {
     candidates = complete_variable(open_quote_content_token, context);
     if (has_open_quote) {

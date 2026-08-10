@@ -2,3 +2,11 @@
 ${HOME}/Documents/
 == a bare variable reference still completes names:
 $VARIABLE_COMPLETION_UNIQUE
+== shit git dynamic variables complete:
+$SHIT_GIT_AHEAD
+$SHIT_GIT_BEHIND
+$SHIT_GIT_BRANCH
+== bash dynamic variables complete in bash mood:
+$BASHPID
+== POSIX mood completes its dynamic variables:
+$LINENO

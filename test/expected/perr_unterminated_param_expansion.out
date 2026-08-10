@@ -3,4 +3,4 @@ shit: 3:1: error: Unterminated variable expansion.
        |  ^
 shit: 2:11: note:
      2 |  echo ${abc
-       |            ^ Expected } here.
+       |            ^ expected } here.

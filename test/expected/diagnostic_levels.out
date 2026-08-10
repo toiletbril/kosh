@@ -33,7 +33,7 @@ compat-level-two-annoying=0
 compat-level-three-annoying=1
 compat-level-two-obsolete=0
 compat-level-three-obsolete=1
-compat-level-two-recursion=0
+compat-level-two-recursion=1
 compat-level-three-recursion=1
 file-directive
 file-directive-errors=0

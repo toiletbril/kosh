@@ -7,7 +7,9 @@
 [Word
   Unquoted "data/*/doesnotexist"
 ]
-shit: 2:6: error: The glob pattern 'data/*/doesnotexist' matched no file, it expands to its literal text, which is rarely intended.
+shit: 2:6: warning: The glob pattern 'data/*/doesnotexist' matched no file, it expands to its literal text, which is rarely intended.
      2 |  echo data/*/doesnotexist
        |       ^~~~~~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'data/*/doesnotexist' or relax with set +o failglob.
+data/*/doesnotexist
+[Code 0]
