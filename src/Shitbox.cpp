@@ -21,17 +21,15 @@ flatten fn find_util(StringView name) throws -> Maybe<Utility::Kind>
 
 /* Zero-initialized so it is immune to static-init order, filled by each
    utility's registrar. */
-static const ArrayList<Flag *> *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] =
-    {};
+static const FlagList *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] = {};
 
 fn register_shitbox_util_flags(Utility::Kind chosen,
-                               const ArrayList<Flag *> *flags) wontthrow -> void
+                               const FlagList *flags) wontthrow -> void
 {
   SHITBOX_UTIL_FLAG_LISTS[static_cast<usize>(chosen)] = flags;
 }
 
-fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow
-    -> const ArrayList<Flag *> *
+fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow -> const FlagList *
 {
   return SHITBOX_UTIL_FLAG_LISTS[static_cast<usize>(chosen)];
 }
@@ -172,8 +170,7 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   }
 }
 
-fn parse_util_operands(const ArrayList<Flag *> &flags,
-                       const ArrayList<String> &args,
+fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
                        const ArrayList<SourceLocation> *arg_locations,
                        ArrayList<SourceLocation> *operand_locations) throws
     -> ArrayList<String>
@@ -189,8 +186,7 @@ fn parse_util_operands(const ArrayList<Flag *> &flags,
 }
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
-                   StringView description,
-                   const ArrayList<Flag *> &flags) throws -> void
+                   StringView description, const FlagList &flags) throws -> void
 {
   let help_text = String{heap_allocator()};
 
@@ -208,8 +204,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
     help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
     help_text += "\n\n";
   }
-  ArrayList<StringView> synopsis_lines{heap_allocator()};
-  synopsis_lines.push(synopsis);
+  SynopsisList synopsis_lines{synopsis};
   help_text += make_synopsis(name, synopsis_lines);
   help_text += '\n';
   help_text += make_flag_help(flags);
@@ -232,6 +227,18 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
   if (!fd.has_value()) return None;
   defer { os::close_fd(*fd); };
   return read_fd_to_string(*fd);
+}
+
+fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow
+    -> Maybe<input_descriptor>
+{
+  if (path == "-")
+    return input_descriptor{ec.in_fd.value_or(SHIT_STDIN), false};
+
+  let const descriptor =
+      os::open_file_descriptor(path, os::file_open_mode::Read);
+  if (!descriptor.has_value()) return None;
+  return input_descriptor{*descriptor, true};
 }
 
 fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>

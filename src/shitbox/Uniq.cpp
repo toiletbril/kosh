@@ -40,45 +40,64 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
-  let const content = read_named_or_stdin(ec, source);
-  if (os::INTERRUPT_REQUESTED) return 130;
-  if (!content.has_value())
+  let const input = open_named_or_stdin(ec, source);
+  if (!input.has_value())
     throw Error{
         "uniq: cannot read '" + String{cxt.scratch_allocator(), source}
           +
         "': " + os::last_system_error_message()
     };
+  defer
+  {
+    if (input->should_close) os::close_fd(input->descriptor);
+  };
 
   let const should_show_count = FLAG_UNIQ_COUNT.is_enabled();
   let output = String{cxt.scratch_allocator()};
   bool has_previous = false;
-  StringView previous{};
+  let previous = String{heap_allocator()};
   u64 run_length = 0;
 
   let const do_flush = [&]() throws -> void {
     if (!has_previous) return;
     if (should_show_count)
       output += count_prefix(run_length, cxt.scratch_allocator());
-    output += previous;
+    output += previous.view();
     output += '\n';
+    if (output.count() >= 65536) {
+      ec.print_to_stdout(output);
+      output.clear();
+    }
   };
 
-  for (const StringView &line : split_keep_newlines(content->view())) {
-    let const body = line.without_trailing_newline();
-    if (has_previous && body == previous) {
+  let reader = utils::BufferedLineReader{input->descriptor};
+  loop
+  {
+    let const result = reader.next();
+    if (result == utils::BufferedLineReader::Result::End) break;
+    if (result == utils::BufferedLineReader::Result::Error) {
+      if (os::INTERRUPT_REQUESTED) return 130;
+      report_soft_shitbox_error(
+          ec, cxt,
+          "uniq: " + String{cxt.scratch_allocator(), source} + ": " +
+              os::last_system_error_message());
+      return 1;
+    }
+    let const line = reader.get_line();
+    if (has_previous && line == previous.view()) {
       run_length++;
       continue;
     }
 
     do_flush();
-    previous = body;
+    previous.clear();
+    previous.append(line);
     run_length = 1;
     has_previous = true;
   }

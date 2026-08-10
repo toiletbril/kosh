@@ -133,14 +133,18 @@ public:
       -> const ArrayList<highlight_span> *;
 
 private:
+  struct cached_line
+  {
+    usize start;
+    usize end;
+    ArrayList<highlight_span> spans{heap_allocator()};
+  };
+
   StringView m_source{};
   ArrayList<shell_lexical_state> m_checkpoints{heap_allocator()};
   shell_lexical_state m_sequential_state{heap_allocator()};
   usize m_next_checkpoint_threshold{0};
-  ArrayList<highlight_span> m_spans{heap_allocator()};
-  usize m_cached_line_start{0};
-  usize m_cached_line_end{0};
-  bool m_has_cached_line{false};
+  ArrayList<cached_line> m_lines{heap_allocator()};
 };
 
 fn highlight_line(StringView line, EvalContext &context) throws

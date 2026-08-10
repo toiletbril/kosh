@@ -7,6 +7,12 @@ rc=141
 2
 3
 rc=141
+--- infinite input through cat into head ---
+cat
+rc=141
+--- infinite input through grep and tee into head ---
+grep
+rc=141
 --- seq through cat into wc counts every line ---
 50
 rc=0

@@ -14,6 +14,9 @@ else
 fi
 printf '%s\n' "$completion_output"
 
+echo "== callback keeps definition annoying state:"
+"$BIN" -c 'set +o annoying-diagnostics; _f(){ if [[ -o annoying-diagnostics ]]; then COMPREPLY=(on); else COMPREPLY=(off); fi; }; complete -F _f annoyingcmd; set -o annoying-diagnostics' --debug-complete-at 'annoyingcmd ' </dev/null
+
 echo "== callback keeps definition mood:"
 "$BIN" -c '_f(){ COMPREPLY=("$(set --mood)"); }; complete -F _f moodcmd; set --mood bash' --debug-complete-at 'moodcmd ' </dev/null
 

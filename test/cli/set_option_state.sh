@@ -100,7 +100,7 @@ set --mood shit
 apply_definition_state
 case $- in *W*) warning_level_clear=no;; *) warning_level_clear=yes;; esac
 if [[ "$(set --mood)" = bash ]] &&
-   [[ "$warning_level_clear" = yes ]] && [[ -o no-diagnostics ]]; then
+    [[ "$warning_level_clear" = yes ]] && [[ -o no-diagnostics ]]; then
     echo function-runtime-state-persisted
 else
     echo function-runtime-state-lost
@@ -158,10 +158,19 @@ set +o no-diagnostics
 isolate_revision_state
 case $- in *W*) warning_level_clear=no;; *) warning_level_clear=yes;; esac
 if [[ "$(set --mood)" = shit ]] &&
-   [[ "$warning_level_clear" = yes ]] && [[ ! -o no-diagnostics ]]; then
+    [[ "$warning_level_clear" = yes ]] && [[ ! -o no-diagnostics ]]; then
     echo substitution-revisions-isolated
 else
     echo substitution-revisions-leaked
+fi
+'
+"$BIN" -M bash -c '
+set +o annoying-diagnostics
+ignored=$(set -o annoying-diagnostics)
+if [[ ! -o annoying-diagnostics ]]; then
+    echo annoying-substitution-isolated
+else
+    echo annoying-substitution-leaked
 fi
 '
 

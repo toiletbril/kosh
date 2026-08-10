@@ -55,11 +55,8 @@ public:
   bool is_substitution_cache_in_function_arena{false};
   mutable bool has_folded_arithmetic_result{false};
 
-  union
-  {
-    mutable i64 folded_arithmetic_result{0};
-    mutable usize source_position;
-  };
+  mutable i64 folded_arithmetic_result{0};
+  mutable usize source_position{0};
   mutable usize source_length{0};
 
   /* The tree lives in AST_ARENA and a function-body segment in FUNCTION_ARENA,
@@ -84,8 +81,7 @@ public:
         is_substitution_cache_in_function_arena;
     if (has_folded_arithmetic_result)
       copy.set_folded_arithmetic_result(get_folded_arithmetic_result());
-    else if (source_length > 0)
-      copy.set_source_span(source_position, source_length);
+    if (source_length > 0) copy.set_source_span(source_position, source_length);
     copy.cached_substitution_ast = cached_substitution_ast;
     copy.cached_substitution_generation = cached_substitution_generation;
     return copy;
@@ -101,14 +97,12 @@ public:
   {
     folded_arithmetic_result = result;
     has_folded_arithmetic_result = true;
-    source_length = 0;
   }
 
   fn set_source_span(usize position, usize length) wontthrow -> void
   {
     source_position = position;
     source_length = length;
-    has_folded_arithmetic_result = false;
   }
 
   pure fn get_source_location(Maybe<StringView> filename) const wontthrow
@@ -121,7 +115,7 @@ public:
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 160);
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 168);
 
 class Word
 {

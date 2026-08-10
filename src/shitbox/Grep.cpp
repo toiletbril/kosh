@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Shitbox.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -66,9 +67,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   bool has_any_match = false;
   i32 status = 0;
   for (let const &source : sources) {
-    let const content = read_named_or_stdin(ec, source);
-    if (os::INTERRUPT_REQUESTED) return 130;
-    if (!content.has_value()) {
+    let const input = open_named_or_stdin(ec, source);
+    if (!input.has_value()) {
       report_soft_shitbox_error(
           ec, cxt,
           "grep: " + String{cxt.scratch_allocator(), source} + ": " +
@@ -76,12 +76,28 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       status = 2;
       continue;
     }
+    defer
+    {
+      if (input->should_close) os::close_fd(input->descriptor);
+    };
     let const display_name =
         source == "-" ? StringView{"(standard input)"} : source;
-    for (let const &line : split_keep_newlines(content->view())) {
-      let const body = line.without_trailing_newline();
-      let const has_newline = body.length != line.length;
-      let const is_match = os::regex_matches(compiled, body);
+    let reader = utils::BufferedLineReader{input->descriptor};
+    loop
+    {
+      let const result = reader.next();
+      if (result == utils::BufferedLineReader::Result::End) break;
+      if (result == utils::BufferedLineReader::Result::Error) {
+        if (os::INTERRUPT_REQUESTED) return 130;
+        report_soft_shitbox_error(
+            ec, cxt,
+            "grep: " + String{cxt.scratch_allocator(), source} + ": " +
+                os::last_system_error_message());
+        status = 2;
+        break;
+      }
+      let const line = reader.get_line();
+      let const is_match = os::regex_matches(compiled, line);
       if (is_match == should_invert) continue;
 
       has_any_match = true;
@@ -90,7 +106,11 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         output += ':';
       }
       output += line;
-      if (!has_newline) output += '\n';
+      output += '\n';
+      if (output.count() >= 65536) {
+        ec.print_to_stdout(output);
+        output.clear();
+      }
     }
   }
 

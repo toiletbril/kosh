@@ -529,8 +529,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   return candidates;
 }
 
-static fn append_flag_forms(const ArrayList<Flag *> &flags,
-                            StringView token_filter,
+static fn append_flag_forms(const FlagList &flags, StringView token_filter,
                             ArrayList<String> &out) throws -> void
 {
   for (const Flag *flag : flags) {

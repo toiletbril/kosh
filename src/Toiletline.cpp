@@ -479,7 +479,22 @@ fn history_append_event(StringView command) -> shit::Maybe<usize>
 }
 
 fn history_rewrite_event(usize number, StringView expected,
+                         const shit::ArrayList<shit::String> &replacements)
+    -> bool;
+
+fn history_rewrite_event(usize number, StringView expected,
                          StringView replacement) -> bool
+{
+  let replacements = shit::ArrayList<shit::String>{shit::heap_allocator()};
+  if (!replacement.is_empty())
+    replacements.push(shit::String{shit::heap_allocator(), replacement});
+
+  return history_rewrite_event(number, expected, replacements);
+}
+
+fn history_rewrite_event(usize number, StringView expected,
+                         const shit::ArrayList<shit::String> &replacements)
+    -> bool
 {
   let const path = history_file_path();
   if (!path.has_value() || !history_read()) return false;
@@ -514,11 +529,12 @@ fn history_rewrite_event(usize number, StringView expected,
   let rewritten = shit::String{shit::heap_allocator()};
   rewritten.append(contents->substring_of_length(0, start_offset));
 
-  if (!replacement.is_empty()) {
-    if (replacement.length > ITL_HISTORY_ENTRY_MAX_BYTES) return false;
+  for (let const &replacement : replacements) {
+    if (replacement.count() > ITL_HISTORY_ENTRY_MAX_BYTES) return false;
     itl_string_t *entry = ::itl_string_alloc();
     defer { ITL_STRING_FREE(entry); };
-    if (!::itl_string_from_bytes(entry, replacement.data, replacement.length))
+    if (!::itl_string_from_bytes(entry, replacement.data(),
+                                 replacement.count()))
       return false;
     itl_char_buf_t *encoded = ::itl_char_buf_alloc();
     defer { ITL_CHAR_BUF_FREE(encoded); };
@@ -1410,6 +1426,16 @@ fn history_rewrite_event(usize number, StringView expected,
   unused(number);
   unused(expected);
   unused(replacement);
+  return false;
+}
+
+fn history_rewrite_event(usize number, StringView expected,
+                         const shit::ArrayList<shit::String> &replacements)
+    -> bool
+{
+  unused(number);
+  unused(expected);
+  unused(replacements);
   return false;
 }
 

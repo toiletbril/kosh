@@ -380,3 +380,17 @@ echo "indexed-conversion=$? value=${conversion_indexed[*]}"
 declare -A conversion_associative=([key]=value)
 declare -a conversion_associative 2>/dev/null
 echo "associative-conversion=$? value=${conversion_associative[key]}"
+
+declare -A unset_by_variable=([foo]=bar)
+unset_key=foo
+unset 'unset_by_variable[$unset_key]'
+echo "assoc-unset-expanded=[${unset_by_variable[foo]+set}]"
+declare -A unset_spaced=(["a b"]=value)
+unset_spaced_key="a b"
+unset 'unset_spaced[$unset_spaced_key]'
+echo "assoc-unset-spaced=[${unset_spaced["a b"]+set}]"
+declare -A unset_once=([foo]=value)
+unset 'unset_once[$(printf hit >&2; printf foo)]'
+echo "assoc-unset-once=[${unset_once[foo]+set}]"
+declare -aA invalid_both 2>/dev/null
+printf 'declare-both=%s\n' "$?"

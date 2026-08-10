@@ -1,4 +1,6 @@
 attached=probe-branch
+first=probe-branch
+second=second-branch
 walked=probe-branch
 detached=0123456
 worktree=linked-tree

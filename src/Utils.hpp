@@ -191,6 +191,8 @@ fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
     -> String;
 
 fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void;
+fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
+    -> void;
 
 fn read_entire_standard_input() throws -> String;
 
@@ -200,8 +202,32 @@ fn read_entire_standard_input() throws -> String;
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
                      char delimiter = '\n', u64 deadline_nanos = 0,
                      bool *was_timed_out = nullptr,
-                     Allocator allocator = heap_allocator()) throws
-    -> Maybe<String>;
+                     Allocator allocator = heap_allocator(),
+                     bool *did_read_fail = nullptr) throws -> Maybe<String>;
+
+class BufferedLineReader
+{
+public:
+  enum class Result : u8
+  {
+    Line,
+    End,
+    Error,
+  };
+
+  explicit BufferedLineReader(os::descriptor descriptor);
+
+  fn next() throws -> Result;
+  pure fn get_line() const wontthrow -> StringView;
+
+private:
+  os::descriptor m_descriptor;
+  String m_line{heap_allocator()};
+  usize m_buffer_position{0};
+  usize m_buffer_length{0};
+  bool m_is_at_end{false};
+  char m_buffer[65536]{};
+};
 
 enum class directory_validation : u8
 {

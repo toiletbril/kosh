@@ -14,8 +14,6 @@ HELP_DESCRIPTION_DECL(
     "The compgen builtin writes the completion candidates for a word.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* The value-carrying options are hand-parsed in execute, so these FLAG rows
-   only feed the help text. */
 FLAG(COMPGEN_WORDLIST, String, 'W', "",
      "Expand the word list the way the shell does and filter to the entries "
      "that start with the word.");
@@ -29,6 +27,18 @@ FLAG(COMPGEN_FILTER, String, 'X', "",
      "unescaped & expanding to the completion word.");
 FLAG(COMPGEN_FUNCTION, String, 'F', "", "Accepted without effect.");
 FLAG(COMPGEN_COMMAND, String, 'C', "", "Accepted without effect.");
+FLAG(COMPGEN_OPTION, String, 'o', "", "Accept the completion option.");
+FLAG(COMPGEN_COMMANDS, Bool, 'c', "", "List matching commands.");
+FLAG(COMPGEN_ALIAS, Bool, 'a', "", "Accept the alias action.");
+FLAG(COMPGEN_BUILTIN, Bool, 'b', "", "Accept the builtin action.");
+FLAG(COMPGEN_DIRECTORY, Bool, 'd', "", "Accept the directory action.");
+FLAG(COMPGEN_DISABLED, Bool, 'e', "", "Accept the enabled action.");
+FLAG(COMPGEN_GROUP, Bool, 'g', "", "Accept the group action.");
+FLAG(COMPGEN_JOB, Bool, 'j', "", "Accept the job action.");
+FLAG(COMPGEN_KEYWORD, Bool, 'k', "", "Accept the keyword action.");
+FLAG(COMPGEN_SERVICE, Bool, 's', "", "Accept the service action.");
+FLAG(COMPGEN_USER, Bool, 'u', "", "Accept the user action.");
+FLAG(COMPGEN_VARIABLE, Bool, 'v', "", "Accept the variable action.");
 
 REGISTER_BUILTIN_FLAGS(Compgen);
 
@@ -93,79 +103,29 @@ pure fn Compgen::kind() const wontthrow -> Builtin::Kind
 
 fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const &args = ec.args();
-  ASSERT(!args.is_empty());
+  let const args = parse_flags_vec(
+      FLAG_LIST, ec.args(), ec.source_location().position, nullptr,
+      &ec.arg_locations(), nullptr, builtin_error_context(ec.program()));
+  defer { reset_flags(FLAG_LIST); };
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  Maybe<StringView> wordlist;
-  Maybe<StringView> glob_pattern;
-  Maybe<StringView> action;
-  Maybe<StringView> filter_pattern;
-  bool should_list_commands = false;
-  bool should_list_files = false;
-  StringView word{};
-  for (usize i = 1; i < args.count();) {
-    let const argument = args[i].view();
-    if (argument == "--") {
-      i++;
-      if (i < args.count()) word = args[i].view();
-      break;
-    }
-    if (argument == "-W") {
-      i++;
-      if (i < args.count()) {
-        wordlist = args[i].view();
-        i++;
-      }
-      continue;
-    }
-    if (argument == "-G") {
-      i++;
-      if (i < args.count()) {
-        glob_pattern = args[i].view();
-        i++;
-      }
-      continue;
-    }
-    if (argument == "-A") {
-      i++;
-      if (i < args.count()) {
-        action = args[i].view();
-        i++;
-      }
-      continue;
-    }
-    if (argument == "-X") {
-      i++;
-      if (i < args.count()) {
-        filter_pattern = args[i].view();
-        i++;
-      }
-      continue;
-    }
-    if (argument == "-c") {
-      should_list_commands = true;
-      i++;
-      continue;
-    }
-    if (argument == "-f") {
-      should_list_files = true;
-      i++;
-      continue;
-    }
-    if (argument.length >= 2 && argument[0] == '-') {
-      if (argument == "-P" || argument == "-S" || argument == "-F" ||
-          argument == "-C" || argument == "-o")
-      {
-        i++;
-      }
-      i++;
-      continue;
-    }
-    word = argument;
-    i++;
-  }
+  let const wordlist = FLAG_COMPGEN_WORDLIST.is_set()
+                           ? Maybe<StringView>{FLAG_COMPGEN_WORDLIST.value()}
+                           : None;
+  let const glob_pattern = FLAG_COMPGEN_GLOB.is_set()
+                               ? Maybe<StringView>{FLAG_COMPGEN_GLOB.value()}
+                               : None;
+  let const action = FLAG_COMPGEN_ACTION.is_set()
+                         ? Maybe<StringView>{FLAG_COMPGEN_ACTION.value()}
+                         : None;
+  let const filter_pattern =
+      FLAG_COMPGEN_FILTER.is_set()
+          ? Maybe<StringView>{FLAG_COMPGEN_FILTER.value()}
+          : None;
+  let const should_list_commands = FLAG_COMPGEN_COMMANDS.is_enabled();
+  let const should_list_files = FLAG_COMPGEN_FILE.is_enabled();
+  let const word = args.count() > 1 ? args[1].view() : StringView{};
 
   Maybe<compgen_filter> filter = None;
   if (filter_pattern.has_value())

@@ -3501,8 +3501,10 @@ fn read_entire_standard_input() throws -> String
 
 fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
                      char delimiter, u64 deadline_nanos, bool *was_timed_out,
-                     Allocator allocator) throws -> Maybe<String>
+                     Allocator allocator, bool *did_read_fail) throws
+    -> Maybe<String>
 {
+  if (did_read_fail != nullptr) *did_read_fail = false;
   let line = String{allocator};
   bool has_read_any_byte = false;
   loop
@@ -3527,7 +3529,11 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
 
     u8 one_byte = 0;
     Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
-    if (!read_count || *read_count == 0) break;
+    if (!read_count.has_value()) {
+      if (did_read_fail != nullptr) *did_read_fail = true;
+      break;
+    }
+    if (*read_count == 0) break;
     has_read_any_byte = true;
     if (one_byte == static_cast<u8>(delimiter)) {
       was_delimiter_terminated = true;
@@ -3544,6 +3550,46 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
   if (!has_read_any_byte) return None;
 
   return line;
+}
+
+BufferedLineReader::BufferedLineReader(os::descriptor descriptor)
+    : m_descriptor(descriptor)
+{}
+
+fn BufferedLineReader::next() throws -> Result
+{
+  m_line.clear();
+
+  loop
+  {
+    usize delimiter_position = m_buffer_position;
+    while (delimiter_position < m_buffer_length &&
+           m_buffer[delimiter_position] != '\n')
+    {
+      delimiter_position++;
+    }
+
+    m_line.append(StringView{m_buffer + m_buffer_position,
+                             delimiter_position - m_buffer_position});
+    m_buffer_position = delimiter_position;
+    if (m_buffer_position < m_buffer_length) {
+      m_buffer_position++;
+      return Result::Line;
+    }
+    if (m_is_at_end) return m_line.is_empty() ? Result::End : Result::Line;
+
+    let const read_size = os::read_fd(m_descriptor, m_buffer, sizeof(m_buffer));
+    if (!read_size.has_value()) return Result::Error;
+
+    m_buffer_position = 0;
+    m_buffer_length = *read_size;
+    m_is_at_end = m_buffer_length == 0;
+  }
+}
+
+pure fn BufferedLineReader::get_line() const wontthrow -> StringView
+{
+  return m_line.view();
 }
 
 fn resolve_git_directory() throws -> Path
@@ -3724,13 +3770,36 @@ fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
 
 fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
 {
+  let branch = String{heap_allocator()};
+  git_status(branch, ahead_count, behind_count);
+}
+
+fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
+    -> void
+{
+  branch.clear();
   ahead_count = 0;
   behind_count = 0;
 
   let const git_dir = resolve_git_directory();
   if (git_dir.text().is_empty()) return;
 
-  let const branch = current_git_branch();
+  let git_head = git_dir.clone();
+  git_head.push_component("HEAD");
+  let const head_content = git_head.read_entire_file();
+  if (!head_content.has_value()) return;
+
+  let head_text = head_content->view();
+  while (!head_text.is_empty() && (head_text[head_text.length - 1] == '\n' ||
+                                   head_text[head_text.length - 1] == '\r'))
+  {
+    head_text = head_text.substring_of_length(0, head_text.length - 1);
+  }
+  let const ref_prefix = StringView{"ref: refs/heads/"};
+  branch = head_text.starts_with(ref_prefix)
+               ? String{head_text.substring(ref_prefix.length)}
+               : String{head_text.substring_of_length(
+                     0, head_text.length < 7 ? head_text.length : 7)};
   if (branch.is_empty()) return;
 
   let const local_ref = StringView{"refs/heads/"} + branch.view();
@@ -3782,22 +3851,15 @@ fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
   if (git_results.is_empty()) return;
   let const git_path = String{heap_allocator(), git_results[0].text().view()};
 
-  let ahead_argv = ArrayList<String>{heap_allocator()};
-  ahead_argv.push(String{heap_allocator(), git_path.view()});
-  ahead_argv.push(String{heap_allocator(), "rev-list"});
-  ahead_argv.push(String{heap_allocator(), "--count"});
-  ahead_argv.push(StringView{upstream_sha.view()} + ".." + local_sha.view());
+  let count_argv = ArrayList<String>{heap_allocator()};
+  count_argv.push(String{heap_allocator(), git_path.view()});
+  count_argv.push(String{heap_allocator(), "rev-list"});
+  count_argv.push(String{heap_allocator(), "--left-right"});
+  count_argv.push(String{heap_allocator(), "--count"});
+  count_argv.push(local_sha.view() + "..." + upstream_sha.view());
 
-  let behind_argv = ArrayList<String>{heap_allocator()};
-  behind_argv.push(String{heap_allocator(), git_path.view()});
-  behind_argv.push(String{heap_allocator(), "rev-list"});
-  behind_argv.push(String{heap_allocator(), "--count"});
-  behind_argv.push(StringView{local_sha.view()} + ".." + upstream_sha.view());
-
-  let const ahead_output =
-      os::capture_program_output(ahead_argv, 5'000'000'000);
-  let const behind_output =
-      os::capture_program_output(behind_argv, 5'000'000'000);
+  let const count_output =
+      os::capture_program_output(count_argv, 5'000'000'000);
 
   let const parse_count = [](StringView s) -> i32 {
     while (!s.is_empty() &&
@@ -3814,9 +3876,15 @@ fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
     return value;
   };
 
-  if (ahead_output.has_value()) ahead_count = parse_count(ahead_output->view());
-  if (behind_output.has_value())
-    behind_count = parse_count(behind_output->view());
+  if (count_output.has_value()) {
+    let const separator = count_output->view().find_character('\t');
+    if (separator.has_value()) {
+      ahead_count =
+          parse_count(count_output->view().substring_of_length(0, *separator));
+      behind_count =
+          parse_count(count_output->view().substring(*separator + 1));
+    }
+  }
 
   cached.branch = String{branch.view()};
   cached.local_sha = String{local_sha.view()};

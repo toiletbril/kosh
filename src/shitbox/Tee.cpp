@@ -35,18 +35,10 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
-  if (os::INTERRUPT_REQUESTED) return 130;
-  if (!input.has_value()) {
-    report_soft_shitbox_error(
-        ec, cxt, "tee: read failed: " + os::last_system_error_message());
-    return 1;
-  }
-
-  ec.print_to_stdout(input->view());
-
   let const mode = FLAG_TEE_APPEND.is_enabled() ? os::file_open_mode::Append
                                                 : os::file_open_mode::Truncate;
+  let output_descriptors = ArrayList<os::descriptor>{cxt.scratch_allocator()};
+  let output_names = ArrayList<StringView>{cxt.scratch_allocator()};
   i32 status = 0;
   for (const String &operand : operands) {
     let const fd = os::open_file_descriptor(operand.view(), mode);
@@ -56,27 +48,45 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    /* write_fd returns one write's count, which can fall short, so the loop
-       writes the rest until the whole input lands or a write fails. */
-    usize written_count = 0;
-    bool did_write_fail = false;
-    while (written_count < input->count()) {
-      let const chunk = os::write_fd(*fd, input->view().data + written_count,
-                                     input->count() - written_count);
-      if (!chunk.has_value() || *chunk == 0) {
-        did_write_fail = true;
-        break;
-      }
+    output_descriptors.push(*fd);
+    output_names.push(operand.view());
+  }
+  defer
+  {
+    for (let const descriptor : output_descriptors)
+      os::close_fd(descriptor);
+  };
 
-      written_count += *chunk;
-    }
-
-    if (did_write_fail) {
+  char buffer[65536];
+  loop
+  {
+    let const read_size =
+        os::read_fd(ec.in_fd.value_or(SHIT_STDIN), buffer, sizeof(buffer));
+    if (!read_size.has_value()) {
+      if (os::INTERRUPT_REQUESTED) return 130;
       report_soft_shitbox_error(
-          ec, cxt, "tee: " + operand + ": " + os::last_system_error_message());
+          ec, cxt, "tee: read failed: " + os::last_system_error_message());
+      return 1;
+    }
+    if (*read_size == 0) break;
+
+    ec.print_to_stdout(StringView{buffer, *read_size});
+    usize output_index = output_descriptors.count();
+    while (output_index > 0) {
+      output_index--;
+      if (os::write_all(output_descriptors[output_index], buffer, *read_size))
+        continue;
+
+      report_soft_shitbox_error(
+          ec, cxt,
+          "tee: " +
+              String{cxt.scratch_allocator(), output_names[output_index]} +
+              ": " + os::last_system_error_message());
+      os::close_fd(output_descriptors[output_index]);
+      output_descriptors.remove(output_index);
+      output_names.remove(output_index);
       status = 1;
     }
-    os::close_fd(*fd);
   }
 
   return status;

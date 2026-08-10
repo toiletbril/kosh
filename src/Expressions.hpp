@@ -12,6 +12,15 @@ using namespace tokens;
 class Token;
 struct heredoc_contents;
 
+struct pending_analysis_warning
+{
+  SourceLocation location;
+  String message;
+  String suggestion;
+  Maybe<SourceLocation> related_location;
+  String related_message;
+};
+
 namespace expressions {
 class IfClause;
 class WhileLoop;
@@ -33,6 +42,8 @@ public:
   bool has_seen_runtime_definer{false};
   HashSet defined_functions{heap_allocator()};
   HashSet known_aliases{heap_allocator()};
+  ArrayList<String> defined_function_insertions{heap_allocator()};
+  ArrayList<String> known_alias_insertions{heap_allocator()};
   /* The table is cleared at a conditional branch, a loop body, a function body,
      a subshell, and on any runtime definer, since a value recorded before such
      a boundary is no longer proven to hold past it. */
@@ -84,7 +95,39 @@ public:
 
   bool should_print_optimizer_state{false};
 
+  ArrayList<pending_analysis_warning> pending_warnings{heap_allocator()};
+
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
+
+  fn add_defined_function(StringView name) throws -> void
+  {
+    if (defined_functions.contains(name)) return;
+    defined_functions.add(name);
+    defined_function_insertions.push(String{name});
+  }
+
+  fn add_known_alias(StringView name) throws -> void
+  {
+    if (known_aliases.contains(name)) return;
+    known_aliases.add(name);
+    known_alias_insertions.push(String{name});
+  }
+
+  fn rollback_defined_functions(usize insertion_count) throws -> void
+  {
+    while (defined_function_insertions.count() > insertion_count) {
+      defined_functions.remove(defined_function_insertions.back().view());
+      defined_function_insertions.pop_back();
+    }
+  }
+
+  fn rollback_known_aliases(usize insertion_count) throws -> void
+  {
+    while (known_alias_insertions.count() > insertion_count) {
+      known_aliases.remove(known_alias_insertions.back().view());
+      known_alias_insertions.pop_back();
+    }
+  }
 
   fn warn(SourceLocation location, StringView message,
           StringView suggestion = {},
@@ -104,6 +147,7 @@ public:
                      StringView message, StringView suggestion = {},
                      Maybe<SourceLocation> related_location = None,
                      StringView related_message = {}) throws -> void;
+  fn flush_warnings() throws -> void;
   pure fn is_shellcheck_suppressed(u16 diagnostic_code,
                                    SourceLocation location) const wontthrow
       -> bool;
@@ -177,6 +221,10 @@ public:
   virtual fn register_defined_functions(AnalysisContext &actx) const throws
       -> void;
 
+  virtual fn append_presence_tested_command_names(
+      const AnalysisContext &actx, HashSet &names,
+      bool status_is_success) const throws -> void;
+
   virtual fn can_evaluate_in_process_substitution(
       const EvalContext &cxt, HashSet &active_functions) const throws -> bool;
 
@@ -209,6 +257,7 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
@@ -369,6 +418,11 @@ public:
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
 
+  fn append_presence_tested_command_names(const AnalysisContext &actx,
+                                          HashSet &names,
+                                          bool status_is_success) const throws
+      -> void override;
+
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
@@ -419,6 +473,11 @@ public:
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
 
+  fn append_presence_tested_command_names(const AnalysisContext &actx,
+                                          HashSet &names,
+                                          bool status_is_success) const throws
+      -> void override;
+
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
@@ -450,6 +509,10 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+  fn append_presence_tested_command_names(const AnalysisContext &actx,
+                                          HashSet &names,
+                                          bool status_is_success) const throws
+      -> void override;
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
@@ -479,6 +542,11 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+
+  fn append_presence_tested_command_names(const AnalysisContext &actx,
+                                          HashSet &names,
+                                          bool status_is_success) const throws
       -> void override;
 
   fn as_simple_command() const wontthrow -> const SimpleCommand * override;

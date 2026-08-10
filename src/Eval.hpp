@@ -960,6 +960,11 @@ public:
     if (root != m_history_recording_root) return None;
     return m_history_recording_source;
   }
+  fn record_history_event(StringView command) throws -> bool;
+  fn begin_history_transaction(ArrayList<String> &commands) throws -> void;
+  fn end_history_transaction() wontthrow -> void;
+  pure fn has_history_transaction() const wontthrow -> bool;
+  fn begin_command_evaluation() wontthrow -> void;
   /* A frame at error_location is dropped. */
   fn print_source_backtrace(Maybe<SourceLocation> error_location = None) throws
       -> void;
@@ -1710,6 +1715,12 @@ protected:
   usize m_expansions_last{0};
   usize m_expansions_total{0};
   usize m_commands_evaluated{0};
+  usize m_command_evaluation_index{0};
+  mutable usize m_git_branch_command_index{static_cast<usize>(-1)};
+  mutable usize m_git_counts_command_index{static_cast<usize>(-1)};
+  mutable String m_git_branch{heap_allocator()};
+  mutable i32 m_git_ahead_count{0};
+  mutable i32 m_git_behind_count{0};
   /* The largest live AST arena footprint seen at the end of any command. */
   usize m_peak_ast_arena_bytes{0};
 
@@ -1812,6 +1823,7 @@ protected:
   Maybe<usize> m_current_history_event_number{None};
   const Expression *m_history_recording_root{nullptr};
   StringView m_history_recording_source{};
+  ArrayList<ArrayList<String> *> m_history_transaction_stack{heap_allocator()};
 
   /* The location in m_current_source of the command being evaluated, read by
      $LINENO for its line and by the runtime warnings for their caret. The whole

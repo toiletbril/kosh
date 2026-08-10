@@ -11,6 +11,9 @@ echo "=== constant arithmetic fold ==="
 echo "=== constant propagation into arithmetic ==="
 "$BIN" --show-optimizer-state -c 'x=2; y=3; echo $((x + y))'
 
+echo "=== DEBUG observes folded arithmetic source ==="
+"$BIN" --show-optimizer-state -c "x=2; trap 'x=9' DEBUG; echo \$((x + 1))"
+
 echo "=== dead branch, condition is true ==="
 "$BIN" --show-optimizer-state -c 'if true; then echo a; else echo b; fi'
 

@@ -25,8 +25,8 @@ fn builtin_error_message(StringView program, StringView message) throws
 }
 
 cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
-                               const ArrayList<StringView> &synopsis_lines,
-                               const ArrayList<Flag *> &flags,
+                               const SynopsisList &synopsis_lines,
+                               const FlagList &flags,
                                StringView extra_sections) throws -> void
 {
   ASSERT(!ec.args().is_empty());
@@ -59,15 +59,15 @@ flatten fn search_builtin(StringView builtin_name) throws
 /* The per-kind flag lists, a zero-initialized table immune to static-init
    order, filled by each builtin file's registrar after its FLAG_LIST is
    built, since both sit in the same translation unit in order. */
-static const ArrayList<Flag *> *BUILTIN_FLAG_LISTS[BUILTIN_KIND_COUNT] = {};
+static const FlagList *BUILTIN_FLAG_LISTS[BUILTIN_KIND_COUNT] = {};
 
 fn register_builtin_flag_list(Builtin::Kind kind,
-                              const ArrayList<Flag *> *flags) wontthrow -> void
+                              const FlagList *flags) wontthrow -> void
 {
   BUILTIN_FLAG_LISTS[static_cast<usize>(kind)] = flags;
 }
 
-fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *
+fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const FlagList *
 {
   return BUILTIN_FLAG_LISTS[static_cast<usize>(kind)];
 }
@@ -173,15 +173,19 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
         report_soft_builtin_error(ec, cxt, e.message(), e.detail_message());
       else
         report_soft_builtin_error(ec, cxt, e.message());
-      return 1;
+      return static_cast<i32>(e.command_status());
     }
 
     let const prefixed = builtin_error_message(ec.program(), e.message());
     if (!e.detail_message().is_empty()) {
-      throw ErrorWithLocationAndDetails{ec.source_location(), prefixed.view(),
-                                        e.detail_message()};
+      let relocated = ErrorWithLocationAndDetails{
+          ec.source_location(), prefixed.view(), e.detail_message()};
+      relocated.set_command_status(e.command_status());
+      throw relocated;
     }
-    throw ErrorWithLocation{ec.source_location(), prefixed.view()};
+    let relocated = ErrorWithLocation{ec.source_location(), prefixed.view()};
+    relocated.set_command_status(e.command_status());
+    throw relocated;
   }
   unreachable("execute_builtin reached the end without dispatching");
 }

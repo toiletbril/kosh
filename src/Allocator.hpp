@@ -193,10 +193,11 @@ hot inline fn heap_alloc(opaque *context, usize length,
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
-     common request stays on the pooled path. The over-aligned path is rare and
+  common request stays on the pooled path. The over-aligned path is rare and
      stays uncached, and its length is rounded up to a multiple of the alignment
      for aligned_alloc. */
   if (alignment > alignof(max_align_t)) {
+    if (length > SIZE_MAX - (alignment - 1)) return nullptr;
     let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
     return os::allocate_aligned(rounded_length, alignment);
   }

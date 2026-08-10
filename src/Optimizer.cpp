@@ -329,60 +329,6 @@ static pure fn trim_arithmetic_whitespace(StringView text) wontthrow
   return text.trim_blanks();
 }
 
-static fn try_algebraic_simplify(StringView expression,
-                                 const AnalysisContext &) wontthrow
-    -> Maybe<i64>
-{
-  let const expr = trim_arithmetic_whitespace(expression);
-  if (expr.length == 0) return None;
-
-  /* A parenthesis or a second operator means the operands are not the two plain
-     terms this matcher assumes. */
-  usize operator_position = 0;
-  usize operator_count = 0;
-  bool has_grouping = false;
-  for (usize i = 0; i < expr.length; i++) {
-    const char byte = expr[i];
-    if (byte == '(' || byte == ')') {
-      has_grouping = true;
-      break;
-    }
-    if (i > 0 && (byte == '*' || byte == '-')) {
-      operator_position = i;
-      operator_count++;
-    }
-  }
-
-  if (has_grouping || operator_count != 1) return None;
-
-  const char op = expr[operator_position];
-  let const lhs = trim_arithmetic_whitespace(
-      expr.substring_of_length(0, operator_position));
-  let const rhs =
-      trim_arithmetic_whitespace(expr.substring(operator_position + 1));
-  if (lhs.length == 0 || rhs.length == 0) return None;
-
-  if (!is_plain_integer_literal(lhs) || !is_plain_integer_literal(rhs))
-    return None;
-
-  if (op == '*') {
-    if (lhs == StringView{"0"} || rhs == StringView{"0"}) {
-      LOG(All, "algebraic simplify '%.*s' to 0 through a zero multiply",
-          static_cast<int>(expr.length), expr.data);
-      return Maybe<i64>{0};
-    }
-    return None;
-  }
-
-  if (op == '-' && lhs == rhs) {
-    LOG(All, "algebraic simplify '%.*s' to 0 through x - x",
-        static_cast<int>(expr.length), expr.data);
-    return Maybe<i64>{0};
-  }
-
-  return None;
-}
-
 enum class static_verdict_kind : u8
 {
   always_true,
@@ -539,10 +485,6 @@ fn fold_constant_arithmetic_in_word(const Word &word,
     let result = try_fold_constant_arithmetic(segment.text.view());
     if (!result.has_value())
       result = try_fold_arithmetic_with_constants(segment.text.view(), actx);
-    /* An identity such as x*0 or x-x folds even when the operand reads a
-       run-time variable, so it runs after the numeric folds decline. */
-    if (!result.has_value())
-      result = try_algebraic_simplify(segment.text.view(), actx);
     if (result.has_value()) {
       LOG(All, "folded the constant arithmetic '%.*s' to %lld",
           static_cast<int>(segment.text.view().length),

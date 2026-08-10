@@ -332,8 +332,8 @@ inline constexpr usize BUILTIN_KIND_COUNT =
    REGISTER_BUILTIN_FLAGS line in its file. A kind with no registration reads
    back null. */
 fn register_builtin_flag_list(Builtin::Kind kind,
-                              const ArrayList<Flag *> *flags) wontthrow -> void;
-fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *;
+                              const FlagList *flags) wontthrow -> void;
+fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const FlagList *;
 
 #define REGISTER_BUILTIN_FLAGS(kind)                                           \
   static uchar t__builtin_flag_registrar =                                     \
@@ -342,8 +342,8 @@ fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *;
        0)
 
 void show_builtin_help_impl(const ExecContext &ec, StringView description,
-                            const ArrayList<StringView> &synopsis_lines,
-                            const ArrayList<Flag *> &flags,
+                            const SynopsisList &synopsis_lines,
+                            const FlagList &flags,
                             StringView extra_sections = {}) throws;
 fn builtin_error_context(StringView program) throws -> String;
 fn builtin_error_message(StringView program, StringView message) throws
@@ -396,7 +396,7 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String;
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &;
 
-fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
+fn shit_binary_flag_list() wontthrow -> const FlagList &;
 
 /* Report a builtin error that must not abort the run, with the same located
    caret in the default and posix moods and the same soft unlocated line in the

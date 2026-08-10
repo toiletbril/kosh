@@ -13,11 +13,15 @@ HELP_DESCRIPTION_DECL(
     "The mapfile builtin reads standard input lines into an indexed array.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* The letters are hand-parsed in execute, so these FLAG rows only feed the
-   help text. */
 FLAG(MAPFILE_TRIM, Bool, 't', "", "Strip the trailing newline from each line.");
 FLAG(MAPFILE_COUNT, String, 'n', "",
      "Read at most count lines, or all of them when count is zero.");
+FLAG(MAPFILE_SKIP, String, 's', "", "Discard count lines before reading.");
+FLAG(MAPFILE_ORIGIN, String, 'O', "", "Begin storing at the array index.");
+FLAG(MAPFILE_DELIMITER, String, 'd', "", "Use the first byte as delimiter.");
+FLAG(MAPFILE_FD, String, 'u', "", "Read from the file descriptor.");
+FLAG(MAPFILE_CALLBACK, String, 'C', "", "Accept the callback name.");
+FLAG(MAPFILE_QUANTUM, String, 'c', "", "Accept the callback interval.");
 
 REGISTER_BUILTIN_FLAGS(Mapfile);
 
@@ -32,91 +36,60 @@ pure fn Mapfile::kind() const wontthrow -> Builtin::Kind
 
 fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const &args = ec.args();
-  ASSERT(!args.is_empty());
+  let const args = parse_flags_vec(
+      FLAG_LIST, ec.args(), ec.source_location().position, nullptr,
+      &ec.arg_locations(), nullptr, builtin_error_context(ec.program()));
+  defer { reset_flags(FLAG_LIST); };
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  bool should_strip_newline = false;
-  StringView array_name = "MAPFILE";
-  /* Zero is bash's unlimited. */
+  let const do_parse_count = [&](const FlagString &flag, StringView label,
+                                 StringView note, i64 &value) throws -> bool {
+    if (!flag.is_set()) return true;
+    let const parsed = flag.value().to<i64>();
+    if (!parsed.is_error() && parsed.value() >= 0) {
+      value = parsed.value();
+      return true;
+    }
+    report_soft_builtin_error(ec, cxt, flag.value_location(),
+                              flag.value() + label, note);
+    return false;
+  };
+
   i64 max_lines = 0;
   i64 skip_count = 0;
   i64 origin = 0;
-  let has_origin = false;
-  char delimiter = '\n';
+  if (!do_parse_count(FLAG_MAPFILE_COUNT, ": invalid line count",
+                      "The -n count must be a whole number", max_lines) ||
+      !do_parse_count(FLAG_MAPFILE_SKIP, ": invalid line count",
+                      "The -s count must be a whole number", skip_count) ||
+      !do_parse_count(FLAG_MAPFILE_ORIGIN, ": invalid array origin",
+                      "The -O origin must be a whole number", origin))
+  {
+    return 1;
+  }
+
   let read_fd = ec.in_fd.value_or(SHIT_STDIN);
-
-  for (usize i = 1; i < args.count(); i++) {
-    const StringView arg = args[i].view();
-
-    if (arg.is_empty() || arg[0] != '-' || arg == "-") {
-      array_name = arg;
-      continue;
-    }
-
-    usize letter_position = 1;
-    while (letter_position < arg.length && arg[letter_position] == 't') {
-      should_strip_newline = true;
-      letter_position++;
-    }
-
-    if (letter_position >= arg.length) continue;
-
-    let const letter = arg[letter_position];
-    let value = StringView{};
-    let has_value = false;
-    if (arg.length > letter_position + 1) {
-      value = arg.substring(letter_position + 1);
-      has_value = true;
-    } else if (i + 1 < args.count() &&
-               (letter == 'n' || letter == 's' || letter == 'O' ||
-                letter == 'd' || letter == 'u'))
-    {
-      value = args[++i].view();
-      has_value = true;
-    }
-
-    if (letter == 'd') {
-      delimiter = value.is_empty() ? '\0' : value[0];
-      continue;
-    }
-
-    if (!has_value) continue;
-
-    if (letter == 'u') {
-      if (let const fd = value.to<i64>(); !fd.is_error())
-        read_fd = os::descriptor_from_fd_number(fd.value());
-      continue;
-    }
-
-    if (letter != 'n' && letter != 's' && letter != 'O') {
-      continue;
-    }
-
-    let const number = value.to<i64>();
-    if (number.is_error() || number.value() < 0) {
-      if (letter == 'O') {
-        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
-                                  value + ": invalid array origin",
-                                  "The -O origin must be a whole number");
-      } else {
-        report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
-                                  value + ": invalid line count",
-                                  "The -n count must be a whole number");
-      }
+  if (FLAG_MAPFILE_FD.is_set()) {
+    let const parsed_fd = FLAG_MAPFILE_FD.value().to<i64>();
+    if (parsed_fd.is_error() || parsed_fd.value() < 0) {
+      report_soft_builtin_error(ec, cxt, FLAG_MAPFILE_FD.value_location(),
+                                FLAG_MAPFILE_FD.value() +
+                                    ": invalid file descriptor");
       return 1;
     }
-
-    if (letter == 'n') {
-      max_lines = number.value();
-    } else if (letter == 's') {
-      skip_count = number.value();
-    } else {
-      origin = number.value();
-      has_origin = true;
-    }
+    read_fd = os::descriptor_from_fd_number(parsed_fd.value());
   }
+
+  let const array_name =
+      args.count() > 1 ? args[1].view() : StringView{"MAPFILE"};
+  let const should_strip_newline = FLAG_MAPFILE_TRIM.is_enabled();
+  let const has_origin = FLAG_MAPFILE_ORIGIN.is_set();
+  let const delimiter = FLAG_MAPFILE_DELIMITER.is_set()
+                            ? (FLAG_MAPFILE_DELIMITER.value().is_empty()
+                                   ? '\0'
+                                   : FLAG_MAPFILE_DELIMITER.value()[0])
+                            : '\n';
 
   LOG(Debug, "mapfile reading lines into array '%.*s'",
       static_cast<int>(array_name.length), array_name.data);

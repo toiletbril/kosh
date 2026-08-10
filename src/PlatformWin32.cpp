@@ -3183,10 +3183,7 @@ fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
   return fd == descriptor_for_shell_fd(shell_fd);
 }
 
-fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void
-{
-  unused(flags);
-}
+fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }
 
 fn initialize_platform_runtime() wontthrow -> void {}
 

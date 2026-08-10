@@ -2730,7 +2730,7 @@ fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
   return fd == descriptor_for_shell_fd(shell_fd);
 }
 
-fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void
+fn register_platform_flags(FlagList &flags) throws -> void
 {
 #if SHIT_PLATFORM_IS COSMO
   static FlagBool ftrace{'\0', "ftrace", flag_section::Debug,

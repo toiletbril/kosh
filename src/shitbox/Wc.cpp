@@ -113,9 +113,8 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   u64 total_bytes = 0;
   i32 status = 0;
   for (const StringView &source : sources) {
-    let const content = read_named_or_stdin(ec, source);
-    if (os::INTERRUPT_REQUESTED) return 130;
-    if (!content.has_value()) {
+    let const input = open_named_or_stdin(ec, source);
+    if (!input.has_value()) {
       report_soft_shitbox_error(
           ec, cxt,
           "wc: " + String{cxt.scratch_allocator(), source} + ": " +
@@ -123,21 +122,46 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
+    defer
+    {
+      if (input->should_close) os::close_fd(input->descriptor);
+    };
     u64 lines = 0;
     u64 words = 0;
-    u64 bytes = content->count();
+    u64 bytes = 0;
     bool is_in_word = false;
-    let const bytes_view = content->view();
-    for (usize i = 0; i < bytes_view.length; i++) {
-      let const c = bytes_view[i];
-      if (c == '\n') lines++;
-      if (is_blank(c)) {
-        is_in_word = false;
-      } else if (!is_in_word) {
-        is_in_word = true;
-        words++;
+    bool did_read_fail = false;
+    char buffer[65536];
+
+    loop
+    {
+      let const read_size =
+          os::read_fd(input->descriptor, buffer, sizeof(buffer));
+      if (!read_size.has_value()) {
+        if (os::INTERRUPT_REQUESTED) return 130;
+        report_soft_shitbox_error(
+            ec, cxt,
+            "wc: " + String{cxt.scratch_allocator(), source} + ": " +
+                os::last_system_error_message());
+        status = 1;
+        did_read_fail = true;
+        break;
+      }
+      if (*read_size == 0) break;
+      bytes += *read_size;
+
+      for (usize i = 0; i < *read_size; i++) {
+        let const c = buffer[i];
+        if (c == '\n') lines++;
+        if (is_blank(c)) {
+          is_in_word = false;
+        } else if (!is_in_word) {
+          is_in_word = true;
+          words++;
+        }
       }
     }
+    if (did_read_fail) continue;
 
     total_lines += lines;
     total_words += words;

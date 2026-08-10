@@ -13,13 +13,11 @@ HELP_DESCRIPTION_DECL(
     "The complete builtin registers a completion spec for a command.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* The options are hand-parsed in execute since several only skip their
-   value, so these FLAG rows only feed the help text. */
 FLAG(COMPLETE_WORDLIST, String, 'W', "",
      "Register the word list as the command's candidates.");
 FLAG(COMPLETE_FUNCTION, String, 'F', "",
      "Register the function to run on an explicit tab, COMPREPLY style.");
-FLAG(COMPLETE_OPTION, String, 'o', "",
+FLAG(COMPLETE_OPTION, ManyStrings, 'o', "",
      "default, bashdefault, and dirnames fall back to filename completion, "
      "any other option is accepted without effect.");
 FLAG(COMPLETE_PRINT, Bool, 'p', "",
@@ -27,6 +25,26 @@ FLAG(COMPLETE_PRINT, Bool, 'p', "",
 FLAG(COMPLETE_DEFAULT, Bool, 'D', "",
      "Register the default spec used for a command with no spec of its own.");
 FLAG(COMPLETE_REMOVE, Bool, 'r', "", "Accepted without effect.");
+FLAG(COMPLETE_ACTION, String, 'A', "", "Accept the completion action.");
+FLAG(COMPLETE_GLOB, String, 'G', "", "Accept the completion glob.");
+FLAG(COMPLETE_COMMAND, String, 'C', "", "Accept the completion command.");
+FLAG(COMPLETE_FILTER, String, 'X', "", "Accept the completion filter.");
+FLAG(COMPLETE_PREFIX, String, 'P', "", "Accept the completion prefix.");
+FLAG(COMPLETE_SUFFIX, String, 'S', "", "Accept the completion suffix.");
+FLAG(COMPLETE_EMPTY, Bool, 'E', "", "Accept the empty-command spec.");
+FLAG(COMPLETE_INITIAL, Bool, 'I', "", "Accept the initial-word spec.");
+FLAG(COMPLETE_ALIAS, Bool, 'a', "", "Accept the alias action.");
+FLAG(COMPLETE_BUILTIN, Bool, 'b', "", "Accept the builtin action.");
+FLAG(COMPLETE_COMMANDS, Bool, 'c', "", "Accept the command action.");
+FLAG(COMPLETE_DIRECTORY, Bool, 'd', "", "Accept the directory action.");
+FLAG(COMPLETE_DISABLED, Bool, 'e', "", "Accept the enabled action.");
+FLAG(COMPLETE_FILE, Bool, 'f', "", "Accept the file action.");
+FLAG(COMPLETE_GROUP, Bool, 'g', "", "Accept the group action.");
+FLAG(COMPLETE_JOB, Bool, 'j', "", "Accept the job action.");
+FLAG(COMPLETE_KEYWORD, Bool, 'k', "", "Accept the keyword action.");
+FLAG(COMPLETE_SERVICE, Bool, 's', "", "Accept the service action.");
+FLAG(COMPLETE_USER, Bool, 'u', "", "Accept the user action.");
+FLAG(COMPLETE_VARIABLE, Bool, 'v', "", "Accept the variable action.");
 
 REGISTER_BUILTIN_FLAGS(Complete);
 
@@ -41,68 +59,34 @@ pure fn Complete::kind() const wontthrow -> Builtin::Kind
 
 fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const &args = ec.args();
-  ASSERT(!args.is_empty());
+  let const args = parse_flags_vec(
+      FLAG_LIST, ec.args(), ec.source_location().position, nullptr,
+      &ec.arg_locations(), nullptr, builtin_error_context(ec.program()));
+  defer { reset_flags(FLAG_LIST); };
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let function_name = String{cxt.scratch_allocator()};
-  let word_list = String{cxt.scratch_allocator()};
+  let function_name =
+      String{cxt.scratch_allocator(), FLAG_COMPLETE_FUNCTION.is_set()
+                                          ? FLAG_COMPLETE_FUNCTION.value()
+                                          : StringView{}};
+  let word_list =
+      String{cxt.scratch_allocator(), FLAG_COMPLETE_WORDLIST.is_set()
+                                          ? FLAG_COMPLETE_WORDLIST.value()
+                                          : StringView{}};
   let should_use_default = false;
-  let is_default_completion = false;
-  let should_print_specs = false;
-  let commands = ArrayList<String>{cxt.scratch_allocator()};
-
-  for (usize i = 1; i < args.count();) {
-    let const arg = args[i].view();
-    if (arg == "--") {
-      for (i++; i < args.count(); i++)
-        commands.push_managed(args[i].view());
-      break;
-    }
-    if (arg == "-p") {
-      should_print_specs = true;
-      i++;
-      continue;
-    }
-    if (arg == "-D") {
-      is_default_completion = true;
-      i++;
-      continue;
-    }
-    if (arg == "-F") {
-      if (++i < args.count()) function_name = String{heap_allocator(), args[i]};
-      i++;
-      continue;
-    }
-    if (arg == "-W") {
-      if (++i < args.count()) word_list = String{heap_allocator(), args[i]};
-      i++;
-      continue;
-    }
-    if (arg == "-o") {
-      if (++i < args.count() &&
-          (args[i] == "default" || args[i] == "bashdefault" ||
-           args[i] == "dirnames"))
-      {
-        should_use_default = true;
-      }
-      i++;
-      continue;
-    }
-    if (arg == "-A" || arg == "-G" || arg == "-C" || arg == "-X" ||
-        arg == "-P" || arg == "-S")
+  for (usize i = 0; i < FLAG_COMPLETE_OPTION.count(); i++) {
+    let const option = FLAG_COMPLETE_OPTION.get(i);
+    if (option == "default" || option == "bashdefault" || option == "dirnames")
     {
-      i += 2;
-      continue;
+      should_use_default = true;
     }
-    if (!arg.is_empty() && arg[0] == '-') {
-      i++;
-      continue;
-    }
-    commands.push_managed(arg);
-    i++;
   }
+  let const is_default_completion = FLAG_COMPLETE_DEFAULT.is_enabled();
+  let const should_print_specs = FLAG_COMPLETE_PRINT.is_enabled();
+  let commands = ArrayList<String>{cxt.scratch_allocator()};
+  for (usize i = 1; i < args.count(); i++)
+    commands.push_managed(args[i].view());
 
   /* -p reports failure when a named command has no spec, since the
      bash-completion loader reads a successful print as a registered spec. */

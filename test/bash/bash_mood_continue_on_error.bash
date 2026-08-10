@@ -61,6 +61,29 @@ printf 'arithmetic=%s\n' "${PIPESTATUS[*]}"
 printf 'conditional=%s\n' "${PIPESTATUS[*]}"
 (exit 7)
 printf 'subshell=%s\n' "${PIPESTATUS[*]}"
+if false; then
+    :
+fi
+observed=("$?" "${PIPESTATUS[*]}")
+printf 'empty-if=%s pipeline=%s\n' "${observed[@]}"
+while false; do
+    :
+done
+observed=("$?" "${PIPESTATUS[*]}")
+printf 'empty-while=%s pipeline=%s\n' "${observed[@]}"
+for ((; 0;)); do
+    :
+done
+observed=("$?" "${PIPESTATUS[*]}")
+printf 'empty-cstyle=%s pipeline=%s\n' "${observed[@]}"
+for value in; do
+    :
+done
+observed=("$?" "${PIPESTATUS[*]}")
+printf 'empty-for=%s pipeline=%s\n' "${observed[@]}"
+pipe_status_definition() { :; }
+observed=("$?" "${PIPESTATUS[*]}")
+printf 'definition=%s pipeline=%s\n' "${observed[@]}"
 
 case b in
     ["a"-c]) printf 'quoted-lower-range=match\n' ;;

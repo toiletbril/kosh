@@ -7,7 +7,10 @@ root=../../shit-git-branch-${PPID-0}-$$
 trap 'test -n "$root" && rm -rf "$root"' EXIT
 mkdir -p "$root/repo/.git" "$root/repo/sub/dir"
 printf 'ref: refs/heads/probe-branch\n' > "$root/repo/.git/HEAD"
+mkdir -p "$root/repo-two/.git"
+printf 'ref: refs/heads/second-branch\n' > "$root/repo-two/.git/HEAD"
 "$BIN" -c "cd '$root/repo' && echo \"attached=\$SHIT_GIT_BRANCH\""
+"$BIN" -c "cd '$root/repo' || exit; echo \"first=\$SHIT_GIT_BRANCH\"; cd ../repo-two || exit; echo \"second=\$SHIT_GIT_BRANCH\""
 "$BIN" -c "cd '$root/repo/sub/dir' && echo \"walked=\$SHIT_GIT_BRANCH\""
 printf '0123456789abcdef\n' > "$root/repo/.git/HEAD"
 "$BIN" -c "cd '$root/repo' && echo \"detached=\$SHIT_GIT_BRANCH\""

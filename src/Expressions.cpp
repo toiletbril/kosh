@@ -3,7 +3,9 @@
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
+#include "Colors.hpp"
 #include "Common.hpp"
+#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -204,10 +206,10 @@ fn Expression::operator delete(opaque *pointer) wontthrow -> void
   ::operator delete(pointer);
 }
 
-cold fn AnalysisContext::warn(SourceLocation location, StringView message,
-                              StringView suggestion, diagnostic_tier tier,
-                              Maybe<SourceLocation> related_location,
-                              StringView related_message) throws -> void
+fn AnalysisContext::warn(SourceLocation location, StringView message,
+                         StringView suggestion, diagnostic_tier tier,
+                         Maybe<SourceLocation> related_location,
+                         StringView related_message) throws -> void
 {
   if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
     return;
@@ -220,6 +222,13 @@ cold fn AnalysisContext::warn(SourceLocation location, StringView message,
   case diagnostic_tier::Annoying: required_level = 3; break;
   }
   if (!is_default_mood && warning_level < required_level) {
+    return;
+  }
+
+  if (!should_trace_optimizer) {
+    pending_warnings.push(
+        pending_analysis_warning{location, String{message}, String{suggestion},
+                                 related_location, String{related_message}});
     return;
   }
 
@@ -238,10 +247,65 @@ cold fn AnalysisContext::warn(SourceLocation location, StringView message,
   print_script_backtrace_if_rooted(location);
 }
 
-cold fn AnalysisContext::warn_shellcheck(
-    u16 diagnostic_code, SourceLocation location, StringView message,
-    StringView suggestion, Maybe<SourceLocation> related_location,
-    StringView related_message) throws -> void
+fn AnalysisContext::flush_warnings() throws -> void
+{
+  if (pending_warnings.is_empty()) return;
+
+  if (eval_context != nullptr && colors::stderr_wants_color()) {
+    let positions = ArrayList<usize>{heap_allocator()};
+    positions.reserve(pending_warnings.count() * 2);
+    for (let const &warning : pending_warnings) {
+      if (warning.location.position <= source.length)
+        positions.push(warning.location.position);
+      if (warning.related_location.has_value() &&
+          warning.related_location->position <= source.length)
+      {
+        positions.push(warning.related_location->position);
+      }
+    }
+    positions.sort();
+
+    let *cache = eval_context->get_or_create_diagnostic_highlight_cache();
+    Maybe<usize> previous_line_start;
+    for (let const position : positions) {
+      let const line = utils::source_line_position_at(source, position);
+      if (previous_line_start.has_value() &&
+          *previous_line_start == line.line_start)
+      {
+        continue;
+      }
+      cache->spans_for(source, line.line_start, line.line_end, *eval_context);
+      previous_line_start = line.line_start;
+    }
+  }
+
+  for (let const &warning : pending_warnings) {
+    if (warning.related_location.has_value()) {
+      let const located =
+          WarningWithLocation{warning.location, warning.message};
+      show_message(located.to_string(source, eval_context));
+
+      let const related = ErrorWithLocationAndDetails{warning.location,
+                                                      {},
+                                                      *warning.related_location,
+                                                      warning.related_message,
+                                                      warning.suggestion};
+      show_message(related.details_to_string(source, eval_context));
+    } else {
+      let const located = WarningWithLocationAndDetails{
+          warning.location, warning.message, warning.suggestion};
+      show_message(located.to_string(source, eval_context));
+    }
+    print_script_backtrace_if_rooted(warning.location);
+  }
+  pending_warnings.clear();
+}
+
+fn AnalysisContext::warn_shellcheck(u16 diagnostic_code,
+                                    SourceLocation location, StringView message,
+                                    StringView suggestion,
+                                    Maybe<SourceLocation> related_location,
+                                    StringView related_message) throws -> void
 {
   if (is_shellcheck_suppressed(diagnostic_code, location)) return;
 
@@ -275,10 +339,10 @@ cold fn AnalysisContext::print_script_backtrace_if_rooted(
   if (eval_context != nullptr) eval_context->print_source_backtrace(location);
 }
 
-cold fn AnalysisContext::fail(SourceLocation location, StringView message,
-                              StringView suggestion, diagnostic_tier tier,
-                              Maybe<SourceLocation> related_location,
-                              StringView related_message) throws -> void
+fn AnalysisContext::fail(SourceLocation location, StringView message,
+                         StringView suggestion, diagnostic_tier tier,
+                         Maybe<SourceLocation> related_location,
+                         StringView related_message) throws -> void
 {
   if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
     return;
@@ -310,6 +374,8 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
     return;
   }
 
+  flush_warnings();
+
   if (related_location.has_value()) {
     let const located = ErrorWithLocation{location, message};
     show_message(located.to_string(source, eval_context));
@@ -326,10 +392,11 @@ cold fn AnalysisContext::fail(SourceLocation location, StringView message,
   has_fatal = true;
 }
 
-cold fn AnalysisContext::fail_shellcheck(
-    u16 diagnostic_code, SourceLocation location, StringView message,
-    StringView suggestion, Maybe<SourceLocation> related_location,
-    StringView related_message) throws -> void
+fn AnalysisContext::fail_shellcheck(u16 diagnostic_code,
+                                    SourceLocation location, StringView message,
+                                    StringView suggestion,
+                                    Maybe<SourceLocation> related_location,
+                                    StringView related_message) throws -> void
 {
   if (is_shellcheck_suppressed(diagnostic_code, location)) return;
 
@@ -360,8 +427,7 @@ pure fn AnalysisContext::is_shellcheck_suppressed(
   return false;
 }
 
-cold fn AnalysisContext::note_variable_assignment(StringView name) throws
-    -> void
+fn AnalysisContext::note_variable_assignment(StringView name) throws -> void
 {
   if (name.is_empty()) return;
 
@@ -378,9 +444,9 @@ cold fn AnalysisContext::note_variable_assignment(StringView name) throws
   }
 }
 
-cold fn AnalysisContext::note_variable_read(
-    StringView name, SourceLocation location,
-    bool is_top_level_unconditional) throws -> void
+fn AnalysisContext::note_variable_read(StringView name, SourceLocation location,
+                                       bool is_top_level_unconditional) throws
+    -> void
 {
   if (!is_top_level_unconditional) return;
   if (has_seen_runtime_definer) return;
@@ -439,6 +505,15 @@ cold fn Expression::register_defined_functions(
     AnalysisContext &actx) const throws -> void
 {
   unused(actx);
+}
+
+fn Expression::append_presence_tested_command_names(
+    const AnalysisContext &actx, HashSet &names,
+    bool status_is_success) const throws -> void
+{
+  unused(actx);
+  unused(names);
+  unused(status_is_success);
 }
 
 fn Expression::is_simple_command() const wontthrow -> bool { return false; }
@@ -699,11 +774,13 @@ fn analyze_ast(const Expression *root, StringView source,
   /* A function or alias defined by an earlier command resolves, so the already
      registered names seed the prepass. */
   known_functions.for_each(
-      [&actx](StringView name) { actx.defined_functions.add(name); });
+      [&actx](StringView name) { actx.add_defined_function(name); });
   known_aliases.for_each(
-      [&actx](StringView name) { actx.known_aliases.add(name); });
+      [&actx](StringView name) { actx.add_known_alias(name); });
 
   root->analyze(actx, true);
+
+  actx.flush_warnings();
 
   if (actx.should_trace_optimizer) {
     let summary = String{"summary: "};
@@ -900,7 +977,7 @@ cold fn SimpleCommand::register_defined_functions(
     let const text = m_args[i]->raw_string();
     let const equals_position = text.find_character('=');
     if (equals_position.has_value() && *equals_position > 0)
-      actx.known_aliases.add(StringView{text.data(), *equals_position});
+      actx.add_known_alias(StringView{text.data(), *equals_position});
   }
 }
 
@@ -1252,24 +1329,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.loop_condition_reads_input = true;
   }
 
-  if (name.has_value()) {
-    let const is_command_test = name->view() == "command";
-    let const is_type_or_hash =
-        name->view() == "type" || name->view() == "hash";
-    if (is_command_test || is_type_or_hash) {
-      bool has_presence_flag = is_type_or_hash;
-      for (usize i = 1; i < m_args.count(); i++) {
-        let const arg = static_command_name(m_args[i]);
-        if (!arg.has_value()) break;
-        if (is_command_test && (arg->view() == "-v" || arg->view() == "-V")) {
-          has_presence_flag = true;
-          continue;
-        }
-        if (arg->view().starts_with("-")) continue;
-        if (has_presence_flag) actx.tested_command_names.add(arg->view());
-      }
-    }
-  }
+  append_presence_tested_command_names(actx, actx.tested_command_names, true);
 
   if (!command_is_shadowed && actx.is_inside_read_loop &&
       command_literal == "ssh")
@@ -2668,6 +2728,37 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 }
 
+fn SimpleCommand::append_presence_tested_command_names(
+    const AnalysisContext &actx, HashSet &names,
+    bool status_is_success) const throws -> void
+{
+  if (status_is_success == is_negated() || m_args.is_empty()) return;
+
+  let const name = static_command_name(m_args[0]);
+  if (!name.has_value()) return;
+  if (actx.defined_functions.contains(name->view()) ||
+      actx.known_aliases.contains(name->view()))
+  {
+    return;
+  }
+
+  let const is_command_test = name->view() == "command";
+  let const is_type_or_hash = name->view() == "type" || name->view() == "hash";
+  if (!is_command_test && !is_type_or_hash) return;
+
+  bool has_presence_flag = is_type_or_hash;
+  for (usize i = 1; i < m_args.count(); i++) {
+    let const arg = static_command_name(m_args[i]);
+    if (!arg.has_value()) break;
+    if (is_command_test && (arg->view() == "-v" || arg->view() == "-V")) {
+      has_presence_flag = true;
+      continue;
+    }
+    if (arg->view().starts_with("-")) continue;
+    if (has_presence_flag) names.add(arg->view());
+  }
+}
+
 cold fn SimpleCommand::try_static_condition_verdict(
     const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
@@ -2809,6 +2900,15 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   if (m_commands.count() > 1) actx.constant_variables.clear();
 }
 
+fn Pipeline::append_presence_tested_command_names(
+    const AnalysisContext &actx, HashSet &names,
+    bool status_is_success) const throws -> void
+{
+  if (m_commands.count() != 1 || m_commands[0] == nullptr) return;
+  m_commands[0]->append_presence_tested_command_names(
+      actx, names, status_is_success != is_negated());
+}
+
 fn Pipeline::as_simple_command() const wontthrow -> const SimpleCommand *
 {
   if (m_commands.count() != 1 || m_commands[0] == nullptr) return nullptr;
@@ -2821,6 +2921,14 @@ fn CompoundListCondition::analyze(AnalysisContext &actx,
   ASSERT(m_cmd != nullptr);
 
   m_cmd->analyze(actx, is_unconditional);
+}
+
+fn CompoundListCondition::append_presence_tested_command_names(
+    const AnalysisContext &actx, HashSet &names,
+    bool status_is_success) const throws -> void
+{
+  ASSERT(m_cmd != nullptr);
+  m_cmd->append_presence_tested_command_names(actx, names, status_is_success);
 }
 
 cold fn CompoundListCondition::register_defined_functions(
@@ -2948,22 +3056,40 @@ fn CompoundList::analyze(AnalysisContext &actx,
   }
 
   let saved_tested_command_names = actx.tested_command_names.clone();
+  const CompoundListCondition *previous_node = nullptr;
   for (let const node : m_nodes) {
     ASSERT(node != nullptr);
 
-    if (node->kind() != CompoundListCondition::Kind::And)
+    if (node->kind() != CompoundListCondition::Kind::And) {
       actx.tested_command_names = saved_tested_command_names.clone();
+      if (node->kind() == CompoundListCondition::Kind::Or &&
+          previous_node != nullptr)
+      {
+        previous_node->append_presence_tested_command_names(
+            actx, actx.tested_command_names, false);
+      }
+    }
 
     /* A semicolon or newline node runs whenever the list runs, an && or || node
        is conditional. */
     let const node_unconditional =
         is_unconditional && node->kind() == CompoundListCondition::Kind::None;
     node->analyze(actx, node_unconditional);
+    previous_node = node;
   }
   if (!actx.should_retain_tested_command_names)
     actx.tested_command_names = steal(saved_tested_command_names);
   if (owns_definition_registration)
     actx.has_registered_definitions_in_scope = false;
+}
+
+fn CompoundList::append_presence_tested_command_names(
+    const AnalysisContext &actx, HashSet &names,
+    bool status_is_success) const throws -> void
+{
+  if (m_nodes.count() != 1 || m_nodes[0] == nullptr) return;
+  m_nodes[0]->append_presence_tested_command_names(actx, names,
+                                                   status_is_success);
 }
 
 cold fn CompoundList::register_defined_functions(

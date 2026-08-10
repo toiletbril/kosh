@@ -50,6 +50,13 @@ FlagBool::FlagBool(char short_name, StringView long_name, flag_section section,
     : Flag(Flag::Kind::Bool, short_name, long_name, section, description)
 {}
 
+FlagBool::FlagBool(FlagList &flags, char short_name, StringView long_name,
+                   flag_section section, StringView description)
+    : FlagBool(short_name, long_name, section, description)
+{
+  flags.push(this);
+}
+
 fn FlagBool::toggle() throws -> void { m_value = !m_value; }
 
 fn FlagBool::enable() wontthrow -> void { m_value = true; }
@@ -71,6 +78,14 @@ FlagRepeatedBool::FlagRepeatedBool(char short_name, StringView long_name,
   ASSERT(long_name.is_empty());
 }
 
+FlagRepeatedBool::FlagRepeatedBool(FlagList &flags, char short_name,
+                                   StringView long_name, flag_section section,
+                                   StringView description)
+    : FlagRepeatedBool(short_name, long_name, section, description)
+{
+  flags.push(this);
+}
+
 fn FlagRepeatedBool::increment() throws -> void { m_count++; }
 
 pure fn FlagRepeatedBool::count() const wontthrow -> usize { return m_count; }
@@ -86,6 +101,13 @@ FlagString::FlagString(char short_name, StringView long_name,
                        flag_section section, StringView description)
     : Flag(Flag::Kind::String, short_name, long_name, section, description)
 {}
+
+FlagString::FlagString(FlagList &flags, char short_name, StringView long_name,
+                       flag_section section, StringView description)
+    : FlagString(short_name, long_name, section, description)
+{
+  flags.push(this);
+}
 
 fn FlagString::set(StringView v) throws -> void
 {
@@ -112,6 +134,14 @@ FlagManyStrings::FlagManyStrings(char short_name, StringView long_name,
                                  flag_section section, StringView description)
     : Flag(Flag::Kind::ManyStrings, short_name, long_name, section, description)
 {}
+
+FlagManyStrings::FlagManyStrings(FlagList &flags, char short_name,
+                                 StringView long_name, flag_section section,
+                                 StringView description)
+    : FlagManyStrings(short_name, long_name, section, description)
+{
+  flags.push(this);
+}
 
 fn FlagManyStrings::append(StringView v) throws -> void
 {
@@ -154,9 +184,8 @@ fn FlagManyStrings::reset() throws -> void
   m_value_position = 0;
 }
 
-static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
-                    bool is_long, Flag **result_flag,
-                    const char **value_start) throws -> bool
+static fn find_flag(const FlagList &flags, const char *flag_start, bool is_long,
+                    Flag **result_flag, const char **value_start) throws -> bool
 {
   usize longest_length = 0;
   let const flag_start_length = std::strlen(flag_start);
@@ -196,9 +225,8 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
   return longest_length > 0;
 }
 
-fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args, usize base_position,
-                   const Flag *operand_value_flag,
+fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
+                   usize base_position, const Flag *operand_value_flag,
                    const ArrayList<SourceLocation> *arg_locations,
                    ArrayList<SourceLocation> *operand_locations,
                    StringView program_name,
@@ -207,16 +235,27 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
 {
   reset_flags(flags);
 
-  let os_argv = ArrayList<const char *>{heap_allocator()};
-  os_argv.reserve(args.count());
+  constexpr usize local_argument_capacity = 128;
+  const char *local_arguments[local_argument_capacity];
+  let overflow_arguments = ArrayList<const char *>{heap_allocator()};
+  const char **argument_data = local_arguments;
 
-  for (let const &arg : args)
-    os_argv.push(arg.c_str());
+  if (args.count() > local_argument_capacity) {
+    overflow_arguments.reserve(args.count());
+
+    for (let const &arg : args)
+      overflow_arguments.push(arg.c_str());
+
+    argument_data = overflow_arguments.begin();
+  } else {
+    for (usize index = 0; index < args.count(); index++)
+      local_arguments[index] = args[index].c_str();
+  }
 
   try {
-    return parse_flags(flags, static_cast<int>(os_argv.count()),
-                       os_argv.begin(), base_position, operand_value_flag,
-                       arg_locations, operand_locations, program_name,
+    return parse_flags(flags, static_cast<int>(args.count()), argument_data,
+                       base_position, operand_value_flag, arg_locations,
+                       operand_locations, program_name,
                        should_accept_negative_number_operand);
   } catch (...) {
     reset_flags(flags);
@@ -272,9 +311,8 @@ static fn attached_flag_value_location(
   return location;
 }
 
-fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv, usize base_position,
-               const Flag *operand_value_flag,
+fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
+               usize base_position, const Flag *operand_value_flag,
                const ArrayList<SourceLocation> *arg_locations,
                ArrayList<SourceLocation> *operand_locations,
                StringView program_name,
@@ -412,12 +450,14 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           let const bool_flag = static_cast<FlagBool *>(flag);
 
           if (is_long && *value_offset != '\0') {
-            throw ErrorWithLocation{
+            let error = ErrorWithLocation{
                 argument_location(argv, static_cast<usize>(i), base_position,
                                   arg_locations),
                 prefixed_message(program_name, "The flag '" +
                                                    flag_name(flag, is_long) +
                                                    "' does not take a value")};
+            error.set_command_status(2);
+            throw error;
           }
 
           bool_flag->enable();
@@ -474,11 +514,13 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                 LOG(All, "set the flag '%s' to '%s'",
                     flag_name(flag, is_long).c_str(), value_offset);
               } else {
-                throw ErrorWithLocation{
+                let error = ErrorWithLocation{
                     argument_location(argv, static_cast<usize>(i),
                                       base_position, arg_locations),
                     "No value provided for '" + flag_name(flag, is_long) +
                         "' flag"};
+                error.set_command_status(2);
+                throw error;
               }
             } else if (!is_long) {
               if (flag->kind() == Flag::Kind::String)
@@ -493,20 +535,24 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
               LOG(All, "set the flag '%s' to the attached value '%s'",
                   flag_name(flag, is_long).c_str(), value_offset);
             } else {
-              throw ErrorWithLocation{
+              let error = ErrorWithLocation{
                   argument_location(argv, static_cast<usize>(i), base_position,
                                     arg_locations),
                   "Long flags require a separator between the flag and the "
                   "value. Try using '" +
                       flag_name(flag, is_long) + "=" + value_offset + "'"};
+              error.set_command_status(2);
+              throw error;
             }
           }
         } break;
         }
       } else {
         if (*flag_offset == '-') {
-          throw Error{prefixed_message(
+          let error = Error{prefixed_message(
               program_name, "Missing space between '-' and other options")};
+          error.set_command_status(2);
+          throw error;
         } else {
           let error_message = String{heap_allocator()};
           error_message += "Unknown flag '-";
@@ -529,10 +575,12 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           LOG(Debug, "rejecting the unknown flag in '%s'", argv[i]);
 
           const usize arg_index = static_cast<usize>(i);
-          throw ErrorWithLocationAndDetails{
+          let error = ErrorWithLocationAndDetails{
               argument_location(argv, arg_index, base_position, arg_locations),
               prefixed_message(program_name, error_message),
               "Use `--` before an operand that begins with a dash"};
+          error.set_command_status(2);
+          throw error;
         }
       }
     }
@@ -540,11 +588,13 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   if (next_arg_is_value) {
     ASSERT(prev_flag != nullptr);
-    throw ErrorWithLocation{
+    let error = ErrorWithLocation{
         prev_flag->value_location(),
         prefixed_message(program_name, "No value provided for '" +
                                            flag_name(prev_flag, prev_is_long) +
                                            "' flag")};
+    error.set_command_status(2);
+    throw error;
   }
 
   return args;
@@ -601,11 +651,19 @@ fn join_command_line(int argc, const char *const *argv) throws -> String
   return s;
 }
 
-fn reset_flags(const ArrayList<Flag *> &flags) throws -> void
+fn reset_flags(const FlagList &flags) throws -> void
 {
-  for (let const flag : flags) {
-    flag->reset();
-  }
+  for (let const flag : flags)
+    switch (flag->kind()) {
+    case Flag::Kind::Bool: static_cast<FlagBool *>(flag)->reset(); break;
+    case Flag::Kind::RepeatedBool:
+      static_cast<FlagRepeatedBool *>(flag)->reset();
+      break;
+    case Flag::Kind::String: static_cast<FlagString *>(flag)->reset(); break;
+    case Flag::Kind::ManyStrings:
+      static_cast<FlagManyStrings *>(flag)->reset();
+      break;
+    }
 }
 
 cold fn append_version_triple(String &out, Allocator allocator) throws -> void
@@ -683,8 +741,8 @@ cold fn show_short_version() throws -> void
   flush();
 }
 
-cold fn make_synopsis(StringView program_name,
-                      const ArrayList<StringView> &lines) throws -> String
+cold fn make_synopsis(StringView program_name, const SynopsisList &lines) throws
+    -> String
 {
   let s = String{heap_allocator()};
 
@@ -734,7 +792,7 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
   return out;
 }
 
-cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
+cold fn make_flag_help(const FlagList &flags) throws -> String
 {
   let s = String{heap_allocator()};
 

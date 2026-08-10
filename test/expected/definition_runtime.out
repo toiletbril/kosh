@@ -1,6 +1,8 @@
 == callback keeps definition diagnostics:
 warning-clean
 ok
+== callback keeps definition annoying state:
+off
 == callback keeps definition mood:
 shit
 == word list keeps registration mood:

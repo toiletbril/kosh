@@ -8,6 +8,10 @@
 [optimizer] folded constant arithmetic: x + y = 5
 [optimizer] summary: 1 arithmetic folded, 2 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
 5
+=== DEBUG observes folded arithmetic source ===
+[optimizer] recorded constant: x = 2
+[optimizer] summary: 0 arithmetic folded, 1 constants recorded, 0 branches folded, 0 loops folded, 0 compounds eliminated
+10
 === dead branch, condition is true ===
 [optimizer] folded if to branch 0
 [optimizer] summary: 0 arithmetic folded, 0 constants recorded, 1 branches folded, 0 loops folded, 0 compounds eliminated

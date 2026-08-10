@@ -47,6 +47,8 @@ shit::ArrayList<history_event> history_events(shit::Allocator allocator);
 shit::Maybe<usize> history_append_event(StringView command);
 bool history_rewrite_event(usize number, StringView expected,
                            StringView replacement);
+bool history_rewrite_event(usize number, StringView expected,
+                           const shit::ArrayList<String> &replacements);
 
 void enable_job_notifications(shit::EvalContext &context);
 

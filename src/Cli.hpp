@@ -9,15 +9,14 @@
 #define HELP_SYNOPSIS T__FLAG_HELP_SYNOPSIS
 
 #define HELP_SYNOPSIS_DECL(...)                                                \
-  static shit::ArrayList<shit::StringView> HELP_SYNOPSIS { __VA_ARGS__ }
+  static shit::SynopsisList HELP_SYNOPSIS { __VA_ARGS__ }
 
 #define HELP_DESCRIPTION T__FLAG_HELP_DESCRIPTION
 
 #define HELP_DESCRIPTION_DECL(text)                                            \
   static shit::StringView HELP_DESCRIPTION { text }
 
-#define FLAG_LIST_DECL()                                                       \
-  static shit::ArrayList<shit::Flag *> FLAG_LIST { shit::heap_allocator() }
+#define FLAG_LIST_DECL() static shit::FlagList FLAG_LIST
 
 /* FLAG takes an optional flag_section argument before the description. The
    section is named unqualified, such as Compat, and the macro prepends
@@ -29,12 +28,64 @@
 #define T__FLAG5(var_name, kind, short_name, long_name, description)           \
   T__FLAG6(var_name, kind, short_name, long_name, NoSection, description)
 #define T__FLAG6(var_name, kind, short_name, long_name, section, description)  \
-  static shit::Flag##kind concat_literal(FLAG_, var_name){                     \
-      short_name, long_name, shit::flag_section::section, description};        \
-  static uchar concat_literal(t__flag_dummy_, __LINE__) =                      \
-      (FLAG_LIST.push(&concat_literal(FLAG_, var_name)), 0)
+  static shit::Flag##kind concat_literal(FLAG_, var_name)                      \
+  {                                                                            \
+    FLAG_LIST, short_name, long_name, shit::flag_section::section, description \
+  }
 
 namespace shit {
+
+class Flag;
+
+class SynopsisList
+{
+public:
+  SynopsisList(std::initializer_list<StringView> lines) wontthrow
+  {
+    ASSERT(lines.size() <= countof(m_lines));
+    for (let const line : lines)
+      m_lines[m_count++] = line;
+  }
+
+  pure fn count() const wontthrow -> usize { return m_count; }
+  pure fn begin() const wontthrow -> const StringView * { return m_lines; }
+  pure fn end() const wontthrow -> const StringView *
+  {
+    return m_lines + m_count;
+  }
+  pure fn operator[](usize index) const wontthrow->StringView
+  {
+    ASSERT(index < m_count);
+    return m_lines[index];
+  }
+
+private:
+  StringView m_lines[4]{};
+  usize m_count{0};
+};
+
+class FlagList
+{
+public:
+  fn push(Flag *flag) wontthrow -> void
+  {
+    ASSERT(m_count < countof(m_flags));
+    m_flags[m_count++] = flag;
+  }
+
+  pure fn count() const wontthrow -> usize { return m_count; }
+  pure fn begin() const wontthrow -> Flag *const * { return m_flags; }
+  pure fn end() const wontthrow -> Flag *const * { return m_flags + m_count; }
+  pure fn operator[](usize index) const wontthrow->Flag *
+  {
+    ASSERT(index < m_count);
+    return m_flags[index];
+  }
+
+private:
+  Flag *m_flags[64]{};
+  usize m_count{0};
+};
 
 /* The order here is the order the sections print in. */
 enum class flag_section : u8
@@ -71,8 +122,6 @@ public:
   pure fn section() const wontthrow -> flag_section;
   pure fn description() const wontthrow -> StringView;
 
-  virtual fn reset() throws -> void = 0;
-
 protected:
   Flag(Kind type, char short_name, StringView long_name, flag_section section,
        StringView description);
@@ -82,13 +131,15 @@ protected:
   SourceLocation m_value_location{};
   char m_short_name;
   flag_section m_section;
-  String m_long_name;
-  String m_description;
+  StringView m_long_name;
+  StringView m_description;
 };
 
 class FlagBool : public Flag
 {
 public:
+  FlagBool(FlagList &flags, char short_name, StringView long_name,
+           flag_section section, StringView description);
   FlagBool(char short_name, StringView long_name, flag_section section,
            StringView description);
 
@@ -96,7 +147,7 @@ public:
   fn toggle() throws -> void;
   pure fn is_enabled() const wontthrow -> bool;
 
-  fn reset() throws -> void override;
+  fn reset() throws -> void;
 
 private:
   bool m_value{false};
@@ -105,13 +156,15 @@ private:
 class FlagRepeatedBool : public Flag
 {
 public:
+  FlagRepeatedBool(FlagList &flags, char short_name, StringView long_name,
+                   flag_section section, StringView description);
   FlagRepeatedBool(char short_name, StringView long_name, flag_section section,
                    StringView description);
 
   fn increment() throws -> void;
   pure fn count() const wontthrow -> usize;
 
-  fn reset() throws -> void override;
+  fn reset() throws -> void;
 
 private:
   usize m_count{0};
@@ -120,6 +173,8 @@ private:
 class FlagString : public Flag
 {
 public:
+  FlagString(FlagList &flags, char short_name, StringView long_name,
+             flag_section section, StringView description);
   FlagString(char short_name, StringView long_name, flag_section section,
              StringView description);
 
@@ -127,7 +182,7 @@ public:
   pure fn is_set() const wontthrow -> bool;
   pure fn value() const wontthrow -> StringView;
 
-  fn reset() throws -> void override;
+  fn reset() throws -> void;
 
 private:
   bool m_is_set{false};
@@ -137,6 +192,8 @@ private:
 class FlagManyStrings : public Flag
 {
 public:
+  FlagManyStrings(FlagList &flags, char short_name, StringView long_name,
+                  flag_section section, StringView description);
   FlagManyStrings(char short_name, StringView long_name, flag_section section,
                   StringView description);
 
@@ -150,7 +207,7 @@ public:
   pure fn at_end() const wontthrow -> bool;
   pure fn value_position() const wontthrow -> usize { return m_value_position; }
 
-  fn reset() throws -> void override;
+  fn reset() throws -> void;
 
 private:
   ArrayList<String> m_values{heap_allocator()};
@@ -162,16 +219,16 @@ private:
    flag that follows it is parsed as a flag rather than swallowed as the value.
    It is null for every builtin, which take an option value from the next
    argument verbatim the way bash's getopt does. */
-fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args, usize base_position = 0,
+fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
+                   usize base_position = 0,
                    const Flag *operand_value_flag = nullptr,
                    const ArrayList<SourceLocation> *arg_locations = nullptr,
                    ArrayList<SourceLocation> *operand_locations = nullptr,
                    StringView program_name = StringView{},
                    bool should_accept_negative_number_operand = false) throws
     -> ArrayList<String>;
-fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv, usize base_position = 0,
+fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
+               usize base_position = 0,
                const Flag *operand_value_flag = nullptr,
                const ArrayList<SourceLocation> *arg_locations = nullptr,
                ArrayList<SourceLocation> *operand_locations = nullptr,
@@ -186,15 +243,15 @@ pure fn shell_quoted_arg_length(StringView arg) wontthrow -> usize;
 fn append_shell_quoted_arg(String &out, StringView arg,
                            bool should_always_quote = false) throws -> void;
 
-fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
+fn reset_flags(const FlagList &flags) throws -> void;
 
 fn show_version() throws -> void;
 fn short_version_string(Allocator allocator) throws -> String;
 fn show_short_version() throws -> void;
 
-fn make_synopsis(StringView program_name,
-                 const ArrayList<StringView> &lines) throws -> String;
-fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String;
+fn make_synopsis(StringView program_name, const SynopsisList &lines) throws
+    -> String;
+fn make_flag_help(const FlagList &flags) throws -> String;
 
 fn wrap_text(StringView text, usize indent, usize width) throws -> String;
 

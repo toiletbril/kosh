@@ -150,10 +150,7 @@ FLAG(DEBUG_GHOST_AT, String, '\0', "debug-ghost-at", Debug,
 
 namespace shit {
 
-fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &
-{
-  return FLAG_LIST;
-}
+fn shit_binary_flag_list() wontthrow -> const FlagList & { return FLAG_LIST; }
 
 #if !defined NDEBUG
 static fn run_debug_completion_driver(StringView driver_line,

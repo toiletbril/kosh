@@ -13,8 +13,6 @@ HELP_DESCRIPTION_DECL(
     "The shopt builtin sets, unsets, and queries the bash shell options.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
-/* The letters are hand-parsed in execute since they combine bash-style, so
-   these FLAG rows only feed the help text. */
 FLAG(SHOPT_SET, Bool, 's', "", "Enable each named option.");
 FLAG(SHOPT_UNSET, Bool, 'u', "", "Disable each named option.");
 FLAG(SHOPT_QUIET, Bool, 'q', "",
@@ -160,42 +158,27 @@ pure fn Shopt::kind() const wontthrow -> Builtin::Kind { return Kind::Shopt; }
 
 fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const &args = ec.args();
-  ASSERT(!args.is_empty());
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const args =
+      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,
+                      nullptr, &ec.arg_locations(), &operand_locations,
+                      builtin_error_context(ec.program()));
+  defer { reset_flags(FLAG_LIST); };
 
-  if (args.count() > 1 && args[1] == "--help")
+  if (FLAG_HELP.is_enabled())
     SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(
         ec, format_option_names_help(cxt.scratch_allocator()).view());
 
-  bool should_enable = false;
-  bool should_disable = false;
-  bool is_quiet = false;
-  bool should_operate_on_set_options = false;
-  bool should_print_reusable = false;
+  let const should_enable = FLAG_SHOPT_SET.is_enabled();
+  let const should_disable = FLAG_SHOPT_UNSET.is_enabled();
+  let const is_quiet = FLAG_SHOPT_QUIET.is_enabled();
+  let const should_operate_on_set_options = FLAG_SHOPT_SET_OPTIONS.is_enabled();
+  let const should_print_reusable = FLAG_SHOPT_PRINT.is_enabled();
   let names = ArrayList<StringView>{cxt.scratch_allocator()};
-  let name_arg_indices = ArrayList<usize>{cxt.scratch_allocator()};
-
+  let name_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   for (usize i = 1; i < args.count(); i++) {
-    const StringView arg = args[i].view();
-    /* The options combine into one argument, such as the -qo of shopt -qo
-       posix. Any other letter is accepted without effect. */
-    if (arg.length >= 2 && arg[0] == '-') {
-      for (usize k = 1; k < arg.length; k++) {
-        if (arg[k] == 's')
-          should_enable = true;
-        else if (arg[k] == 'u')
-          should_disable = true;
-        else if (arg[k] == 'q')
-          is_quiet = true;
-        else if (arg[k] == 'o')
-          should_operate_on_set_options = true;
-        else if (arg[k] == 'p')
-          should_print_reusable = true;
-      }
-    } else {
-      names.push(arg);
-      name_arg_indices.push(i);
-    }
+    names.push(args[i].view());
+    name_locations.push(operand_locations[i]);
   }
 
   let const do_format_status_line = [&](StringView name, bool on) throws {
@@ -206,11 +189,12 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   i32 status = 0;
-  let do_reject_unknown = [&](StringView name, usize arg_index) throws -> bool {
+  let do_reject_unknown = [&](StringView name, SourceLocation location)
+                              throws -> bool {
     if (is_known_shopt_option(name)) return false;
     status = 1;
     if (!is_quiet)
-      report_soft_builtin_error(ec, cxt, ec.arg_location_at(arg_index),
+      report_soft_builtin_error(ec, cxt, location,
                                 StringView{"'"} + name +
                                     "' is not a valid shell option name");
     return true;
@@ -239,15 +223,14 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     for (usize n = 0; n < names.count(); n++) {
       let const &name = names[n];
-      let const arg_index = name_arg_indices[n];
+      let const location = name_locations[n];
       if (should_enable || should_disable) {
         if (!apply_shell_option(cxt, name, should_enable)) {
           if (is_quiet)
             status = 1;
           else
-            throw make_error_for_arg(ec, arg_index,
-                                     StringView{"Unknown shopt option '"} +
-                                         name + "'");
+            throw ErrorWithLocation{
+                location, StringView{"Unknown shopt option '"} + name + "'"};
         }
       } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
@@ -258,8 +241,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (is_quiet)
           status = 1;
         else
-          throw make_error_for_arg(
-              ec, arg_index, StringView{"Unknown shopt option '"} + name + "'");
+          throw ErrorWithLocation{
+              location, StringView{"Unknown shopt option '"} + name + "'"};
       }
     }
     return status;
@@ -285,8 +268,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     for (usize n = 0; n < names.count(); n++) {
       let const &name = names[n];
-      let const arg_index = name_arg_indices[n];
-      if (do_reject_unknown(name, arg_index)) continue;
+      let const location = name_locations[n];
+      if (do_reject_unknown(name, location)) continue;
       if (name == "restricted_shell") continue;
       LOG(Info, "shopt setting '%.*s' to %s", static_cast<int>(name.length),
           name.data, should_enable ? "on" : "off");
@@ -308,8 +291,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize n = 0; n < names.count(); n++) {
     let const &name = names[n];
-    let const arg_index = name_arg_indices[n];
-    if (do_reject_unknown(name, arg_index)) continue;
+    let const location = name_locations[n];
+    if (do_reject_unknown(name, location)) continue;
     let const is_on = cxt.is_shopt_enabled(name);
     if (!is_on) status = 1;
     if (!is_quiet)

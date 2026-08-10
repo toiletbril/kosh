@@ -105,9 +105,14 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (start_position < end_position &&
             end_position <= history_source->length)
         {
-          unused(toiletline::history_append_event(
-              history_source->substring_of_length(
-                  start_position, end_position - start_position)));
+          if (!cxt.record_history_event(history_source->substring_of_length(
+                  start_position, end_position - start_position)))
+          {
+            throw ErrorWithLocation{
+                first_command->source_location(),
+                "Unable to record the command because the history file "
+                "rejected the entry"};
+          }
         }
       }
     }
@@ -279,6 +284,7 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
     -> i64
 {
   ASSERT(m_cmd != nullptr);
+  cxt.begin_command_evaluation();
 
   /* A negated or timed command must run to completion here, since the inverse
      or the report applies after the command returns, which an exec would
@@ -774,6 +780,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (m_is_fully_eliminated && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated if as a no-op");
+    cxt.publish_single_pipe_status(1);
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
@@ -786,6 +793,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (*m_folded_branch < m_branches.count())
       return m_branches[*m_folded_branch].body->evaluate(cxt);
     if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+    cxt.publish_single_pipe_status(1);
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
@@ -818,14 +826,15 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional. */
-  let is_first_branch = true;
   let saved_tested_command_names = actx.tested_command_names.clone();
+  let condition_failure_names = saved_tested_command_names.clone();
+  let is_first_branch = true;
   for (usize i = 0; i < m_branches.count(); i++) {
     let const & [ condition, body ] = m_branches[i];
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
-    actx.tested_command_names = saved_tested_command_names.clone();
+    actx.tested_command_names = condition_failure_names.clone();
     let const was_retaining_tested_command_names =
         actx.should_retain_tested_command_names;
     actx.should_retain_tested_command_names = true;
@@ -838,6 +847,11 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     if (is_dead_branch) actx.should_silence_unresolved_commands = true;
     body->analyze(actx, false);
     actx.should_silence_unresolved_commands = was_silenced;
+
+    actx.tested_command_names = condition_failure_names.clone();
+    condition->append_presence_tested_command_names(
+        actx, actx.tested_command_names, false);
+    condition_failure_names = steal(actx.tested_command_names);
     is_first_branch = false;
   }
 
@@ -845,7 +859,7 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       has_folded_branch() && folded_branch_index() != m_branches.count();
   let const was_else_silenced = actx.should_silence_unresolved_commands;
   if (else_is_dead) actx.should_silence_unresolved_commands = true;
-  actx.tested_command_names = saved_tested_command_names.clone();
+  actx.tested_command_names = steal(condition_failure_names);
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
   actx.should_silence_unresolved_commands = was_else_silenced;
   actx.tested_command_names = steal(saved_tested_command_names);
@@ -966,6 +980,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   if ((m_folded_to_skip || m_is_fully_eliminated) &&
       can_skip_condition_commands)
   {
+    cxt.publish_single_pipe_status(m_is_until ? 0 : 1);
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
@@ -1016,12 +1031,23 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
   let const was_inside_loop_condition = actx.is_inside_loop_condition;
   let const prior_loop_condition_reads_input = actx.loop_condition_reads_input;
+  let saved_tested_command_names = actx.tested_command_names.clone();
+  let const was_retaining_tested_command_names =
+      actx.should_retain_tested_command_names;
   actx.is_inside_loop_condition = true;
   actx.loop_condition_reads_input = false;
+  actx.should_retain_tested_command_names = true;
   m_condition->analyze(actx, is_unconditional);
+  actx.should_retain_tested_command_names = was_retaining_tested_command_names;
   let const loop_condition_reads_input = actx.loop_condition_reads_input;
   actx.is_inside_loop_condition = was_inside_loop_condition;
   actx.loop_condition_reads_input = prior_loop_condition_reads_input;
+
+  if (m_is_until) {
+    actx.tested_command_names = saved_tested_command_names.clone();
+    m_condition->append_presence_tested_command_names(
+        actx, actx.tested_command_names, false);
+  }
 
   let const was_silenced = actx.should_silence_unresolved_commands;
   let const was_inside_read_loop = actx.is_inside_read_loop;
@@ -1030,6 +1056,7 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   m_body->analyze(actx, false);
   actx.is_inside_read_loop = was_inside_read_loop;
   actx.should_silence_unresolved_commands = was_silenced;
+  actx.tested_command_names = steal(saved_tested_command_names);
 }
 
 cold fn WhileLoop::register_defined_functions(
@@ -1203,6 +1230,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_terminal_exec_allowed(false);
 
   if (m_is_fully_eliminated) {
+    cxt.publish_single_pipe_status(0);
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
@@ -1630,6 +1658,7 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_terminal_exec_allowed(false);
 
   if (m_is_fully_eliminated) {
+    cxt.publish_single_pipe_status(0);
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 

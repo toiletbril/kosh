@@ -1,0 +1,9 @@
+sequence=1
+negated_and=1
+negated_if=1
+shadowed_command=1
+shadowed_type=1
+shadowed_hash=1
+until_failure=1
+valid_or=0
+valid_until=0

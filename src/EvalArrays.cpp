@@ -418,8 +418,10 @@ fn EvalContext::unset_array_element(StringView name,
     throw Error{"Unable to unset '" + name + "' because it is read only"};
 
   if (is_associative_array(name)) {
+    let const key = expand_modifier_word(subscript);
     m_associative_values.erase(
-        associative_composite_key(name, subscript, scratch_allocator()).view());
+        associative_composite_key(name, key.view(), scratch_allocator())
+            .view());
     return;
   }
 

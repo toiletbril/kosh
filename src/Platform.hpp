@@ -113,6 +113,7 @@ namespace shit {
 
 class ExecContext;
 class Flag;
+class FlagList;
 enum class mimic_mood : u8;
 
 namespace os {
@@ -473,6 +474,21 @@ extern const ProgramSuffixList PROGRAM_SUFFIXES;
 
 fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
+inline fn write_all(os::descriptor fd, const opaque *buf, usize size) wontthrow
+    -> bool
+{
+  usize written_size = 0;
+
+  while (written_size < size) {
+    let const result = write_fd(fd, static_cast<const u8 *>(buf) + written_size,
+                                size - written_size);
+    if (!result.has_value() || *result == 0) return false;
+
+    written_size += *result;
+  }
+
+  return true;
+}
 fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
@@ -947,7 +963,7 @@ fn launch_compound_stage(
     process_group_mode process_group = process_group_mode::Inherit,
     i64 process_group_id = 0) throws -> compound_stage_launch;
 
-fn register_platform_flags(ArrayList<Flag *> &flags) throws -> void;
+fn register_platform_flags(FlagList &flags) throws -> void;
 fn initialize_platform_runtime() wontthrow -> void;
 
 /* A forked pipeline-stage child calls this so it never runs the parent's

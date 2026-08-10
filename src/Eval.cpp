@@ -15,6 +15,7 @@
 #include "ResolvedCommand.hpp"
 #include "Shitbox.hpp"
 #include "StaticStringMap.hpp"
+#include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -97,6 +98,39 @@ fn EvalContext::end_command() wontthrow -> void
   }
 
   m_expansions_last = m_expressions_executed_last = 0;
+}
+
+fn EvalContext::record_history_event(StringView command) throws -> bool
+{
+  if (!m_history_transaction_stack.is_empty()) {
+    m_history_transaction_stack.back()->push(String{heap_allocator(), command});
+    return true;
+  }
+
+  unused(toiletline::history_append_event(command));
+  return true;
+}
+
+fn EvalContext::begin_history_transaction(ArrayList<String> &commands) throws
+    -> void
+{
+  m_history_transaction_stack.push(&commands);
+}
+
+fn EvalContext::end_history_transaction() wontthrow -> void
+{
+  ASSERT(!m_history_transaction_stack.is_empty());
+  m_history_transaction_stack.pop_back();
+}
+
+pure fn EvalContext::has_history_transaction() const wontthrow -> bool
+{
+  return !m_history_transaction_stack.is_empty();
+}
+
+fn EvalContext::begin_command_evaluation() wontthrow -> void
+{
+  m_command_evaluation_index++;
 }
 
 hot fn EvalContext::assign_variable(StringView name, StringView value) throws
@@ -830,18 +864,33 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       case dynamic_var::LINENO:
         return String::from(line_number_at_location(m_current_location),
                             heap_allocator());
-      case dynamic_var::SHIT_GIT_BRANCH: return utils::current_git_branch();
-      case dynamic_var::SHIT_GIT_AHEAD: {
-        i32 ahead_count = 0, behind_count = 0;
-        utils::git_ahead_behind_counts(ahead_count, behind_count);
-        return ahead_count > 0 ? String::from(ahead_count, heap_allocator())
-                               : String{heap_allocator()};
+      case dynamic_var::SHIT_GIT_BRANCH: {
+        if (m_git_branch_command_index != m_command_evaluation_index) {
+          m_git_branch = utils::current_git_branch();
+          m_git_branch_command_index = m_command_evaluation_index;
+        }
+        return String{heap_allocator(), m_git_branch.view()};
       }
+      case dynamic_var::SHIT_GIT_AHEAD:
       case dynamic_var::SHIT_GIT_BEHIND: {
-        i32 ahead_count = 0, behind_count = 0;
-        utils::git_ahead_behind_counts(ahead_count, behind_count);
-        return behind_count > 0 ? String::from(behind_count, heap_allocator())
-                                : String{heap_allocator()};
+        if (m_git_counts_command_index != m_command_evaluation_index) {
+          utils::git_status(m_git_branch, m_git_ahead_count,
+                            m_git_behind_count);
+          m_git_branch_command_index = m_command_evaluation_index;
+          m_git_counts_command_index = m_command_evaluation_index;
+        }
+
+        switch (*tag) {
+        case dynamic_var::SHIT_GIT_AHEAD:
+          return m_git_ahead_count > 0
+                     ? String::from(m_git_ahead_count, heap_allocator())
+                     : String{heap_allocator()};
+        case dynamic_var::SHIT_GIT_BEHIND:
+          return m_git_behind_count > 0
+                     ? String::from(m_git_behind_count, heap_allocator())
+                     : String{heap_allocator()};
+        default: ASSERT(false); return String{heap_allocator()};
+        }
       }
       case dynamic_var::SHIT_IDENTITY: return materialize_shit_identity();
       default: break;
@@ -2137,8 +2186,7 @@ pure fn ExecContext::builtin_kind() const wontthrow -> const Builtin::Kind &
 
 fn ExecContext::print_to_stdout(StringView s) const throws -> void
 {
-  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length).has_value())
-  {
+  if (!os::write_all(out_fd.value_or(SHIT_STDOUT), s.data, s.length)) {
     const i32 saved_errno = errno;
     if (saved_errno == EPIPE) throw BrokenPipeExit{};
     throw Error{"Unable to write to stdout: " +
@@ -2148,8 +2196,7 @@ fn ExecContext::print_to_stdout(StringView s) const throws -> void
 
 fn ExecContext::print_to_stderr(StringView s) const throws -> void
 {
-  if (!os::write_fd(err_fd.value_or(SHIT_STDERR), s.data, s.length).has_value())
-  {
+  if (!os::write_all(err_fd.value_or(SHIT_STDERR), s.data, s.length)) {
     const i32 saved_errno = errno;
     if (saved_errno == EPIPE) throw BrokenPipeExit{};
     throw Error{"Unable to write to stderr: " +

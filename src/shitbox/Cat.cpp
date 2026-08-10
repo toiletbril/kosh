@@ -98,6 +98,42 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
   let is_at_output_line_start = true;
   i32 status = 0;
   for (let const &source : sources) {
+    if (!FLAG_CAT_NUMBER.is_enabled() && !should_highlight_output) {
+      let const input = open_named_or_stdin(ec, source);
+      if (!input.has_value()) {
+        report_soft_shitbox_error(
+            ec, cxt,
+            "cat: " + String{cxt.scratch_allocator(), source} + ": " +
+                os::last_system_error_message());
+        status = 1;
+        continue;
+      }
+      defer
+      {
+        if (input->should_close) os::close_fd(input->descriptor);
+      };
+      char buffer[65536];
+
+      loop
+      {
+        let const read_size =
+            os::read_fd(input->descriptor, buffer, sizeof(buffer));
+        if (!read_size.has_value()) {
+          if (os::INTERRUPT_REQUESTED) return 130;
+          report_soft_shitbox_error(
+              ec, cxt,
+              "cat: " + String{cxt.scratch_allocator(), source} + ": " +
+                  os::last_system_error_message());
+          status = 1;
+          break;
+        }
+        if (*read_size == 0) break;
+        ec.print_to_stdout(StringView{buffer, *read_size});
+      }
+
+      continue;
+    }
+
     let const content = read_named_or_stdin(ec, source);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {

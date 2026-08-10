@@ -261,7 +261,9 @@ static fn execute_fc_command(const ExecContext &ec, EvalContext &cxt,
 
   ec.print_to_stderr(command.view());
   ec.print_to_stderr("\n");
-  if (!remember_fc_command(cxt, events, active_index, command.view())) {
+  if (!cxt.has_history_transaction() &&
+      !remember_fc_command(cxt, events, active_index, command.view()))
+  {
     report_soft_builtin_error(ec, cxt, ec.source_location(),
                               "cannot replace the history event");
     return 1;
@@ -377,10 +379,31 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
     unused(parser.construct_ast());
   }
 
-  if (active_index.has_value()) {
+  ec.print_to_stderr(edited->view());
+  if (edited->back() != '\n') ec.print_to_stderr("\n");
+
+  let recorded_commands = ArrayList<String>{heap_allocator()};
+  let const should_replace_active =
+      active_index.has_value() && !cxt.has_history_transaction();
+  let should_end_transaction = should_replace_active;
+  if (should_end_transaction) cxt.begin_history_transaction(recorded_commands);
+  defer
+  {
+    if (should_end_transaction) cxt.end_history_transaction();
+  };
+
+  let const status =
+      cxt.run_source(edited->view(), "fc", return_handling::Consume,
+                     ec.source_location(), StringView{"fc"}, true);
+  if (should_end_transaction) {
+    cxt.end_history_transaction();
+    should_end_transaction = false;
+  }
+
+  if (should_replace_active) {
     let const &active = events[*active_index];
     if (!toiletline::history_rewrite_event(active.number, active.command.view(),
-                                           {}))
+                                           recorded_commands))
     {
       report_soft_builtin_error(ec, cxt, ec.source_location(),
                                 "Unable to replace the active history event");
@@ -389,11 +412,7 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
     cxt.set_current_history_event_number(None);
   }
 
-  ec.print_to_stderr(edited->view());
-  if (edited->back() != '\n') ec.print_to_stderr("\n");
-
-  return cxt.run_source(edited->view(), "fc", return_handling::Consume,
-                        ec.source_location(), StringView{"fc"}, true);
+  return status;
 }
 
 fn Fc::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32

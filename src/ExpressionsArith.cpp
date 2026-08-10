@@ -395,8 +395,11 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   cxt.set_terminal_exec_allowed(false);
 
-  if (m_is_fully_eliminated) {
+  let const can_skip_condition_commands =
+      !cxt.has_debug_trap() && !cxt.should_echo_expanded();
+  if (m_is_fully_eliminated && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
+    cxt.publish_single_pipe_status(0);
     SET_AND_RETURN_EXIT_STATUS(cxt, 0);
   }
 
@@ -418,7 +421,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   i64 ret = 0;
   /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (condition_is_blank ||
-         (m_folded_condition.has_value()
+         (m_folded_condition.has_value() && can_skip_condition_commands
               ? (*m_folded_condition != 0)
               : cxt.evaluate_arithmetic_cached_clause(
                     m_condition.view(), m_condition_tokens,
@@ -650,17 +653,18 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
   /* An assignment in the body never changes a parent variable, so the body
      starts from an empty table and the outer constants are restored after. */
-  let saved_constants = actx.constant_variables.clone();
-  let saved_defined_functions = actx.defined_functions.clone();
-  let saved_known_aliases = actx.known_aliases.clone();
+  let saved_constants = steal(actx.constant_variables);
+  actx.constant_variables = StringMap<String>{heap_allocator()};
+  let const defined_function_insertion_count =
+      actx.defined_function_insertions.count();
+  let const known_alias_insertion_count = actx.known_alias_insertions.count();
   let const had_registered_definitions =
       actx.has_registered_definitions_in_scope;
-  actx.constant_variables.clear();
   actx.has_registered_definitions_in_scope = false;
   m_body->analyze(actx, is_unconditional);
   actx.constant_variables = steal(saved_constants);
-  actx.defined_functions = steal(saved_defined_functions);
-  actx.known_aliases = steal(saved_known_aliases);
+  actx.rollback_defined_functions(defined_function_insertion_count);
+  actx.rollback_known_aliases(known_alias_insertion_count);
   actx.has_registered_definitions_in_scope = had_registered_definitions;
 }
 
@@ -722,6 +726,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
       definition_text.is_empty() ? " without recorded definition text" : "");
   cxt.register_function(m_name, m_body, definition_text.view(),
                         m_body->source_location().position, source_location());
+  cxt.publish_single_pipe_status(0);
   SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }
 
@@ -731,7 +736,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
 
   unused(is_unconditional);
-  actx.defined_functions.add(m_name);
+  actx.add_defined_function(m_name);
 
   let body_source = analysis_source_span(actx, *m_body).trim_blanks();
   if (!body_source.is_empty() &&
@@ -753,10 +758,11 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
 
   /* The body runs later when the function is called, so it is analyzed from an
      empty constant table with the outer constants restored after. */
-  let saved_constants = actx.constant_variables.clone();
-  let saved_defined_functions = actx.defined_functions.clone();
-  let saved_known_aliases = actx.known_aliases.clone();
-  actx.constant_variables.clear();
+  let saved_constants = steal(actx.constant_variables);
+  actx.constant_variables = StringMap<String>{heap_allocator()};
+  let const defined_function_insertion_count =
+      actx.defined_function_insertions.count();
+  let const known_alias_insertion_count = actx.known_alias_insertions.count();
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = HashSet{heap_allocator()};
   let const had_registered_definitions =
@@ -768,14 +774,14 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.has_registered_definitions_in_scope = had_registered_definitions;
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
-  actx.defined_functions = steal(saved_defined_functions);
-  actx.known_aliases = steal(saved_known_aliases);
+  actx.rollback_defined_functions(defined_function_insertion_count);
+  actx.rollback_known_aliases(known_alias_insertion_count);
 }
 
 cold fn FunctionDefinition::register_defined_functions(
     AnalysisContext &actx) const throws -> void
 {
-  actx.defined_functions.add(m_name);
+  actx.add_defined_function(m_name);
 }
 
 RedirectedCommand::RedirectedCommand(SourceLocation location,

@@ -705,7 +705,10 @@ hot flatten fn EvalContext::process_args(
                     source_location.has_value() ? &*source_location : nullptr);
               } break;
               case WordSegment::Kind::ArithmeticExpansion: {
-                let const number = segment.has_folded_arithmetic_result
+                let const can_use_folded_result =
+                    segment.has_folded_arithmetic_result && !has_debug_trap() &&
+                    !should_echo_expanded();
+                let const number = can_use_folded_result
                                        ? segment.get_folded_arithmetic_result()
                                        : evaluate_arithmetic_cached(segment);
                 char buffer[24];

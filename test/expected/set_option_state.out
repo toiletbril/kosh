@@ -27,6 +27,7 @@ function-posix-noop-stayed
 diagnostic-options-independent
 annoying-option-persisted
 substitution-revisions-isolated
+annoying-substitution-isolated
 == command strings publish c in dollar dash:
 command-string
 == interactive state is independent of hashall:

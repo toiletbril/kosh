@@ -86,3 +86,11 @@ printf 'repeated-raw=%s\n' "$repeated_raw"
 read -r -Z 2>/dev/null || :
 read parser_state <<< 'a\b'
 printf 'parser-state=%s\n' "$parser_state"
+mapfile -Z 2>/dev/null; echo "mapfile-unknown=$?"
+shopt -Z 2>/dev/null; echo "shopt-unknown=$?"
+complete -Z 2>/dev/null; echo "complete-unknown=$?"
+compgen -Z 2>/dev/null; echo "compgen-unknown=$?"
+mapfile mapfile_first mapfile_ignored <<< x
+echo "mapfile-extra=${#mapfile_first[@]}"
+compgen -W 'alpha beta' alpha ignored
+echo "compgen-extra=$?"

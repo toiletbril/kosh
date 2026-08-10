@@ -61,9 +61,10 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
   {
     if (!m_blocks.is_empty()) {
       let &block = m_blocks.back();
+      if (block.used > SIZE_MAX - (alignment - 1)) throw std::bad_alloc{};
       let const aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
 
-      if (aligned + size <= block.size) [[likely]] {
+      if (aligned <= block.size && size <= block.size - aligned) [[likely]] {
         ASSERT(block.base != nullptr);
 
         let const pointer = block.base + aligned;
@@ -73,6 +74,7 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
       }
     }
 
+    if (size > SIZE_MAX - alignment) throw std::bad_alloc{};
     add_block(size + alignment);
   }
 }

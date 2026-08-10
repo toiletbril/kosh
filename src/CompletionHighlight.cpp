@@ -1617,19 +1617,31 @@ fn shell_highlight_cache::spans_for(StringView source, usize line_start,
   if (source_changed) {
     m_source = source;
     m_checkpoints.clear();
-    m_spans.clear();
+    m_lines.clear();
     m_sequential_state = shell_lexical_state{heap_allocator()};
-    m_has_cached_line = false;
 
     let state = shell_lexical_state{heap_allocator()};
     m_checkpoints.push(state);
     m_next_checkpoint_threshold = DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL;
   }
 
-  if (m_has_cached_line && line_start == m_cached_line_start &&
-      line_end == m_cached_line_end)
-  {
-    return &m_spans;
+  usize cached_line_index = 0;
+  usize cached_line_limit = m_lines.count();
+  while (cached_line_index < cached_line_limit) {
+    let const middle =
+        cached_line_index + (cached_line_limit - cached_line_index) / 2;
+    let const &line = m_lines[middle];
+    if (line.start < line_start ||
+        (line.start == line_start && line.end < line_end))
+    {
+      cached_line_index = middle + 1;
+    } else {
+      cached_line_limit = middle;
+    }
+  }
+  if (cached_line_index < m_lines.count()) {
+    let &line = m_lines[cached_line_index];
+    if (line_start == line.start && line_end == line.end) return &line.spans;
   }
 
   let const do_advance_with_checkpoints = [&](shell_lexical_state &state,
@@ -1685,20 +1697,20 @@ fn shell_highlight_cache::spans_for(StringView source, usize line_start,
 #endif
   let const generated =
       highlight_line_with_lexical_state(source_line, context, line_state);
-  m_spans.clear();
-  m_spans.reserve(generated.count());
+  let cached = cached_line{line_start, line_end};
+  cached.spans.reserve(generated.count());
   for (let const &span : generated)
-    m_spans.push(span);
-  m_cached_line_start = line_start;
-  m_cached_line_end = line_end;
-  m_has_cached_line = true;
+    cached.spans.push(span);
+  m_lines.push(steal(cached));
+  for (usize index = m_lines.count() - 1; index > cached_line_index; index--)
+    std::swap(m_lines[index], m_lines[index - 1]);
   if (line_state != &m_sequential_state)
     m_sequential_state = steal(lexical_state);
   let state_target = line_end;
   if (state_target < source.length && source[state_target] == '\n')
     state_target++;
   do_advance_with_checkpoints(m_sequential_state, state_target);
-  return &m_spans;
+  return &m_lines[cached_line_index].spans;
 }
 
 #if !defined NDEBUG

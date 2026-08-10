@@ -173,6 +173,11 @@ shell option bits. Capture and restore copy the complete state. The set builtin
 uses one descriptor table for mutation, queries, help, completion, SHELLOPTS,
 and `$-`. Its compile-time name map retains binary search.
 
+Builtin and utility flag metadata uses immutable string views and fixed
+registries. Parsing state is reset for each invocation. The shared parser uses
+local argument pointer storage for ordinary command sizes and preserves Bash
+syntax statuses and repeated option values.
+
 `apply_strictness_for_mood` owns mood strictness. An explicit nounset, pipefail,
 or failglob setting survives a mood change. `command_word_is_glob` owns the
 command-position glob check. The runtime diagnostic levels distinguish strict,
@@ -207,6 +212,9 @@ A process-group reference retained for timeout remains valid after polling
 closes the leader. `close_process_group` releases the retained platform handle.
 An interactive timeout child waits behind a start pipe until its process group
 owns the controlling terminal.
+
+Standard output and standard error writes retry partial platform writes. A zero
+length write is treated as a failure while bytes remain.
 
 Forked evaluators report the current process through BASHPID. `$$` retains the
 original shell process.
@@ -303,6 +311,10 @@ copying their lexical containers. Checkpoints retain function definitions.
 Random lookup resumes at the nearest checkpoint. A source identity change
 invalidates checkpoints and cached spans.
 
+Analysis warnings are queued with owned messages. Unique source lines are
+highlighted in source order, then diagnostics are rendered in discovery order.
+Fatal diagnostics flush earlier warnings before they are rendered.
+
 The diagnostic catalog owns each numbered check's strict, lenient, or annoying
 tier. The default mood rejects every enabled tier. Compatibility moods expose
 the tiers as warnings through `-W`, `-WW`, and `-WWW`. Related-location notes
@@ -323,6 +335,10 @@ in src/toiletline/toiletline.h. The completion bridge retains its result until
 the editor consumes returned pointers. Plain appends update the stored byte
 length and serialized line directly. History entries are decoded as bytes.
 Display width is tracked separately.
+
+An edited fc command records complete commands in a transaction. One history
+rewrite replaces the accepted active event after successful evaluation. A
+failed rewrite retains the active event.
 
 Ghost completion and history cache prefixes that produce no suggestion. The
 physical working directory is captured once per input. Reassigning PWD does not
@@ -383,15 +399,19 @@ value is removed before evaluation begins.
 SHIT_GIT_BRANCH, SHIT_GIT_AHEAD, and SHIT_GIT_BEHIND are always-dynamic
 variables. SHIT_GIT_BRANCH reads the branch name from .git/HEAD. SHIT_GIT_AHEAD
 and SHIT_GIT_BEHIND read the local and upstream SHAs from the filesystem and
-fork git rev-list --count only when the SHAs diverge. Both are empty outside a
-repository, with no upstream, or when the count is zero. The ahead/behind pair
-is cached keyed on branch and both SHAs so a single prompt cycle computes it
-once.
+fork one git rev-list --left-right --count command only when the SHAs diverge.
+Both are empty outside a repository, with no upstream, or when the count is
+zero. The branch is read lazily. Ahead and behind share one snapshot for each
+evaluated command.
 
 The shitbox cat highlighter selects recognized shell extensions and shebangs.
 It is suppressed for null bytes and redirected output. Line numbering remains
 continuous across file and standard input boundaries. Highlighting emits no
 underline attributes.
+
+Plain cat, grep, tee, uniq, and wc process input through bounded buffers. Cat
+retains complete input only when numbering or highlighting requires source
+context.
 
 ## Value types and allocation
 
@@ -412,9 +432,9 @@ ArrayList allocates nothing during default construction and grows
 geometrically. String has a small inline buffer and grows geometrically. A
 scratch arena uses mark and release lifetime within one scope.
 
-WordSegment overlays its source position with its folded arithmetic result. A
-folded segment clears its source length. A source-bearing segment clears the
-folded-result tag. The 64-bit layout is 160 bytes.
+WordSegment retains its source position beside a folded arithmetic result. A
+DEBUG trap or xtrace reevaluates the original expression. The 64-bit layout is
+168 bytes.
 
 ## Logging
 

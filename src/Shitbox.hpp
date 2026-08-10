@@ -120,10 +120,8 @@ inline constexpr usize SHITBOX_UTIL_COUNT =
 
 /* A utility with no registration reads back null. */
 fn register_shitbox_util_flags(Utility::Kind chosen,
-                               const ArrayList<Flag *> *flags) wontthrow
-    -> void;
-fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow
-    -> const ArrayList<Flag *> *;
+                               const FlagList *flags) wontthrow -> void;
+fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow -> const FlagList *;
 
 #define REGISTER_SHITBOX_UTIL_FLAGS(util)                                      \
   static uchar t__shitbox_flag_registrar =                                     \
@@ -154,15 +152,14 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
                            usize name_index, SourceLocation &error_location,
                            String &error_message) throws -> Maybe<i32>;
 
-fn parse_util_operands(
-    const ArrayList<Flag *> &flags, const ArrayList<String> &args,
-    const ArrayList<SourceLocation> *arg_locations = nullptr,
-    ArrayList<SourceLocation> *operand_locations = nullptr) throws
-    -> ArrayList<String>;
+fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
+                       const ArrayList<SourceLocation> *arg_locations = nullptr,
+                       ArrayList<SourceLocation> *operand_locations =
+                           nullptr) throws -> ArrayList<String>;
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
-                   StringView description,
-                   const ArrayList<Flag *> &flags) throws -> void;
+                   StringView description, const FlagList &flags) throws
+    -> void;
 
 /* Reads FLAG_HELP, HELP_SYNOPSIS, HELP_DESCRIPTION, and FLAG_LIST from the
    caller's scope. */
@@ -284,6 +281,15 @@ enum class removal_mode : u8
 fn remove_path(StringView path, removal_mode mode) throws -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
+
+struct input_descriptor
+{
+  os::descriptor descriptor;
+  bool should_close;
+};
+
+fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow
+    -> Maybe<input_descriptor>;
 
 fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
 
