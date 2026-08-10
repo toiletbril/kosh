@@ -16,10 +16,10 @@ namespace shit {
    unconditionally and emits nothing on the plain path. */
 struct diagnostic_color
 {
-  StringView severity{};
-  StringView location{};
-  StringView message{};
-  StringView caret{};
+  StringView severity;
+  StringView location;
+  StringView message;
+  StringView caret;
 
   pure fn get_reset() const wontthrow -> StringView
   {
@@ -39,6 +39,11 @@ cold static fn diagnostic_colors_for(error_severity severity) throws
   case error_severity::Warning:
     return diagnostic_color{colors::ansi::YELLOW, {}, {}, colors::ansi::YELLOW};
   case error_severity::Note:
+    return diagnostic_color{
+        colors::ansi::CYAN, {}, colors::ansi::CYAN, colors::ansi::CYAN};
+  case error_severity::Details:
+    return diagnostic_color{
+        colors::ansi::BLUE, {}, colors::ansi::BLUE, colors::ansi::BLUE};
   case error_severity::Trace:
     return diagnostic_color{
         colors::ansi::CYAN, {}, colors::ansi::CYAN, colors::ansi::CYAN};
@@ -462,6 +467,16 @@ cold fn TraceWithLocation::get_severity() const wontthrow -> error_severity
   return error_severity::Trace;
 }
 
+DetailsWithLocation::DetailsWithLocation(SourceLocation location,
+                                         StringView message)
+    : ErrorWithLocation(steal(location), message)
+{}
+
+cold fn DetailsWithLocation::get_severity() const wontthrow -> error_severity
+{
+  return error_severity::Details;
+}
+
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
     SourceLocation details_location, StringView details_message,
@@ -477,19 +492,20 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
       m_details_message(heap_allocator()), m_note(note)
 {}
 
-cold fn ErrorWithLocationAndDetails::details_to_string(
-    StringView source, EvalContext *context) const throws -> String
+cold fn DetailsWithLocation::to_string(StringView source,
+                                       EvalContext *context) const throws
+    -> String
 {
-  if (m_details_message.is_empty()) return String{heap_allocator()};
+  if (m_message.is_empty()) return String{heap_allocator()};
 
-  usize byte_position = m_details_location.position;
-  const usize byte_count = m_details_location.length;
+  usize byte_position = m_location.position;
+  const usize byte_count = m_location.length;
 
   /* The out-of-source guard renders nothing when the location names another
      source, so the caret never reads past the end. */
   if (byte_position > source.count()) return String{heap_allocator()};
 
-  LOG(Debug, "formatting the detail note at byte %zu", byte_position);
+  LOG(Debug, "formatting details at byte %zu", byte_position);
 
   if (byte_position > 0 && byte_position == source.count() &&
       source[byte_position - 1] == '\n')
@@ -505,13 +521,13 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
                                    details_line_position.line_start) +
       1;
 
-  let const severity = error_severity::Note;
+  let const severity = get_severity();
   let const severity_word = get_error_severity_word(severity);
   let const color = diagnostic_colors_for(severity);
 
   let result = String{heap_allocator()};
   result += color.location;
-  if (let const name = m_details_location.filename; name.has_value()) {
+  if (let const name = m_location.filename; name.has_value()) {
     result += *name;
     result += ':';
   }
@@ -528,8 +544,21 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   result += ":\n";
 
   result += get_context_pointing_to(source, byte_position, byte_count,
-                                    details_line_position,
-                                    m_details_message.view(), color, context);
+                                    details_line_position, m_message.view(),
+                                    color, context);
+  return result;
+}
+
+cold fn ErrorWithLocationAndDetails::details_to_string(
+    StringView source, EvalContext *context) const throws -> String
+{
+  if (m_details_message.is_empty()) return String{heap_allocator()};
+
+  let const details =
+      DetailsWithLocation{m_details_location, m_details_message.view()};
+  let result = details.to_string(source, context);
+  if (result.is_empty()) return result;
+
   result += trailing_details_to_string();
   return result;
 }

@@ -367,7 +367,7 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "an earlier case pattern makes this pattern unreachable",
       "An earlier case pattern makes this pattern unreachable",
       "Remove the duplicate pattern", "this identical pattern matches first",
-      Annoying, Policy),
+      Strict, Policy),
     D(2222, "shadowed-case-pattern",
       "an earlier case pattern shadows this pattern",
       "An earlier case pattern shadows this pattern",

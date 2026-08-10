@@ -1,7 +1,7 @@
 shit: TMPDIR/unterminated:1:1: error: Unterminated brace group.
      1 |  {
        |  ^
-shit: TMPDIR/unterminated:2:10: note:
+shit: TMPDIR/unterminated:2:10: details:
      2 |    echo hi
        |           ^ Expected '}'.
 rc=0
@@ -12,7 +12,7 @@ complete second
 shit: TMPDIR/error-state:3:1: error: Unterminated subshell.
      3 |  (
        |  ^
-shit: TMPDIR/error-state:3:2: note:
+shit: TMPDIR/error-state:3:2: details:
      3 |  (
        |   ^ expected ')'.
 trap-status=1

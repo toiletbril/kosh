@@ -14,6 +14,7 @@ enum class error_severity : u8
   Error,
   Warning,
   Note,
+  Details,
   Trace,
 };
 
@@ -24,6 +25,7 @@ pure inline fn get_error_severity_word(error_severity severity) wontthrow
   case error_severity::Error: return "error";
   case error_severity::Warning: return "warning";
   case error_severity::Note: return "note";
+  case error_severity::Details: return "details";
   case error_severity::Trace: return "trace";
   }
   ASSERT(false);
@@ -265,6 +267,16 @@ public:
   TraceWithLocation(SourceLocation location);
 
   fn get_severity() const wontthrow -> error_severity override;
+};
+
+class DetailsWithLocation : public ErrorWithLocation
+{
+public:
+  DetailsWithLocation(SourceLocation location, StringView message);
+
+  fn get_severity() const wontthrow -> error_severity override;
+  fn to_string(StringView source, EvalContext *context = nullptr) const throws
+      -> String override;
 };
 
 class ErrorWithLocationAndDetails : public ErrorWithLocation

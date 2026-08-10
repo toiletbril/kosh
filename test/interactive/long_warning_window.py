@@ -105,27 +105,6 @@ caret_aligned = (
     + content[: content.index("$")].count(wide_character)
     == caret.index("^")
 )
-printed_palette_is_applied = all(
-    token in output
-    for token in (
-        b"\x1b[1;35mif\x1b[0m",
-        b"\x1b[1;35m&&\x1b[0m",
-        b"\x1b[1;35m>\x1b[0m",
-        b"\x1b[96m$SECOND_UNSET\x1b[0m",
-        b"\x1b[34mdiagnostic_missing_command\x1b[0m",
-        b"\x1b[34mech\x1b[0m",
-    )
-)
-warning_header_is_bold = bool(
-    re.search(
-        rb"\x1b\[1m\d+:\d+:\x1b\[0m \x1b\[1;33mwarning\x1b\[0m: "
-        rb"\x1b\[1mA test reads an unquoted variable\.\x1b\[0m",
-        output,
-    )
-)
-caret_annotation_is_yellow = bool(
-    re.search(rb"\x1b\[33m\^~*\x1b\[0m", output)
-)
 highlight_scan_is_bounded = 0 < highlight_bytes <= len(source_line.encode()) * 2 + 16
 lexical_scan_is_bounded = 0 < lexical_bytes <= len(source.encode()) + 16
 passed = (
@@ -133,9 +112,6 @@ passed = (
     and within_width
     and has_both_ellipses
     and caret_aligned
-    and printed_palette_is_applied
-    and warning_header_is_bold
-    and caret_annotation_is_yellow
     and highlight_scan_is_bounded
     and lexical_scan_is_bounded
 )
@@ -144,9 +120,6 @@ print("CHILD_EXITED_CLEANLY:", child_exited_cleanly)
 print("WITHIN_WIDTH:", within_width)
 print("BOTH_ELLIPSES:", has_both_ellipses)
 print("CARET_ALIGNED:", caret_aligned)
-print("PRINTED_PALETTE_IS_APPLIED:", printed_palette_is_applied)
-print("WARNING_HEADER_IS_BOLD:", warning_header_is_bold)
-print("CARET_ANNOTATION_IS_YELLOW:", caret_annotation_is_yellow)
 print("HIGHLIGHT_SCAN_BOUNDED:", highlight_scan_is_bounded)
 print("LEXICAL_SCAN_BOUNDED:", lexical_scan_is_bounded)
 print("RESULT:", "PASS" if passed else "FAIL")

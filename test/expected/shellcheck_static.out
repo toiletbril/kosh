@@ -1837,7 +1837,7 @@ note: Put the file redirect first as in '>file 2>&1'.
 shit: 14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
     14 |    sort < data > data
        |                  ^~~~
-shit: 14:10: note:
+shit: 14:10: details:
     14 |    sort < data > data
        |           ^~~~ this redirect reads the file that is later truncated.
 note: Write to a temporary and move it over.
@@ -1977,7 +1977,7 @@ note: Give the file to the next command directly instead of piping cat.
 shit: 94:3: warning: Commands after exec do not run when exec succeeds.
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
-shit: 94:23: note:
+shit: 94:23: details:
     94 |    exec echo replaced; echo unreachable
        |                        ^~~~~~~~~~~~~~~~ this is the first command skipped after exec.
 note: Remove exec or remove the unreachable commands.
@@ -2120,7 +2120,7 @@ note: Keep CDPATH unexported or clear it before running scripts.
 shit: 118:15: warning: Several commands append to the same file separately.
    118 |    echo one >> style.log
        |                ^~~~~~~~~
-shit: 120:17: note:
+shit: 120:17: details:
    120 |    echo three >> style.log
        |                  ^~~~~~~~~ this later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
@@ -2207,28 +2207,28 @@ note: Use $((...)) for arithmetic expansion.
 shit: 139:9: warning: The nested inner loop reuses the outer loop variable 'outer_index'.
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~
-shit: 138:7: note:
+shit: 138:7: details:
    138 |    for outer_index in one; do
        |        ^~~~~~~~~~~ the outer loop first binds 'outer_index' here.
 note: Use a distinct variable for the nested loop.
 shit: 138:7: warning: The outer loop variable 'outer_index' is overwritten by the nested inner loop.
    138 |    for outer_index in one; do
        |        ^~~~~~~~~~~
-shit: 139:9: note:
+shit: 139:9: details:
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~ the nested inner loop binds 'outer_index' again here.
 note: Use a distinct variable for the nested loop.
 shit: 143:3: warning: An earlier case pattern makes this pattern unreachable.
    143 |    same) : ;;
        |    ^~~~
-shit: 142:3: note:
+shit: 142:3: details:
    142 |    same) : ;;
        |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
 shit: 147:3: warning: An earlier case pattern shadows this pattern.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
-shit: 146:3: note:
+shit: 146:3: details:
    146 |    prefix*) : ;;
        |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.

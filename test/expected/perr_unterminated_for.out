@@ -1,6 +1,6 @@
 shit: 2:1: error: Unterminated for loop.
      2 |  for x y
        |  ^~~
-shit: 2:7: note:
+shit: 2:7: details:
      2 |  for x y
        |        ^ Expected 'do', or 'in WORDS' before it; without 'in' the loop walks the positional parameters.
