@@ -2,7 +2,7 @@
 
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 /* An argument split at its first '=', for the assignment builtins. The value is
    absent when no '=' is present, so a bare name reads differently from name=.
@@ -35,4 +35,4 @@ private:
   Maybe<StringView> m_value;
 };
 
-} // namespace shit
+} // namespace koshka

@@ -1,6 +1,0 @@
-#!/bin/env shit
-echo a >>/dev/null
-echo b 2>&1 >/dev/null
-echo c >|/dev/null
-exec 3<>/dev/null
-true 3>&-

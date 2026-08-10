@@ -1,7 +1,0 @@
-#!/bin/env shit
-f() {
-  leaked=1
-  echo "$leaked"
-}
-f
-echo after

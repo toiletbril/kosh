@@ -2,9 +2,9 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
-#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -24,7 +24,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(CommandBuiltin);
 
-namespace shit {
+namespace koshka {
 
 CommandBuiltin::CommandBuiltin() = default;
 
@@ -125,8 +125,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
         did_find_any = true;
         continue;
       }
-      if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
-          shitbox::find_util(name.view()).has_value())
+      if ((cxt.koshkit() || cxt.mood() == mimic_mood::Default) &&
+          koshkit::find_util(name.view()).has_value())
       {
         ec.print_to_stdout(is_verbose ? name + " is a built-in utility\n"
                                       : name + "\n");
@@ -154,7 +154,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const *source = cxt.current_source();
     sub = ExecContext::make_from(
         ec.source_location(), source != nullptr ? source->view() : StringView{},
-        steal(operand_args), cxt.mood(), cxt.shitbox(), resolver,
+        steal(operand_args), cxt.mood(), cxt.koshkit(), resolver,
         steal(operand_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     LOG(Debug, "command handled a resolution error: %s",
@@ -167,4 +167,4 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
 }
 
-} // namespace shit
+} // namespace koshka

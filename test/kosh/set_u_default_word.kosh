@@ -1,0 +1,4 @@
+#!/bin/env kosh
+set -u
+printf '%s' "${x-$y}"
+echo unreachable

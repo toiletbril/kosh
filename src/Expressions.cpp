@@ -10,16 +10,16 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "ExpressionsInternal.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 fn indent_for_layer(usize layer) throws -> String
 {
@@ -438,7 +438,7 @@ fn Expression::try_static_condition_verdict(
     const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
   unused(actx);
-  return shit::None;
+  return koshka::None;
 }
 
 fn Expression::can_evaluate_in_process_substitution(
@@ -453,7 +453,7 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 {
   ASSERT(token != nullptr);
 
-  if (token->kind() != Token::Kind::Word) return shit::None;
+  if (token->kind() != Token::Kind::Word) return koshka::None;
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
 
@@ -465,11 +465,11 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
         segment.kind != WordSegment::Kind::DoubleQuotedText &&
         segment.kind != WordSegment::Kind::UnquotedText)
     {
-      return shit::None;
+      return koshka::None;
     }
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (usize i = 0; i < segment.text.count(); i++) {
-        if (lexer::is_expandable_char(segment.text[i])) return shit::None;
+        if (lexer::is_expandable_char(segment.text[i])) return koshka::None;
       }
     }
     name.append(segment.text.view());
@@ -496,9 +496,9 @@ fn command_resolves(
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
   /* The prepass runs only in the default mood, where a coreutil falls back to
-     its shitbox implementation, so a shitbox name resolves without a PATH
+     its koshkit implementation, so a koshkit name resolves without a PATH
      binary. */
-  if (shitbox::find_util(name.view()).has_value()) return true;
+  if (koshkit::find_util(name.view()).has_value()) return true;
   if (os::has_directory_separator(name.view())) {
     let const expanded = expanded_command_path(name.view(), heap_allocator());
     let const typed_path = Path{expanded.view()};
@@ -622,7 +622,7 @@ fn analyze_ast(const Expression *root, StringView source,
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
-     name without 'bash'. */
+     name without 'bash' or 'kosh'. This shell's own name also ends in 'sh'. */
   if (source.length >= 2 && source[0] == '#' && source[1] == '!') {
     usize line_end = 0;
     while (line_end < source.length && source[line_end] != '\n')
@@ -630,12 +630,15 @@ fn analyze_ast(const Expression *root, StringView source,
     let const first_line = source.substring_of_length(0, line_end);
     let contains_dash = false;
     let contains_bash = false;
+    let contains_kosh = false;
     let interpreter_is_sh = false;
     for (usize i = 0; i + 4 <= first_line.length; i++) {
       if (first_line.substring(i).starts_with(StringView{"dash"}))
         contains_dash = true;
       if (first_line.substring(i).starts_with(StringView{"bash"}))
         contains_bash = true;
+      if (first_line.substring(i).starts_with(StringView{"kosh"}))
+        contains_kosh = true;
     }
     /* A trailing 'sh' at the line end is the sh program name. */
     if (first_line.length >= 2 &&
@@ -643,7 +646,9 @@ fn analyze_ast(const Expression *root, StringView source,
     {
       interpreter_is_sh = true;
     }
-    if (contains_dash || (interpreter_is_sh && !contains_bash)) {
+    if (contains_dash ||
+        (interpreter_is_sh && !contains_bash && !contains_kosh))
+    {
       actx.shebang_is_posix_sh = true;
     }
   }
@@ -2470,9 +2475,9 @@ cold fn SimpleCommand::try_static_condition_verdict(
   /* A redirection, an async or negated command, or a prefix assignment is not
      constant, so the fold declines it. The guards read this node's private
      members. */
-  if (!m_redirections.is_empty()) return shit::None;
-  if (is_async() || is_negated()) return shit::None;
-  if (m_local_vars.count() > 0) return shit::None;
+  if (!m_redirections.is_empty()) return koshka::None;
+  if (is_async() || is_negated()) return koshka::None;
+  if (m_local_vars.count() > 0) return koshka::None;
 
   return optimizer::simple_command_static_verdict(m_args, actx);
 }
@@ -2639,7 +2644,7 @@ cold fn CompoundListCondition::try_static_condition_verdict(
 
   /* An && or || node depends on the command before it, so only a plain sequence
      node carries its own verdict. */
-  if (m_kind != Kind::None) return shit::None;
+  if (m_kind != Kind::None) return koshka::None;
   return m_cmd->try_static_condition_verdict(actx);
 }
 
@@ -2797,7 +2802,7 @@ cold fn CompoundList::try_static_condition_verdict(
 {
   /* Only a condition list of exactly one command has a verdict the whole
      condition takes. */
-  if (m_nodes.count() != 1) return shit::None;
+  if (m_nodes.count() != 1) return koshka::None;
   ASSERT(m_nodes[0] != nullptr);
   return m_nodes[0]->try_static_condition_verdict(actx);
 }
@@ -2831,4 +2836,4 @@ cold fn IfStatement::register_defined_functions(
 
 } /* namespace expressions */
 
-} /* namespace shit */
+} /* namespace koshka */

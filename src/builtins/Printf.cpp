@@ -15,7 +15,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Printf);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -596,4 +596,4 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return exit_status;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

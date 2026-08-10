@@ -1,6 +1,6 @@
 == bench stops on a non-zero exit code:
-shit: 1:16: error: Builtin `bench`: the command `false` exited with status 1.
-shit: note: Pass `--ignore-exit-code` to benchmark it regardless.
+kosh: 1:16: error: Builtin `bench`: the command `false` exited with status 1.
+kosh: note: Pass `--ignore-exit-code` to benchmark it regardless.
 == the failure sets the exit status:
 rc=1
 == --ignore-exit-code keeps sampling a failing command:
@@ -16,24 +16,24 @@ rc=1
 rc=1
 rc=1
 == unsigned overflow is rejected by number parsing:
-shit: 1:14: error: --runs expects a number, got '18446744073709551616'.
+kosh: 1:14: error: --runs expects a number, got '18446744073709551616'.
 == invalid values carry granular carets:
-shit: 1:14: error: --runs expects a number, got 'nope'.
+kosh: 1:14: error: --runs expects a number, got 'nope'.
      1 |  bench --runs nope true
        |               ^~~~
-shit: 1:14: error: --runs expects a number, got 'nope'.
+kosh: 1:14: error: --runs expects a number, got 'nope'.
      1 |  bench --runs=nope true
        |               ^~~~
-shit: 1:14: error: --runs expects a number from 1 through 100000.
+kosh: 1:14: error: --runs expects a number from 1 through 100000.
      1 |  bench --runs 0 true
        |               ^
-shit: 1:18: error: --duration is too large.
+kosh: 1:18: error: --duration is too large.
      1 |  bench --duration 18446744073710 true
        |                   ^~~~~~~~~~~~~~
-shit: 1:7: error: --runs expects a number, got 'nope'.
+kosh: 1:7: error: --runs expects a number, got 'nope'.
      1 |  bench "--runs=nope" true
        |        ^~~~~~~~~~~~~
-shit: 1:18: error: --runs expects a number, got 'nope'.
+kosh: 1:18: error: --runs expects a number, got 'nope'.
      1 |  runs=nope; bench --runs=$runs true
        |                   ^~~~~~~~~~~~
 == an overflowing duration is rejected:

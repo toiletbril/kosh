@@ -1,9 +1,0 @@
-#!/bin/env shit
-nosuchcmd_xyz
-$name=value
-name = value
-[grep needle file]
-[[left=right]]
-( -f file )
--n
-echo after

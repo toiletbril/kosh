@@ -81,15 +81,15 @@
   DoubleQuoted "posix="
   Variable "?"
 ]
-shit: 2:7: error: custom message.
+kosh: 2:7: error: custom message.
      2 |  (echo "${nope:?custom message}")
        |        ^~~~~~~~~~~~~~~~~~~~~~~~~
 default=2
-shit: 5:7: error: bash message.
+kosh: 5:7: error: bash message.
      5 |  (echo "${nope:?bash message}")
        |        ^~~~~~~~~~~~~~~~~~~~~~~
 bash=1
-shit: 8:7: error: posix message.
+kosh: 8:7: error: posix message.
      8 |  (echo "${nope?posix message}")
        |        ^~~~~~~~~~~~~~~~~~~~~~~
 posix=2

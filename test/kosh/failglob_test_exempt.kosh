@@ -1,0 +1,10 @@
+#!/bin/env kosh
+d=$(mktemp -d)
+cd "$d"
+[ -e *.zzz ] && echo bracket-exists || echo bracket-no-match
+test -e *.zzz && echo test-exists || echo test-no-match
+touch real.zzz
+[ -e *.zzz ] && echo bracket-exists || echo bracket-no-match
+test -e *.zzz && echo test-exists || echo test-no-match
+cd /
+rm -r "$d"

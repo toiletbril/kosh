@@ -18,10 +18,10 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:14: warning: The assignment prefix does not affect this command, 'foo' is read before it is set.
+kosh: 2:14: warning: The assignment prefix does not affect this command, 'foo' is read before it is set.
      2 |  foo=bar echo "$foo"
        |               ^~~~~~
-shit: 2:15: warning: The variable 'foo' is not set, it expands to empty.
+kosh: 2:15: warning: The variable 'foo' is not set, it expands to empty.
      2 |  foo=bar echo "$foo"
        |                ^~~~
 note: Replace it with ${foo-} if empty expansion is desired.

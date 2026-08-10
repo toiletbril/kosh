@@ -3,7 +3,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 
-namespace shit {
+namespace koshka {
 
 class Nothing
 {};
@@ -132,8 +132,8 @@ private:
 #define UNWRAP(maybe_expr)                                                     \
   ({                                                                           \
     auto t__result = (maybe_expr);                                             \
-    if (!t__result) return ::shit::None;                                       \
+    if (!t__result) return ::koshka::None;                                     \
     t__result.take();                                                          \
   })
 
-} // namespace shit
+} // namespace koshka

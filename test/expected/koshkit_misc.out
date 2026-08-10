@@ -1,0 +1,49 @@
+--- sleep zero ---
+rc=0
+--- sleep accepts representable subnormal values ---
+minimum=0
+subnormal=0
+kosh: 1:1: error: sleep: invalid duration '1e-4000'.
+     1 |  koshkit sleep 1e-4000
+       |  ^~~~~~~~~~~~~~~~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, e.g. `sleep 5`.
+underflow=1
+--- sleep bad duration ---
+kosh: 1:1: error: sleep: invalid duration 'abc'.
+     1 |  koshkit sleep abc
+       |  ^~~~~~~~~~~~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, e.g. `sleep 5`.
+rc=1
+--- env runs the command ---
+1
+rc=0
+--- env applies the assignment ---
+KOSHKIT_TESTVAR=present
+--- pkill with no pattern ---
+kosh: 1:1: error: pkill: Not enough arguments.
+     1 |  koshkit pkill
+       |  ^~~~~~~~~~~~~
+kosh: note: Try `pkill --help` for more info.
+rc=2
+--- pkill with no match ---
+rc=1
+--- killall with no match ---
+kosh: 1:1: error: killall: no_such_process_xyz_123: no process found.
+     1 |  koshkit killall no_such_process_xyz_123
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+rc=1
+--- kill is a builtin, not a koshkit utility ---
+kosh: 1:9: error: koshkit has no utility named 'kill'.
+     1 |  koshkit kill
+       |          ^~~~
+rc=1
+--- kill with a non-numeric pid ---
+kosh: 1:6: error: Builtin `kill`: 'notapid' is not a valid job or process id.
+     1 |  kill notapid
+       |       ^~~~~~~
+rc=1
+--- ps prints the header ---
+  PID CMD
+rc=0
+--- list prints the utility count ---
+37

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The caret line renders the argv[0] the harness invoked, which varies by host
 # and platform, so the test asserts the message text and the exit code rather
 # than the BIN-dependent caret.

@@ -1,0 +1,40 @@
+#!/bin/env kosh
+test -s /dev/null; echo $?
+test 5 -le 10; echo $?
+test abc -eq 5; echo $?
+test ! ""; echo $?
+[ ]; echo $?
+test a -a b c; echo $?
+test /dev/null -nt /dev/null; echo $?
+
+
+[ ! ]
+echo $?
+
+test 1 -eq 1; echo "eq=$?"
+test 1 -ne 2; echo "ne=$?"
+[ abc = abc ]; echo "streq=$?"
+[ -z "" ]; echo "empty=$?"
+[ -n "x" ]; echo "nonempty=$?"
+[ 5 -gt 3 ]; echo "gt=$?"
+
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY"
+: > "$TEST_TEMP_DIRECTORY/same-file"
+: > "$TEST_TEMP_DIRECTORY/different-file"
+test "$TEST_TEMP_DIRECTORY/same-file" -ef "$TEST_TEMP_DIRECTORY/same-file"; echo "ef_same:$?"
+test "$TEST_TEMP_DIRECTORY/same-file" -ef "$TEST_TEMP_DIRECTORY/different-file"; echo "ef_diff:$?"
+koshkit unlink "$TEST_TEMP_DIRECTORY/same-file"
+koshkit unlink "$TEST_TEMP_DIRECTORY/different-file"
+
+[ "(" = "(" ]; echo "paren_eq=$?"
+[ "(" ]; echo "paren_single=$?"
+[ ")" ]; echo "rparen_single=$?"
+[ "(" = ")" ]; echo "paren_ne=$?"
+[ a \< b ]; echo "lt_true=$?"
+[ b \< a ]; echo "lt_false=$?"
+[ a \> b ]; echo "gt_false=$?"
+[ b \> a ]; echo "gt_true=$?"
+[ 10 \< 9 ]; echo "byte_lt=$?"
+[ abc \< abd ]; echo "abc_lt_abd=$?"
+[ \( a = a \) ]; echo "group_eq=$?"
+[ \( a = a \) -a -n x ]; echo "group_and=$?"

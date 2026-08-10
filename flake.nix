@@ -1,5 +1,5 @@
 {
-  description = "shit - the fastest cross-platform Bash and POSIX-compatible shell";
+  description = "Koshka - the fastest cross-platform Bash and POSIX-compatible shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -21,7 +21,7 @@
 
       mkPackage = { pkgs, mode ? "rel" }:
         pkgs.stdenv.mkDerivation {
-          pname = "shit";
+          pname = "kosh";
           version = "0.1.0";
 
           src = self;
@@ -49,43 +49,43 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out/bin
-            cp ./shit $out/bin/
+            cp ./kosh $out/bin/
             runHook postInstall
           '';
 
           meta = with pkgs.lib; {
             description = "The fastest cross-platform Bash and POSIX-compatible shell";
-            homepage = "https://github.com/toiletbril/shit";
+            homepage = "https://github.com/toiletbril/kosh";
             license = licenses.bsd3;
-            mainProgram = "shit";
+            mainProgram = "kosh";
             platforms = platforms.unix;
           };
         };
 
       mkSystemModule = { config, lib, pkgs, ... }:
         let
-          cfg = config.programs.shit;
+          cfg = config.programs.kosh;
         in
         {
-          options.programs.shit = {
-            enable = lib.mkEnableOption "shit - the fastest cross-platform Bash and POSIX-compatible shell";
+          options.programs.kosh = {
+            enable = lib.mkEnableOption "Koshka - the fastest cross-platform Bash and POSIX-compatible shell";
             package = lib.mkOption {
               type = lib.types.package;
               default = mkPackage { inherit pkgs; };
-              description = "The shit package to use";
+              description = "The kosh package to use";
             };
           };
 
           config = lib.mkIf cfg.enable {
             environment.systemPackages = [ cfg.package ];
-            environment.shells = [ "${cfg.package}/bin/shit" ];
+            environment.shells = [ "${cfg.package}/bin/kosh" ];
           };
         };
     in
     {
       packages = forAllSystems (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
-        default = self.packages.${system}.shit;
-        shit = mkPackage { inherit pkgs; };
+        default = self.packages.${system}.kosh;
+        kosh = mkPackage { inherit pkgs; };
       });
 
       devShells = forAllSystems (system:
@@ -94,7 +94,7 @@
         in
         {
           default = pkgs.mkShell {
-            inputsFrom = [ self.packages.${system}.shit ];
+            inputsFrom = [ self.packages.${system}.kosh ];
 
             packages = with pkgs; [
               clang
@@ -115,7 +115,7 @@
       );
 
       overlays.default = final: prev: {
-        shit = mkPackage { pkgs = final; };
+        kosh = mkPackage { pkgs = final; };
       };
 
       nixosModules.default = mkSystemModule;
@@ -124,15 +124,15 @@
 
       homeModules.default = { config, lib, pkgs, ... }:
         let
-          cfg = config.programs.shit;
+          cfg = config.programs.kosh;
         in
         {
-          options.programs.shit = {
-            enable = lib.mkEnableOption "shit - the fastest cross-platform Bash and POSIX-compatible shell";
+          options.programs.kosh = {
+            enable = lib.mkEnableOption "Koshka - the fastest cross-platform Bash and POSIX-compatible shell";
             package = lib.mkOption {
               type = lib.types.package;
               default = mkPackage { inherit pkgs; };
-              description = "The shit package to use";
+              description = "The kosh package to use";
             };
           };
 

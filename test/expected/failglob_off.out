@@ -45,12 +45,12 @@
 [Word
   Unquoted "failglob"
 ]
-shit: 3:6: warning: The glob pattern 'nomatch_*' matched no file, it expands to its literal text, which is rarely intended.
+kosh: 3:6: warning: The glob pattern 'nomatch_*' matched no file, it expands to its literal text, which is rarely intended.
      3 |  echo nomatch_*
        |       ^~~~~~~~~
 note: Probe for matches with compgen -G 'nomatch_*' or relax with set +o failglob.
 nomatch_*
-shit: 4:6: warning: The glob pattern 'a*.zzznomatch' matched no file, it expands to its literal text, which is rarely intended.
+kosh: 4:6: warning: The glob pattern 'a*.zzznomatch' matched no file, it expands to its literal text, which is rarely intended.
      4 |  echo a*.zzznomatch literal
        |       ^~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'a*.zzznomatch' or relax with set +o failglob.

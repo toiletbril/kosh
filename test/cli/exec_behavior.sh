@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 # exec exits 127 when the named command is not found, whether the name carries a
 # slash or is searched on the PATH, exits 126 when the file is present but not
@@ -33,7 +33,7 @@ echo "== direct no-shebang exec honors an empty environment:"
 "$BIN" -c 'shown=exported; export shown; exec -c -a empty "$1" value' shell "$d/plain"
 [ -n "$d" ] && /bin/rm -rf "$d"
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 input=$(mktemp)
 trap 'rm -f "$input"' EXIT
 printf 'exec . <<EOF\nignored\nEOF\necho input-survived\nkill -PIPE $$\necho signal-survived\nexit\n' > "$input"

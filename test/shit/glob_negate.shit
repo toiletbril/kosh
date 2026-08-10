@@ -1,3 +1,0 @@
-#!/bin/env shit
-case b in [!a]) echo y;; *) echo n;; esac
-case a in [!a]) echo y;; *) echo n;; esac

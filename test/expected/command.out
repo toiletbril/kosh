@@ -6,7 +6,7 @@
   [CompoundListCondition, None]
     [Assign d=$TEST_TEMP_DIRECTORY/command-v-golden]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$d"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$d"]
   [CompoundListCondition, None]
     [Assign probe_file=$d/probe]
   [CompoundListCondition, None]
@@ -18,7 +18,7 @@
         [CompoundListCondition, None]
           [Assign probe_file=$probe_file.exe]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "cp" "$BIN" "$probe_file"]
+    [SimpleCommand "koshkit" "cp" "$BIN" "$probe_file"]
   [CompoundListCondition, None]
     [Assign PATH=$d]
   [CompoundListCondition, None]
@@ -30,7 +30,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "command" "-v" "probe"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "rm" "-rf" "$d"]
+    [SimpleCommand "koshkit" "rm" "-rf" "$d"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "== command -v guard:"]
   [CompoundListCondition, None]
@@ -126,7 +126,7 @@
   Unquoted "/command-v-golden"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -172,7 +172,7 @@
   Unquoted "fi"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "cp"
@@ -212,7 +212,7 @@
   Unquoted "probe"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "rm"
@@ -484,7 +484,7 @@ rc=0
 start
 end
 == unguarded still errors:
-shit: 31:1: error: Command 'totally-nonexistent-command' was not found.
+kosh: 31:1: error: Command 'totally-nonexistent-command' was not found.
     31 |  totally-nonexistent-command
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 rc=127

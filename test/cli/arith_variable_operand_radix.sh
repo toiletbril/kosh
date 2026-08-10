@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A variable whose value is a single integer literal parses through one scan,
 # so a hex, binary, octal, or negative operand read from a name evaluates the
 # same as a bare literal, and an overflowing add wraps modulo 2^64.

@@ -1,0 +1,32 @@
+#!/bin/env kosh
+command -v echo
+command -v set
+d=$TEST_TEMP_DIRECTORY/command-v-golden
+koshkit mkdir -p "$d"
+probe_file=$d/probe
+if [ "${OS-}" = Windows_NT ]; then probe_file=$probe_file.exe; fi
+koshkit cp "$BIN" "$probe_file"
+PATH=$d
+probe() { echo function_probe; }
+command -v probe
+koshkit rm -rf "$d"
+
+echo "== command -v guard:"
+if ! command -v nonexistent-tool-xyz >/dev/null 2>&1; then echo "tool is required"; fi
+echo "rc=$?"
+echo "== command -v if/then/else:"
+if command -v nonexistent-tool-xyz >/dev/null 2>&1; then nonexistent-tool-xyz run; else echo "tool not installed"; fi
+echo "rc=$?"
+echo "== type guard:"
+if ! type nonexistent-tool-abc >/dev/null 2>&1; then echo "need abc"; fi
+echo "rc=$?"
+echo "== hash guard:"
+if ! hash nonexistent-tool-def 2>/dev/null; then echo "need def"; fi
+echo "rc=$?"
+echo "== dead branch if false:"
+echo start
+if false; then totally-nonexistent-command; fi
+echo end
+echo "== unguarded still errors:"
+totally-nonexistent-command
+echo "rc=$?"

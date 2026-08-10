@@ -12,7 +12,7 @@
           [CompoundListCondition, None]
             [SimpleCommand "/bin/echo" "dyn-extern"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/shit_dyn_fd.txt"]
+    [SimpleCommand "cat" "/tmp/kosh_dyn_fd.txt"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "separator"]
   [CompoundListCondition, None]
@@ -20,9 +20,9 @@
   [CompoundListCondition, None]
     [SimpleCommand "/bin/echo" "to-stderr"]
   [CompoundListCondition, None]
-    [SimpleCommand "cat" "/tmp/shit_dyn_fd2.txt"]
+    [SimpleCommand "cat" "/tmp/kosh_dyn_fd2.txt"]
   [CompoundListCondition, None]
-    [SimpleCommand "rm" "-f" "/tmp/shit_dyn_fd.txt" "/tmp/shit_dyn_fd2.txt"]
+    [SimpleCommand "rm" "-f" "/tmp/kosh_dyn_fd.txt" "/tmp/kosh_dyn_fd2.txt"]
 [Word
   Unquoted "fd=5"
 ]
@@ -63,13 +63,13 @@
   Unquoted "5"
 ]
 [Word
-  Unquoted "/tmp/shit_dyn_fd.txt"
+  Unquoted "/tmp/kosh_dyn_fd.txt"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit_dyn_fd.txt"
+  Unquoted "/tmp/kosh_dyn_fd.txt"
 ]
 [Word
   Unquoted "echo"
@@ -93,13 +93,13 @@
   Unquoted "2"
 ]
 [Word
-  Unquoted "/tmp/shit_dyn_fd2.txt"
+  Unquoted "/tmp/kosh_dyn_fd2.txt"
 ]
 [Word
   Unquoted "cat"
 ]
 [Word
-  Unquoted "/tmp/shit_dyn_fd2.txt"
+  Unquoted "/tmp/kosh_dyn_fd2.txt"
 ]
 [Word
   Unquoted "rm"
@@ -108,10 +108,10 @@
   Unquoted "-f"
 ]
 [Word
-  Unquoted "/tmp/shit_dyn_fd.txt"
+  Unquoted "/tmp/kosh_dyn_fd.txt"
 ]
 [Word
-  Unquoted "/tmp/shit_dyn_fd2.txt"
+  Unquoted "/tmp/kosh_dyn_fd2.txt"
 ]
 dyn-builtin
 lit-builtin

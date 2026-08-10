@@ -1,0 +1,107 @@
+#!/bin/env kosh
+# Bash arithmetic extensions run in the default mood.
+echo $((2 ** 10))
+echo $((-2 ** 2))
+echo $((2 ** 3 ** 2))
+echo $((0xff + 16#10))
+echo $((010 + 2#101))
+echo $((36#z))
+echo $((6 & 3 | 8 ^ 1))
+echo $((5 > 3 ? 10 : 20))
+n=5
+((n += 3, n *= 2))
+echo "n=$n"
+status=ok
+((0)) || status=zero-false
+echo "$status"
+sum=0
+for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
+echo "sum=$sum"
+fact=1
+let "fact = 1"
+for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
+echo "fact=$fact"
+
+
+echo $((1 + 2 * 3))
+x=5
+echo $((x * x))
+echo $((10 % 3))
+echo $((y = 7)); echo $y
+
+echo $(( 0b101 ))
+echo $(( 0b1010 * 2 ))
+echo $(( 0x10 + 0b10 ))
+echo $(( 0b11111111 ))
+echo $(( 0xff * 0b10 ))
+echo $(( -0b101 ))
+echo $(( 0b0 ))
+echo $(( 0b100 << 2 ))
+echo $(( 2#101 + 0b11 ))
+echo $(( 0B1 + 0b1 ))
+
+echo $(( (1,2,3) )); s=0; echo $(( s=5, s+1 ))
+
+x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
+
+echo $(( 2 ** 3 ** 2 ))
+echo $(( -2 ** 2 ))
+echo $(( ~0 ))
+echo $(( -10 % 3 ))
+echo $(( 10 % -3 ))
+echo $(( +-+5 ))
+echo $(( 0 ? 20 : 30 ))
+echo $(( 3 & 5 | 2 ^ 1 ))
+
+echo $((1||0))
+echo $((0&&1))
+echo $((1||0||0))
+echo $((0||0||1))
+echo $((0&&1&&1))
+x=1; echo $((1 || (x=9))); echo $x
+x=1; echo $((0 && (x=9))); echo $x
+x=1; echo $((0 || (x=9))); echo $x
+x=1; echo $((1 && (x=9))); echo $x
+x=5; echo $((1 || (x=9) || (x=10))); echo $x
+
+echo $(( $(printf ")" | wc -c) ))
+echo $(( $(printf "((" | wc -c) ))
+echo $(( 2 + $((3 * 4)) ))
+echo $(( $(echo 5)$(echo 0) ))
+echo $(( (1 + 2) * 3 ))
+
+echo $(( 1 + 2 * 3 - 4 / 2 % 3 ))
+echo $(( 1 << 4 | 2 & 3 ^ 5 ))
+echo $(( ~0 ))
+echo $(( 2 ** 10 ))
+echo $(( 5 > 3 ? 10 : 20 ))
+echo $(( 1 && 0 || 1 ))
+x=7; echo $(( x++ + ++x ))
+echo $(( 010 + 0x1f ))
+
+c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
+c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
+c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
+c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
+echo $((1 ? 2 ? 3 : 4 : 5))
+
+echo $(( 1 ? 5 : 1/0 ))
+echo $(( 0 ? 1/0 : 7 ))
+koshkit calc '1 ? 5 : 1/0'
+koshkit calc '0 ? 1/0 : 7'
+koshkit calc '1 ? 5 : undefined_var'
+koshkit calc '0 ? c=5 : 9'
+echo "c=[${c-unset}]"
+
+# The (( )) arithmetic command and the C-style for parse in the default mood
+# the way the array literal does, while POSIX mode keeps the subshell reading.
+x=5
+if ((x>=4)); then echo "ge=yes"; fi
+((x+=2))
+echo "x=$x"
+for ((i=0;i<3;i++)); do echo "i=$i"; done
+while ((x-->6)); do echo "w=$x"; done
+echo "status_true=$?"
+((0)); echo "status_false=$?"
+((echo sub1; echo sub2;); echo sub3)
+echo "backoff=$?"

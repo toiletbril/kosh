@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = if (is_release) "shit" else "shit-dbg",
+        .name = if (is_release) "kosh" else "kosh-dbg",
         .root_module = module,
     });
 
@@ -45,12 +45,12 @@ pub fn build(b: *std.Build) void {
     const os_info = b.fmt("zig {f} {s}", .{ @import("builtin").zig_version, systemInfo(b) });
 
     const defines = [_][]const u8{
-        "-DSHIT_COMPILER_COMMAND=\"zig c++\"",
-        "-DSHIT_LIBC=\"zig libc++\"",
-        b.fmt("-DSHIT_OS_INFO=\"{s}\"", .{os_info}),
-        b.fmt("-DSHIT_COMMIT_HASH=\"{s}\"", .{commit_hash}),
-        b.fmt("-DSHIT_BUILD_MODE=\"{s}\"", .{mode}),
-        "-DSHIT_ENVCXXFLAGS=\"\"",
+        "-DKOSH_COMPILER_COMMAND=\"zig c++\"",
+        "-DKOSH_LIBC=\"zig libc++\"",
+        b.fmt("-DKOSH_OS_INFO=\"{s}\"", .{os_info}),
+        b.fmt("-DKOSH_COMMIT_HASH=\"{s}\"", .{commit_hash}),
+        b.fmt("-DKOSH_BUILD_MODE=\"{s}\"", .{mode}),
+        "-DKOSH_ENVCXXFLAGS=\"\"",
     };
     flags.appendSlice(b.allocator, &defines) catch @panic("out of memory");
 
@@ -63,7 +63,7 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    const run_step = b.step("run", "Build and run shit");
+    const run_step = b.step("run", "Build and run kosh");
     const run_cmd = b.addRunArtifact(exe);
     if (b.args) |args| run_cmd.addArgs(args);
     run_step.dependOn(&run_cmd.step);

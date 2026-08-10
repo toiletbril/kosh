@@ -26,7 +26,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(History);
 
-namespace shit {
+namespace koshka {
 
 History::History() = default;
 
@@ -154,7 +154,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           ec, cxt, ec.arg_location_at(1),
           StringView{"cannot read history from '"} + args[1].view() +
               "': " + os::last_system_error_message(),
-          "Pass a readable history file, e.g. `history -r ~/.shit_history`");
+          "Pass a readable history file, e.g. `history -r ~/.kosh_history`");
       return 1;
     }
 
@@ -174,7 +174,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             ec, cxt, ec.arg_location_at(1),
             StringView{"cannot write history to '"} + args[1].view() +
                 "': " + os::last_system_error_message(),
-            "Pass a writable path, e.g. `history -w ~/.shit_history`");
+            "Pass a writable path, e.g. `history -w ~/.kosh_history`");
         return 1;
       }
     } else {
@@ -217,4 +217,4 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

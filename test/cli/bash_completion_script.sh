@@ -2,15 +2,15 @@ DIRECTORY=$(mktemp -d) || exit 1
 trap '[ -n "$DIRECTORY" ] && /bin/rm -rf "$DIRECTORY"' EXIT
 touch "$DIRECTORY/a b" "$DIRECTORY/a*star"
 
-. ../completions/shit.bash
+. ../completions/kosh.bash
 
 cd "$DIRECTORY" || exit 1
-COMP_WORDS=(shit a)
+COMP_WORDS=(kosh a)
 COMP_CWORD=1
-_shit_complete
+_kosh_complete
 printf '<%s>\n' "${COMPREPLY[@]}" | sort
 
-COMP_WORDS=(shit --debug)
+COMP_WORDS=(kosh --debug)
 COMP_CWORD=1
-_shit_complete
+_kosh_complete
 printf 'release-debug-flags=%s\n' "${#COMPREPLY[@]}"

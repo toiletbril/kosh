@@ -17,7 +17,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Times);
 
-namespace shit {
+namespace koshka {
 
 Times::Times() = default;
 
@@ -44,4 +44,4 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

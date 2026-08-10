@@ -12,7 +12,7 @@ import termios
 import time
 
 here = os.path.dirname(os.path.abspath(__file__))
-binary = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "..", "shit-dbg")
+binary = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "..", "kosh-dbg")
 column_count = 80
 wide_character = "\u754c"
 source_line = 'test "%s" = $UNSET %s' % (

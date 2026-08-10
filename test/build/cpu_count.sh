@@ -23,51 +23,51 @@ PATH="$d" "$detector"
 PATH="$d" "$detector"
 
 default_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
-    make -n CPU_COUNT=6 shit 2>/dev/null)
+    make -n CPU_COUNT=6 kosh 2>/dev/null)
 case "$default_jobs" in
-    *'-j6 -C src shit'*) echo default-make-uses-all ;;
+    *'-j6 -C src kosh'*) echo default-make-uses-all ;;
     *) echo default-make-missed ;;
 esac
 
 variable_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
-    make -n CPU_COUNT=6 LABEL=project shit 2>/dev/null)
+    make -n CPU_COUNT=6 LABEL=project kosh 2>/dev/null)
 case "$variable_jobs" in
-    *'-j6 -C src shit'*) echo variable-make-uses-all ;;
+    *'-j6 -C src kosh'*) echo variable-make-uses-all ;;
     *) echo variable-make-missed ;;
 esac
 
-explicit_jobs=$(cd .. && make -n -j2 CPU_COUNT=6 shit 2>/dev/null)
+explicit_jobs=$(cd .. && make -n -j2 CPU_COUNT=6 kosh 2>/dev/null)
 case "$explicit_jobs" in
-    *'-j6 -C src shit'*) echo explicit-make-overridden ;;
+    *'-j6 -C src kosh'*) echo explicit-make-overridden ;;
     *) echo explicit-make-preserved ;;
 esac
 
-single_job=$(cd .. && make -n -j1 CPU_COUNT=6 shit 2>/dev/null)
+single_job=$(cd .. && make -n -j1 CPU_COUNT=6 kosh 2>/dev/null)
 case "$single_job" in
-    *'-j6 -C src shit'*) echo single-make-overridden ;;
+    *'-j6 -C src kosh'*) echo single-make-overridden ;;
     *) echo single-make-preserved ;;
 esac
 
 single_job_without_discovery=$(cd .. && \
-    make -n -j1 MAKE_COMMAND_LINE= CPU_COUNT=6 shit 2>/dev/null)
+    make -n -j1 MAKE_COMMAND_LINE= CPU_COUNT=6 kosh 2>/dev/null)
 case "$single_job_without_discovery" in
-    *'-j6 -C src shit'*) echo single-make-fallback-overridden ;;
+    *'-j6 -C src kosh'*) echo single-make-fallback-overridden ;;
     *) echo single-make-fallback-preserved ;;
 esac
 
 windows_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
     OS=Windows_NT NUMBER_OF_PROCESSORS=7 \
-    make -n shit 2>/dev/null)
+    make -n kosh 2>/dev/null)
 case "$windows_jobs" in
-    *'-j7 -C src shit'*) echo windows-make-uses-all ;;
+    *'-j7 -C src kosh'*) echo windows-make-uses-all ;;
     *) echo windows-make-missed ;;
 esac
 
 for invalid_count in 0 invalid; do
     windows_jobs=$(cd .. && MAKEFLAGS= MFLAGS= MAKELEVEL=0 OS=Windows_NT \
-        NUMBER_OF_PROCESSORS=$invalid_count make -n shit 2>/dev/null)
+        NUMBER_OF_PROCESSORS=$invalid_count make -n kosh 2>/dev/null)
     case "$windows_jobs" in
-        *"-j$invalid_count -C src shit"*)
+        *"-j$invalid_count -C src kosh"*)
             echo windows-invalid-count-leaked
             exit 1
             ;;

@@ -1,3 +1,0 @@
-#!/bin/env shit
-wait 99999
-echo exit=$?

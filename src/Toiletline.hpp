@@ -5,26 +5,26 @@
 #include "StringView.hpp"
 #include "toiletline/toiletline.h"
 
-namespace shit {
+namespace koshka {
 class EvalContext;
-} /* namespace shit */
+} /* namespace koshka */
 
 namespace toiletline {
 
-using shit::String;
-using shit::StringView;
+using koshka::String;
+using koshka::StringView;
 
 String default_prompt_template();
 
-String build_prompt(shit::EvalContext &context);
+String build_prompt(koshka::EvalContext &context);
 
-String expand_prompt_template(StringView prompt, shit::EvalContext &context);
+String expand_prompt_template(StringView prompt, koshka::EvalContext &context);
 
-String render_ps0(shit::EvalContext &context);
+String render_ps0(koshka::EvalContext &context);
 
 /* Called only on the interactive path, so a non-interactive run never enables
    it. */
-void enable_completion(shit::EvalContext &context);
+void enable_completion(koshka::EvalContext &context);
 void disable_completion();
 
 bool completion_is_enabled();
@@ -32,7 +32,7 @@ bool completion_is_enabled();
 void enter_calc_history();
 void leave_calc_history();
 
-shit::Maybe<shit::Path> history_path();
+koshka::Maybe<koshka::Path> history_path();
 bool history_write();
 bool history_read();
 bool history_clear();
@@ -43,14 +43,14 @@ struct history_event
   String command;
 };
 
-shit::ArrayList<history_event> history_events(shit::Allocator allocator);
-shit::Maybe<usize> history_append_event(StringView command);
+koshka::ArrayList<history_event> history_events(koshka::Allocator allocator);
+koshka::Maybe<usize> history_append_event(StringView command);
 bool history_rewrite_event(usize number, StringView expected,
                            StringView replacement);
 bool history_rewrite_event(usize number, StringView expected,
-                           const shit::ArrayList<String> &replacements);
+                           const koshka::ArrayList<String> &replacements);
 
-void enable_job_notifications(shit::EvalContext &context);
+void enable_job_notifications(koshka::EvalContext &context);
 
 void set_ghost_enabled(bool enabled);
 
@@ -86,8 +86,8 @@ void exit();
 struct input_result
 {
   i32 code;
-  String text{shit::heap_allocator()};
-  shit::Maybe<usize> history_event_number{shit::None};
+  String text{koshka::heap_allocator()};
+  koshka::Maybe<usize> history_event_number{koshka::None};
 };
 
 input_result get_input(const String &prompt);

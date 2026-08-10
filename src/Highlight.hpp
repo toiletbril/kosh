@@ -3,7 +3,7 @@
 #include "Common.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 enum class highlight_role : u8
 {
@@ -55,4 +55,4 @@ struct highlight_theme
 
 pure fn highlight_role_name(highlight_role role) wontthrow -> StringView;
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # An error raised inside a function defined by eval and called after the eval has
 # returned renders against the stored body copy, with the eval origin and the
 # caret on the body. Before the fix the bash mood rendered the error against the

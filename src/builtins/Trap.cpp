@@ -1,7 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -17,7 +17,7 @@ FLAG(TRAP_PRINT, Bool, 'p', "", "Print the set traps in a reusable form.");
 
 REGISTER_BUILTIN_FLAGS(Trap);
 
-namespace shit {
+namespace koshka {
 
 Trap::Trap() = default;
 
@@ -86,7 +86,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (!cxt.is_posix_mode() && args.count() == 2 &&
       (args[1] == "-l" || args[1] == "--list"))
   {
-    ec.print_to_stdout(shitbox::format_signal_list());
+    ec.print_to_stdout(koshkit::format_signal_list());
     return 0;
   }
 
@@ -163,4 +163,4 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

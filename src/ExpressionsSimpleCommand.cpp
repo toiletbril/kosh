@@ -7,15 +7,15 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "ExpressionsInternal.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace expressions {
 
@@ -397,7 +397,7 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
     -> resolved_duplication
 {
   if (redir.target == nullptr)
-    return resolved_duplication{redir.dup_fd, shit::None};
+    return resolved_duplication{redir.dup_fd, koshka::None};
 
   ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
   target_tokens.push(redir.target);
@@ -409,7 +409,7 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
 
   String &field = fields[0];
   if (field == "-")
-    return resolved_duplication{Redirection::DUP_FD_CLOSE, shit::None};
+    return resolved_duplication{Redirection::DUP_FD_CLOSE, koshka::None};
 
   let const parsed_descriptor = field.view().to<i64>();
   if (parsed_descriptor.is_error() || parsed_descriptor.value() < 0) {
@@ -419,7 +419,7 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
                             "'" + field + "' is not a valid descriptor"};
   }
   return resolved_duplication{static_cast<i32>(parsed_descriptor.value()),
-                              shit::None};
+                              koshka::None};
 }
 
 } /* namespace */
@@ -804,8 +804,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   if (cxt.should_echo()) {
-    shit::print(utils::merge_tokens_to_string(m_args) + "\n");
-    shit::flush();
+    koshka::print(utils::merge_tokens_to_string(m_args) + "\n");
+    koshka::flush();
   }
 
   let const args_mark = cxt.scratch_mark();
@@ -901,7 +901,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            stays contained the way a fork would contain it. */
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(redir.fd);
-          shit::flush();
+          koshka::flush();
           os::replace_descriptor(redir.fd, body_fd);
           if (!os::descriptor_is_shell_fd(body_fd, redir.fd))
             os::close_fd(body_fd);
@@ -936,7 +936,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         /* The filename lands on the standard output and the standard error
            follows it, the pair bash builds for csh >&file. */
         const os::descriptor file_fd = r.opened_fd;
-        shit::flush();
+        koshka::flush();
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(1);
           cxt.snapshot_subshell_descriptor(2);
@@ -973,7 +973,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            descriptor before it moves. */
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(redir.fd);
-          shit::flush();
+          koshka::flush();
 
           if (from_fd == Redirection::DUP_FD_CLOSE) {
             os::close_shell_fd(redir.fd);
@@ -1001,7 +1001,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         /* A cross-route such as 2>&1 points the real shell descriptor at the
            target in source order so a later file redirect on the source does
            not change what the copy already captured. */
-        shit::flush();
+        koshka::flush();
 
         if (from_fd == Redirection::DUP_FD_CLOSE) {
           dup_saved_descriptors.push(os::save_and_replace_descriptor(
@@ -1032,7 +1032,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            flush keeps buffered output on the original descriptor. */
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(redir.fd);
-          shit::flush();
+          koshka::flush();
           const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
           if (!os::descriptor_is_shell_fd(file_fd, redir.fd))
             os::close_fd(file_fd);
@@ -1049,7 +1049,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            copies the descriptor fd N points at now. A redirect onto fd 1 or 2
            mutates the shell's own stdout or stderr, so it is flushed first. */
         if (redir.fd == 1 || redir.fd == 2) {
-          shit::flush();
+          koshka::flush();
         }
         const bool file_is_target_fd =
             os::descriptor_is_shell_fd(file_fd, redir.fd);
@@ -1263,7 +1263,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       dup_saved_descriptors.push(
           os::save_and_replace_descriptor(0, *redirect_in_fd));
       os::close_fd(*redirect_in_fd);
-      redirect_in_fd = shit::None;
+      redirect_in_fd = koshka::None;
       was_redirect_in_fd_handed_off = true;
     }
 
@@ -1392,7 +1392,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     let const *source = cxt.current_source();
     resolved_ec = ExecContext::make_from(
         source_location(), source != nullptr ? source->view() : StringView{},
-        steal(program_args), cxt.mood(), cxt.shitbox(),
+        steal(program_args), cxt.mood(), cxt.koshkit(),
         cxt.get_program_resolver(), steal(program_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);
@@ -1501,4 +1501,4 @@ cold fn SimpleCommand::to_string() const throws -> String
 
 } /* namespace expressions */
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -15,7 +15,7 @@
 [Word
   Unquoted "echo"
 ]
-shit: 2:15: warning: An unquoted variable can split into words and expand globs.
+kosh: 2:15: warning: An unquoted variable can split into words and expand globs.
      2 |  printf "[%s]" ${x:-$(printf ")")}
        |                ^~~~~~~~~~~~~~~~~~~
 note: Quote the expansion to keep one argument.

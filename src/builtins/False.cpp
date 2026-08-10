@@ -11,7 +11,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(False);
 
-namespace shit {
+namespace koshka {
 
 False::False() = default;
 
@@ -26,4 +26,4 @@ fn False::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 1;
 }
 
-} // namespace shit
+} // namespace koshka

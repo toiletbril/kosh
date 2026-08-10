@@ -1,0 +1,17 @@
+post_install() {
+  for shell_path in /bin/kosh /usr/bin/kosh; do
+    grep -Fqx "$shell_path" /etc/shells ||
+      printf '%s\n' "$shell_path" >> /etc/shells
+  done
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  temporary_shells=$(mktemp) || return 1
+  grep -Fvx -e /bin/kosh -e /usr/bin/kosh /etc/shells > "$temporary_shells"
+  cat "$temporary_shells" > /etc/shells
+  rm -f "$temporary_shells"
+}

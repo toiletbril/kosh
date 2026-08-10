@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A test or [ command probes presence or emptiness, so an unset variable operand
 # is the question being asked, not a mistake. The unset-variable warning is
 # suppressed across the operand expansion, while a plain expansion elsewhere

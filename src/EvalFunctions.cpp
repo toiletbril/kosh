@@ -6,7 +6,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -345,4 +345,4 @@ fn EvalContext::append_integer_expression(String &joined,
   joined += '0';
 }
 
-} // namespace shit
+} // namespace koshka

@@ -33,13 +33,13 @@ jobs:
           submodules: recursive
 
       - name: Build ASAN binary
-        run: make shit
+        run: make kosh
 
       - name: Run golden tests
         run: make test
 
       - name: Build release binary
-        run: make clean && make CXX=g++ USE_LD= MODE=rel shit
+        run: make clean && make CXX=g++ USE_LD= MODE=rel kosh
 
       - name: Run benchmark
         run: >-
@@ -49,7 +49,7 @@ jobs:
 
       - name: Build release binary with code coverage
         if: '!cancelled()'
-        run: make clean && make MODE=cov shit
+        run: make clean && make MODE=cov kosh
 
       - name: Run tests under release coverage binary
         if: '!cancelled()'
@@ -61,14 +61,14 @@ jobs:
         run: |
           ./scripts/llvm-tool.sh llvm-profdata merge -sparse \
             coverage/profraw/*.profraw \
-            -o coverage/shit.profdata
+            -o coverage/kosh.profdata
           {
             echo '## Coverage'
             echo
             echo '| File | Line cover | Branch cover |'
             echo '| --- | --- | --- |'
-            ./scripts/llvm-tool.sh llvm-cov report ./shit-cov \
-              -instr-profile=coverage/shit.profdata src \
+            ./scripts/llvm-tool.sh llvm-cov report ./kosh-cov \
+              -instr-profile=coverage/kosh.profdata src \
               -ignore-filename-regex='toiletline' \
               | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ \
                      { print "| "$1" | "$10" | "$13" |" }'
@@ -77,8 +77,8 @@ jobs:
             echo
             echo '| File | Uncovered lines |'
             echo '| --- | --- |'
-            ./scripts/llvm-tool.sh llvm-cov export ./shit-cov \
-              -instr-profile=coverage/shit.profdata src \
+            ./scripts/llvm-tool.sh llvm-cov export ./kosh-cov \
+              -instr-profile=coverage/kosh.profdata src \
               -ignore-filename-regex='toiletline' -format=lcov \
               | awk '
                   /^SF:/ { f=$0; sub(/^SF:/,"",f); sub(/.*\/src\//,"",f);
@@ -203,7 +203,7 @@ jobs:
             throw "The MSYS2 golden test toolchain is incomplete"
           }
           $symlinkProbeDirectory = Join-Path ([IO.Path]::GetTempPath()) `
-            "shit-symlink-$([guid]::NewGuid())"
+            "kosh-symlink-$([guid]::NewGuid())"
           $symlinkProbePath = $symlinkProbeDirectory -replace '\\', '/'
           $symlinkProbeCommand = `
             'mkdir -p "$1/target" && ' +

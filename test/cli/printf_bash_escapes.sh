@@ -1,7 +1,7 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # printf \e and \E emit the escape character in bash moods but pass through
 # literally in the sh mood. The %b conversion follows the same gate.
-output_sentinel=shit-printf-output-end
+output_sentinel=kosh-printf-output-end
 escape_character=$(printf '\033')
 escape_line=$(printf '\033\nx')
 escape_line=${escape_line%x}

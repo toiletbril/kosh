@@ -1,7 +1,7 @@
 == --posix keeps [[ working:
 bracket-works
 == --posix seeds BASH_VERSION:
-BASH_VERSION=5.2.0(1)-shit
+BASH_VERSION=5.2.0(1)-kosh
 == --posix reports the bash-posix mood:
 bash-posix
 == --mood bash-posix keeps [[ working:

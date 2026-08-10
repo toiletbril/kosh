@@ -31,7 +31,7 @@
 [Word
   Unquoted "not-reached"
 ]
-shit: 4:7: error: Unable to expand 'never_set_var' because the parameter is not set.
+kosh: 4:7: error: Unable to expand 'never_set_var' because the parameter is not set.
      4 |  echo "$never_set_var"
        |        ^~~~~~~~~~~~~~
 note: Replace it with ${never_set_var-} if empty expansion is desired.

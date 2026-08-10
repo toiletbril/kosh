@@ -1,7 +1,7 @@
 dir=$(mktemp -d)
 trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 
-script="$dir/named.shit"
+script="$dir/named.kosh"
 {
     printf 'if true; then\r\n'
     printf '  echo named\r\n'
@@ -20,7 +20,7 @@ script="$dir/named.shit"
 
 printf 'echo stdin\r\n' | "$BIN" -s
 
-source_script="$dir/source.shit"
+source_script="$dir/source.kosh"
 printf 'echo sourced\r\n' > "$source_script"
 "$BIN" -c '. "$1"' crlf-driver "$source_script"
 
@@ -37,7 +37,7 @@ lone_carriage_return=$(printf 'a\rb')
 "$BIN" -c 'value=$1; printf "lone=%s\n" "${#value}"' crlf-driver \
     "$lone_carriage_return"
 
-invalid_script="$dir/invalid.shit"
+invalid_script="$dir/invalid.kosh"
 printf 'echo first\r\nmissing_crlf_probe\r\n' > "$invalid_script"
 diagnostic=$("$BIN" "$invalid_script" 2>&1) && exit 1
 case "$diagnostic" in

@@ -1,3 +1,0 @@
-#!/bin/env shit
-echo before $(echo one two)
-echo after

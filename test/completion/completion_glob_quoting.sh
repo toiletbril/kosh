@@ -3,7 +3,7 @@
 # quote, a bang, or a single quote inserts as valid shell input. The preferred
 # order is single quotes, then double quotes when the name holds a single quote.
 # A backtick, dollar, and double quote are escaped inside the double-quote form,
-# while a bang stays literal since shit has no history expansion.
+# while a bang stays literal since kosh has no history expansion.
 d=$(mktemp -d)
 cd "$d" || exit 1
 # Names without a single quote take the single-quote form.

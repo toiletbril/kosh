@@ -5,7 +5,7 @@
 
 #include <type_traits>
 
-namespace shit {
+namespace koshka {
 
 class BumpArena
 {
@@ -99,4 +99,4 @@ extern BumpArena *FUNCTION_ARENA;
 
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool;
 
-} // namespace shit
+} // namespace koshka

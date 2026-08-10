@@ -1,0 +1,15 @@
+#!/bin/env kosh
+d=$(mktemp -d)
+cd "$d"
+touch real.txt
+compgen -G '*.txt'
+echo "glob-match=$?"
+compgen -G '*.zzz'
+echo "glob-miss=$?"
+compgen -G 'real.txt'
+echo "plain-exists=$?"
+compgen -G 'missing.txt'
+echo "plain-missing=$?"
+if compgen -G '*.txt' >/dev/null; then echo found; fi
+cd /
+rm -r "$d"

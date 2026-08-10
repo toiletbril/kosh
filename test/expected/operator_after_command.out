@@ -1,3 +1,3 @@
-shit: 2:8: error: Expected a command after an operator.
+kosh: 2:8: error: Expected a command after an operator.
      2 |  true ||
        |         ^

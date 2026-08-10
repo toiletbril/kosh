@@ -1,0 +1,11 @@
+#!/bin/env kosh
+# A multiply by a literal zero folds to zero whatever the other operand reads,
+# and a subtraction of a name from itself folds to zero. The recorded constant
+# keeps the operand defined, so the fold is safe.
+x=7
+echo $((x * 0))
+echo $((0 * x))
+echo $((x - x))
+
+# A constant arithmetic still folds through the numeric path, unchanged.
+echo $((3 + 4 * 5))

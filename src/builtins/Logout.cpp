@@ -14,7 +14,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Logout);
 
-namespace shit {
+namespace koshka {
 
 Logout::Logout() = default;
 
@@ -74,4 +74,4 @@ fn Logout::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   utils::quit(static_cast<i32>(status), utils::farewell_policy::Goodbye);
 }
 
-} // namespace shit
+} // namespace koshka

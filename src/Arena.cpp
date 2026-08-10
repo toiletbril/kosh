@@ -4,7 +4,7 @@
 #include "Containers.hpp"
 #include "Trace.hpp"
 
-namespace shit {
+namespace koshka {
 
 BumpArena *AST_ARENA = nullptr;
 BumpArena *FUNCTION_ARENA = nullptr;
@@ -139,4 +139,4 @@ cold fn BumpArena::reset() wontthrow -> void
   if (!m_blocks.is_empty()) m_blocks.front().used = 0;
 }
 
-} // namespace shit
+} // namespace koshka

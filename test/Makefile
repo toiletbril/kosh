@@ -35,12 +35,12 @@ export TEST_MKTEMP_DIRECTORY := $(shell $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/.tes
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)
-BIN ?= ../shit$(MODE_SUFFIX).com
+BIN ?= ../kosh$(MODE_SUFFIX).com
 else ifeq ($(TARGET), Windows_NT)
-BIN ?= ../shit$(MODE_SUFFIX).exe
+BIN ?= ../kosh$(MODE_SUFFIX).exe
 DIFF_FLAGS += -w -a # CRLF on Windows SMH
 else
-BIN ?= ../shit$(MODE_SUFFIX)
+BIN ?= ../kosh$(MODE_SUFFIX)
 endif
 
 # The test drivers run with the current directory set to test, so a BIN given
@@ -64,8 +64,8 @@ FAILED_LIST := failed.diff
 export BIN_FLAGS DIFF_FLAGS FAILED_LIST TEST_JOBS
 export TEST_SHELL := $(SHELL)
 
-export SHIT_HISTORY := $(CURDIR)/.test_history
-export SHIT_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
+export KOSH_HISTORY := $(CURDIR)/.test_history
+export KOSH_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
 ifeq ($(TARGET), Windows_NT)
 export TEST_SYSTEM_PATH := .test-work/system-path
 export TEST_UNAME_DIRECTORY := .test-work/system-path
@@ -79,17 +79,17 @@ export PATH := $(CURDIR)/bin$(TEST_HOST_PATH_SEPARATOR)$(PATH)
 
 %: expected/%.out
 	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
-		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-shit-test.sh $*
+		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-kosh-test.sh $*
 
 clean:
-	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
+	@rm -f $(FAILED_LIST) $(KOSH_HISTORY) $(KOSH_DIRECTORY_HISTORY)
 	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
 
 test: $(BIN)
 	@$(SHELL) run-test-suite.sh all
 
-shit_tests: $(BIN)
-	@$(SHELL) run-test-suite.sh shit
+kosh_tests: $(BIN)
+	@$(SHELL) run-test-suite.sh kosh
 
 cli_%: expected/%.out
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
@@ -122,7 +122,7 @@ WINDOWS_SKIPPED_TEST_NAMES := \
 	umask_modes
 
 $(WINDOWS_SKIPPED_TEST_NAMES):
-	@printf "	%-64s skipped, unsupported Windows backend feature\n" "$@.shit"
+	@printf "	%-64s skipped, unsupported Windows backend feature\n" "$@.kosh"
 
 cli_assimilate:
 	@printf "	%-64s skipped, remote transaction requires POSIX\n" "cli/assimilate.sh"
@@ -236,7 +236,7 @@ dashdiff bashdiff mimicrydiff: compatdiff
 
 BENCH := bench/configure.sh
 BENCH_BASH := bench/configure.bash
-BENCH_SHIT := bench/configure.shit
+BENCH_KOSH := bench/configure.kosh
 PRIMES := bench/primes.bash
 PRIMES_PY := bench/primes.py
 PRIMES_LIMIT ?= 100000
@@ -249,7 +249,7 @@ BASH_SPEEDUP_REQUIRED ?= 3
 bench: $(BIN)
 	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASHP='$(BASHP)' ZSH='$(ZSH)' \
 		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' \
-		BENCH_BASH='$(BENCH_BASH)' BENCH_SHIT='$(BENCH_SHIT)' PRIMES='$(PRIMES)' \
+		BENCH_BASH='$(BENCH_BASH)' BENCH_KOSH='$(BENCH_KOSH)' PRIMES='$(PRIMES)' \
 		PRIMES_PY='$(PRIMES_PY)' PRIMES_LIMIT='$(PRIMES_LIMIT)' PYTHON='$(PYTHON)' \
 		BENCH_WARMUP_COUNT='$(BENCH_WARMUP_COUNT)' \
 		BENCH_SAMPLE_COUNT='$(BENCH_SAMPLE_COUNT)' \
@@ -257,5 +257,5 @@ bench: $(BIN)
 		BASH_SPEEDUP_REQUIRED='$(BASH_SPEEDUP_REQUIRED)' \
 		$(SHELL) run-bench-test.sh
 
-.PHONY: test clean shit_tests refill compatdiff dashdiff bashdiff mimicrydiff bench \
+.PHONY: test clean kosh_tests refill compatdiff dashdiff bashdiff mimicrydiff bench \
 		build_tests completion_tests completion_refill cli_tests highlight_tests

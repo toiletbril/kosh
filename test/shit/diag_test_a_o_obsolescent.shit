@@ -1,3 +1,0 @@
-#!/bin/env shit
-[ -f /a -o -f /b ] || echo none
-echo after

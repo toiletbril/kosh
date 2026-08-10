@@ -17,9 +17,9 @@ word_is_listed()
 }
 
 ACTIVE_TEST_NAMES=
-for TEST_FILE in shit/*.shit; do
-  TEST_NAME=${TEST_FILE#shit/}
-  TEST_NAME=${TEST_NAME%.shit}
+for TEST_FILE in kosh/*.kosh; do
+  TEST_NAME=${TEST_FILE#kosh/}
+  TEST_NAME=${TEST_NAME%.kosh}
   if word_is_listed "$TEST_NAME" "$SKIPPED_TEST_NAMES"; then
     continue
   fi
@@ -129,8 +129,8 @@ run_harness_item()
   TEST_ITEM=$2
 
   case $HARNESS_NAME in
-  shit)
-    "$TEST_SHELL" run-shit-test.sh "$TEST_ITEM"
+  kosh)
+    "$TEST_SHELL" run-kosh-test.sh "$TEST_ITEM"
     ;;
   cli)
     "$TEST_SHELL" run-cli-test.sh "$TEST_SHELL" "$TEST_ITEM"
@@ -169,10 +169,10 @@ print_platform_skips()
   HARNESS_NAME=$1
 
   case $HARNESS_NAME in
-  shit)
+  kosh)
     for TEST_NAME in $SKIPPED_TEST_NAMES; do
       printf "\t%-64s skipped, unsupported Windows backend feature\n" \
-        "$TEST_NAME.shit"
+        "$TEST_NAME.kosh"
     done
     ;;
   cli)
@@ -231,8 +231,8 @@ run_named_suite()
 
   print_platform_skips "$HARNESS_NAME"
   case $HARNESS_NAME in
-  shit)
-    run_parallel_harness shit "$ACTIVE_TEST_NAMES"
+  kosh)
+    run_parallel_harness kosh "$ACTIVE_TEST_NAMES"
     ;;
   cli)
     run_parallel_harness cli "$PARALLEL_CLI_INPUT" && run_serial_cli_tests
@@ -281,7 +281,7 @@ fi
 
 START_TIME=$(date +%s)
 SUITE_STATUS=0
-rm -f "$FAILED_LIST" "$SHIT_HISTORY" "$SHIT_DIRECTORY_HISTORY"
+rm -f "$FAILED_LIST" "$KOSH_HISTORY" "$KOSH_DIRECTORY_HISTORY"
 test -n "$PWD/.test-work" && rm -rf "$PWD/.test-work"
 
 if [ "$SUITE_STATUS" -eq 0 ]; then
@@ -295,7 +295,7 @@ if [ "$SUITE_STATUS" -eq 0 ] && [ "${TARGET-}" != Windows_NT ]; then
   (
     FAILED_LIST=$PARALLEL_FAILED_LIST
     PARALLEL_STATUS=0
-    for HARNESS_NAME in shit build highlight; do
+    for HARNESS_NAME in kosh build highlight; do
       if [ "$PARALLEL_STATUS" -eq 0 ]; then
         run_named_suite "$HARNESS_NAME" || PARALLEL_STATUS=$?
       fi
@@ -320,7 +320,7 @@ if [ "$SUITE_STATUS" -eq 0 ] && [ "${TARGET-}" != Windows_NT ]; then
     run_named_suite interactive || SUITE_STATUS=$?
   fi
 else
-  for HARNESS_NAME in shit build highlight completion; do
+  for HARNESS_NAME in kosh build highlight completion; do
     if [ "$SUITE_STATUS" -eq 0 ]; then
       run_named_suite "$HARNESS_NAME" || SUITE_STATUS=$?
     fi

@@ -24,6 +24,6 @@
   Unquoted "not-reached"
 ]
 before
-shit: 3:6: error: Unable to expand 'nope' because the parameter is not set.
+kosh: 3:6: error: Unable to expand 'nope' because the parameter is not set.
      3 |  echo "${nope:1:2}"
        |       ^~~~~~~~~~~~~

@@ -5,7 +5,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 class PackedStringKey
 {
@@ -90,6 +90,6 @@ public:
   }
 };
 
-} // namespace shit
+} // namespace koshka
 
-#define SSK(literal) shit::PackedStringKey::from_literal(literal)
+#define SSK(literal) koshka::PackedStringKey::from_literal(literal)

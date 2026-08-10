@@ -1,0 +1,10 @@
+#!/bin/env kosh
+# An if whose only branch is statically false and which has no else body runs
+# nothing, so the optimizer eliminates the whole compound to a no-op.
+if false; then echo never; fi
+echo after_if
+
+# A for over an explicit empty list never iterates, so the whole loop is a
+# no-op whatever the body holds.
+for item in; do echo never; done
+echo after_for

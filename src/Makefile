@@ -72,17 +72,17 @@ DEPS := $(OBJECTS:.o=.d)
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)
-OUT := ../shit$(MODE_SUFFIX).com
+OUT := ../kosh$(MODE_SUFFIX).com
 else ifeq ($(TARGET), Windows_NT)
-OUT := ../shit$(MODE_SUFFIX).exe
+OUT := ../kosh$(MODE_SUFFIX).exe
 else
-OUT := ../shit$(MODE_SUFFIX)
+OUT := ../kosh$(MODE_SUFFIX)
 endif
 
 LINKED_OUT := $(OUT)
 ifeq ($(MODE), rel)
 ifneq ($(TARGET), Windows_NT)
-LINKED_OUT := $(OBJ_DIR)/shit
+LINKED_OUT := $(OBJ_DIR)/kosh
 endif
 endif
 
@@ -171,12 +171,12 @@ encode_metadata = $(subst $(space),\\040,$(1))
 endif
 
 DEFINES := \
-	-DSHIT_COMPILER_COMMAND="\"$(call encode_metadata,$(CXX))\"" \
-	-DSHIT_LIBC="\"$(call encode_metadata,$(LIBC_INFO))\"" \
-	-DSHIT_OS_INFO="\"$(call encode_metadata,$(OS_INFO))\"" \
-	-DSHIT_COMMIT_HASH="\"$(call encode_metadata,$(COMMIT_HASH))\"" \
-	-DSHIT_BUILD_MODE="\"$(call encode_metadata,$(MODE))\"" \
-	-DSHIT_ENVCXXFLAGS="\"$(call encode_metadata,$(ENVCXXFLAGS))\""
+	-DKOSH_COMPILER_COMMAND="\"$(call encode_metadata,$(CXX))\"" \
+	-DKOSH_LIBC="\"$(call encode_metadata,$(LIBC_INFO))\"" \
+	-DKOSH_OS_INFO="\"$(call encode_metadata,$(OS_INFO))\"" \
+	-DKOSH_COMMIT_HASH="\"$(call encode_metadata,$(COMMIT_HASH))\"" \
+	-DKOSH_BUILD_MODE="\"$(call encode_metadata,$(MODE))\"" \
+	-DKOSH_ENVCXXFLAGS="\"$(call encode_metadata,$(ENVCXXFLAGS))\""
 
 CXXFLAGS := \
 	-Wall \
@@ -321,7 +321,7 @@ CXXFLAGS += \
 	-DNDEBUG \
 	-fno-omit-frame-pointer \
 	-O0 \
-	"-fprofile-instr-generate=$(COVERAGE_PROFILE_DIRECTORY)/shit-%p.profraw" \
+	"-fprofile-instr-generate=$(COVERAGE_PROFILE_DIRECTORY)/kosh-%p.profraw" \
 	-fcoverage-mapping
 ifeq ($(TARGET), Linux)
 CXXFLAGS += \
@@ -358,13 +358,13 @@ CXXFLAGS += \
 endif
 endif
 
-# A bare `make` builds the shell, the same as `make shit`, rather than the first
+# A bare `make` builds the shell, the same as `make kosh`, rather than the first
 # object the rules below would otherwise name as the default goal.
-.DEFAULT_GOAL := shit
+.DEFAULT_GOAL := kosh
 
 # Every object is built into $(OBJ_DIR), so its directory tree must exist first.
 # The order-only prerequisite creates it before any compile, so a plain
-# `make MODE=rel` from a clean tree works without first running the shit target.
+# `make MODE=rel` from a clean tree works without first running the kosh target.
 $(OBJECTS): | dirs
 
 $(OBJ_DIR)/%.o: %.cpp Makefile
@@ -383,7 +383,7 @@ ifeq ($(MODE), cov)
 	mkdir -p "$(COVERAGE_PROFILE_DIRECTORY)"
 endif
 
-shit: dirs
+kosh: dirs
 	$(MAKE) $(LINKED_OUT)
 ifneq ($(LINKED_OUT), $(OUT))
 	cp $(LINKED_OUT) $(OUT)
@@ -398,38 +398,38 @@ man5dir ?= $(PREFIX)/share/man/man5
 bashcompdir ?= $(PREFIX)/share/bash-completion/completions
 INSTALL_MOOD_SYMLINKS ?=
 
-REL_BINARY := ../shit
-MANPAGE := ../docs/shit.1
-MANPAGE5 := ../docs/shit.5
-BASH_COMPLETION := ../completions/shit.bash
+REL_BINARY := ../kosh
+MANPAGE := ../docs/kosh.1
+MANPAGE5 := ../docs/kosh.5
+BASH_COMPLETION := ../completions/kosh.bash
 
 install:
 ifeq ($(TARGET), Windows_NT)
 	$(error Unable to figure out install directory for Windows. \
 			Please put '$(realpath ..)' in your PATH manually)
 else
-	$(MAKE) MODE=rel shit
+	$(MAKE) MODE=rel kosh
 	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(mandir)" \
 		"$(DESTDIR)$(man5dir)" "$(DESTDIR)$(bashcompdir)"
-	install -m 755 $(REL_BINARY) "$(DESTDIR)$(bindir)/shit"
-	install -m 644 $(MANPAGE) "$(DESTDIR)$(mandir)/shit.1"
-	install -m 644 $(MANPAGE5) "$(DESTDIR)$(man5dir)/shit.5"
-	install -m 644 $(BASH_COMPLETION) "$(DESTDIR)$(bashcompdir)/shit"
+	install -m 755 $(REL_BINARY) "$(DESTDIR)$(bindir)/kosh"
+	install -m 644 $(MANPAGE) "$(DESTDIR)$(mandir)/kosh.1"
+	install -m 644 $(MANPAGE5) "$(DESTDIR)$(man5dir)/kosh.5"
+	install -m 644 $(BASH_COMPLETION) "$(DESTDIR)$(bashcompdir)/kosh"
 	for mood in $(INSTALL_MOOD_SYMLINKS); do \
-		ln -sf shit "$(DESTDIR)$(bindir)/$$mood"; \
+		ln -sf kosh "$(DESTDIR)$(bindir)/$$mood"; \
 	done
-	echo "Installed shit, its manual pages, and its bash completion under '$(DESTDIR)$(PREFIX)'."
+	echo "Installed kosh, its manual pages, and its bash completion under '$(DESTDIR)$(PREFIX)'."
 endif
 
 uninstall:
-	rm -f "$(DESTDIR)$(bindir)/shit"
-	rm -f "$(DESTDIR)$(mandir)/shit.1"
-	rm -f "$(DESTDIR)$(man5dir)/shit.5"
-	rm -f "$(DESTDIR)$(bashcompdir)/shit"
+	rm -f "$(DESTDIR)$(bindir)/kosh"
+	rm -f "$(DESTDIR)$(mandir)/kosh.1"
+	rm -f "$(DESTDIR)$(man5dir)/kosh.5"
+	rm -f "$(DESTDIR)$(bashcompdir)/kosh"
 	for mood in $(INSTALL_MOOD_SYMLINKS); do \
 		rm -f "$(DESTDIR)$(bindir)/$$mood"; \
 	done
-	echo "Removed shit, its manual pages, and its bash completion from '$(DESTDIR)$(PREFIX)'."
+	echo "Removed kosh, its manual pages, and its bash completion from '$(DESTDIR)$(PREFIX)'."
 
 CLANG_TIDY ?= clang-tidy
 
@@ -444,13 +444,13 @@ fmt:
 	$(CLANG_FORMAT) -i $(SOURCES) $(ROUTED_SOURCES) $(HEADERS)
 
 clean:
-	rm -rf ./o ../shit ../shit-$(MODE) ../shit.exe ../shit-$(MODE).exe
+	rm -rf ./o ../kosh ../kosh-$(MODE) ../kosh.exe ../kosh-$(MODE).exe
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
-	rm -rf ../shit.com ../shit-cosmo.com ../shit.com.dbg ../shit-cosmo.com.dbg ../shit.aarch64.elf ../shit-cosmo.aarch64.elf # Cosmopolitan
+	rm -rf ../kosh.com ../kosh-cosmo.com ../kosh.com.dbg ../kosh-cosmo.com.dbg ../kosh.aarch64.elf ../kosh-cosmo.aarch64.elf # Cosmopolitan
 	rm -rf ../perf*
 	rm -rf ../zig-out
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
-.PHONY: dirs shit install uninstall tidy fmt clean
+.PHONY: dirs kosh install uninstall tidy fmt clean
 
 -include $(DEPS)

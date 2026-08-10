@@ -1,0 +1,4 @@
+#!/bin/env kosh
+echo "$count"
+count=5
+echo "$count"

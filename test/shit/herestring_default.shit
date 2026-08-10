@@ -1,9 +1,0 @@
-#!/bin/env shit
-read -r first <<< "one two three"
-echo "read=$first"
-cat <<< "straight through"
-total=0
-while read -r n; do
-  total=$(( total + n ))
-done <<< "$(printf '3\n4\n5')"
-echo "summed=$total"

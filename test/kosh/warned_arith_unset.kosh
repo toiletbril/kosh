@@ -1,0 +1,13 @@
+#!/bin/env kosh
+set -WWW
+echo $((never_counted + 1))
+echo continued
+
+
+set -WWW
+echo *.zzz_nomatch_downgrade
+echo continued
+
+set -WWW
+echo "value=$never_piped" | cat
+echo continued

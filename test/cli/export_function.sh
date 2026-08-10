@@ -1,5 +1,5 @@
 # export -f serializes a shell function into the environment under the bash
-# BASH_FUNC_name%% convention so a child bash inherits it. shit does not import
+# BASH_FUNC_name%% convention so a child bash inherits it. kosh does not import
 # BASH_FUNC itself, so an inherited entry stays inert and cannot inject code.
 echo "== brace-body function serializes:"
 "$BIN" -c 'greet() { echo "hi $1"; }; export -f greet; env' 2>/dev/null | grep BASH_FUNC_greet

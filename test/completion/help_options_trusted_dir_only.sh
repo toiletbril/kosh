@@ -1,8 +1,8 @@
 # Option completion from a command's --help text passes two gates. The command
-# is on shit's allowlist of commands safe to fork, and it resolves into a
+# is on kosh's allowlist of commands safe to fork, and it resolves into a
 # directory the current user or root owns that is not writable by group or
 # other. A fake binary named for an allowlisted command (act) drives the
-# probe deterministically. The same binary under a name shit does not recognize,
+# probe deterministically. The same binary under a name kosh does not recognize,
 # or in a world-writable directory, is never forked.
 workspace=$(mktemp -d) || exit 1
 trap 'test -n "$workspace" && rm -rf "$workspace"' EXIT
@@ -12,11 +12,11 @@ marker=$workspace/marker
 mkdir -p "$trusted" "$untrusted"
 chmod 755 "$trusted"
 chmod 777 "$untrusted"
-export SHIT_HELP_MARKER=$marker
+export KOSH_HELP_MARKER=$marker
 write_probe() {
   cat > "$1" <<'SH'
 #!/bin/sh
-echo forked >> "$SHIT_HELP_MARKER"
+echo forked >> "$KOSH_HELP_MARKER"
 echo "  --marker-option   a probe option"
 SH
   chmod +x "$1"
@@ -45,7 +45,7 @@ if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
 cat > "$trusted/act" <<'SH'
 #!/bin/sh
-echo attempted >> "$SHIT_HELP_MARKER"
+echo attempted >> "$KOSH_HELP_MARKER"
 sleep 2
 SH
 chmod +x "$trusted/act"

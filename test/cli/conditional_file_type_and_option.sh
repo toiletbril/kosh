@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 directory=$(mktemp -d)
 trap '[ -n "$directory" ] && /bin/rm -rf "$directory"' EXIT
 plain=$directory/plain

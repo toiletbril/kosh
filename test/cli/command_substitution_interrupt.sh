@@ -33,7 +33,7 @@ test -s "$d/ready" || exit 1
 
 kill -INT "$shell_pid"
 "$BIN" -p --mood sh -c \
-    'shitbox sleep 10; kill -KILL "$1" 2>/dev/null' \
+    'koshkit sleep 10; kill -KILL "$1" 2>/dev/null' \
     shell "$shell_pid" &
 watchdog_pid=$!
 wait "$shell_pid"

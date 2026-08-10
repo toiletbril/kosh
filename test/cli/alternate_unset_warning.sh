@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The ${name:+word} alternate form tests whether a name is set, so an unset name
 # expands to empty by design and never warns, not even under -W. Each grep count
 # is zero because no warning is printed.

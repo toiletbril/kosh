@@ -1,0 +1,11 @@
+#!/bin/env kosh
+set -o no-glob
+set -o | grep glob
+set +o no-glob
+set -o error-exit
+set -o | grep errexit
+set +o error-exit
+set -o no-clobber
+set -o | grep clobber
+set +o no-clobber
+echo done

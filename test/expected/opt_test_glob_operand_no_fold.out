@@ -83,11 +83,11 @@
 [Word
   Unquoted "fi"
 ]
-shit: 3:13: warning: [ and test compare strings byte for byte and never glob-match.
+kosh: 3:13: warning: [ and test compare strings byte for byte and never glob-match.
      3 |  if [ "a*" = "a*" ]; then echo quoted_glob_folds; fi
        |              ^~~~
 note: Use a case or the [[ ]] form for the pattern.
-shit: 4:11: warning: [ and test compare strings byte for byte and never glob-match.
+kosh: 4:11: warning: [ and test compare strings byte for byte and never glob-match.
      4 |  if [ a* = a* ]; then echo unquoted_glob_no_fold; fi
        |            ^~
 note: Use a case or the [[ ]] form for the pattern.

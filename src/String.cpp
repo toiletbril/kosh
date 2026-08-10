@@ -4,7 +4,7 @@
 #include "IntBase.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 String::String(Allocator allocator, StringView initial) throws
     : m_allocator(allocator)
@@ -180,31 +180,31 @@ fn String::from<f64>(f64 value, Allocator allocator) throws -> String
   return utils::format_f64(value, allocator);
 }
 
-#define SHIT_STRING_TO(T) template ErrorOr<T> String::to<T>() const;
-SHIT_STRING_TO(i16)
-SHIT_STRING_TO(u16)
-SHIT_STRING_TO(i32)
-SHIT_STRING_TO(u32)
-SHIT_STRING_TO(i64)
-SHIT_STRING_TO(u64)
-SHIT_STRING_TO(bi16)
-SHIT_STRING_TO(bi32)
-SHIT_STRING_TO(bi64)
-SHIT_STRING_TO(bu16)
-SHIT_STRING_TO(bu32)
-SHIT_STRING_TO(bu64)
-SHIT_STRING_TO(oi16)
-SHIT_STRING_TO(oi32)
-SHIT_STRING_TO(oi64)
-SHIT_STRING_TO(ou16)
-SHIT_STRING_TO(ou32)
-SHIT_STRING_TO(ou64)
-SHIT_STRING_TO(hi16)
-SHIT_STRING_TO(hi32)
-SHIT_STRING_TO(hi64)
-SHIT_STRING_TO(hu16)
-SHIT_STRING_TO(hu32)
-SHIT_STRING_TO(hu64)
-#undef SHIT_STRING_TO
+#define KOSH_STRING_TO(T) template ErrorOr<T> String::to<T>() const;
+KOSH_STRING_TO(i16)
+KOSH_STRING_TO(u16)
+KOSH_STRING_TO(i32)
+KOSH_STRING_TO(u32)
+KOSH_STRING_TO(i64)
+KOSH_STRING_TO(u64)
+KOSH_STRING_TO(bi16)
+KOSH_STRING_TO(bi32)
+KOSH_STRING_TO(bi64)
+KOSH_STRING_TO(bu16)
+KOSH_STRING_TO(bu32)
+KOSH_STRING_TO(bu64)
+KOSH_STRING_TO(oi16)
+KOSH_STRING_TO(oi32)
+KOSH_STRING_TO(oi64)
+KOSH_STRING_TO(ou16)
+KOSH_STRING_TO(ou32)
+KOSH_STRING_TO(ou64)
+KOSH_STRING_TO(hi16)
+KOSH_STRING_TO(hi32)
+KOSH_STRING_TO(hi64)
+KOSH_STRING_TO(hu16)
+KOSH_STRING_TO(hu32)
+KOSH_STRING_TO(hu64)
+#undef KOSH_STRING_TO
 
-} /* namespace shit */
+} /* namespace koshka */

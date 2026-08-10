@@ -24,7 +24,7 @@ FLAG(EXEC_CLEAR_ENV, Bool, 'c', "",
 
 REGISTER_BUILTIN_FLAGS(Exec);
 
-namespace shit {
+namespace koshka {
 
 Exec::Exec() = default;
 
@@ -238,7 +238,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   try {
-    unused(cxt.materialize_shit_identity());
+    unused(cxt.materialize_kosh_identity());
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {
     return report_exec_resolution_error(
@@ -253,4 +253,4 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   utils::quit(status, utils::farewell_policy::Silent);
 }
 
-} // namespace shit
+} // namespace koshka

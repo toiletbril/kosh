@@ -5,7 +5,7 @@
 #include "PackedStringKey.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 template <class Value>
 struct static_string_entry
@@ -108,4 +108,4 @@ public:
 template <usize Count>
 StaticStringSet(const PackedStringKey (&)[Count]) -> StaticStringSet<Count>;
 
-} // namespace shit
+} // namespace koshka

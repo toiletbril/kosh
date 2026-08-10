@@ -35,11 +35,11 @@ the `os` wrappers.
 
 ## Preserve one behavior owner
 
-The canonical native test is `test/shit/<builtin>.shit` unless the behavior
+The canonical native test is `test/kosh/<builtin>.kosh` unless the behavior
 requires a real executable boundary. Add cases to that owner. Compatibility,
 completion, and terminal tests cover only contracts owned by those harnesses.
 Literal help output has no golden.
 
-A new builtin updates the root `AGENTS.md`, `docs/shit.1`, and
-`completions/shit.bash`. Registered flags feed runtime completion. Custom
+A new builtin updates the root `AGENTS.md`, `docs/kosh.1`, and
+`completions/kosh.bash`. Registered flags feed runtime completion. Custom
 completion policy belongs in the existing completion tables.

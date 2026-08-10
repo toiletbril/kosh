@@ -1,23 +1,23 @@
 # Contributor: Alexey Andreyev <dev@aa13q.ru>
-pkgname=shit-shell
-_upstream_name=shit
+pkgname=kosh-shell
+_upstream_name=kosh
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Fast, portable, Bash-compatible interactive shell, interpreter and diagnostic tool"
 arch=('x86_64' 'aarch64')
-url="https://github.com/toiletbril/shit"
+url="https://github.com/toiletbril/kosh"
 license=('BSD-3-Clause AND MIT')
 depends=('glibc')
 makedepends=('clang' 'git')
-conflicts=('shit')
-install=shit-shell.install
+conflicts=('kosh')
+install=kosh-shell.install
 _release_commit="c2731c40d2cb3770f5fd3f6f7bfdc68d55f05483"
 _release_epoch=1785870591
-_source_directory="toiletbril-shit-c2731c4"
+_source_directory="toiletbril-kosh-c2731c4"
 _toiletline_commit="024fa036a7306ed07751fe90fbd583c9a6c2086c"
 export SOURCE_DATE_EPOCH="$_release_epoch"
 source=(
-  "$_upstream_name-$pkgver.tar.gz::https://api.github.com/repos/toiletbril/shit/tarball/$pkgver"
+  "$_upstream_name-$pkgver.tar.gz::https://api.github.com/repos/toiletbril/kosh/tarball/$pkgver"
   "toiletline-$_toiletline_commit.tar.gz::https://github.com/toiletbril/toiletline/archive/$_toiletline_commit.tar.gz"
 )
 sha512sums=(
@@ -39,10 +39,10 @@ build() {
 
 package() {
   cd "$srcdir/$_source_directory"
-  install -Dm755 shit "$pkgdir/usr/bin/shit"
-  install -Dm644 docs/shit.1 "$pkgdir/usr/share/man/man1/shit.1"
-  install -Dm644 docs/shit.5 "$pkgdir/usr/share/man/man5/shit.5"
-  install -Dm644 completions/shit.bash "$pkgdir/usr/share/bash-completion/completions/shit"
+  install -Dm755 kosh "$pkgdir/usr/bin/kosh"
+  install -Dm644 docs/kosh.1 "$pkgdir/usr/share/man/man1/kosh.1"
+  install -Dm644 docs/kosh.5 "$pkgdir/usr/share/man/man5/kosh.5"
+  install -Dm644 completions/kosh.bash "$pkgdir/usr/share/bash-completion/completions/kosh"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 src/toiletline/LICENSE.txt \
     "$pkgdir/usr/share/licenses/$pkgname/LICENSE.toiletline"

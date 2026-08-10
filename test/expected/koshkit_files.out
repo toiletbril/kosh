@@ -1,0 +1,30 @@
+--- ls ---
+a
+nums.txt
+--- ls a ---
+b
+--- ls -l sym (mode nlink size name) ---
+lrwxrwxrwx 1 8 sym
+--- ls after operations ---
+a
+moved.txt
+nums.txt
+stamp
+sym
+--- du -s nums.txt ---
+6	nums.txt
+--- basename ---
+libfoo
+--- dirname ---
+/usr/local
+--- realpath lexical basename ---
+lib
+--- ls a after rmdir ---
+--- unlink removes a single file ---
+unlink rc=0
+0
+--- unlink a directory fails ---
+kosh: 1:1: error: unlink: cannot unlink 'a': it is a directory.
+     1 |  koshkit unlink a
+       |  ^~~~~~~~~~~~~~~~
+rc=1

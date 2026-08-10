@@ -7,7 +7,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -106,4 +106,4 @@ fn command_substitution_range(StringView line, usize cursor) throws
 
 } /* namespace completion */
 
-} /* namespace shit */
+} /* namespace koshka */

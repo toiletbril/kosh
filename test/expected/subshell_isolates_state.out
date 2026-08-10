@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/subshell-state"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/subshell-state"]
   [CompoundListCondition, None]
     [Subshell]
       [CompoundList]
@@ -21,7 +21,7 @@
         [CompoundListCondition, None]
           [Pipeline]
             [SimpleCommand "alias"]
-            [SimpleCommand "shitbox" "grep" "^alias sub_only="]
+            [SimpleCommand "koshkit" "grep" "^alias sub_only="]
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "leaked from subshell"]
@@ -38,7 +38,7 @@
         [CompoundListCondition, None]
           [Pipeline]
             [SimpleCommand "alias"]
-            [SimpleCommand "shitbox" "grep" "^alias cs_only="]
+            [SimpleCommand "koshkit" "grep" "^alias cs_only="]
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "leaked from cmdsub"]
@@ -163,7 +163,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -208,7 +208,7 @@
   Unquoted "alias"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "grep"
@@ -258,7 +258,7 @@
   Unquoted "alias"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "grep"

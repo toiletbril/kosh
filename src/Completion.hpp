@@ -9,7 +9,7 @@
 #include "StringMap.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -166,4 +166,4 @@ fn command_word_resolves(StringView line, EvalContext &context) throws -> bool;
 
 } /* namespace completion */
 
-} /* namespace shit */
+} /* namespace koshka */

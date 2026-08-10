@@ -1,2 +1,0 @@
-#!/bin/env shit
-echo $((1/0))

@@ -20,7 +20,7 @@ FLAG(UMASK_SYMBOLIC, Bool, 'S', "",
 
 REGISTER_BUILTIN_FLAGS(Umask);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -181,4 +181,4 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   return 0;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

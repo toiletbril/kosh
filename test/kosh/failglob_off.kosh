@@ -1,0 +1,5 @@
+#!/bin/env kosh
+set +o failglob
+echo nomatch_*
+echo a*.zzznomatch literal
+set -o | grep failglob

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # pushd saves the current directory and changes to its argument, dirs prints the
 # stack with the current directory first, popd returns to the top, and +N or -N
 # rotates or drops an entry. The home directory abbreviates to ~.
@@ -39,4 +39,4 @@ echo "== a forged PWD does not change the saved directory:"
 echo "== the home directory abbreviates to ~:"
 HOME="$dir" "$BIN" -c "cd '$dir' || exit; pushd '$dir/a'" 2>&1 | scrub
 echo "== popd on an empty stack reports an error:"
-"$BIN" -c "cd '$dir' || exit; popd" 2>&1 | scrub | sed 's/^shit: [0-9]*:[0-9]*: //'
+"$BIN" -c "cd '$dir' || exit; popd" 2>&1 | scrub | sed 's/^kosh: [0-9]*:[0-9]*: //'

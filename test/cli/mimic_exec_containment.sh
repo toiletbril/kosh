@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A mimicked script that points stdin away with an exec redirection must not
 # leave the parent shell's descriptors moved, the way a fork would have
 # contained it. configure does exactly this and the interactive prompt used to

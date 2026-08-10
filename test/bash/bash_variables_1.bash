@@ -1,8 +1,8 @@
 #!/bin/bash
 # Alternative for bash_variables.bash on a bash older than 5.3, which lacks
 # BASH_MONOSECONDS, and on a distro or platform whose bash reports a HOSTTYPE
-# and a MACHTYPE vendor other than shit's. The monoseconds line is unconditional,
-# and the hosttype and the machtype are spelled to match shit. shit reports the
+# and a MACHTYPE vendor other than kosh's. The monoseconds line is unconditional,
+# and the hosttype and the machtype are spelled to match kosh. kosh reports the
 # uname machine as the hosttype, and the uname machine joined with the fixed
 # vendor string "-unknown-linux-gnu" as the machtype, so the alt reads uname to
 # match both.

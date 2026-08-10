@@ -1,4 +1,4 @@
-shit: 1:6: error: Unable to build the pipeline because no command follows the pipe. The |& stderr pipe is a bashism that POSIX mode does not read.
-shit: 1:5: error: Expected a variable name after 'for'. The for ((...)) C-style loop is a bashism that POSIX mode does not read.
-shit: 1:13: error: Expected a heredoc delimiter. The <<< here-string is a bashism that POSIX mode does not read.
+kosh: 1:6: error: Unable to build the pipeline because no command follows the pipe. The |& stderr pipe is a bashism that POSIX mode does not read.
+kosh: 1:5: error: Expected a variable name after 'for'. The for ((...)) C-style loop is a bashism that POSIX mode does not read.
+kosh: 1:13: error: Expected a heredoc delimiter. The <<< here-string is a bashism that POSIX mode does not read.
 rc=0

@@ -1,0 +1,2 @@
+#!/bin/env kosh
+VAR=1 echo $VAR

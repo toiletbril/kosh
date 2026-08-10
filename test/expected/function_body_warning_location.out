@@ -1,12 +1,12 @@
-shit: 1:37: warning: Command 'probe_fn' was not found.
+kosh: 1:37: warning: Command 'probe_fn' was not found.
      1 |  . LIB; probe_fn
        |                                      ^~~~~~~~
-shit: LIB:3:15: warning: The variable 'UNSET_FN_PROBE' is not set, it expands to empty.
+kosh: LIB:3:15: warning: The variable 'UNSET_FN_PROBE' is not set, it expands to empty.
      3 |    echo "first=${UNSET_FN_PROBE}"
        |                ^~~~~~~~~~~~~~~~~
 note: Replace it with ${UNSET_FN_PROBE-} if empty expansion is desired.
 first=
-shit: LIB:4:11: warning: The variable 'UNSET_FN_ARITH' is not set, it expands to empty.
+kosh: LIB:4:11: warning: The variable 'UNSET_FN_ARITH' is not set, it expands to empty.
      4 |    echo $((UNSET_FN_ARITH + 1))
        |            ^~~~~~~~~~~~~~
 note: Replace it with ${UNSET_FN_ARITH-} if empty expansion is desired.

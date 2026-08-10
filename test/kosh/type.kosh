@@ -1,0 +1,18 @@
+#!/bin/env kosh
+type echo
+type -a cd
+type nope
+
+alias ll='ls -l'
+type if
+type ll
+command -v if
+command -v ll
+command -V if
+command -V ll
+
+g() { :; }
+type echo
+type g
+type true
+type nonexistent_xyz

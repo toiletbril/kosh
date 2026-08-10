@@ -1,3 +1,0 @@
-#!/bin/env shit
-if false; then echo a; elif true; then echo elif_taken; else echo c; fi
-if false; then echo a; elif false; then echo b; else echo else_taken; fi

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # bash brace-expands before lexing a variable name, so a greedy $name that a
 # brace expansion leaves next to name bytes absorbs them. A bounded ${name} is
 # left split.

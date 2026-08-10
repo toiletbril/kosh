@@ -1,0 +1,7 @@
+#!/bin/env kosh
+count=0
+for item in a b c d; do count=$((count + 1)); done
+echo "count=$count"
+i=0
+until [ "$i" -ge 3 ]; do i=$((i + 1)); done
+echo "i=$i"

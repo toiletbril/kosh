@@ -1,0 +1,4 @@
+#!/bin/env kosh
+echo \
+привет мир! \
+hello sailor!

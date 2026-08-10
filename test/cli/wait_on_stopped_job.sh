@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 d=$(mktemp -d)
 escaped_cleanup_is_armed=no
 cleanup()

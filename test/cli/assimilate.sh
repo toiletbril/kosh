@@ -14,9 +14,9 @@ cat > "$failure_runner" <<'SH'
 #!/bin/sh
 case $0 in
     *.upload|*.candidate) exec "$ASSIMILATE_RUNNER" "$@" ;;
-    */shit)
+    */kosh)
         install_directory=${0%/*}
-        for lock in "$install_directory"/.shit-assimilate-*.lock; do :; done
+        for lock in "$install_directory"/.kosh-assimilate-*.lock; do :; done
         /bin/ln -s . "$lock/committed"
         exec "$ASSIMILATE_RUNNER" "$@"
         ;;
@@ -89,8 +89,8 @@ case $command in
         exit
         ;;
     *'/bin/'*) exit 43 ;;
-    "exec ./.shit-assimilate-"*.upload*) ;;
-    "exec './.shit-assimilate-"*.upload*) ;;
+    "exec ./.kosh-assimilate-"*.upload*) ;;
+    "exec './.kosh-assimilate-"*.upload*) ;;
     *) exit 44 ;;
 esac
 cd "$ASSIMILATE_REMOTE" || exit 1
@@ -101,7 +101,7 @@ chmod +x "$transport/ssh"
 
 leftovers()
 {
-    find "$remote" -name '.shit-assimilate-*' | wc -l | tr -d ' '
+    find "$remote" -name '.kosh-assimilate-*' | wc -l | tr -d ' '
 }
 
 file_mode()
@@ -116,7 +116,7 @@ file_mode()
 run_assimilate()
 {
     PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-        "$BIN" -c 'assimilate "$@"' shit \
+        "$BIN" -c 'assimilate "$@"' kosh \
         "$@" 'user@[2001:db8::1]' \
         >/dev/null 2>&1
 }
@@ -131,25 +131,25 @@ export ASSIMILATE_FAILURE_RUNNER=$failure_runner
 export ASSIMILATE_RUNNER=$binary
 run_assimilate
 assimilate_status=$?
-if [ "$assimilate_status" -eq 0 ] && cmp "$BIN" "$install/shit" >/dev/null &&
-    [ -x "$install/shit" ]; then
+if [ "$assimilate_status" -eq 0 ] && cmp "$BIN" "$install/kosh" >/dev/null &&
+    [ -x "$install/kosh" ]; then
     success_status=0
 else
     success_status=1
 fi
 printf 'success=%s leftovers=%s\n' "$success_status" "$(leftovers)"
 
-printf 'architecture-old\n' > "$install/shit"
+printf 'architecture-old\n' > "$install/kosh"
 : > "$ASSIMILATE_TRANSPORT_LOG"
 export ASSIMILATE_REMOTE_SYSTEM=MismatchOS
 export ASSIMILATE_REMOTE_MACHINE=mismatch-arch
 architecture_output=$root/architecture.out
 PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -c 'assimilate --trace "$@"' shit \
+    "$BIN" -c 'assimilate --trace "$@"' kosh \
     'user@[2001:db8::1]' >"$architecture_output" 2>&1
 architecture_status=$?
 if [ "$architecture_status" -ne 0 ] &&
-    [ "$(cat "$install/shit")" = architecture-old ] &&
+    [ "$(cat "$install/kosh")" = architecture-old ] &&
     grep -q '^+ assimilate: preflight$' "$architecture_output" &&
     grep -q 'Cannot install a .* binary on MismatchOS/mismatch-arch' \
         "$architecture_output" &&
@@ -163,42 +163,42 @@ printf 'architecture-status=%s result=%s leftovers=%s\n' \
 unset ASSIMILATE_REMOTE_SYSTEM ASSIMILATE_REMOTE_MACHINE
 
 stale_id=999999-1
-stale_lock=$install/.shit-assimilate-$stale_id.lock
+stale_lock=$install/.kosh-assimilate-$stale_id.lock
 physical_install=$(cd "$install" && pwd -P)
-/bin/mkdir "$install/.shit-assimilate-888888-1.lock"
+/bin/mkdir "$install/.kosh-assimilate-888888-1.lock"
 /bin/mkdir "$stale_lock"
 printf '999999:%s\n' "${stale_lock##*/}" > "$stale_lock/owner"
-printf '.shit-assimilate-%s.upload\n' "$stale_id" > "$stale_lock/upload"
-printf '%s/.shit-assimilate-%s.candidate\n' "$physical_install" "$stale_id" \
+printf '.kosh-assimilate-%s.upload\n' "$stale_id" > "$stale_lock/upload"
+printf '%s/.kosh-assimilate-%s.candidate\n' "$physical_install" "$stale_id" \
     > "$stale_lock/candidate"
 printf 'identity-old\n' > "$stale_lock/backup"
-printf 'identity-rejected\n' > "$install/shit"
+printf 'identity-rejected\n' > "$install/kosh"
 : > "$stale_lock/had-target"
 : > "$stale_lock/rollback"
-: > "$remote/.shit-assimilate-$stale_id.upload"
-: > "$install/.shit-assimilate-$stale_id.candidate"
+: > "$remote/.kosh-assimilate-$stale_id.upload"
+: > "$install/.kosh-assimilate-$stale_id.candidate"
 export ASSIMILATE_FAILURE=identity
 run_assimilate
 identity_status=$?
 printf 'identity-status=%s old=%s leftovers=%s\n' "$identity_status" \
-    "$(cat "$install/shit")" "$(leftovers)"
+    "$(cat "$install/kosh")" "$(leftovers)"
 unset ASSIMILATE_FAILURE
 
-printf 'regular-old\n' > "$install/shit"
-chmod 751 "$install/shit"
+printf 'regular-old\n' > "$install/kosh"
+chmod 751 "$install/kosh"
 export ASSIMILATE_FAILURE=rollback
 run_assimilate
 rollback_status=$?
 printf 'rollback-status=%s old=%s mode=%s leftovers=%s\n' "$rollback_status" \
-    "$(cat "$install/shit")" "$(file_mode "$install/shit")" "$(leftovers)"
+    "$(cat "$install/kosh")" "$(file_mode "$install/kosh")" "$(leftovers)"
 unset ASSIMILATE_FAILURE
 
-printf 'transfer-old\n' > "$install/shit"
+printf 'transfer-old\n' > "$install/kosh"
 export ASSIMILATE_FAIL_SCP=1
 run_assimilate
 transfer_status=$?
 printf 'transfer-status=%s old=%s leftovers=%s\n' "$transfer_status" \
-    "$(cat "$install/shit")" "$(leftovers)"
+    "$(cat "$install/kosh")" "$(leftovers)"
 unset ASSIMILATE_FAIL_SCP
 
 /bin/mkdir -p "$ASSIMILATE_REMOTE_HOME/.local/bin" "$remote/sbin"
@@ -207,14 +207,14 @@ export ASSIMILATE_REMOTE_PATH="$remote/sbin:$install:$ASSIMILATE_REMOTE_HOME/.lo
 : > "$ASSIMILATE_TRANSPORT_LOG"
 trace_output=$root/trace.out
 PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -c 'assimilate "$@"' shit \
+    "$BIN" -c 'assimilate "$@"' kosh \
     -x --ssh-command 'ssh ssh-prefix' --scp-command 'scp scp-prefix' \
     --link-mood bash,dash --link-mood sh 'user@[2001:db8::1]' \
     >"$trace_output" 2>&1
 option_status=$?
-if [ -L "$install/bash" ] && [ "$install/bash" -ef "$install/shit" ] &&
-    [ -L "$install/dash" ] && [ "$install/dash" -ef "$install/shit" ] &&
-    [ -L "$install/sh" ] && [ "$install/sh" -ef "$install/shit" ]; then
+if [ -L "$install/bash" ] && [ "$install/bash" -ef "$install/kosh" ] &&
+    [ -L "$install/dash" ] && [ "$install/dash" -ef "$install/kosh" ] &&
+    [ -L "$install/sh" ] && [ "$install/sh" -ef "$install/kosh" ]; then
     link_status=0
 else
     link_status=1
@@ -233,7 +233,7 @@ if grep -q '^+ assimilate: preflight$' "$trace_output" &&
 else
     trace_status=1
 fi
-if [ ! -e "$remote/sbin/shit" ]; then
+if [ ! -e "$remote/sbin/kosh" ]; then
     sbin_status=0
 else
     sbin_status=1

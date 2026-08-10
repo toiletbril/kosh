@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 echo "== disown %1 leaves one running job:"
 "$BIN" --mood bash -c 'sleep 2 & sleep 2 & disown %1; jobs' 2>&1 | grep -c Running
 echo "== disown -a leaves none:"

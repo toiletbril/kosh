@@ -1,11 +1,11 @@
 # The -n count returns success when the requested bytes are read and failure
 # when the input ends first, and either way the field holds what was read.
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 printf 'hi' | "$BIN" -c 'read -r -n 2 x; echo "rc=$? x=[$x]"'
 printf 'h' | "$BIN" -c 'read -r -n 2 x; echo "rc=$? x=[$x]"'
 printf '' | "$BIN" -c 'read -r -n 2 x; echo "rc=$? x=[$x]"'
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A prefix IFS=... on read must split on that IFS even when a prior assignment
 # left a different IFS in the store. sdkman reads its comma-separated candidate
 # list this way after setting IFS to a newline, so a stale IFS broke its PATH
@@ -41,7 +41,7 @@ echo "== read -q at EOF returns one:"
 
 #!/bin/sh
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 
 d=$(mktemp -d) || exit 1

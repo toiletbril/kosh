@@ -1,0 +1,19 @@
+--- binary named ls acts as ls ---
+ls
+one.txt
+two.txt
+rc=0
+--- unknown flag on a symlinked utility reports an error, not a crash ---
+kosh: 1:6: error: tail: Unknown flag '--bogus'.
+     1 |  tail --bogus
+       |       ^~~~~~~
+note: Use `--` before an operand that begins with a dash.
+rc=1
+--- a symlinked utility reports the kosh version on --version ---
+1
+== a symlink was installed for head:
+head-linked
+== a symlinked head routes its own -c flag to the utility:
+abc
+== a symlinked ls routes -A to ls (count of the dot file):
+1

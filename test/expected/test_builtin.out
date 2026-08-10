@@ -56,7 +56,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "gt=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
   [CompoundListCondition, None]
     [SimpleCommand ":"]
   [CompoundListCondition, None]
@@ -70,9 +70,9 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "ef_diff:$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$TEST_TEMP_DIRECTORY/same-file"]
+    [SimpleCommand "koshkit" "unlink" "$TEST_TEMP_DIRECTORY/same-file"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$TEST_TEMP_DIRECTORY/different-file"]
+    [SimpleCommand "koshkit" "unlink" "$TEST_TEMP_DIRECTORY/different-file"]
   [CompoundListCondition, None]
     [SimpleCommand "[" "(" "=" "(" "]"]
   [CompoundListCondition, None]
@@ -374,7 +374,7 @@
   Variable "?"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -442,7 +442,7 @@
   Variable "?"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"
@@ -452,7 +452,7 @@
   DoubleQuoted "/same-file"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"
@@ -734,11 +734,11 @@
   DoubleQuoted "group_and="
   Variable "?"
 ]
-shit: 4:6: warning: The numeric comparison -eq reads 'abc', which is not a number, so the test errors at run time.
+kosh: 4:6: warning: The numeric comparison -eq reads 'abc', which is not a number, so the test errors at run time.
      4 |  test abc -eq 5; echo $?
        |       ^~~
 1
 0
-shit: 4:6: error: Builtin `test`: Cannot compare with '-eq', 'abc' is not an integer.
+kosh: 4:6: error: Builtin `test`: Cannot compare with '-eq', 'abc' is not an integer.
      4 |  test abc -eq 5; echo $?
        |       ^~~

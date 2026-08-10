@@ -1,0 +1,41 @@
+--- builtin getopts with no arguments ---
+kosh: 1:1: error: getopts: Not enough arguments.
+     1 |  getopts
+       |  ^~~~~~~
+kosh: note: Try `getopts --help` for more info.
+rc=2
+--- builtin let with no expression ---
+kosh: 1:1: error: Builtin `let`: expression expected.
+     1 |  let
+       |  ^~~
+rc=1
+--- calc with no expression ---
+kosh: 1:1: error: calc has no expression to evaluate.
+     1 |  koshkit calc
+       |  ^~~~~~~~~~~~
+note: Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or enter the interactive prompt with `-i`.
+rc=1
+--- koshkit cp with one operand ---
+kosh: 1:1: error: cp: Not enough arguments.
+     1 |  koshkit cp onlyone
+       |  ^~~~~~~~~~~~~~~~~~
+kosh: note: Try `cp --help` for more info.
+rc=2
+--- koshkit grep with no pattern ---
+kosh: 1:1: error: grep: Not enough arguments.
+     1 |  koshkit grep
+       |  ^~~~~~~~~~~~
+kosh: note: Try `grep --help` for more info.
+rc=2
+--- the note is located in the bash mood too ---
+kosh: 1:1: error: mkdir: Not enough arguments.
+     1 |  koshkit mkdir
+       |  ^~~~~~~~~~~~~
+kosh: note: Try `mkdir --help` for more info.
+rc=2
+--- and in the sh mood ---
+kosh: 1:1: error: mkdir: Not enough arguments.
+     1 |  koshkit mkdir
+       |  ^~~~~~~~~~~~~
+kosh: note: Try `mkdir --help` for more info.
+rc=2

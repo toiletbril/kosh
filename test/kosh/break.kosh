@@ -1,0 +1,19 @@
+#!/bin/env kosh
+for i in 1 2; do for j in a b; do break 5; echo unreached; done; echo inner-done; done
+echo end-break
+for i in 1 2; do continue 5; echo body; done
+echo end-continue
+
+for x in 1 2 3; do echo $x; break; done
+
+f() { break; }
+for i in 1 2 3; do f; echo "$i"; done
+echo "loop_done"
+
+break
+echo after-break
+continue
+echo after-continue
+
+for i in 1 2; do break 0; echo unreached; done
+echo after

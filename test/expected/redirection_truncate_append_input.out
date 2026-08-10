@@ -2,7 +2,7 @@
   [CompoundListCondition, None]
     [Assign file=$TEST_TEMP_DIRECTORY/redirection-truncate]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "first"]
   [CompoundListCondition, None]
@@ -10,14 +10,14 @@
   [CompoundListCondition, None]
     [SimpleCommand "cat"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$file"]
+    [SimpleCommand "koshkit" "unlink" "$file"]
 [Word
   Unquoted "file="
   Variable "TEST_TEMP_DIRECTORY"
   Unquoted "/redirection-truncate"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -53,7 +53,7 @@
   Variable "file"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"

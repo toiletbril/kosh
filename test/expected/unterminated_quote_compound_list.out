@@ -1,6 +1,6 @@
-shit: 2:11: error: Unterminated string literal.
+kosh: 2:11: error: Unterminated string literal.
      2 |  echo;hello"helloworld
        |            ^~~~~~~~~~~
-shit: 2:22: details:
+kosh: 2:22: details:
      2 |  echo;hello"helloworld
        |                       ^ Expected " here.

@@ -17,7 +17,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Cd);
 
-namespace shit {
+namespace koshka {
 
 Cd::Cd() = default;
 
@@ -330,4 +330,4 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                     details};
 }
 
-} // namespace shit
+} // namespace koshka

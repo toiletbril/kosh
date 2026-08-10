@@ -1,0 +1,2 @@
+#!/bin/env kosh
+case x in a) y;; b

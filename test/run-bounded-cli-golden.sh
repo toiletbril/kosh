@@ -125,9 +125,9 @@ trap 'request_exit 129' HUP
 
 if [ "${OS-}" = Windows_NT ]; then
   BIN=$BIN BOUNDED_GOLDEN=$GOLDEN BOUNDED_TIMEOUT_SECONDS=$TIMEOUT_SECONDS \
-    SHIT_TEST_TIMEOUT_JOB_LIFETIME=leader \
+    KOSH_TEST_TIMEOUT_JOB_LIFETIME=leader \
     "$BIN" -p --mood sh -c \
-    'shitbox timeout "$BOUNDED_TIMEOUT_SECONDS" "$BIN" --mood sh -c '\''unset SHIT_TEST_TIMEOUT_JOB_LIFETIME; sh "$BOUNDED_GOLDEN"'\''' &
+    'koshkit timeout "$BOUNDED_TIMEOUT_SECONDS" "$BIN" --mood sh -c '\''unset KOSH_TEST_TIMEOUT_JOB_LIFETIME; sh "$BOUNDED_GOLDEN"'\''' &
 elif command -v setsid >/dev/null 2>&1; then
   BIN=$BIN setsid /bin/sh "$GOLDEN" &
 elif command -v perl >/dev/null 2>&1; then

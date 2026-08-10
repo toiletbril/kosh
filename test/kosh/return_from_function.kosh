@@ -1,0 +1,7 @@
+#!/bin/env kosh
+f() { return 3; }
+f
+echo got=$?
+g() { echo a; return; echo b; }
+g
+echo got2=$?

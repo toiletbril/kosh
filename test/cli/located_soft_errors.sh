@@ -1,6 +1,6 @@
 #!/bin/sh
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 
 echo '== alias:'
 "$BIN" -c 'alias missing_name' 2>&1
@@ -19,5 +19,5 @@ echo '== jobspec:'
 echo "rc=$?"
 
 echo '== timeout command:'
-"$BIN" -c 'shitbox timeout 1 missing_name' 2>&1
+"$BIN" -c 'koshkit timeout 1 missing_name' 2>&1
 echo "rc=$?"

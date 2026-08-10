@@ -2,7 +2,7 @@
 # Alternative for funsub_basic.bash on a bash older than 5.3, which lacks the
 # ${ command; } funsub. The body is rewritten with $(...) for the capturing
 # forms and plain statements for the side-effecting ones, so the output matches
-# shit byte for byte.
+# kosh byte for byte.
 echo "simple=$(echo one)"
 echo "quoted=[$(printf 'a\nb\n\n\n')]"
 persist=42

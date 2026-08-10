@@ -78,13 +78,13 @@
   DoubleQuoted "reenabled="
   Variable "?"
 ]
-shit: 2:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+kosh: 2:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
      2 |  false | true
        |          ^~~~
-shit: 5:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+kosh: 5:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
      5 |  false | true
        |          ^~~~
-shit: 8:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+kosh: 8:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
      8 |  false | true
        |          ^~~~
 strict=1

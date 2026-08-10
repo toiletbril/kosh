@@ -1,6 +1,6 @@
 == help nope is a located error:
-shit: 1:6: error: Builtin `help`: 'nope' is not a shell builtin.
+kosh: 1:6: error: Builtin `help`: 'nope' is not a shell builtin.
      1 |  help nope
        |       ^~~~
-shit: note: Run `help` with no operand to list every builtin.
+kosh: note: Run `help` with no operand to list every builtin.
 rc=1

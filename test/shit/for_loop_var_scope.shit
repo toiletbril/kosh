@@ -1,6 +1,0 @@
-#!/bin/env shit
-a=outer
-for a in 1 2 3; do echo "in: $a"; done
-echo "after restore: [$a]"
-for fresh in x y; do :; done
-echo "fresh leaked: [${fresh:-no}]"

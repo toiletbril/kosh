@@ -16,7 +16,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Popd);
 
-namespace shit {
+namespace koshka {
 
 Popd::Popd() = default;
 
@@ -71,4 +71,4 @@ fn Popd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       "Pass a +N or a -N stack index, or no argument to pop the top"};
 }
 
-} // namespace shit
+} // namespace koshka

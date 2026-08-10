@@ -1,5 +1,5 @@
-unset SHIT_FLAGS
-export SHIT_FLAGS=--no-diagnostics
+unset KOSH_FLAGS
+export KOSH_FLAGS=--no-diagnostics
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 if [ "${OS-}" = Windows_NT ]; then
@@ -8,7 +8,7 @@ else
     BENCH_ECHO=/bin/echo
 fi
 export BENCH_ECHO
-# bench forks a shit process per sample and runs the command under it. Only the
+# bench forks a kosh process per sample and runs the command under it. Only the
 # deterministic lines are checked here, since the timing summary varies per run.
 echo "== bench stops on a non-zero exit code:"
 "$BIN" -c 'bench --runs 5 false' 2>&1 | grep -E 'exited with status|note:'
@@ -84,7 +84,7 @@ fi
 echo "counter fallback passed"
 echo "== a failed later sample clears terminal progress:"
 cat > "$d/vanishing-environment" <<'SH'
-shitbox sleep 0.03 || exit 1
+koshkit sleep 0.03 || exit 1
 rm -f "$BENCH_VANISHING_COMMAND" || exit 1
 SH
 vanishing_command="$d/vanishing-command.exe"
@@ -133,7 +133,7 @@ if [ "$has_typescript" -eq 1 ]; then
 fi
 if [ "$has_progress_terminal" -eq 1 ]; then
     case $terminal_hex in
-        *0d1b5b324b736869743a*) ;;
+        *0d1b5b324b6b6f73683a*) ;;
         *) echo "progress clobbered error"; exit 1 ;;
     esac
 fi

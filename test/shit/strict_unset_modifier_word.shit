@@ -1,5 +1,0 @@
-#!/bin/env shit
-x=set
-echo before
-echo "${x:+$nope}"
-echo not-reached

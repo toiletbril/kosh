@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 echo "== default argument location =="
 "$BIN" -c 'a=0; let a = 2; echo unreached' 2>&1
 echo "rc=$?"

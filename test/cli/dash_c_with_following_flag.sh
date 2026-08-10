@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A recognized flag that follows -c is parsed as a flag, and the -c command is
 # taken from the first non-option operand the way bash reads it. A regression
 # made -c swallow the following flag as its command and then run that flag as a

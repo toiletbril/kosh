@@ -5,7 +5,7 @@
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 
-namespace shit {
+namespace koshka {
 
 using namespace expressions;
 
@@ -139,4 +139,4 @@ private:
   mustuse fn parse_expression(u8 min_precedence = 0) throws -> Expression *;
 };
 
-} /* namespace shit */
+} /* namespace koshka */

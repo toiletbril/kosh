@@ -47,6 +47,7 @@ help
 history
 jobs
 kill
+koshkit
 let
 local
 logout
@@ -62,7 +63,6 @@ readonly
 return
 set
 shift
-shitbox
 shopt
 source
 suspend
@@ -79,17 +79,17 @@ unalias
 unset
 wait
 z
-shit has 67 builtins:
+Koshka has 67 builtins:
 
   .           :           [           alias       assimilate  bench
   bg          bind        break       builtin     caller      cd
   command     compgen     complete    compopt     continue    declare
   dirs        disown      echo        enable      eval        exec
   exit        export      false       fc          fg          getopts
-  hash        help        history     jobs        kill        let
-  local       logout      mapfile     newgrp      popd        printf
-  pushd       pwd         read        readarray   readonly    return
-  set         shift       shitbox     shopt       source      suspend
+  hash        help        history     jobs        kill        koshkit
+  let         local       logout      mapfile     newgrp      popd
+  printf      pushd       pwd         read        readarray   readonly
+  return      set         shift       shopt       source      suspend
   test        time        times       trap        true        type
   typeset     ulimit      umask       unalias     unset       wait
   z

@@ -9,7 +9,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 struct modifier_array_word
 {
@@ -990,4 +990,4 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   return fields;
 }
 
-} // namespace shit
+} // namespace koshka

@@ -2,7 +2,7 @@
 
 #include "PackedStringKey.hpp"
 
-namespace shit {
+namespace koshka {
 
 fn detect_mimic_shell_from_source(StringView source) throws -> Maybe<mimic_mood>
 {
@@ -51,10 +51,10 @@ fn detect_mimic_shell_from_source(StringView source) throws -> Maybe<mimic_mood>
       {SSK("sh"),   mimic_mood::Posix  },
       {SSK("dash"), mimic_mood::Posix  },
       {SSK("bash"), mimic_mood::Bash   },
-      {SSK("shit"), mimic_mood::Default},
+      {SSK("kosh"), mimic_mood::Default},
   };
   static constexpr StaticStringMap SHELL_MOODS{SHELL_ENTRIES};
   return SHELL_MOODS.find(shell);
 }
 
-} /* namespace shit */
+} /* namespace koshka */

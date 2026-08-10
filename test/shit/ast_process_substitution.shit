@@ -1,3 +1,0 @@
-#!/bin/env shit
-cat <(echo input) >/dev/null
-echo data > >(cat >/dev/null)

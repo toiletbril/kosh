@@ -1,0 +1,15 @@
+#!/bin/env kosh
+start=$PWD
+koshkit mkdir -p .test-work/cd-paths/parent/child
+cd .test-work/cd-paths/parent/child
+koshkit basename "$PWD"
+cd ..
+koshkit basename "$PWD"
+cd - > ../cd-output
+koshkit basename "$PWD"
+cd ../..
+CDPATH="$TEST_PATH_SEPARATOR" cd parent > cd-output
+echo "cdpath=$?"
+cd "$start"
+cd .test-work/nonexistent-xyz-dir 2>&-
+echo "miss=$?"

@@ -1,0 +1,9 @@
+#!/bin/env kosh
+(echo "${nope:?custom message}")
+echo "default=$?"
+set --mood bash
+(echo "${nope:?bash message}")
+echo "bash=$?"
+set --mood sh
+(echo "${nope?posix message}")
+echo "posix=$?"

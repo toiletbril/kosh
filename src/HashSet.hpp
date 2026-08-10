@@ -4,7 +4,7 @@
 #include "StringMap.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 /* A set of byte-string keys over the StringMap open-addressing table. The value
    is None, so a set stores only keys. It owns a copy of every key it holds, so
@@ -40,4 +40,4 @@ private:
   StringMap<Nothing> m_map;
 };
 
-} /* namespace shit */
+} /* namespace koshka */

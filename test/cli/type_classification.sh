@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # type reports how a name resolves in the shell's own order, a keyword, an alias,
 # a function, then a builtin. The -t form prints the class word, the default form
 # spells it out, -a lists every location, and -p and -t stay silent for a name
@@ -16,7 +16,7 @@ echo "== -a lists a keyword with no file:"; "$BIN" -c 'type -a for'
 echo "== -p stays silent for a builtin:"; "$BIN" -c 'type -p echo'; echo "rc=$?"
 echo "== -t stays silent for a missing name:"; "$BIN" -c 'type -t missing_xyz'; echo "rc=$?"
 echo "== the default mood classifies a missing coreutility fallback:"
-PATH= "$BIN" -c 'type -t calc; command -v calc; shitbox which calc'
+PATH= "$BIN" -c 'type -t calc; command -v calc; koshkit which calc'
 type_path=$(mktemp -d)
 mkdir "$type_path/blocked" "$type_path/runnable"
 mkdir "$type_path/blocked/calc"

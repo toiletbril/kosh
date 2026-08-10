@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 output=$(mktemp)
 trap 'rm -f "$output"' EXIT
 printf 'echo piped-script\n' | "$BIN" --clean -s > "$output" 2>&1

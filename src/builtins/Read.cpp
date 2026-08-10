@@ -34,7 +34,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Read);
 
-namespace shit {
+namespace koshka {
 
 Read::Read() = default;
 
@@ -61,7 +61,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 2;
   }
 
-  let read_fd = ec.in_fd.value_or(SHIT_STDIN);
+  let read_fd = ec.in_fd.value_or(KOSH_STDIN);
   if (FLAG_READ_FD.is_set()) {
     if (let const parsed = FLAG_READ_FD.value().to<i64>(); !parsed.is_error())
       read_fd = os::descriptor_from_fd_number(parsed.value());
@@ -105,7 +105,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const now_nanos = os::monotonic_nanos();
       if (now_nanos >= deadline_nanos) {
         was_timed_out = true;
-        return shit::None;
+        return koshka::None;
       }
       let const remaining_nanos_unsigned = deadline_nanos - now_nanos;
       let const remaining_nanos = static_cast<i64>(
@@ -115,7 +115,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const readable = os::wait_for_fd_readable(read_fd, remaining_nanos);
       if (readable != 1) {
         was_timed_out = readable == 0;
-        return shit::None;
+        return koshka::None;
       }
     }
 
@@ -125,9 +125,9 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A -p prompt prints only when the read's own input is a terminal, matching
      bash for a redirected descriptor. */
   if (FLAG_READ_PROMPT.is_set() &&
-      os::is_fd_a_tty(ec.in_fd.value_or(SHIT_STDIN)))
+      os::is_fd_a_tty(ec.in_fd.value_or(KOSH_STDIN)))
   {
-    shit::print_error(FLAG_READ_PROMPT.value());
+    koshka::print_error(FLAG_READ_PROMPT.value());
   }
 
   /* Query mode is a yes or no probe, so the answer never reaches a variable. */
@@ -357,4 +357,4 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return was_timed_out ? 142 : (was_newline_terminated ? 0 : 1);
 }
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -2,7 +2,7 @@ ifndef VERBOSE
 MAKEFLAGS += -s
 endif
 
-.DEFAULT_GOAL := shit
+.DEFAULT_GOAL := kosh
 
 CPU_COUNT := $(shell ./scripts/cpu-count.sh)
 
@@ -32,11 +32,11 @@ endif
 export MODE
 export TARGET
 
-all: shit test
+all: kosh test
 
-shit:
-	echo Creating shit...
-	$(MAKE) $(AUTO_JOBS) -C src shit
+kosh:
+	echo Creating kosh...
+	$(MAKE) $(AUTO_JOBS) -C src kosh
 
 install:
 	echo Installing...
@@ -54,15 +54,15 @@ fmt:
 	echo Launching '$$'CLANG_FMT...
 	$(MAKE) $(AUTO_JOBS) -C src fmt
 
-test: shit
+test: kosh
 	echo Launching tests...
 	$(MAKE) $(AUTO_JOBS) -C test test
 
-bench: shit
+bench: kosh
 	echo Launching benchmarks...
 	$(MAKE) -C test bench
 
-refill_tests: shit
+refill_tests: kosh
 	echo Refilling tests...
 	$(MAKE) $(AUTO_JOBS) -C test refill
 
@@ -71,4 +71,4 @@ clean:
 	$(MAKE) $(AUTO_JOBS) -C src clean
 	$(MAKE) $(AUTO_JOBS) -C test clean
 
-.PHONY: all shit install uninstall tidy fmt test bench refill_tests clean
+.PHONY: all kosh install uninstall tidy fmt test bench refill_tests clean

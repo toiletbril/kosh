@@ -1,7 +1,0 @@
-#!/bin/env shit
-set -o pipefail; echo "on=$?"
-set +o pipefail; echo "off=$?"
-set -- one two three; echo "$1 $3 count=$#"
-( set -euo pipefail; echo "bundled=$?" )
-set -Z 2>&1; echo "bad=$?"
-( set -e; false; echo notreached ); echo "after=$?"

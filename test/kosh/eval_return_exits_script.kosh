@@ -1,0 +1,4 @@
+#!/bin/env kosh
+echo before
+eval "return 5"
+echo after

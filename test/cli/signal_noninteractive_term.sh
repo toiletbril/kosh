@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A non-interactive script stuck in a non-forked builtin loop must terminate on
 # SIGTERM and SIGHUP the way dash and bash scripts do. The interactive shell
 # blocks those terminal signals, but a script leaves them at their default.

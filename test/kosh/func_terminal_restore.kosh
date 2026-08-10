@@ -1,0 +1,5 @@
+#!/bin/env kosh
+f(){ "$BIN" -c 'echo x'; }
+set -- a b c
+f
+echo "$1"

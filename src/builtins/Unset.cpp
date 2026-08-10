@@ -16,7 +16,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Unset);
 
-namespace shit {
+namespace koshka {
 
 Unset::Unset() = default;
 
@@ -82,4 +82,4 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_error ? 1 : 0;
 }
 
-} // namespace shit
+} // namespace koshka

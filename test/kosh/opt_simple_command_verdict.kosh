@@ -1,0 +1,4 @@
+#!/bin/env kosh
+if true; then echo true_succeeds; fi
+if false; then echo never; else echo false_fails; fi
+if :; then echo colon_succeeds; fi

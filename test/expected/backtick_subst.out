@@ -92,39 +92,39 @@
 [Word
   CommandSubstitution "echo $foo"
 ]
-shit: 2:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 2:1: warning: An echo of a command substitution prints what the command already prints.
      2 |  echo `echo hi`
        |  ^~~~
 note: Run the command on its own instead.
-shit: 2:6: warning: An unquoted command substitution splits its output.
+kosh: 2:6: warning: An unquoted command substitution splits its output.
      2 |  echo `echo hi`
        |       ^~~~~~~~~
 note: Quote it to keep one argument.
-shit: 4:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 4:1: warning: An echo of a command substitution prints what the command already prints.
      4 |  echo "`echo q`"
        |  ^~~~
 note: Run the command on its own instead.
-shit: 6:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 6:1: warning: An echo of a command substitution prints what the command already prints.
      6 |  echo `(echo y) 2>/dev/null`
        |  ^~~~
 note: Run the command on its own instead.
-shit: 6:6: warning: An unquoted command substitution splits its output.
+kosh: 6:6: warning: An unquoted command substitution splits its output.
      6 |  echo `(echo y) 2>/dev/null`
        |       ^~~~~~~~~~~~~~~~~~~~~~
 note: Quote it to keep one argument.
-shit: 7:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 7:1: warning: An echo of a command substitution prints what the command already prints.
      7 |  echo `echo "a b"`
        |  ^~~~
 note: Run the command on its own instead.
-shit: 7:6: warning: An unquoted command substitution splits its output.
+kosh: 7:6: warning: An unquoted command substitution splits its output.
      7 |  echo `echo "a b"`
        |       ^~~~~~~~~~~~
 note: Quote it to keep one argument.
-shit: 9:10: warning: An echo of a command substitution prints what the command already prints.
+kosh: 9:10: warning: An echo of a command substitution prints what the command already prints.
      9 |  foo=bar; echo `echo \$foo`
        |           ^~~~
 note: Run the command on its own instead.
-shit: 9:15: warning: An unquoted command substitution splits its output.
+kosh: 9:15: warning: An unquoted command substitution splits its output.
      9 |  foo=bar; echo `echo \$foo`
        |                ^~~~~~~~~~~~
 note: Quote it to keep one argument.

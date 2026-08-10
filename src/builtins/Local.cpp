@@ -27,7 +27,7 @@ FLAG(LOCAL_EXPORT, Bool, 'x', "",
 
 REGISTER_BUILTIN_FLAGS(Local);
 
-namespace shit {
+namespace koshka {
 
 Local::Local() = default;
 
@@ -138,4 +138,4 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

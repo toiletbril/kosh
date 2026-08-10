@@ -20,14 +20,14 @@ FLAG(OPTIONS, Bool, '\0', "options",
 /* The mood flags are parsed by hand in execute(), so these declarations only
    join the set builtin's flag list for completion and the help listing. */
 FLAG(MOOD, String, 'M', "mood",
-     "Set the runtime mood to shit, bash, or sh, or print it with no value.");
+     "Set the runtime mood to kosh, bash, or sh, or print it with no value.");
 FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods",
      "Source the startup files for the listed moods, or print the loaded ones "
      "with no value.");
 
 REGISTER_BUILTIN_FLAGS(Set);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -151,8 +151,8 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      '\0', "failglob",
      "Fail a command whose glob matches nothing.", {},
      true},
-    {shell_option_id::Shitbox, set_option_behavior::Stored, '\0', "shitbox",
-     "Resolve the bundled shitbox utility names directly as commands."},
+    {shell_option_id::Koshkit, set_option_behavior::Stored, '\0', "koshkit",
+     "Resolve the bundled koshkit utility names directly as commands."},
     {shell_option_id::Vi,
      set_option_behavior::Vi,
      '\0', "vi",
@@ -750,7 +750,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         throw make_error_for_arg(
             ec, i,
             String{cxt.scratch_allocator(), "Unknown --mood value '"} + *value +
-                "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
+                "', expected 'kosh', 'bash', 'sh', or 'bash-posix'");
       cxt.set_mood(*parsed);
       cxt.note_warning_option_mutation();
       cxt.set_warning_level(0);
@@ -789,7 +789,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           throw make_error_for_arg(
               ec, i,
               String{cxt.scratch_allocator(), "Unknown --init-moods value '"} +
-                  name + "', expected 'shit', 'bash', 'sh', or 'bash-posix'");
+                  name + "', expected 'kosh', 'bash', 'sh', or 'bash-posix'");
         moods.push(*parsed);
       }
       if (AST_ARENA == nullptr)
@@ -873,4 +873,4 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

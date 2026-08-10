@@ -19,7 +19,7 @@ FLAG(BUILTIN_LIST, Bool, '\0', "list", "List every builtin one per line.");
 
 REGISTER_BUILTIN_FLAGS(BuiltinBuiltin);
 
-namespace shit {
+namespace koshka {
 
 BuiltinBuiltin::BuiltinBuiltin() = default;
 
@@ -50,7 +50,7 @@ static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
   let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
 
   let out = String{allocator};
-  out += "shit has ";
+  out += "Koshka has ";
   out += String::from(static_cast<i64>(sorted.count()), allocator);
   out += " builtins:\n\n";
   for (usize i = 0; i < sorted.count(); i++) {
@@ -116,4 +116,4 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return execute_builtin(steal(sub), cxt);
 }
 
-} // namespace shit
+} // namespace koshka

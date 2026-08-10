@@ -7,7 +7,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 namespace os {
 
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
@@ -34,11 +34,11 @@ fn take_pending_signal() wontthrow -> i32
 }
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */
 
-#define SHIT_UMASK(mask) umask(static_cast<mode_t>(mask))
+#define KOSH_UMASK(mask) umask(static_cast<mode_t>(mask))
 
-namespace shit {
+namespace koshka {
 
 namespace os {
 
@@ -53,7 +53,7 @@ hot fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     if (written_count == -1 && errno == EINTR) {
       continue;
     }
-    if (written_count == -1) return shit::None;
+    if (written_count == -1) return koshka::None;
     return static_cast<usize>(written_count);
   }
 }
@@ -72,10 +72,10 @@ hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     let read_count = read(fd, buf, size);
     /* A Ctrl-C returns to the caller, any other interrupting signal retries. */
     if (read_count == -1 && errno == EINTR) {
-      if (INTERRUPT_REQUESTED) return shit::None;
+      if (INTERRUPT_REQUESTED) return koshka::None;
       continue;
     }
-    if (read_count == -1) return shit::None;
+    if (read_count == -1) return koshka::None;
     return static_cast<usize>(read_count);
   }
 }
@@ -259,7 +259,7 @@ fn get_current_user() throws -> Maybe<String>
 fn get_hostname() throws -> Maybe<String>
 {
   char buffer[256];
-  if (gethostname(buffer, sizeof(buffer)) != 0) return shit::None;
+  if (gethostname(buffer, sizeof(buffer)) != 0) return koshka::None;
   buffer[sizeof(buffer) - 1] = '\0';
 
   return String{buffer};
@@ -283,7 +283,7 @@ fn get_home_directory() throws -> Maybe<Path>
 {
   if (let const home = get_environment_variable("HOME"); home.has_value())
     return Path{StringView{*home}};
-  return shit::None;
+  return koshka::None;
 }
 
 /* The colon field at index of an /etc/passwd line, empty when the line has too
@@ -308,19 +308,19 @@ static fn passwd_field(StringView line, usize index) wontthrow -> StringView
 
 fn get_home_for_user(StringView username) throws -> Maybe<Path>
 {
-  if (username.is_empty()) return shit::None;
+  if (username.is_empty()) return koshka::None;
 
   let const contents = Path{StringView{"/etc/passwd"}}.read_entire_file();
-  if (!contents) return shit::None;
+  if (!contents) return koshka::None;
 
   let const text = contents->view();
   for (let const &line : utils::split_lines(text)) {
     if (passwd_field(line, 0) != username) continue;
     let const home_field = passwd_field(line, 5);
-    if (home_field.is_empty()) return shit::None;
+    if (home_field.is_empty()) return koshka::None;
     return Path{home_field};
   }
-  return shit::None;
+  return koshka::None;
 }
 
 fn enumerate_users() throws -> ArrayList<String>
@@ -363,11 +363,11 @@ fn process_has_id(process p, i64 id) wontthrow -> bool
   return p == static_cast<process>(id);
 }
 
-fn is_stdin_a_tty() wontthrow -> bool { return isatty(SHIT_STDIN); }
+fn is_stdin_a_tty() wontthrow -> bool { return isatty(KOSH_STDIN); }
 
-fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
+fn is_stdout_a_tty() wontthrow -> bool { return isatty(KOSH_STDOUT); }
 
-fn is_stderr_a_tty() wontthrow -> bool { return isatty(SHIT_STDERR); }
+fn is_stderr_a_tty() wontthrow -> bool { return isatty(KOSH_STDERR); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
 
 fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *
@@ -831,7 +831,7 @@ static fn rlimit_resource_of(resource_kind kind) wontthrow -> Maybe<int>
 #ifdef RLIMIT_RTPRIO
   case resource_kind::RealtimePriority: return RLIMIT_RTPRIO;
 #endif
-  default: return shit::None;
+  default: return koshka::None;
   }
 }
 
@@ -891,7 +891,7 @@ fn make_fd_inheritable(descriptor fd) wontthrow -> void
 }
 
 /* TODO replace with a runtime check, Cosmopolitan runs on Linux and Windows. */
-#if SHIT_PLATFORM_ISNT COSMO
+#if KOSH_PLATFORM_ISNT COSMO
 const ProgramSuffixList PROGRAM_SUFFIXES{POSIX_PROGRAM_SUFFIXES};
 
 fn normalize_program_name(String &program_name) throws -> program_name_info
@@ -907,7 +907,7 @@ fn get_environment_variable(StringView key) throws -> Maybe<String>
   const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
   if (e != nullptr) return String{e};
-  return shit::None;
+  return koshka::None;
 }
 
 fn set_environment_variable(StringView key, StringView value) throws -> void
@@ -946,8 +946,8 @@ fn environment_names() throws -> ArrayList<String>
 fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 {
   if (status == -1) {
-    throw shit::Error{"'" + invocation +
-                      "' fail: " + last_system_error_message()};
+    throw koshka::Error{"'" + invocation +
+                        "' fail: " + last_system_error_message()};
   }
 
   return status;
@@ -978,8 +978,8 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
     let error = ErrorWithLocation{steal(location),
                                   "Unable to execute `" + program_path.text() +
                                       "`: " + last_system_error_message()};
-    shit::show_message(error.to_string(source));
-    shit::flush();
+    koshka::show_message(error.to_string(source));
+    koshka::flush();
     /* 127 for a missing file, 126 for a resolved but unexecutable program. */
     _exit(spawn_error == ENOENT ? 127 : 126);
   }
@@ -1030,7 +1030,7 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
                               "Could not open the program start gate"};
     }
 
-    shit::flush();
+    koshka::flush();
     let const child = fork_job_process();
     if (child == 0) {
       os::close_fd(start_pipe->out);
@@ -1080,7 +1080,7 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
     if (*outcome_read == 1 && outcome == 'f' && allow_script_fallback) {
       os::reap_process_quietly(child);
       was_fds_handed_to_fallback = true;
-      return SHIT_INVALID_PROCESS;
+      return KOSH_INVALID_PROCESS;
     }
 
     ec.close_fds();
@@ -1158,7 +1158,7 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
      behavior. The check runs before the fds close so the script keeps them. */
   if (spawn_error == ENOEXEC && allow_script_fallback) {
     was_fds_handed_to_fallback = true;
-    return SHIT_INVALID_PROCESS;
+    return KOSH_INVALID_PROCESS;
   }
 
   ec.close_fds();
@@ -1413,13 +1413,13 @@ static fn fork_compound_stage(
 
       reset_signal_handlers();
 
-#if defined SHIT_HAS_ADDRESS_SANITIZER
+#if defined KOSH_HAS_ADDRESS_SANITIZER
       __lsan_disable();
 #endif
-    } catch (const shit::Error &e) {
-      shit::show_message(
+    } catch (const koshka::Error &e) {
+      koshka::show_message(
           ErrorWithLocation{steal(location), e.message()}.to_string(source));
-      shit::flush();
+      koshka::flush();
       exit_process_immediately(1);
     } catch (...) {
       LOG(Debug,
@@ -1449,7 +1449,7 @@ static fn fork_job_process() throws -> process
       reset_signal_handlers();
       (void) setpgid(0, 0);
 
-#if defined SHIT_HAS_ADDRESS_SANITIZER
+#if defined KOSH_HAS_ADDRESS_SANITIZER
       __lsan_disable();
 #endif
     } catch (...) {
@@ -1612,7 +1612,7 @@ fn replace_process(ExecContext &&ec) throws -> void
      clobber errno. */
   errno = exec_error;
   let const reason = last_system_error_message();
-  let error = shit::ErrorWithLocation{
+  let error = koshka::ErrorWithLocation{
       ec.source_location(),
       "Unable to execute `" + ec.program_path().text() + "`: " + reason};
   error.set_command_status(exec_error == ENOENT ? 127 : 126);
@@ -1630,10 +1630,10 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
 {
   LOG(Debug, "opening a close-on-exec pipe");
 
-  descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
+  descriptor p[2] = {KOSH_INVALID_FD, KOSH_INVALID_FD};
 
   if (pipe(p) != 0) {
-    return shit::None;
+    return koshka::None;
   }
 
   for (descriptor end : p) {
@@ -1665,12 +1665,12 @@ fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
 {
   let const storage = os::allocate_aligned(sizeof(thread_start_context),
                                            alignof(thread_start_context));
-  if (storage == nullptr) return shit::None;
+  if (storage == nullptr) return koshka::None;
   let const start = new (storage) thread_start_context{entry, context};
   pthread_t handle{};
   if (pthread_create(&handle, nullptr, thread_trampoline, start) != 0) {
     os::free_aligned(start);
-    return shit::None;
+    return koshka::None;
   }
   return thread{handle};
 }
@@ -1699,7 +1699,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
 
   const String path_string{path};
   const int fd = ::open(path_string.c_str(), flags, 0666);
-  if (fd < 0) return shit::None;
+  if (fd < 0) return koshka::None;
   return fd;
 }
 
@@ -1726,7 +1726,7 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   let const temp_dir = Path::temp_directory();
 
   let const path_template_path =
-      PathBuilder{temp_dir.text()}.append("shit_heredoc_XXXXXX").build();
+      PathBuilder{temp_dir.text()}.append("kosh_heredoc_XXXXXX").build();
 
   /* mkstemp rewrites the XXXXXX suffix in place, so the template is mutable. */
   const String &path_template_text = path_template_path.text();
@@ -1737,7 +1737,7 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   path_template.push('\0');
 
   const int fd = mkstemp(path_template.begin());
-  if (fd < 0) return shit::None;
+  if (fd < 0) return koshka::None;
 
   unlink(path_template.begin());
 
@@ -1749,14 +1749,14 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
     }
     if (written < 0) {
       close(fd);
-      return shit::None;
+      return koshka::None;
     }
     offset += static_cast<usize>(written);
   }
 
   if (lseek(fd, 0, SEEK_SET) < 0) {
     close(fd);
-    return shit::None;
+    return koshka::None;
   }
   return fd;
 }
@@ -1835,18 +1835,18 @@ fn wait_and_monitor_process(process pid, bool *was_stopped) throws -> i32
        newline, every other signal prints the located process message. */
     if (sig == SIGPIPE) {
     } else if (sig != SIGINT) {
-      shit::print("[Process " + String::from(changed_pid, heap_allocator()) +
-                  ": " + sig_desc + ", signal " +
-                  String::from(sig, heap_allocator()) + "]\n");
+      koshka::print("[Process " + String::from(changed_pid, heap_allocator()) +
+                    ": " + sig_desc + ", signal " +
+                    String::from(sig, heap_allocator()) + "]\n");
     } else {
-      shit::print("\n");
+      koshka::print("\n");
     }
 
     return 128 + sig;
   } else if (!WIFEXITED(status)) {
-    throw shit::Error{"The process did not exit, was not signalled, and did "
-                      "not stop: " +
-                      last_system_error_message()};
+    throw koshka::Error{"The process did not exit, was not signalled, and did "
+                        "not stop: " +
+                        last_system_error_message()};
   } else {
     return WEXITSTATUS(status);
   }
@@ -1972,7 +1972,7 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
     const ErrorOr<i64> parsed_value = name.to<i64>();
     if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
         parsed_value.value() > INT32_MAX)
-      return shit::None;
+      return koshka::None;
     return static_cast<i32>(parsed_value.value());
   }
 
@@ -1980,14 +1980,14 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 
   for (let const &pair : SIGNAL_PAIRS)
     if (pair.name == bare) return pair.number;
-  return shit::None;
+  return koshka::None;
 }
 
 fn signal_name_from_number(i32 number) throws -> Maybe<String>
 {
   for (let const &pair : SIGNAL_PAIRS)
     if (pair.number == number) return String{pair.name};
-  return shit::None;
+  return koshka::None;
 }
 
 fn signal_names() throws -> const ArrayList<StringView> &
@@ -2199,7 +2199,7 @@ fn machine_type() throws -> String
 
 fn executable_system_name() throws -> String
 {
-#if SHIT_PLATFORM_IS COSMO
+#if KOSH_PLATFORM_IS COSMO
   return String{"any"};
 #elif defined __APPLE__
   return String{"Darwin"};
@@ -2216,7 +2216,7 @@ fn executable_system_name() throws -> String
 
 fn executable_machine_name() throws -> String
 {
-#if SHIT_PLATFORM_IS COSMO
+#if KOSH_PLATFORM_IS COSMO
   return String{"any"};
 #elif defined __aarch64__ || defined __arm64__
   return String{"arm64"};
@@ -2545,13 +2545,13 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
     buffer.reserve(capacity);
     let const length =
         ::readlink(path_string.c_str(), buffer.begin(), capacity);
-    if (length < 0) return shit::None;
+    if (length < 0) return koshka::None;
     if (static_cast<usize>(length) < capacity)
       return String{
           StringView{buffer.begin(), static_cast<usize>(length)}
       };
 
-    if (capacity >= (1U << 20)) return shit::None;
+    if (capacity >= (1U << 20)) return koshka::None;
     capacity *= 2;
   }
 }
@@ -2637,7 +2637,7 @@ static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
                             usize id_field_index) throws -> Maybe<String>
 {
   let const contents = Path{database_path}.read_entire_file();
-  if (!contents) return shit::None;
+  if (!contents) return koshka::None;
   let const wanted =
       String::from(static_cast<u64>(wanted_id), heap_allocator());
   let const text = contents->view();
@@ -2646,7 +2646,7 @@ static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
     let const name = passwd_field(line, 0);
     if (!name.is_empty()) return String{name};
   }
-  return shit::None;
+  return koshka::None;
 }
 
 fn uid_to_username(u32 uid) throws -> Maybe<String>
@@ -2676,11 +2676,11 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
 
 } /* namespace os */
 
-} /* namespace shit */
+} /* namespace koshka */
 
-#if SHIT_PLATFORM_IS COSMO
+#if KOSH_PLATFORM_IS COSMO
 
-namespace shit {
+namespace koshka {
 
 namespace os {
 
@@ -2697,11 +2697,11 @@ fn normalize_program_name(String &program_name) -> program_name_info
 
 } /* namespace os */
 
-} /* namespace shit */
+} /* namespace koshka */
 
 #endif /* COSMO */
 
-namespace shit {
+namespace koshka {
 namespace os {
 
 fn get_shell_process_id() wontthrow -> i64
@@ -2717,13 +2717,13 @@ fn get_current_process_id() wontthrow -> i64
 fn get_file_creation_mask() wontthrow -> u32
 {
   /* umask reads only through a set, so it is read and put back. */
-  let const previous_mask = SHIT_UMASK(0);
-  SHIT_UMASK(previous_mask);
+  let const previous_mask = KOSH_UMASK(0);
+  KOSH_UMASK(previous_mask);
 
   return static_cast<u32>(previous_mask);
 }
 
-fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
+fn set_file_creation_mask(u32 mask) wontthrow -> void { KOSH_UMASK(mask); }
 
 fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
 {
@@ -2732,7 +2732,7 @@ fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
 
 fn register_platform_flags(FlagList &flags) throws -> void
 {
-#if SHIT_PLATFORM_IS COSMO
+#if KOSH_PLATFORM_IS COSMO
   static FlagBool ftrace{'\0', "ftrace", flag_section::Debug,
                          "Trace functions under Cosmopolitan."};
   static FlagBool strace{'\0', "strace", flag_section::Debug,
@@ -2746,10 +2746,10 @@ fn register_platform_flags(FlagList &flags) throws -> void
 
 fn initialize_platform_runtime() wontthrow -> void
 {
-#if SHIT_PLATFORM_IS COSMO
+#if KOSH_PLATFORM_IS COSMO
   ShowCrashReports();
 #endif
 }
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */

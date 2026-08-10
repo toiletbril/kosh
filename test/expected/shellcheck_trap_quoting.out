@@ -30,7 +30,7 @@
 [Word
   Unquoted "done"
 ]
-shit: 2:6: warning: The double-quoted trap action expands now, when the trap is set, not when it fires.
+kosh: 2:6: warning: The double-quoted trap action expands now, when the trap is set, not when it fires.
      2 |  trap ": ${unset_at_set_time-}" EXIT
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~
 note: Single-quote it so it expands as the signal arrives.

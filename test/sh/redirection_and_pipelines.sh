@@ -1,7 +1,7 @@
 #!/bin/sh
 # Redirection, descriptor duplication, and pipelines together.
 
-tmp=/tmp/shit_everything_redir_$$
+tmp=/tmp/kosh_everything_redir_$$
 
 echo first >"$tmp"
 echo second >>"$tmp"
@@ -31,7 +31,7 @@ rm -f "$tmp" "$tmp.sorted"
 # against dash. A real pipe after a file redirection stays a pipe, so the
 # operators do not capture an unrelated bar or greater.
 
-f=/tmp/shit_redirops_$$
+f=/tmp/kosh_redirops_$$
 rm -f "$f"
 
 # >| writes even when noclobber would refuse a plain >.
@@ -69,7 +69,7 @@ echo "after shift 2: $1 $#"
 result=$(echo "  spaced  " | cat)
 echo "[$result]"
 
-tmp=/tmp/shit_everything_$$
+tmp=/tmp/kosh_everything_$$
 printf '%s\n' gamma alpha beta > "$tmp"
 echo "sorted:"
 sort "$tmp"

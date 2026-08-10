@@ -2,7 +2,7 @@
   [CompoundListCondition, None]
     [Assign start=$PWD]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/cd-dash/first" "$TEST_TEMP_DIRECTORY/cd-dash/second"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/cd-dash/first" "$TEST_TEMP_DIRECTORY/cd-dash/second"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY/cd-dash/first"]
   [CompoundListCondition, None]
@@ -10,13 +10,13 @@
   [CompoundListCondition, None]
     [SimpleCommand "cd" "-"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "basename" "$PWD"]
+    [SimpleCommand "koshkit" "basename" "$PWD"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "PWD=$(shitbox basename "$PWD") OLDPWD=$(shitbox basename "$OLDPWD")"]
+    [SimpleCommand "echo" "PWD=$(koshkit basename "$PWD") OLDPWD=$(koshkit basename "$OLDPWD")"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "-"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "basename" "$PWD"]
+    [SimpleCommand "koshkit" "basename" "$PWD"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "$start"]
 [Word
@@ -24,7 +24,7 @@
   Variable "PWD"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -63,7 +63,7 @@
   Unquoted "/dev/null"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "basename"
@@ -76,9 +76,9 @@
 ]
 [Word
   DoubleQuoted "PWD="
-  CommandSubstitution "shitbox basename "$PWD""
+  CommandSubstitution "koshkit basename "$PWD""
   DoubleQuoted " OLDPWD="
-  CommandSubstitution "shitbox basename "$OLDPWD""
+  CommandSubstitution "koshkit basename "$OLDPWD""
 ]
 [Word
   Unquoted "cd"
@@ -90,7 +90,7 @@
   Unquoted "/dev/null"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "basename"

@@ -11,7 +11,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -1213,4 +1213,4 @@ fn EvalContext::apply_value_modifier(
   return String{scratch_allocator(), value};
 }
 
-} // namespace shit
+} // namespace koshka

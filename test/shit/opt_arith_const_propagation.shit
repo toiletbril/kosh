@@ -1,4 +1,0 @@
-#!/bin/env shit
-x=10
-echo $((x*2+1))
-echo $((x+x))

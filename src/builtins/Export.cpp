@@ -21,7 +21,7 @@ FLAG(EXPORT_FUNCTION, Bool, 'f', "",
 
 REGISTER_BUILTIN_FLAGS(Export);
 
-namespace shit {
+namespace koshka {
 
 Export::Export() = default;
 
@@ -210,4 +210,4 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_error ? 1 : 0;
 }
 
-} // namespace shit
+} // namespace koshka

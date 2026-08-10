@@ -1,9 +1,0 @@
-#!/bin/env shit
-fd=5
-{ echo dyn-builtin >&$fd; echo lit-builtin >&5; /bin/echo dyn-extern >&$fd; } 5>/tmp/shit_dyn_fd.txt
-cat /tmp/shit_dyn_fd.txt
-echo separator
-errfd=2
-/bin/echo to-stderr >&$errfd 2>/tmp/shit_dyn_fd2.txt
-cat /tmp/shit_dyn_fd2.txt
-rm -f /tmp/shit_dyn_fd.txt /tmp/shit_dyn_fd2.txt

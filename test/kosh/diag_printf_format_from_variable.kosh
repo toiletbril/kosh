@@ -1,0 +1,4 @@
+#!/bin/env kosh
+fmt="%s\n"
+printf $fmt hi
+echo after

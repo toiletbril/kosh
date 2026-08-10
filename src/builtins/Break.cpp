@@ -13,7 +13,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Break);
 
-namespace shit {
+namespace koshka {
 
 Break::Break() = default;
 
@@ -32,7 +32,7 @@ static fn report_break_out_of_range(const ExecContext &ec, EvalContext &cxt,
     show_message(located.to_string(source->view(), &cxt));
   } else {
     let fallback = String{cxt.scratch_allocator()};
-    fallback += "shit: ";
+    fallback += "kosh: ";
     fallback.append(message.view());
     fallback += "\n";
     print_error(fallback.view());
@@ -83,4 +83,4 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

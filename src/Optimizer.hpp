@@ -18,7 +18,7 @@
 #include "Maybe.hpp"
 #include "Tokens.hpp"
 
-namespace shit {
+namespace koshka {
 
 class Token;
 class Expression;
@@ -109,4 +109,4 @@ fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void;
 
 } /* namespace optimizer */
 
-} /* namespace shit */
+} /* namespace koshka */

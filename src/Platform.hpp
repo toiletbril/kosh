@@ -49,14 +49,14 @@
 #endif
 #if defined __SANITIZE_ADDRESS__
 extern "C" void __lsan_disable(void);
-#define SHIT_HAS_ADDRESS_SANITIZER 1
+#define KOSH_HAS_ADDRESS_SANITIZER 1
 #endif
 #if defined __COSMOPOLITAN__
 #include <libc/dce.h>
 #include <libc/runtime/runtime.h>
-#define SHIT_SUPPORT_VECTOR (COSMO | POSIX)
+#define KOSH_SUPPORT_VECTOR (COSMO | POSIX)
 #else
-#define SHIT_SUPPORT_VECTOR (POSIX)
+#define KOSH_SUPPORT_VECTOR (POSIX)
 #endif
 #elif defined _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -71,24 +71,24 @@ extern "C" void __lsan_disable(void);
 #include <psapi.h>
 #include <sys/stat.h>
 #include <tlhelp32.h>
-#define SHIT_SUPPORT_VECTOR (WIN32)
+#define KOSH_SUPPORT_VECTOR (WIN32)
 #endif
 /* clang-format on */
 
-#define SHIT_PLATFORM_IS   (SHIT_SUPPORT_VECTOR) &
-#define SHIT_PLATFORM_ISNT (~SHIT_SUPPORT_VECTOR) &
+#define KOSH_PLATFORM_IS   (KOSH_SUPPORT_VECTOR) &
+#define KOSH_PLATFORM_ISNT (~KOSH_SUPPORT_VECTOR) &
 
 #if defined SIGPIPE
-#define SHIT_BROKEN_PIPE_EXIT_STATUS (128 + SIGPIPE)
+#define KOSH_BROKEN_PIPE_EXIT_STATUS (128 + SIGPIPE)
 #else
-#define SHIT_BROKEN_PIPE_EXIT_STATUS 141
+#define KOSH_BROKEN_PIPE_EXIT_STATUS 141
 #endif
 
-#if SHIT_PLATFORM_IS POSIX
+#if KOSH_PLATFORM_IS POSIX
 extern char **environ;
 #endif
 
-namespace shit::os {
+namespace koshka::os {
 
 hot alwaysinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
                                              usize count) wontthrow -> void
@@ -102,14 +102,14 @@ hot alwaysinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
 #endif
 }
 
-} /* namespace shit::os */
+} /* namespace koshka::os */
 
 #include "ArrayList.hpp"
 #include "Maybe.hpp"
 #include "Path.hpp"
 #include "String.hpp"
 
-namespace shit {
+namespace koshka {
 
 class ExecContext;
 class Flag;
@@ -160,7 +160,7 @@ enum class process_group_mode : u8
 pure constexpr fn background_process_group_mode(i64 process_group_id) wontthrow
     -> process_group_mode
 {
-#if SHIT_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS WIN32
   unused(process_group_id);
   return process_group_mode::NewBackground;
 #else
@@ -175,7 +175,7 @@ enum class terminal_handoff : u8
   BeforeStart,
 };
 
-#if SHIT_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS WIN32
 constexpr char PATH_DELIMITER = ';';
 constexpr char DIRECTORY_SEPARATOR = '\\';
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = false;
@@ -185,14 +185,14 @@ using process = HANDLE;
 using descriptor = HANDLE;
 using os_args = String;
 
-#define SHIT_INVALID_FD      INVALID_HANDLE_VALUE
-#define SHIT_INVALID_PROCESS INVALID_HANDLE_VALUE
+#define KOSH_INVALID_FD      INVALID_HANDLE_VALUE
+#define KOSH_INVALID_PROCESS INVALID_HANDLE_VALUE
 
-#define SHIT_STDIN  GetStdHandle(STD_INPUT_HANDLE)
-#define SHIT_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
-#define SHIT_STDERR GetStdHandle(STD_ERROR_HANDLE)
+#define KOSH_STDIN  GetStdHandle(STD_INPUT_HANDLE)
+#define KOSH_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
+#define KOSH_STDERR GetStdHandle(STD_ERROR_HANDLE)
 
-#elif SHIT_PLATFORM_IS POSIX
+#elif KOSH_PLATFORM_IS POSIX
 constexpr char PATH_DELIMITER = ':';
 constexpr char DIRECTORY_SEPARATOR = '/';
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = true;
@@ -202,12 +202,12 @@ using process = pid_t;
 using descriptor = int;
 using os_args = ArrayList<const char *>;
 
-#define SHIT_INVALID_FD      -1
-#define SHIT_INVALID_PROCESS -1
+#define KOSH_INVALID_FD      -1
+#define KOSH_INVALID_PROCESS -1
 
-#define SHIT_STDIN  STDIN_FILENO
-#define SHIT_STDOUT STDOUT_FILENO
-#define SHIT_STDERR STDERR_FILENO
+#define KOSH_STDIN  STDIN_FILENO
+#define KOSH_STDOUT STDOUT_FILENO
+#define KOSH_STDERR STDERR_FILENO
 #endif
 
 enum class program_extension : u8
@@ -308,17 +308,17 @@ inline fn normalize_windows_program_name(String &program_name) throws
 
 struct Pipe
 {
-  descriptor in{SHIT_INVALID_FD};
-  descriptor out{SHIT_INVALID_FD};
+  descriptor in{KOSH_INVALID_FD};
+  descriptor out{KOSH_INVALID_FD};
 };
 
 fn make_pipe() wontthrow -> Maybe<Pipe>;
 
 struct thread
 {
-#if SHIT_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS WIN32
   HANDLE handle{nullptr};
-#elif SHIT_PLATFORM_IS POSIX
+#elif KOSH_PLATFORM_IS POSIX
   pthread_t handle{};
 #endif
 };
@@ -357,7 +357,7 @@ public:
   fn cleanup_from(usize mark) wontthrow -> void;
 
 private:
-#if SHIT_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS WIN32
   ArrayList<Path> m_paths{heap_allocator()};
 #endif
 };
@@ -402,7 +402,7 @@ fn signal_names() throws -> const ArrayList<StringView> &;
    the process is gone or not permitted. */
 fn process_from_pid(i64 pid) wontthrow -> process;
 
-/* One live process the shitbox pkill, killall, and ps utilities read, its
+/* One live process the koshkit pkill, killall, and ps utilities read, its
    numeric id, the basename of its command, the owner uid, and the full command
    line. The command line is empty for a process that exposes none. */
 struct process_entry
@@ -418,7 +418,7 @@ struct process_entry
   u64 cpu_ticks{0};
 };
 
-/* Every process the current user can see, for the shitbox pkill and killall
+/* Every process the current user can see, for the koshkit pkill and killall
    utilities to match a name against. Empty on a platform with no process
    listing. The resource stats are read only when asked. */
 fn enumerate_processes(process_detail detail = process_detail::Basic) throws
@@ -525,18 +525,18 @@ public:
 
   pure fn is_valid() const wontthrow -> bool
   {
-    return m_descriptor != SHIT_INVALID_FD;
+    return m_descriptor != KOSH_INVALID_FD;
   }
   pure fn get() const wontthrow -> descriptor { return m_descriptor; }
   fn take() wontthrow -> descriptor
   {
     let const result = m_descriptor;
-    m_descriptor = SHIT_INVALID_FD;
+    m_descriptor = KOSH_INVALID_FD;
     return result;
   }
 
 private:
-  descriptor m_descriptor{SHIT_INVALID_FD};
+  descriptor m_descriptor{KOSH_INVALID_FD};
 };
 
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor;
@@ -546,7 +546,7 @@ struct saved_descriptor
 {
   i32 shell_fd{-1};
   /* A copy of the original descriptor, valid only when was_open is true. */
-  descriptor saved{SHIT_INVALID_FD};
+  descriptor saved{KOSH_INVALID_FD};
   /* False when shell_fd was not open before the redirection, so restore closes
      it instead of duplicating the backup back. */
   bool was_open{false};
@@ -557,7 +557,7 @@ struct saved_descriptor
   /* On Windows, the handle this redirection installed in the standard-handle
      slot, so restore closes that exact handle rather than whatever the slot
      holds at restore time. Unused on POSIX, which restores by dup2. */
-  descriptor replacement{SHIT_INVALID_FD};
+  descriptor replacement{KOSH_INVALID_FD};
 };
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
@@ -588,7 +588,7 @@ struct regex_span
    not here. */
 struct compiled_regex
 {
-#if SHIT_PLATFORM_IS POSIX
+#if KOSH_PLATFORM_IS POSIX
   regex_t re{};
 #else
   String pattern{heap_allocator()};
@@ -611,7 +611,7 @@ enum class regex_match_result : u8
 
 /* False on a platform with no regex engine, so [[ =~ ]] reports it is
    unsupported rather than matching. */
-constexpr bool HAS_REGEX_ENGINE = ((SHIT_SUPPORT_VECTOR) &POSIX) != 0;
+constexpr bool HAS_REGEX_ENGINE = ((KOSH_SUPPORT_VECTOR) &POSIX) != 0;
 
 fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result;
@@ -774,7 +774,7 @@ fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool;
 pure fn is_directory_separator(char c) wontthrow -> bool;
 pure inline fn has_directory_separator(StringView path) wontthrow -> bool
 {
-#if SHIT_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS WIN32
   return path.find_character('/').has_value() ||
          path.find_character('\\').has_value();
 #else
@@ -848,7 +848,7 @@ fn realtime_microseconds() wontthrow -> u64;
 fn format_local_time(StringView format, i64 epoch) throws -> String;
 
 fn terminal_size(u32 &columns, u32 &rows,
-                 descriptor output = SHIT_STDOUT) wontthrow -> bool;
+                 descriptor output = KOSH_STDOUT) wontthrow -> bool;
 
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. Windows has no equivalent and reports zero. */
@@ -890,7 +890,7 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
                 Maybe<descriptor> inherited_handle = {}) throws
     -> Maybe<measured_result>;
 
-/* Script fallback returns SHIT_INVALID_PROCESS when it is allowed and the file
+/* Script fallback returns KOSH_INVALID_PROCESS when it is allowed and the file
    has no executable format. */
 fn execute_program(
     ExecContext &&ec,
@@ -929,7 +929,7 @@ struct process_substitution_launch
   String path{heap_allocator()};
   Maybe<descriptor> retained_fd{};
   Maybe<descriptor> child_close_fd{};
-  process child{SHIT_INVALID_PROCESS};
+  process child{KOSH_INVALID_PROCESS};
   String diagnostic_output{heap_allocator()};
   bool should_evaluate_child{false};
   bool is_temporary_file{false};
@@ -952,7 +952,7 @@ fn can_fork_evaluator() wontthrow -> bool;
 
 struct compound_stage_launch
 {
-  process child{SHIT_INVALID_PROCESS};
+  process child{KOSH_INVALID_PROCESS};
   bool should_evaluate_child{false};
 };
 
@@ -977,4 +977,4 @@ fn redirect_self(const ExecContext &ec) throws -> void;
 
 } /* namespace os */
 
-} /* namespace shit */
+} /* namespace koshka */

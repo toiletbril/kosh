@@ -1,3 +1,0 @@
-#!/bin/env shit
-foo=bar echo "$foo"
-echo after

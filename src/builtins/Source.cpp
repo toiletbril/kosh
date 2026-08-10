@@ -15,7 +15,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Source);
 
-namespace shit {
+namespace koshka {
 
 Source::Source() = default;
 
@@ -85,4 +85,4 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                         ec.arg_location_at(path_index), StringView{path});
 }
 
-} /* namespace shit */
+} /* namespace koshka */

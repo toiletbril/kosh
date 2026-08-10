@@ -1,7 +1,7 @@
 == a matching glob expands to the sorted names:
 real_one real_two
 == the default mood aborts on no match:
-shit: 1:6: error: The glob pattern 'no_match_*' matched no file, it expands to its literal text, which is rarely intended.
+kosh: 1:6: error: The glob pattern 'no_match_*' matched no file, it expands to its literal text, which is rarely intended.
      1 |  echo no_match_*
        |       ^~~~~~~~~~
 note: Probe for matches with compgen -G 'no_match_*' or relax with set +o failglob.

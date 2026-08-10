@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The optimizer prepass runs in the default mood, so --show-optimizer-state traces
 # what each pass folds. Each case is a separate process, so its stderr trace
 # prints before its stdout result. The goldens assert the behavior of constant
@@ -32,7 +32,7 @@ echo "=== runtime variable does not fold ==="
 echo "=== undecidable condition does not fold ==="
 "$BIN" --show-optimizer-state -c 'if [ -f /nonexistent_optimizer_probe ]; then echo a; fi; echo done'
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The --show-optimizer-state flag prints the optimizer state and a located line
 # for every node the analysis stage eliminated, then a final summary, all to
 # standard error. Each case is a separate process, so its stderr dump prints

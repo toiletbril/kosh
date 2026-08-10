@@ -11,7 +11,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 fn builtin_error_context(StringView program) throws -> String
 {
@@ -164,7 +164,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
     }
   } catch (const BrokenPipeExit &) {
-    return SHIT_BROKEN_PIPE_EXIT_STATUS;
+    return KOSH_BROKEN_PIPE_EXIT_STATUS;
   } catch (const ErrorWithLocation &) {
     throw;
   } catch (const Error &e) {
@@ -198,7 +198,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error("shit: " + builtin_error_message(ec.program(), message) + "\n");
+    print_error("kosh: " + builtin_error_message(ec.program(), message) + "\n");
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
@@ -217,7 +217,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error("shit: " + builtin_error_message(ec.program(), message) + "\n");
+    print_error("kosh: " + builtin_error_message(ec.program(), message) + "\n");
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
@@ -232,7 +232,7 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
                       StringView program_name) throws -> i32
 {
   /* A missing required argument reads the same located caret in every mood, the
-     shit feature form, rather than the soft unlocated line the bash mood gives
+     kosh feature form, rather than the soft unlocated line the bash mood gives
      a thrown builtin error. The trailing note points the reader at the
      per-command help the way a compiler points past an error at a hint. The
      fallback line is for the rare case with no source to caret against, such as
@@ -242,7 +242,7 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
+    print_error(String{"kosh: "} + program_name + ": Not enough arguments.\n");
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
                    .to_string());
   return 2;
@@ -256,7 +256,7 @@ fn report_usage_error(EvalContext &cxt, SourceLocation location,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
+    print_error(String{"kosh: "} + program_name + ": Not enough arguments.\n");
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
                    .to_string());
   return 2;
@@ -435,4 +435,4 @@ fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
   ec.print_to_stdout(out);
 }
 
-} /* namespace shit */
+} /* namespace koshka */

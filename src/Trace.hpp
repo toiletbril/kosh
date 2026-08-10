@@ -3,7 +3,7 @@
 #include "Common.hpp"
 #include "Containers.hpp"
 
-namespace shit {
+namespace koshka {
 
 enum class verbosity : u8
 {
@@ -130,7 +130,7 @@ fn format_named_values(StringView names, Args &&...args) -> String
 
 } /* namespace log_detail */
 
-} /* namespace shit */
+} /* namespace koshka */
 
 #define T__LOG_STRINGIZE2(x) #x
 #define T__LOG_STRINGIZE(x)  T__LOG_STRINGIZE2(x)
@@ -147,15 +147,15 @@ fn format_named_values(StringView names, Args &&...args) -> String
 #else /* NDEBUG */
 
 /* The level is named unqualified, such as Debug, and the macro prepends
-   ::shit::verbosity the way the FLAG macro prepends the section, so a call site
-   spells neither the namespace nor the enum. */
+   ::koshka::verbosity the way the FLAG macro prepends the section, so a call
+   site spells neither the namespace nor the enum. */
 #define LOG(level, ...)                                                        \
   do {                                                                         \
-    constexpr ::shit::verbosity t__log_level = ::shit::verbosity::level;       \
-    if (t__log_level <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {               \
-      std::FILE *t__log_stream = ::shit::log_output_stream();                  \
+    constexpr ::koshka::verbosity t__log_level = ::koshka::verbosity::level;   \
+    if (t__log_level <= ::koshka::LOGGER_VERBOSITY) [[unlikely]] {             \
+      std::FILE *t__log_stream = ::koshka::log_output_stream();                \
       unused(std::fprintf(t__log_stream, "[%s] %32s %32s(): ",                 \
-                          ::shit::verbosity_to_string(t__log_level),           \
+                          ::koshka::verbosity_to_string(t__log_level),         \
                           __FILE__ ":" T__LOG_STRINGIZE(__LINE__), __func__)); \
       unused(std::fprintf(t__log_stream, __VA_ARGS__));                        \
       unused(std::fputc('\n', t__log_stream));                                 \
@@ -165,13 +165,13 @@ fn format_named_values(StringView names, Args &&...args) -> String
 
 #define LOG_VARS(level, ...)                                                   \
   do {                                                                         \
-    constexpr ::shit::verbosity t__log_level = ::shit::verbosity::level;       \
-    if (t__log_level <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {               \
-      ::shit::String t__vars =                                                 \
-          ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
-      std::FILE *t__log_stream = ::shit::log_output_stream();                  \
+    constexpr ::koshka::verbosity t__log_level = ::koshka::verbosity::level;   \
+    if (t__log_level <= ::koshka::LOGGER_VERBOSITY) [[unlikely]] {             \
+      ::koshka::String t__vars = ::koshka::log_detail::format_named_values(    \
+          #__VA_ARGS__, __VA_ARGS__);                                          \
+      std::FILE *t__log_stream = ::koshka::log_output_stream();                \
       unused(std::fprintf(t__log_stream, "[%s] %32s %32s(): %s\n",             \
-                          ::shit::verbosity_to_string(t__log_level),           \
+                          ::koshka::verbosity_to_string(t__log_level),         \
                           __FILE__ ":" T__LOG_STRINGIZE(__LINE__), __func__,   \
                           t__vars.c_str()));                                   \
       unused(std::fflush(t__log_stream));                                      \

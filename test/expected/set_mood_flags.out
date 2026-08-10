@@ -5,20 +5,20 @@
 == set --mood value:
 bash
 bash-posix
+kosh
 sh
-shit
 == set --init-moods value:
 bash
 bash-posix
+kosh
 sh
-shit
 == set -M value:
 bash
 bash-posix
+kosh
 sh
-shit
 == set -L value:
 bash
 bash-posix
+kosh
 sh
-shit

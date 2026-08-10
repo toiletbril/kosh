@@ -4,7 +4,7 @@
 #include "Common.hpp"
 #include "Path.hpp"
 
-namespace shit {
+namespace koshka {
 
 class ResolvedCommand
 {
@@ -49,4 +49,4 @@ public:
   mustuse bool is_unresolved() const { return kind == Kind::Unresolved; }
 };
 
-} // namespace shit
+} // namespace koshka

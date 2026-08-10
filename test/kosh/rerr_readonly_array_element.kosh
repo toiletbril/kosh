@@ -1,0 +1,4 @@
+#!/bin/env kosh
+arr[0]=1
+readonly arr
+arr[1]=2

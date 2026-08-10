@@ -1,0 +1,40 @@
+--- default goal ---
+echo hello from make
+hello from make
+finished
+--- explicit target ---
+echo hello from make
+hello from make
+--- missing target ---
+kosh: 1:1: error: There is no rule to make the target 'nope'.
+     1 |  koshkit make nope
+       |  ^~~~~~~~~~~~~~~~~
+rc=2
+--- advanced features ---
+second recipe line ran after a forking command
+make=[koshkit make -j4]
+src=[a.c b.c]
+obj=[a.o b.o]
+flags=[one  two]
+tag=[debug]
+--- ignored flags -B and -k ---
+built
+rc=0
+--- failing recipe aborts ---
+kosh: 1:1: error: The recipe for the target 'broken' failed with status 1.
+     1 |  koshkit make broken
+       |  ^~~~~~~~~~~~~~~~~~~
+rc=2
+--- default goal builds both through the pattern ---
+echo cc foo.c -o foo.o
+cc foo.c -o foo.o
+echo cc bar.c -o bar.o
+cc bar.c -o bar.o
+--- explicit object target ---
+echo cc foo.c -o foo.o
+cc foo.c -o foo.o
+--- all prerequisites variable ---
+echo all are a b c and first is a
+all are a b c and first is a
+== the $(shell) error names the make source (count):
+0

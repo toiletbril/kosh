@@ -25,7 +25,7 @@ wait_for_path()
 probe_directory_lock()
 {
     if [ "${OS-}" = Windows_NT ]; then
-        lock_file=$directory/.shit-flock.lock
+        lock_file=$directory/.kosh-flock.lock
         [ -e "$lock_file" ] || return 2
         powershell.exe -NoProfile -NonInteractive -Command '& {
             param($lock_path)
@@ -110,11 +110,11 @@ cleanup()
 trap cleanup EXIT
 
 SHELL_BINARY=$BIN "$BIN" -p --mood sh -c '
-    shitbox flock "$1" "$SHELL_BINARY" -p --mood sh -c \
+    koshkit flock "$1" "$SHELL_BINARY" -p --mood sh -c \
         "printf held > \"\$1\"" shell "$2"
 ' shell "$directory" "$directory/normal"
 printf 'normal=%s list=%s\n' "$(cat "$directory/normal")" \
-    "$("$BIN" -c 'shitbox --list' | grep -c '^flock$')"
+    "$("$BIN" -c 'koshkit --list' | grep -c '^flock$')"
 if [ "${OS-}" = Windows_NT ]; then
     wait_for_lock_release 10 || exit 1
 else
@@ -123,15 +123,15 @@ fi
 
 LOCK_DIRECTORY=$directory STATE_DIRECTORY=$directory SHELL_BINARY=$BIN \
     "$BIN" -p --mood bash -c '
-    shitbox flock --transaction-held-lock "$LOCK_DIRECTORY" "$SHELL_BINARY" \
-        -p --mood sh -c '\''shitbox touch "$STATE_DIRECTORY/started"
+    koshkit flock --transaction-held-lock "$LOCK_DIRECTORY" "$SHELL_BINARY" \
+        -p --mood sh -c '\''koshkit touch "$STATE_DIRECTORY/started"
         attempt_count=0
         while [ ! -e "$STATE_DIRECTORY/release" ] && [ "$attempt_count" -lt 3000 ]; do
-            shitbox sleep 0.01
+            koshkit sleep 0.01
             attempt_count=$((attempt_count + 1))
         done
         test -e "$STATE_DIRECTORY/release" || exit 1
-        shitbox touch "$STATE_DIRECTORY/finished"'\''
+        koshkit touch "$STATE_DIRECTORY/finished"'\''
 ' &
 wrapper_process=$!
 transaction_state=launched
@@ -155,13 +155,13 @@ wait_for_lock_release || exit 1
 LOCK_DIRECTORY=$directory STATE_DIRECTORY=$directory SHELL_BINARY=$BIN \
     "$BIN" -p --mood sh -c '
     printf "%s\n" "$$" > "$STATE_DIRECTORY/evaluator-pid"
-    shitbox flock --transaction-held-lock "$LOCK_DIRECTORY" \
+    koshkit flock --transaction-held-lock "$LOCK_DIRECTORY" \
         "$SHELL_BINARY" -p --mood sh -c \
-        '\''shitbox touch "$STATE_DIRECTORY/transaction-acquired"'\''
-    shitbox flock "$LOCK_DIRECTORY" "$SHELL_BINARY" -p --mood sh -c \
+        '\''koshkit touch "$STATE_DIRECTORY/transaction-acquired"'\''
+    koshkit flock "$LOCK_DIRECTORY" "$SHELL_BINARY" -p --mood sh -c \
         '\''set --mood bash
         printf "%s\n" "$PPID" > "$STATE_DIRECTORY/normal-parent-pid"
-        shitbox touch "$STATE_DIRECTORY/acquired"'\''
+        koshkit touch "$STATE_DIRECTORY/acquired"'\''
 '
 test -e "$directory/transaction-acquired" || exit 1
 test -e "$directory/acquired" || exit 1

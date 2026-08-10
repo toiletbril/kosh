@@ -391,27 +391,27 @@
   DoubleQuoted "plain_assign="
   Variable "?"
 ]
-shit: 2:8: warning: An unquoted command substitution splits its output.
+kosh: 2:8: warning: An unquoted command substitution splits its output.
      2 |  echo a $(echo b) c
        |         ^~~~~~~~~
 note: Quote it to keep one argument.
-shit: 31:6: warning: An echo of a command substitution prints what the command already prints.
+kosh: 31:6: warning: An echo of a command substitution prints what the command already prints.
     31 |  f(){ echo "$(echo hi)"; }
        |       ^~~~
 note: Run the command on its own instead.
-shit: 38:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 38:1: warning: An echo of a command substitution prints what the command already prints.
     38 |  echo $(echo $(echo deep))
        |  ^~~~
 note: Run the command on its own instead.
-shit: 38:6: warning: An unquoted command substitution splits its output.
+kosh: 38:6: warning: An unquoted command substitution splits its output.
     38 |  echo $(echo $(echo deep))
        |       ^~~~~~~~~~~~~~~~~~~~
 note: Quote it to keep one argument.
-shit: 50:1: warning: A command substitution in command position executes its output.
+kosh: 50:1: warning: A command substitution in command position executes its output.
     50 |  $(false); echo "bare_csub=$?"
        |  ^~~~~~~~
 note: Run the command inside the substitution directly.
-shit: 52:7: warning: A command substitution in command position executes its output.
+kosh: 52:7: warning: A command substitution in command position executes its output.
     52 |  true; $(false); echo "vanished_word=$?"
        |        ^~~~~~~~
 note: Run the command inside the substitution directly.

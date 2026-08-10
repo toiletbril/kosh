@@ -35,7 +35,7 @@ RUN git clone --depth=1 'https://github.com/tpoechtrager/osxcross' '/opt/osxcros
 
 ENV PATH="/opt/osxcross/target/bin:$PATH"
 
-ENV SHIT_TARGETS="x86_64-linux-musl aarch64-apple-darwin"
+ENV KOSH_TARGETS="x86_64-linux-musl aarch64-apple-darwin"
 
 RUN git config --global --add safe.directory '*'
 

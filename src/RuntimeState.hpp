@@ -3,7 +3,7 @@
 #include "Common.hpp"
 #include "MimicMood.hpp"
 
-namespace shit {
+namespace koshka {
 
 class EvalContext;
 
@@ -17,7 +17,7 @@ enum class shell_option_id : u8
   Noclobber,
   Noglob,
   Noexec,
-  Shitbox,
+  Koshkit,
   Monitor,
   Failglob,
   Notify,
@@ -81,4 +81,4 @@ public:
   fn restore(EvalContext &context) const wontthrow -> void;
 };
 
-} // namespace shit
+} // namespace koshka

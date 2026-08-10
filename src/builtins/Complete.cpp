@@ -48,7 +48,7 @@ FLAG(COMPLETE_VARIABLE, Bool, 'v', "", "Accept the variable action.");
 
 REGISTER_BUILTIN_FLAGS(Complete);
 
-namespace shit {
+namespace koshka {
 
 Complete::Complete() = default;
 
@@ -160,4 +160,4 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

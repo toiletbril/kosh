@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 
 directory=$(mktemp -d)
 trap 'test -n "$directory" && /bin/rm -rf "$directory"' EXIT
@@ -56,7 +56,7 @@ for noexec_script in \
     'for ((;;)); do set -n; echo leaked; done'
 do
     NOEXEC_BIN=$BIN NOEXEC_SCRIPT=$noexec_script "$BIN" -c \
-        'shitbox timeout 1 "$NOEXEC_BIN" -M bash -c "$NOEXEC_SCRIPT"' \
+        'koshkit timeout 1 "$NOEXEC_BIN" -M bash -c "$NOEXEC_SCRIPT"' \
         >> "$noexec_loop_output" 2>&1 || noexec_loop_status=1
 done
 if [ "$noexec_loop_status" -eq 0 ] && [ ! -s "$noexec_loop_output" ]; then
@@ -69,11 +69,11 @@ echo "== function option changes survive defining-mood state:"
 "$BIN" -M bash -c '
 function enable_noclobber { set -C; }
 set +C
-set --mood shit
+set --mood kosh
 enable_noclobber
 case $- in *C*) echo function-option-persisted;; *) echo function-option-lost;; esac
 '
-"$BIN" -M shit -c '
+"$BIN" -M kosh -c '
 function enable_strict_options {
     set -u
     set -o pipefail
@@ -96,7 +96,7 @@ function apply_definition_state {
 }
 set +o no-diagnostics
 set -W
-set --mood shit
+set --mood kosh
 apply_definition_state
 case $- in *W*) warning_level_clear=no;; *) warning_level_clear=yes;; esac
 if [[ "$(set --mood)" = bash ]] &&
@@ -108,7 +108,7 @@ fi
 '
 "$BIN" -M bash -c '
 function enable_posix_mode { set -o posix; }
-set --mood shit
+set --mood kosh
 enable_posix_mode
 if [[ -o posix ]] && [[ "$(set --mood)" = bash-posix ]]; then
     echo function-posix-persisted
@@ -118,9 +118,9 @@ fi
 '
 "$BIN" -M bash -c '
 function disable_posix_noop { set +o posix; }
-set --mood shit
+set --mood kosh
 disable_posix_noop
-if [[ "$(set --mood)" = shit ]]; then
+if [[ "$(set --mood)" = kosh ]]; then
     echo function-posix-noop-stayed
 else
     echo function-posix-noop-leaked
@@ -152,12 +152,12 @@ function isolate_revision_state {
         set -W
         set -o no-diagnostics)
 }
-set --mood shit
+set --mood kosh
 set +W
 set +o no-diagnostics
 isolate_revision_state
 case $- in *W*) warning_level_clear=no;; *) warning_level_clear=yes;; esac
-if [[ "$(set --mood)" = shit ]] &&
+if [[ "$(set --mood)" = kosh ]] &&
     [[ "$warning_level_clear" = yes ]] && [[ ! -o no-diagnostics ]]; then
     echo substitution-revisions-isolated
 else
@@ -203,7 +203,7 @@ fi
 echo "== command substitution isolates startup state:"
 /bin/mkdir -p "$directory/home"
 printf 'ignored=$(set --mood sh)\nignored=$(set --init-moods=sh)\n' \
-    > "$directory/home/.shitrc"
+    > "$directory/home/.koshrc"
 send_snapshot_input()
 {
     sleep 0.5
@@ -212,16 +212,16 @@ send_snapshot_input()
 if script --version >/dev/null 2>&1; then
     send_snapshot_input |
         HOME="$directory/home" ENV=/dev/null BIN="$BIN" script -q -c \
-            'exec "$BIN" -i -M bash --init-moods=shit' \
+            'exec "$BIN" -i -M bash --init-moods=kosh' \
             "$directory/startup-state" >/dev/null 2>&1
 else
     send_snapshot_input |
         HOME="$directory/home" ENV=/dev/null BIN="$BIN" script -q \
             "$directory/startup-state" /bin/sh -c \
-            'exec "$BIN" -i -M bash --init-moods=shit' >/dev/null 2>&1
+            'exec "$BIN" -i -M bash --init-moods=kosh' >/dev/null 2>&1
 fi
 if strings "$directory/startup-state" | grep -q 'snapshot-mood=bash' &&
-    strings "$directory/startup-state" | grep -q 'snapshot-moods=shit'
+    strings "$directory/startup-state" | grep -q 'snapshot-moods=kosh'
 then
     echo startup-state-isolated
 else

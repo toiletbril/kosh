@@ -1,0 +1,22 @@
+#!/bin/env kosh
+printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
+printf '1 2 3\n' | { read -a arr; echo "n=${#arr[@]} a0=${arr[0]} a2=${arr[2]}"; }
+printf 'noeol' | { read v; echo "rc=$? v=$v"; }
+
+
+file=$TEST_TEMP_DIRECTORY/read-eof
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY"
+printf abc > "$file"
+read x < "$file"
+echo "no_newline=[$x] $?"
+printf 'def\n' > "$file"
+read y < "$file"
+echo "with_newline=[$y] $?"
+koshkit unlink "$file"
+
+printf 'x::y\n' | { IFS=:; read a b c; echo "[$a][$b][$c]"; }
+
+IFS=- read a b c d <<IN
+w-x-y-z
+IN
+echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }

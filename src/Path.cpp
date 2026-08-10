@@ -6,7 +6,7 @@
 #include "StaticStringMap.hpp"
 #include "Trace.hpp"
 
-namespace shit {
+namespace koshka {
 
 Path::Path(StringView text) : m_text(text) {}
 
@@ -413,7 +413,7 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
     }
   }
 
-  if (!was_resolved) return shit::None;
+  if (!was_resolved) return koshka::None;
   return candidate;
 }
 
@@ -438,7 +438,7 @@ fn Path::is_shell_source(StringView source) const throws -> bool
       {SSK(".bash"), true},
       {SSK(".dash"), true},
       {SSK(".sh"),   true},
-      {SSK(".shit"), true},
+      {SSK(".kosh"), true},
   };
   static constexpr StaticStringMap EXTENSIONS{EXTENSION_ENTRIES};
   return EXTENSIONS.find(extension()).has_value() ||
@@ -461,4 +461,4 @@ fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
 
 fn PathBuilder::build() const throws -> Path { return Path{m_text}; }
 
-} /* namespace shit */
+} /* namespace koshka */

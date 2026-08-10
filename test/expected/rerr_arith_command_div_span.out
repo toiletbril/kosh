@@ -10,7 +10,7 @@
 [Word
   Unquoted "0"
 ]
-shit: 2:4: error: Division by zero.
+kosh: 2:4: error: Division by zero.
      2 |  (( 1 / 0 ))
        |     ^~~~~
 note: The right operand evaluated to 0.

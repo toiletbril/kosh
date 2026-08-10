@@ -60,7 +60,7 @@
 [Word
   Unquoted "-"
 ]
-shit: 3:14: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
+kosh: 3:14: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
      3 |  echo b 2>&1 >/dev/null
        |               ^~~~~~~~~
 note: Put the file redirect first as in '>file 2>&1'.

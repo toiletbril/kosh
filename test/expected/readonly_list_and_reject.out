@@ -1,12 +1,12 @@
 == list shows a name marked with a value:
 readonly x='5'
 == reassignment of a read-only name is rejected:
-shit: 1:15: error: Unable to assign 'x' because it is read only.
+kosh: 1:15: error: Unable to assign 'x' because it is read only.
      1 |  readonly x=5; x=6
        |                ^~~
 rc=1
 == a bare name marks the current value:
-shit: 1:19: error: Unable to assign 'y' because it is read only.
+kosh: 1:19: error: Unable to assign 'y' because it is read only.
      1 |  y=hi; readonly y; y=bye
        |                    ^~~~~
 rc=1

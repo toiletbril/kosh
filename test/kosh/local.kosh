@@ -1,0 +1,16 @@
+#!/bin/env kosh
+x=outer
+f() { local x; echo "[$x]"; x=inner; echo "[$x]"; }
+f
+echo "[$x]"
+g() { local y; echo "[${y-UNSET}]"; }
+g
+
+v=outer
+f() { local v=inner; echo "in=$v"; }
+f
+echo "out=$v"
+
+f() { local X=1; readonly X; echo "in=$X"; }
+f
+echo "after"

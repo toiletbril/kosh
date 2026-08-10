@@ -1,0 +1,9 @@
+#!/bin/env kosh
+fd=5
+{ echo dyn-builtin >&$fd; echo lit-builtin >&5; /bin/echo dyn-extern >&$fd; } 5>/tmp/kosh_dyn_fd.txt
+cat /tmp/kosh_dyn_fd.txt
+echo separator
+errfd=2
+/bin/echo to-stderr >&$errfd 2>/tmp/kosh_dyn_fd2.txt
+cat /tmp/kosh_dyn_fd2.txt
+rm -f /tmp/kosh_dyn_fd.txt /tmp/kosh_dyn_fd2.txt

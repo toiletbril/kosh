@@ -1,0 +1,10 @@
+#!/bin/env kosh
+readonly x=1
+x=2; echo "assign=$?"
+export y=1; readonly y; export y=2; echo "export=$?"
+unset x; echo "unset=$?"
+
+readonly R=5
+echo "R=$R"
+R=9
+echo "after=$R"

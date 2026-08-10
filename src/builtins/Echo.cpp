@@ -18,7 +18,7 @@ FLAG(ECHO_NO_ESCAPES, Bool, 'E', "", "Leave backslash escapes literal.");
 
 REGISTER_BUILTIN_FLAGS(Echo);
 
-namespace shit {
+namespace koshka {
 
 Echo::Echo() = default;
 
@@ -29,7 +29,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  /* Only the shit default mood answers --help, since bash and dash print the
+  /* Only the kosh default mood answers --help, since bash and dash print the
      literal text a script may depend on. */
   if (args.count() == 2 && args[1] == "--help" && !cxt.is_posix_mode() &&
       !cxt.is_bash_compatible())
@@ -194,4 +194,4 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

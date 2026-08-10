@@ -2,19 +2,19 @@
   [CompoundListCondition, None]
     [Assign start=$PWD]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" ".test-work/cd-paths/parent/child"]
+    [SimpleCommand "koshkit" "mkdir" "-p" ".test-work/cd-paths/parent/child"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" ".test-work/cd-paths/parent/child"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "basename" "$PWD"]
+    [SimpleCommand "koshkit" "basename" "$PWD"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" ".."]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "basename" "$PWD"]
+    [SimpleCommand "koshkit" "basename" "$PWD"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "-"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "basename" "$PWD"]
+    [SimpleCommand "koshkit" "basename" "$PWD"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "../.."]
   [CompoundListCondition, None]
@@ -32,7 +32,7 @@
   Variable "PWD"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -50,7 +50,7 @@
   Unquoted ".test-work/cd-paths/parent/child"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "basename"
@@ -65,7 +65,7 @@
   Unquoted ".."
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "basename"
@@ -83,7 +83,7 @@
   Unquoted "../cd-output"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "basename"
@@ -146,7 +146,7 @@ child
 parent
 child
 cdpath=0
-shit: 14:15: error: The directory '.test-work/nonexistent-xyz-dir' does not exist.
+kosh: 14:15: error: The directory '.test-work/nonexistent-xyz-dir' does not exist.
     14 |  cd .test-work/nonexistent-xyz-dir 2>&-
        |                ^~~~~~~~~~~~~~~~~~~
 note: Check the spelling or create it with `mkdir -p`.

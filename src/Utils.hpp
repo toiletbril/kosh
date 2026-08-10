@@ -9,7 +9,7 @@
 #include "Platform.hpp"
 #include "Tokens.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace utils {
 
@@ -268,7 +268,7 @@ pure fn debug_program_path_candidate_count() wontthrow -> usize;
 fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>;
 
-fn shit_identity(StringView fallback_path) throws -> Maybe<StringView>;
+fn kosh_identity(StringView fallback_path) throws -> Maybe<StringView>;
 
 /* glob_active reads which bytes act as metacharacters. With extglob set the
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
@@ -290,4 +290,4 @@ enum class farewell_policy : u8
 
 } /* namespace utils */
 
-} /* namespace shit */
+} /* namespace koshka */

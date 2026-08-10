@@ -1,0 +1,8 @@
+#!/bin/env kosh
+x=hello
+echo "${x}"
+unset x
+echo "[${x-}]"
+f() { echo fn; }
+unset f
+type f

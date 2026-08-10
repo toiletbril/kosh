@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A script run as a command hits ENOEXEC and is mimicked in-process, so a parse
 # error in it locates against the script file and name, not the command line the
 # way it used to caret an unrelated column of the typed path.
@@ -37,7 +37,7 @@ echo "binary rc=$binary_status"
 
 printf '#!/bin/sh\n"$0"\n' > "$dir/recurse"
 chmod +x "$dir/recurse"
-out=$(SHIT_FLAGS= "$BIN" --mood bash -I "$dir/recurse" 2>&1)
+out=$(KOSH_FLAGS= "$BIN" --mood bash -I "$dir/recurse" 2>&1)
 recursive_status=$?
 printf '%s\n' "$out" |
     sed -e "s#$canonical_dir#TMPDIR#g" -e "s#$dir#TMPDIR#g" \

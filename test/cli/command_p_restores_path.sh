@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # command -p resolves its operand against a default PATH, then the resolver
 # must revert to the shell's own PATH. A bogus or a valid operand once left the
 # resolver with no PATH, so every later command stopped being found.

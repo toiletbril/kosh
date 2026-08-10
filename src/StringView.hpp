@@ -3,7 +3,7 @@
 #include "Common.hpp"
 #include "Maybe.hpp"
 
-namespace shit {
+namespace koshka {
 
 template <class T>
 class ErrorOr;
@@ -130,4 +130,4 @@ pure alwaysinline fn hash_bytes(StringView view) wontthrow -> u64
   return hash;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

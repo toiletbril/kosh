@@ -11,7 +11,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 fn EvalContext::render_contained_substitution_error(std::exception_ptr error,
                                                     StringView source) throws
@@ -270,7 +270,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   }
 
   ASSERT(launch.retained_fd.has_value());
-  ASSERT(launch.child != SHIT_INVALID_PROCESS);
+  ASSERT(launch.child != KOSH_INVALID_PROCESS);
   let const location = m_current_location;
   let const source =
       m_current_source != nullptr ? m_current_source->view() : StringView{};
@@ -466,7 +466,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   }
   if (!can_evaluate_in_process) {
     LOG(Debug, "running the captured substitution in a child process");
-    unused(materialize_shit_identity());
+    unused(materialize_kosh_identity());
     let const pipe = os::make_pipe();
     if (!pipe)
       throw ErrorWithLocation{previous_location,
@@ -480,7 +480,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       }
     };
 
-    shit::flush();
+    koshka::flush();
     let const forked_child = os::try_fork_compound_stage(
         None, pipe->out, None, previous_location,
         previous_source != nullptr ? previous_source->view() : StringView{});
@@ -521,7 +521,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
           render_contained_substitution_error(error, source.view());
           set_last_exit_status(1);
         }
-        shit::flush();
+        koshka::flush();
         os::exit_process_immediately(last_exit_status());
       }
 
@@ -586,7 +586,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     throw Error{"Could not start a thread for command substitution"};
   }
 
-  shit::flush();
+  koshka::flush();
   let const saved = os::redirect_stdout(pipe->out);
 
   let const was_interactive = m_shell_is_interactive;
@@ -620,7 +620,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
   m_shell_is_interactive = was_interactive;
 
-  shit::flush();
+  koshka::flush();
   os::restore_stdout(saved);
   os::close_fd(pipe->out);
   os::join_thread(*reader);
@@ -716,7 +716,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     throw Error{"Could not start a thread for function substitution"};
   }
 
-  shit::flush();
+  koshka::flush();
   let const saved = os::redirect_stdout(pipe->out);
 
   let const was_interactive = m_shell_is_interactive;
@@ -739,7 +739,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
 
   m_shell_is_interactive = was_interactive;
 
-  shit::flush();
+  koshka::flush();
   os::restore_stdout(saved);
   os::close_fd(pipe->out);
   os::join_thread(*reader);
@@ -762,4 +762,4 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   return captured;
 }
 
-} // namespace shit
+} // namespace koshka

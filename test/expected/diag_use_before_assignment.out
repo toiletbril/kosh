@@ -20,10 +20,10 @@
 [Word
   Variable "count"
 ]
-shit: 2:6: warning: The variable 'count' is read before it is assigned.
+kosh: 2:6: warning: The variable 'count' is read before it is assigned.
      2 |  echo "$count"
        |       ^~~~~~~~
-shit: 2:7: warning: The variable 'count' is not set, it expands to empty.
+kosh: 2:7: warning: The variable 'count' is not set, it expands to empty.
      2 |  echo "$count"
        |        ^~~~~~
 note: Replace it with ${count-} if empty expansion is desired.

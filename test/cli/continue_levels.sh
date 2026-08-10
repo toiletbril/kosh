@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # continue rejects a count below one, defaults to one enclosing loop, and a count
 # above one skips to the next iteration of an outer loop.
 echo "== a zero count is rejected:"

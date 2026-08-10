@@ -1,0 +1,5 @@
+== -c in KOSH_FLAGS does not run its command:
+clean
+== benign flag in KOSH_FLAGS survives:
+flagged
+rc=0

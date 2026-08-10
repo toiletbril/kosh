@@ -1,0 +1,10 @@
+#!/bin/env kosh
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY"
+amp_file=$TEST_TEMP_DIRECTORY/bash-operators-amp
+echo through |& cat
+{ echo to-err >&2; } |& cat
+echo both &> "$amp_file"
+cat "$amp_file"
+echo more &>> "$amp_file"
+cat "$amp_file"
+koshkit unlink "$amp_file"

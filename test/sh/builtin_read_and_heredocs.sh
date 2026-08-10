@@ -32,7 +32,7 @@ END
 # A bare exec applies its redirections to the shell itself and keeps them for
 # every later command. An arbitrary descriptor such as 5 opens a file, takes
 # writes across separate commands, appends, and closes, matching dash.
-ef=/tmp/shit_exec_fd_test_$$
+ef=/tmp/kosh_exec_fd_test_$$
 rm -f "$ef"
 exec 5>"$ef"
 echo "fd5 line one" >&5

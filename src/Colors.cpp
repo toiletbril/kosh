@@ -3,7 +3,7 @@
 #include "Platform.hpp"
 #include "Trace.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace colors {
 
@@ -163,4 +163,4 @@ pure fn highlight_role_name(highlight_role role) wontthrow -> StringView
   return "unknown";
 }
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -5,7 +5,7 @@
 #include "Maybe.hpp"
 #include "Platform.hpp"
 
-namespace shit {
+namespace koshka {
 
 class ExecContext;
 class EvalContext;
@@ -68,7 +68,7 @@ public:
     Z,
     Complete,
     Compgen,
-    Shitbox,
+    Koshkit,
     Compopt,
     History,
     Fc,
@@ -150,7 +150,7 @@ inline constexpr static_string_entry<Builtin::Kind> BUILTIN_ENTRIES[] = {
     {SSK("z"),          Builtin::Kind::Z             },
     {SSK("complete"),   Builtin::Kind::Complete      },
     {SSK("compgen"),    Builtin::Kind::Compgen       },
-    {SSK("shitbox"),    Builtin::Kind::Shitbox       },
+    {SSK("koshkit"),    Builtin::Kind::Koshkit       },
     {SSK("compopt"),    Builtin::Kind::Compopt       },
     {SSK("history"),    Builtin::Kind::History       },
     {SSK("fc"),         Builtin::Kind::Fc            },
@@ -223,7 +223,7 @@ inline constexpr StaticStringMap BUILTINS{BUILTIN_ENTRIES};
   B_CASE(Z);                                                                   \
   B_CASE(Complete);                                                            \
   B_CASE(Compgen);                                                             \
-  B_CASE(Shitbox);                                                             \
+  B_CASE(Koshkit);                                                             \
   B_CASE(Compopt);                                                             \
   B_CASE(History);                                                             \
   B_CASE(Fc);                                                                  \
@@ -296,7 +296,7 @@ BUILTIN_STRUCT(Complete);
 BUILTIN_STRUCT(Compgen);
 BUILTIN_STRUCT(Compopt);
 BUILTIN_STRUCT(Z);
-BUILTIN_STRUCT(Shitbox);
+BUILTIN_STRUCT(Koshkit);
 BUILTIN_STRUCT(History);
 BUILTIN_STRUCT(Fc);
 BUILTIN_STRUCT(Caller);
@@ -337,8 +337,8 @@ fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const FlagList *;
 
 #define REGISTER_BUILTIN_FLAGS(kind)                                           \
   static uchar t__builtin_flag_registrar =                                     \
-      (shit::register_builtin_flag_list(shit::Builtin::Kind::kind,             \
-                                        &FLAG_LIST),                           \
+      (koshka::register_builtin_flag_list(koshka::Builtin::Kind::kind,         \
+                                          &FLAG_LIST),                         \
        0)
 
 void show_builtin_help_impl(const ExecContext &ec, StringView description,
@@ -396,7 +396,7 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String;
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &;
 
-fn shit_binary_flag_list() wontthrow -> const FlagList &;
+fn kosh_binary_flag_list() wontthrow -> const FlagList &;
 
 /* Report a builtin error that must not abort the run, with the same located
    caret in the default and posix moods and the same soft unlocated line in the
@@ -469,4 +469,4 @@ fn quote_for_declare(StringView value) throws -> String;
 fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64;
 
-} // namespace shit
+} // namespace koshka

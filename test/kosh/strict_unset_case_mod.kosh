@@ -1,0 +1,4 @@
+#!/bin/env kosh
+echo before
+echo "${nope^^}"
+echo not-reached

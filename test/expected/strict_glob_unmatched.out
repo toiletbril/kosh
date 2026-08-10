@@ -24,7 +24,7 @@
   Unquoted "not-reached"
 ]
 before
-shit: 3:6: warning: The glob pattern '*.zzz_no_such_glob' matched no file, it expands to its literal text, which is rarely intended.
+kosh: 3:6: warning: The glob pattern '*.zzz_no_such_glob' matched no file, it expands to its literal text, which is rarely intended.
      3 |  echo *.zzz_no_such_glob
        |       ^~~~~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G '*.zzz_no_such_glob' or relax with set +o failglob.

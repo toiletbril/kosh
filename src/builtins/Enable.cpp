@@ -8,7 +8,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-a] [-d] [-n] [-f filename] [-s] [name ...]");
 HELP_DESCRIPTION_DECL(
-    "The enable builtin lists and toggles shell builtins. In shit every "
+    "The enable builtin lists and toggles shell builtins. In Koshka every "
     "builtin is always enabled, so toggling is accepted without effect and "
     "the listing is the only observable output.");
 
@@ -21,7 +21,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Enable);
 
-namespace shit {
+namespace koshka {
 
 Enable::Enable() = default;
 
@@ -71,4 +71,4 @@ fn Enable::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

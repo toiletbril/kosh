@@ -1,4 +1,0 @@
-#!/bin/env shit
-set -u
-printf '%s' "${x-$y}"
-echo unreachable

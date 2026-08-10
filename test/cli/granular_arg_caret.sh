@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 
 echo "== bench points at the failing command, not the whole bench line:"
 "$BIN" -c 'bench --runs 1 ls --color' 2>&1 | grep -A1 'error:'

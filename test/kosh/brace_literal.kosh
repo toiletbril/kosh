@@ -1,0 +1,9 @@
+#!/bin/env kosh
+echo a{b}c
+echo x\${y}
+y=5; echo x${y}z
+echo }
+echo {
+echo 2}
+echo {a,b}
+{ echo group; }

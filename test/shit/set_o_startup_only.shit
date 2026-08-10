@@ -1,4 +1,0 @@
-#!/bin/env shit
-set --options | grep -E 'login|rcfile'
-set -o login
-echo not-reached

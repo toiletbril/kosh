@@ -8,7 +8,7 @@
 #include "StringView.hpp"
 #include "Tokens.hpp"
 
-namespace shit {
+namespace koshka {
 
 class BumpArena;
 
@@ -171,4 +171,4 @@ protected:
       -> usize;
 };
 
-} /* namespace shit */
+} /* namespace koshka */

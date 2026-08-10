@@ -7,7 +7,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 static fn sparse_array_key(StringView name, usize index,
                            Allocator allocator) throws -> String
@@ -857,4 +857,4 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   return out;
 }
 
-} // namespace shit
+} // namespace koshka

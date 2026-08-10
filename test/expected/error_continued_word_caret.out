@@ -4,10 +4,10 @@
 [Word
   Unquoted "xyzzy_undefined"
 ]
-shit: 2:1: warning: Command 'xyzzy_undefined' was not found.
+kosh: 2:1: warning: Command 'xyzzy_undefined' was not found.
      2 |  xy\
        |  ^~~
-shit: 2:1: error: Command 'xyzzy_undefined' was not found.
+kosh: 2:1: error: Command 'xyzzy_undefined' was not found.
      2 |  xy\
        |  ^~~
 [Code 127]

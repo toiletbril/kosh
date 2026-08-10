@@ -1,0 +1,46 @@
+== koshkit utilities by prefix:
+make
+mkdir
+mv
+== ls flags through koshkit:
+--help
+-1
+-A
+-a
+-h
+-l
+== du flags through koshkit:
+--help
+-h
+-s
+== timeout flags through koshkit:
+--help
+--kill-after
+--preserve-status
+--signal
+-k
+-p
+-s
+== nproc flags through koshkit:
+--all
+--help
+--ignore
+== cat flags through koshkit:
+--syntax-highlighting
+== koshkit own flags:
+--assimilate
+--help
+--list
+== bare utility flags under set -o koshkit:
+--help
+-1
+-A
+-a
+-h
+-l
+== bare utility names in the default mood:
+whoami
+== bare utility names stay hidden in bash mood:
+== bare utility names appear after set -o koshkit:
+whoami
+== a PATH program keeps its own flags:

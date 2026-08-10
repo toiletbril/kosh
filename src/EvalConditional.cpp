@@ -9,7 +9,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 cold [[noreturn]] static fn fail_conditional(StringView message,
                                              StringView reason) throws -> void
@@ -507,12 +507,13 @@ fn EvalContext::evaluate_conditional(
   let evaluator = conditional_evaluator{*this, elements};
   const bool is_conditional_true = evaluator.eval_or();
   if (!evaluator.at_end()) {
-    fail_conditional("The token '" + evaluator.unexpected_token() +
-                     "' came after a complete conditional, so it may be an "
-                     "operator shit does not support or a missing && or || "
-                     "between two tests");
+    fail_conditional(
+        "The token '" + evaluator.unexpected_token() +
+        "' came after a complete conditional, so it may be an "
+        "operator the shell does not support or a missing && or || "
+        "between two tests");
   }
   return is_conditional_true;
 }
 
-} // namespace shit
+} // namespace koshka

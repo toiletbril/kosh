@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 start=$PWD
 dir=$(mktemp -d)
 trap 'cd "$start" && rm -rf "$dir"' EXIT

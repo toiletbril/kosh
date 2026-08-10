@@ -18,7 +18,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Z);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -34,7 +34,7 @@ struct frecency_entry
 static fn frecency_store_path() throws -> Maybe<Path>
 {
   if (let const override_path =
-          os::get_environment_variable("SHIT_DIRECTORY_HISTORY");
+          os::get_environment_variable("KOSH_DIRECTORY_HISTORY");
       override_path.has_value() && !override_path->is_empty())
   {
     return Path{override_path->view()};
@@ -42,7 +42,7 @@ static fn frecency_store_path() throws -> Maybe<Path>
   let home = os::get_home_directory();
   if (!home) return None;
   let path = *home;
-  path.push_component(".shit_directory_history");
+  path.push_component(".kosh_directory_history");
   return path;
 }
 
@@ -240,4 +240,4 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

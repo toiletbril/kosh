@@ -10,10 +10,10 @@
 [Word
   DoubleQuoted "hello world"
 ]
-shit: 2:6: warning: The code 'hello world' is not a number from 0 to 255, exit either rejects it or wraps it modulo 256.
+kosh: 2:6: warning: The code 'hello world' is not a number from 0 to 255, exit either rejects it or wraps it modulo 256.
      2 |  exit "hello world" "hello world"
        |       ^~~~~~~~~~~~~
-shit: 2:6: error: Builtin `exit`: 'hello world' is not a numeric exit status.
+kosh: 2:6: error: Builtin `exit`: 'hello world' is not a numeric exit status.
      2 |  exit "hello world" "hello world"
        |       ^~~~~~~~~~~~~
 [Code 2]

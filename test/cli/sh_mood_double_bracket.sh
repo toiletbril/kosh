@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The [[ conditional is a bash addition, so the sh mood rejects it while the
 # default and bash moods run it.
 "$BIN" -c 'value=x; [[ -n $value ]] && echo ran'

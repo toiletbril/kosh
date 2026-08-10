@@ -7,7 +7,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 namespace os {
 
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
@@ -34,11 +34,11 @@ fn take_pending_signal() wontthrow -> i32
 }
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */
 
-#define SHIT_UMASK(mask) _umask(static_cast<int>(mask))
+#define KOSH_UMASK(mask) _umask(static_cast<int>(mask))
 
-namespace shit {
+namespace koshka {
 
 namespace os {
 
@@ -57,7 +57,7 @@ fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     case ERROR_NETNAME_DELETED: errno = EPIPE; break;
     default: break;
     }
-    return shit::None;
+    return koshka::None;
   }
   return static_cast<usize>(written_size);
 }
@@ -66,7 +66,7 @@ fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
   let const handle = descriptor_from_fd_number(fd_number);
-  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  if (handle == INVALID_HANDLE_VALUE) return koshka::None;
   return write_fd(handle, buf, size);
 }
 
@@ -83,7 +83,7 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
     {
       return 0;
     }
-    return shit::None;
+    return koshka::None;
   }
   return static_cast<usize>(read_size);
 }
@@ -228,7 +228,7 @@ static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
   case 0: return STD_INPUT_HANDLE;
   case 1: return STD_OUTPUT_HANDLE;
   case 2: return STD_ERROR_HANDLE;
-  default: return shit::None;
+  default: return koshka::None;
   }
 }
 
@@ -325,13 +325,13 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
         candidate.c_str(), 0,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-    if (handle == INVALID_HANDLE_VALUE) return shit::None;
+    if (handle == INVALID_HANDLE_VALUE) return koshka::None;
     defer { CloseHandle(handle); };
 
     char buffer[32768];
     let const length = GetFinalPathNameByHandleA(
         handle, buffer, sizeof(buffer), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-    if (length == 0 || length >= sizeof(buffer)) return shit::None;
+    if (length == 0 || length >= sizeof(buffer)) return koshka::None;
 
     let const resolved = StringView{buffer, static_cast<usize>(length)};
     if (should_preserve_extended_prefix) return Path{resolved};
@@ -346,7 +346,7 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   };
 
   let const text = path.text().view();
-  if (text.is_empty()) return shit::None;
+  if (text.is_empty()) return koshka::None;
   let const has_extended_prefix =
       text.length >= 4 && is_directory_separator(text[0]) &&
       is_directory_separator(text[1]) && text[2] == '?' &&
@@ -432,14 +432,14 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
           GetCurrentDirectoryA(countof(initial_path), initial_path);
     }
     if (initial_length == 0 || initial_length >= countof(initial_path))
-      return shit::None;
+      return koshka::None;
     resolved = Path{
         StringView{initial_path, static_cast<usize>(initial_length)}
     };
   }
 
   let initial_resolved = do_resolve_direct(resolved, has_extended_prefix);
-  if (!initial_resolved.has_value()) return shit::None;
+  if (!initial_resolved.has_value()) return koshka::None;
   resolved = initial_resolved.take();
 
   while (position < text.length) {
@@ -455,7 +455,7 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
     candidate.push_component(
         text.substring_of_length(component_start, position - component_start));
     let component_resolved = do_resolve_direct(candidate, has_extended_prefix);
-    if (!component_resolved.has_value()) return shit::None;
+    if (!component_resolved.has_value()) return koshka::None;
     resolved = component_resolved.take();
   }
 
@@ -594,9 +594,9 @@ fn capture_program_output(const ArrayList<String> &argv,
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
-  if (!slot.has_value()) return SHIT_INVALID_FD;
+  if (!slot.has_value()) return KOSH_INVALID_FD;
   let const handle = GetStdHandle(*slot);
-  return handle != nullptr ? handle : SHIT_INVALID_FD;
+  return handle != nullptr ? handle : KOSH_INVALID_FD;
 }
 
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
@@ -643,7 +643,7 @@ fn get_current_user() -> Maybe<String>
           StringView{buffer.begin(), size - 1}
       };
   }
-  return shit::None;
+  return koshka::None;
 }
 
 fn get_hostname() throws -> Maybe<String>
@@ -654,7 +654,7 @@ fn get_hostname() throws -> Maybe<String>
     return String{
         StringView{buffer, size}
     };
-  return shit::None;
+  return koshka::None;
 }
 
 fn get_processor_counts() wontthrow -> processor_counts
@@ -716,14 +716,14 @@ fn get_home_directory() -> Maybe<Path>
     return Path{StringView{*home}};
   if (Maybe<String> home = get_environment_variable("USERPROFILE"))
     return Path{StringView{*home}};
-  return shit::None;
+  return koshka::None;
 }
 
 /* Windows has no /etc/passwd, so ~user stays literal. */
 fn get_home_for_user(StringView username) throws -> Maybe<Path>
 {
   unused(username);
-  return shit::None;
+  return koshka::None;
 }
 
 fn enumerate_users() throws -> ArrayList<String>
@@ -802,11 +802,11 @@ fn process_has_id(process p, i64 id) wontthrow -> bool
   return process_id_of(p) == id;
 }
 
-fn is_stdin_a_tty() wontthrow -> bool { return is_fd_a_tty(SHIT_STDIN); }
+fn is_stdin_a_tty() wontthrow -> bool { return is_fd_a_tty(KOSH_STDIN); }
 
-fn is_stdout_a_tty() wontthrow -> bool { return is_fd_a_tty(SHIT_STDOUT); }
+fn is_stdout_a_tty() wontthrow -> bool { return is_fd_a_tty(KOSH_STDOUT); }
 
-fn is_stderr_a_tty() wontthrow -> bool { return is_fd_a_tty(SHIT_STDERR); }
+fn is_stderr_a_tty() wontthrow -> bool { return is_fd_a_tty(KOSH_STDERR); }
 
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool
 {
@@ -1314,7 +1314,7 @@ fn get_environment_variable(StringView key) -> Maybe<String>
   buffer.reserve(static_cast<usize>(required_size));
   let const value_length = GetEnvironmentVariableA(
       key_string.c_str(), buffer.begin(), required_size);
-  if (value_length == 0 || value_length >= required_size) return shit::None;
+  if (value_length == 0 || value_length >= required_size) return koshka::None;
   return String{
       StringView{buffer.begin(), static_cast<usize>(value_length)}
   };
@@ -1337,7 +1337,7 @@ fn signal_internal_diagnostic() wontthrow -> void
 {
   char marker_path[MAX_PATH];
   let const marker_path_length = GetEnvironmentVariableA(
-      "SHIT_INTERNAL_DIAGNOSTIC_MARKER", marker_path, countof(marker_path));
+      "KOSH_INTERNAL_DIAGNOSTIC_MARKER", marker_path, countof(marker_path));
   if (marker_path_length == 0 || marker_path_length >= countof(marker_path))
     return;
 
@@ -1418,7 +1418,7 @@ static fn timeout_job_name(HANDLE process_handle, char (&name)[64]) wontthrow
   let const creation_ticks =
       (static_cast<u64>(creation_time.dwHighDateTime) << 32u) |
       creation_time.dwLowDateTime;
-  ::snprintf(name, sizeof(name), "shit-timeout-%lu-%llu",
+  ::snprintf(name, sizeof(name), "kosh-timeout-%lu-%llu",
              static_cast<unsigned long>(GetProcessId(process_handle)),
              static_cast<unsigned long long>(creation_ticks));
   return true;
@@ -1640,7 +1640,7 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
       if (!resolved_program_path_storage.is_empty())
         ec.set_program_path(Path{resolved_program_path_storage.view()});
       were_handles_handed_to_fallback = true;
-      return SHIT_INVALID_PROCESS;
+      return KOSH_INVALID_PROCESS;
     }
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
   }
@@ -1691,14 +1691,14 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
      into a temp file the consumer reads by path. The whole output is written
      before the path returns. */
   let const module_path = current_executable_path();
-  if (!module_path.has_value()) return shit::None;
+  if (!module_path.has_value()) return koshka::None;
 
   char temp_dir[MAX_PATH];
   let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
   if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH)
-    return shit::None;
+    return koshka::None;
   char temp_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
+  if (GetTempFileNameA(temp_dir, "kos", 0, temp_path) == 0) return koshka::None;
   bool should_delete_temp_path = true;
   defer
   {
@@ -1709,17 +1709,17 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
   const HANDLE temp_file =
       CreateFileA(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-  if (temp_file == INVALID_HANDLE_VALUE) return shit::None;
+  if (temp_file == INVALID_HANDLE_VALUE) return koshka::None;
   defer { CloseHandle(temp_file); };
 
   char diagnostic_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "sht", 0, diagnostic_path) == 0)
-    return shit::None;
+  if (GetTempFileNameA(temp_dir, "kos", 0, diagnostic_path) == 0)
+    return koshka::None;
   defer { DeleteFileA(diagnostic_path); };
   const HANDLE diagnostic_file =
       CreateFileA(diagnostic_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-  if (diagnostic_file == INVALID_HANDLE_VALUE) return shit::None;
+  if (diagnostic_file == INVALID_HANDLE_VALUE) return koshka::None;
   bool is_diagnostic_file_open = true;
   defer
   {
@@ -1727,8 +1727,8 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
   };
 
   char diagnostic_marker_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "sht", 0, diagnostic_marker_path) == 0)
-    return shit::None;
+  if (GetTempFileNameA(temp_dir, "kos", 0, diagnostic_marker_path) == 0)
+    return koshka::None;
   defer { DeleteFileA(diagnostic_marker_path); };
 
   let arguments = ArrayList<String>{heap_allocator()};
@@ -1756,30 +1756,30 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
 
   PROCESS_INFORMATION process_info{};
   let const previous_root_trace_marker =
-      get_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE");
+      get_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE");
   let const previous_diagnostic_marker =
-      get_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER");
-  set_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE", "1");
-  set_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER",
+      get_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER");
+  set_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE", "1");
+  set_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER",
                            diagnostic_marker_path);
   defer
   {
     if (previous_root_trace_marker.has_value())
-      set_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE",
+      set_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE",
                                previous_root_trace_marker->view());
     else
-      unset_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE");
+      unset_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE");
     if (previous_diagnostic_marker.has_value())
-      set_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER",
+      set_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER",
                                previous_diagnostic_marker->view());
     else
-      unset_environment_variable("SHIT_INTERNAL_DIAGNOSTIC_MARKER");
+      unset_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER");
   };
   if (CreateProcessA(module_path->c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
                      TRUE, 0, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
-    return shit::None;
+    return koshka::None;
   defer { CloseHandle(process_info.hProcess); };
   defer { CloseHandle(process_info.hThread); };
   WaitForSingleObject(process_info.hProcess, INFINITE);
@@ -1834,7 +1834,7 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
   let const module_path = current_executable_path();
-  if (!module_path.has_value()) return shit::None;
+  if (!module_path.has_value()) return koshka::None;
 
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), module_path->view()});
@@ -1872,7 +1872,7 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
                      TRUE, creation_flags, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
-    return shit::None;
+    return koshka::None;
   CloseHandle(process_info.hThread);
   return process_info.hProcess;
 }
@@ -1889,10 +1889,10 @@ fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   unused(source);
   unused(process_group);
   unused(process_group_id);
-  return shit::None;
+  return koshka::None;
 }
 
-fn try_fork_job_process() -> Maybe<process> { return shit::None; }
+fn try_fork_job_process() -> Maybe<process> { return koshka::None; }
 
 fn can_fork_evaluator() wontthrow -> bool { return false; }
 
@@ -1935,7 +1935,7 @@ fn replace_process(ExecContext &&ec) -> void
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
   process child = execute_program(steal(ec), script_fallback_policy::Allow);
-  if (child == SHIT_INVALID_PROCESS) {
+  if (child == KOSH_INVALID_PROCESS) {
     redirect_self(ec);
     ec.close_fds();
     return;
@@ -1993,7 +1993,7 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
     if (in != INVALID_HANDLE_VALUE) close_fd(in);
     if (out != INVALID_HANDLE_VALUE) close_fd(out);
 
-    return shit::None;
+    return koshka::None;
   }
 
   return Pipe{in, out};
@@ -2020,13 +2020,13 @@ fn start_thread(void (*entry)(opaque *), opaque *context) wontthrow
 {
   let const storage = os::allocate_aligned(sizeof(thread_start_context),
                                            alignof(thread_start_context));
-  if (storage == nullptr) return shit::None;
+  if (storage == nullptr) return koshka::None;
   let const start = new (storage) thread_start_context{entry, context};
   HANDLE handle =
       CreateThread(nullptr, 0, thread_trampoline, start, 0, nullptr);
   if (handle == nullptr) {
     os::free_aligned(start);
-    return shit::None;
+    return koshka::None;
   }
   return thread{handle};
 }
@@ -2063,7 +2063,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   HANDLE handle = CreateFileA(path_string.c_str(), access,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
                               disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
-  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  if (handle == INVALID_HANDLE_VALUE) return koshka::None;
 
   return handle;
 }
@@ -2080,7 +2080,7 @@ fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
       StringView{absolute_path, static_cast<usize>(length)}
   };
   if (!is_directory_separator(lock_path.back())) lock_path += '\\';
-  lock_path += ".shit-flock.lock";
+  lock_path += ".kosh-flock.lock";
   SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
   loop
   {
@@ -2106,17 +2106,17 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   char temp_dir[MAX_PATH];
   let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
   if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH)
-    return shit::None;
+    return koshka::None;
 
   char temp_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
+  if (GetTempFileNameA(temp_dir, "kos", 0, temp_path) == 0) return koshka::None;
 
   HANDLE handle = CreateFileA(
       temp_path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
       FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
     DeleteFileA(temp_path);
-    return shit::None;
+    return koshka::None;
   }
 
   usize written_size = 0;
@@ -2125,7 +2125,7 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
                                     content.count() - written_size);
     if (!write_size.has_value() || *write_size == 0) {
       close_fd(handle);
-      return shit::None;
+      return koshka::None;
     }
     written_size += *write_size;
   }
@@ -2133,7 +2133,7 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   LARGE_INTEGER beginning{};
   if (SetFilePointerEx(handle, beginning, nullptr, FILE_BEGIN) == FALSE) {
     close_fd(handle);
-    return shit::None;
+    return koshka::None;
   }
 
   return handle;
@@ -2327,7 +2327,7 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
     const ErrorOr<i64> parsed_value = name.to<i64>();
     if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
         parsed_value.value() > INT32_MAX)
-      return shit::None;
+      return koshka::None;
     return static_cast<i32>(parsed_value.value());
   }
 
@@ -2869,7 +2869,7 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
       OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
       nullptr);
-  if (handle == INVALID_HANDLE_VALUE) return shit::None;
+  if (handle == INVALID_HANDLE_VALUE) return koshka::None;
   defer { CloseHandle(handle); };
 
   alignas(void *) u8 buffer[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
@@ -2877,7 +2877,7 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
   if (DeviceIoControl(handle, FSCTL_GET_REPARSE_POINT, nullptr, 0, buffer,
                       sizeof(buffer), &bytes_returned, nullptr) == FALSE)
   {
-    return shit::None;
+    return koshka::None;
   }
 
   const WCHAR *wide_target = nullptr;
@@ -2908,21 +2908,21 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
         reinterpret_cast<const u8 *>(data->path_buffer) + offset);
     wide_target_length = length / sizeof(WCHAR);
   } else {
-    return shit::None;
+    return koshka::None;
   }
 
   if (wide_target_length == 0) return String{StringView{}};
   let const utf8_length = WideCharToMultiByte(
       CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length), nullptr, 0,
       nullptr, nullptr);
-  if (utf8_length <= 0) return shit::None;
+  if (utf8_length <= 0) return koshka::None;
   let utf8_target = ArrayList<char>{heap_allocator()};
   utf8_target.reserve(static_cast<usize>(utf8_length));
   if (WideCharToMultiByte(
           CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length),
           utf8_target.begin(), utf8_length, nullptr, nullptr) != utf8_length)
   {
-    return shit::None;
+    return koshka::None;
   }
   return String{
       StringView{utf8_target.begin(), static_cast<usize>(utf8_length)}
@@ -2935,7 +2935,7 @@ fn current_executable_path() wontthrow -> Maybe<String>
   let const module_path_length =
       GetModuleFileNameA(nullptr, module_path, MAX_PATH);
   if (module_path_length == 0 || module_path_length == MAX_PATH)
-    return shit::None;
+    return koshka::None;
 
   return String{
       StringView{module_path, module_path_length}
@@ -3095,13 +3095,13 @@ fn uid_to_username(u32 uid) throws -> Maybe<String>
   /* Windows names users through the security database, so ls uses the numeric
    * id. */
   unused(uid);
-  return shit::None;
+  return koshka::None;
 }
 
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>
 {
   unused(gid);
-  return shit::None;
+  return koshka::None;
 }
 
 fn sleep_for_seconds(double seconds) wontthrow -> void
@@ -3137,9 +3137,9 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 
 } /* namespace os */
 
-} /* namespace shit */
+} /* namespace koshka */
 
-namespace shit {
+namespace koshka {
 
 namespace os {
 
@@ -3152,9 +3152,9 @@ fn normalize_program_name(String &program_name) -> program_name_info
 
 } /* namespace os */
 
-} /* namespace shit */
+} /* namespace koshka */
 
-namespace shit {
+namespace koshka {
 namespace os {
 
 fn get_shell_process_id() wontthrow -> i64
@@ -3170,13 +3170,13 @@ fn get_current_process_id() wontthrow -> i64
 fn get_file_creation_mask() wontthrow -> u32
 {
   /* umask reads only through a set, so it is read and put back. */
-  let const previous_mask = SHIT_UMASK(0);
-  SHIT_UMASK(previous_mask);
+  let const previous_mask = KOSH_UMASK(0);
+  KOSH_UMASK(previous_mask);
 
   return static_cast<u32>(previous_mask);
 }
 
-fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
+fn set_file_creation_mask(u32 mask) wontthrow -> void { KOSH_UMASK(mask); }
 
 fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
 {
@@ -3188,4 +3188,4 @@ fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }
 fn initialize_platform_runtime() wontthrow -> void {}
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */

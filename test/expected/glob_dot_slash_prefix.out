@@ -4,9 +4,9 @@
   [CompoundListCondition, None]
     [Assign directory=$TEST_TEMP_DIRECTORY/glob-dot-slash]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "rm" "-rf" "$directory"]
+    [SimpleCommand "koshkit" "rm" "-rf" "$directory"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$directory"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$directory"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "$directory"]
   [CompoundListCondition, &&]
@@ -20,7 +20,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "cd" "$start"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "rm" "-rf" "$directory"]
+    [SimpleCommand "koshkit" "rm" "-rf" "$directory"]
 [Word
   Unquoted "start="
   Variable "PWD"
@@ -31,7 +31,7 @@
   Unquoted "/glob-dot-slash"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "rm"
@@ -43,7 +43,7 @@
   Variable "directory"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -91,7 +91,7 @@
   Variable "start"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "rm"

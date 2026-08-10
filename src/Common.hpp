@@ -2,59 +2,59 @@
 
 /* Timestamp the build. */
 
-#if !defined SHIT_ENVCXXFLAGS
-#warning SHIT_ENVCXXFLAGS should be defined. Please use provided makefile \
+#if !defined KOSH_ENVCXXFLAGS
+#warning KOSH_ENVCXXFLAGS should be defined. Please use provided makefile \
          for compilation!
-#define SHIT_ENVCXXFLAGS "<unknown>"
+#define KOSH_ENVCXXFLAGS "<unknown>"
 #endif
 
-#if !defined SHIT_COMPILER_COMMAND
-#warning SHIT_COMPILER_COMMAND should be defined. Please use provided makefile \
+#if !defined KOSH_COMPILER_COMMAND
+#warning KOSH_COMPILER_COMMAND should be defined. Please use provided makefile \
          for compilation!
-#define SHIT_COMPILER_COMMAND "<unknown>"
+#define KOSH_COMPILER_COMMAND "<unknown>"
 #endif
 
-#if !defined SHIT_COMMIT_HASH
-#warning SHIT_COMMIT_HASH should be defined. Please use provided makefile for \
+#if !defined KOSH_COMMIT_HASH
+#warning KOSH_COMMIT_HASH should be defined. Please use provided makefile for \
          compilation!
-#define SHIT_COMMIT_HASH "<unknown>"
+#define KOSH_COMMIT_HASH "<unknown>"
 #endif
 
-#if !defined SHIT_BUILD_MODE
-#warning SHIT_BUILD_MODE should be defined. Please use provided makefile for \
+#if !defined KOSH_BUILD_MODE
+#warning KOSH_BUILD_MODE should be defined. Please use provided makefile for \
          compilation!
-#define SHIT_BUILD_MODE "<unset>"
+#define KOSH_BUILD_MODE "<unset>"
 #endif
 
-#if !defined SHIT_OS_INFO
-#warning SHIT_OS_INFO should be defined. Please use provided makefile for \
+#if !defined KOSH_OS_INFO
+#warning KOSH_OS_INFO should be defined. Please use provided makefile for \
          compilation!
-#define SHIT_OS_INFO "<unset>"
+#define KOSH_OS_INFO "<unset>"
 #endif
 
-#if !defined SHIT_LIBC
-#warning SHIT_LIBC should be defined. Please use provided makefile for \
+#if !defined KOSH_LIBC
+#warning KOSH_LIBC should be defined. Please use provided makefile for \
          compilation!
-#define SHIT_LIBC "<unknown libc>"
+#define KOSH_LIBC "<unknown libc>"
 #endif
 
-#define SHIT_BUILD_DATE (__DATE__ " at " __TIME__)
+#define KOSH_BUILD_DATE (__DATE__ " at " __TIME__)
 
-#define SHIT_COMPILER SHIT_COMPILER_COMMAND " (" __VERSION__ ", " SHIT_LIBC ")"
+#define KOSH_COMPILER KOSH_COMPILER_COMMAND " (" __VERSION__ ", " KOSH_LIBC ")"
 
-#define SHIT_VER_MAJOR 0
-#define SHIT_VER_MINOR 1
-#define SHIT_VER_PATCH 1
-#define SHIT_VER_EXTRA "prod"
+#define KOSH_VER_MAJOR 0
+#define KOSH_VER_MINOR 1
+#define KOSH_VER_PATCH 1
+#define KOSH_VER_EXTRA "prod"
 
-#define SHIT_STRINGIFY_INNER(x) #x
-#define SHIT_STRINGIFY(x)       SHIT_STRINGIFY_INNER(x)
-#define SHIT_VERSION_STRING                                                    \
-  SHIT_STRINGIFY(SHIT_VER_MAJOR)                                               \
-  "." SHIT_STRINGIFY(SHIT_VER_MINOR) "." SHIT_STRINGIFY(                       \
-      SHIT_VER_PATCH) "-" SHIT_VER_EXTRA
+#define KOSH_STRINGIFY_INNER(x) #x
+#define KOSH_STRINGIFY(x)       KOSH_STRINGIFY_INNER(x)
+#define KOSH_VERSION_STRING                                                    \
+  KOSH_STRINGIFY(KOSH_VER_MAJOR)                                               \
+  "." KOSH_STRINGIFY(KOSH_VER_MINOR) "." KOSH_STRINGIFY(                       \
+      KOSH_VER_PATCH) "-" KOSH_VER_EXTRA
 
-#define SHIT_SHORT_LICENSE                                                     \
+#define KOSH_SHORT_LICENSE                                                     \
   "Licensed under the 3-Clause BSD License.\n"                                 \
   "There is NO WARRANTY, to the extent permitted by law."
 
@@ -190,7 +190,7 @@ public:
 #define noinline
 #endif /* T__HAS_GCC_EXTENSIONS */
 
-namespace shit {
+namespace koshka {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
 constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
-} /* namespace shit */
+} /* namespace koshka */

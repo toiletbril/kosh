@@ -2,7 +2,7 @@
   [CompoundListCondition, None]
     [Assign start=$PWD]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/cd-fail-file"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/cd-fail-file"]
   [CompoundListCondition, None]
     [SimpleCommand ":"]
   [CompoundListCondition, None]
@@ -14,13 +14,13 @@
   [CompoundListCondition, &&]
     [SimpleCommand "echo" "cwd=unchanged"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$TEST_TEMP_DIRECTORY/cd-fail-file/target"]
+    [SimpleCommand "koshkit" "unlink" "$TEST_TEMP_DIRECTORY/cd-fail-file/target"]
 [Word
   Unquoted "start="
   Variable "PWD"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -80,7 +80,7 @@
   DoubleQuoted "cwd=unchanged"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"

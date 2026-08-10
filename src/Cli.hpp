@@ -9,18 +9,18 @@
 #define HELP_SYNOPSIS T__FLAG_HELP_SYNOPSIS
 
 #define HELP_SYNOPSIS_DECL(...)                                                \
-  static shit::SynopsisList HELP_SYNOPSIS { __VA_ARGS__ }
+  static koshka::SynopsisList HELP_SYNOPSIS { __VA_ARGS__ }
 
 #define HELP_DESCRIPTION T__FLAG_HELP_DESCRIPTION
 
 #define HELP_DESCRIPTION_DECL(text)                                            \
-  static shit::StringView HELP_DESCRIPTION { text }
+  static koshka::StringView HELP_DESCRIPTION { text }
 
-#define FLAG_LIST_DECL() static shit::FlagList FLAG_LIST
+#define FLAG_LIST_DECL() static koshka::FlagList FLAG_LIST
 
 /* FLAG takes an optional flag_section argument before the description. The
    section is named unqualified, such as Compat, and the macro prepends
-   shit::flag_section. The five-argument form defaults to NoSection, which
+   koshka::flag_section. The five-argument form defaults to NoSection, which
    renders the flag at the top of --help with no section heading. The
    six-argument form names the section the flag renders under. */
 #define T__FLAG_SELECT(_1, _2, _3, _4, _5, _6, name, ...) name
@@ -28,12 +28,13 @@
 #define T__FLAG5(var_name, kind, short_name, long_name, description)           \
   T__FLAG6(var_name, kind, short_name, long_name, NoSection, description)
 #define T__FLAG6(var_name, kind, short_name, long_name, section, description)  \
-  static shit::Flag##kind concat_literal(FLAG_, var_name)                      \
+  static koshka::Flag##kind concat_literal(FLAG_, var_name)                    \
   {                                                                            \
-    FLAG_LIST, short_name, long_name, shit::flag_section::section, description \
+    FLAG_LIST, short_name, long_name, koshka::flag_section::section,           \
+        description                                                            \
   }
 
-namespace shit {
+namespace koshka {
 
 class Flag;
 
@@ -94,7 +95,7 @@ enum class flag_section : u8
   Posix,
   Bash,
   Compat,
-  Shit,
+  Kosh,
   Debug,
 };
 
@@ -266,4 +267,4 @@ fn print(StringView text) throws -> void;
 fn print_error(StringView text) throws -> void;
 fn flush() throws -> void;
 
-} // namespace shit
+} // namespace koshka

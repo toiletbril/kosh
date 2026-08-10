@@ -14,7 +14,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Compopt);
 
-namespace shit {
+namespace koshka {
 
 Compopt::Compopt() = default;
 
@@ -36,4 +36,4 @@ fn Compopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

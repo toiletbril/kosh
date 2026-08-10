@@ -1,0 +1,2 @@
+#!/bin/env kosh
+echo юникод; does_not_exist*

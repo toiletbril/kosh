@@ -4,7 +4,7 @@
 #include "ArrayList.hpp"
 #include "Common.hpp"
 
-namespace shit {
+namespace koshka {
 
 class Bitset
 {
@@ -105,4 +105,4 @@ private:
   usize m_length{0};
 };
 
-} // namespace shit
+} // namespace koshka

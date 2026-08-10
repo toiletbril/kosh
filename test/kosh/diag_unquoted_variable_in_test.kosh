@@ -1,0 +1,4 @@
+#!/bin/env kosh
+v=x
+[ $v = x ] && echo equal
+echo after

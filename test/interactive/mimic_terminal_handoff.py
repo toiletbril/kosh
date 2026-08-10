@@ -7,7 +7,7 @@ import tempfile
 import time
 
 here = os.path.dirname(os.path.abspath(__file__))
-binary = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "..", "shit-dbg")
+binary = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "..", "kosh-dbg")
 with tempfile.NamedTemporaryFile("w", suffix=".bash", delete=False) as script:
     script.write("#!/bin/bash\necho MIMIC_RAN_OK\n")
     script_path = script.name

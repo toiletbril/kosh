@@ -1,5 +1,5 @@
-unset SHIT_FLAGS
-# A set --init-moods inside ~/.shitrc must not recurse into the same flavor and
+unset KOSH_FLAGS
+# A set --init-moods inside ~/.koshrc must not recurse into the same flavor and
 # overflow the stack, and the nested bash source must reuse the live arena rather
 # than reset it under the tree being evaluated, which would dangle that tree's
 # nodes. The shell sources the rc once, then exits because the /dev/null stdin is
@@ -9,7 +9,7 @@ unset SHIT_FLAGS
 # assignment, the construct that tripped the arena corruption.
 home=$(mktemp -d)
 trap 'rm -rf "$home"' EXIT
-printf 'echo RC-MARK\nset --init-moods shit,bash\n' > "$home/.shitrc"
+printf 'echo RC-MARK\nset --init-moods kosh,bash\n' > "$home/.koshrc"
 printf 'arr=(a b c)\necho "bashrc-arr=${arr[1]}"\n' > "$home/.bashrc"
 HOME="$home" "$BIN" -i </dev/null >"$home/out" 2>&1
 case "$?" in

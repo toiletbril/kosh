@@ -36,7 +36,7 @@ if pid == 0:
     os.environ.pop("CAT_UNSET_VARIABLE", None)
     os.environ.pop("CAT_BRACED_UNSET", None)
     os.environ.pop("CAT_ARITHMETIC_UNSET", None)
-    command = "shitbox cat --syntax-highlighting '%s'" % source_path
+    command = "koshkit cat --syntax-highlighting '%s'" % source_path
     os.execv(binary, [binary, "-c", command])
 
 output = b""

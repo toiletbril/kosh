@@ -1,8 +1,8 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf 'echo one\nls\ncd /tmp\ngit status\n' > "$dir/hist"
-export SHIT_HISTORY="$dir/hist"
+export KOSH_HISTORY="$dir/hist"
 echo "== the numbered list prints every entry =="
 "$BIN" -c 'history'
 echo "== a trailing count prints only the most recent entries =="
@@ -20,7 +20,7 @@ echo "== type reports the builtin =="
 echo "== clear empties the list =="
 "$BIN" -c 'history -c; history; echo cleared'
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # history -r <file> reads a named file into the list. The list is backed by its
 # file, so the named file is merged into the backing history and the whole list
 # is listed back.
@@ -28,9 +28,9 @@ d=$(mktemp -d)
 printf 'existing one\nexisting two\n' > "$d/hist"
 printf 'merged alpha\nmerged beta\n' > "$d/extra"
 echo "== history -r <file> merges the named file into the list:"
-SHIT_HISTORY="$d/hist" "$BIN" -c "history -r $d/extra; history"
+KOSH_HISTORY="$d/hist" "$BIN" -c "history -r $d/extra; history"
 echo "== history -r on a missing file errors:"
-SHIT_HISTORY="$d/hist" "$BIN" -c \
+KOSH_HISTORY="$d/hist" "$BIN" -c \
     'history -r "$TEST_TEMP_DIRECTORY/no-such-history"; echo "rc=$?"' \
     2>/dev/null
 [ -n "$d" ] && rm -rf "$d"
@@ -81,7 +81,7 @@ out=$({
     'fc -s -1\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" SHIT_HISTORY="$hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null) ||
   exit 1
@@ -102,7 +102,7 @@ out=$({
   send_input_when_ready '\022' 'mixed_history_marker' '\r' '\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" SHIT_HISTORY="$search_hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$search_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null) ||
   exit 1

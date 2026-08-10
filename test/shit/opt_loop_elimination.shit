@@ -1,4 +1,0 @@
-#!/bin/env shit
-while false; do echo never1; done
-until true; do echo never2; done
-echo loops_skipped

@@ -1,3 +1,0 @@
-#!/bin/sh
-add-shell '/usr/bin/shit'
-exit 0

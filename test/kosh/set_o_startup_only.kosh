@@ -1,0 +1,4 @@
+#!/bin/env kosh
+set --options | grep -E 'login|rcfile'
+set -o login
+echo not-reached

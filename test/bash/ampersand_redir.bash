@@ -2,7 +2,7 @@
 # Bash &>, &>>, and |& redirections, checked byte-for-byte against bash. The
 # &> forms write to a temp file that is read back, the |& form pipes both
 # standard streams so the result is observable on standard output.
-tmp=/tmp/shit_bashdiff_ampredir_$$
+tmp=/tmp/kosh_bashdiff_ampredir_$$
 echo hello &>"$tmp"
 cat "$tmp"
 { echo out; echo err >&2; } &>"$tmp"
@@ -23,7 +23,7 @@ printf 'x\ny\nz\n' |& wc -l | tr -d ' '
 # checks assert the descriptor lands at or above ten and the data flows rather
 # than the absolute number, and a brace word with no adjacent redirect stays an
 # argument.
-tmp=/tmp/shit_bashdiff_fdalloc_$$
+tmp=/tmp/kosh_bashdiff_fdalloc_$$
 
 exec {w}>"$tmp"
 echo "w>=10: $(( w >= 10 ))"

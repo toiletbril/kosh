@@ -1,0 +1,3 @@
+#!/bin/env kosh
+foo=bar echo "$foo"
+echo after

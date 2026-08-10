@@ -10,7 +10,7 @@
 [Word
   Unquoted "/"
 ]
-shit: 2:11: error: Could not open '/': File exists.
+kosh: 2:11: error: Could not open '/': File exists.
      2 |  echo hi > /
        |            ^~
 [Code 2]

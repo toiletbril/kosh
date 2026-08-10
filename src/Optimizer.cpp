@@ -8,7 +8,7 @@
 #include "Tokens.hpp"
 #include "Trace.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace optimizer {
 
@@ -747,4 +747,4 @@ fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void
 
 } // namespace optimizer
 
-} // namespace shit
+} // namespace koshka

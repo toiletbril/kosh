@@ -1,6 +1,6 @@
 #!/bin/sh
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 
 d=$(mktemp -d) || exit 1

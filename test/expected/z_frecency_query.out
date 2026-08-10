@@ -1,7 +1,7 @@
 == a query matches the seeded directory:
 TMPDIR
 == a query with no match errors:
-shit: 1:3: error: Builtin `z`: No matching directory for 'no_such_dir_xyz'.
+kosh: 1:3: error: Builtin `z`: No matching directory for 'no_such_dir_xyz'.
      1 |  z no_such_dir_xyz
        |    ^~~~~~~~~~~~~~~
 rc=1

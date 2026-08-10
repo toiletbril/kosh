@@ -5,7 +5,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
 {
@@ -221,7 +221,7 @@ fn EvalContext::find_job(i32 id) wontthrow -> job *
 
 fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
 {
-  if (m_jobs.is_empty()) return shit::None;
+  if (m_jobs.is_empty()) return koshka::None;
 
   StringView body = spec;
   if (!body.is_empty() && body[0] == '%') body = body.substring(1);
@@ -236,13 +236,13 @@ fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
     for (usize i = 0; i < m_jobs.count(); i++)
       if (static_cast<i64>(m_jobs[i].id) == parsed_value.value()) return i;
 
-    return shit::None;
+    return koshka::None;
   }
 
   let const wants_substring_match = body[0] == '?';
   if (wants_substring_match) body = body.substring(1);
 
-  if (body.is_empty()) return shit::None;
+  if (body.is_empty()) return koshka::None;
 
   for (usize i = 0; i < m_jobs.count(); i++) {
     if (wants_substring_match) {
@@ -252,7 +252,7 @@ fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
     }
   }
 
-  return shit::None;
+  return koshka::None;
 }
 
 fn EvalContext::find_job_by_spec(StringView spec) throws -> job *
@@ -370,4 +370,4 @@ pure fn EvalContext::notify() const wontthrow -> bool
   return m_runtime.option_is_enabled(shell_option_id::Notify);
 }
 
-} // namespace shit
+} // namespace koshka

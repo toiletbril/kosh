@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The default mood makes an unmatched glob a hard error, the strict shell default
 # that catches a typo, while the bash and sh moods leave it as its literal text
 # the way bash and dash do. A matching glob expands the same in every mood.

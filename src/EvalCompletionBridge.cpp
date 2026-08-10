@@ -5,7 +5,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 fn EvalContext::register_completion_spec(StringView command,
                                          completion_spec spec) throws -> void
@@ -150,4 +150,4 @@ fn EvalContext::run_completion_function(StringView function_name,
   return result;
 }
 
-} // namespace shit
+} // namespace koshka

@@ -1,0 +1,6 @@
+#!/bin/env kosh
+ref=missing_target
+(echo "${!ref}")
+echo "target-form=$?"
+echo "${!nope}"
+echo not-reached

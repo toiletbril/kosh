@@ -4,7 +4,7 @@
 # regular expressions, printf, and brace expansion. The heavy loops spawn no
 # external command, so the run time measures evaluation speed rather than
 # process creation. The output is deterministic, so the same input yields the
-# same bytes on bash and on shit, which lets a run double as a correctness
+# same bytes on bash and on kosh, which lets a run double as a correctness
 # check. The work scales by SCALE the way the POSIX configure.sh does, with the
 # dense quadratic and per-character loops carrying the bulk of the cost.
 

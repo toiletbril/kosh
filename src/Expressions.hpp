@@ -5,7 +5,7 @@
 #include "Eval.hpp"
 #include "Tokens.hpp"
 
-namespace shit {
+namespace koshka {
 
 using namespace tokens;
 
@@ -74,7 +74,7 @@ public:
   /* The lookup is lazy, and null in a context with no live shell. */
   EvalContext *eval_context{nullptr};
 
-  /* The SC3xxx bashism lints fire only behind this gate, since a shit or bash
+  /* The SC3xxx bashism lints fire only behind this gate, since a kosh or bash
      shebang means the bash extension on purpose. */
   bool shebang_is_posix_sh{false};
 
@@ -1045,4 +1045,4 @@ BINARY_EXPRESSION_STRUCT(NotEqual);
 
 } /* namespace expressions */
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -1,8 +1,0 @@
-#!/bin/env shit
-eval 'echo routed_stderr 1>&2' >zz_builtin_redir_xyz 2>&1
-echo captured-2to1:
-cat zz_builtin_redir_xyz
-{ eval 'echo to_stderr' 1>&2; } 2>zz_builtin_redir_xyz
-echo captured-1to2:
-cat zz_builtin_redir_xyz
-rm -f zz_builtin_redir_xyz

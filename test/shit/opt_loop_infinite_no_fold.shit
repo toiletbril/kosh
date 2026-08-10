@@ -1,4 +1,0 @@
-#!/bin/env shit
-while true; do echo body_ran; break; done
-until false; do echo until_body; break; done
-echo done

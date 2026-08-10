@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # touch sets the modification time of an existing file to the current time rather
 # than passing it over. A hermetic temp directory keeps it stable, and it is left
 # in place so the test never runs rm.
@@ -9,7 +9,7 @@ dir=$(mktemp -d)
 : > "$dir/f"
 before=$(stat_mtime "$dir/f")
 sleep 1.1
-"$BIN" -c "shitbox touch '$dir/f'" </dev/null
+"$BIN" -c "koshkit touch '$dir/f'" </dev/null
 after=$(stat_mtime "$dir/f")
 echo "== touch advances the modification time of an existing file:"
 if [ "$after" -gt "$before" ]; then
@@ -18,5 +18,5 @@ else
   echo unchanged
 fi
 echo "== touch -c still does not create a missing file:"
-"$BIN" -c "shitbox touch -c '$dir/ghost'" </dev/null
+"$BIN" -c "koshkit touch -c '$dir/ghost'" </dev/null
 "$BIN" -c "if [ -e '$dir/ghost' ]; then echo ghost-exists; else echo ghost-missing; fi" </dev/null

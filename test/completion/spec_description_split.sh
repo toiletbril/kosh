@@ -1,5 +1,5 @@
 # A cobra-style completion function appends "  (description)" to each value for
-# its own menu. shit renders its own dimmed description column, so the value is
+# its own menu. kosh renders its own dimmed description column, so the value is
 # split from the description and only the bare value lands in the candidate
 # list. The driver prints candidates alone, so a stripped value here proves the
 # split ran. A value that carries no description passes through unchanged, and a

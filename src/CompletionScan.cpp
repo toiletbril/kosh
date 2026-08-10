@@ -6,16 +6,16 @@
 #include "CompletionPolicy.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -360,10 +360,10 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
 
-  /* A `shitbox make` routes make through the multicall dispatcher, so the build
-     tool is the second word when shitbox is the command word. */
+  /* A `koshkit make` routes make through the multicall dispatcher, so the build
+     tool is the second word when koshkit is the command word. */
   let const tool =
-      (command == "shitbox") ? second_word_of(line).value_or(command) : command;
+      (command == "koshkit") ? second_word_of(line).value_or(command) : command;
 
   /* The name resolves to a path first, since the helper runs the path directly
      with no PATH search, and a probe that overruns the deadline is killed. */
@@ -426,7 +426,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
           parse_make_database_targets(capture(probe).view(), make_directory);
       if (!database_targets.is_empty()) return database_targets;
       let const intrinsic_targets =
-          shitbox::collect_makefile_targets(context, makefile_path);
+          koshkit::collect_makefile_targets(context, makefile_path);
       let filtered = ArrayList<String>{heap_allocator()};
       let seen = HashSet{heap_allocator()};
       for (const String &name : intrinsic_targets) {
@@ -559,7 +559,7 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
 
   if (!builtin_kind.has_value()) {
     if (!was_binary_built) {
-      append_flag_forms(shit_binary_flag_list(), StringView{},
+      append_flag_forms(kosh_binary_flag_list(), StringView{},
                         binary_candidates);
       was_binary_built = true;
     }
@@ -602,7 +602,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
   if (command.is_empty()) return None;
 
   let const builtin_kind = search_builtin(command);
-  /* Matched by basename so both shit and a path to it answer. */
+  /* Matched by basename so both kosh and a path to it answer. */
   let shell_binary_name = command;
   for (usize i = command.length; i > 0; i--)
     if (os::is_directory_separator(command[i - 1])) {
@@ -610,29 +610,29 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       break;
     }
   let const completes_shell_binary =
-      !builtin_kind.has_value() && shell_binary_name == "shit";
+      !builtin_kind.has_value() && shell_binary_name == "kosh";
 
   {
-    let const is_shitbox_builtin =
-        builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shitbox;
-    Maybe<shitbox::Utility::Kind> util_for_flags;
+    let const is_koshkit_builtin =
+        builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Koshkit;
+    Maybe<koshkit::Utility::Kind> util_for_flags;
     bool should_offer_util_names = false;
-    if (is_shitbox_builtin) {
+    if (is_koshkit_builtin) {
       if (previous_settled_word(line, token_start) == command) {
         if (token.is_empty() || token[0] != '-') should_offer_util_names = true;
       } else if (let const second = second_word_of(line); second.has_value()) {
-        util_for_flags = shitbox::find_util(*second);
+        util_for_flags = koshkit::find_util(*second);
       }
-    } else if (!completes_shell_binary && context.shitbox() &&
+    } else if (!completes_shell_binary && context.koshkit() &&
                context.get_program_resolver().get_status(command) ==
                    ProgramResolver::Status::Missing)
     {
-      util_for_flags = shitbox::find_util(command);
+      util_for_flags = koshkit::find_util(command);
     }
 
     if (should_offer_util_names) {
       let names = ArrayList<String>{heap_allocator()};
-      for (const String &name : shitbox::util_names())
+      for (const String &name : koshkit::util_names())
         if (name.view().starts_with(token)) names.push(String{name.view()});
       if (!names.is_empty()) return names;
       return None;
@@ -640,7 +640,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
 
     if (util_for_flags.has_value()) {
       if (token.is_empty() || token[0] != '-') return None;
-      let const flags = shitbox::shitbox_util_flag_list(*util_for_flags);
+      let const flags = koshkit::koshkit_util_flag_list(*util_for_flags);
       if (flags == nullptr) return None;
       let forms = ArrayList<String>{heap_allocator()};
       append_flag_forms(*flags, token, forms);
@@ -1339,4 +1339,4 @@ fn command_substitution_range(StringView line, usize cursor) throws
 
 } /* namespace completion */
 
-} /* namespace shit */
+} /* namespace koshka */

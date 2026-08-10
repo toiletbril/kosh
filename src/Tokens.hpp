@@ -5,7 +5,7 @@
 #include "Eval.hpp"
 #include "Maybe.hpp"
 
-namespace shit {
+namespace koshka {
 
 class Expression;
 
@@ -547,4 +547,4 @@ BINARY_OPERATOR_TOKEN_STRUCT(ExclamationEquals);
 
 } // namespace tokens
 
-} // namespace shit
+} // namespace koshka

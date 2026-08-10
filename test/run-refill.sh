@@ -3,7 +3,7 @@
 TEST_SHELL_COMMAND=$1
 
 if [ -n "${REFILL-}" ]; then
-  "$TEST_SHELL_COMMAND" run-shit-test.sh --refill $REFILL
+  "$TEST_SHELL_COMMAND" run-kosh-test.sh --refill $REFILL
   for TEST_NAME in $REFILL; do
     if [ -f "cli/$TEST_NAME.sh" ]; then
       "$TEST_SHELL_COMMAND" run-cli-test.sh --refill \
@@ -22,11 +22,11 @@ if [ -n "${REFILL-}" ]; then
 fi
 
 NATIVE_TEST_NAMES=
-for TEST_FILE in shit/*.shit; do
-  TEST_NAME=${TEST_FILE#shit/}
-  NATIVE_TEST_NAMES="$NATIVE_TEST_NAMES ${TEST_NAME%.shit}"
+for TEST_FILE in kosh/*.kosh; do
+  TEST_NAME=${TEST_FILE#kosh/}
+  NATIVE_TEST_NAMES="$NATIVE_TEST_NAMES ${TEST_NAME%.kosh}"
 done
-"$TEST_SHELL_COMMAND" run-shit-test.sh --refill $NATIVE_TEST_NAMES
+"$TEST_SHELL_COMMAND" run-kosh-test.sh --refill $NATIVE_TEST_NAMES
 "$TEST_SHELL_COMMAND" run-cli-test.sh --refill "$TEST_SHELL_COMMAND" cli/*.sh
 "$TEST_SHELL_COMMAND" run-completion-test.sh --refill \
   "$TEST_SHELL_COMMAND" completion/*.sh

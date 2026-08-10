@@ -1,5 +1,0 @@
-#!/bin/env shit
-: $foo ${bar}
-: "$foo" "${bar}"
-: pre$foo "lead${bar}tail"
-: a${b}c$d

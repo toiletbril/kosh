@@ -1,0 +1,4 @@
+#!/bin/env kosh
+total=$((6*7))
+echo $total
+prefix=$((2+2)) printenv prefix

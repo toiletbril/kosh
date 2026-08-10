@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 
 starting_directory=$PWD
 d=$(mktemp -d) || exit 1
@@ -26,13 +26,13 @@ run_rejected_file() {
 
 run_rejected_file plain './program/'
 run_rejected_file exec 'exec ./program/'
-run_rejected_file timeout 'shitbox timeout 1 ./program/'
+run_rejected_file timeout 'koshkit timeout 1 ./program/'
 run_rejected_file timeout-pipeline \
-    'set -o pipefail; shitbox timeout 1 ./program/ | shitbox cat'
+    'set -o pipefail; koshkit timeout 1 ./program/ | koshkit cat'
 run_rejected_file command 'command ./program/'
-run_rejected_file env 'shitbox env ./program/'
+run_rejected_file env 'koshkit env ./program/'
 run_rejected_file symlink './link/'
-run_rejected_file pipeline 'set -o pipefail; ./program/ | shitbox cat'
+run_rejected_file pipeline 'set -o pipefail; ./program/ | koshkit cat'
 
 echo '--- directory remains a directory ---'
 output=$("$BIN" --mood sh -c './directory/' 2>&1)

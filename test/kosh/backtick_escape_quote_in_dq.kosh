@@ -1,0 +1,6 @@
+#!/bin/env kosh
+PRG=/foo/bar/retrace
+set -- "`dirname \"$PRG\"`/.."
+for a; do echo "arg=<$a>"; done
+echo "`echo \"$PRG\"`"
+echo "`printf %s \"$PRG\"`"

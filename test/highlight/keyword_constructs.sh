@@ -14,7 +14,7 @@ tab=$(printf '\t')
     grep -E "${tab}invalid-syntax$"
 
 "$BIN" --debug-highlight-at \
-    'echo "green" - -x -- --long=value --color="$PATH" *.shit ./shit-highlight-missing-path-xyz; shit-highlight-missing-command-xyz' |
+    'echo "green" - -x -- --long=value --color="$PATH" *.kosh ./kosh-highlight-missing-path-xyz; kosh-highlight-missing-command-xyz' |
     grep -E "${tab}(string|flag|glob|invalid-path|unknown-command)$"
 
 "$BIN" --debug-highlight-at 'if true

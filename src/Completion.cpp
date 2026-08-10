@@ -7,15 +7,15 @@
 #include "CompletionPolicy.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -170,7 +170,7 @@ static fn timeout_flag_takes_value(char short_name,
                                    StringView long_name) wontthrow -> bool
 {
   let const flags =
-      shitbox::shitbox_util_flag_list(shitbox::Utility::Kind::Timeout);
+      koshkit::koshkit_util_flag_list(koshkit::Utility::Kind::Timeout);
   if (flags == nullptr) return false;
 
   for (let const flag : *flags) {
@@ -249,7 +249,7 @@ static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
     if (decoded_word.text == "timeout")
       return timeout_managed_command_start(line, position);
 
-    if (decoded_word.text == "shitbox") {
+    if (decoded_word.text == "koshkit") {
       let const utility = next_completion_prefix_word(line, position);
       if (!utility.has_value()) return None;
       let const decoded_utility =
@@ -585,8 +585,8 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
   for (let const &builtin_name : builtin_names())
     do_add(builtin_name.view());
 
-  if (context.shitbox() || context.mood() == mimic_mood::Default)
-    for (const String &util_name : shitbox::util_names())
+  if (context.koshkit() || context.mood() == mimic_mood::Default)
+    for (const String &util_name : koshkit::util_names())
       do_add(util_name.view());
 
   context.for_each_function_name(do_add);
@@ -1906,4 +1906,4 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
 } /* namespace completion */
 
-} /* namespace shit */
+} /* namespace koshka */

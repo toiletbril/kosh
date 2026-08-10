@@ -7,16 +7,16 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "ExpressionsInternal.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace expressions {
 
@@ -576,7 +576,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-  shit::flush();
+  koshka::flush();
   let const forked_child = os::try_fork_compound_stage(None, None, None);
   if (!forked_child.has_value()) {
     i32 status = 1;
@@ -607,7 +607,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     } catch (...) {
       LOG(Debug, "the subshell child swallowed an unknown error");
     }
-    shit::flush();
+    koshka::flush();
     os::exit_process_immediately(status);
   }
 
@@ -834,12 +834,12 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   ArrayList<os::saved_descriptor> saved_descriptors{cxt.scratch_allocator()};
   defer
   {
-    shit::flush();
+    koshka::flush();
     for (usize i = saved_descriptors.count(); i > 0; i--)
       os::restore_descriptor(saved_descriptors[i - 1]);
   };
 
-  shit::flush();
+  koshka::flush();
 
   for (let const &redir : m_redirections) {
     let r = resolve_redirection(redir, cxt, source_location());
@@ -1071,4 +1071,4 @@ BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
 } // namespace expressions
 
-} // namespace shit
+} // namespace koshka

@@ -1,7 +1,7 @@
 == brace-body function serializes:
 BASH_FUNC_greet%%=() { echo "hi $1"; }
 == error on a non-function:
-shit: 1:11: error: Builtin `export`: 'not_a_function' is not a function.
+kosh: 1:11: error: Builtin `export`: 'not_a_function' is not a function.
      1 |  export -f not_a_function
        |            ^~~~~~~~~~~~~~
 == an inherited BASH_FUNC is not imported and cannot inject:

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # suspend stops the shell with SIGSTOP and resumes on SIGCONT. The login-shell
 # guard is bypassed with -f. The test runs the shell in the background, sends
 # SIGCONT after a pause, and checks that the line after suspend ran.

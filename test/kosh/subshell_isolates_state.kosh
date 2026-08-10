@@ -1,0 +1,38 @@
+#!/bin/env kosh
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY/subshell-state"
+(echo inside; cd "$TEST_TEMP_DIRECTORY/subshell-state"); echo outside
+
+
+( alias sub_only='echo hi' )
+if alias | koshkit grep '^alias sub_only=' >/dev/null; then echo "leaked from subshell"; else echo "isolated from subshell"; fi
+cs=$( alias cs_only='echo hi'; echo defined-inside )
+echo "cmdsub reported: $cs"
+if alias | koshkit grep '^alias cs_only=' >/dev/null; then echo "leaked from cmdsub"; else echo "isolated from cmdsub"; fi
+
+export V=parent; (V=child); echo "1:$V"; r=$(V=sub; echo x); echo "2:$V $r"; export W=keep; (unset W); echo "3:[$W]"
+
+f() { echo parent; }
+( f() { echo child; }; f )
+f
+
+set +e
+( set -e; false; echo never-printed )
+echo e-isolated-parent-survives
+set +f
+( set -f )
+case $- in *f*) echo f-LEAKED;; *) echo f-isolated;; esac
+set -f
+( set +f )
+case $- in *f*) echo f-still-set;; *) echo f-UNSET-LEAK;; esac
+set +f
+
+trap "echo PARENT" EXIT
+( trap "echo SUB" EXIT; echo in-sub )
+echo after-sub
+( echo plain-sub )
+echo after-plain
+( exit 3 )
+echo exit-rc=$?
+v=$( trap "echo CSUB" EXIT; echo captured )
+echo got=$v
+echo done

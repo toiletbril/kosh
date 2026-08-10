@@ -1,0 +1,8 @@
+#!/bin/env kosh
+start=$PWD
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY/cd-fail-file"
+: > "$TEST_TEMP_DIRECTORY/cd-fail-file/target"
+"$BIN" -c 'cd "$TEST_TEMP_DIRECTORY/cd-fail-file/target"' 2>/dev/null
+echo "after rc=$?"
+test "$PWD" = "$start" && echo "cwd=unchanged"
+koshkit unlink "$TEST_TEMP_DIRECTORY/cd-fail-file/target"

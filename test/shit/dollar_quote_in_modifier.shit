@@ -1,7 +1,0 @@
-#!/bin/env shit
-unset x
-printf '[%s]\n' "${x:-$'a\tb'}"
-y=$'a\tb'
-printf '[%s]\n' "${y#$'a\t'}"
-printf '[%s]\n' "${y/$'\t'/-}"
-printf '[%s]\n' "${x:-$'\x41é'}"

@@ -20,7 +20,7 @@
 ]
 hello
 [Code 0]
-shit: 1:7: warning: The glob pattern 'nonexistent_zzz_glob_*.tmp' matched no file, it expands to its literal text, which is rarely intended.
+kosh: 1:7: warning: The glob pattern 'nonexistent_zzz_glob_*.tmp' matched no file, it expands to its literal text, which is rarely intended.
      1 |  rm -f nonexistent_zzz_glob_*.tmp
        |        ^~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'nonexistent_zzz_glob_*.tmp' or relax with set +o failglob.

@@ -7,7 +7,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 constexpr usize HELP_WRAP_WIDTH = 80;
 constexpr usize HELP_INDENT = 2;
@@ -668,39 +668,39 @@ fn reset_flags(const FlagList &flags) throws -> void
 
 cold fn append_version_triple(String &out, Allocator allocator) throws -> void
 {
-  out += String::from(SHIT_VER_MAJOR, allocator);
+  out += String::from(KOSH_VER_MAJOR, allocator);
   out += '.';
-  out += String::from(SHIT_VER_MINOR, allocator);
+  out += String::from(KOSH_VER_MINOR, allocator);
   out += '.';
-  out += String::from(SHIT_VER_PATCH, allocator);
+  out += String::from(KOSH_VER_PATCH, allocator);
   out += '-';
-  out += SHIT_VER_EXTRA;
+  out += KOSH_VER_EXTRA;
 }
 
 cold fn show_version() throws -> void
 {
   let s = String{heap_allocator()};
-  s += "Shit Shell ";
+  s += "Koshka Shell ";
   append_version_triple(s, heap_allocator());
   s += '\n';
   s += "Built on ";
-  s += SHIT_BUILD_DATE;
+  s += KOSH_BUILD_DATE;
   s += '\n';
   s += '\n';
   s += "MODE=";
-  s += SHIT_BUILD_MODE;
+  s += KOSH_BUILD_MODE;
   s += '\n';
   s += "HEAD=";
-  s += SHIT_COMMIT_HASH;
+  s += KOSH_COMMIT_HASH;
   s += '\n';
   s += "CXX=";
-  s += SHIT_COMPILER;
+  s += KOSH_COMPILER;
   s += '\n';
   s += "ENVCXXFLAGS=";
-  s += (*SHIT_ENVCXXFLAGS == '\0' ? "<none>" : SHIT_ENVCXXFLAGS);
+  s += (*KOSH_ENVCXXFLAGS == '\0' ? "<none>" : KOSH_ENVCXXFLAGS);
   s += '\n';
   s += "OS=";
-  s += SHIT_OS_INFO;
+  s += KOSH_OS_INFO;
   s += '\n';
   s += "RUNTIME=";
   s += os::executable_system_name();
@@ -708,12 +708,12 @@ cold fn show_version() throws -> void
   s += os::executable_machine_name();
   s += '\n';
   s += '\n';
-  s += SHIT_SHORT_LICENSE;
+  s += KOSH_SHORT_LICENSE;
   s += '\n';
   s += "(c) toiletbril <https://github.com/toiletbril>";
   s += '\n';
   s += '\n';
-  s += "Report bugs at <https://github.com/toiletbril/shit>";
+  s += "Report bugs at <https://github.com/toiletbril/kosh>";
   s += '\n';
 
   print(s);
@@ -725,9 +725,9 @@ cold fn short_version_string(Allocator allocator) throws -> String
   let s = String{allocator};
   append_version_triple(s, allocator);
   s += '-';
-  s += SHIT_BUILD_MODE;
+  s += KOSH_BUILD_MODE;
   s += '+';
-  s += StringView{SHIT_COMMIT_HASH}.substring_of_length(0, 7);
+  s += StringView{KOSH_COMMIT_HASH}.substring_of_length(0, 7);
 
   return s;
 }
@@ -799,14 +799,14 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
   static constexpr usize DESCRIPTION_COLUMN = 26;
   static constexpr usize TEXT_WIDTH = HELP_WRAP_WIDTH - DESCRIPTION_COLUMN;
 
-  let const do_render_flag = [&](const shit::Flag *f) throws {
+  let const do_render_flag = [&](const koshka::Flag *f) throws {
     s += "\n";
 
     let left = String{heap_allocator()};
     if (f->short_name() != '\0') {
       left += "  -";
       left += f->short_name();
-      if (f->kind() == shit::Flag::Kind::RepeatedBool) {
+      if (f->kind() == koshka::Flag::Kind::RepeatedBool) {
         left += "[";
         left += f->short_name();
         left += "..]";
@@ -822,10 +822,10 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
       left += "--";
       left += f->long_name();
       switch (f->kind()) {
-      case shit::Flag::Kind::String: left += "=<...>"; break;
-      case shit::Flag::Kind::ManyStrings: left += "=<.., ..>"; break;
-      case shit::Flag::Kind::Bool:
-      case shit::Flag::Kind::RepeatedBool: break;
+      case koshka::Flag::Kind::String: left += "=<...>"; break;
+      case koshka::Flag::Kind::ManyStrings: left += "=<.., ..>"; break;
+      case koshka::Flag::Kind::Bool:
+      case koshka::Flag::Kind::RepeatedBool: break;
       }
     }
 
@@ -867,8 +867,9 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
   };
 
   static const StringView SECTION_HEADERS[] = {
-      "OPTIONS",      "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
-      "SHIT OPTIONS", "DEBUG OPTIONS"};
+      "OPTIONS",        "POSIX OPTIONS",
+      "BASH OPTIONS",   "COMPATIBILITY OPTIONS",
+      "KOSHKA OPTIONS", "DEBUG OPTIONS"};
   for (u8 section = 0; section < countof(SECTION_HEADERS); section++) {
     bool was_header_printed = false;
     for (let const flag : flags) {
@@ -897,7 +898,7 @@ fn print_error(StringView text) throws -> void
 {
   usize written_count = 0;
   while (written_count < text.count()) {
-    let const written = os::write_fd(SHIT_STDERR, text.data + written_count,
+    let const written = os::write_fd(KOSH_STDERR, text.data + written_count,
                                      text.count() - written_count);
     if (!written.has_value() || *written == 0) return;
     written_count += *written;
@@ -925,9 +926,9 @@ cold fn show_message(StringView err) throws -> void
     print_error("\n");
     MESSAGE_LEADING_NEWLINE_ARMED = false;
   }
-  print_error("shit: ");
+  print_error("kosh: ");
   print_error(err);
   print_error("\n");
 }
 
-} /* namespace shit */
+} /* namespace koshka */

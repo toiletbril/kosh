@@ -1,8 +1,8 @@
-unset SHIT_FLAGS
-# A glob in command position is rejected in the shit mood and downgraded to a
+unset KOSH_FLAGS
+# A glob in command position is rejected in the kosh mood and downgraded to a
 # warning in a compatibility mood. The test command [ and a quoted glob are not
 # globs in command position and stay unflagged.
-echo "== shit mood rejects a command-position glob (count):"
+echo "== kosh mood rejects a command-position glob (count):"
 "$BIN" -c '*.zzz_no_such' 2>&1 | grep -c "glob pattern in command position"
 echo "== bash mood warns once, not fatal (count):"
 "$BIN" -M bash -c '*.zzz_no_such_qqq' 2>&1 | grep -c "warning: A glob pattern in command position"

@@ -1,0 +1,4 @@
+#!/bin/env kosh
+x=5
+if [ "$x" = 5 ]; then echo quoted_folds; fi
+if [ $x = 5 ]; then echo unquoted_no_fold; fi

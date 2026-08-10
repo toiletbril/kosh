@@ -1,0 +1,7 @@
+#!/bin/env kosh
+if [ -n abc ]; then echo n_true; fi
+if [ -z "" ]; then echo z_true; fi
+if [ a = a ]; then echo eq_true; fi
+if [ a != b ]; then echo neq_true; fi
+if test hello; then echo one_op_true; fi
+if [ ]; then echo never; else echo zero_op_false; fi

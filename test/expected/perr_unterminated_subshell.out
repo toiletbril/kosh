@@ -1,6 +1,6 @@
-shit: 2:1: error: Unterminated subshell.
+kosh: 2:1: error: Unterminated subshell.
      2 |  (echo hi
        |  ^
-shit: 2:9: details:
+kosh: 2:9: details:
      2 |  (echo hi
        |          ^ expected ')'.

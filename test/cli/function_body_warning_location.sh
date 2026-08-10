@@ -1,9 +1,9 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A warning from a function body called after its defining source is gone
 # renders against the function's stored definition copy, with the defining
 # file's name, its absolute line numbers, and the caret on the reference.
 lib=$TEST_TEMP_DIRECTORY/function-body-warning
-"$BIN" -c 'shitbox mkdir -p "$1"' setup "$TEST_TEMP_DIRECTORY"
+"$BIN" -c 'koshkit mkdir -p "$1"' setup "$TEST_TEMP_DIRECTORY"
 cat > "$lib" <<'EOF'
 lib_marker=1
 probe_fn() {
@@ -13,5 +13,5 @@ probe_fn() {
 }
 EOF
 "$BIN" -WWW -c ". $lib; probe_fn" 2>&1 | sed "s|$lib|LIB|" | ./normalize-trace.sh "$BIN"
-"$BIN" -c 'shitbox unlink "$1"' cleanup "$lib"
+"$BIN" -c 'koshkit unlink "$1"' cleanup "$lib"
 echo "rc=$?"

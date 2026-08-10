@@ -1,0 +1,2 @@
+#!/bin/env kosh
+if [ ~ = ~ ]; then echo tilde_branch; fi

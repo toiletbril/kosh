@@ -5,7 +5,7 @@
 #include "Debug.hpp"
 #include "Maybe.hpp"
 
-namespace shit {
+namespace koshka {
 
 template <class T>
 class ArrayList
@@ -338,4 +338,4 @@ private:
   usize m_capacity{0};
 };
 
-} /* namespace shit */
+} /* namespace koshka */

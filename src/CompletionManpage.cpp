@@ -6,15 +6,15 @@
 #include "CompletionPolicy.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -1172,4 +1172,4 @@ fn complete_from_help_subcommands(StringView line, StringView token,
 
 } // namespace completion
 
-} // namespace shit
+} // namespace koshka

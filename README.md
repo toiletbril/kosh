@@ -1,12 +1,20 @@
-# shit
+# koshka-oriented shell
 
-[![Shit is at least 5 times faster than Bash](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
+[![Koshka is at least 5 times faster than Bash](https://github.com/toiletbril/kosh/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/kosh/actions/workflows/ci.yml)
 
 0.1.0 has been released! See the [Release Blog Post](https://fennec.support/scribbles/shell-release).
 
+**The project was renamed in 0.1.1.** The `shit` binary is now `kosh`, the
+`shitbox` utilities are now `koshkit`, the startup files are `~/.koshrc` and
+`/etc/koshrc`, the history files carry the `.kosh_` prefix, and the environment
+and shell variables carry the `KOSH_` prefix. The repository now lives at
+`github.com/toiletbril/kosh`. The old names are not accepted, so a configuration
+written for 0.1.0 has to be renamed by hand.
+
 ---
 
-Man, my shell is **shit**. The name is experimental.
+**Koshka** is the Russian word for a cat. The binary is `kosh`, which reads as
+Koshka-Oriented SHell.
 
 Have you ever seen warnings from software that uses Bison as its parsing
 engine? Did you encounter any of the coreutils' error messages? Have you spent a
@@ -14,13 +22,13 @@ day debugging a Bash script? Aren't you tired?
 
 I invite you to notice the interactive prompt, the speed, and the diagnostics:
 
-| shit analyzing 20K-line shell script in ~0.05s |
+| Koshka analyzing 20K-line shell script in ~0.05s |
 | :-: | 
 | ![](assets/demo.gif) |
 
 ## What
 
-**Shit** is an interpreter, interactive shell and diagnostic tool, with
+**Koshka** is an interpreter, interactive shell and diagnostic tool, with
 first tier support for Windows, Linux and macOS, fully compatible with Bash 5.3
 and Dash. It usually runs at least 5 times faster than Bash and is built to
 have the best UX possible.
@@ -37,52 +45,52 @@ The shell guarantees first tier support for Linux, macOS and Windows,
 preserving equivalent behavior on either of these systems.
 
 The shell is designed to work without absolutely no config whatsoever.
-**shit**'s Linux binary is static and it does not use C++'s STL. **shit** also
-can work without coreutils, using it's own utilities.
+**Koshka**'s Linux binary is static and it does not use C++'s STL. **Koshka**
+also can work without coreutils, using it's own utilities.
 
 **The project is in early stage**. There's no guarantee that it will not blow
 your computer up. Bug reports are greatly appreciated.
 
 ## Three shells in a trenchcoat
 
-[See the manual page](docs/shit.1) for a fuller explanation:
+[See the manual page](docs/kosh.1) for a fuller explanation:
 ```bash
-$ man docs/shit.1
+$ man docs/kosh.1
 ```
 
-**shit** runs in four modes, called moods, across three shell identities. ZSH
+**Koshka** runs in four modes, called moods, across three shell identities. ZSH
 has similar idea behind it's `emulate` builtin.
 
-The default `shit` mood is a strict superset of Bash with analysis and
+The default `kosh` mood is a strict superset of Bash with analysis and
 optimization enabled. The other moods are `bash`, `bash-posix`, and `sh`. The
 `bash-posix` mood provides Bash behavior with its POSIX mode enabled.
 
-Before it runs a command, **shit** analyzes and optimizes the complete script.
+Before it runs a command, **Koshka** analyzes and optimizes the complete script.
 The catalog includes about 100 checks derived from ShellCheck and about a dozen
 native analysis checks.
 
-The `--mood` option, or `-M`, selects `shit`, `bash`, `bash-posix`, or `sh`.
-The default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` selects
+The `--mood` option, or `-M`, selects `kosh`, `bash`, `bash-posix`, or `sh`.
+The default is `kosh`. A binary symlinked as `sh`, `dash`, or `bash` selects
 the matching mood and disables diagnostics. `set --mood` changes the mood at
 runtime. In the default mood, `-W` retains the default severities, `-WW`
 demotes lenient errors to warnings, and `-WWW` also demotes strict errors. In
 other moods, `-W` enables strict warnings, `-WW` also enables lenient warnings,
 and `-WWW` also enables annoying warnings.
 
-The `-I` option enables mimicry. **shit** detects `sh`, `dash`, and `bash`
+The `-I` option enables mimicry. **Koshka** detects `sh`, `dash`, and `bash`
 shebangs and runs each script in the matching mood. The current diagnostics
 setting is preserved.
 
 The `--init-moods` option, or `-L`, accepts a comma-separated list of moods whose
 startup files will be used. Its default value is the selected mood.
 
-The `SHIT_FLAGS` environment variable specifies default flags. A flag on the
+The `KOSH_FLAGS` environment variable specifies default flags. A flag on the
 command line still wins.
 
-When `SHIT_FLAGS` or the command line contains an invalid flag or argument, a
+When `KOSH_FLAGS` or the command line contains an invalid flag or argument, a
 login shell skips its startup files and opens a rescue session.
 
-## Additional bull**shit**
+## Additional furballs
 
 The interactive mode is inspired by
 [fish](https://github.com/fish-shell/fish-shell). Shell provides syntax
@@ -90,7 +98,7 @@ highlighting, word movement, editing controls, UTF-8 support, display-width
 handling for wide characters, multiline editing, history search, and persistent
 history. Shell does not depend on readline.
 
-**Shit** has more than 50 builtins, and each builtin supports `--help`. These
+**Koshka** has more than 50 builtins, and each builtin supports `--help`. These
 include Bash and POSIX builtins. The additional builtins include the following
 commands.
 
@@ -99,14 +107,14 @@ commands.
   Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop)).
 - `assimilate` provides transactional installation on an SSH target.
 
-The `shitbox` builtin bundles a BusyBox-style set of small core utilities.
+The `koshkit` builtin bundles a BusyBox-style set of small core utilities.
 
 - File utilities include `cp`, `mv`, `ln`, and `rm`.
 - Search utilities include `find` and `grep`.
 - Process utilities include `killall`, `pkill`, `ps`, `timeout`, and `nproc`.
 - Minimal implementations of `calc` and `make` are included.
 
-`shitbox cat --syntax-highlighting` colors shell files when standard output is
+`koshkit cat --syntax-highlighting` colors shell files when standard output is
 a terminal. Shell extensions and known shell shebangs select the source. The
 output omits underline attributes.
 
@@ -179,14 +187,14 @@ shares its bounded job pool with recursive builds.
 $ make MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
 $ make MODE=rel TARGET=Windows_NT
 $ make MODE=rel TARGET=Darwin ARCH=arm64
-$ ./shit --help
+$ ./kosh --help
 ```
 
 Zig can also build the `dbg` and `rel` modes.
 
 ```bash
 $ zig build --release=fast
-$ ./zig-out/bin/shit --help
+$ ./zig-out/bin/kosh --help
 ```
 
 Install or uninstall the selected build with the following commands.
@@ -225,5 +233,5 @@ Is it exceptional?
 
 - [x] The shell supports Bash scripts.
 - [x] ShellCheck-style warnings are built in.
-- [x] Shitbox replaces common Unix programs that are absent from Windows.
+- [x] Koshkit replaces common Unix programs that are absent from Windows.
 - [ ] Arbitrary-precision numeric expressions are planned.

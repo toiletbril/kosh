@@ -7,7 +7,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 enum class mimic_mood : u8;
 
@@ -135,4 +135,4 @@ private:
   String m_text{heap_allocator()};
 };
 
-} // namespace shit
+} // namespace koshka

@@ -1,0 +1,11 @@
+#!/bin/env kosh
+# A C-style for whose condition is a constant zero never runs, so the optimizer
+# eliminates the whole loop. The body must not print.
+for ((i = 0; 0; i++)); do echo never; done
+echo after_zero
+
+# A C-style for with a real counter still runs every iteration. The condition
+# reads the counter, so it is not folded, and the loop counts as usual.
+sum=0
+for ((i = 1; i <= 4; i++)); do sum=$((sum + i)); done
+echo "sum=$sum"

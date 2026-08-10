@@ -8,7 +8,7 @@
 #include "Optimizer.hpp"
 #include "Trace.hpp"
 
-namespace shit {
+namespace koshka {
 
 Token::Token(SourceLocation location) : m_location(location) {}
 
@@ -216,7 +216,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
 {
   const WordSegment &first = segments[0];
   if (first.text.is_empty() || !lexer::is_variable_name_start(first.text[0])) {
-    return shit::None;
+    return koshka::None;
   }
 
   usize name_end = 1;
@@ -224,14 +224,14 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
          lexer::is_variable_name(first.text[name_end]))
     name_end++;
   if (name_end >= first.text.count() || first.text[name_end] != '[') {
-    return shit::None;
+    return koshka::None;
   }
 
   let subscript = String{heap_allocator()};
   /* A ] in the rest of segment 0 means the = sits in segment 0 too, already
      ruled out, so this is not an assignment. */
   const StringView head = first.text.substring(name_end + 1);
-  if (head.find_character(']').has_value()) return shit::None;
+  if (head.find_character(']').has_value()) return koshka::None;
   subscript.append(head);
 
   for (usize i = 1; i < segments.count(); i++) {
@@ -241,7 +241,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
                          segment.kind == WordSegment::Kind::LiteralText;
     if (!is_text) {
       if (!append_subscript_segment_source(segment, subscript))
-        return shit::None;
+        return koshka::None;
       continue;
     }
 
@@ -261,7 +261,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     } else if (after.starts_with("=")) {
       value_start = 1;
     } else {
-      return shit::None;
+      return koshka::None;
     }
 
     let key = String{first.text.substring_of_length(0, name_end)};
@@ -281,42 +281,42 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     return word_assignment_split{steal(key), steal(value), is_append};
   }
 
-  return shit::None;
+  return koshka::None;
 }
 
 hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 {
-  if (segments.is_empty()) return shit::None;
+  if (segments.is_empty()) return koshka::None;
 
   const WordSegment &first = segments[0];
-  if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
+  if (first.kind != WordSegment::Kind::UnquotedText) return koshka::None;
 
   let const equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
     if (first.text.find_character('[').has_value())
       return array_element_assignment_split(segments);
-    return shit::None;
+    return koshka::None;
   }
-  if (*equals_position == 0) return shit::None;
+  if (*equals_position == 0) return koshka::None;
 
   ASSERT(*equals_position <= first.text.count());
 
   const bool is_append = first.text[*equals_position - 1] == '+';
   const usize name_length = is_append ? *equals_position - 1 : *equals_position;
-  if (name_length == 0) return shit::None;
+  if (name_length == 0) return koshka::None;
 
-  if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
+  if (!lexer::is_variable_name_start(first.text[0])) return koshka::None;
   usize name_cursor = 1;
   while (name_cursor < name_length &&
          lexer::is_variable_name(first.text[name_cursor]))
     name_cursor++;
   if (name_cursor < name_length && first.text[name_cursor] == '[') {
     if (first.text[name_length - 1] != ']' || name_length - name_cursor < 3) {
-      return shit::None;
+      return koshka::None;
     }
     name_cursor = name_length;
   }
-  if (name_cursor != name_length) return shit::None;
+  if (name_cursor != name_length) return koshka::None;
 
   let const name_view = first.text.substring_of_length(0, name_length);
   let name = String{name_view};
@@ -620,4 +620,4 @@ UNARY_OPERATOR_TOKEN_DECLS(Tilde, "~", 13, BinaryComplement);
 
 } // namespace tokens
 
-} // namespace shit
+} // namespace koshka

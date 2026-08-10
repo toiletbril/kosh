@@ -29,10 +29,10 @@
 [Word
   Variable "cmd"
 ]
-shit: eval:1:1: error: Command 'badcmd_xyzzy' was not found.
+kosh: eval:1:1: error: Command 'badcmd_xyzzy' was not found.
      1 |  badcmd_xyzzy
        |  ^~~~~~~~~~~~
-shit: 2:1: trace:
+kosh: 2:1: trace:
      2 |  eval 'badcmd_xyzzy'
        |  ^~~~~~~~~~~~~~~~~~~
 eval set x=5

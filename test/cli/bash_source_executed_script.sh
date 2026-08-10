@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # An executed script roots BASH_SOURCE at the script itself, so the envman
 # style probe test "$BASH_SOURCE" == "$0" takes its executed branch under
 # mimicry, while a dot-sourced run still reports the sourcing.

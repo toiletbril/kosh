@@ -1,0 +1,51 @@
+=== koshkit prefix always works ===
+1
+2
+3
+=== default mood, empty PATH, falls back to koshkit ===
+1
+2
+3
+rc=0
+=== sh mood, empty PATH, not found ===
+kosh: 1:8: error: Command 'seq' was not found.
+     1 |  PATH=; seq 3
+       |         ^~~
+note: Did you mean `set`?
+rc=127
+=== set -o koshkit turns bare names on ===
+1
+2
+3
+=== --enable-koshkit turns bare names on ===
+1
+2
+3
+=== --enable-koshkit prefers a PATH binary ===
+PATH seq
+=== set -o koshkit prefers a PATH binary ===
+PATH seq
+=== --enable-koshkit works in the sh mood ===
+1
+2
+3
+=== command reports the enabled fallback ===
+seq
+seq is a built-in utility
+=== which reports the enabled fallback ===
+seq
+=== a builtin name is not a koshkit utility ===
+kosh: 1:9: error: koshkit has no utility named 'echo'.
+     1 |  koshkit echo routed via koshkit
+       |          ^~~~
+rc=1
+=== the koshkit name does not recurse ===
+kosh: 1:9: error: koshkit has no utility named 'koshkit'.
+     1 |  koshkit koshkit
+       |          ^~~~~~~
+rc=1
+=== unknown utility errors ===
+kosh: 1:9: error: koshkit has no utility named 'nope'.
+     1 |  koshkit nope
+       |          ^~~~
+rc=1

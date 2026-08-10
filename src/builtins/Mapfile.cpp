@@ -25,7 +25,7 @@ FLAG(MAPFILE_QUANTUM, String, 'c', "", "Accept the callback interval.");
 
 REGISTER_BUILTIN_FLAGS(Mapfile);
 
-namespace shit {
+namespace koshka {
 
 Mapfile::Mapfile() = default;
 
@@ -69,7 +69,7 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 1;
   }
 
-  let read_fd = ec.in_fd.value_or(SHIT_STDIN);
+  let read_fd = ec.in_fd.value_or(KOSH_STDIN);
   if (FLAG_MAPFILE_FD.is_set()) {
     let const parsed_fd = FLAG_MAPFILE_FD.value().to<i64>();
     if (parsed_fd.is_error() || parsed_fd.value() < 0) {
@@ -137,4 +137,4 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

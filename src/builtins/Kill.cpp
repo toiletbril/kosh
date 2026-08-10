@@ -2,8 +2,8 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -17,7 +17,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Kill);
 
-namespace shit {
+namespace koshka {
 
 Kill::Kill() = default;
 
@@ -33,7 +33,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* Checked before the signal parsing so -l is not read as a signal named l. */
   if (args.count() > 1 && (args[1] == "-l" || args[1] == "--list")) {
     if (args.count() == 2) {
-      ec.print_to_stdout(shitbox::format_signal_list());
+      ec.print_to_stdout(koshkit::format_signal_list());
       return 0;
     }
 
@@ -45,7 +45,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       if (StringView{spec}.is_all_decimal_digits()) {
         let const parsed = StringView{spec}.to<i64>();
-        Maybe<String> name = shit::None;
+        Maybe<String> name = koshka::None;
         if (!parsed.is_error()) {
           let const number = static_cast<i32>(parsed.value());
           name = os::signal_name_from_number(number);
@@ -189,4 +189,4 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

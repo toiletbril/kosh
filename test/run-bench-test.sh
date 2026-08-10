@@ -1,8 +1,8 @@
 #!/bin/bash
-# Benchmark configure.sh, configure.bash, and configure.shit across the reference
-# shells and shit, reporting wall-clock seconds at the given scale and checking
-# that shit output matches the reference shell. The Makefile passes SCALE, BIN,
-# DASH, BASHP, ZSH, ASH, YASH, PYTHON, BENCH, BENCH_BASH, and BENCH_SHIT. Run
+# Benchmark configure.sh, configure.bash, and configure.kosh across the reference
+# shells and kosh, reporting wall-clock seconds at the given scale and checking
+# that kosh output matches the reference shell. The Makefile passes SCALE, BIN,
+# DASH, BASHP, ZSH, ASH, YASH, PYTHON, BENCH, BENCH_BASH, and BENCH_KOSH. Run
 # from the test directory. The bash time keyword formats the wall clock through
 # TIMEFORMAT.
 
@@ -238,13 +238,13 @@ benchmark_pair() {
     if [ "$MODE" = sh ]; then
       if ((REFERENCE_MAXIMUM_MILLISECONDS <=
           CANDIDATE_MINIMUM_MILLISECONDS * REQUIRED_SPEEDUP)); then
-        echo "shit is not faster than dash" >&2
+        echo "kosh is not faster than dash" >&2
         return 1
       fi
     else
       if ((REFERENCE_MAXIMUM_MILLISECONDS <
           CANDIDATE_MINIMUM_MILLISECONDS * REQUIRED_SPEEDUP)); then
-        echo "shit is not at least $REQUIRED_SPEEDUP times faster" \
+        echo "kosh is not at least $REQUIRED_SPEEDUP times faster" \
           "than bash" >&2
         return 1
       fi
@@ -302,9 +302,9 @@ run_timed "$(basename "$BIN")+analysis" "$SB" \
   "$BIN" --mood bash -W "$BENCH_BASH"
 compare_outputs "$BB" "$SB" "bash with analysis"
 
-echo "configure.shit, wall-clock seconds at SCALE=$SCALE, lower is better:"
-run_timed "$(basename "$BASHP")" "$ZB" "$BASHP" "$BENCH_SHIT"
-run_timed "$(basename "$BIN")+analysis" "$ZS" "$BIN" "$BENCH_SHIT"
+echo "configure.kosh, wall-clock seconds at SCALE=$SCALE, lower is better:"
+run_timed "$(basename "$BASHP")" "$ZB" "$BASHP" "$BENCH_KOSH"
+run_timed "$(basename "$BIN")+analysis" "$ZS" "$BIN" "$BENCH_KOSH"
 compare_outputs "$ZB" "$ZS" "bash with analysis"
 
 echo "primes.bash, wall-clock seconds up to LIMIT=$PRIMES_LIMIT, lower is better:"

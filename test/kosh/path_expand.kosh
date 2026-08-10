@@ -1,0 +1,11 @@
+#!/bin/env kosh
+echo data/*;
+echo data/*/;
+echo data/*/*;
+echo data/*/*/;
+echo data/*g;
+echo data/abcd*;
+echo data/??*fg;
+echo data/[a-b]*/;
+echo data/*[^g];
+echo data/.*;

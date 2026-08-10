@@ -1,0 +1,4 @@
+#!/bin/env kosh
+set +u
+echo $((notrecorded+1))
+echo $((0x10+1))

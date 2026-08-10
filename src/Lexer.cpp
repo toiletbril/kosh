@@ -9,7 +9,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace lexer {
 
@@ -1602,4 +1602,4 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
   return t;
 }
 
-} // namespace shit
+} // namespace koshka

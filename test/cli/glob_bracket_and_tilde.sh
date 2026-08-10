@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A bracket with no closing bracket is not a glob in the bash mood, so it stays
 # literal with no directory scan. The ~+ prefix expands to PWD the way bash reads
 # it.

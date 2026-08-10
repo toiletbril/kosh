@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # kill, fg, disown, bg, and wait accept the full job spec grammar, not only
 # %number. A leading name matches a job by its command prefix, %+ names the
 # current job.

@@ -31,9 +31,9 @@ in	invalid-syntax
 --	flag
 --long=value	flag
 --color="$PATH"	flag
-*.shit	glob
-shit-highlight-missing-path-xyz	invalid-path
-shit-highlight-missing-command-xyz	unknown-command
+*.kosh	glob
+kosh-highlight-missing-path-xyz	invalid-path
+kosh-highlight-missing-command-xyz	unknown-command
 if	keyword
 then	keyword
 $MISSING	unset-variable

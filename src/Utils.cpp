@@ -6,13 +6,13 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace utils {
 
@@ -451,7 +451,7 @@ fn file_content_identity(const Path &path, Allocator allocator) throws
 
 namespace {
 
-fn compute_shit_identity(StringView fallback_path) throws -> Maybe<String>
+fn compute_kosh_identity(StringView fallback_path) throws -> Maybe<String>
 {
   if (let const executable = os::current_executable_path();
       executable.has_value())
@@ -459,22 +459,22 @@ fn compute_shit_identity(StringView fallback_path) throws -> Maybe<String>
     let const identity =
         file_content_identity(Path{executable->view()}, heap_allocator());
     if (identity.has_value()) {
-      os::set_environment_variable("SHIT_IDENTITY", identity->view());
+      os::set_environment_variable("KOSH_IDENTITY", identity->view());
       return identity;
     }
   }
   let const identity =
       file_content_identity(Path{fallback_path}, heap_allocator());
   if (identity.has_value())
-    os::set_environment_variable("SHIT_IDENTITY", identity->view());
+    os::set_environment_variable("KOSH_IDENTITY", identity->view());
   return identity;
 }
 
 } /* namespace */
 
-fn shit_identity(StringView fallback_path) throws -> Maybe<StringView>
+fn kosh_identity(StringView fallback_path) throws -> Maybe<StringView>
 {
-  static const Maybe<String> cached = compute_shit_identity(fallback_path);
+  static const Maybe<String> cached = compute_kosh_identity(fallback_path);
   if (cached.has_value()) return cached->view();
   return None;
 }
@@ -531,7 +531,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
            terminal, so it never touches the terminal before the handoff. */
         let const sync_pipe = os::make_pipe();
 
-        shit::flush();
+        koshka::flush();
         let const forked_child = os::try_fork_job_process();
         if (forked_child.has_value()) {
           const os::process child = *forked_child;
@@ -598,7 +598,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
         "execute_context replacing the shell with the terminal command '%s'",
         ec.program().c_str());
     flush();
-    unused(cxt.materialize_shit_identity());
+    unused(cxt.materialize_kosh_identity());
     try {
       os::replace_process(steal(ec));
     } catch (const ErrorWithLocation &error) {
@@ -645,7 +645,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   }
 
   let const source = cxt.current_source();
-  unused(cxt.materialize_shit_identity());
+  unused(cxt.materialize_kosh_identity());
   os::process p =
       os::execute_program(steal(ec),
                           is_async ? os::script_fallback_policy::Reject
@@ -654,7 +654,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
                           : is_foreground_job ? os::process_group_mode::New
                                               : os::process_group_mode::Inherit,
                           source != nullptr ? source->view() : StringView{});
-  if (p == SHIT_INVALID_PROCESS) {
+  if (p == KOSH_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
     return cxt.run_program_fallback(ec, mode,
@@ -667,10 +667,10 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
     let const process_group_id = os::process_id_of(p);
     const i32 id = cxt.register_job(p, command, process_group_id);
     if (cxt.shell_is_interactive())
-      shit::print_error("[" + String::from(id, heap_allocator()) + "] " +
-                        String::from(static_cast<u64>(os::process_id_of(p)),
-                                     heap_allocator()) +
-                        "\n");
+      koshka::print_error("[" + String::from(id, heap_allocator()) + "] " +
+                          String::from(static_cast<u64>(os::process_id_of(p)),
+                                       heap_allocator()) +
+                          "\n");
     return 0;
   }
 
@@ -705,7 +705,7 @@ pure static fn builtin_can_launch_fresh(Builtin::Kind kind) wontthrow -> bool
   case Builtin::Kind::False:
   case Builtin::Kind::Test:
   case Builtin::Kind::Printf:
-  case Builtin::Kind::Shitbox: return true;
+  case Builtin::Kind::Koshkit: return true;
   default: return false;
   }
 }
@@ -741,8 +741,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
      last. Otherwise a first stage like yes is left a zombie when the last stage
      exits. */
   let children = ArrayList<os::process>{heap_allocator()};
-  os::process last_child = SHIT_INVALID_PROCESS;
-  os::descriptor last_stdin = SHIT_INVALID_FD;
+  os::process last_child = KOSH_INVALID_PROCESS;
+  os::descriptor last_stdin = KOSH_INVALID_FD;
   i64 process_group_id = 0;
   bool should_reap_children_on_unwind = true;
   defer
@@ -750,7 +750,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     if (should_reap_children_on_unwind) {
       for (ExecContext &pending_context : ecs)
         pending_context.close_fds();
-      if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+      if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
       terminate_and_reap_processes(children);
     }
   };
@@ -803,7 +803,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       ec.close_fds();
     } else if (!ec.is_builtin()) {
       let const source = cxt.current_source();
-      unused(cxt.materialize_shit_identity());
+      unused(cxt.materialize_kosh_identity());
       let const process_group =
           !is_async ? os::process_group_mode::Inherit
                     : os::background_process_group_mode(process_group_id);
@@ -831,24 +831,24 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       if (!forked_child.has_value() &&
           builtin_can_launch_fresh(ec.builtin_kind()))
       {
-        const usize utility_index = ec.program() == "shitbox" ? 1 : 0;
+        const usize utility_index = ec.program() == "koshkit" ? 1 : 0;
         bool should_launch_fresh_stage =
-            ec.builtin_kind() != Builtin::Kind::Shitbox;
+            ec.builtin_kind() != Builtin::Kind::Koshkit;
         bool should_restore_environment = false;
-        if (ec.builtin_kind() == Builtin::Kind::Shitbox &&
+        if (ec.builtin_kind() == Builtin::Kind::Koshkit &&
             utility_index < ec.args().count())
         {
           let const utility_kind =
-              shitbox::find_util(ec.args()[utility_index].view());
+              koshkit::find_util(ec.args()[utility_index].view());
           if (utility_kind.has_value()) {
             should_launch_fresh_stage = true;
-            if (!is_async && *utility_kind == shitbox::Utility::Kind::Timeout) {
-              preflight_status = shitbox::preflight_timeout_stage(
+            if (!is_async && *utility_kind == koshkit::Utility::Kind::Timeout) {
+              preflight_status = koshkit::preflight_timeout_stage(
                   ec, cxt, utility_index, preflight_location,
                   preflight_message);
             }
             should_restore_environment =
-                *utility_kind == shitbox::Utility::Kind::Env;
+                *utility_kind == koshkit::Utility::Kind::Env;
           }
         }
 
@@ -857,17 +857,17 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           if (should_restore_environment) {
             static const StringView RESTORED_ENVIRONMENT_NAMES[] = {
                 "PWD",
-                "SHIT",
-                "SHIT_VERSION",
-                "SHIT_COMMIT",
-                "SHIT_BUILD_MODE",
-                "SHIT_OS",
+                "KOSH",
+                "KOSH_VERSION",
+                "KOSH_COMMIT",
+                "KOSH_BUILD_MODE",
+                "KOSH_OS",
                 "BASH_VERSION",
                 "BASH",
                 "SHLVL",
                 "PATH",
                 "NO_COLOR",
-                "SHIT_INTERNAL_SUPPRESS_ROOT_TRACE"};
+                "KOSH_INTERNAL_SUPPRESS_ROOT_TRACE"};
             for (let const name : RESTORED_ENVIRONMENT_NAMES) {
               let const value = os::get_environment_variable(name);
               if (value.has_value()) {
@@ -882,10 +882,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               stage_source.append("; ");
             }
           }
-          if (ec.builtin_kind() == Builtin::Kind::Shitbox &&
-              ec.program() != "shitbox")
+          if (ec.builtin_kind() == Builtin::Kind::Koshkit &&
+              ec.program() != "koshkit")
           {
-            stage_source.append("shitbox ");
+            stage_source.append("koshkit ");
           }
           for (usize argument_index = 0; argument_index < ec.args().count();
                argument_index++)
@@ -898,8 +898,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           let stage_out = ec.out_fd;
           let stage_err = ec.err_fd;
           ec.apply_dup_routing(
-              [&]() { stage_err = stage_out.value_or(SHIT_STDOUT); },
-              [&]() { stage_out = stage_err.value_or(SHIT_STDERR); });
+              [&]() { stage_err = stage_out.value_or(KOSH_STDOUT); },
+              [&]() { stage_out = stage_err.value_or(KOSH_STDERR); });
           try {
             let const launch = os::launch_compound_stage(
                 stage_source.view(), ec.in_fd, stage_out, stage_err, cxt.mood(),
@@ -910,7 +910,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           } catch (...) {
             ec.close_fds();
             os::close_fd(last_stdin);
-            last_stdin = SHIT_INVALID_FD;
+            last_stdin = KOSH_INVALID_FD;
             throw;
           }
         }
@@ -919,19 +919,19 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       if (preflight_status.has_value()) {
         let const error =
             ErrorWithLocation{preflight_location, preflight_message.view()};
-        let diagnostic = String{cxt.scratch_allocator(), "shit: "};
+        let diagnostic = String{cxt.scratch_allocator(), "kosh: "};
         diagnostic += error.to_string(
             source != nullptr ? source->view() : StringView{}, &cxt);
         diagnostic.push('\n');
         let diagnostic_out = ec.out_fd;
         let diagnostic_err = ec.err_fd;
         ec.apply_dup_routing(
-            [&]() { diagnostic_err = diagnostic_out.value_or(SHIT_STDOUT); },
-            [&]() { diagnostic_out = diagnostic_err.value_or(SHIT_STDERR); });
+            [&]() { diagnostic_err = diagnostic_out.value_or(KOSH_STDOUT); },
+            [&]() { diagnostic_out = diagnostic_err.value_or(KOSH_STDERR); });
         os::signal_internal_diagnostic();
         usize written_count = 0;
         while (written_count < diagnostic.count()) {
-          let const written = os::write_fd(diagnostic_err.value_or(SHIT_STDERR),
+          let const written = os::write_fd(diagnostic_err.value_or(KOSH_STDERR),
                                            diagnostic.data() + written_count,
                                            diagnostic.count() - written_count);
           if (!written.has_value() || *written == 0) {
@@ -953,29 +953,29 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       } else {
         const os::process child = *forked_child;
         if (os::process_id_of(child) == 0) {
-          ec.in_fd = shit::None;
-          ec.out_fd = shit::None;
-          ec.err_fd = shit::None;
-          if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+          ec.in_fd = koshka::None;
+          ec.out_fd = koshka::None;
+          ec.err_fd = koshka::None;
+          if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
           cxt.set_in_pipeline_stage(true);
           cxt.enter_subshell();
           i32 child_status = 0;
           try {
             child_status = execute_builtin(steal(ec), cxt);
           } catch (const BrokenPipeExit &) {
-            child_status = SHIT_BROKEN_PIPE_EXIT_STATUS;
+            child_status = KOSH_BROKEN_PIPE_EXIT_STATUS;
           } catch (const ErrorWithLocation &e) {
             const String *source = cxt.current_source();
-            shit::show_message(e.to_string(
+            koshka::show_message(e.to_string(
                 source != nullptr ? source->view() : StringView{}, &cxt));
             child_status = static_cast<i32>(e.command_status());
           } catch (const Error &e) {
-            shit::show_message(e.to_string());
+            koshka::show_message(e.to_string());
             child_status = static_cast<i32>(e.command_status());
           } catch (...) {
             child_status = 1;
           }
-          shit::flush();
+          koshka::flush();
           os::exit_process_immediately(child_status);
         }
 
@@ -1000,13 +1000,13 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   }
 
   if (is_async) {
-    if (last_child != SHIT_INVALID_PROCESS) {
+    if (last_child != KOSH_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_pipeline_job(children, last_child, "pipeline",
                                                process_group_id);
       should_reap_children_on_unwind = false;
       if (cxt.shell_is_interactive())
-        shit::print_error(
+        koshka::print_error(
             "[" + String::from(id, heap_allocator()) + "] " +
             String::from(static_cast<u64>(os::process_id_of(last_child)),
                          heap_allocator()) +
@@ -1186,7 +1186,7 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
 
   if (peak_rss_bytes > 0)
     report += "  rss    " +
-              shitbox::format_human_size(peak_rss_bytes, heap_allocator()) +
+              koshkit::format_human_size(peak_rss_bytes, heap_allocator()) +
               "\n";
 
   return report;
@@ -2361,7 +2361,7 @@ cold fn print_memory_report() wontthrow -> void
         QUIT_CONTEXT->shell_is_interactive())
     {
       if (let const farewell =
-              QUIT_CONTEXT->get_variable_value("SHIT_FAREWELL");
+              QUIT_CONTEXT->get_variable_value("KOSH_FAREWELL");
           farewell.has_value())
       {
         if (!farewell->is_empty()) {
@@ -3492,7 +3492,7 @@ fn suggest_directory_entry(const Path &directory, StringView name) throws
 
 fn read_entire_standard_input() throws -> String
 {
-  let contents = os::read_fd_to_string(SHIT_STDIN, heap_allocator());
+  let contents = os::read_fd_to_string(KOSH_STDIN, heap_allocator());
   if (!contents.has_value())
     throw Error{"Unable to read standard input: " +
                 os::last_system_error_message()};
@@ -3895,4 +3895,4 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
 
 } /* namespace utils */
 
-} /* namespace shit */
+} /* namespace koshka */

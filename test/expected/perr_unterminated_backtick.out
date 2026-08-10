@@ -1,6 +1,6 @@
-shit: 2:6: error: Unterminated command substitution.
+kosh: 2:6: error: Unterminated command substitution.
      2 |  echo `echo hi
        |       ^
-shit: 2:14: details:
+kosh: 2:14: details:
      2 |  echo `echo hi
        |               ^ expected ` here.

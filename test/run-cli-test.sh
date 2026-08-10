@@ -29,9 +29,9 @@ for TEST_FILE in "$@"; do
 
   case $TEST_NAME in
   command_substitution_interrupt|fg_terminal_handoff|history_behavior|read_behavior|\
-    shitbox_timeout|transaction_lock_lifetime|wait_on_stopped_job)
+    koshkit_timeout|transaction_lock_lifetime|wait_on_stopped_job)
     GOLDEN_TIMEOUT_SECONDS=60
-    if [ "$TEST_NAME" = history_behavior ] || [ "$TEST_NAME" = shitbox_timeout ]; then
+    if [ "$TEST_NAME" = history_behavior ] || [ "$TEST_NAME" = koshkit_timeout ]; then
       GOLDEN_TIMEOUT_SECONDS=120
     fi
     CLI_TEST_TIMEOUT_SECONDS=${CLI_TEST_TIMEOUT_SECONDS:-$GOLDEN_TIMEOUT_SECONDS} \

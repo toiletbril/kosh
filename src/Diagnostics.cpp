@@ -1,6 +1,6 @@
 #include "Diagnostics.hpp"
 
-namespace shit {
+namespace koshka {
 
 #define D(code, slug, summary, message, suggestion, related, tier, delivery)   \
   {slug,                                                                       \
@@ -666,4 +666,4 @@ pure fn diagnostic_directive_disables(StringView comment,
   return false;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

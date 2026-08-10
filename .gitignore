@@ -36,10 +36,10 @@ test/.test-work/
 .DS_Store
 ._.DS_Store
 
-shit
-shit-*
-shit.aarch64.elf
-shit.com.dbg
+/kosh
+/kosh-*
+/kosh.aarch64.elf
+/kosh.com.dbg
 
 core.*
 
@@ -50,11 +50,11 @@ result-*
 # Arch packaging build output (makepkg)
 deploy/archlinux/*
 !deploy/archlinux/PKGBUILD
-!deploy/archlinux/shit-shell.install
+!deploy/archlinux/kosh-shell.install
 
 # Alpine packaging build output (abuild)
 deploy/alpine/*
 !deploy/alpine/APKBUILD
-!deploy/alpine/shit.post-install
-!deploy/alpine/shit.post-upgrade
-!deploy/alpine/shit.pre-deinstall
+!deploy/alpine/kosh.post-install
+!deploy/alpine/kosh.post-upgrade
+!deploy/alpine/kosh.pre-deinstall

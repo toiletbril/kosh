@@ -5,15 +5,15 @@
 #include "CompletionInternal.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -63,8 +63,8 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
   if (path_status != ProgramResolver::Status::Missing) return resolves;
 
-  return (context.shitbox() || context.mood() == mimic_mood::Default) &&
-         shitbox::find_util(word).has_value();
+  return (context.koshkit() || context.mood() == mimic_mood::Default) &&
+         koshkit::find_util(word).has_value();
 }
 
 static fn command_word_prefixes_any(StringView word,
@@ -92,8 +92,8 @@ static fn command_word_prefixes_any(StringView word,
 
   if (context.get_program_resolver().command_name_has_prefix(word)) return true;
 
-  if (context.shitbox() || context.mood() == mimic_mood::Default) {
-    for (let const &util_name : shitbox::util_names())
+  if (context.koshkit() || context.mood() == mimic_mood::Default) {
+    for (let const &util_name : koshkit::util_names())
       if (has_prefix(util_name.view())) return true;
   }
 
@@ -651,14 +651,14 @@ static fn color_path_argument(usize word_start, StringView word,
 static fn simple_dollar_name(StringView line, usize i,
                              usize expansion_end) wontthrow -> Maybe<StringView>
 {
-  if (i + 1 >= expansion_end) return shit::None;
+  if (i + 1 >= expansion_end) return koshka::None;
   if (line[i + 1] == '{') {
     if (expansion_end < i + 3 || line[expansion_end - 1] != '}')
-      return shit::None;
+      return koshka::None;
     let inner = line.substring_of_length(i + 2, expansion_end - (i + 2) - 1);
-    if (inner.is_empty()) return shit::None;
+    if (inner.is_empty()) return koshka::None;
     for (usize k = 0; k < inner.length; k++)
-      if (!is_highlight_name_char(inner[k])) return shit::None;
+      if (!is_highlight_name_char(inner[k])) return koshka::None;
     return inner;
   }
   return line.substring_of_length(i + 1, expansion_end - (i + 1));
@@ -1803,4 +1803,4 @@ fn debug_diagnostic_cache_is_stable(EvalContext &context) throws -> bool
 
 } /* namespace completion */
 
-} /* namespace shit */
+} /* namespace koshka */

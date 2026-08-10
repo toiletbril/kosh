@@ -1,5 +1,5 @@
 == local outside a function is an error:
-shit: 1:1: error: Builtin `local`: Unable to declare a local variable outside a function.
+kosh: 1:1: error: Builtin `local`: Unable to declare a local variable outside a function.
      1 |  local x=5
        |  ^~~~~~~~~
 note: `local` only works inside a function body.

@@ -1,0 +1,8 @@
+#!/bin/env kosh
+start=$PWD
+directory=$TEST_TEMP_DIRECTORY/glob-dot-slash
+koshkit rm -rf "$directory"
+koshkit mkdir -p "$directory"
+cd "$directory" && : > a.sh && : > b.sh && echo ./*.sh && echo *.sh
+cd "$start"
+koshkit rm -rf "$directory"

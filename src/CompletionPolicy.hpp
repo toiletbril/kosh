@@ -3,7 +3,7 @@
 #include "Common.hpp"
 #include "StaticStringMap.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 
@@ -485,4 +485,4 @@ inline constexpr StaticStringMap HELP_ALLOWLIST{HELP_ALLOWLIST_ENTRIES};
 
 } /* namespace completion */
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -1,19 +1,19 @@
-# shit project notes
+# Koshka project notes
 
 ## Documentation ownership
 
 Never modify README.md without explicit approval.
 
-The runtime manual is docs/shit.1. It owns invocation, options, moods, shell
+The runtime manual is docs/kosh.1. It owns invocation, options, moods, shell
 syntax, runtime behavior, builtins, interactive behavior, diagnostics,
 environment variables, startup processing, and runtime files.
 
-The configuration manual is docs/shit.5. It owns startup file identity and
+The configuration manual is docs/kosh.5. It owns startup file identity and
 file-format behavior. Startup files contain ordinary shell commands. Shell
-language and runtime loading rules remain in docs/shit.1.
+language and runtime loading rules remain in docs/kosh.1.
 
-A new flag, mood, builtin, or renamed option updates AGENTS.md, docs/shit.1,
-and completions/shit.bash. A configuration file change also updates docs/shit.5.
+A new flag, mood, builtin, or renamed option updates AGENTS.md, docs/kosh.1,
+and completions/kosh.bash. A configuration file change also updates docs/kosh.5.
 An architecture or contributor workflow change updates AGENTS.md.
 
 The project is a C++ and C command shell. Speed is the defining goal. The
@@ -24,14 +24,14 @@ interactive editor is the vendored C submodule under src/toiletline.
 The top-level Makefile delegates to src/Makefile. It supplies the configured
 logical processor count when the caller does not select a parallel job count.
 
-`make MODE=rel` writes the optimized binary to ./shit. `make MODE=dbg` writes
-./shit-dbg with AddressSanitizer and UndefinedBehaviorSanitizer. `make MODE=cov`
-writes ./shit-cov. The default mode is dbg.
+`make MODE=rel` writes the optimized binary to ./kosh. `make MODE=dbg` writes
+./kosh-dbg with AddressSanitizer and UndefinedBehaviorSanitizer. `make MODE=cov`
+writes ./kosh-cov. The default mode is dbg.
 
-A bare `make` builds the `shit` target from a clean checkout. The `shit` target
+A bare `make` builds the `kosh` target from a clean checkout. The `kosh` target
 is the default goal. Object directories are order-only prerequisites. Prefer a
 make target to a raw compiler invocation.
-Use `make clean` to remove stale artifacts. Never remove ./shit directly. The
+Use `make clean` to remove stale artifacts. Never remove ./kosh directly. The
 clean target removes the main binaries, object trees, and every Cosmopolitan
 .dbg and architecture ELF sidecar.
 
@@ -82,9 +82,9 @@ The local benchmark uses one measured run by default. CI gives each executable
 seven measured runs. The speed gate compares the slowest reference time with
 the fastest candidate time.
 
-Every rm test invokes the shitbox rm with `--dry-run`. This rule applies to
-shitbox_rm and every new rm test. Temporary directory cleanup uses the system rm
-behind a `[ -n "$d" ]` guard. The shitbox rm under test never performs cleanup.
+Every rm test invokes the koshkit rm with `--dry-run`. This rule applies to
+koshkit_rm and every new rm test. Temporary directory cleanup uses the system rm
+behind a `[ -n "$d" ]` guard. The koshkit rm under test never performs cleanup.
 
 The bashdiff and mimicrydiff comparisons require Bash 5.3 or newer. Both scripts
 report a skipped comparison when BASHP names an older Bash. The macOS system
@@ -160,7 +160,7 @@ logical nodes. Shared free helpers are declared in
 src/ExpressionsInternal.hpp.
 
 The builtins live under src/builtins. The bundled utilities live under
-src/shitbox. Every builtin remains enabled. The enable `-d`, `-n`, `-f`, and
+src/koshkit. Every builtin remains enabled. The enable `-d`, `-n`, `-f`, and
 `-s` flags are accepted without effect. The `-a` flag lists every builtin.
 
 ### Runtime state
@@ -240,12 +240,12 @@ header, or platform macro.
 
 `read_fd` reports a closed pipe as EOF on every implementation. The shared
 `get_processor_counts` wrapper supplies the affinity-limited and configured
-logical processor counts used by shitbox nproc.
+logical processor counts used by koshkit nproc.
 
 Fork-backed evaluator launches pass through os wrappers. POSIX evaluates the
 inherited syntax tree in the child. Windows selects an in-process fallback or
 starts a fresh shell from recorded source. When Windows cannot fork a piped
-evaluator, a context-independent builtin or valid shitbox utility starts as a
+evaluator, a context-independent builtin or valid koshkit utility starts as a
 fresh shell stage. Platform flags and runtime initialization also pass through
 os wrappers.
 
@@ -301,7 +301,7 @@ command and history classification performs no filesystem access. Variable
 lookup is limited to names present on the line. Nested command and arithmetic
 substitutions are colored in one pass.
 
-Completion, diagnostics, and shitbox cat share semantic highlight roles and the
+Completion, diagnostics, and koshkit cat share semantic highlight roles and the
 tolerant lexical scanner. Colors.cpp maps roles to terminal styles. Styled
 underline support remains behind a disabled capability gate.
 
@@ -324,8 +324,8 @@ Compatibility moods expose the tiers as warnings through `-W`, `-WW`, and
 begins with a lowercase byte.
 
 Variable completion includes the dynamic variables available in the active
-mood. Builtin command completion includes every builtin. Bare shitbox utility
-completion is active in the default mood and when the shitbox option is enabled.
+mood. Builtin command completion includes every builtin. Bare koshkit utility
+completion is active in the default mood and when the koshkit option is enabled.
 
 The analysis stage accepts ShellCheck `disable` comments. A leading directive
 applies to the complete file. A later directive applies to the next complete
@@ -375,7 +375,7 @@ Missing paths retain the first unavailable component for the diagnostic span.
 
 ### Builtins and utilities
 
-The fc builtin reads decoded events from SHIT_HISTORY. The accepted interactive
+The fc builtin reads decoded events from KOSH_HISTORY. The accepted interactive
 event number is retained on EvalContext, so ordinary selection excludes the
 active fc command. Listing keeps that event. Execution and editing replace it
 with the command that is run. Edited commands run in the current shell after a
@@ -383,7 +383,7 @@ named temporary file is removed. The editor is selected from an explicit
 option, FCEDIT, EDITOR, and the mood default in that order.
 
 The assimilate transaction copies the running executable through scp. The
-remote transaction uses explicit shitbox utilities. The remote login shell must
+remote transaction uses explicit koshkit utilities. The remote login shell must
 be POSIX-compatible and able to start the transferred executable.
 
 The candidate SHA-256 identity must match the local executable. A keeper process
@@ -393,21 +393,19 @@ failure restores the prior file or symlink and removes transaction files. A
 failure before bootstrap cannot alter the installed target. An unusable partial
 upload may remain.
 
-`scripts/shit-scp` is a compatibility wrapper for assimilate.
-
-SHIT_IDENTITY is a read-only exported dynamic variable. Its lowercase CRC-32
+KOSH_IDENTITY is a read-only exported dynamic variable. Its lowercase CRC-32
 value is computed once on first read or before a child starts. An inherited
 value is removed before evaluation begins.
 
-SHIT_GIT_BRANCH, SHIT_GIT_AHEAD, and SHIT_GIT_BEHIND are always-dynamic
-variables. SHIT_GIT_BRANCH reads the branch name from .git/HEAD. SHIT_GIT_AHEAD
-and SHIT_GIT_BEHIND read the local and upstream SHAs from the filesystem and
+KOSH_GIT_BRANCH, KOSH_GIT_AHEAD, and KOSH_GIT_BEHIND are always-dynamic
+variables. KOSH_GIT_BRANCH reads the branch name from .git/HEAD. KOSH_GIT_AHEAD
+and KOSH_GIT_BEHIND read the local and upstream SHAs from the filesystem and
 fork one git rev-list --left-right --count command only when the SHAs diverge.
 Both are empty outside a repository, with no upstream, or when the count is
 zero. The branch is read lazily. Ahead and behind share one snapshot for each
 evaluated command.
 
-The shitbox cat highlighter selects recognized shell extensions and shebangs.
+The koshkit cat highlighter selects recognized shell extensions and shebangs.
 It is suppressed for null bytes and redirected output. Line numbering remains
 continuous across file and standard input boundaries. Highlighting emits no
 underline attributes.
@@ -422,7 +420,7 @@ Small types live in lightweight headers. MimicMood.hpp owns mimic_mood.
 RuntimeState.hpp owns RuntimeState. NameValueArg.hpp owns NameValueArg and its
 `from` factory.
 
-A factored data structure lives directly in the shit namespace. A factored
+A factored data structure lives directly in the koshka namespace. A factored
 class method is defined inline in its header. A free helper whose receiver is a
 value type becomes a method on that type. Existing examples include
 `StringView::is_all_decimal_digits`, `String::replace`, and
@@ -445,7 +443,7 @@ The log macros live in src/Trace.hpp. `LOG(level, fmt, ...)` prints at or below
 the active verbosity. `LOG_VARS` prints named variables. The levels are Nothing,
 Info, Debug, and All. Both macros compile out of a release build.
 
-The executable logging and optimizer flags are documented in docs/shit.1.
+The executable logging and optimizer flags are documented in docs/kosh.1.
 
 ## Finishing a change
 

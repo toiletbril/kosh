@@ -1,6 +1,6 @@
 #!/bin/sh
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 
 d=$(mktemp -d) || exit 1
@@ -18,7 +18,7 @@ echo '== direct command:'
 echo '== pipeline stage:'
 (
     cd "$d" || exit 1
-    "$BIN" --mood sh -c './notexec | shitbox cat; printf "pipeline=%s first=%s\n" "$?" "${PIPESTATUS[0]}"'
+    "$BIN" --mood sh -c './notexec | koshkit cat; printf "pipeline=%s first=%s\n" "$?" "${PIPESTATUS[0]}"'
 ) 2>&1 | sed "s#$real_d#TMPDIR#g"
 
 echo '== exec command:'

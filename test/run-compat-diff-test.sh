@@ -44,13 +44,13 @@ compare_one() {
   fi
 
   if [ "$EXPLICIT_MATCHES" -eq 0 ]; then
-    diff $DIFF_FLAGS --label "$TEST_FILE (shit --mood $MOOD)" \
+    diff $DIFF_FLAGS --label "$TEST_FILE (kosh --mood $MOOD)" \
       --label "$TEST_FILE ($REFERENCE_LABEL)" \
       <(printf '%s' "$EXPLICIT_OUTPUT") \
       <(printf '%s' "$REFERENCE_OUTPUT") >> "$FAILED_LIST"
   fi
   if [ "$MIMIC_MATCHES" -eq 0 ]; then
-    diff $DIFF_FLAGS --label "$TEST_FILE (shit -I)" \
+    diff $DIFF_FLAGS --label "$TEST_FILE (kosh -I)" \
       --label "$TEST_FILE ($REFERENCE_LABEL)" \
       <(printf '%s' "$MIMIC_OUTPUT") \
       <(printf '%s' "$REFERENCE_OUTPUT") >> "$FAILED_LIST"

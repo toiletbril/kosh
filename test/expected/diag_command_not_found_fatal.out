@@ -12,10 +12,10 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:1: warning: Command 'zzqqxxnonexist_command_4242' was not found.
+kosh: 2:1: warning: Command 'zzqqxxnonexist_command_4242' was not found.
      2 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-shit: 2:1: error: Command 'zzqqxxnonexist_command_4242' was not found.
+kosh: 2:1: error: Command 'zzqqxxnonexist_command_4242' was not found.
      2 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 after

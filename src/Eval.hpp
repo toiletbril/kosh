@@ -13,7 +13,7 @@
 #include "ResolvedCommand.hpp"
 #include "RuntimeState.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace completion {
 class shell_highlight_cache;
@@ -593,7 +593,7 @@ public:
   {
     return m_shell_executable_path.view();
   }
-  fn materialize_shit_identity() const throws -> Maybe<String>;
+  fn materialize_kosh_identity() const throws -> Maybe<String>;
 
   fn unset_shell_variable(StringView name) throws -> void;
 
@@ -1098,8 +1098,8 @@ public:
   pure fn no_glob() const wontthrow -> bool;
   fn set_no_exec(bool enabled) wontthrow -> void;
   pure fn no_exec() const wontthrow -> bool;
-  fn set_shitbox(bool enabled) wontthrow -> void;
-  pure fn shitbox() const wontthrow -> bool;
+  fn set_koshkit(bool enabled) wontthrow -> void;
+  pure fn koshkit() const wontthrow -> bool;
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
   /* Marks the glob strictness as the script's own set -o failglob rather than
@@ -1305,7 +1305,7 @@ public:
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
      source_init_moods marks a flavor while it sources it and skips a flavor the
-     bit already names, so a set --init-moods inside a sourced ~/.shitrc cannot
+     bit already names, so a set --init-moods inside a sourced ~/.koshrc cannot
      re-source the same rc and recurse without end. */
   fn set_init_mood_sourcing(mimic_mood mood, bool active) wontthrow -> void
   {
@@ -2014,7 +2014,7 @@ class ExecContext
 public:
   static fn make_from(SourceLocation location, StringView source,
                       ArrayList<String> &&args, mimic_mood mood,
-                      bool is_shitbox_enabled,
+                      bool is_koshkit_enabled,
                       ProgramResolver &program_resolver,
                       ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
@@ -2048,7 +2048,7 @@ public:
   bool should_use_empty_environment{false};
   bool should_use_fallback_argv0{false};
 
-  /* Set when a shitbox utility runs from a symlink. Its help names the shit
+  /* Set when a koshkit utility runs from a symlink. Its help names the kosh
      binary behind it. */
   bool is_multicall{false};
 
@@ -2127,12 +2127,12 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize;
     -> void;
 
 /* Source the startup files for each mood in the list, in order, the way the
-   --init-moods flag and the set --init-moods builtin both ask. A shit flavor
-   reads /etc/shitrc and ~/.shitrc, a bash flavor the bash rc and completion, a
+   --init-moods flag and the set --init-moods builtin both ask. A kosh flavor
+   reads /etc/koshrc and ~/.koshrc, a bash flavor the bash rc and completion, a
    posix flavor the ENV file, and each adds its login profiles when is_login is
    set. */
 fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
                      const ArrayList<mimic_mood> &moods, bool is_login_shell,
                      bool should_be_interactive) throws -> void;
 
-} // namespace shit
+} // namespace koshka

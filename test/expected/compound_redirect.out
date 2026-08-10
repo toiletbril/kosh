@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
   [CompoundListCondition, None]
     [Assign redirect_file=$TEST_TEMP_DIRECTORY/compound-redirect]
   [CompoundListCondition, None]
@@ -43,9 +43,9 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "y"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$redirect_file"]
+    [SimpleCommand "koshkit" "unlink" "$redirect_file"]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -185,7 +185,7 @@
   Unquoted "/dev/null"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"
@@ -193,7 +193,7 @@
 [Word
   Variable "redirect_file"
 ]
-shit: 9:25: warning: An unquoted variable can split into words and expand globs.
+kosh: 9:25: warning: An unquoted variable can split into words and expand globs.
      9 |  for n in 1 2 3; do echo $n; done > "$redirect_file"
        |                          ^~
 note: Quote the expansion to keep one argument.

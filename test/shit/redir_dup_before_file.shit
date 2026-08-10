@@ -1,5 +1,0 @@
-#!/bin/env shit
-sh -c 'echo this-is-stdout; echo this-is-stderr 1>&2' 2>&1 >zz_dup_before_file
-echo file-has-only-stdout:
-cat zz_dup_before_file
-rm -f zz_dup_before_file

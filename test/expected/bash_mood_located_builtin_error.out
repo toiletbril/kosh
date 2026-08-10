@@ -1,15 +1,15 @@
 == a soft builtin error in the bash mood carries a located caret ==
-shit: 1:9: error: Builtin `builtin`: 'nosuchbuiltin' is not a shell builtin.
+kosh: 1:9: error: Builtin `builtin`: 'nosuchbuiltin' is not a shell builtin.
      1 |  builtin nosuchbuiltin
        |          ^~~~~~~~~~~~~
 rc=1
 == the run keeps going past the soft error ==
-shit: 1:9: error: Builtin `builtin`: 'nosuchbuiltin' is not a shell builtin.
+kosh: 1:9: error: Builtin `builtin`: 'nosuchbuiltin' is not a shell builtin.
      1 |  builtin nosuchbuiltin; echo after
        |          ^~~~~~~~~~~~~
 after
 == a thrown builtin error in the bash mood is located and soft too ==
-shit: 1:6: error: Builtin `read`: Unknown flag '-Z'.
+kosh: 1:6: error: Builtin `read`: Unknown flag '-Z'.
      1 |  read -Z; echo after
        |       ^~
 note: Use `--` before an operand that begins with a dash.

@@ -17,7 +17,7 @@ FLAG(READONLY_PRINT, Bool, 'p', "",
 
 REGISTER_BUILTIN_FLAGS(Readonly);
 
-namespace shit {
+namespace koshka {
 
 Readonly::Readonly() = default;
 
@@ -93,4 +93,4 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_error ? 1 : 0;
 }
 
-} // namespace shit
+} // namespace koshka

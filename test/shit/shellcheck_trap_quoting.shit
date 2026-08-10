@@ -1,4 +1,0 @@
-#!/bin/env shit
-trap ": ${unset_at_set_time-}" EXIT
-trap ': ${expands_when_fired-}' EXIT
-echo done

@@ -42,7 +42,7 @@ FLAG(COMPGEN_VARIABLE, Bool, 'v', "", "Accept the variable action.");
 
 REGISTER_BUILTIN_FLAGS(Compgen);
 
-namespace shit {
+namespace koshka {
 
 Compgen::Compgen() = default;
 
@@ -211,4 +211,4 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_any_matched ? 0 : 1;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -1804,442 +1804,442 @@
 [Word
   Unquoted "}"
 ]
-shit: 3:8: warning: A bare glob can expand to a filename that begins with '-'.
+kosh: 3:8: warning: A bare glob can expand to a filename that begins with '-'.
      3 |    grep *.txt file
        |         ^~~~~
 note: Prefix the glob with a directory or place -- before it.
-shit: 3:8: warning: The unquoted grep pattern can glob against the local files before grep sees it.
+kosh: 3:8: warning: The unquoted grep pattern can glob against the local files before grep sees it.
      3 |    grep *.txt file
        |         ^~~~~
 note: Quote the pattern.
-shit: 4:8: warning: A grep reads a regular expression, where a leading * has nothing to repeat, this pattern looks like a glob.
+kosh: 4:8: warning: A grep reads a regular expression, where a leading * has nothing to repeat, this pattern looks like a glob.
      4 |    grep '*x' file
        |         ^~~~
-shit: 5:12: warning: A for over the cat output iterates IFS-split words rather than lines.
+kosh: 5:12: warning: A for over the cat output iterates IFS-split words rather than lines.
      5 |    for f in $(cat list); do echo "$f"; done
        |             ^~~~~~~~~~~
 note: Read the lines with 'while IFS= read -r line' instead.
-shit: 6:12: warning: A for over the find output breaks a name with whitespace apart.
+kosh: 6:12: warning: A for over the find output breaks a name with whitespace apart.
      6 |    for f in $(find . -name x); do echo "$f"; done
        |             ^~~~~~~~~~~~~~~~~
 note: Use find -exec or a 'while read -r' loop over find -print0.
-shit: 7:12: warning: An xargs splits the find output on whitespace and quotes.
+kosh: 7:12: warning: An xargs splits the find output on whitespace and quotes.
      7 |    find . | xargs echo
        |             ^~~~~
 note: Pair find -print0 with xargs -0 or use find -exec.
-shit: 8:10: warning: The pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.
+kosh: 8:10: warning: The pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.
      8 |    true | echo discarded
        |           ^~~~
-shit: 13:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
+kosh: 13:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
     13 |    command 2>&1 > out.log
        |                   ^~~~~~~
 note: Put the file redirect first as in '>file 2>&1'.
-shit: 14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
+kosh: 14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
     14 |    sort < data > data
        |                  ^~~~
-shit: 14:10: details:
+kosh: 14:10: details:
     14 |    sort < data > data
        |           ^~~~ this redirect reads the file that is later truncated.
 note: Write to a temporary and move it over.
-shit: 15:8: warning: A command substitution wraps a useless echo.
+kosh: 15:8: warning: A command substitution wraps a useless echo.
     15 |    echo "wrapped $(echo inner)"
        |         ^~~~~~~~~~~~~~~~~~~~~~~
 note: The text can be used directly without the subshell.
-shit: 16:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument.
+kosh: 16:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument.
     16 |    printf '%s' "a $@ b"
        |                ^~~~~~~~
 note: Use $* for one joined string or a separate "$@" word.
-shit: 21:8: warning: The operand is a literal, so this -z test is constant.
+kosh: 21:8: warning: The operand is a literal, so this -z test is constant.
     21 |    [ -z lit ] && echo a
        |         ^~~
 note: Test a variable or drop the check.
-shit: 22:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
+kosh: 22:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
     22 |    [ count -eq notanumber ] && echo b
        |      ^~~~~
-shit: 22:15: warning: The numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
+kosh: 22:15: warning: The numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
     22 |    [ count -eq notanumber ] && echo b
        |                ^~~~~~~~~~
-shit: 23:12: warning: [ and test compare strings byte for byte and never glob-match.
+kosh: 23:12: warning: [ and test compare strings byte for byte and never glob-match.
     23 |    [ "$x" = "glob*" ] && echo c
        |             ^~~~~~~
 note: Use a case or the [[ ]] form for the pattern.
-shit: 28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+kosh: 28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
     28 |  case a in a) ;; esac
        |       ^
-shit: 34:3: warning: The egrep command is deprecated.
+kosh: 34:3: warning: The egrep command is deprecated.
     34 |    egrep pattern file
        |    ^~~~~
 note: Use grep -E for the extended regular expression match.
-shit: 35:3: warning: The fgrep command is deprecated.
+kosh: 35:3: warning: The fgrep command is deprecated.
     35 |    fgrep word file
        |    ^~~~~
 note: Use grep -F for the fixed string match.
-shit: 36:3: warning: An expr forks for arithmetic the shell does natively.
+kosh: 36:3: warning: An expr forks for arithmetic the shell does natively.
     36 |    expr 1 + 2
        |    ^~~~
 note: Use $((...)) for the calculation.
-shit: 38:3: warning: An echo of a command substitution prints what the command already prints.
+kosh: 38:3: warning: An echo of a command substitution prints what the command already prints.
     38 |    echo "$(date)"
        |    ^~~~
 note: Run the command on its own instead.
-shit: 39:8: warning: Grepping the ps output races the process table and matches the grep itself.
+kosh: 39:8: warning: Grepping the ps output races the process table and matches the grep itself.
     39 |    ps | grep init
        |         ^~~~
 note: Use pgrep to match a process by name.
-shit: 40:8: warning: Grepping the ls listing mangles a name with a space or a newline.
+kosh: 40:8: warning: Grepping the ls listing mangles a name with a space or a newline.
     40 |    ls | grep conf
        |         ^~~~
 note: Match the names with a glob or with find instead.
-shit: 41:3: warning: Counting grep output with wc -l runs an extra process.
+kosh: 41:3: warning: Counting grep output with wc -l runs an extra process.
     41 |    grep needle file | wc -l
        |    ^~~~
 note: Use grep -c to count the matching lines directly.
-shit: 43:5: warning: A test reads an unquoted variable.
+kosh: 43:5: warning: A test reads an unquoted variable.
     43 |    [ $? -eq 0 ] && echo ok
        |      ^~
 note: Quote it to avoid an empty or split argument.
-shit: 43:5: warning: Testing $? checks the exit status indirectly.
+kosh: 43:5: warning: Testing $? checks the exit status indirectly.
     43 |    [ $? -eq 0 ] && echo ok
        |      ^~
 note: Test the command directly with if or && so an intervening command cannot clobber the status.
-shit: 44:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
+kosh: 44:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
     44 |    local declared=$(date)
        |          ^~~~~~~~~~~~~~~~
 note: Split the declaration and the assignment so a failure is seen.
-shit: 48:7: warning: This assignment to 'x' in a function has no local, so the value leaks to the global scope.
+kosh: 48:7: warning: This assignment to 'x' in a function has no local, so the value leaks to the global scope.
     48 |  f() { x=1; }
        |        ^~~
 note: Declare it with local to keep it inside the function.
-shit: 50:7: warning: This assignment to 'z' in a function has no local, so the value leaks to the global scope.
+kosh: 50:7: warning: This assignment to 'z' in a function has no local, so the value leaks to the global scope.
     50 |  h() { z=4; }
        |        ^~~
 note: Declare it with local to keep it inside the function.
-shit: 58:3: warning: A negated -eq is just -ne.
+kosh: 58:3: warning: A negated -eq is just -ne.
     58 |  [ ! 1 -eq 2 ]
        |    ^
 note: Drop the ! and use -ne.
-shit: 59:3: warning: A negated = is just !=.
+kosh: 59:3: warning: A negated = is just !=.
     59 |  [ ! a = b ]
        |    ^
 note: Drop the ! and use !=.
-shit: 62:8: warning: The printf format comes from a variable, the data can inject format directives.
+kosh: 62:8: warning: The printf format comes from a variable, the data can inject format directives.
     62 |  printf "$1"
        |         ^~~~
 note: Use printf '%s' to print it.
-shit: 64:11: warning: The printf format comes from a variable, the data can inject format directives.
+kosh: 64:11: warning: The printf format comes from a variable, the data can inject format directives.
     64 |  printf -- "$1"
        |            ^~~~
 note: Use printf '%s' to print it.
-shit: 66:1: warning: A read without -r mangles a backslash in the input.
+kosh: 66:1: warning: A read without -r mangles a backslash in the input.
     66 |  read x < /dev/null
        |  ^~~~~~
 note: Add -r to read the line literally.
-shit: 69:8: warning: A test with -a or -o is obsolescent.
+kosh: 69:8: warning: A test with -a or -o is obsolescent.
     69 |  [ -f a -a -f b ]
        |         ^~
 note: Join two tests with && or || instead.
-shit: 70:3: warning: A negated -z is just -n.
+kosh: 70:3: warning: A negated -z is just -n.
     70 |  [ ! -z "$x" ]
        |    ^
 note: Test with -n instead.
-shit: 71:3: warning: A negated -n is just -z.
+kosh: 71:3: warning: A negated -n is just -z.
     71 |  [ ! -n "$y" ]
        |    ^
 note: Test with -z instead.
-shit: 74:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 74:1: warning: An echo of a command substitution prints what the command already prints.
     74 |  echo $(echo hi)
        |  ^~~~
 note: Run the command on its own instead.
-shit: 74:6: warning: An unquoted command substitution splits its output.
+kosh: 74:6: warning: An unquoted command substitution splits its output.
     74 |  echo $(echo hi)
        |       ^~~~~~~~~~
 note: Quote it to keep one argument.
-shit: 74:6: warning: A command substitution wraps a useless echo.
+kosh: 74:6: warning: A command substitution wraps a useless echo.
     74 |  echo $(echo hi)
        |       ^~~~~~~~~~
 note: The text can be used directly without the subshell.
-shit: 75:8: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
+kosh: 75:8: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
     75 |  export FOO=$(echo hi)
        |         ^~~~~~~~~~~~~~
 note: Split the declaration and the assignment so a failure is seen.
-shit: 76:1: warning: An echo of a command substitution prints what the command already prints.
+kosh: 76:1: warning: An echo of a command substitution prints what the command already prints.
     76 |  echo "$(echo hi)"
        |  ^~~~
 note: Run the command on its own instead.
-shit: 76:6: warning: A command substitution wraps a useless echo.
+kosh: 76:6: warning: A command substitution wraps a useless echo.
     76 |  echo "$(echo hi)"
        |       ^~~~~~~~~~~~
 note: The text can be used directly without the subshell.
-shit: 78:1: warning: A useless cat.
+kosh: 78:1: warning: A useless cat.
     78 |  cat data/hello-d | cat
        |  ^~~
 note: Give the file to the next command directly instead of piping cat.
-shit: 94:3: warning: Commands after exec do not run when exec succeeds.
+kosh: 94:3: warning: Commands after exec do not run when exec succeeds.
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
-shit: 94:23: details:
+kosh: 94:23: details:
     94 |    exec echo replaced; echo unreachable
        |                        ^~~~~~~~~~~~~~~~ this is the first command skipped after exec.
 note: Remove exec or remove the unreachable commands.
-shit: 95:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+kosh: 95:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
     95 |    cd missing; echo wrong-directory
        |    ^~
 note: Stop or return when cd fails.
-shit: 96:17: warning: A && B || C also runs C when B fails.
+kosh: 96:17: warning: A && B || C also runs C when B fails.
     96 |    true && false || echo fallback
        |                  ^~
 note: Use an if statement when C is the else branch.
-shit: 83:15: warning: A for loop over ls output breaks filenames at whitespace.
+kosh: 83:15: warning: A for loop over ls output breaks filenames at whitespace.
     83 |    for file in $(ls *.mp3); do echo "$file"; done
        |                ^~~~~~~~~~~
 note: Iterate over a glob or read a delimited filename stream.
-shit: 84:15: warning: A quoted for-loop glob remains one literal word.
+kosh: 84:15: warning: A quoted for-loop glob remains one literal word.
     84 |    for file in "*.mp3"; do echo "$file"; done
        |                ^~~~~~~
 note: Leave the glob unquoted so it expands into loop values.
-shit: 86:16: warning: The unquoted find pattern expands before find sees it.
+kosh: 86:16: warning: The unquoted find pattern expands before find sees it.
     86 |    find . -name *.ogg
        |                 ^~~~~
 note: Quote the pattern so find performs the match.
-shit: 86:16: warning: A bare glob can expand to a filename that begins with '-'.
+kosh: 86:16: warning: A bare glob can expand to a filename that begins with '-'.
     86 |    find . -name *.ogg
        |                 ^~~~~
 note: Prefix the glob with a directory or place -- before it.
-shit: 87:22: warning: The find result is inserted into shell source and can execute filename text.
+kosh: 87:22: warning: The find result is inserted into shell source and can execute filename text.
     87 |    find . -exec sh -c 'echo {}' \;
        |                       ^~~~~~~~~
 note: Pass the result as an argument and reference it as $1.
-shit: 88:9: warning: An unquoted unset array index can expand as a filename glob.
+kosh: 88:9: warning: An unquoted unset array index can expand as a filename glob.
     88 |    unset values[0]
        |          ^~~~~~~~~
 note: Quote the complete array element name.
-shit: 89:8: warning: A read operand is a variable name, not a variable value.
+kosh: 89:8: warning: A read operand is a variable name, not a variable value.
     89 |    read $target
        |         ^~~~~~~
 note: Drop the dollar sign from the variable name.
-shit: 89:3: warning: A read without -r mangles a backslash in the input.
+kosh: 89:3: warning: A read without -r mangles a backslash in the input.
     89 |    read $target
        |    ^~~~~~~~~~~~
 note: Add -r to read the line literally.
-shit: 92:10: warning: The printf format consumes more arguments than the command supplies.
+kosh: 92:10: warning: The printf format consumes more arguments than the command supplies.
     92 |    printf '%s %s\n' one
        |           ^~~~~~~~~
 note: Add the missing arguments or remove format directives.
-shit: 93:60: warning: The shell opens this redirection before sudo changes privileges.
+kosh: 93:60: warning: The shell opens this redirection before sudo changes privileges.
     93 |    command -v sudo >/dev/null 2>&1 && sudo echo protected > output
        |                                                             ^~~~~~
 note: Run a shell under sudo or pipe through sudo tee.
-shit: 97:22: warning: This pipeline read assignment is lost when the stage exits.
+kosh: 97:22: warning: This pipeline read assignment is lost when the stage exits.
     97 |    echo one | read -r pipeline_value
        |                       ^~~~~~~~~~~~~~
 note: Feed the loop with a redirection or process substitution.
-shit: 98:8: warning: This read sees the value from before the pipeline.
+kosh: 98:8: warning: This read sees the value from before the pipeline.
     98 |    echo "$pipeline_value"
        |         ^~~~~~~~~~~~~~~~~
 note: Move the assignment outside the pipeline or avoid the pipeline subshell.
-shit: 99:3: warning: The > operator compares strings lexicographically.
+kosh: 99:3: warning: The > operator compares strings lexicographically.
     99 |    [[ 10 > 7 ]]
        |    ^~
 note: Use an arithmetic command or a numeric -lt or -gt operator.
-shit: 99:3: warning: The '>' comparison has literal operands on both sides.
+kosh: 99:3: warning: The '>' comparison has literal operands on both sides.
     99 |    [[ 10 > 7 ]]
        |    ^~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-shit: 100:3: warning: The '<' comparison has literal operands on both sides.
+kosh: 100:3: warning: The '<' comparison has literal operands on both sides.
    100 |    [[ left < right ]]
        |    ^~~~~~~~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-shit: 101:15: warning: A quoted regular expression is matched literally.
+kosh: 101:15: warning: A quoted regular expression is matched literally.
    101 |    [[ value =~ 'v.*' ]]
        |                ^~~~~
 note: Store the expression in a variable or leave it unquoted.
-shit: 102:9: warning: A file test on a glob checks only one expanded path.
+kosh: 102:9: warning: A file test on a glob checks only one expanded path.
    102 |    [[ -e *.txt ]]
        |          ^~~~~
 note: Expand the glob in a loop and test each path.
-shit: 103:6: warning: A conditional operator needs surrounding spaces.
+kosh: 103:6: warning: A conditional operator needs surrounding spaces.
    103 |    [[ $left=$right ]]
        |       ^~~~~~~~~~~~
 note: Place spaces around the comparison operator.
-shit: 104:9: warning: The operand is literal, so this string test is constant.
+kosh: 104:9: warning: The operand is literal, so this string test is constant.
    104 |    [[ -n literal ]]
        |          ^~~~~~~
 note: Test a variable or drop the check.
-shit: 105:8: warning: Brace ranges are expanded before variables.
+kosh: 105:8: warning: Brace ranges are expanded before variables.
    105 |    echo {1..$limit}
        |         ^~~~~~~~~~~
 note: Use an arithmetic loop for a variable limit.
-shit: 105:8: warning: An unquoted variable can split into words and expand globs.
+kosh: 105:8: warning: An unquoted variable can split into words and expand globs.
    105 |    echo {1..$limit}
        |         ^~~~~~~~~~~
 note: Quote the expansion to keep one argument.
-shit: 106:6: warning: Brackets around a tr range add literal bracket bytes.
+kosh: 106:6: warning: Brackets around a tr range add literal bracket bytes.
    106 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Use a quoted range without brackets.
-shit: 106:12: warning: Brackets around a tr range add literal bracket bytes.
+kosh: 106:12: warning: Brackets around a tr range add literal bracket bytes.
    106 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Use a quoted range without brackets.
-shit: 106:6: warning: The unquoted tr range can expand as a filename glob.
+kosh: 106:6: warning: The unquoted tr range can expand as a filename glob.
    106 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Quote the range.
-shit: 106:12: warning: The unquoted tr range can expand as a filename glob.
+kosh: 106:12: warning: The unquoted tr range can expand as a filename glob.
    106 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Quote the range.
-shit: 107:3: warning: This assignment to 'index' in a function has no local, so the value leaks to the global scope.
+kosh: 107:3: warning: This assignment to 'index' in a function has no local, so the value leaks to the global scope.
    107 |    index=0
        |    ^~~~~~~
 note: Declare it with local to keep it inside the function.
-shit: 108:21: warning: A redirection expansion can run in a child and lose its mutation.
+kosh: 108:21: warning: A redirection expansion can run in a child and lose its mutation.
    108 |    echo redirected > "file$((index++))"
        |                      ^~~~~~~~~~~~~~~~~~
 note: Update the variable before forming the redirect path.
-shit: 109:8: warning: An unquoted variable can split into words and expand globs.
+kosh: 109:8: warning: An unquoted variable can split into words and expand globs.
    109 |    echo $value
        |         ^~~~~~
 note: Quote the expansion to keep one argument.
-shit: 110:8: warning: A quoted tilde stays literal instead of expanding to the home directory.
+kosh: 110:8: warning: A quoted tilde stays literal instead of expanding to the home directory.
    110 |    echo "~"
        |         ^~~
 note: Leave the tilde unquoted or use a quoted $HOME expansion.
-shit: 111:8: warning: Single quotes prevent the expansion written inside them.
+kosh: 111:8: warning: Single quotes prevent the expansion written inside them.
    111 |    echo '$value'
        |         ^~~~~~~~
 note: Use double quotes if the value should expand.
-shit: 113:8: warning: External input is evaluated as arithmetic code.
+kosh: 113:8: warning: External input is evaluated as arithmetic code.
    113 |    echo $((number + 1))
        |         ^~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
-shit: 114:10: warning: An exported CDPATH can redirect cd commands in child scripts.
+kosh: 114:10: warning: An exported CDPATH can redirect cd commands in child scripts.
    114 |    export CDPATH=.:~/project
        |           ^~~~~~~~~~~~~~~~~~
 note: Keep CDPATH unexported or clear it before running scripts.
-shit: 118:15: warning: Several commands append to the same file separately.
+kosh: 118:15: warning: Several commands append to the same file separately.
    118 |    echo one >> style.log
        |                ^~~~~~~~~
-shit: 120:17: details:
+kosh: 120:17: details:
    120 |    echo three >> style.log
        |                  ^~~~~~~~~ this later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
-shit: 121:8: warning: Backticks are harder to nest than command substitutions.
+kosh: 121:8: warning: Backticks are harder to nest than command substitutions.
    121 |    echo `date`
        |         ^~~~~~
 note: Use $(...) for command substitution.
-shit: 121:3: warning: An echo of a command substitution prints what the command already prints.
+kosh: 121:3: warning: An echo of a command substitution prints what the command already prints.
    121 |    echo `date`
        |    ^~~~
 note: Run the command on its own instead.
-shit: 121:8: warning: An unquoted command substitution splits its output.
+kosh: 121:8: warning: An unquoted command substitution splits its output.
    121 |    echo `date`
        |         ^~~~~~
 note: Quote it to keep one argument.
-shit: 122:8: warning: Arithmetic variables do not need a dollar sign.
+kosh: 122:8: warning: Arithmetic variables do not need a dollar sign.
    122 |    echo $(($number + 1))
        |         ^~~~~~~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
-shit: 122:8: warning: External input is evaluated as arithmetic code.
+kosh: 122:8: warning: External input is evaluated as arithmetic code.
    122 |    echo $(($number + 1))
        |         ^~~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
-shit: 123:5: warning: The x-prefix test workaround is obsolete.
+kosh: 123:5: warning: The x-prefix test workaround is obsolete.
    123 |    [ x"$value" = xvalue ]
        |      ^~~~~~~~~
 note: Quote the variable directly.
-shit: 124:3: warning: PS1 control escapes need balanced display guards.
+kosh: 124:3: warning: PS1 control escapes need balanced display guards.
    124 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
 note: Wrap nonprinting prompt escapes in \[ and \].
-shit: 124:3: warning: This assignment to 'PS1' in a function has no local, so the value leaks to the global scope.
+kosh: 124:3: warning: This assignment to 'PS1' in a function has no local, so the value leaks to the global scope.
    124 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
 note: Declare it with local to keep it inside the function.
-shit: 128:10: warning: The find -exec action has no terminating ';' or '+'.
+kosh: 128:10: warning: The find -exec action has no terminating ';' or '+'.
    128 |    find . -exec echo {}
        |           ^~~~~
 note: Terminate the action with an escaped semicolon or plus.
-shit: 129:11: warning: The test builtin does not support the =~ regular expression operator.
+kosh: 129:11: warning: The test builtin does not support the =~ regular expression operator.
    129 |    [ value =~ expression ]
        |            ^~
 note: Use [[ value =~ expression ]].
-shit: 130:60: warning: An ssh command in a while-read loop can consume the loop input.
+kosh: 130:60: warning: An ssh command in a while-read loop can consume the loop input.
    130 |    while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
        |                                                             ^~~
 note: Redirect ssh input from /dev/null or pass -n.
-shit: 131:9: warning: An alias body cannot receive positional arguments.
+kosh: 131:9: warning: An alias body cannot receive positional arguments.
    131 |    alias archive='mv $1 /backup'
        |          ^~~~~~~~~~~~~~~~~~~~~~~
 note: Use a function when the wrapper needs arguments.
-shit: 132:24: warning: The find expression uses -o without grouping its actions.
+kosh: 132:24: warning: The find expression uses -o without grouping its actions.
    132 |    find . -name '*.bak' -o -name '*~' -delete
        |                         ^~
 note: Group each side with escaped parentheses.
-shit: 133:8: warning: A positional parameter above nine needs braces.
+kosh: 133:8: warning: A positional parameter above nine needs braces.
    133 |    echo $10
        |         ^~~
 note: Write ${10} to select positional parameter 10.
-shit: 133:8: warning: An unquoted variable can split into words and expand globs.
+kosh: 133:8: warning: An unquoted variable can split into words and expand globs.
    133 |    echo $10
        |         ^~~
 note: Quote the expansion to keep one argument.
-shit: 134:3: warning: A command substitution in command position executes its output.
+kosh: 134:3: warning: A command substitution in command position executes its output.
    134 |    $(printf command)
        |    ^~~~~~~~~~~~~~~~~
 note: Run the command inside the substitution directly.
-shit: 135:3: warning: A scalar assignment from $@ loses argument boundaries.
+kosh: 135:3: warning: A scalar assignment from $@ loses argument boundaries.
    135 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
 note: Assign one value or use an array.
-shit: 135:3: warning: This assignment to 'arguments' in a function has no local, so the value leaks to the global scope.
+kosh: 135:3: warning: This assignment to 'arguments' in a function has no local, so the value leaks to the global scope.
    135 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
 note: Declare it with local to keep it inside the function.
-shit: 136:3: warning: A tilde inside PATH remains literal.
+kosh: 136:3: warning: A tilde inside PATH remains literal.
    136 |    PATH="$PATH:~/bin"
        |    ^~~~~~~~~~~~~~~~~~
 note: Expand HOME before assigning PATH.
-shit: 137:8: warning: $[...] is the obsolete arithmetic expansion spelling.
+kosh: 137:8: warning: $[...] is the obsolete arithmetic expansion spelling.
    137 |    echo $[1+2]
        |         ^~~~~~
 note: Use $((...)) for arithmetic expansion.
-shit: 139:9: warning: The nested inner loop reuses the outer loop variable 'outer_index'.
+kosh: 139:9: warning: The nested inner loop reuses the outer loop variable 'outer_index'.
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~
-shit: 138:7: details:
+kosh: 138:7: details:
    138 |    for outer_index in one; do
        |        ^~~~~~~~~~~ the outer loop first binds 'outer_index' here.
 note: Use a distinct variable for the nested loop.
-shit: 138:7: warning: The outer loop variable 'outer_index' is overwritten by the nested inner loop.
+kosh: 138:7: warning: The outer loop variable 'outer_index' is overwritten by the nested inner loop.
    138 |    for outer_index in one; do
        |        ^~~~~~~~~~~
-shit: 139:9: details:
+kosh: 139:9: details:
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~ the nested inner loop binds 'outer_index' again here.
 note: Use a distinct variable for the nested loop.
-shit: 143:3: warning: An earlier case pattern makes this pattern unreachable.
+kosh: 143:3: warning: An earlier case pattern makes this pattern unreachable.
    143 |    same) : ;;
        |    ^~~~
-shit: 142:3: details:
+kosh: 142:3: details:
    142 |    same) : ;;
        |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
-shit: 147:3: warning: An earlier case pattern shadows this pattern.
+kosh: 147:3: warning: An earlier case pattern shadows this pattern.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
-shit: 146:3: details:
+kosh: 146:3: details:
    146 |    prefix*) : ;;
        |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
-shit: 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+kosh: 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
    141 |    case value in
        |         ^~~~~
-shit: 151:21: warning: This function wrapper calls itself recursively.
+kosh: 151:21: warning: This function wrapper calls itself recursively.
    151 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                      ^
 note: Use command before the wrapped command name.
-shit: 156:8: warning: An unquoted variable can split into words and expand globs.
+kosh: 156:8: warning: An unquoted variable can split into words and expand globs.
    156 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.

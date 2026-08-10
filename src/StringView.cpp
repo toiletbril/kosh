@@ -3,7 +3,7 @@
 #include "ErrorOr.hpp"
 #include "IntBase.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace utils {
 fn parse_decimal_i64(StringView text, bool *out_of_range = nullptr) throws
@@ -53,32 +53,32 @@ fn StringView::to() const throws -> ErrorOr<T>
   }
 }
 
-#define SHIT_STRINGVIEW_TO(T) template ErrorOr<T> StringView::to<T>() const;
-SHIT_STRINGVIEW_TO(i16)
-SHIT_STRINGVIEW_TO(u16)
-SHIT_STRINGVIEW_TO(i32)
-SHIT_STRINGVIEW_TO(u32)
-SHIT_STRINGVIEW_TO(i64)
-SHIT_STRINGVIEW_TO(u64)
-SHIT_STRINGVIEW_TO(bi16)
-SHIT_STRINGVIEW_TO(bi32)
-SHIT_STRINGVIEW_TO(bi64)
-SHIT_STRINGVIEW_TO(bu16)
-SHIT_STRINGVIEW_TO(bu32)
-SHIT_STRINGVIEW_TO(bu64)
-SHIT_STRINGVIEW_TO(oi16)
-SHIT_STRINGVIEW_TO(oi32)
-SHIT_STRINGVIEW_TO(oi64)
-SHIT_STRINGVIEW_TO(ou16)
-SHIT_STRINGVIEW_TO(ou32)
-SHIT_STRINGVIEW_TO(ou64)
-SHIT_STRINGVIEW_TO(hi16)
-SHIT_STRINGVIEW_TO(hi32)
-SHIT_STRINGVIEW_TO(hi64)
-SHIT_STRINGVIEW_TO(hu16)
-SHIT_STRINGVIEW_TO(hu32)
-SHIT_STRINGVIEW_TO(hu64)
-#undef SHIT_STRINGVIEW_TO
+#define KOSH_STRINGVIEW_TO(T) template ErrorOr<T> StringView::to<T>() const;
+KOSH_STRINGVIEW_TO(i16)
+KOSH_STRINGVIEW_TO(u16)
+KOSH_STRINGVIEW_TO(i32)
+KOSH_STRINGVIEW_TO(u32)
+KOSH_STRINGVIEW_TO(i64)
+KOSH_STRINGVIEW_TO(u64)
+KOSH_STRINGVIEW_TO(bi16)
+KOSH_STRINGVIEW_TO(bi32)
+KOSH_STRINGVIEW_TO(bi64)
+KOSH_STRINGVIEW_TO(bu16)
+KOSH_STRINGVIEW_TO(bu32)
+KOSH_STRINGVIEW_TO(bu64)
+KOSH_STRINGVIEW_TO(oi16)
+KOSH_STRINGVIEW_TO(oi32)
+KOSH_STRINGVIEW_TO(oi64)
+KOSH_STRINGVIEW_TO(ou16)
+KOSH_STRINGVIEW_TO(ou32)
+KOSH_STRINGVIEW_TO(ou64)
+KOSH_STRINGVIEW_TO(hi16)
+KOSH_STRINGVIEW_TO(hi32)
+KOSH_STRINGVIEW_TO(hi64)
+KOSH_STRINGVIEW_TO(hu16)
+KOSH_STRINGVIEW_TO(hu32)
+KOSH_STRINGVIEW_TO(hu64)
+#undef KOSH_STRINGVIEW_TO
 
 StringView::StringView(const char *cstr) wontthrow
     : data(cstr),
@@ -120,4 +120,4 @@ fn StringView::starts_with(StringView prefix) const wontthrow -> bool
          std::memcmp(data, prefix.data, prefix.length) == 0;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

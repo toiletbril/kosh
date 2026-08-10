@@ -15,7 +15,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Wait);
 
-namespace shit {
+namespace koshka {
 
 Wait::Wait() = default;
 
@@ -85,4 +85,4 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

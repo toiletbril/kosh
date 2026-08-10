@@ -1,4 +1,4 @@
 ran
 ran
-shit: 1:10: error: The [[ conditional is a bash extension that the sh mood does not provide.
+kosh: 1:10: error: The [[ conditional is a bash extension that the sh mood does not provide.
 rc=0

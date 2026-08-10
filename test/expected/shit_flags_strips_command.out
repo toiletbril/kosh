@@ -1,5 +1,0 @@
-== -c in SHIT_FLAGS does not run its command:
-clean
-== benign flag in SHIT_FLAGS survives:
-flagged
-rc=0

@@ -16,7 +16,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Hash);
 
-namespace shit {
+namespace koshka {
 
 Hash::Hash() = default;
 
@@ -66,4 +66,4 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

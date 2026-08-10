@@ -1,21 +1,21 @@
 == default argument location ==
-shit: 1:12: error: Builtin `let`: Unexpected character in the arithmetic expression.
+kosh: 1:12: error: Builtin `let`: Unexpected character in the arithmetic expression.
      1 |  a=0; let a = 2; echo unreached
        |             ^
 note: This is not a valid operator or operand.
 rc=1
 == bash soft argument location ==
-shit: 1:12: error: Builtin `let`: Unexpected character in the arithmetic expression.
+kosh: 1:12: error: Builtin `let`: Unexpected character in the arithmetic expression.
      1 |  a=0; let a = 2; echo "status=$? after"
        |             ^
-shit: note: This is not a valid operator or operand.
+kosh: note: This is not a valid operator or operand.
 status=1 after
 rc=0
 == later argument location ==
-shit: 1:22: error: Builtin `let`: Unfinished expression.
+kosh: 1:22: error: Builtin `let`: Unfinished expression.
      1 |  let "first=1" "bad=1 +" "later=3"; echo "status=$? later=${later-unset}"
        |                       ^
-shit: note: An operand is missing.
+kosh: note: An operand is missing.
 status=1 later=unset
 rc=0
 == diagnostic catalog ==

@@ -1,5 +1,0 @@
-#!/bin/env shit
-x=12
-y=hello
-echo $((x+1))
-echo $((y+1))

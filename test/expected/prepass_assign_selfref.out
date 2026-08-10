@@ -10,14 +10,14 @@
 [Word
   Variable "VAR"
 ]
-shit: 2:12: warning: An unquoted variable can split into words and expand globs.
+kosh: 2:12: warning: An unquoted variable can split into words and expand globs.
      2 |  VAR=1 echo $VAR
        |             ^~~~
 note: Quote the expansion to keep one argument.
-shit: 2:12: warning: The assignment prefix does not affect this command, 'VAR' is read before it is set.
+kosh: 2:12: warning: The assignment prefix does not affect this command, 'VAR' is read before it is set.
      2 |  VAR=1 echo $VAR
        |             ^~~~
-shit: 2:12: warning: The variable 'VAR' is not set, it expands to empty.
+kosh: 2:12: warning: The variable 'VAR' is not set, it expands to empty.
      2 |  VAR=1 echo $VAR
        |             ^~~~
 note: Replace it with ${VAR-} if empty expansion is desired.

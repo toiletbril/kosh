@@ -1,6 +1,0 @@
-#!/bin/env shit
-set +u
-echo "[$nope]"
-set -u
-(echo "$nope")
-echo "code=$?"

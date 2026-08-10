@@ -1,9 +1,9 @@
 #!/bin/sh
 # ulimit reads resource limits and the -a table, checked against dash. The
-# values come from the same kernel, so shit and dash report the same numbers.
+# values come from the same kernel, so kosh and dash report the same numbers.
 # The -u flag is a bash-style alias the test avoids, since dash has none.
 
-# The core limit is pinned to a known value first, since shit drops it to zero at
+# The core limit is pinned to a known value first, since kosh drops it to zero at
 # startup as a courtesy while dash inherits whatever the environment carried, so
 # without pinning the coredump line would differ by environment rather than by a
 # real shell difference.

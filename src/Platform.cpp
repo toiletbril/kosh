@@ -9,18 +9,18 @@
 #endif
 #endif
 
-#if SHIT_PLATFORM_IS POSIX
+#if KOSH_PLATFORM_IS POSIX
 /* clang-format off */
 #include "PlatformPosixExtra.cpp"
 #include "PlatformPosix.cpp"
 /* clang-format on */
-#elif SHIT_PLATFORM_IS WIN32
+#elif KOSH_PLATFORM_IS WIN32
 #include "PlatformWin32.cpp"
 #else
 #error Unsupported platform
 #endif
 
-namespace shit {
+namespace koshka {
 namespace os {
 
 fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
@@ -38,9 +38,9 @@ fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
 }
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */
 
-namespace shit {
+namespace koshka {
 namespace os {
 
 namespace {
@@ -136,4 +136,4 @@ fn crc32c_update(u32 crc, const void *data, usize length) wontthrow -> u32
 }
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */

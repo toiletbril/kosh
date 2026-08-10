@@ -1,0 +1,12 @@
+#!/bin/env kosh
+HOME=testhome
+export E=~/a:~/b
+echo "$E"
+readonly R=~/r
+echo "$R"
+f() { local L=~/z; echo "$L"; }
+f
+declare D=~/d
+echo "$D"
+a=~/x b=~/y
+echo "$a $b"

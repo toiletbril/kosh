@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 echo "== bash mood reports an arithmetic error and goes on to the next line, matching bash:"
 "$BIN" --mood bash -c 'echo before
 echo $((1/0))

@@ -1,6 +1,0 @@
-#!/bin/env shit
-set -a
-readonly R=1
-echo "R=$R"
-R=2
-echo "unreached_if_rejected"

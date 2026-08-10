@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 
 directory=
 trap 'test -n "$directory" && /bin/rm -rf "$directory"' EXIT
@@ -21,7 +21,7 @@ echo "== callback keeps definition mood:"
 "$BIN" -c '_f(){ COMPREPLY=("$(set --mood)"); }; complete -F _f moodcmd; set --mood bash' --debug-complete-at 'moodcmd ' </dev/null
 
 echo "== word list keeps registration mood:"
-"$BIN" -M bash-posix -c "complete -W '\$(set --mood)' moodcmd; set --mood shit" --debug-complete-at 'moodcmd ' </dev/null
+"$BIN" -M bash-posix -c "complete -W '\$(set --mood)' moodcmd; set --mood kosh" --debug-complete-at 'moodcmd ' </dev/null
 
 echo "== callback can replace its spec:"
 "$BIN" -M bash -c '_f(){ complete -W replacement selfcmd; COMPREPLY=(stable); }; complete -F _f selfcmd' --debug-complete-at 'selfcmd ' </dev/null

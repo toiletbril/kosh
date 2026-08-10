@@ -14,7 +14,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Alias);
 
-namespace shit {
+namespace koshka {
 
 Alias::Alias() = default;
 
@@ -76,4 +76,4 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

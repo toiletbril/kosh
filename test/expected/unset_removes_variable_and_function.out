@@ -69,7 +69,7 @@
 ]
 hello
 []
-shit: 8:1: error: Builtin `type`: The command 'f' was not found.
+kosh: 8:1: error: Builtin `type`: The command 'f' was not found.
      8 |  type f
        |  ^~~~~~
 [Code 1]

@@ -37,7 +37,7 @@ FLAG(DECLARE_EXPORT, Bool, 'x', "", "Mark the variable for the environment.");
 
 REGISTER_BUILTIN_FLAGS(Declare);
 
-namespace shit {
+namespace koshka {
 
 Declare::Declare() = default;
 
@@ -411,4 +411,4 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

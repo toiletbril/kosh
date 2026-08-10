@@ -1,0 +1,2 @@
+#!/bin/env kosh
+for x in a b c; do echo $x; done

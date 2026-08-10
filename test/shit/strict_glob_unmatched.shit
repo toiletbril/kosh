@@ -1,4 +1,0 @@
-#!/bin/env shit
-echo before
-echo *.zzz_no_such_glob
-echo not-reached

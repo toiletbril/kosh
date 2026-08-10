@@ -1,11 +1,11 @@
-== bash-defined function stays lax after switching to shit:
+== bash-defined function stays lax after switching to kosh:
 []
 ok
-== shit-defined function stays strict when called from bash mood:
+== kosh-defined function stays strict when called from bash mood:
 is not set
 == sourced function keeps its source mood:
 inside=bash unset=[]
-outside=shit
+outside=kosh
 == idempotent strictness changes survive the defining mood:
 nounset=off
 pipefail=off

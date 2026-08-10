@@ -57,17 +57,17 @@ jobs:
             sh -euc '
               mkdir -p dist
               make -C src MODE=rel TARGET=Linux ARCH=x86_64
-              install -m 755 shit "dist/shit-linux-amd64-$VERSION"
+              install -m 755 kosh "dist/kosh-linux-amd64-$VERSION"
               make -C src MODE=rel TARGET=Windows_NT ARCH=x86_64
-              install -m 755 shit.exe "dist/shit-win32-amd64-$VERSION.exe"
+              install -m 755 kosh.exe "dist/kosh-win32-amd64-$VERSION.exe"
               make -C src MODE=rel TARGET=Darwin ARCH=aarch64
-              install -m 755 shit "dist/shit-darwin-aarch64-$VERSION"
+              install -m 755 kosh "dist/kosh-darwin-aarch64-$VERSION"
             '
 
       - name: Upload the binaries as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: shit-${{ env.VERSION }}
+          name: kosh-${{ env.VERSION }}
           path: dist/*
           if-no-files-found: error
 

@@ -1,5 +1,0 @@
-#!/bin/env shit
-echo hi >| /dev/null; echo "trunc=$?"
-exec 3<> /dev/null; echo "rw=$?"
-echo x 2>&1 >/dev/null; echo "dup=done"
-true >&-; echo "close=$?"

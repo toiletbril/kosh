@@ -1,5 +1,5 @@
 == a zero count is rejected:
-shit: 1:27: error: Builtin `continue`: Unable to continue because '0' is not a valid loop count.
+kosh: 1:27: error: Builtin `continue`: Unable to continue because '0' is not a valid loop count.
      1 |  for i in 1 2; do continue 0; done
        |                            ^
 rc=1

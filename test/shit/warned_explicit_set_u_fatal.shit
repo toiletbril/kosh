@@ -1,5 +1,0 @@
-#!/bin/env shit
-set -WWW
-set -u
-echo "$never_set_var"
-echo not-reached

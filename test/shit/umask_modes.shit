@@ -1,5 +1,0 @@
-#!/bin/env shit
-umask 0022; umask
-umask -S
-umask 0999 2>&1; echo "badoct=$?"
-umask "u=rwx,bogus" 2>&1; echo "badsym=$?"

@@ -1,0 +1,74 @@
+#!/bin/env kosh
+x=$(cat <<\EOF
+backslash escaped delimiter
+EOF
+)
+echo "$x"
+y=$(cat <<FOO-BAR
+bareword with dash
+FOO-BAR
+)
+echo "$y"
+z=$(cat <<   EOF
+leading whitespace before delimiter
+EOF
+)
+echo "$z"
+w=$(echo pre; cat <<EOF
+semicolon sentinel
+EOF
+)
+echo "$w"
+v=$(true && cat <<-EOF
+	tab stripped in substitution
+	EOF
+)
+echo "$v"
+
+
+x=$(cat <<EOF
+body
+EOF
+)
+echo "$x"
+y=$(cat <<EOF
+first line
+second line
+third line
+EOF
+)
+echo "$y"
+for i in 1 2 3; do
+  z=$(cat <<EOF
+iteration $i
+EOF
+)
+  echo "$z"
+done
+
+HOME=/testhome
+x=$(cat <<EOF
+body
+EOF
+)
+echo "$x"
+y=$(cat <<'EOF'
+a " b
+EOF
+)
+echo "$y"
+z=$(cat <<EOF
+$HOME
+EOF
+)
+echo "$z"
+w=$(echo pre; cat <<EOF
+mid
+EOF
+echo post)
+echo "$w"
+t=$(cat <<'EOF'
+has `backticks` and $vars
+EOF
+)
+echo "$t"

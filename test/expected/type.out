@@ -148,7 +148,7 @@
 echo is a shell builtin
 cd is a shell builtin
 cd is /usr/bin/cd
-shit: 4:1: error: Builtin `type`: The command 'nope' was not found.
+kosh: 4:1: error: Builtin `type`: The command 'nope' was not found.
      4 |  type nope
        |  ^~~~~~~~~
 if is a shell keyword
@@ -160,7 +160,7 @@ ll is aliased to `ls -l'
 echo is a shell builtin
 g is a shell function
 true is a shell builtin
-shit: 18:1: error: Builtin `type`: The command 'nonexistent_xyz' was not found.
+kosh: 18:1: error: Builtin `type`: The command 'nonexistent_xyz' was not found.
     18 |  type nonexistent_xyz
        |  ^~~~~~~~~~~~~~~~~~~~
 [Code 1]

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # bind is a no-op stub. The flags and the operands are accepted without
 # effect, and the builtin returns zero. The -m and -l forms and a key binding
 # operand all pass through.

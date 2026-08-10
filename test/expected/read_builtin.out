@@ -29,7 +29,7 @@
   [CompoundListCondition, None]
     [Assign file=$TEST_TEMP_DIRECTORY/read-eof]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "abc"]
   [CompoundListCondition, None]
@@ -43,7 +43,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "with_newline=[$y] $?"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$file"]
+    [SimpleCommand "koshkit" "unlink" "$file"]
   [CompoundListCondition, None]
     [Pipeline]
       [SimpleCommand "printf" "x::y\n"]
@@ -163,7 +163,7 @@
   Unquoted "/read-eof"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -229,7 +229,7 @@
   Variable "?"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"
@@ -347,35 +347,35 @@
 [Word
   Unquoted "}"
 ]
-shit: 2:22: warning: A read without -r mangles a backslash in the input.
+kosh: 2:22: warning: A read without -r mangles a backslash in the input.
      2 |  printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
        |                       ^~~~~~~~~~~~~~~
 note: Add -r to read the line literally.
-shit: 3:22: warning: A read without -r mangles a backslash in the input.
+kosh: 3:22: warning: A read without -r mangles a backslash in the input.
      3 |  printf '1 2 3\n' | { read -a arr; echo "n=${#arr[@]} a0=${arr[0]} a2=${arr[2]}"; }
        |                       ^~~~~~~~~~~
 note: Add -r to read the line literally.
-shit: 4:20: warning: A read without -r mangles a backslash in the input.
+kosh: 4:20: warning: A read without -r mangles a backslash in the input.
      4 |  printf 'noeol' | { read v; echo "rc=$? v=$v"; }
        |                     ^~~~~~
 note: Add -r to read the line literally.
-shit: 10:1: warning: A read without -r mangles a backslash in the input.
+kosh: 10:1: warning: A read without -r mangles a backslash in the input.
     10 |  read x < "$file"
        |  ^~~~~~
 note: Add -r to read the line literally.
-shit: 13:1: warning: A read without -r mangles a backslash in the input.
+kosh: 13:1: warning: A read without -r mangles a backslash in the input.
     13 |  read y < "$file"
        |  ^~~~~~
 note: Add -r to read the line literally.
-shit: 17:28: warning: A read without -r mangles a backslash in the input.
+kosh: 17:28: warning: A read without -r mangles a backslash in the input.
     17 |  printf 'x::y\n' | { IFS=:; read a b c; echo "[$a][$b][$c]"; }
        |                             ^~~~~~~~~~
 note: Add -r to read the line literally.
-shit: 19:7: warning: A read without -r mangles a backslash in the input.
+kosh: 19:7: warning: A read without -r mangles a backslash in the input.
     19 |  IFS=- read a b c d <<IN
        |        ^~~~~~~~~~~~
 note: Add -r to read the line literally.
-shit: 22:47: warning: A read without -r mangles a backslash in the input.
+kosh: 22:47: warning: A read without -r mangles a backslash in the input.
     22 |  echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }
        |                                                ^~~~~~~~~~
 note: Add -r to read the line literally.

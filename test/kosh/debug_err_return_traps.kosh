@@ -1,0 +1,17 @@
+#!/bin/env kosh
+echo "== DEBUG =="
+trap 'echo D' DEBUG
+echo one
+echo two
+trap - DEBUG
+echo "== ERR =="
+trap 'echo E' ERR
+false
+true
+trap - ERR
+echo "== RETURN =="
+f() { echo body; return 7; }
+trap 'echo R' RETURN
+f
+echo "rc=$?"
+trap - RETURN

@@ -1,15 +1,15 @@
 == a missing command with a slash exits 127:
-shit: 1:7: error: Command '/nonexistent' was not found.
+kosh: 1:7: error: Command '/nonexistent' was not found.
      1 |  exec /nonexistent/cmd
        |        ^~~~~~~~~~~
 rc=127
 == a missing command on the PATH exits 127:
-shit: 1:6: error: Command 'nonexistent_cmd_xyz' was not found.
+kosh: 1:6: error: Command 'nonexistent_cmd_xyz' was not found.
      1 |  exec nonexistent_cmd_xyz
        |       ^~~~~~~~~~~~~~~~~~~
 rc=127
 == a non-executable file exits 126:
-shit: 1:6: error: Unable to execute `./notexec`: Permission denied.
+kosh: 1:6: error: Unable to execute `./notexec`: Permission denied.
      1 |  exec ./notexec
        |       ^~~~~~~~~
 rc=126

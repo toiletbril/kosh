@@ -1,0 +1,3 @@
+#!/bin/env kosh
+{ echo out; echo err 1>&2; } 2>&1 1>&2
+{ echo out2; echo err2 1>&2; } 1>&2 2>&1

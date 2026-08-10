@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # export of a read-only name fails, and export of an integer-marked name stores
 # the evaluated arithmetic value in the environment a child reads.
 echo "== export of a read-only name fails:"

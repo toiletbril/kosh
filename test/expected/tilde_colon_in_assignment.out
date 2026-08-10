@@ -43,7 +43,7 @@
 [Word
   Variable "r"
 ]
-shit: 8:6: warning: An unquoted variable can split into words and expand globs.
+kosh: 8:6: warning: An unquoted variable can split into words and expand globs.
      8 |  echo $r
        |       ^~
 note: Quote the expansion to keep one argument.

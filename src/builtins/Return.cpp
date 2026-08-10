@@ -15,7 +15,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Return);
 
-namespace shit {
+namespace koshka {
 
 Return::Return() = default;
 
@@ -77,4 +77,4 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return static_cast<i32>(status);
 }
 
-} // namespace shit
+} // namespace koshka

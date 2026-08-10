@@ -2,9 +2,9 @@
   [CompoundListCondition, None]
     [Assign d=$TEST_TEMP_DIRECTORY/fc]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$d"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$d"]
   [CompoundListCondition, None]
-    [SimpleCommand "export" "SHIT_HISTORY=$d/history"]
+    [SimpleCommand "export" "KOSH_HISTORY=$d/history"]
   [CompoundListCondition, None]
     [FunctionDefinition "seed_fc_history"]
       [BraceGroup]
@@ -152,7 +152,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$edited_value"]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "--mood" "shit"]
+    [SimpleCommand "set" "--mood" "kosh"]
   [CompoundListCondition, None]
     [SimpleCommand "seed_fc_history"]
   [CompoundListCondition, None]
@@ -225,7 +225,7 @@
   Unquoted "/fc"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -240,7 +240,7 @@
   Unquoted "export"
 ]
 [Word
-  Unquoted "SHIT_HISTORY="
+  Unquoted "KOSH_HISTORY="
   Variable "d"
   Unquoted "/history"
 ]
@@ -734,7 +734,7 @@
   Unquoted "--mood"
 ]
 [Word
-  Unquoted "shit"
+  Unquoted "kosh"
 ]
 [Word
   Unquoted "seed_fc_history"
@@ -1031,20 +1031,20 @@ echo second
 first
 second
 == selection errors ==
-shit: 111:7: error: Builtin `fc`: no command found.
+kosh: 111:7: error: Builtin `fc`: no command found.
    111 |  fc -s missing-prefix
        |        ^~~~~~~~~~~~~~
 missing-rc=1
-shit: 113:7: error: Builtin `fc`: no command found.
+kosh: 113:7: error: Builtin `fc`: no command found.
    113 |  fc -s -0
        |        ^~
 zero-rc=1
 return 7
-shit: fc:1:1: error: Builtin `return`: can only `return' from a function or sourced script.
+kosh: fc:1:1: error: Builtin `return`: can only `return' from a function or sourced script.
      1 |  return 7
        |  ^~~~~~~~
 execute-return-rc=2
-shit: 121:4: error: Builtin `fc`: Unknown flag '-v'.
+kosh: 121:4: error: Builtin `fc`: Unknown flag '-v'.
    121 |  fc -v
        |     ^~
 note: Use `--` before an operand that begins with a dash.

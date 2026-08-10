@@ -1,0 +1,4 @@
+#!/bin/env kosh
+set -f
+if [ "a*" = "a*" ]; then echo quoted_glob_folds; fi
+if [ a* = a* ]; then echo unquoted_glob_no_fold; fi

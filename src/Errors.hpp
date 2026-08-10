@@ -5,7 +5,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 class EvalContext;
 
@@ -326,4 +326,4 @@ static_assert(
   throw relocated;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

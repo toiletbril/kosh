@@ -1,0 +1,5 @@
+#!/bin/env kosh
+x=set
+echo before
+echo "${x:+$nope}"
+echo not-reached

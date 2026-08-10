@@ -1,0 +1,3 @@
+#!/bin/env kosh
+read x </dev/null
+echo after

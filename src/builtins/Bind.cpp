@@ -10,7 +10,7 @@ HELP_SYNOPSIS_DECL("[-lmrvpPsSq] [-f filename] [-q function] [-u function] "
 
 HELP_DESCRIPTION_DECL(
     "The bind builtin accepts readline key bindings without effect. The "
-    "shit editor is the vendored toiletline, so key binding is not wired "
+    "line editor is the vendored toiletline, so key binding is not wired "
     "through this builtin.");
 
 FLAG(LIST_NAMES, Bool, 'l', "\0", "Accepted without effect.");
@@ -27,7 +27,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Bind);
 
-namespace shit {
+namespace koshka {
 
 Bind::Bind() = default;
 
@@ -44,4 +44,4 @@ fn Bind::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

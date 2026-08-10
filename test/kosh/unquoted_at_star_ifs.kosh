@@ -1,0 +1,16 @@
+#!/bin/env kosh
+set -- 'a b' c
+printf '[%s]' $*
+echo
+printf '[%s]' $@
+echo
+IFS=:
+printf '[%s]' $*
+echo
+printf '[%s]' $@
+echo
+IFS=
+printf '[%s]' $*
+echo
+printf '[%s]' $@
+echo

@@ -1,0 +1,4 @@
+#!/bin/env kosh
+x=10
+echo $((x*2+1))
+echo $((x+x))

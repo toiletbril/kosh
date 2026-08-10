@@ -1,4 +1,4 @@
-shit: 2:16: error: Unable to parse the loop.
+kosh: 2:16: error: Unable to parse the loop.
      2 |  while true; do done
        |                 ^~~~
 note: The body between 'do' and 'done' is empty, a command is required.

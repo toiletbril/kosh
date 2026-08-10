@@ -1,8 +1,8 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Koshkit.hpp"
 #include "../Path.hpp"
-#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -27,7 +27,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Type);
 
-namespace shit {
+namespace koshka {
 
 Type::Type() = default;
 
@@ -92,8 +92,8 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       word = "function";
     } else if (search_builtin(name.view()).has_value()) {
       word = "builtin";
-    } else if ((cxt.shitbox() || cxt.mood() == mimic_mood::Default) &&
-               shitbox::find_util(name.view()).has_value() &&
+    } else if ((cxt.koshkit() || cxt.mood() == mimic_mood::Default) &&
+               koshkit::find_util(name.view()).has_value() &&
                cxt.get_program_resolver().get_status(
                    name, ProgramResolver::StatusLookup::Authoritative) ==
                    ProgramResolver::Status::Missing)
@@ -194,4 +194,4 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return did_find_all ? 0 : 1;
 }
 
-} // namespace shit
+} // namespace koshka

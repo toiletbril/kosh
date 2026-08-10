@@ -9,10 +9,10 @@
 #include "StringView.hpp"
 
 #define SET_AND_RETURN_EXIT_STATUS(cxt, status)                                \
-  return ::shit::expressions::set_and_return_exit_status(                      \
+  return ::koshka::expressions::set_and_return_exit_status(                    \
       (cxt), static_cast<i64>(status))
 
-namespace shit {
+namespace koshka {
 
 fn indent_for_layer(usize layer) throws -> String;
 fn report_command_resolution_error(
@@ -89,4 +89,4 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
 
 } /* namespace expressions */
 
-} /* namespace shit */
+} /* namespace koshka */

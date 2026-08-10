@@ -28,7 +28,7 @@ HELP_DESCRIPTION_DECL(
 
 REGISTER_BUILTIN_FLAGS(Bench);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -308,7 +308,7 @@ fn draw_progress(StringView command, u64 percent, Allocator allocator) throws
 
 fn clear_progress() wontthrow -> void
 {
-  unused(os::write_fd(SHIT_STDERR, CLEAR_PROGRESS_LINE.data,
+  unused(os::write_fd(KOSH_STDERR, CLEAR_PROGRESS_LINE.data,
                       CLEAR_PROGRESS_LINE.count()));
 }
 
@@ -546,7 +546,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{StringView{"No command given"}};
   }
 
-  unused(cxt.materialize_shit_identity());
+  unused(cxt.materialize_kosh_identity());
 
   Maybe<u64> run_limit = None;
   if (FLAG_bench_runs.is_set())
@@ -580,7 +580,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
   if (should_use_shell && shell_binary.is_empty())
     throw Error{
-        StringView{"bench cannot find the shit binary to run a sample"}};
+        StringView{"bench cannot find the kosh binary to run a sample"}};
 
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));
@@ -631,4 +631,4 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

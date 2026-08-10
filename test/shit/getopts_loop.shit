@@ -1,8 +1,0 @@
-#!/bin/env shit
-set -- -a val -bc arg
-while getopts "a:bc" opt; do
-  echo "opt=$opt arg=${OPTARG-}"
-done
-echo "rest=$1 ind=$OPTIND"
-set -- -x
-getopts ":a:" o; echo "silent=$o arg=${OPTARG-}"

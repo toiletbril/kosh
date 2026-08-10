@@ -13,7 +13,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 static constexpr usize MAX_MIMICRY_DEPTH = 16;
 
@@ -64,7 +64,7 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
       current_source(), String{heap_allocator(), current_origin().view()});
   fallback_context.m_mimicry_depth = m_mimicry_depth;
   fallback_context.set_shell_executable_path(shell_executable_path());
-  fallback_context.set_shitbox(shitbox());
+  fallback_context.set_koshkit(koshkit());
   fallback_context.set_mimicry(mimicry());
   fallback_context.set_warning_level(warning_level());
   fallback_context.set_diagnostics_disabled(diagnostics_disabled());
@@ -163,14 +163,14 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_is_script_run = true;
 
   /* A mimicked script runs with the strictness of the mood it mimics, so a bash
-     or sh script clears nounset, pipefail, and failglob while a shit script
+     or sh script clears nounset, pipefail, and failglob while a kosh script
      keeps the strict default. */
   let const is_mimic_strict = mode == mimic_mood::Default;
   set_error_unset(is_mimic_strict);
   set_pipefail(is_mimic_strict);
   set_failglob(is_mimic_strict);
   LOG(Debug, "seeded the strict options for the %s mimicked run",
-      is_mimic_strict ? "shit" : "lax");
+      is_mimic_strict ? "kosh" : "lax");
 
   let const script_filename = ec.program_path().text().view();
   m_source_frames.push(source_frame{String{ec.program().view()},
@@ -526,4 +526,4 @@ fn EvalContext::expand_heredoc_body(
   return expand_modifier_word(body, false, false, source_location);
 }
 
-} // namespace shit
+} // namespace koshka

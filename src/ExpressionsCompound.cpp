@@ -7,16 +7,16 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "ExpressionsInternal.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace expressions {
 
@@ -398,8 +398,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       m_commands.count());
 
   let children = ArrayList<os::process>{cxt.scratch_allocator()};
-  os::process last_child = SHIT_INVALID_PROCESS;
-  os::descriptor last_stdin = SHIT_INVALID_FD;
+  os::process last_child = KOSH_INVALID_PROCESS;
+  os::descriptor last_stdin = KOSH_INVALID_FD;
   i64 process_group_id = 0;
   let pending_pipe = Maybe<os::Pipe>{};
 
@@ -474,20 +474,20 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
             stage_status = static_cast<i32>(cxt.pending_control_flow().value);
           }
         } catch (const BrokenPipeExit &) {
-          stage_status = SHIT_BROKEN_PIPE_EXIT_STATUS;
+          stage_status = KOSH_BROKEN_PIPE_EXIT_STATUS;
         } catch (const ErrorWithLocation &e) {
           const String *source = cxt.current_source();
-          shit::show_message(e.to_string(
+          koshka::show_message(e.to_string(
               source != nullptr ? source->view() : StringView{}, &cxt));
           stage_status = 1;
         } catch (const Error &e) {
-          shit::show_message(e.to_string());
+          koshka::show_message(e.to_string());
           stage_status = 1;
         } catch (...) {
           LOG(Debug, "swallowed an unknown error in the pipeline stage child");
           stage_status = 1;
         }
-        shit::flush();
+        koshka::flush();
         os::exit_process_immediately(stage_status);
       }
 
@@ -508,13 +508,13 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       os::close_fd(pending_pipe->in);
       os::close_fd(pending_pipe->out);
     }
-    if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+    if (last_stdin != KOSH_INVALID_FD) os::close_fd(last_stdin);
     utils::terminate_and_reap_processes(children);
     throw;
   }
 
   if (is_async()) {
-    if (last_child != SHIT_INVALID_PROCESS) {
+    if (last_child != KOSH_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
       let did_register_job = false;
       defer
@@ -525,7 +525,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
                                                process_group_id);
       did_register_job = true;
       if (cxt.shell_is_interactive())
-        shit::print_error(
+        koshka::print_error(
             "[" + String::from(id, heap_allocator()) + "] " +
             String::from(static_cast<u64>(os::process_id_of(last_child)),
                          heap_allocator()) +
@@ -662,7 +662,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       stage_ec = ExecContext::make_from(
           e->source_location(),
           source != nullptr ? source->view() : StringView{}, steal(stage_args),
-          cxt.mood(), cxt.shitbox(), cxt.get_program_resolver(),
+          cxt.mood(), cxt.koshkit(), cxt.get_program_resolver(),
           steal(stage_arg_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       report_command_resolution_error(cxt, resolution_error);
@@ -1149,18 +1149,18 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
         menu.append(values[i].view());
         menu += '\n';
       }
-      shit::print_error(menu.view());
+      koshka::print_error(menu.view());
       should_reprint_menu = false;
     }
-    shit::print_error(cxt.get_variable_value("PS3").value_or(String{"#? "}));
+    koshka::print_error(cxt.get_variable_value("PS3").value_or(String{"#? "}));
 
     bool was_newline_terminated = false;
     let const input =
-        utils::read_line_from_fd(SHIT_STDIN, was_newline_terminated);
+        utils::read_line_from_fd(KOSH_STDIN, was_newline_terminated);
     /* End of input ends the loop, and bash echoes a newline to standard output
        the way a terminal end-of-file does. */
     if (!input) {
-      shit::print("\n");
+      koshka::print("\n");
       ret = 1;
       break;
     }
@@ -1652,4 +1652,4 @@ cold fn BraceGroup::register_defined_functions(
 
 } // namespace expressions
 
-} // namespace shit
+} // namespace koshka

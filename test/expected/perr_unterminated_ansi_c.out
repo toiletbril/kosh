@@ -1,6 +1,6 @@
-shit: 2:6: error: Unterminated $'...' string.
+kosh: 2:6: error: Unterminated $'...' string.
      2 |  echo $'abc
        |       ^~~~~
-shit: 2:11: details:
+kosh: 2:11: details:
      2 |  echo $'abc
        |            ^ expected ' here.

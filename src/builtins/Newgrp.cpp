@@ -16,7 +16,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Newgrp);
 
-namespace shit {
+namespace koshka {
 
 Newgrp::Newgrp() = default;
 
@@ -57,7 +57,7 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Info, "newgrp handing the shell off to '%s'", found[0].text().c_str());
 
   try {
-    unused(cxt.materialize_shit_identity());
+    unused(cxt.materialize_kosh_identity());
     os::replace_process(steal(command));
   } catch (const ErrorBase &error) {
     report_soft_builtin_error(ec, cxt, error.message());
@@ -69,4 +69,4 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 126;
 }
 
-} // namespace shit
+} // namespace koshka

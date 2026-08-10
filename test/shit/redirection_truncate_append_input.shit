@@ -1,7 +1,0 @@
-#!/bin/env shit
-file=$TEST_TEMP_DIRECTORY/redirection-truncate
-shitbox mkdir -p "$TEST_TEMP_DIRECTORY"
-echo first > "$file"
-echo second >> "$file"
-cat < "$file"
-shitbox unlink "$file"

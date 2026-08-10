@@ -1,0 +1,10 @@
+#!/bin/env kosh
+total=$((6 * 7))
+echo "$total"
+typeset name=value
+echo "$name"
+A=((2 + 2))
+B=(2 + 2)
+C=( (2) )
+EMPTY=(())
+((standalone = 2 + 2))

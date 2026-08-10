@@ -1,5 +1,5 @@
-unset SHIT_FLAGS
-# enable is accepted as a no-op since every builtin is always enabled in shit.
+unset KOSH_FLAGS
+# enable is accepted as a no-op since every builtin is always enabled in kosh.
 # -a lists every builtin, named args return 0 for known builtins and 1 for
 # unknown, and the flags -n, -f, -s are accepted without effect.
 echo "== enable with no args returns 0:"

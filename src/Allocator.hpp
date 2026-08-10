@@ -5,7 +5,7 @@
 
 #include <new>
 
-namespace shit {
+namespace koshka {
 
 class BumpArena;
 fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
@@ -277,4 +277,4 @@ inline fn fake_allocator() wontthrow -> Allocator
   return Allocator{nullptr, &allocators::FAKE_VTABLE};
 }
 
-} // namespace shit
+} // namespace koshka

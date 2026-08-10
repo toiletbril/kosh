@@ -1,0 +1,27 @@
+KOSH_ANSI_BLACK  []
+KOSH_ANSI_RED    []
+KOSH_ANSI_GREEN  []
+KOSH_ANSI_YELLOW []
+KOSH_ANSI_BLUE   []
+KOSH_ANSI_MAGENTA []
+KOSH_ANSI_CYAN   []
+KOSH_ANSI_WHITE  []
+KOSH_ANSI_BRIGHT_BLACK []
+KOSH_ANSI_BRIGHT_RED []
+KOSH_ANSI_BRIGHT_GREEN []
+KOSH_ANSI_BRIGHT_YELLOW []
+KOSH_ANSI_BRIGHT_BLUE []
+KOSH_ANSI_BRIGHT_MAGENTA []
+KOSH_ANSI_BRIGHT_CYAN []
+KOSH_ANSI_BRIGHT_WHITE []
+KOSH_ANSI_BOLD   []
+KOSH_ANSI_DIM    []
+KOSH_ANSI_RESET  []
+KOSH_ANSI_BOGUS  [MISSING]
+stored=[stored]
+sh_green=[]
+kosh: 1:15: error: Unable to expand 'KOSH_ANSI_NOPE' because the parameter is not set.
+     1 |  set -u; echo "${KOSH_ANSI_NOPE}"
+       |                ^~~~~~~~~~~~~~~~~
+note: Replace it with ${KOSH_ANSI_NOPE-} if empty expansion is desired.
+rc=1

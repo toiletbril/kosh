@@ -40,14 +40,14 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
 
 } /* namespace toiletline */
 
-#if !defined SHIT_NO_TOILETLINE
+#if !defined KOSH_NO_TOILETLINE
 
 namespace {
 
 /* The bump arena cannot free a single block, so a free returns the block to a
    free list the next allocation reuses. A header before each block records its
    capacity for realloc and for sizing a reused block. */
-shit::BumpArena TOILETLINE_ARENA{};
+koshka::BumpArena TOILETLINE_ARENA{};
 
 constexpr usize TL_ALLOC_HEADER = 16;
 
@@ -125,8 +125,8 @@ fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 
 namespace {
 
-shit::EvalContext *COMPLETION_CONTEXT = nullptr;
-const shit::Path *COMPLETION_BASE_DIRECTORY = nullptr;
+koshka::EvalContext *COMPLETION_CONTEXT = nullptr;
+const koshka::Path *COMPLETION_BASE_DIRECTORY = nullptr;
 bool HIGHLIGHT_COLOR_ENABLED = false;
 bool HIGHLIGHT_STYLED_UNDERLINES_ENABLED = false;
 #if !defined NDEBUG
@@ -135,14 +135,14 @@ usize DEBUG_COMPLETION_SOURCE_SCAN_COUNT = 0;
 usize DEBUG_COMPLETION_MATERIALIZED_COUNT = 0;
 #endif
 
-shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
-    shit::heap_allocator()};
-shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
-    shit::heap_allocator()};
-shit::completion::completion_result *COMPLETION_RESULT = nullptr;
+koshka::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
+    koshka::heap_allocator()};
+koshka::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
+    koshka::heap_allocator()};
+koshka::completion::completion_result *COMPLETION_RESULT = nullptr;
 
 /* Toiletline edits in codepoints while the completion engine works in bytes. */
-fn shit_completion_callback(const char *buffer, size_t cursor,
+fn kosh_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
 {
   if (COMPLETION_CONTEXT == nullptr || COMPLETION_BASE_DIRECTORY == nullptr ||
@@ -158,7 +158,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     const bool is_explicit_completion = for_listing != 0;
     if (is_explicit_completion)
       COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion(
-          shit::ProgramResolver::CompletionRefresh::Cached);
+          koshka::ProgramResolver::CompletionRefresh::Cached);
     defer
     {
       if (is_explicit_completion)
@@ -166,27 +166,27 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     };
 
     const usize byte_length = std::strlen(buffer);
-    let line = shit::StringView{buffer, byte_length};
+    let line = koshka::StringView{buffer, byte_length};
 
     const usize byte_cursor =
         toiletline::byte_offset_of_codepoint(buffer, byte_length, cursor);
 
     /* A completion diagnostic is armed to break onto its own line, then
        disarmed so a later command's message is unaffected. */
-    shit::arm_message_leading_newline(true);
+    koshka::arm_message_leading_newline(true);
     COMPLETION_RESULT->candidates.clear();
     COMPLETION_RESULT->descriptions.clear();
     COMPLETION_RESULT->longest_common_prefix.clear();
-    *COMPLETION_RESULT = shit::completion::complete(
+    *COMPLETION_RESULT = koshka::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, *COMPLETION_BASE_DIRECTORY,
-        for_listing != 0 ? shit::completion::completion_mode::Listing
-                         : shit::completion::completion_mode::Ghost);
+        for_listing != 0 ? koshka::completion::completion_mode::Listing
+                         : koshka::completion::completion_mode::Ghost);
     let const &result = *COMPLETION_RESULT;
 #if !defined NDEBUG
     DEBUG_COMPLETION_SOURCE_SCAN_COUNT += result.source_candidate_scan_count;
     DEBUG_COMPLETION_MATERIALIZED_COUNT += result.materialized_candidate_count;
 #endif
-    shit::arm_message_leading_newline(false);
+    koshka::arm_message_leading_newline(false);
 
     if (result.candidate_count == 0) return 0;
 
@@ -204,7 +204,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     if (for_listing != 0 && result.descriptions.count() > 0) {
       COMPLETION_DESCRIPTION_POINTERS.reserve(result.candidates.count());
       for (let const &candidate : result.candidates) {
-        if (const shit::String *found_description =
+        if (const koshka::String *found_description =
                 result.descriptions.find(candidate.view());
             found_description != nullptr)
           COMPLETION_DESCRIPTION_POINTERS.push(found_description->c_str());
@@ -223,33 +223,33 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
 
     return 1;
-  } catch (shit::ErrorBase &error) {
+  } catch (koshka::ErrorBase &error) {
     /* A throw skips the disarm above, so it runs here too. */
-    shit::arm_message_leading_newline(false);
+    koshka::arm_message_leading_newline(false);
     LOG(Debug, "completion swallowed an error: %s", error.message().c_str());
     return 0;
   } catch (...) {
-    shit::arm_message_leading_newline(false);
+    koshka::arm_message_leading_newline(false);
     LOG(Debug, "completion swallowed an unknown throw");
     return 0;
   }
 }
 
 /* The body is guarded since toiletline calls through a C function pointer. */
-fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
+fn kosh_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
   if (!HIGHLIGHT_COLOR_ENABLED) return 0;
 
   try {
     const usize byte_length = std::strlen(buffer);
-    let line = shit::StringView{buffer, byte_length};
+    let line = koshka::StringView{buffer, byte_length};
 
-    shit::ArrayList<shit::highlight_span> result =
-        shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
+    koshka::ArrayList<koshka::highlight_span> result =
+        koshka::completion::highlight_line(line, *COMPLETION_CONTEXT);
     let const &theme = HIGHLIGHT_STYLED_UNDERLINES_ENABLED
-                           ? shit::colors::SHELL_HIGHLIGHT_THEME
-                           : shit::colors::NONINTERACTIVE_HIGHLIGHT_THEME;
+                           ? koshka::colors::SHELL_HIGHLIGHT_THEME
+                           : koshka::colors::NONINTERACTIVE_HIGHLIGHT_THEME;
 
     size_t filled = 0;
     usize byte_position = 0;
@@ -280,26 +280,26 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
   }
 }
 
-shit::EvalContext *JOB_CONTEXT = nullptr;
-shit::String WAKE_NOTIFICATION_STASH{shit::heap_allocator()};
+koshka::EvalContext *JOB_CONTEXT = nullptr;
+koshka::String WAKE_NOTIFICATION_STASH{koshka::heap_allocator()};
 
 /* The two-phase wake hook for set -b. Phase 0 formats the Done rows, phase 1
    prints them after the editor cleared its render block. The body is guarded
    since toiletline calls through a C function pointer. */
-fn shit_wake_callback(int phase) -> int
+fn kosh_wake_callback(int phase) -> int
 {
   try {
     if (phase == 0) {
-      if (shit::os::CHILD_STATE_CHANGED == 0) return 0;
+      if (koshka::os::CHILD_STATE_CHANGED == 0) return 0;
       /* The flag clears only when this hook consumes it. */
       if (JOB_CONTEXT == nullptr || !JOB_CONTEXT->notify()) return 0;
-      shit::os::CHILD_STATE_CHANGED = 0;
+      koshka::os::CHILD_STATE_CHANGED = 0;
       WAKE_NOTIFICATION_STASH =
           JOB_CONTEXT->format_done_job_notifications("\r\n");
       return WAKE_NOTIFICATION_STASH.is_empty() ? 0 : 1;
     }
-    shit::print_error(WAKE_NOTIFICATION_STASH.view());
-    shit::flush();
+    koshka::print_error(WAKE_NOTIFICATION_STASH.view());
+    koshka::flush();
     WAKE_NOTIFICATION_STASH.clear();
     return 0;
   } catch (...) {
@@ -309,13 +309,13 @@ fn shit_wake_callback(int phase) -> int
 
 /* An entry whose command word no longer resolves is rejected. A throw accepts
    the entry. */
-fn shit_ghost_validate_callback(const char *entry) -> int
+fn kosh_ghost_validate_callback(const char *entry) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 1;
   try {
     const usize byte_length = std::strlen(entry);
-    return shit::completion::command_word_resolves(
-               shit::StringView{entry, byte_length}, *COMPLETION_CONTEXT)
+    return koshka::completion::command_word_resolves(
+               koshka::StringView{entry, byte_length}, *COMPLETION_CONTEXT)
                ? 1
                : 0;
   } catch (...) {
@@ -327,51 +327,51 @@ fn shit_ghost_validate_callback(const char *entry) -> int
 
 namespace toiletline {
 
-using shit::EvalContext;
-using shit::Maybe;
-using shit::Path;
-using shit::String;
-using shit::StringView;
-namespace colors = shit::colors;
-namespace os = shit::os;
-namespace utils = shit::utils;
+using koshka::EvalContext;
+using koshka::Maybe;
+using koshka::Path;
+using koshka::String;
+using koshka::StringView;
+namespace colors = koshka::colors;
+namespace os = koshka::os;
+namespace utils = koshka::utils;
 
 struct input_result
 {
   i32 code;
   String text;
-  shit::Maybe<usize> history_event_number{shit::None};
+  koshka::Maybe<usize> history_event_number{koshka::None};
 };
 
 static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
-static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
+static constexpr char KOSH_HISTORY_FILE[] = ".kosh_history";
 
 static fn resolve_history_path(StringView env_name, StringView default_file)
-    -> shit::Maybe<shit::Path>
+    -> koshka::Maybe<koshka::Path>
 {
-  if (let const override_path = shit::os::get_environment_variable(env_name);
+  if (let const override_path = koshka::os::get_environment_variable(env_name);
       override_path.has_value() && !override_path->is_empty())
   {
-    return shit::Path{override_path->view()};
+    return koshka::Path{override_path->view()};
   }
-  let home = shit::os::get_home_directory();
-  if (!home.has_value()) return shit::None;
+  let home = koshka::os::get_home_directory();
+  if (!home.has_value()) return koshka::None;
   let path = home->clone();
   path.push_component(default_file);
   return path;
 }
 
-static constexpr char SHIT_CALC_HISTORY_FILE[] = ".shit_calc_history";
+static constexpr char KOSH_CALC_HISTORY_FILE[] = ".kosh_calc_history";
 
-static fn history_file_path() -> shit::Maybe<shit::Path>
+static fn history_file_path() -> koshka::Maybe<koshka::Path>
 {
-  return resolve_history_path("SHIT_HISTORY", SHIT_HISTORY_FILE);
+  return resolve_history_path("KOSH_HISTORY", KOSH_HISTORY_FILE);
 }
 
-static fn calc_history_file_path() -> shit::Maybe<shit::Path>
+static fn calc_history_file_path() -> koshka::Maybe<koshka::Path>
 {
-  return resolve_history_path("SHIT_CALC_HISTORY", SHIT_CALC_HISTORY_FILE);
+  return resolve_history_path("KOSH_CALC_HISTORY", KOSH_CALC_HISTORY_FILE);
 }
 
 /* The history is swapped to the calc file on entry and back on leave, so the
@@ -379,23 +379,27 @@ static fn calc_history_file_path() -> shit::Maybe<shit::Path>
    reload. */
 fn enter_calc_history() -> void
 {
-  if (shit::Maybe<shit::Path> shell = history_file_path(); shell.has_value())
+  if (koshka::Maybe<koshka::Path> shell = history_file_path();
+      shell.has_value())
     ::tl_history_dump(shell->c_str());
 
-  if (shit::Maybe<shit::Path> calc = calc_history_file_path(); calc.has_value())
+  if (koshka::Maybe<koshka::Path> calc = calc_history_file_path();
+      calc.has_value())
     ::tl_history_load(calc->c_str());
 }
 
 fn leave_calc_history() -> void
 {
-  if (shit::Maybe<shit::Path> calc = calc_history_file_path(); calc.has_value())
+  if (koshka::Maybe<koshka::Path> calc = calc_history_file_path();
+      calc.has_value())
     ::tl_history_dump(calc->c_str());
 
-  if (shit::Maybe<shit::Path> shell = history_file_path(); shell.has_value())
+  if (koshka::Maybe<koshka::Path> shell = history_file_path();
+      shell.has_value())
     ::tl_history_load(shell->c_str());
 }
 
-fn history_path() -> shit::Maybe<shit::Path> { return history_file_path(); }
+fn history_path() -> koshka::Maybe<koshka::Path> { return history_file_path(); }
 
 fn history_write() -> bool
 {
@@ -417,10 +421,10 @@ fn history_clear() -> bool
 {
   let const path = history_file_path();
   if (!path.has_value()) return false;
-  let opened = shit::os::open_file_descriptor(
-      path->text().view(), shit::os::file_open_mode::Truncate);
+  let opened = koshka::os::open_file_descriptor(
+      path->text().view(), koshka::os::file_open_mode::Truncate);
   if (!opened.has_value()) return false;
-  shit::os::close_fd(opened.take());
+  koshka::os::close_fd(opened.take());
   ::tl_history_load(path->c_str());
   return true;
 }
@@ -431,9 +435,10 @@ struct history_event
   String command;
 };
 
-fn history_events(shit::Allocator allocator) -> shit::ArrayList<history_event>
+fn history_events(koshka::Allocator allocator)
+    -> koshka::ArrayList<history_event>
 {
-  let events = shit::ArrayList<history_event>{allocator};
+  let events = koshka::ArrayList<history_event>{allocator};
   if (!history_read() || ::itl_g_history_count == 0) return events;
   if (!::itl_history_ensure_read_buffer()) return events;
 
@@ -453,47 +458,48 @@ fn history_events(shit::Allocator allocator) -> shit::ArrayList<history_event>
 
     events.push(history_event{
         first_number + index,
-        shit::String{allocator, shit::StringView{decoded, decoded_size}}
+        koshka::String{allocator, koshka::StringView{decoded, decoded_size}}
     });
   }
 
   return events;
 }
 
-fn history_append_event(StringView command) -> shit::Maybe<usize>
+fn history_append_event(StringView command) -> koshka::Maybe<usize>
 {
   if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES)
-    return shit::None;
+    return koshka::None;
 
   let const path = history_file_path();
-  if (!path.has_value()) return shit::None;
+  if (!path.has_value()) return koshka::None;
   if (::itl_g_history_path == NULL) unused(::tl_history_load(path->c_str()));
 
   itl_string_t *entry = ::itl_string_alloc();
   defer { ITL_STRING_FREE(entry); };
   if (!::itl_string_from_bytes(entry, command.data, command.length))
-    return shit::None;
-  if (!::itl_history_append_to_file(entry, false)) return shit::None;
+    return koshka::None;
+  if (!::itl_history_append_to_file(entry, false)) return koshka::None;
 
   return ::itl_g_last_history_event_number;
 }
 
 fn history_rewrite_event(usize number, StringView expected,
-                         const shit::ArrayList<shit::String> &replacements)
+                         const koshka::ArrayList<koshka::String> &replacements)
     -> bool;
 
 fn history_rewrite_event(usize number, StringView expected,
                          StringView replacement) -> bool
 {
-  let replacements = shit::ArrayList<shit::String>{shit::heap_allocator()};
+  let replacements =
+      koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
   if (!replacement.is_empty())
-    replacements.push(shit::String{shit::heap_allocator(), replacement});
+    replacements.push(koshka::String{koshka::heap_allocator(), replacement});
 
   return history_rewrite_event(number, expected, replacements);
 }
 
 fn history_rewrite_event(usize number, StringView expected,
-                         const shit::ArrayList<shit::String> &replacements)
+                         const koshka::ArrayList<koshka::String> &replacements)
     -> bool
 {
   let const path = history_file_path();
@@ -521,12 +527,12 @@ fn history_rewrite_event(usize number, StringView expected,
   if (!::itl_history_ensure_read_buffer() ||
       !::itl_history_decode_entry_buffered(start_offset, decoded,
                                            sizeof(decoded), &decoded_size) ||
-      shit::StringView{decoded, decoded_size} != expected)
+      koshka::StringView{decoded, decoded_size} != expected)
   {
     return false;
   }
 
-  let rewritten = shit::String{shit::heap_allocator()};
+  let rewritten = koshka::String{koshka::heap_allocator()};
   rewritten.append(contents->substring_of_length(0, start_offset));
 
   for (let const &replacement : replacements) {
@@ -539,15 +545,15 @@ fn history_rewrite_event(usize number, StringView expected,
     itl_char_buf_t *encoded = ::itl_char_buf_alloc();
     defer { ITL_CHAR_BUF_FREE(encoded); };
     ::itl_char_buf_append_string_escaped(encoded, entry);
-    rewritten.append(shit::StringView{encoded->data, encoded->size});
+    rewritten.append(koshka::StringView{encoded->data, encoded->size});
     rewritten.push('\n');
   }
 
   rewritten.append(contents->substring(end_offset));
-  let replacement_path = shit::os::write_to_named_temp_file(
-      path->parent(), ".shit_history_fc", rewritten.view());
+  let replacement_path = koshka::os::write_to_named_temp_file(
+      path->parent(), ".kosh_history_fc", rewritten.view());
   if (!replacement_path.has_value()) return false;
-  defer { unused(shit::os::remove_file(replacement_path->text().view())); };
+  defer { unused(koshka::os::remove_file(replacement_path->text().view())); };
 
   let const current_contents = path->read_entire_file();
   if (!current_contents.has_value() ||
@@ -555,8 +561,8 @@ fn history_rewrite_event(usize number, StringView expected,
   {
     return false;
   }
-  if (!shit::os::rename_path(replacement_path->text().view(),
-                             path->text().view()))
+  if (!koshka::os::rename_path(replacement_path->text().view(),
+                               path->text().view()))
   {
     return false;
   }
@@ -565,12 +571,12 @@ fn history_rewrite_event(usize number, StringView expected,
 
 static fn strip_ansi_color(StringView text) throws -> String;
 
-fn enable_completion(shit::EvalContext &context) -> void
+fn enable_completion(koshka::EvalContext &context) -> void
 {
   COMPLETION_CONTEXT = &context;
-  ::tl_set_complete_callback(shit_completion_callback);
-  ::tl_set_highlight_callback(shit_highlight_callback);
-  ::tl_set_ghost_validate_callback(shit_ghost_validate_callback);
+  ::tl_set_complete_callback(kosh_completion_callback);
+  ::tl_set_highlight_callback(kosh_highlight_callback);
+  ::tl_set_ghost_validate_callback(kosh_ghost_validate_callback);
 }
 
 fn disable_completion() -> void
@@ -583,11 +589,11 @@ fn disable_completion() -> void
 
 fn completion_is_enabled() -> bool { return COMPLETION_CONTEXT != nullptr; }
 
-fn enable_job_notifications(shit::EvalContext &context) -> void
+fn enable_job_notifications(koshka::EvalContext &context) -> void
 {
   /* Registered even under -T, since set -b is job reporting, not completion. */
   JOB_CONTEXT = &context;
-  ::tl_set_wake_callback(shit_wake_callback);
+  ::tl_set_wake_callback(kosh_wake_callback);
 }
 
 fn set_ghost_enabled(bool enabled) -> void
@@ -597,7 +603,7 @@ fn set_ghost_enabled(bool enabled) -> void
 
 fn set_highlight_enabled(bool enabled) -> void
 {
-  ::tl_set_highlight_callback(enabled ? shit_highlight_callback : nullptr);
+  ::tl_set_highlight_callback(enabled ? kosh_highlight_callback : nullptr);
 }
 
 fn set_edit_mode(edit_mode mode) -> void
@@ -645,38 +651,38 @@ fn is_active() -> bool { return ::itl_g_is_active; }
 
 fn initialize() -> void
 {
-  if (shit::Maybe<shit::Path> shit_history = history_file_path();
-      shit_history.has_value())
+  if (koshka::Maybe<koshka::Path> kosh_history = history_file_path();
+      kosh_history.has_value())
   {
-    ::tl_history_load(shit_history->c_str());
+    ::tl_history_load(kosh_history->c_str());
   }
 
   if (::tl_init() != TL_SUCCESS) {
-    throw shit::ErrorWithDetails{
+    throw koshka::ErrorWithDetails{
         "Toiletline: could not initialize the terminal: " +
-            shit::os::last_system_error_message(),
+            koshka::os::last_system_error_message(),
         "The input is not a terminal, pass `-` to read stdin or `-c`/`-s`"};
   }
 }
 
 fn exit() -> void
 {
-  if (shit::Maybe<shit::Path> shit_history = history_file_path();
-      shit_history.has_value())
+  if (koshka::Maybe<koshka::Path> kosh_history = history_file_path();
+      kosh_history.has_value())
   {
-    if (int dump_status = ::tl_history_dump(shit_history->c_str());
+    if (int dump_status = ::tl_history_dump(kosh_history->c_str());
         dump_status != TL_SUCCESS && dump_status != -EINVAL)
     {
-      shit::Error error{"Toiletline: Could not dump history: " +
-                        shit::os::last_system_error_message()};
-      shit::show_message(error.to_string());
+      koshka::Error error{"Toiletline: Could not dump history: " +
+                          koshka::os::last_system_error_message()};
+      koshka::show_message(error.to_string());
     }
   }
 
   if (::tl_exit() != TL_SUCCESS) {
-    throw shit::ErrorWithDetails{
+    throw koshka::ErrorWithDetails{
         "Toiletline: could not exit the line editor: " +
-            shit::os::last_system_error_message(),
+            koshka::os::last_system_error_message(),
         "The terminal may be left in raw mode, run `reset` to recover"};
   }
 }
@@ -722,10 +728,10 @@ fn get_input(const String &prompt) -> input_result
   HIGHLIGHT_STYLED_UNDERLINES_ENABLED =
       colors::terminal_supports_styled_underlines();
   let const completion_base_directory = Path::current_directory();
-  let completion_result = shit::completion::completion_result{
-      shit::ArrayList<shit::String>{shit::heap_allocator()},
-      shit::StringMap<shit::String>{shit::heap_allocator()},
-      shit::String{shit::heap_allocator()},
+  let completion_result = koshka::completion::completion_result{
+      koshka::ArrayList<koshka::String>{koshka::heap_allocator()},
+      koshka::StringMap<koshka::String>{koshka::heap_allocator()},
+      koshka::String{koshka::heap_allocator()},
       0,
       0,
       0,
@@ -759,95 +765,97 @@ fn get_input(const String &prompt) -> input_result
   COMPLETION_BASE_DIRECTORY = nullptr;
   COMPLETION_RESULT = nullptr;
 #if !defined NDEBUG
-  if (shit::os::get_environment_variable("SHIT_TEST_EDITOR_STATS").has_value())
+  if (koshka::os::get_environment_variable("KOSH_TEST_EDITOR_STATS")
+          .has_value())
   {
-    shit::print_error(
+    koshka::print_error(
         "editor-refresh append=" +
-        shit::String::from(::itl_g_debug_append_refresh_count -
-                               append_refresh_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(::itl_g_debug_append_refresh_count -
+                                 append_refresh_count_before,
+                             koshka::heap_allocator()) +
         " full=" +
-        shit::String::from(::itl_g_debug_full_refresh_count -
-                               full_refresh_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(::itl_g_debug_full_refresh_count -
+                                 full_refresh_count_before,
+                             koshka::heap_allocator()) +
         " metrics=" +
-        shit::String::from(::itl_g_debug_metrics_scan_count -
-                               metrics_scan_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(::itl_g_debug_metrics_scan_count -
+                                 metrics_scan_count_before,
+                             koshka::heap_allocator()) +
         " serializations=" +
-        shit::String::from(::itl_g_debug_line_serialization_count -
-                               line_serialization_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(::itl_g_debug_line_serialization_count -
+                                 line_serialization_count_before,
+                             koshka::heap_allocator()) +
         " history-scans=" +
-        shit::String::from(::itl_g_debug_ghost_history_scan_count -
-                               history_scan_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(::itl_g_debug_ghost_history_scan_count -
+                                 history_scan_count_before,
+                             koshka::heap_allocator()) +
         " history-loads=" +
-        shit::String::from(::itl_g_debug_history_buffer_load_count -
-                               history_buffer_load_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(::itl_g_debug_history_buffer_load_count -
+                                 history_buffer_load_count_before,
+                             koshka::heap_allocator()) +
         " preprompt-stats=" +
-        shit::String::from(preprompt_directory_stat_count,
-                           shit::heap_allocator()) +
+        koshka::String::from(preprompt_directory_stat_count,
+                             koshka::heap_allocator()) +
         " preprompt-reads=" +
-        shit::String::from(preprompt_directory_read_count,
-                           shit::heap_allocator()) +
+        koshka::String::from(preprompt_directory_read_count,
+                             koshka::heap_allocator()) +
         " preprompt-sorts=" +
-        shit::String::from(preprompt_directory_sort_count,
-                           shit::heap_allocator()) +
+        koshka::String::from(preprompt_directory_sort_count,
+                             koshka::heap_allocator()) +
         " preprompt-probes=" +
-        shit::String::from(preprompt_executable_probe_count,
-                           shit::heap_allocator()) +
+        koshka::String::from(preprompt_executable_probe_count,
+                             koshka::heap_allocator()) +
         " preprompt-resolutions=" +
-        shit::String::from(preprompt_program_path_candidate_count,
-                           shit::heap_allocator()) +
+        koshka::String::from(preprompt_program_path_candidate_count,
+                             koshka::heap_allocator()) +
         " preprompt-history-loads=" +
-        shit::String::from(preprompt_history_buffer_load_count,
-                           shit::heap_allocator()) +
+        koshka::String::from(preprompt_history_buffer_load_count,
+                             koshka::heap_allocator()) +
         " cwd=" +
-        shit::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -
-                               cwd_capture_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -
+                                 cwd_capture_count_before,
+                             koshka::heap_allocator()) +
         " stats=" +
-        shit::String::from(utils::debug_directory_stat_count() -
-                               directory_stat_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(utils::debug_directory_stat_count() -
+                                 directory_stat_count_before,
+                             koshka::heap_allocator()) +
         " reads=" +
-        shit::String::from(utils::debug_directory_read_count() -
-                               directory_read_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(utils::debug_directory_read_count() -
+                                 directory_read_count_before,
+                             koshka::heap_allocator()) +
         " sorts=" +
-        shit::String::from(utils::debug_directory_sort_count() -
-                               directory_sort_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(utils::debug_directory_sort_count() -
+                                 directory_sort_count_before,
+                             koshka::heap_allocator()) +
         " probes=" +
-        shit::String::from(utils::debug_executable_probe_count() -
-                               executable_probe_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(utils::debug_executable_probe_count() -
+                                 executable_probe_count_before,
+                             koshka::heap_allocator()) +
         " resolutions=" +
-        shit::String::from(utils::debug_program_path_candidate_count() -
-                               program_path_candidate_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(utils::debug_program_path_candidate_count() -
+                                 program_path_candidate_count_before,
+                             koshka::heap_allocator()) +
         " scans=" +
-        shit::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -
-                               source_scan_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(DEBUG_COMPLETION_SOURCE_SCAN_COUNT -
+                                 source_scan_count_before,
+                             koshka::heap_allocator()) +
         " materialized=" +
-        shit::String::from(DEBUG_COMPLETION_MATERIALIZED_COUNT -
-                               materialized_count_before,
-                           shit::heap_allocator()) +
+        koshka::String::from(DEBUG_COMPLETION_MATERIALIZED_COUNT -
+                                 materialized_count_before,
+                             koshka::heap_allocator()) +
         "\n");
   }
 #endif
   if (code == TL_ERROR) {
-    throw shit::ErrorWithDetails{"Toiletline: could not read the input: " +
-                                     shit::os::last_system_error_message(),
-                                 "Pass `-s` to read stdin without the editor"};
+    throw koshka::ErrorWithDetails{
+        "Toiletline: could not read the input: " +
+            koshka::os::last_system_error_message(),
+        "Pass `-s` to read stdin without the editor"};
   }
   let const history_event_number =
       ::itl_g_last_history_event_number == 0
-          ? shit::Maybe<usize>{shit::None}
-          : shit::Maybe<usize>{::itl_g_last_history_event_number};
+          ? koshka::Maybe<usize>{koshka::None}
+          : koshka::Maybe<usize>{::itl_g_last_history_event_number};
   return input_result{code, String{TL_BUFFER}, history_event_number};
 }
 
@@ -861,22 +869,22 @@ fn enter_raw_mode() -> void
   if (::tl_enter_raw_mode() == TL_SUCCESS) return;
   /* An in-process exec redirection can leave fd 0 off the terminal, so the tty
      is reopened onto fd 0 and raw mode retried. */
-  if (shit::os::reopen_terminal_as_stdin() &&
+  if (koshka::os::reopen_terminal_as_stdin() &&
       ::tl_enter_raw_mode() == TL_SUCCESS)
   {
     return;
   }
-  throw shit::ErrorWithDetails{"Toiletline: could not enter raw mode: " +
-                                   shit::os::last_system_error_message(),
-                               "The input is not an interactive terminal"};
+  throw koshka::ErrorWithDetails{"Toiletline: could not enter raw mode: " +
+                                     koshka::os::last_system_error_message(),
+                                 "The input is not an interactive terminal"};
 }
 
 fn exit_raw_mode() -> void
 {
   if (::tl_exit_raw_mode() != TL_SUCCESS) {
-    throw shit::ErrorWithDetails{
+    throw koshka::ErrorWithDetails{
         "Toiletline: could not leave raw mode: " +
-            shit::os::last_system_error_message(),
+            koshka::os::last_system_error_message(),
         "The terminal may be left in raw mode, run `reset` to recover"};
   }
 }
@@ -884,8 +892,8 @@ fn exit_raw_mode() -> void
 fn emit_newlines(StringView buffer) -> void
 {
   if (::tl_emit_newlines(buffer.data) != TL_SUCCESS)
-    throw shit::Error{"Toiletline: could not write to the terminal: " +
-                      shit::os::last_system_error_message()};
+    throw koshka::Error{"Toiletline: could not write to the terminal: " +
+                        koshka::os::last_system_error_message()};
 }
 
 static constexpr usize PROMPT_PWD_LENGTH = 24;
@@ -900,7 +908,7 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
   while (tail_start < path.length &&
          (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
     tail_start++;
-  let shortened = String{shit::heap_allocator()};
+  let shortened = String{koshka::heap_allocator()};
   shortened += "...";
   shortened += StringView{path.data + tail_start, path.length - tail_start};
   return shortened;
@@ -911,20 +919,20 @@ static fn git_branch() throws -> String { return utils::current_git_branch(); }
 static fn format_prompt_duration(u64 nanos) throws -> String
 {
   const u64 milliseconds = nanos / 1000000ULL;
-  if (milliseconds < 5) return String{shit::heap_allocator()};
-  let out = String{shit::heap_allocator()};
+  if (milliseconds < 5) return String{koshka::heap_allocator()};
+  let out = String{koshka::heap_allocator()};
   if (milliseconds < 1000) {
     out.append(
-        String::from(static_cast<i64>(milliseconds), shit::heap_allocator()));
+        String::from(static_cast<i64>(milliseconds), koshka::heap_allocator()));
     out += "ms";
     return out;
   }
   const u64 tenths = nanos / 100000000ULL;
   out.append(
-      String::from(static_cast<i64>(tenths / 10), shit::heap_allocator()));
+      String::from(static_cast<i64>(tenths / 10), koshka::heap_allocator()));
   out += '.';
   out.append(
-      String::from(static_cast<i64>(tenths % 10), shit::heap_allocator()));
+      String::from(static_cast<i64>(tenths % 10), koshka::heap_allocator()));
   out += 's';
   return out;
 }
@@ -935,7 +943,7 @@ static fn prompt_strftime(const char *format) throws -> String
 {
   std::time_t now = std::time(nullptr);
   std::tm *local = std::localtime(&now);
-  if (local == nullptr) return String{shit::heap_allocator()};
+  if (local == nullptr) return String{koshka::heap_allocator()};
   char buffer[128];
   usize written = std::strftime(buffer, sizeof(buffer), format, local);
   return String{
@@ -965,7 +973,7 @@ static fn collapse_home_prefix(StringView path) throws -> String
   if (shown.starts_with(home->text()) &&
       (shown.length() == home_length || shown.view()[home_length] == '/'))
   {
-    let collapsed = String{shit::heap_allocator()};
+    let collapsed = String{koshka::heap_allocator()};
     collapsed += "~";
     collapsed += shown.substring(home_length);
     shown = steal(collapsed);
@@ -977,7 +985,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
                                 StringView working_directory,
                                 EvalContext &context) throws -> String
 {
-  let out = String{shit::heap_allocator()};
+  let out = String{koshka::heap_allocator()};
   for (usize i = 0; i < prompt.length; i++) {
     if (prompt[i] != '\\' || i + 1 >= prompt.length) {
       out += prompt[i];
@@ -1041,7 +1049,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       const bool should_use_color = colors::stdout_wants_color();
       if (should_use_color)
         out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
-      out += String::from(status, shit::heap_allocator());
+      out += String::from(status, koshka::heap_allocator());
       if (should_use_color) out += colors::ansi::RESET;
     } break;
     case '.': {
@@ -1053,7 +1061,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     } break;
     case 'j':
       out += String::from(static_cast<i64>(context.jobs().count()),
-                          shit::heap_allocator());
+                          koshka::heap_allocator());
       break;
     case 'D':
       out += format_prompt_duration(context.last_command_duration_ns());
@@ -1076,19 +1084,21 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
    form has inputs the names cannot capture, so it never caches. */
 struct prompt_cache_input
 {
-  String name{shit::heap_allocator()};
+  String name{koshka::heap_allocator()};
   Maybe<String> value{};
 };
-static String PROMPT_CACHE_TEMPLATE{shit::heap_allocator()};
-static shit::ArrayList<prompt_cache_input> PROMPT_CACHE_INPUTS{
-    shit::heap_allocator()};
-static String PROMPT_CACHE_EXPANSION{shit::heap_allocator()};
+static String PROMPT_CACHE_TEMPLATE{koshka::heap_allocator()};
+static koshka::ArrayList<prompt_cache_input> PROMPT_CACHE_INPUTS{
+    koshka::heap_allocator()};
+static String PROMPT_CACHE_EXPANSION{koshka::heap_allocator()};
 static bool PROMPT_CACHE_VALID = false;
 
 /* A $ that opens anything but a plain name or a non-assigning braced parameter
    form marks the template impure. */
-static fn scan_prompt_template_inputs(
-    StringView text, shit::ArrayList<prompt_cache_input> &names) throws -> bool
+static fn
+scan_prompt_template_inputs(StringView text,
+                            koshka::ArrayList<prompt_cache_input> &names) throws
+    -> bool
 {
   let is_name_byte = [](char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -1147,40 +1157,40 @@ static fn scan_prompt_template_inputs(
 
 fn default_prompt_template() -> String
 {
-  let template_string = String{shit::heap_allocator()};
+  let template_string = String{koshka::heap_allocator()};
   const bool should_use_color = colors::stdout_wants_color();
 
   if (should_use_color) {
-    template_string += R"(${SHIT_GIT_BRANCH:+)";
+    template_string += R"(${KOSH_GIT_BRANCH:+)";
     template_string += colors::ansi::CYAN;
-    template_string += R"($SHIT_GIT_BRANCH)";
+    template_string += R"($KOSH_GIT_BRANCH)";
     template_string += colors::ansi::RESET;
     template_string += R"(})";
-    template_string += R"(${SHIT_GIT_AHEAD:+ )";
+    template_string += R"(${KOSH_GIT_AHEAD:+ )";
     template_string += colors::ansi::BOLD_YELLOW;
     template_string += "\xe2\x86\x91";
-    template_string += R"($SHIT_GIT_AHEAD)";
+    template_string += R"($KOSH_GIT_AHEAD)";
     template_string += colors::ansi::RESET;
     template_string += R"(})";
-    template_string += R"(${SHIT_GIT_BEHIND:+ )";
+    template_string += R"(${KOSH_GIT_BEHIND:+ )";
     template_string += colors::ansi::BOLD_YELLOW;
     template_string += "\xe2\x86\x93";
-    template_string += R"($SHIT_GIT_BEHIND)";
+    template_string += R"($KOSH_GIT_BEHIND)";
     template_string += colors::ansi::RESET;
     template_string += R"(})";
-    template_string += R"(${SHIT_GIT_BRANCH:+ at }\u@\h )";
+    template_string += R"(${KOSH_GIT_BRANCH:+ at }\u@\h )";
     template_string += colors::ansi::GREEN;
     template_string += R"(\P)";
     template_string += colors::ansi::RESET;
   } else {
-    template_string += R"([${SHIT_GIT_BRANCH:+$SHIT_GIT_BRANCH})";
-    template_string += R"(${SHIT_GIT_AHEAD:+ )";
+    template_string += R"([${KOSH_GIT_BRANCH:+$KOSH_GIT_BRANCH})";
+    template_string += R"(${KOSH_GIT_AHEAD:+ )";
     template_string += "\xe2\x86\x91";
-    template_string += R"($SHIT_GIT_AHEAD})";
-    template_string += R"(${SHIT_GIT_BEHIND:+ )";
+    template_string += R"($KOSH_GIT_AHEAD})";
+    template_string += R"(${KOSH_GIT_BEHIND:+ )";
     template_string += "\xe2\x86\x93";
-    template_string += R"($SHIT_GIT_BEHIND})";
-    template_string += R"(${SHIT_GIT_BRANCH:+ at }\u@\h \P)";
+    template_string += R"($KOSH_GIT_BEHIND})";
+    template_string += R"(${KOSH_GIT_BRANCH:+ at }\u@\h \P)";
   }
   template_string += R"( \. )";
   return template_string;
@@ -1194,7 +1204,7 @@ static constexpr char PROMPT_GUARD_BACKTICK = '\x03';
 
 static fn guard_prompt_backslashes(StringView template_string) throws -> String
 {
-  let out = String{shit::heap_allocator()};
+  let out = String{koshka::heap_allocator()};
   for (usize i = 0; i < template_string.length; i++) {
     if (template_string[i] == '\\' && i + 1 < template_string.length) {
       switch (template_string[i + 1]) {
@@ -1220,7 +1230,7 @@ static fn guard_prompt_backslashes(StringView template_string) throws -> String
 
 static fn unguard_prompt_backslashes(StringView expanded) throws -> String
 {
-  let out = String{shit::heap_allocator()};
+  let out = String{koshka::heap_allocator()};
   for (usize i = 0; i < expanded.length; i++) {
     switch (expanded[i]) {
     case PROMPT_GUARD_DOLLAR: out += "\\$"; break;
@@ -1235,7 +1245,7 @@ static fn unguard_prompt_backslashes(StringView expanded) throws -> String
 /* Only an SGR sequence ending in 'm' is stripped, a non-color CSI is left. */
 static fn strip_ansi_color(StringView text) throws -> String
 {
-  let out = String{shit::heap_allocator()};
+  let out = String{koshka::heap_allocator()};
   usize i = 0;
   while (i < text.length) {
     if (text[i] == '\x1b' && i + 1 < text.length && text[i + 1] == '[') {
@@ -1267,14 +1277,14 @@ fn build_prompt(EvalContext &context) -> String
   let const full_pwd = Path::current_directory().text().clone();
 
   /* The user is stable for the session, so it is resolved once and reused. */
-  static String CACHED_USER{shit::heap_allocator()};
+  static String CACHED_USER{koshka::heap_allocator()};
   static bool was_user_resolved = false;
   if (!was_user_resolved) {
     CACHED_USER = os::get_current_user().value_or("???");
     was_user_resolved = true;
   }
 
-  String ps1_template{shit::heap_allocator()};
+  String ps1_template{koshka::heap_allocator()};
   if (Maybe<String> ps1 = context.get_variable_value("PS1");
       ps1.has_value() && !ps1->is_empty())
     ps1_template = steal(*ps1);
@@ -1286,7 +1296,7 @@ fn build_prompt(EvalContext &context) -> String
      named $(...) therefore cannot run a command at the prompt. */
 
   let scanned_inputs =
-      shit::ArrayList<prompt_cache_input>{shit::heap_allocator()};
+      koshka::ArrayList<prompt_cache_input>{koshka::heap_allocator()};
   const bool is_cacheable =
       scan_prompt_template_inputs(ps1_template.view(), scanned_inputs);
   if (is_cacheable && PROMPT_CACHE_VALID &&
@@ -1315,11 +1325,11 @@ fn build_prompt(EvalContext &context) -> String
 
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps1_template.view());
-  String expanded{shit::heap_allocator()};
+  String expanded{koshka::heap_allocator()};
   try {
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view()).view());
-  } catch (const shit::ErrorBase &) {
+  } catch (const koshka::ErrorBase &) {
     /* A prompt draw error leaves the template standing rather than taking down
        the shell. */
     expanded = ps1_template;
@@ -1346,17 +1356,17 @@ fn render_ps0(EvalContext &context) -> String
 {
   Maybe<String> ps0 = context.get_variable_value("PS0");
   if (!ps0.has_value() || ps0->is_empty())
-    return String{shit::heap_allocator()};
+    return String{koshka::heap_allocator()};
 
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps0->view());
-  String expanded{shit::heap_allocator()};
+  String expanded{koshka::heap_allocator()};
   try {
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view()).view());
-  } catch (const shit::ErrorBase &) {
+  } catch (const koshka::ErrorBase &) {
     context.set_last_exit_status(saved_status);
-    return String{shit::heap_allocator()};
+    return String{koshka::heap_allocator()};
   }
   context.set_last_exit_status(saved_status);
 
@@ -1370,22 +1380,22 @@ fn render_ps0(EvalContext &context) -> String
 
 } /* namespace toiletline */
 
-#else /* SHIT_NO_TOILETLINE */
+#else /* KOSH_NO_TOILETLINE */
 
 /* The line editor is compiled out, so these stubs keep the shell linking. */
 namespace toiletline {
 
-using shit::String;
-using shit::StringView;
+using koshka::String;
+using koshka::StringView;
 
 struct input_result
 {
   i32 code;
   String text;
-  shit::Maybe<usize> history_event_number{shit::None};
+  koshka::Maybe<usize> history_event_number{koshka::None};
 };
 
-fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
+fn enable_completion(koshka::EvalContext &context) -> void { unused(context); }
 
 fn disable_completion() -> void {}
 
@@ -1395,7 +1405,7 @@ fn enter_calc_history() -> void {}
 
 fn leave_calc_history() -> void {}
 
-fn history_path() -> shit::Maybe<shit::Path> { return shit::None; }
+fn history_path() -> koshka::Maybe<koshka::Path> { return koshka::None; }
 
 fn history_write() -> bool { return true; }
 
@@ -1409,15 +1419,16 @@ struct history_event
   String command;
 };
 
-fn history_events(shit::Allocator allocator) -> shit::ArrayList<history_event>
+fn history_events(koshka::Allocator allocator)
+    -> koshka::ArrayList<history_event>
 {
-  return shit::ArrayList<history_event>{allocator};
+  return koshka::ArrayList<history_event>{allocator};
 }
 
-fn history_append_event(StringView command) -> shit::Maybe<usize>
+fn history_append_event(StringView command) -> koshka::Maybe<usize>
 {
   unused(command);
-  return shit::None;
+  return koshka::None;
 }
 
 fn history_rewrite_event(usize number, StringView expected,
@@ -1430,7 +1441,7 @@ fn history_rewrite_event(usize number, StringView expected,
 }
 
 fn history_rewrite_event(usize number, StringView expected,
-                         const shit::ArrayList<shit::String> &replacements)
+                         const koshka::ArrayList<koshka::String> &replacements)
     -> bool
 {
   unused(number);
@@ -1439,7 +1450,7 @@ fn history_rewrite_event(usize number, StringView expected,
   return false;
 }
 
-fn enable_job_notifications(shit::EvalContext &context) -> void
+fn enable_job_notifications(koshka::EvalContext &context) -> void
 {
   unused(context);
 }
@@ -1476,7 +1487,7 @@ fn is_active() -> bool { return false; }
 
 fn initialize() -> void
 {
-  throw shit::Error{
+  throw koshka::Error{
       "This build has no line editor, use '-c', '-s', or a file argument"};
 }
 
@@ -1485,7 +1496,7 @@ fn exit() -> void {}
 fn get_input(const String &prompt) -> input_result
 {
   unused(prompt);
-  throw shit::Error{"This build has no line editor"};
+  throw koshka::Error{"This build has no line editor"};
 }
 
 fn set_input(const String &input) -> void { unused(input); }
@@ -1499,38 +1510,38 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 fn default_prompt_template() -> String
 {
   let template_string = String{};
-  const bool should_use_color = shit::colors::stdout_wants_color();
+  const bool should_use_color = koshka::colors::stdout_wants_color();
 
   if (should_use_color) {
-    template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ (";
-    template_string += shit::colors::ansi::CYAN;
-    template_string += "$SHIT_GIT_BRANCH";
-    template_string += shit::colors::ansi::RESET;
+    template_string += "[\\u@\\h${KOSH_GIT_BRANCH:+ (";
+    template_string += koshka::colors::ansi::CYAN;
+    template_string += "$KOSH_GIT_BRANCH";
+    template_string += koshka::colors::ansi::RESET;
     template_string += ")} ";
-    template_string += shit::colors::ansi::GREEN;
+    template_string += koshka::colors::ansi::GREEN;
     template_string += "\\P";
-    template_string += shit::colors::ansi::RESET;
+    template_string += koshka::colors::ansi::RESET;
   } else {
-    template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} \\P";
+    template_string += "[\\u@\\h${KOSH_GIT_BRANCH:+ ($KOSH_GIT_BRANCH)} \\P";
   }
   template_string += "] ";
   return template_string;
 }
 
-fn build_prompt(shit::EvalContext &context) -> String
+fn build_prompt(koshka::EvalContext &context) -> String
 {
   unused(context);
-  throw shit::Error{"This build has no line editor"};
+  throw koshka::Error{"This build has no line editor"};
 }
 
-fn expand_prompt_template(StringView prompt, shit::EvalContext &context)
+fn expand_prompt_template(StringView prompt, koshka::EvalContext &context)
     -> String
 {
   unused(context);
   return String{prompt};
 }
 
-fn render_ps0(shit::EvalContext &context) -> String
+fn render_ps0(koshka::EvalContext &context) -> String
 {
   unused(context);
   return String{};
@@ -1538,4 +1549,4 @@ fn render_ps0(shit::EvalContext &context) -> String
 
 } /* namespace toiletline */
 
-#endif /* SHIT_NO_TOILETLINE */
+#endif /* KOSH_NO_TOILETLINE */

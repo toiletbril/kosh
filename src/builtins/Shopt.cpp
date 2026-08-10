@@ -24,7 +24,7 @@ FLAG(SHOPT_SET_OPTIONS, Bool, 'o', "", "Operate on the set -o option names.");
 
 REGISTER_BUILTIN_FLAGS(Shopt);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -301,4 +301,4 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

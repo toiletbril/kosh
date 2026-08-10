@@ -1,0 +1,11 @@
+#!/bin/env kosh
+start=$PWD
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY/cd-dash/first" "$TEST_TEMP_DIRECTORY/cd-dash/second"
+cd "$TEST_TEMP_DIRECTORY/cd-dash/first"
+cd ../second
+cd - >/dev/null
+koshkit basename "$PWD"
+echo "PWD=$(koshkit basename "$PWD") OLDPWD=$(koshkit basename "$OLDPWD")"
+cd - >/dev/null
+koshkit basename "$PWD"
+cd "$start"

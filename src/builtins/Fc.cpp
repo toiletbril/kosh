@@ -25,7 +25,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Fc);
 
-namespace shit {
+namespace koshka {
 
 struct fc_options
 {
@@ -492,4 +492,4 @@ fn Fc::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                           last_index);
 }
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -1,3 +1,3 @@
-shit: 2:6: error: Unable to build the pipeline because no command follows the pipe to receive the output.
+kosh: 2:6: error: Unable to build the pipeline because no command follows the pipe to receive the output.
      2 |  true |
        |       ^

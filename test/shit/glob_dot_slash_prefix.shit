@@ -1,8 +1,0 @@
-#!/bin/env shit
-start=$PWD
-directory=$TEST_TEMP_DIRECTORY/glob-dot-slash
-shitbox rm -rf "$directory"
-shitbox mkdir -p "$directory"
-cd "$directory" && : > a.sh && : > b.sh && echo ./*.sh && echo *.sh
-cd "$start"
-shitbox rm -rf "$directory"

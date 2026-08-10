@@ -1,6 +1,6 @@
-shit: 2:1: error: Unterminated if.
+kosh: 2:1: error: Unterminated if.
      2 |  if true; then
        |  ^~
-shit: 2:14: details:
+kosh: 2:14: details:
      2 |  if true; then
        |               ^ Expected 'fi'.

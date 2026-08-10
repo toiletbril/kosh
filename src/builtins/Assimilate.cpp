@@ -18,12 +18,12 @@ FLAG(SSH_COMMAND, String, '\0', "ssh-command",
 FLAG(SCP_COMMAND, String, '\0', "scp-command",
      "Use this space-separated command instead of scp.");
 FLAG(LINK_MOOD, ManyStrings, '\0', "link-mood",
-     "Link this binary as bash, dash, sh, or shit. Commas are accepted.");
+     "Link this binary as bash, dash, sh, or kosh. Commas are accepted.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Assimilate);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -52,7 +52,7 @@ remove_recorded_links() {
   [ ! -r "$links_file" ] || while IFS= read -r link_name; do
     case $link_name in bash|dash|sh) ;; *) return 1 ;; esac
     link_path=${links_file%/*}/../$link_name
-    [ ! -L "$link_path" ] || shitbox rm -f "$link_path" || return 1
+    [ ! -L "$link_path" ] || koshkit rm -f "$link_path" || return 1
   done < "$links_file"
 }
 cleanup() {
@@ -65,36 +65,36 @@ cleanup() {
   cleanup_failed=0
   trap - 0 1 2 15
   if [ "$lock_owned" -eq 1 ]; then
-    [ -n "$candidate" ] || [ ! -r "$lock/candidate" ] || candidate=$(shitbox cat "$lock/candidate")
-    [ -n "$upload" ] || [ ! -r "$lock/upload" ] || upload=$(shitbox cat "$lock/upload")
+    [ -n "$candidate" ] || [ ! -r "$lock/candidate" ] || candidate=$(koshkit cat "$lock/candidate")
+    [ -n "$upload" ] || [ ! -r "$lock/upload" ] || upload=$(koshkit cat "$lock/upload")
     if [ "$rollback_active" -eq 1 ] && [ "$committed" -eq 0 ]; then
       remove_recorded_links "$lock/links" || cleanup_failed=1
       if [ "$had_target" -eq 1 ] && { [ -e "$backup" ] || [ -L "$backup" ]; }; then
-        shitbox mv -f "$backup" "$target" || cleanup_failed=1
+        koshkit mv -f "$backup" "$target" || cleanup_failed=1
       elif [ "$had_target" -eq 1 ]; then
         [ -e "$target" ] || [ -L "$target" ] || cleanup_failed=1
       else
-        shitbox rm -f "$target" || cleanup_failed=1
+        koshkit rm -f "$target" || cleanup_failed=1
       fi
     fi
-    [ -z "$candidate" ] || shitbox rm -f "$candidate" || cleanup_failed=1
-    [ -z "$upload" ] || shitbox rm -f "$upload" || cleanup_failed=1
+    [ -z "$candidate" ] || koshkit rm -f "$candidate" || cleanup_failed=1
+    [ -z "$upload" ] || koshkit rm -f "$upload" || cleanup_failed=1
     if [ "$committed" -eq 1 ] || [ "$rollback_active" -eq 0 ]; then
-      [ -z "$backup" ] || shitbox rm -f "$backup" || cleanup_failed=1
+      [ -z "$backup" ] || koshkit rm -f "$backup" || cleanup_failed=1
     fi
     if [ "$cleanup_failed" -eq 0 ]; then
-      shitbox rm -f "$lock/upload" "$lock/candidate" \
+      koshkit rm -f "$lock/upload" "$lock/candidate" \
         "$lock/had-target" "$lock/rollback" "$lock/committed" \
         "$lock/links" || cleanup_failed=1
-      [ "$lock_published" -eq 0 ] || shitbox rm -f "$lock_path" || cleanup_failed=1
+      [ "$lock_published" -eq 0 ] || koshkit rm -f "$lock_path" || cleanup_failed=1
       if [ "$cleanup_failed" -eq 0 ]; then
-        shitbox rm -f "$lock/owner" || cleanup_failed=1
-        [ "$cleanup_failed" -ne 0 ] || shitbox rmdir "$lock" || cleanup_failed=1
+        koshkit rm -f "$lock/owner" || cleanup_failed=1
+        [ "$cleanup_failed" -ne 0 ] || koshkit rmdir "$lock" || cleanup_failed=1
       fi
     fi
   else
-    [ -z "$candidate" ] || shitbox rm -f "$candidate" || cleanup_failed=1
-    [ -z "$upload" ] || shitbox rm -f "$upload" || cleanup_failed=1
+    [ -z "$candidate" ] || koshkit rm -f "$candidate" || cleanup_failed=1
+    [ -z "$upload" ] || koshkit rm -f "$upload" || cleanup_failed=1
   fi
   [ "$cleanup_failed" -eq 0 ] || exit 1
   exit "$transaction_status"
@@ -104,8 +104,8 @@ load_stale_lock_record() {
   stale_lock_name=${lock_record#*:}
   [ "$stale_lock_name" != "$lock_record" ] || return 1
   case $stale_owner in ''|*[!0-9]*) return 1 ;; esac
-  case $stale_lock_name in .shit-assimilate-*.lock) ;; *) return 1 ;; esac
-  stale_transaction_id=${stale_lock_name#.shit-assimilate-}
+  case $stale_lock_name in .kosh-assimilate-*.lock) ;; *) return 1 ;; esac
+  stale_transaction_id=${stale_lock_name#.kosh-assimilate-}
   stale_transaction_id=${stale_transaction_id%.lock}
   stale_process_id=${stale_transaction_id%%-*}
   stale_timestamp=${stale_transaction_id#*-}
@@ -115,17 +115,17 @@ load_stale_lock_record() {
   [ "$stale_transaction_id" = "$stale_process_id-$stale_timestamp" ] || return 1
   stale_lock=$install_dir/$stale_lock_name
   [ -d "$stale_lock" ] && [ ! -L "$stale_lock" ] || return 1
-  stale_upload=.shit-assimilate-$stale_transaction_id.upload
-  stale_candidate=$install_dir/.shit-assimilate-$stale_transaction_id.candidate
+  stale_upload=.kosh-assimilate-$stale_transaction_id.upload
+  stale_candidate=$install_dir/.kosh-assimilate-$stale_transaction_id.candidate
   [ "${1-0}" -eq 0 ] || return 0
   [ ! -L "$stale_lock/upload" ] || return 1
   [ ! -L "$stale_lock/candidate" ] || return 1
   if [ -e "$stale_lock/upload" ]; then
-    recorded_upload=$(shitbox cat "$stale_lock/upload") || return 1
+    recorded_upload=$(koshkit cat "$stale_lock/upload") || return 1
     [ "$recorded_upload" = "$stale_upload" ] || return 1
   fi
   if [ -e "$stale_lock/candidate" ]; then
-    recorded_candidate=$(shitbox cat "$stale_lock/candidate") || return 1
+    recorded_candidate=$(koshkit cat "$stale_lock/candidate") || return 1
     [ "$recorded_candidate" = "$stale_candidate" ] || return 1
   fi
 }
@@ -135,40 +135,40 @@ recover_stale_lock() {
     remove_recorded_links "$stale_lock/links" || return 1
     if [ -e "$stale_lock/had-target" ]; then
       if [ -e "$stale_backup" ] || [ -L "$stale_backup" ]; then
-        shitbox mv -f "$stale_backup" "$target" || return 1
+        koshkit mv -f "$stale_backup" "$target" || return 1
       else
         [ -e "$target" ] || [ -L "$target" ] || return 1
       fi
     else
-      shitbox rm -f "$target" || return 1
+      koshkit rm -f "$target" || return 1
     fi
   fi
-  shitbox rm -f "$stale_candidate" "$stale_upload" "$stale_backup" || return 1
-  shitbox rm -f "$stale_lock/upload" "$stale_lock/candidate" \
+  koshkit rm -f "$stale_candidate" "$stale_upload" "$stale_backup" || return 1
+  koshkit rm -f "$stale_lock/upload" "$stale_lock/candidate" \
     "$stale_lock/had-target" "$stale_lock/rollback" \
     "$stale_lock/committed" "$stale_lock/links" || return 1
   if [ "${1-0}" -eq 1 ]; then
-    current_lock_record=$(shitbox cat "$lock_path") || return 1
+    current_lock_record=$(koshkit cat "$lock_path") || return 1
     [ "$current_lock_record" = "$lock_record" ] || return 1
-    shitbox rm -f "$lock_path" || return 1
+    koshkit rm -f "$lock_path" || return 1
   fi
-  shitbox rm -f "$stale_lock/owner" || return 1
-  shitbox rmdir "$stale_lock" || return 1
+  koshkit rm -f "$stale_lock/owner" || return 1
+  koshkit rmdir "$stale_lock" || return 1
 }
 recover_existing_lock() {
-  lock_record=$(shitbox cat "$lock_path") || return 1
+  lock_record=$(koshkit cat "$lock_path") || return 1
   load_stale_lock_record || return 1
   recover_stale_lock 1
 }
 recover_orphan_locks() {
-  for orphan_lock in "$install_dir"/.shit-assimilate-*.lock; do
+  for orphan_lock in "$install_dir"/.kosh-assimilate-*.lock; do
     [ -d "$orphan_lock" ] || continue
     [ ! -L "$orphan_lock" ] || return 1
     if [ ! -e "$orphan_lock/rollback" ] && [ ! -e "$orphan_lock/committed" ]; then
       lock_record=0:${orphan_lock##*/}
       load_stale_lock_record 1 || return 1
     else
-      lock_record=$(shitbox cat "$orphan_lock/owner") || return 1
+      lock_record=$(koshkit cat "$orphan_lock/owner") || return 1
       load_stale_lock_record || return 1
     fi
     [ "$stale_lock" = "$orphan_lock" ] || return 1
@@ -201,7 +201,7 @@ directory_accepts_links() {
       *,*) link_name=${remaining_moods%%,*}; remaining_moods=${remaining_moods#*,} ;;
       *) link_name=$remaining_moods; remaining_moods= ;;
     esac
-    [ "$link_name" = shit ] && continue
+    [ "$link_name" = kosh ] && continue
     link_path=$install_dir/$link_name
     if [ -e "$link_path" ] || [ -L "$link_path" ]; then
       [ -L "$link_path" ] && [ "$link_path" -ef "$target" ] || return 1
@@ -214,8 +214,8 @@ try_install_directory() {
   [ -d "$proposed_directory" ] && [ -w "$proposed_directory" ] &&
     [ -x "$proposed_directory" ] || return 1
   install_dir=$(cd "$proposed_directory" && pwd -P) || return 1
-  target=$install_dir/shit
-  lock_path=$install_dir/.shit-assimilate.lock
+  target=$install_dir/kosh
+  lock_path=$install_dir/.kosh-assimilate.lock
   recover_all_stale_locks || return 1
   directory_accepts_links || return 1
 }
@@ -249,12 +249,12 @@ while [ -z "$install_dir" ]; do
   [ "$has_more" -eq 1 ] || break
 done
 [ -n "$install_dir" ] || exit 1
-candidate=$install_dir/.shit-assimilate-$2.candidate
+candidate=$install_dir/.kosh-assimilate-$2.candidate
 [ ! -d "$target" ] || exit 1
 recover_all_stale_locks
 trap '' 1 2 15
-new_lock=$install_dir/.shit-assimilate-$2.lock
-shitbox mkdir "$new_lock"
+new_lock=$install_dir/.kosh-assimilate-$2.lock
+koshkit mkdir "$new_lock"
 lock=$new_lock
 lock_owned=1
 backup=$lock/backup
@@ -262,16 +262,16 @@ printf '%s:%s\n' "$$" "${lock##*/}" > "$lock/owner"
 printf '%s\n' "$upload" > "$lock/upload"
 printf '%s\n' "$candidate" > "$lock/candidate"
 : > "$lock/links"
-if ! shitbox ln -s "$lock/owner" "$lock_path"; then
+if ! koshkit ln -s "$lock/owner" "$lock_path"; then
   recover_existing_lock
-  shitbox ln -s "$lock/owner" "$lock_path"
+  koshkit ln -s "$lock/owner" "$lock_path"
 fi
 lock_published=1
 trap 'exit 129' 1
 trap 'exit 130' 2
 trap 'exit 143' 15
-shitbox mv "$upload" "$candidate"
-if ! candidate_identity=$("$candidate" -p --mood sh -c 'printf "%s\n" "$SHIT_IDENTITY"'); then
+koshkit mv "$upload" "$candidate"
+if ! candidate_identity=$("$candidate" -p --mood sh -c 'printf "%s\n" "$KOSH_IDENTITY"'); then
   cleanup 1
 fi
 [ -n "$candidate_identity" ] && [ "$candidate_identity" = "$3" ] || cleanup 1
@@ -281,10 +281,10 @@ if [ -e "$target" ] || [ -L "$target" ]; then
 fi
 rollback_active=1
 : > "$lock/rollback"
-[ "$had_target" -eq 0 ] || shitbox mv -f "$target" "$backup"
-shitbox mv -f "$candidate" "$target"
+[ "$had_target" -eq 0 ] || koshkit mv -f "$target" "$backup"
+koshkit mv -f "$candidate" "$target"
 candidate=
-if ! target_identity=$("$target" -p --mood sh -c 'printf "%s\n" "$SHIT_IDENTITY"'); then
+if ! target_identity=$("$target" -p --mood sh -c 'printf "%s\n" "$KOSH_IDENTITY"'); then
   cleanup 1
 fi
 [ -n "$target_identity" ] && [ "$target_identity" = "$candidate_identity" ] || cleanup 1
@@ -294,12 +294,12 @@ while [ -n "$remaining_moods" ]; do
     *,*) link_name=${remaining_moods%%,*}; remaining_moods=${remaining_moods#*,} ;;
     *) link_name=$remaining_moods; remaining_moods= ;;
   esac
-  [ "$link_name" = shit ] && continue
+  [ "$link_name" = kosh ] && continue
   link_path=$install_dir/$link_name
   if [ -e "$link_path" ] || [ -L "$link_path" ]; then
     [ -L "$link_path" ] && [ "$link_path" -ef "$target" ] || cleanup 1
   else
-    shitbox ln -s shit "$link_path" || cleanup 1
+    koshkit ln -s kosh "$link_path" || cleanup 1
     printf '%s\n' "$link_name" >> "$lock/links"
   fi
 done
@@ -310,17 +310,17 @@ if ! : > "$lock/committed"; then
 fi
 committed=1
 rollback_active=0
-shitbox rm -f "$lock/rollback"
-[ "$had_target" -eq 0 ] || shitbox rm -f "$backup"
-shitbox rm -f "$lock/upload" "$lock/candidate" \
+koshkit rm -f "$lock/rollback"
+[ "$had_target" -eq 0 ] || koshkit rm -f "$backup"
+koshkit rm -f "$lock/upload" "$lock/candidate" \
   "$lock/had-target" "$lock/committed" "$lock/links"
-shitbox rm -f "$lock_path"
+koshkit rm -f "$lock_path"
 lock_published=0
-shitbox rm -f "$lock/owner"
-shitbox rmdir "$lock"
+koshkit rm -f "$lock/owner"
+koshkit rmdir "$lock"
 lock_owned=0
 lock=
-shitbox rm -f "$upload"
+koshkit rm -f "$upload"
 trap - 0 1 2 15
 printf '%s\n' "$target"
 )SH";
@@ -332,11 +332,11 @@ constexpr char REMOTE_PREFLIGHT_TEXT[] = R"SH(set -eu
 expected_system=$2
 expected_machine=$3
 if ! remote_system=$(uname -s 2>/dev/null); then
-  printf '%s\n' 'shit: assimilate: Cannot determine the remote operating system.' >&2
+  printf '%s\n' 'kosh: assimilate: Cannot determine the remote operating system.' >&2
   exit 125
 fi
 if ! remote_machine=$(uname -m 2>/dev/null); then
-  printf '%s\n' 'shit: assimilate: Cannot determine the remote architecture.' >&2
+  printf '%s\n' 'kosh: assimilate: Cannot determine the remote architecture.' >&2
   exit 125
 fi
 case $expected_machine in
@@ -352,7 +352,7 @@ machine_matches=0
 [ "$expected_system" = any ] || [ "$expected_system" = "$remote_system" ] || system_matches=1
 [ "$expected_machine" = any ] || [ "$expected_machine" = "$remote_machine" ] || machine_matches=1
 if [ "$system_matches" -ne 0 ] || [ "$machine_matches" -ne 0 ]; then
-  printf 'shit: assimilate: Cannot install a %s/%s binary on %s/%s.\n' \
+  printf 'kosh: assimilate: Cannot install a %s/%s binary on %s/%s.\n' \
     "$expected_system" "$expected_machine" "$remote_system" "$remote_machine" >&2
   exit 126
 fi
@@ -442,8 +442,8 @@ fn remote_command(StringView upload_name, StringView transaction_id,
   do_append_argument("--mood");
   do_append_argument("sh");
   do_append_argument("-c");
-  do_append_argument("shitbox flock --transaction-held-lock \"$@\"");
-  do_append_argument("shit");
+  do_append_argument("koshkit flock --transaction-held-lock \"$@\"");
+  do_append_argument("kosh");
   do_append_argument(".");
   do_append_argument(upload_path.view());
   do_append_argument("-p");
@@ -451,7 +451,7 @@ fn remote_command(StringView upload_name, StringView transaction_id,
   do_append_argument("sh");
   do_append_argument("-c");
   do_append_argument(REMOTE_TRANSACTION);
-  do_append_argument("shit");
+  do_append_argument("kosh");
   do_append_argument(upload_name);
   do_append_argument(transaction_id);
   do_append_argument(expected_identity);
@@ -568,7 +568,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       {SSK("bash"), true},
       {SSK("dash"), true},
       {SSK("sh"),   true},
-      {SSK("shit"), true},
+      {SSK("kosh"), true},
   };
   constexpr StaticStringMap LINK_MOODS{LINK_MOOD_ENTRIES};
   let link_moods = String{allocator};
@@ -591,7 +591,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  let const expected_identity = cxt.materialize_shit_identity();
+  let const expected_identity = cxt.materialize_kosh_identity();
   if (!expected_identity.has_value()) {
     report_soft_builtin_error(ec, cxt,
                               "Cannot identify this shell's executable");
@@ -613,7 +613,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       String::from(static_cast<u64>(os::get_shell_process_id()), allocator) +
       "-" + String::from(os::realtime_microseconds(), allocator);
   let const upload_name =
-      String{".shit-assimilate-"} + transaction_id + ".upload";
+      String{".kosh-assimilate-"} + transaction_id + ".upload";
   let const destination = arguments[1].view() + ":" + upload_name;
 
   let scp_arguments = ArrayList<String>{allocator};
@@ -638,4 +638,4 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

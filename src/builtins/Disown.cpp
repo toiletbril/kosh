@@ -20,7 +20,7 @@ FLAG(NO_HUP, Bool, 'h', "nohup",
 
 REGISTER_BUILTIN_FLAGS(Disown);
 
-namespace shit {
+namespace koshka {
 
 Disown::Disown() = default;
 
@@ -74,4 +74,4 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace shit
+} // namespace koshka

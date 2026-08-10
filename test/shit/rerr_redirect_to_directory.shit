@@ -1,3 +1,0 @@
-#!/bin/env shit
-shitbox mkdir -p "$TEST_TEMP_DIRECTORY/redirect-directory"
-echo hi > "$TEST_TEMP_DIRECTORY/redirect-directory"

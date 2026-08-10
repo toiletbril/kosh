@@ -1,5 +1,5 @@
 # Regression tests for correctness fixes found in the code-review sweep.
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 echo "== bare wait returns 0, not the last job status:"
 "$BIN" -c '(exit 7) & wait; echo "rc=$?"'
 echo "== declare -x exports an already-set variable:"
@@ -11,7 +11,7 @@ $'\n'
 EOF
 OUTER
 echo "== pkill rejects an empty pattern:"
-"$BIN" -c 'shitbox pkill ""' 2>&1
+"$BIN" -c 'koshkit pkill ""' 2>&1
 echo "== cp -r of a directory into itself is refused, not infinite:"
 start=$PWD
 d=$(mktemp -d)
@@ -19,4 +19,4 @@ trap 'cd "$start" && rm -rf "$d"' EXIT
 cd "$d" || exit 1
 mkdir sub
 : > sub/f
-"$BIN" -c 'shitbox cp -r sub sub' 2>&1
+"$BIN" -c 'koshkit cp -r sub sub' 2>&1

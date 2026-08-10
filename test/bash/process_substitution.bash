@@ -8,10 +8,10 @@ wc -l < <(seq 5) | tr -d ' '
 diff <(printf 'a\nb\nc\n') <(printf 'a\nx\nc\n') | grep -c '^[<>]'
 echo <(true) | grep -c '^/dev/fd/'
 sort <(printf '3\n1\n2\n')
-echo data | tee >(cat > /tmp/shit_ps_out_$$) >/dev/null
+echo data | tee >(cat > /tmp/kosh_ps_out_$$) >/dev/null
 sleep 0.2
-cat /tmp/shit_ps_out_$$
-rm -f /tmp/shit_ps_out_$$
+cat /tmp/kosh_ps_out_$$
+rm -f /tmp/kosh_ps_out_$$
 
 
 # A process substitution as a while loop's redirection target is read correctly

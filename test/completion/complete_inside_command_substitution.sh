@@ -11,7 +11,7 @@ echo "== inside \$( ):"
 
 echo "== before a closed substitution delimiter:"
 line='echo $(probecmd a)'
-SHIT_TEST_COMPLETE_CURSOR=$((${#line} - 1)) \
+KOSH_TEST_COMPLETE_CURSOR=$((${#line} - 1)) \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null
 
@@ -19,21 +19,21 @@ echo "== command name before a closed substitution delimiter:"
 printf '#!/bin/sh\n' > "$dir/innerprobe-command"
 chmod +x "$dir/innerprobe-command"
 line='echo $(innerprobe-c)'
-SHIT_TEST_COMPLETE_CURSOR=$((${#line} - 1)) \
+KOSH_TEST_COMPLETE_CURSOR=$((${#line} - 1)) \
     env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$dir" \
     "$BIN" --debug-complete-at "$line" </dev/null
 
 echo "== quoted close and outer suffix stay outside the active body:"
 prefix='echo $(printf ")"; probecmd b'
 line="$prefix) tail"
-SHIT_TEST_COMPLETE_CURSOR=${#prefix} \
+KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null
 
 echo "== innermost closed substitution owns the cursor:"
 prefix='echo $(echo $(probecmd g'
 line="$prefix))"
-SHIT_TEST_COMPLETE_CURSOR=${#prefix} \
+KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null
 echo "== a heredoc close does not close the substitution:"
@@ -42,7 +42,7 @@ prefix='echo $(cat <<EOF
 EOF
 probecmd a'
 line="$prefix) tail"
-SHIT_TEST_COMPLETE_CURSOR=${#prefix} \
+KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null
 echo "== inside backticks:"
@@ -65,7 +65,7 @@ echo "== arithmetic is not a command body:"
 echo "== a case pattern does not close the substitution:"
 prefix='echo $(case x in x) probecmd a'
 line="$prefix;; esac)"
-SHIT_TEST_COMPLETE_CURSOR=${#prefix} \
+KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null
 
@@ -73,6 +73,6 @@ echo "== an operator-adjacent comment ends at its newline:"
 prefix='echo $(true;# )
 probecmd a'
 line="$prefix)"
-SHIT_TEST_COMPLETE_CURSOR=${#prefix} \
+KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null

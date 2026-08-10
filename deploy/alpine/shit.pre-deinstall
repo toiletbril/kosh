@@ -1,3 +1,0 @@
-#!/bin/sh
-remove-shell '/usr/bin/shit'
-exit 0

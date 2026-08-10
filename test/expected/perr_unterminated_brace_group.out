@@ -1,6 +1,6 @@
-shit: 2:1: error: Unterminated brace group.
+kosh: 2:1: error: Unterminated brace group.
      2 |  { echo hi
        |  ^
-shit: 2:10: details:
+kosh: 2:10: details:
      2 |  { echo hi
        |           ^ Expected '}'.

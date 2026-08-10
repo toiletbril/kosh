@@ -1,0 +1,22 @@
+#!/bin/env kosh
+# The malformed-glob prepass keeps a leading member ] in view and skips a
+# leading ! or ^, mirroring the matcher. A negated class still negates, a leading
+# member ] is still a member, and a bracket the matcher accepts no longer raises
+# a spurious unterminated-class analysis error. These arms use the POSIX !
+# negation, so they match dash. The ^ spelling is a shell extension.
+
+# A POSIX negated class negates and matches with its closing member.
+case b in [!a]) echo neg_b_hit;; *) echo neg_b_miss;; esac
+case a in [!a]) echo neg_a_hit;; *) echo neg_a_miss;; esac
+
+# A leading member ] inside an otherwise normal class is a member, not the
+# terminator, so the class is { ], x }.
+case ] in []x]) echo member_close_hit;; *) echo member_close_miss;; esac
+case x in []x]) echo member_x_hit;; *) echo member_x_miss;; esac
+case y in []x]) echo member_y_hit;; *) echo member_y_miss;; esac
+
+# A leading member ] after a ! negation is also a member, so [!]x] negates the
+# set { ], x } and matches anything else.
+case a in [!]x]) echo neg_member_a_hit;; *) echo neg_member_a_miss;; esac
+case ] in [!]x]) echo neg_member_close_hit;; *) echo neg_member_close_miss;; esac
+case x in [!]x]) echo neg_member_x_hit;; *) echo neg_member_x_miss;; esac

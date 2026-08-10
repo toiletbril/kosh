@@ -1,0 +1,2 @@
+#!/bin/env kosh
+IFS=:; x=a::b:c; set -- $x; echo "[$1][$2][$3][$4] n=$#"

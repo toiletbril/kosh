@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # disown -r drops the running jobs and keeps a stopped one. It refreshes the
 # recorded state itself, so a stopped job survives even with no jobs call before
 # the disown. The short wait lets the stop reach the job before disown runs.

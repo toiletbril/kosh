@@ -7,7 +7,7 @@
 [Word
   ArithmeticExpansion "1/0"
 ]
-shit: 2:6: error: Division by zero.
+kosh: 2:6: error: Division by zero.
      2 |  echo $((1/0))
        |       ^~~~~~~~
 note: The right operand evaluated to 0.

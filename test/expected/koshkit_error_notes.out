@@ -1,0 +1,25 @@
+=== killall arg count ===
+kosh: 1:1: error: killall expects one process name.
+     1 |  koshkit killall a b
+       |  ^~~~~~~~~~~~~~~~~~~
+note: Pass one name, e.g. `killall firefox`.
+=== seq zero increment ===
+kosh: 1:1: error: seq: the increment must not be zero.
+     1 |  koshkit seq 1 0 10
+       |  ^~~~~~~~~~~~~~~~~~
+note: Give a non-zero step, e.g. `seq 1 2 10`.
+=== ln without -s ===
+kosh: 1:1: error: ln supports only symbolic links.
+     1 |  koshkit ln a b
+       |  ^~~~~~~~~~~~~~
+note: Re-run with `-s` to make a symlink.
+=== tr one set ===
+kosh: 1:1: error: tr expects two sets unless -d is given.
+     1 |  koshkit tr abc
+       |  ^~~~~~~~~~~~~~
+note: Supply SET1 and SET2, or use `-d` with one set.
+=== find bad -type ===
+kosh: 1:1: error: find: -type expects one of f, d, or l.
+     1 |  koshkit find . -type x
+       |  ^~~~~~~~~~~~~~~~~~~~~~
+note: Pass `f`, `d`, or `l` after `-type`.

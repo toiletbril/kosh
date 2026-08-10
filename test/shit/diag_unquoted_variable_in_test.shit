@@ -1,4 +1,0 @@
-#!/bin/env shit
-v=x
-[ $v = x ] && echo equal
-echo after

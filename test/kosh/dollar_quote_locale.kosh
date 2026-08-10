@@ -1,0 +1,6 @@
+#!/bin/env kosh
+x=world
+printf '[%s]\n' $"plain"
+printf '[%s]\n' $"hello $x"
+echo pre$"mid"post
+echo "a $"

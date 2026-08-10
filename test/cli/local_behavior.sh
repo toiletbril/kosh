@@ -1,5 +1,5 @@
-unset SHIT_FLAGS
-export SHIT_FLAGS=--no-diagnostics
+unset KOSH_FLAGS
+export KOSH_FLAGS=--no-diagnostics
 # local declares a function-scoped variable and rejects use outside a function.
 # The attribute flags declare an integer, an indexed array, and an associative
 # array, the same letters declare takes.
@@ -17,7 +17,7 @@ echo "== local -A declares an associative array:"
 echo "== a local shadows an outer value and restores it:"
 "$BIN" -c 'v=outer; f(){ local v=inner; echo $v; }; f; echo $v'
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The no-local warning fires for a fresh name assigned in a function body, the
 # leaking footgun, but stays quiet for a name already set at the top level or
 # inherited from the environment, since that assignment updates an existing

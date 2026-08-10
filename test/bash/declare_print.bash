@@ -66,10 +66,10 @@ declare -iA m3
 m3[q]=5
 declare -p m3
 declare -ix q2=5
-q2+=3 env > /tmp/shit_test_q2env_$$ 2>/dev/null
-grep "^q2=" /tmp/shit_test_q2env_$$
+q2+=3 env > /tmp/kosh_test_q2env_$$ 2>/dev/null
+grep "^q2=" /tmp/kosh_test_q2env_$$
 echo "prefix_restores=$q2"
-rm -f /tmp/shit_test_q2env_$$
+rm -f /tmp/kosh_test_q2env_$$
 
 # declare -i marks a name so every assignment evaluates as arithmetic, += adds
 # rather than concatenates, +i and unset clear the mark, and -p prints it.

@@ -1,0 +1,12 @@
+#!/bin/env kosh
+# A C-style for whose condition folds to a constant zero never runs its body,
+# but the init clause still runs once the way C semantics require. The optimizer
+# folds the condition without eliminating the whole loop, so the init binding
+# survives and the body stays silent.
+for ((x = 5; 0; x++)); do echo never; done
+echo "x=$x"
+
+# A blank-init zero-condition loop has nothing to run, so it is eliminated whole
+# and the body never prints.
+for ((; 0;)); do echo never; done
+echo after_blank

@@ -4,7 +4,7 @@
 #include "Highlight.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace colors {
 
@@ -52,4 +52,4 @@ extern const highlight_theme DIAGNOSTIC_HIGHLIGHT_THEME;
 
 } /* namespace colors */
 
-} /* namespace shit */
+} /* namespace koshka */

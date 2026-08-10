@@ -47,7 +47,7 @@ chmod +x "$dir/warm-first/warmprobe" "$dir/warm-second/warmprobe"
 WARM_FIRST="$dir/warm-first/warmprobe" WARM_REMOVED="$dir/warm-removed" \
     PATH="$dir/warm-first${TEST_PATH_SEPARATOR}$dir/warm-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'compgen -c warmprobe > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$WARM_FIRST" "$WARM_REMOVED"
+    koshkit mv "$WARM_FIRST" "$WARM_REMOVED"
     warmprobe'
 
 mkdir "$dir/blocked-later"
@@ -61,8 +61,8 @@ chmod +x "$dir/staged-recover"
 RECOVER_DIRECTORY="$dir/blocked-later" RECOVER_STAGED="$dir/staged-recover" \
     PATH="$dir/blocked-later${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'recoverprobe > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$RECOVER_DIRECTORY/recoverprobe" "$RECOVER_DIRECTORY/recoverprobe.removed"
-    shitbox mv "$RECOVER_STAGED" "$RECOVER_DIRECTORY/recoverprobe"
+    koshkit mv "$RECOVER_DIRECTORY/recoverprobe" "$RECOVER_DIRECTORY/recoverprobe.removed"
+    koshkit mv "$RECOVER_STAGED" "$RECOVER_DIRECTORY/recoverprobe"
     recoverprobe'
 
 printf '#!/bin/sh\n' > "$dir/completion-hot/hotprobe"
@@ -71,17 +71,17 @@ HOT_PROBE="$dir/completion-hot/hotprobe" HOT_REMOVED="$dir/hot-removed" \
     LATE_DIRECTORY="$dir/completion-late" LATE_STAGED="$dir/staged-late" \
     PATH="$dir/completion-hot${TEST_PATH_SEPARATOR}$dir/completion-late${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'compgen -c hotprobe 2>&-
-    shitbox mv "$HOT_PROBE" "$HOT_REMOVED"
+    koshkit mv "$HOT_PROBE" "$HOT_REMOVED"
     removed=$(compgen -c hotprobe 2>&-)
     compgen -c lateprobe > "$TEST_NULL_OUTPUT" 2>&1 || :
-    shitbox mv "$LATE_STAGED" "$LATE_DIRECTORY/lateprobe"
+    koshkit mv "$LATE_STAGED" "$LATE_DIRECTORY/lateprobe"
     added=$(compgen -c lateprobe 2>&-)
     printf "removed=%s added=%s\n" "$removed" "$added"'
 
 VANISHED_DIRECTORY="$dir/vanished" \
     PATH="$dir/vanished${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'compgen -c vanishprobe > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$VANISHED_DIRECTORY" "$VANISHED_DIRECTORY.removed"
+    koshkit mv "$VANISHED_DIRECTORY" "$VANISHED_DIRECTORY.removed"
     vanished=$(compgen -c vanishprobe 2>&-)
     printf "vanished=%s\n" "$vanished"'
 
@@ -89,8 +89,8 @@ touch -r "$dir/atomic" "$dir/atomic-replacement"
 ATOMIC_DIRECTORY="$dir/atomic" ATOMIC_REPLACEMENT="$dir/atomic-replacement" \
     PATH="$dir/atomic${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'compgen -c oldatomicprobe > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$ATOMIC_DIRECTORY" "$ATOMIC_DIRECTORY-old"
-    shitbox mv "$ATOMIC_REPLACEMENT" "$ATOMIC_DIRECTORY"
+    koshkit mv "$ATOMIC_DIRECTORY" "$ATOMIC_DIRECTORY-old"
+    koshkit mv "$ATOMIC_REPLACEMENT" "$ATOMIC_DIRECTORY"
     old=$(compgen -c oldatomicprobe 2>&-)
     new=$(compgen -c newatomicprobe 2>&-)
     printf "atomic-old=%s atomic-new=%s\n" "$old" "$new"'
@@ -99,7 +99,7 @@ CACHE_COMMAND=refreshed CACHE_DIRECTORY="$dir/refresh" \
     CACHE_STAGED="$dir/staged" \
     PATH="$dir/refresh${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'command -v "$CACHE_COMMAND" > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$CACHE_STAGED" "$CACHE_DIRECTORY/refreshed"
+    koshkit mv "$CACHE_STAGED" "$CACHE_DIRECTORY/refreshed"
     hash -r
     "$CACHE_COMMAND"'
 
@@ -107,7 +107,7 @@ CACHE_COMMAND=appeared CACHE_DIRECTORY="$dir/appeared" \
     CACHE_STAGED="$dir/staged-appeared" \
     PATH="$dir/appeared${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'command -v "$CACHE_COMMAND" > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$CACHE_STAGED" "$CACHE_DIRECTORY/appeared"
+    koshkit mv "$CACHE_STAGED" "$CACHE_DIRECTORY/appeared"
     "$CACHE_COMMAND"'
 
 mkdir "$dir/validation-first" "$dir/validation-second"
@@ -120,7 +120,7 @@ VALIDATION_FIRST="$dir/validation-first" \
     VALIDATION_STAGED="$dir/validation-staged" \
     PATH="$dir/validation-first${TEST_PATH_SEPARATOR}$dir/validation-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c '
     validationprobe
-    shitbox mv "$VALIDATION_STAGED" "$VALIDATION_FIRST/validationprobe"
+    koshkit mv "$VALIDATION_STAGED" "$VALIDATION_FIRST/validationprobe"
     compgen -c validationprobe > "$TEST_NULL_OUTPUT" 2>&1
     validationprobe
 '
@@ -133,7 +133,7 @@ chmod +x "$dir/compgen-staged" "$dir/query-second/compgenprobe"
 QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/compgen-staged" \
     PATH="$dir/query-first${TEST_PATH_SEPARATOR}$dir/query-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'compgen -c compgenprobe > "$TEST_NULL_OUTPUT" 2>&1
-    shitbox mv "$QUERY_STAGED" "$QUERY_FIRST/compgenprobe"
+    koshkit mv "$QUERY_STAGED" "$QUERY_FIRST/compgenprobe"
     compgenprobe'
 
 printf '#!/bin/sh\necho command-first\n' > "$dir/command-staged"
@@ -143,7 +143,7 @@ chmod +x "$dir/command-staged" "$dir/query-second/commandprobe"
 QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/command-staged" \
     PATH="$dir/query-first${TEST_PATH_SEPARATOR}$dir/query-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'command -v commandprobe > "$TEST_NULL_OUTPUT"
-    shitbox mv "$QUERY_STAGED" "$QUERY_FIRST/commandprobe"
+    koshkit mv "$QUERY_STAGED" "$QUERY_FIRST/commandprobe"
     commandprobe'
 
 printf '#!/bin/sh\necho type-first\n' > "$dir/type-staged"
@@ -152,7 +152,7 @@ chmod +x "$dir/type-staged" "$dir/query-second/typeprobe"
 QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/type-staged" \
     PATH="$dir/query-first${TEST_PATH_SEPARATOR}$dir/query-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'type typeprobe > "$TEST_NULL_OUTPUT"
-    shitbox mv "$QUERY_STAGED" "$QUERY_FIRST/typeprobe"
+    koshkit mv "$QUERY_STAGED" "$QUERY_FIRST/typeprobe"
     typeprobe'
 
 printf '#!/bin/sh\necho optimizer-first\n' > "$dir/optimizer-staged"
@@ -161,7 +161,7 @@ printf '#!/bin/sh\necho optimizer-second\n' > \
 chmod +x "$dir/optimizer-staged" "$dir/query-second/optimizerprobe"
 QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/optimizer-staged" \
     PATH="$dir/query-first${TEST_PATH_SEPARATOR}$dir/query-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
-    'shitbox mv "$QUERY_STAGED" "$QUERY_FIRST/optimizerprobe"; optimizerprobe'
+    'koshkit mv "$QUERY_STAGED" "$QUERY_FIRST/optimizerprobe"; optimizerprobe'
 
 printf '#!/bin/sh\necho execution-first\n' > "$dir/execution-staged"
 printf '#!/bin/sh\necho execution-second\n' > \
@@ -169,14 +169,14 @@ printf '#!/bin/sh\necho execution-second\n' > \
 chmod +x "$dir/execution-staged" "$dir/query-second/executionprobe"
 QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/execution-staged" \
     PATH="$dir/query-first${TEST_PATH_SEPARATOR}$dir/query-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
-    'executionprobe; shitbox mv "$QUERY_STAGED" "$QUERY_FIRST/executionprobe"; executionprobe'
+    'executionprobe; koshkit mv "$QUERY_STAGED" "$QUERY_FIRST/executionprobe"; executionprobe'
 
 printf '#!/bin/sh\necho hash-first\n' > "$dir/hash-staged"
 printf '#!/bin/sh\necho hash-second\n' > "$dir/query-second/hashprobe"
 chmod +x "$dir/hash-staged" "$dir/query-second/hashprobe"
 QUERY_FIRST="$dir/query-first" QUERY_STAGED="$dir/hash-staged" \
     PATH="$dir/query-first${TEST_PATH_SEPARATOR}$dir/query-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
-    'hash hashprobe; shitbox mv "$QUERY_STAGED" "$QUERY_FIRST/hashprobe"; hashprobe'
+    'hash hashprobe; koshkit mv "$QUERY_STAGED" "$QUERY_FIRST/hashprobe"; hashprobe'
 
 printf '#!/bin/sh\necho mode-first\n' > "$dir/query-first/modeprobe"
 printf '#!/bin/sh\necho mode-second\n' > "$dir/query-second/modeprobe"
@@ -196,7 +196,7 @@ PATH="$dir/query-directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c '
     printf "type-directory=%s " "$?"
     command -v directoryprobe > "$TEST_NULL_OUTPUT"
     printf "command-directory=%s " "$?"
-    shitbox which directoryprobe > "$TEST_NULL_OUTPUT"
+    koshkit which directoryprobe > "$TEST_NULL_OUTPUT"
     printf "which-directory=%s\n" "$?"
     type -p regularprobe > "$TEST_NULL_OUTPUT"
     printf "type-regular=%s " "$?"
@@ -209,7 +209,7 @@ analysis_command=uname
 analysis_path="$TEST_SYSTEM_PATH${TEST_PATH_SEPARATOR}$TEST_UNAME_DIRECTORY"
 if [ "${OS-}" = Windows_NT ]; then
     mkdir "$dir/analysis"
-    "$BIN" -c 'shitbox cp "$1" "$2"' \
+    "$BIN" -c 'koshkit cp "$1" "$2"' \
         test-copy "$BIN" "$dir/analysis/analysis-probe.exe"
     analysis_command='analysis-probe -c true'
     analysis_path=$dir/analysis
@@ -412,7 +412,7 @@ PATH="$dir/source-directory-first${TEST_PATH_SEPARATOR}$dir/source-file-second${
 mkdir "$dir/which-first" "$dir/which-second"
 mkdir "$dir/which-first/whichblocked"
 PATH="$dir/which-first${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
-    'shitbox which whichblocked > "$TEST_NULL_OUTPUT" 2>&1
+    'koshkit which whichblocked > "$TEST_NULL_OUTPUT" 2>&1
     printf "which-blocked=%s\n" "$?"'
 printf '#!/bin/sh\necho which-first\n' > "$dir/which-staged"
 printf '#!/bin/sh\necho which-second\n' > "$dir/which-second/whichprobe"
@@ -420,8 +420,8 @@ chmod +x "$dir/which-staged" "$dir/which-second/whichprobe"
 WHICH_FIRST="$dir/which-first" WHICH_STAGED="$dir/which-staged" \
     PATH="$dir/which-first${TEST_PATH_SEPARATOR}$dir/which-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'whichprobe > "$TEST_NULL_OUTPUT"
-    shitbox mv "$WHICH_STAGED" "$WHICH_FIRST/whichprobe"
-    shitbox which whichprobe' | sed "s|$dir|DIR|g"
+    koshkit mv "$WHICH_STAGED" "$WHICH_FIRST/whichprobe"
+    koshkit which whichprobe' | sed "s|$dir|DIR|g"
 
 mkdir "$dir/command-p-first" "$dir/command-p-second"
 printf '#!/bin/sh\necho command-p-first\n' > "$dir/command-p-staged"
@@ -433,7 +433,7 @@ COMMAND_P_FIRST="$dir/command-p-first" \
     PATH="$dir/command-p-first${TEST_PATH_SEPARATOR}$dir/command-p-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'commandpprobe
     command -p true
-    shitbox mv "$COMMAND_P_STAGED" "$COMMAND_P_FIRST/commandpprobe"
+    koshkit mv "$COMMAND_P_STAGED" "$COMMAND_P_FIRST/commandpprobe"
     commandpprobe'
 
 mkdir "$dir/equal-first" "$dir/equal-second"
@@ -444,14 +444,14 @@ EQUAL_FIRST="$dir/equal-first" EQUAL_STAGED="$dir/equal-staged" \
     PATH="$dir/equal-first${TEST_PATH_SEPARATOR}$dir/equal-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'equalprobe
     PATH="$PATH"
-    shitbox mv "$EQUAL_STAGED" "$EQUAL_FIRST/equalprobe"
+    koshkit mv "$EQUAL_STAGED" "$EQUAL_FIRST/equalprobe"
     equalprobe'
 
 mkdir "$dir/mimic-first" "$dir/mimic-second"
 printf '#!/bin/sh\necho mimic-first\n' > "$dir/mimic-staged"
 printf '#!/bin/sh\necho mimic-second\n' > "$dir/mimic-second/mimicprobe"
 chmod +x "$dir/mimic-staged" "$dir/mimic-second/mimicprobe"
-printf '#!/bin/bash\nhash -r\nshitbox mv "%s" "%s"\n' \
+printf '#!/bin/bash\nhash -r\nkoshkit mv "%s" "%s"\n' \
     "$dir/mimic-staged" "$dir/mimic-first/mimicprobe" > "$dir/mimic-script"
 chmod +x "$dir/mimic-script"
 MIMIC_SCRIPT="$dir/mimic-script" \
@@ -498,7 +498,7 @@ if [ "${OS-}" != Windows_NT ]; then
         PATH=/bin "$BIN" --mood bash -c '
             type -p ./slashprobe
             type -P ./slashprobe
-            shitbox which ./slashprobe
+            koshkit which ./slashprobe
             hash ./slashprobe
             printf "hash-slash=%s\n" "$?"
             hash ./missing

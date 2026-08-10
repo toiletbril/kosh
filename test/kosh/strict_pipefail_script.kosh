@@ -1,0 +1,9 @@
+#!/bin/env kosh
+false | true
+echo "strict=$?"
+set +o pipefail
+false | true
+echo "relaxed=$?"
+set -o pipefail
+false | true
+echo "reenabled=$?"

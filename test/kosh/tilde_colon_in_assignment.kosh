@@ -1,0 +1,8 @@
+#!/bin/env kosh
+HOME=testhome
+p=~/a:~/b:~
+echo "$p"
+q=~/only
+echo "$q"
+r=~/x:~/y
+echo $r

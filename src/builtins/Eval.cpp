@@ -14,7 +14,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Eval);
 
-namespace shit {
+namespace koshka {
 
 Eval::Eval() = default;
 
@@ -65,4 +65,4 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                         ec.source_location(), StringView{"eval"});
 }
 
-} // namespace shit
+} // namespace koshka

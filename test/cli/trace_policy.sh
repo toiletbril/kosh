@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 d=$(mktemp -d)
 trap '[ -n "$d" ] && rm -rf "$d"' EXIT
 
@@ -23,7 +23,7 @@ printf 'substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
     "$(printf '%s\n' "$out" | grep -Fc 'echo $(no_such_substitution_xyz)')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:6: trace:')"
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:6: trace:')"
 
 out=$("$BIN" --no-diagnostics \
     -c 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}' 2>&1)
@@ -32,7 +32,7 @@ printf 'nested substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
     "$(printf '%s\n' "$out" |
         grep -Fc 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:28: trace:')"
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:28: trace:')"
 
 check_expansion_trace()
 {
@@ -44,7 +44,7 @@ check_expansion_trace()
         "$label" \
         "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
         "$(printf '%s\n' "$out" | grep -c 'error:')" \
-        "$(printf '%s\n' "$out" | grep -c "shit: 1:$site: trace:")"
+        "$(printf '%s\n' "$out" | grep -c "kosh: 1:$site: trace:")"
 }
 
 check_expansion_trace pattern 23 \
@@ -87,20 +87,20 @@ printf 'function substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
     "$(printf '%s\n' "$out" |
         grep -Fc 'echo ${ no_such_function_substitution_xyz; }')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:6: trace:')"
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:6: trace:')"
 
 out=$("$BIN" --no-diagnostics \
     -c 'case X=$(no_such_case_copy_xyz) in *) :;; esac' 2>&1)
 printf 'case assignment copy traces=%s errors=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:8: trace:')"
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:8: trace:')"
 
 out=$("$BIN" --no-diagnostics -c 'echo ${X:-$(if)}' 2>&1)
 printf 'substitution parse traces=%s errors=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:11: trace:')"
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:11: trace:')"
 
 out=$("$BIN" --no-diagnostics -c 'echo $(echo ${X:-$(if)})' 2>&1)
 printf 'nested parse traces=%s errors=%s\n' \
@@ -108,7 +108,7 @@ printf 'nested parse traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
 out=$("$BIN" --no-diagnostics \
-    -c 'shitbox cat <(no_such_process_substitution_xyz)' 2>&1)
+    -c 'koshkit cat <(no_such_process_substitution_xyz)' 2>&1)
 case "$out" in
 *error:*trace:*) process_order=error-first ;;
 *) process_order=wrong ;;
@@ -116,18 +116,18 @@ esac
 printf 'process substitution traces=%s errors=%s sites=%s order=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:13: trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:13: trace:')" \
     "$process_order"
 
 out=$("$BIN" --no-diagnostics \
-    -c 'shitbox cat <(eval no_such_process_eval_xyz)' 2>&1)
+    -c 'koshkit cat <(eval no_such_process_eval_xyz)' 2>&1)
 printf 'process eval traces=%s errors=%s inner-sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'shit: 1:1: trace:')"
+    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:1: trace:')"
 
 out=$("$BIN" --no-diagnostics \
-    -c 'shitbox cat <(echo prefix >&2; eval no_such_prefixed_process_eval_xyz)' \
+    -c 'koshkit cat <(echo prefix >&2; eval no_such_prefixed_process_eval_xyz)' \
     2>&1)
 printf 'prefixed process eval traces=%s errors=%s prefixes=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
@@ -141,7 +141,7 @@ printf 'disabled-substitution traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
 out=$("$BIN" --no-traces --no-diagnostics \
-    -c 'shitbox cat <(eval no_such_suppressed_process_substitution_xyz)' 2>&1)
+    -c 'koshkit cat <(eval no_such_suppressed_process_substitution_xyz)' 2>&1)
 printf 'disabled-process-substitution traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
@@ -222,23 +222,23 @@ printf 'disabled-fallback traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 out=$("$BIN" -c 'echo hi' -c no_such_command_xyz 2>&1)
 rc=$?
 trace_line=$(printf '%s\n' "$out" | grep 'trace:' -A1 | tail -1)
-trace_line="     1 |  SHIT -c ${trace_line#* -c }"
+trace_line="     1 |  KOSH -c ${trace_line#* -c }"
 printf '%s\n' "$trace_line"
 printf '%s\n' "$out" | grep -q -- "-c 'echo hi' -c no_such_command_xyz" && echo "quoted_and_second_c=ok"
 echo "rc=$rc"
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 out=$("$BIN" -c no_such_command_xyz 2>&1)
 rc=$?
 printf 'traces=%s\n' "$(printf '%s\n' "$out" | grep -Ec 'trace:')"
 printf '%s\n' "$out" | grep -q 'no_such_command_xyz' && echo "error=ok"
 echo "rc=$rc"
 
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # A missing script file operand with spaces in its name is wrapped in single
 # quotes in the trace line, and the caret lands on the quoted operand.
 out=$("$BIN" "no such script file" 2>&1)

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # readonly lists the marked variables, marks a name with or without a value, and
 # a later assignment to a marked name fails. The list output is filtered to the
 # test's own names so an unrelated default read-only variable cannot perturb it.

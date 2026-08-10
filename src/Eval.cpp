@@ -8,18 +8,18 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ResolvedCommand.hpp"
-#include "Shitbox.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
@@ -223,14 +223,14 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
 {
   if (is_bash_identity) {
     LOG(Info, "seeding the bash identity variables");
-    set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+    set_shell_variable("BASH_VERSION", "5.2.0(1)-kosh");
     let versinfo = ArrayList<String>{heap_allocator()};
     versinfo.push(String{"5"});
     versinfo.push(String{"2"});
     versinfo.push(String{"0"});
     versinfo.push(String{"1"});
     versinfo.push(String{"release"});
-    versinfo.push(String{SHIT_OS_INFO});
+    versinfo.push(String{KOSH_OS_INFO});
     set_indexed_array("BASH_VERSINFO", steal(versinfo));
     set_shell_variable("BASH", m_shell_executable_path.view());
     /* A missing COMP_WORDBREAKS collapses every word into one and kills
@@ -244,9 +244,9 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
   force_unset_shell_variable("BASH");
 }
 
-fn EvalContext::materialize_shit_identity() const throws -> Maybe<String>
+fn EvalContext::materialize_kosh_identity() const throws -> Maybe<String>
 {
-  let const identity = utils::shit_identity(m_shell_executable_path.view());
+  let const identity = utils::kosh_identity(m_shell_executable_path.view());
   if (identity.has_value()) return String{heap_allocator(), *identity};
   return None;
 }
@@ -643,31 +643,31 @@ struct ansi_color_variable
   const char *escape;
 };
 
-static constexpr ansi_color_variable SHIT_ANSI_COLORS[] = {
-    {"SHIT_ANSI_BLACK",          "\x1b[30m"},
-    {"SHIT_ANSI_RED",            "\x1b[31m"},
-    {"SHIT_ANSI_GREEN",          "\x1b[32m"},
-    {"SHIT_ANSI_YELLOW",         "\x1b[33m"},
-    {"SHIT_ANSI_BLUE",           "\x1b[34m"},
-    {"SHIT_ANSI_MAGENTA",        "\x1b[35m"},
-    {"SHIT_ANSI_CYAN",           "\x1b[36m"},
-    {"SHIT_ANSI_WHITE",          "\x1b[37m"},
-    {"SHIT_ANSI_BRIGHT_BLACK",   "\x1b[90m"},
-    {"SHIT_ANSI_BRIGHT_RED",     "\x1b[91m"},
-    {"SHIT_ANSI_BRIGHT_GREEN",   "\x1b[92m"},
-    {"SHIT_ANSI_BRIGHT_YELLOW",  "\x1b[93m"},
-    {"SHIT_ANSI_BRIGHT_BLUE",    "\x1b[94m"},
-    {"SHIT_ANSI_BRIGHT_MAGENTA", "\x1b[95m"},
-    {"SHIT_ANSI_BRIGHT_CYAN",    "\x1b[96m"},
-    {"SHIT_ANSI_BRIGHT_WHITE",   "\x1b[97m"},
-    {"SHIT_ANSI_BOLD",           "\x1b[1m" },
-    {"SHIT_ANSI_DIM",            "\x1b[2m" },
-    {"SHIT_ANSI_RESET",          "\x1b[0m" },
+static constexpr ansi_color_variable KOSH_ANSI_COLORS[] = {
+    {"KOSH_ANSI_BLACK",          "\x1b[30m"},
+    {"KOSH_ANSI_RED",            "\x1b[31m"},
+    {"KOSH_ANSI_GREEN",          "\x1b[32m"},
+    {"KOSH_ANSI_YELLOW",         "\x1b[33m"},
+    {"KOSH_ANSI_BLUE",           "\x1b[34m"},
+    {"KOSH_ANSI_MAGENTA",        "\x1b[35m"},
+    {"KOSH_ANSI_CYAN",           "\x1b[36m"},
+    {"KOSH_ANSI_WHITE",          "\x1b[37m"},
+    {"KOSH_ANSI_BRIGHT_BLACK",   "\x1b[90m"},
+    {"KOSH_ANSI_BRIGHT_RED",     "\x1b[91m"},
+    {"KOSH_ANSI_BRIGHT_GREEN",   "\x1b[92m"},
+    {"KOSH_ANSI_BRIGHT_YELLOW",  "\x1b[93m"},
+    {"KOSH_ANSI_BRIGHT_BLUE",    "\x1b[94m"},
+    {"KOSH_ANSI_BRIGHT_MAGENTA", "\x1b[95m"},
+    {"KOSH_ANSI_BRIGHT_CYAN",    "\x1b[96m"},
+    {"KOSH_ANSI_BRIGHT_WHITE",   "\x1b[97m"},
+    {"KOSH_ANSI_BOLD",           "\x1b[1m" },
+    {"KOSH_ANSI_DIM",            "\x1b[2m" },
+    {"KOSH_ANSI_RESET",          "\x1b[0m" },
 };
 
 static fn ansi_escape_for_color(StringView name) throws -> Maybe<StringView>
 {
-  for (let const &color : SHIT_ANSI_COLORS)
+  for (let const &color : KOSH_ANSI_COLORS)
     if (StringView{color.name} == name) return StringView{color.escape};
   return None;
 }
@@ -676,10 +676,10 @@ enum class dynamic_var : u8
 {
   IFS,
   LINENO,
-  SHIT_GIT_BRANCH,
-  SHIT_GIT_AHEAD,
-  SHIT_GIT_BEHIND,
-  SHIT_IDENTITY,
+  KOSH_GIT_BRANCH,
+  KOSH_GIT_AHEAD,
+  KOSH_GIT_BEHIND,
+  KOSH_IDENTITY,
 
   RANDOM,
   SECONDS,
@@ -709,10 +709,10 @@ enum class dynamic_var : u8
 constexpr static_string_entry<dynamic_var> ALWAYS_DYNAMIC_ENTRIES[] = {
     {SSK("IFS"),             dynamic_var::IFS            },
     {SSK("LINENO"),          dynamic_var::LINENO         },
-    {SSK("SHIT_GIT_BRANCH"), dynamic_var::SHIT_GIT_BRANCH},
-    {SSK("SHIT_GIT_AHEAD"),  dynamic_var::SHIT_GIT_AHEAD },
-    {SSK("SHIT_GIT_BEHIND"), dynamic_var::SHIT_GIT_BEHIND},
-    {SSK("SHIT_IDENTITY"),   dynamic_var::SHIT_IDENTITY  },
+    {SSK("KOSH_GIT_BRANCH"), dynamic_var::KOSH_GIT_BRANCH},
+    {SSK("KOSH_GIT_AHEAD"),  dynamic_var::KOSH_GIT_AHEAD },
+    {SSK("KOSH_GIT_BEHIND"), dynamic_var::KOSH_GIT_BEHIND},
+    {SSK("KOSH_IDENTITY"),   dynamic_var::KOSH_IDENTITY  },
 };
 constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
 
@@ -752,6 +752,7 @@ constexpr pure fn is_dynamic_first_byte(char c) wontthrow -> bool
   case 'G':
   case 'H':
   case 'I':
+  case 'K':
   case 'L':
   case 'M':
   case 'O':
@@ -768,7 +769,7 @@ pure fn EvalContext::variable_requires_dynamic_lookup(
 {
   if (name.is_empty() || !is_dynamic_first_byte(name[0])) return false;
   if (ALWAYS_DYNAMIC.find(name).has_value()) return true;
-  if (name[0] == 'S' && name.starts_with("SHIT_ANSI_")) return true;
+  if (name[0] == 'K' && name.starts_with("KOSH_ANSI_")) return true;
 
   return bash_dynamic_variables_enabled() &&
          BASH_DYNAMIC.find(name).has_value();
@@ -846,11 +847,11 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      treats $a as ${a[0]}. */
   if (m_indexed_arrays.count() != 0)
     if (let const *array = m_indexed_arrays.find(name); array != nullptr) {
-      if (array->is_empty()) return shit::None;
+      if (array->is_empty()) return koshka::None;
       return array->front();
     }
 
-  if (is_local_in_current_scope(name)) return shit::None;
+  if (is_local_in_current_scope(name)) return koshka::None;
 
   /* The store lookup above wins, so IFS= reads back empty while the unset
      default reads back space-tab-newline, keeping the IFS save/restore idiom
@@ -864,15 +865,15 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       case dynamic_var::LINENO:
         return String::from(line_number_at_location(m_current_location),
                             heap_allocator());
-      case dynamic_var::SHIT_GIT_BRANCH: {
+      case dynamic_var::KOSH_GIT_BRANCH: {
         if (m_git_branch_command_index != m_command_evaluation_index) {
           m_git_branch = utils::current_git_branch();
           m_git_branch_command_index = m_command_evaluation_index;
         }
         return String{heap_allocator(), m_git_branch.view()};
       }
-      case dynamic_var::SHIT_GIT_AHEAD:
-      case dynamic_var::SHIT_GIT_BEHIND: {
+      case dynamic_var::KOSH_GIT_AHEAD:
+      case dynamic_var::KOSH_GIT_BEHIND: {
         if (m_git_counts_command_index != m_command_evaluation_index) {
           utils::git_status(m_git_branch, m_git_ahead_count,
                             m_git_behind_count);
@@ -881,23 +882,23 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         }
 
         switch (*tag) {
-        case dynamic_var::SHIT_GIT_AHEAD:
+        case dynamic_var::KOSH_GIT_AHEAD:
           return m_git_ahead_count > 0
                      ? String::from(m_git_ahead_count, heap_allocator())
                      : String{heap_allocator()};
-        case dynamic_var::SHIT_GIT_BEHIND:
+        case dynamic_var::KOSH_GIT_BEHIND:
           return m_git_behind_count > 0
                      ? String::from(m_git_behind_count, heap_allocator())
                      : String{heap_allocator()};
         default: ASSERT(false); return String{heap_allocator()};
         }
       }
-      case dynamic_var::SHIT_IDENTITY: return materialize_shit_identity();
+      case dynamic_var::KOSH_IDENTITY: return materialize_kosh_identity();
       default: break;
       }
     }
 
-    if (first_byte == 'S' && name.starts_with("SHIT_ANSI_")) {
+    if (first_byte == 'K' && name.starts_with("KOSH_ANSI_")) {
       if (let const escape = ansi_escape_for_color(name)) {
         if (!colors::stdout_wants_color()) return String{heap_allocator()};
         return String{heap_allocator(), *escape};
@@ -978,7 +979,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::BASH_LINENO:
           if (funcname_frame_count() > 0)
             return String::from(funcname_line_at(0), heap_allocator());
-          return shit::None;
+          return koshka::None;
         case dynamic_var::BASH_COMMAND:
           if (!m_current_command.is_empty())
             return String{heap_allocator(), m_current_command.view()};
@@ -1001,7 +1002,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::FUNCNAME:
           if (funcname_frame_count() > 0)
             return String{heap_allocator(), funcname_frame_at(0)};
-          return shit::None;
+          return koshka::None;
         default: break;
         }
       }
@@ -1010,7 +1011,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (let const env = os::get_environment_variable(name))
     return String{heap_allocator(), env->view()};
-  return shit::None;
+  return koshka::None;
 }
 
 fn EvalContext::append_dynamic_variable_names(
@@ -1018,12 +1019,12 @@ fn EvalContext::append_dynamic_variable_names(
 {
   out.push(StringView{"IFS"});
   out.push(StringView{"LINENO"});
-  out.push(StringView{"SHIT_GIT_AHEAD"});
-  out.push(StringView{"SHIT_GIT_BEHIND"});
-  out.push(StringView{"SHIT_GIT_BRANCH"});
-  out.push(StringView{"SHIT_IDENTITY"});
+  out.push(StringView{"KOSH_GIT_AHEAD"});
+  out.push(StringView{"KOSH_GIT_BEHIND"});
+  out.push(StringView{"KOSH_GIT_BRANCH"});
+  out.push(StringView{"KOSH_IDENTITY"});
 
-  for (let const &color : SHIT_ANSI_COLORS)
+  for (let const &color : KOSH_ANSI_COLORS)
     out.push(StringView{color.name});
 
   if (!bash_dynamic_variables_enabled()) return;
@@ -1653,15 +1654,15 @@ pure fn EvalContext::no_exec() const wontthrow -> bool
   return m_runtime.option_is_enabled(shell_option_id::Noexec);
 }
 
-fn EvalContext::set_shitbox(bool enabled) wontthrow -> void
+fn EvalContext::set_koshkit(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the shitbox option flips to %s", enabled ? "on" : "off");
-  m_runtime.set_option(shell_option_id::Shitbox, enabled);
+  LOG(Info, "the koshkit option flips to %s", enabled ? "on" : "off");
+  m_runtime.set_option(shell_option_id::Koshkit, enabled);
 }
 
-pure fn EvalContext::shitbox() const wontthrow -> bool
+pure fn EvalContext::koshkit() const wontthrow -> bool
 {
-  return m_runtime.option_is_enabled(shell_option_id::Shitbox);
+  return m_runtime.option_is_enabled(shell_option_id::Koshkit);
 }
 
 fn EvalContext::set_failglob(bool enabled) wontthrow -> void
@@ -2186,7 +2187,7 @@ pure fn ExecContext::builtin_kind() const wontthrow -> const Builtin::Kind &
 
 fn ExecContext::print_to_stdout(StringView s) const throws -> void
 {
-  if (!os::write_all(out_fd.value_or(SHIT_STDOUT), s.data, s.length)) {
+  if (!os::write_all(out_fd.value_or(KOSH_STDOUT), s.data, s.length)) {
     const i32 saved_errno = errno;
     if (saved_errno == EPIPE) throw BrokenPipeExit{};
     throw Error{"Unable to write to stdout: " +
@@ -2196,7 +2197,7 @@ fn ExecContext::print_to_stdout(StringView s) const throws -> void
 
 fn ExecContext::print_to_stderr(StringView s) const throws -> void
 {
-  if (!os::write_all(err_fd.value_or(SHIT_STDERR), s.data, s.length)) {
+  if (!os::write_all(err_fd.value_or(KOSH_STDERR), s.data, s.length)) {
     const i32 saved_errno = errno;
     if (saved_errno == EPIPE) throw BrokenPipeExit{};
     throw Error{"Unable to write to stderr: " +
@@ -2206,7 +2207,7 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 
 fn ExecContext::make_from(SourceLocation location, StringView source,
                           ArrayList<String> &&args, mimic_mood mood,
-                          bool is_shitbox_enabled,
+                          bool is_koshkit_enabled,
                           ProgramResolver &program_resolver,
                           ArrayList<SourceLocation> &&arg_locations) throws
     -> ExecContext
@@ -2280,12 +2281,12 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
       LOG(Debug, "resolved '%s' to the program '%s'", program.c_str(),
           resolved_program_path->text().c_str());
       kind = ResolvedCommand::from_program(steal(*resolved_program_path));
-    } else if ((is_shitbox_enabled || mood == mimic_mood::Default) &&
-               shitbox::find_util(program.view()).has_value())
+    } else if ((is_koshkit_enabled || mood == mimic_mood::Default) &&
+               koshkit::find_util(program.view()).has_value())
     {
-      LOG(Debug, "no program matches '%s', using the shitbox utility",
+      LOG(Debug, "no program matches '%s', using the koshkit utility",
           program.c_str());
-      kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
+      kind = ResolvedCommand::from_builtin(Builtin::Kind::Koshkit);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       let const message = "Command '" + resolution_program + "' was not found";
@@ -2328,4 +2329,4 @@ fn ExecContext::make_unresolved(SourceLocation location,
           steal(args), steal(arg_locations)};
 }
 
-} /* namespace shit */
+} /* namespace koshka */

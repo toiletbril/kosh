@@ -1,0 +1,13 @@
+#!/bin/env kosh
+# Extended globs match in [[ ]] and case in the default mood once shopt enables.
+shopt -s extglob
+[[ "abbbc" == a+(b)c ]] && echo plus
+[[ "ac" == a*(b)c ]] && echo star
+[[ "abc" == a@(b|x)c ]] && echo alt
+[[ "ac" == a?(b)c ]] && echo opt
+case foo in
+!(bar)) echo not-bar ;;
+esac
+case readme in
+@(readme|license)) echo known ;;
+esac

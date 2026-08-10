@@ -23,7 +23,7 @@ rm -rf "$d" "$file"
 # CDPATH resolves a relative cd operand against a directory list, checked against
 # dash. Only stable markers are printed, never the pid-specific temporary path.
 
-base=/tmp/shit_cdpath_$$
+base=/tmp/kosh_cdpath_$$
 rm -rf "$base"
 mkdir -p "$base/sub" "$base/other"
 

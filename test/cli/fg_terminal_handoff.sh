@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 
 d=$(mktemp -d)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
@@ -33,7 +33,7 @@ send_input()
         attempt_count=$((attempt_count + 1))
     done
     wait_for_transcript 'Bash me harder!' || return 1
-    printf 'set --mood shit; echo HANDOFF_STEP_1\n'
+    printf 'set --mood kosh; echo HANDOFF_STEP_1\n'
     wait_for_transcript 'HANDOFF_STEP_1' || return 1
     printf 'stty tostop; echo HANDOFF_STEP_2\n'
     wait_for_transcript 'HANDOFF_STEP_2' || return 1

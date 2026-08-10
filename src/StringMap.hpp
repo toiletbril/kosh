@@ -6,7 +6,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 template <class Value = String>
 class StringMap
@@ -317,4 +317,4 @@ private:
   usize m_tombstones{0};
 };
 
-} // namespace shit
+} // namespace koshka

@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY"]
   [CompoundListCondition, None]
     [Assign amp_file=$TEST_TEMP_DIRECTORY/bash-operators-amp]
   [CompoundListCondition, None]
@@ -25,9 +25,9 @@
   [CompoundListCondition, None]
     [SimpleCommand "cat" "$amp_file"]
   [CompoundListCondition, None]
-    [SimpleCommand "shitbox" "unlink" "$amp_file"]
+    [SimpleCommand "koshkit" "unlink" "$amp_file"]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "mkdir"
@@ -101,7 +101,7 @@
   Variable "amp_file"
 ]
 [Word
-  Unquoted "shitbox"
+  Unquoted "koshkit"
 ]
 [Word
   Unquoted "unlink"

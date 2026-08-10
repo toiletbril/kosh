@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # shopt queries, sets, and unsets a bash shell option, the -q form reports the
 # state through the status alone, the -p form prints a replayable command, an
 # unknown name is an error or a silent non-zero under -q, and -o bridges to a

@@ -6,12 +6,12 @@
 
 #if defined __GLIBC__
 #if __GLIBC_PREREQ(2, 33)
-#define SHIT_HAS_MALLINFO2 1
+#define KOSH_HAS_MALLINFO2 1
 #pragma weak mallinfo2
 #endif
 #endif
 
-namespace shit {
+namespace koshka {
 namespace os {
 namespace {
 
@@ -506,11 +506,11 @@ fn current_executable_path() wontthrow -> Maybe<String>
 #if defined __APPLE__
   u32 capacity = 0;
   _NSGetExecutablePath(nullptr, &capacity);
-  if (capacity == 0) return shit::None;
+  if (capacity == 0) return koshka::None;
 
   ArrayList<char> buffer{heap_allocator()};
   buffer.reserve(capacity);
-  if (_NSGetExecutablePath(buffer.begin(), &capacity) != 0) return shit::None;
+  if (_NSGetExecutablePath(buffer.begin(), &capacity) != 0) return koshka::None;
 
   let const raw_path = StringView{buffer.begin()};
   if (let const canonical = canonical_path(Path{raw_path}); canonical)
@@ -751,7 +751,7 @@ fn enumerate_processes(process_detail) throws -> ArrayList<process_entry>
 fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 {
 #if defined __GLIBC__
-#if defined SHIT_HAS_MALLINFO2
+#if defined KOSH_HAS_MALLINFO2
   if (mallinfo2 != nullptr) {
     let const info = mallinfo2();
     stats.bytes_in_use = static_cast<usize>(info.uordblks);
@@ -777,4 +777,4 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 }
 
 } /* namespace os */
-} /* namespace shit */
+} /* namespace koshka */

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The exit builtin masks an out-of-range status to its low 8 bits, so exit 300
 # in a subshell reports 44.
 echo "== exit masks an out-of-range status to 8 bits in a subshell:"

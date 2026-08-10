@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # The sh mood and the equivalent --posix flag support background jobs and the
 # jobs builtin, the same job table the default and the bash moods use.
 echo "== sh mood lists a running background job:"

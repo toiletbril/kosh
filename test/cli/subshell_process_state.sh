@@ -3,7 +3,7 @@ before_mask=$(umask)
 (pushd / >/dev/null; umask 077)
 after_mask=$(umask)
 [ "$before_mask" = "$after_mask" ] && echo mask-restored
-[ "$(dirs -p | shitbox wc -l)" -eq 1 ] && echo directory-stack-restored
+[ "$(dirs -p | koshkit wc -l)" -eq 1 ] && echo directory-stack-restored
 '
 
 directory=$(mktemp -d)

@@ -1,0 +1,6 @@
+#!/bin/env kosh
+eval 'badcmd_xyzzy'
+
+eval 'x=5; echo "eval set x=$x"'
+cmd="echo evaluated"
+eval "$cmd"

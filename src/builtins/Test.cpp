@@ -17,7 +17,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Test);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -324,7 +324,7 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &arguments = ec.args();
   ASSERT(!arguments.is_empty());
 
-  /* Only the shit default mood answers --help, only as the sole argument,
+  /* Only the kosh default mood answers --help, only as the sole argument,
      and only for the word form, since bash and dash evaluate the word as a
      nonempty string and [ --help ] stays an expression. */
   if (arguments.count() == 2 && arguments[1] == "--help" &&
@@ -366,4 +366,4 @@ fn Test::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return result ? 0 : 1;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

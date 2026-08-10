@@ -1,3 +1,0 @@
-#!/bin/env shit
-[ ! -n "" ] && echo empty
-echo after

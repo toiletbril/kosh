@@ -9,7 +9,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -1673,4 +1673,4 @@ fn EvalContext::evaluate_arithmetic_wide(StringView expression,
   return format_wide(value);
 }
 
-} /* namespace shit */
+} /* namespace koshka */

@@ -9,7 +9,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 using namespace tokens;
 using namespace expressions;
@@ -99,7 +99,7 @@ cold pure static fn find_standalone_keyword(StringView source,
   };
 
   if (keyword.length == 0 || keyword.length > source.length) {
-    return shit::None;
+    return koshka::None;
   }
 
   for (usize pos = 0; pos + keyword.length <= source.length; pos++) {
@@ -112,7 +112,7 @@ cold pure static fn find_standalone_keyword(StringView source,
       return SourceLocation{pos, keyword.length};
     }
   }
-  return shit::None;
+  return koshka::None;
 }
 
 cold [[noreturn]] static fn
@@ -298,7 +298,7 @@ fn Parser::reject_empty_loop_body(const Expression *body) throws -> void
   if (!body->is_dummy()) return;
   Token *terminator = m_lexer.peek_shell_token();
   ASSERT(terminator != nullptr);
-  throw shit::ErrorWithLocationAndDetails{
+  throw koshka::ErrorWithLocationAndDetails{
       terminator->source_location(), "Unable to parse the loop",
       "The body between 'do' and 'done' is empty, a command is required"};
 }
@@ -313,7 +313,7 @@ hot fn Parser::parse_command_list(
   if (m_command_depth > MAX_COMMAND_DEPTH) {
     Token *token = m_lexer.peek_shell_token();
     ASSERT(token != nullptr);
-    throw shit::ErrorWithLocation{
+    throw koshka::ErrorWithLocation{
         token->source_location(),
         "Compound command nested deeper than " +
             String::from(static_cast<i64>(MAX_COMMAND_DEPTH),
@@ -422,8 +422,8 @@ hot fn Parser::parse_command_list(
       if (lhs != nullptr) {
         do_finish_pending(lhs, token);
       } else if (next_cond != CompoundListCondition::Kind::None) {
-        throw shit::ErrorWithLocation{token->source_location(),
-                                      "Expected a command after an operator"};
+        throw koshka::ErrorWithLocation{token->source_location(),
+                                        "Expected a command after an operator"};
       }
       if (compound_list->is_empty()) {
         return m_lexer.arena().create<DummyExpression>(
@@ -445,7 +445,7 @@ hot fn Parser::parse_command_list(
         msg += " operator, found '";
         msg += ast.view();
         msg += "'";
-        throw shit::ErrorWithLocation{token->source_location(), msg};
+        throw koshka::ErrorWithLocation{token->source_location(), msg};
       }
       [[fallthrough]];
     case Token::Kind::Newline:
@@ -473,8 +473,8 @@ hot fn Parser::parse_command_list(
 
       if (token->kind() == Token::Kind::EndOfFile) {
         if (next_cond != CompoundListCondition::Kind::None) {
-          throw shit::ErrorWithLocation{token->source_location(),
-                                        "Expected a command after an operator"};
+          throw koshka::ErrorWithLocation{
+              token->source_location(), "Expected a command after an operator"};
         }
 
         if (compound_list->is_empty()) {
@@ -489,8 +489,8 @@ hot fn Parser::parse_command_list(
     case Token::Kind::Pipe:
     case Token::Kind::PipeAmpersand: {
       if (lhs == nullptr) {
-        throw shit::ErrorWithLocation{token->source_location(),
-                                      "Expected a command before the pipe"};
+        throw koshka::ErrorWithLocation{token->source_location(),
+                                        "Expected a command before the pipe"};
       }
 
       /* A |& pipe routes the left command's stderr into the pipe too, the
@@ -519,14 +519,14 @@ hot fn Parser::parse_command_list(
               after->source_location().position ==
                   last_pipe_token->source_location().position + 1)
           {
-            throw shit::ErrorWithLocationAndDetails{
+            throw koshka::ErrorWithLocationAndDetails{
                 last_pipe_token->source_location(),
                 "Unable to build the pipeline because no command follows "
                 "the pipe. The |& stderr pipe is a bashism that POSIX mode "
                 "does not read",
                 "Use 2>&1 | instead"};
           }
-          throw shit::ErrorWithLocation{
+          throw koshka::ErrorWithLocation{
               last_pipe_token->source_location(),
               "Unable to build the pipeline because no command follows the "
               "pipe to receive the output"};
@@ -2299,4 +2299,4 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
   return lhs;
 }
 
-} /* namespace shit */
+} /* namespace koshka */

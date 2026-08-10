@@ -2,7 +2,7 @@
 
 #include "Common.hpp"
 
-namespace shit {
+namespace koshka {
 class String;
 }
 
@@ -21,10 +21,11 @@ class String;
     unused(fflush(stderr));                                                    \
   } while (0)
 #if defined __clang__
-/* The string parameter is a template so the body sees a complete ::shit::String
-   only at the call site. Debug.hpp can not include String.hpp, since String.hpp
-   includes Debug.hpp, so naming String here would close an include cycle. */
-namespace shit {
+/* The string parameter is a template so the body sees a complete
+   ::koshka::String only at the call site. Debug.hpp can not include String.hpp,
+   since String.hpp includes Debug.hpp, so naming String here would close an
+   include cycle. */
+namespace koshka {
 
 template <class P>
 constexpr bool t__is_dumpable_record_pointer()
@@ -127,19 +128,20 @@ fn t__string_from_struct(const T &value, AllocatorT allocator) throws -> StringT
   return static_cast<StringT &&>(state.output);
 }
 
-} // namespace shit
+} // namespace koshka
 
 #define STRUCT_STRING(x)                                                       \
-  ::shit::t__string_from_struct<::shit::String>(x, ::shit::heap_allocator())
+  ::koshka::t__string_from_struct<::koshka::String>(                           \
+      x, ::koshka::heap_allocator())
 #endif
 #else /* !NDEBUG */
-#define STRUCT_STRING(...) ::shit::String{"<optimized out>"}
+#define STRUCT_STRING(...) ::koshka::String{"<optimized out>"}
 #define TRACE(...)         /* None */
 #define TRACELN(...)       /* None */
 #endif
 
 #if !defined STRUCT_STRING
-#define STRUCT_STRING(...) ::shit::String{"<not supported>"}
+#define STRUCT_STRING(...) ::koshka::String{"<not supported>"}
 #endif
 
 #define t__va_are_empty(...) (sizeof((char[]) {#__VA_ARGS__}) == 1)

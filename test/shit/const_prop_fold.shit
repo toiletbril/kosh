@@ -1,4 +1,0 @@
-#!/bin/env shit
-x=5
-if [ "$x" = 5 ]; then echo folded_A; else echo B; fi
-x=2; echo $((x+x))

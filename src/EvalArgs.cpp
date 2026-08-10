@@ -14,7 +14,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -787,10 +787,10 @@ hot flatten fn EvalContext::process_args(
     if (xtrace_fd.has_value())
       (void) os::write_to_numbered_fd(*xtrace_fd, trace.data(), trace.length());
     else
-      shit::print_error(trace);
+      koshka::print_error(trace);
   }
 
   return expanded_args;
 }
 
-} // namespace shit
+} // namespace koshka

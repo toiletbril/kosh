@@ -1,0 +1,30 @@
+== rm sees a dangling symlink, so it would remove it, not report it absent:
+rm: would remove 'link'
+== --dry-run prints without deleting a file:
+rm: would remove 'keep.txt'
+keep.txt still present
+== --dry-run -r lists a tree in removal order without deleting it:
+rm: would remove 'tree/sub/b'
+rm: would remove 'tree/sub'
+rm: would remove 'tree'
+tree still present
+== rm refuses '.' and the root directory, before any removal:
+kosh: 1:1: error: rm: refusing to remove '.' or '..' directory: skipping '.'.
+     1 |  koshkit rm --dry-run .
+       |  ^~~~~~~~~~~~~~~~~~~~~~
+kosh: 1:1: error: rm: refusing to remove the root directory: skipping '/'.
+     1 |  koshkit rm --dry-run /
+       |  ^~~~~~~~~~~~~~~~~~~~~~
+== rm -rf . is refused (count of the refusal):
+1
+== rm -rf .. is refused (count):
+1
+== the directory contents survive:
+keep-survives
+== rm -rf / is refused (count of the refusal):
+1
+== rm -rf // is refused (count):
+1
+== a normal file is reported for removal under --dry-run, and survives:
+rm: would remove 'keep'
+keep-survives

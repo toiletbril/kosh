@@ -33,7 +33,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Ulimit);
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -201,4 +201,4 @@ Ulimit::Ulimit() = default;
 
 pure fn Ulimit::kind() const wontthrow -> Builtin::Kind { return Kind::Ulimit; }
 
-} // namespace shit
+} // namespace koshka

@@ -7,7 +7,7 @@
 #include "Maybe.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 class String
 {
@@ -280,4 +280,4 @@ fn String::to<f64>() const throws -> ErrorOr<f64>;
 
 fn operator+(StringView left, StringView right) throws->String;
 
-} /* namespace shit */
+} /* namespace koshka */

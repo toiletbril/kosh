@@ -10,7 +10,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 /* Each field is empty when color is off, so the render code appends them
    unconditionally and emits nothing on the plain path. */
@@ -183,8 +183,8 @@ cold static fn get_context_pointing_to(
 
   u32 terminal_columns = 0;
   u32 terminal_rows = 0;
-  if (display_cells > 24 && os::is_fd_a_tty(SHIT_STDERR) &&
-      os::terminal_size(terminal_columns, terminal_rows, SHIT_STDERR) &&
+  if (display_cells > 24 && os::is_fd_a_tty(KOSH_STDERR) &&
+      os::terminal_size(terminal_columns, terminal_rows, KOSH_STDERR) &&
       terminal_columns > gutter_width + 24 &&
       display_cells > terminal_columns - gutter_width)
   {
@@ -563,4 +563,4 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   return result;
 }
 
-} // namespace shit
+} // namespace koshka

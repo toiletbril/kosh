@@ -1,5 +1,5 @@
 == export of a read-only name fails:
-shit: 1:24: error: Builtin `export`: 'x' is read-only.
+kosh: 1:24: error: Builtin `export`: 'x' is read-only.
      1 |  readonly x=old; export x=new
        |                         ^~~~~
 rc=1

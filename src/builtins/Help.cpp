@@ -18,7 +18,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Help);
 
-namespace shit {
+namespace koshka {
 
 Help::Help() = default;
 
@@ -69,4 +69,4 @@ fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace shit
+} // namespace koshka

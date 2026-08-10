@@ -1,2 +1,0 @@
-#!/bin/env shit
-IFS=:; x=a::b:c; set -- $x; echo "[$1][$2][$3][$4] n=$#"

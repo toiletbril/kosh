@@ -5,7 +5,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 
-namespace shit {
+namespace koshka {
 
 class Ok
 {};
@@ -132,7 +132,7 @@ private:
                                                                : sizeof(Error)];
 };
 
-} // namespace shit
+} // namespace koshka
 
 /* Evaluate a fallible expression, return its error early on failure, and yield
    its value otherwise. Used inside a function that itself returns an ErrorOr.
@@ -148,9 +148,9 @@ private:
 /* Build an Error whose message carries the source file and line, for an
    internal failure that should not normally reach the user. */
 #define MAKE_ERROR(msg)                                                        \
-  ::shit::Error                                                                \
+  ::koshka::Error                                                              \
   {                                                                            \
-    ::shit::String{__FILE__ ":"} +                                             \
-        ::shit::String::from(__LINE__, ::shit::heap_allocator()) + ": " +      \
+    ::koshka::String{__FILE__ ":"} +                                           \
+        ::koshka::String::from(__LINE__, ::koshka::heap_allocator()) + ": " +  \
         (msg)                                                                  \
   }

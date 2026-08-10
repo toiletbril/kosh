@@ -7,7 +7,7 @@
     3  cd /tmp
     4  git status
 == a non-numeric count is rejected without printing the list ==
-shit: 1:9: error: Builtin `history`: 'foo' is not a valid count.
+kosh: 1:9: error: Builtin `history`: 'foo' is not a valid count.
      1 |  history foo; echo "rc=$?"
        |          ^~~
 rc=2

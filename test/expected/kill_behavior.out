@@ -9,28 +9,28 @@
 == the list has the common signal set:
 complete
 == no target is required:
-shit: 1:1: error: kill: Not enough arguments.
+kosh: 1:1: error: kill: Not enough arguments.
      1 |  kill
        |  ^~~~
-shit: note: Try `kill --help` for more info.
+kosh: note: Try `kill --help` for more info.
 rc=2
 == an unknown signal name is rejected:
-shit: 1:6: error: Builtin `kill`: 'BOGUSSIG' is not a valid signal.
+kosh: 1:6: error: Builtin `kill`: 'BOGUSSIG' is not a valid signal.
      1 |  kill -BOGUSSIG 123
        |       ^~~~~~~~~
 rc=1
 == an unknown job is reported:
-shit: 1:6: error: Builtin `kill`: '%999' is not a known job.
+kosh: 1:6: error: Builtin `kill`: '%999' is not a known job.
      1 |  kill %999
        |       ^~~~
 rc=1
 == a non-numeric job is rejected:
-shit: 1:6: error: Builtin `kill`: '%abc' is not a known job.
+kosh: 1:6: error: Builtin `kill`: '%abc' is not a known job.
      1 |  kill %abc
        |       ^~~~
 rc=1
 == a non-numeric pid is rejected:
-shit: 1:6: error: Builtin `kill`: 'notanumber' is not a valid job or process id.
+kosh: 1:6: error: Builtin `kill`: 'notanumber' is not a valid job or process id.
      1 |  kill notanumber
        |       ^~~~~~~~~~
 rc=1

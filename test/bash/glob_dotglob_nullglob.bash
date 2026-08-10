@@ -37,7 +37,7 @@ f=image.jpg
 echo "${f%%@(.jpg|.png)}"
 case hello in @(hi|hello)) echo case-yes;; esac
 case zzz in !(a|b)) echo case-neg;; esac
-dir=/tmp/shit_extglob_test_$$
+dir=/tmp/kosh_extglob_test_$$
 rm -rf "$dir"; mkdir -p "$dir"
 ( cd "$dir" && touch a.txt b.txt c.log foo bar )
 ( cd "$dir" && echo @(a|b).txt )
@@ -92,7 +92,7 @@ rm -rf "$d"
 # directory levels when shopt globstar is on, as a trailing component it lists
 # every file and directory recursively, and in a path position it stands in for
 # zero or more levels. Without globstar ** behaves like *.
-dir=/tmp/shit_globstar_test_$$
+dir=/tmp/kosh_globstar_test_$$
 rm -rf "$dir"
 mkdir -p "$dir/a/b/c" "$dir/a/d"
 touch "$dir/f0" "$dir/a/f1" "$dir/a/b/f2" "$dir/a/b/c/f3" "$dir/a/d/f4"

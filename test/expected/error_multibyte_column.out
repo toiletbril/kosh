@@ -9,7 +9,7 @@
 [Word
   Unquoted "doesnotexist_xyz*"
 ]
-shit: 3:1: error: A glob pattern in command position is rarely intended as a command name.
+kosh: 3:1: error: A glob pattern in command position is rarely intended as a command name.
      3 |  doesnotexist_xyz*
        |  ^~~~~~~~~~~~~~~~~
 note: Quote it to run a literal name, or list the matches with compgen -G.

@@ -1,0 +1,12 @@
+#!/bin/env kosh
+echo -n no-newline; echo
+echo -e "tab\tnl\nff\f"
+echo -e "stop\cafter"
+echo -E "raw\tkept"
+echo -e "esc\eX"
+
+echo -e "\101"
+echo -e "\0101"
+echo -e "\1011"
+echo -e "\77"
+echo -e "\8"

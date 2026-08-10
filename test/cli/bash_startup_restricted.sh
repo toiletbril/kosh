@@ -133,8 +133,8 @@ output=$(HOME="$directory" BASH_ENV='~/env' \
 printf 'bash-env-tilde=%s\n' "$output"
 output=$(BASH_ENV="$directory/env" "$BIN" --mood bash-posix -c 'printf body')
 printf 'bash-env-posix=%s\n' "$output"
-output=$(BASH_ENV="$directory/env" "$BIN" --mood shit -c 'printf body')
-printf 'bash-env-shit=%s\n' "$output"
+output=$(BASH_ENV="$directory/env" "$BIN" --mood kosh -c 'printf body')
+printf 'bash-env-kosh=%s\n' "$output"
 output=$(BASH_ENV="$directory/env" "$BIN" --mood bash --clean -c 'printf body')
 printf 'bash-env-clean=%s\n' "$output"
 output=$(BASH_ENV="$directory/env" \
@@ -229,7 +229,7 @@ output=$("$BIN" --mood bash --restricted -c \
 printf 'restricted-shopt-fixed=%s\n' "$output"
 
 if [ "${OS-}" = Windows_NT ]; then
-  "$BIN" -c 'shitbox cp "$1" "$2"' \
+  "$BIN" -c 'koshkit cp "$1" "$2"' \
     test-copy "$BIN" "$directory/rbash.exe"
   rbash=$directory/rbash.exe
 else
@@ -382,7 +382,7 @@ printf 'sparse-local-restore=%s\n' "$output"
 
 mkdir "$directory/z-target"
 printf '%s\t1\t1\n' "$directory/z-target" > "$directory/z-store"
-output=$(SHIT_DIRECTORY_HISTORY="$directory/z-store" \
+output=$(KOSH_DIRECTORY_HISTORY="$directory/z-store" \
   "$BIN" --mood bash --restricted -c \
   'before=$PWD; z z-target; status=$?; test "$PWD" = "$before"; printf "status=%s cwd=%s" "$status" "$?"' \
   2>/dev/null)

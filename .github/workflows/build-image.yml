@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: shit-cross
+  IMAGE_NAME: kosh-cross
 
 jobs:
   build:

@@ -1,4 +1,4 @@
-unset SHIT_FLAGS
+unset KOSH_FLAGS
 # --posix selects the bash-posix mood, not the dash-like sh mood, so the bash
 # identity is seeded and the bash grammar stays on. [[ still works, arrays still
 # work, and BASH_VERSION is set so a bash rc detects it.

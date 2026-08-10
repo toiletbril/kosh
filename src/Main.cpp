@@ -8,12 +8,12 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "PackedStringKey.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "Shitbox.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
@@ -69,13 +69,13 @@ FLAG(RESTRICTED, Bool, 'r', "restricted", Bash,
      "Start a restricted shell after the startup files finish.");
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
      "Run privileged, suppressing BASH_ENV. Unequal ids skip startup files.");
-FLAG(CLEAN, Bool, '\0', "clean", Shit,
+FLAG(CLEAN, Bool, '\0', "clean", Kosh,
      "Start clean, reading no startup file and setting a minimal PATH.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
      "Run in bash POSIX mode, equivalent to --mood bash-posix.");
 
 FLAG(MOOD, String, 'M', "mood", Compat,
-     "Select the runtime mood, 'shit' is strict with the analysis stage on, "
+     "Select the runtime mood, 'kosh' is strict with the analysis stage on, "
      "'bash' runs the extensions with it off, 'sh' behaves like dash, and "
      "'bash-posix' is bash with the posix identity reached by --posix.");
 FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
@@ -85,32 +85,33 @@ FLAG(MIMICRY, Bool, 'I', "mimicry", Compat,
      "Mimic the shell a script's shebang names, running a known shell shebang "
      "in-process in the matching mode.");
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
-     "Make shit extremely dumb. Equivalent to --mood sh -T --no-diagnostics.");
+     "Make the shell extremely dumb. Equivalent to --mood sh -T "
+     "--no-diagnostics.");
 
-FLAG(WARNINGS, RepeatedBool, 'W', "", Shit,
+FLAG(WARNINGS, RepeatedBool, 'W', "", Kosh,
      "In the default mood, demote annoying, lenient, then strict diagnostics "
      "as W is repeated. In other moods, enable those tiers in reverse order.");
-FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
+FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Kosh,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
-FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
+FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Kosh,
      "Skip the analysis stage. No warnings or pre-run diagnostics are "
      "reported.");
-FLAG(SUPPRESS_ANNOYING_DIAGNOSTICS, Bool, '\0', "no-annoying-diagnostics", Shit,
+FLAG(SUPPRESS_ANNOYING_DIAGNOSTICS, Bool, '\0', "no-annoying-diagnostics", Kosh,
      "Suppress the annoying diagnostic tier while retaining strict and "
      "lenient analysis.");
-FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
+FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Kosh,
      "Suppress diagnostics only while the startup files source, then restore "
      "them for the prompt.");
-FLAG(NO_TRACES, Bool, '\0', "no-traces", Shit,
+FLAG(NO_TRACES, Bool, '\0', "no-traces", Kosh,
      "Suppress source backtraces for errors and warnings.");
-FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
+FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Kosh,
      "Disable interactive tab completion and ghost-text.");
-FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Shit,
+FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Kosh,
      "Disable the syntax coloring and the ghost suggestion, leaving tab "
      "completion working.");
-FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
-     "Resolve the bundled shitbox utility names such as ls and mkdir directly "
-     "as commands, the same as set -o shitbox.");
+FLAG(ENABLE_KOSHKIT, Bool, '\0', "enable-koshkit", Kosh,
+     "Resolve the bundled koshkit utility names such as ls and mkdir directly "
+     "as commands, the same as set -o koshkit.");
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
@@ -148,9 +149,9 @@ FLAG(DEBUG_GHOST_AT, String, '\0', "debug-ghost-at", Debug,
      "Print the ghost completion result and operation counts, then exit.");
 #endif
 
-namespace shit {
+namespace koshka {
 
-fn shit_binary_flag_list() wontthrow -> const FlagList & { return FLAG_LIST; }
+fn kosh_binary_flag_list() wontthrow -> const FlagList & { return FLAG_LIST; }
 
 #if !defined NDEBUG
 static fn run_debug_completion_driver(StringView driver_line,
@@ -159,7 +160,7 @@ static fn run_debug_completion_driver(StringView driver_line,
   context.get_program_resolver().initialize_path_map();
   usize driver_cursor = driver_line.length;
   if (let const cursor_text =
-          os::get_environment_variable("SHIT_TEST_COMPLETE_CURSOR");
+          os::get_environment_variable("KOSH_TEST_COMPLETE_CURSOR");
       cursor_text.has_value())
   {
     let const parsed_cursor = cursor_text->view().to<u64>();
@@ -263,15 +264,15 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
     let h = String{heap_allocator()};
-    h += "SHIT";
+    h += "KOSHKA";
     h += "\n";
     h += wrap_text(
-        "Shit is a pedantic, Bash-compatible command line interpreter and a "
+        "Koshka is a pedantic, Bash-compatible command line interpreter and a "
         "friendly interactive shell.\n\n",
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
-    h += wrap_text("Options are also read from the SHIT_FLAGS environment "
+    h += wrap_text("Options are also read from the KOSH_FLAGS environment "
                    "variable. A flag "
                    "on the command line overrides one set there.\n\n",
                    HELP_INDENT, HELP_WRAP_WIDTH);
@@ -279,7 +280,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += '\n';
     h += '\n';
     h += "Report bugs and suggest features at "
-         "<https://github.com/toiletbril/shit>";
+         "<https://github.com/toiletbril/kosh>";
     h += '\n';
     print_error(h);
     return EXIT_SUCCESS;
@@ -406,7 +407,7 @@ static fn run_script_contents(const String &script_contents,
 
       /* A file with any parse error must not run, so every error is collected
          and reported at once. */
-      let parse_errors = ArrayList<shit::String>{heap_allocator()};
+      let parse_errors = ArrayList<koshka::String>{heap_allocator()};
       ast = p.construct_ast(parse_errors, &context);
 
       if (!parse_errors.is_empty()) {
@@ -493,14 +494,14 @@ static fn run_script_contents(const String &script_contents,
         context.set_current_history_event_number(previous_history_event_number);
       };
       context.set_current_source(&script_contents, "the script");
-      const auto command_start_ns = shit::os::monotonic_nanos();
+      const auto command_start_ns = koshka::os::monotonic_nanos();
       exit_code = static_cast<int>(ast->evaluate(context));
-      context.set_last_command_duration_ns(shit::os::monotonic_nanos() -
+      context.set_last_command_duration_ns(koshka::os::monotonic_nanos() -
                                            command_start_ns);
       LOG(Debug, "the chunk finished with exit code %d", exit_code);
       /* A signal trapped during the last command has no following node to
          trigger its action, so the pending traps drain here. */
-      if (shit::os::SIGNAL_PENDING) context.run_pending_traps();
+      if (koshka::os::SIGNAL_PENDING) context.run_pending_traps();
       report_escaped_control_flow(context, script_contents);
       /* script_contents is local, so the frame is dropped before it dangles. */
       context.set_current_source(nullptr, "");
@@ -754,7 +755,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
           flavor == mimic_mood::Bash        ? "bash"
           : flavor == mimic_mood::Posix     ? "posix"
           : flavor == mimic_mood::BashPosix ? "bash-posix"
-                                            : "shit");
+                                            : "kosh");
       continue;
     }
     context.set_init_mood_sourcing(flavor, true);
@@ -764,17 +765,17 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
         flavor == mimic_mood::Bash        ? "bash"
         : flavor == mimic_mood::Posix     ? "posix"
         : flavor == mimic_mood::BashPosix ? "bash-posix"
-                                          : "shit");
+                                          : "kosh");
     switch (flavor) {
     case mimic_mood::Default:
-      /* A --rcfile replaces the shit rc with the named file. */
+      /* A --rcfile replaces the kosh rc with the named file. */
       if (is_login_shell) source_posix_login_files(context, ast_arena);
       if (should_be_interactive) {
         if (let const rcfile = selected_rcfile(); rcfile.has_value()) {
           source_custom_rcfile(*rcfile, context, ast_arena);
         } else {
-          source_file(Path{"/etc/shitrc"}, context, ast_arena);
-          source_home_file(".shitrc", context, ast_arena);
+          source_file(Path{"/etc/koshrc"}, context, ast_arena);
+          source_home_file(".koshrc", context, ast_arena);
         }
       }
       break;
@@ -836,76 +837,77 @@ pure fn quoted_argv_offset_until(int argc, const char *const *argv,
   return offset;
 }
 
-} // namespace shit
+} // namespace koshka
 
 fn main(int argc, char **argv) -> int
 {
-  shit::os::initialize_platform_runtime();
-  shit::os::register_platform_flags(FLAG_LIST);
+  koshka::os::initialize_platform_runtime();
+  koshka::os::register_platform_flags(FLAG_LIST);
 
-  /* A symlink or rename to a shitbox utility name runs that utility directly,
+  /* A symlink or rename to a koshkit utility name runs that utility directly,
      before any flag parsing, so `ls -l` reaches ls and its own flag parser. */
   if (argc > 0) {
-    shit::StringView invocation = shit::StringView{argv[0]};
+    koshka::StringView invocation = koshka::StringView{argv[0]};
     usize basename_start = 0;
     for (usize i = 0; i < invocation.length; i++)
-      if (shit::os::is_directory_separator(invocation[i]))
+      if (koshka::os::is_directory_separator(invocation[i]))
         basename_start = i + 1;
     invocation = invocation.substring(basename_start);
     if (!invocation.is_empty() && invocation[0] == '-') {
       invocation = invocation.substring(1);
     }
-    let invocation_name = shit::String{invocation};
+    let invocation_name = koshka::String{invocation};
     let const invocation_info =
-        shit::os::normalize_program_name(invocation_name);
+        koshka::os::normalize_program_name(invocation_name);
     invocation =
         invocation_name.substring_of_length(0, invocation_info.stem_length);
 
-    if (shit::shitbox::find_util(invocation).has_value()) {
-      if (shit::os::is_running_setuid() && !shit::os::drop_elevated_identity())
+    if (koshka::koshkit::find_util(invocation).has_value()) {
+      if (koshka::os::is_running_setuid() &&
+          !koshka::os::drop_elevated_identity())
       {
-        shit::show_message("Unable to drop elevated ids: " +
-                           shit::os::last_system_error_message());
+        koshka::show_message("Unable to drop elevated ids: " +
+                             koshka::os::last_system_error_message());
         return 1;
       }
-      LOG(Info, "acting as the shitbox utility '%.*s' from argv[0]",
+      LOG(Info, "acting as the koshkit utility '%.*s' from argv[0]",
           static_cast<int>(invocation.length), invocation.data);
-      shit::os::set_default_signal_handlers(
-          shit::os::signal_profile::NonInteractive);
-      let ast_arena = shit::BumpArena{};
-      shit::AST_ARENA = &ast_arena;
-      let function_arena = shit::BumpArena{};
-      shit::FUNCTION_ARENA = &function_arena;
+      koshka::os::set_default_signal_handlers(
+          koshka::os::signal_profile::NonInteractive);
+      let ast_arena = koshka::BumpArena{};
+      koshka::AST_ARENA = &ast_arena;
+      let function_arena = koshka::BumpArena{};
+      koshka::FUNCTION_ARENA = &function_arena;
 
-      let context = shit::EvalContext{false, false, false,
-                                      false, false, shit::String{invocation}};
+      let context = koshka::EvalContext{
+          false, false, false, false, false, koshka::String{invocation}};
 
-      shit::ArrayList<shit::String> operands{shit::heap_allocator()};
+      koshka::ArrayList<koshka::String> operands{koshka::heap_allocator()};
       operands.reserve(static_cast<usize>(argc - 1));
       for (int i = 1; i < argc; i++)
-        operands.push(shit::String{shit::StringView{argv[i]}});
+        operands.push(koshka::String{koshka::StringView{argv[i]}});
 
-      return static_cast<int>(shit::shitbox::run_as_multicall(
+      return static_cast<int>(koshka::koshkit::run_as_multicall(
           invocation, steal(operands), context));
     }
   }
 
   bool is_login_shell = false;
-  let file_names = shit::ArrayList<shit::String>{shit::heap_allocator()};
+  let file_names = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
 
-  /* SHIT_FLAGS supplies options through the environment. The whitespace-split
+  /* KOSH_FLAGS supplies options through the environment. The whitespace-split
      tokens are spliced in right after the program name, so a command-line flag
      still has the final say. The token strings and the spliced pointer array
      outlive the parse below. */
-  shit::ArrayList<shit::String> shit_flags_tokens{shit::heap_allocator()};
-  shit::ArrayList<const char *> spliced_argv{shit::heap_allocator()};
-  if (shit::Maybe<shit::String> shit_flags =
-          shit::os::get_environment_variable("SHIT_FLAGS");
-      shit_flags.has_value() && !shit_flags->is_empty())
+  koshka::ArrayList<koshka::String> kosh_flags_tokens{koshka::heap_allocator()};
+  koshka::ArrayList<const char *> spliced_argv{koshka::heap_allocator()};
+  if (koshka::Maybe<koshka::String> kosh_flags =
+          koshka::os::get_environment_variable("KOSH_FLAGS");
+      kosh_flags.has_value() && !kosh_flags->is_empty())
   {
-    let const view = shit_flags->view();
+    let const view = kosh_flags->view();
     usize token_start = 0;
-    /* A -c in SHIT_FLAGS is dropped with the command word after it, since the
+    /* A -c in KOSH_FLAGS is dropped with the command word after it, since the
        variable must not splice a command into every invocation. */
     bool should_skip_next_command_word = false;
 
@@ -920,7 +922,7 @@ fn main(int argc, char **argv) -> int
           } else if (token == "-c") {
             should_skip_next_command_word = true;
           } else {
-            shit_flags_tokens.push(shit::String{token});
+            kosh_flags_tokens.push(koshka::String{token});
           }
         }
         token_start = i + 1;
@@ -928,9 +930,9 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  if (!shit_flags_tokens.is_empty() && argc > 0) {
+  if (!kosh_flags_tokens.is_empty() && argc > 0) {
     spliced_argv.push(argv[0]);
-    for (let const &token : shit_flags_tokens)
+    for (let const &token : kosh_flags_tokens)
       spliced_argv.push(token.c_str());
     for (int i = 1; i < argc; i++)
       spliced_argv.push(argv[i]);
@@ -946,52 +948,52 @@ fn main(int argc, char **argv) -> int
      is marked by a dash-prefixed argv[0], a bare - or -bash, so rescue is
      offered only there and any other invocation keeps the usage exit. */
   let const invocation_path =
-      argc > 0 ? shit::Path{shit::StringView{argv[0]}} : shit::Path{};
+      argc > 0 ? koshka::Path{koshka::StringView{argv[0]}} : koshka::Path{};
   let const invocation_name = invocation_path.filename();
   const bool is_login_invocation =
       !invocation_name.is_empty() && invocation_name[0] == '-';
 
   bool is_rescue_mode = false;
   let const do_enter_rescue = [&]() {
-    shit::show_message("Entering rescue.");
+    koshka::show_message("Entering rescue.");
     is_rescue_mode = true;
-    shit::reset_flags(FLAG_LIST);
+    koshka::reset_flags(FLAG_LIST);
     try {
-      file_names = shit::parse_flags(FLAG_LIST, argc, argv, 0, &FLAG_COMMAND);
+      file_names = koshka::parse_flags(FLAG_LIST, argc, argv, 0, &FLAG_COMMAND);
     } catch (...) {
       /* The real argv carried the bad flag too, so even the clean reparse
          fails. The program name is kept as the sole operand so $0 and SHELL
          stay the real name. */
-      shit::reset_flags(FLAG_LIST);
-      file_names = shit::ArrayList<shit::String>{shit::heap_allocator()};
-      if (argc > 0) file_names.push(shit::String{argv[0]});
+      koshka::reset_flags(FLAG_LIST);
+      file_names = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+      if (argc > 0) file_names.push(koshka::String{argv[0]});
     }
   };
 
   try {
-    file_names =
-        shit::parse_flags(FLAG_LIST, parse_argc, parse_argv, 0, &FLAG_COMMAND);
-  } catch (const shit::ErrorWithLocation &e) {
-    shit::show_message(
-        e.to_string(shit::join_command_line(parse_argc, parse_argv)));
+    file_names = koshka::parse_flags(FLAG_LIST, parse_argc, parse_argv, 0,
+                                     &FLAG_COMMAND);
+  } catch (const koshka::ErrorWithLocation &e) {
+    koshka::show_message(
+        e.to_string(koshka::join_command_line(parse_argc, parse_argv)));
     if (!is_login_invocation) {
       return 2;
     }
     do_enter_rescue();
-  } catch (const shit::Error &e) {
-    shit::show_message(e.to_string());
+  } catch (const koshka::Error &e) {
+    koshka::show_message(e.to_string());
     if (!is_login_invocation) {
       return 2;
     }
     do_enter_rescue();
   }
 
-  let const has_elevated_identity = shit::os::is_running_setuid();
+  let const has_elevated_identity = koshka::os::is_running_setuid();
   if (has_elevated_identity && !FLAG_PRIVILEGED.is_enabled() &&
-      !shit::os::drop_elevated_identity())
+      !koshka::os::drop_elevated_identity())
   {
-    shit::show_message("Unable to drop elevated ids: " +
-                       shit::os::last_system_error_message());
+    koshka::show_message("Unable to drop elevated ids: " +
+                         koshka::os::last_system_error_message());
     return 1;
   }
 
@@ -1001,13 +1003,13 @@ fn main(int argc, char **argv) -> int
     if (!FLAG_NO_COMPLETION.is_enabled()) FLAG_NO_COMPLETION.toggle();
     if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
       FLAG_SUPPRESS_DIAGNOSTICS.toggle();
-    shit::os::set_environment_variable("NO_COLOR", "1");
+    koshka::os::set_environment_variable("NO_COLOR", "1");
   }
 
   /* --clean resets PATH to a minimal default before the context seeds its
      variables from the environment. */
   if (FLAG_CLEAN.is_enabled()) {
-    shit::os::set_environment_variable("PATH", "/usr/bin:/bin");
+    koshka::os::set_environment_variable("PATH", "/usr/bin:/bin");
   }
 
   /* Raise the runtime log level before any helper runs, so the trace covers
@@ -1017,25 +1019,25 @@ fn main(int argc, char **argv) -> int
     struct log_level_name
     {
       const char *name;
-      shit::verbosity level;
+      koshka::verbosity level;
     };
     static const log_level_name LOG_LEVEL_NAMES[] = {
-        {"info",  shit::verbosity::Info },
-        {"debug", shit::verbosity::Debug},
-        {"all",   shit::verbosity::All  },
+        {"info",  koshka::verbosity::Info },
+        {"debug", koshka::verbosity::Debug},
+        {"all",   koshka::verbosity::All  },
     };
     let is_known_level = false;
     for (let const &entry : LOG_LEVEL_NAMES)
       if (FLAG_LOG.value() == entry.name) {
-        shit::LOGGER_VERBOSITY = entry.level;
+        koshka::LOGGER_VERBOSITY = entry.level;
         is_known_level = true;
         break;
       }
     if (!is_known_level) {
-      shit::show_message(
-          shit::ErrorWithDetails{"Unknown debug logging level '" +
-                                     shit::String{FLAG_LOG.value()} + "'",
-                                 "Pass `info`, `debug`, or `all` to `-X`"}
+      koshka::show_message(
+          koshka::ErrorWithDetails{"Unknown debug logging level '" +
+                                       koshka::String{FLAG_LOG.value()} + "'",
+                                   "Pass `info`, `debug`, or `all` to `-X`"}
               .to_string());
       return 2;
     }
@@ -1046,16 +1048,16 @@ fn main(int argc, char **argv) -> int
   if (FLAG_DEBUG_OUTPUT_FILE.is_set() &&
       !FLAG_DEBUG_OUTPUT_FILE.value().is_empty())
   {
-    let const log_file_name = shit::String{FLAG_DEBUG_OUTPUT_FILE.value()};
+    let const log_file_name = koshka::String{FLAG_DEBUG_OUTPUT_FILE.value()};
     if (std::FILE *log_file = std::fopen(log_file_name.c_str(), "a");
         log_file != nullptr)
     {
-      shit::LOGGER_OUTPUT = log_file;
+      koshka::LOGGER_OUTPUT = log_file;
     }
   }
 #endif
 
-  let program_path = shit::String{shit::heap_allocator()};
+  let program_path = koshka::String{koshka::heap_allocator()};
 
   if (file_names.count() > 0) {
     program_path = steal(file_names[0]);
@@ -1068,13 +1070,13 @@ fn main(int argc, char **argv) -> int
      bash mode, so a symlink named after a system shell behaves like it. */
   usize program_basename_start = 0;
   for (usize i = 0; i < program_path.length(); i++)
-    if (shit::os::is_directory_separator(program_path[i]))
+    if (koshka::os::is_directory_separator(program_path[i]))
       program_basename_start = i + 1;
   let normalized_program_basename =
-      shit::String{program_path.substring(program_basename_start)};
+      koshka::String{program_path.substring(program_basename_start)};
   let const program_name_info =
-      shit::os::normalize_program_name(normalized_program_basename);
-  shit::StringView program_basename =
+      koshka::os::normalize_program_name(normalized_program_basename);
+  koshka::StringView program_basename =
       normalized_program_basename.substring_of_length(
           0, program_name_info.stem_length);
   /* A login shell receives argv[0] prefixed with a dash, such as -bash, and
@@ -1090,7 +1092,7 @@ fn main(int argc, char **argv) -> int
      run. */
   let executable_path = program_path.clone();
   if (does_name_mark_login && program_path.view().length > 1)
-    executable_path = shit::String{program_path.view().substring(1)};
+    executable_path = koshka::String{program_path.view().substring(1)};
 
   if (does_name_mark_login && !program_basename.is_empty() &&
       program_basename[0] == '-')
@@ -1098,24 +1100,25 @@ fn main(int argc, char **argv) -> int
     program_basename = program_basename.substring(1);
   }
 
-  const shit::mimic_mood invocation_mood =
+  const koshka::mimic_mood invocation_mood =
       (program_basename == "sh" || program_basename == "dash")
-          ? shit::mimic_mood::Posix
+          ? koshka::mimic_mood::Posix
       : program_basename == "bash" || program_basename == "rbash"
-          ? shit::mimic_mood::Bash
-          : shit::mimic_mood::Default;
+          ? koshka::mimic_mood::Bash
+          : koshka::mimic_mood::Default;
   let const is_restricted_shell =
       FLAG_RESTRICTED.is_enabled() || program_basename == "rbash";
   LOG(Info, "invocation basename is '%.*s'",
       static_cast<int>(program_basename.length), program_basename.data);
-  let const session_mood = shit::resolve_session_mood(invocation_mood);
+  let const session_mood = koshka::resolve_session_mood(invocation_mood);
   LOG(Info, "selecting the %s mood",
-      session_mood == shit::mimic_mood::Posix       ? "posix"
-      : session_mood == shit::mimic_mood::Bash      ? "bash"
-      : session_mood == shit::mimic_mood::BashPosix ? "bash-posix"
-                                                    : "default");
+      session_mood == koshka::mimic_mood::Posix       ? "posix"
+      : session_mood == koshka::mimic_mood::Bash      ? "bash"
+      : session_mood == koshka::mimic_mood::BashPosix ? "bash-posix"
+                                                      : "default");
 
-  if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
+  if (koshka::Maybe<int> code =
+          koshka::print_help_or_version_status(program_path))
     return *code;
 
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
@@ -1125,43 +1128,45 @@ fn main(int argc, char **argv) -> int
   }
   LOG(Info, "the shell %s a login shell", is_login_shell ? "is" : "is not");
 
-  if (FLAG_MOOD.is_set() && !shit::parse_mood_name(FLAG_MOOD.value())) {
-    shit::String source = "--mood ";
+  if (FLAG_MOOD.is_set() && !koshka::parse_mood_name(FLAG_MOOD.value())) {
+    koshka::String source = "--mood ";
     let const value_position = source.count();
     source += FLAG_MOOD.value();
-    shit::show_message(shit::ErrorWithLocation{
-        shit::SourceLocation{value_position, FLAG_MOOD.value().length},
-        "Unknown --mood value, expected one of 'shit', 'bash', 'sh', or "
+    koshka::show_message(koshka::ErrorWithLocation{
+        koshka::SourceLocation{value_position, FLAG_MOOD.value().length},
+        "Unknown --mood value, expected one of 'kosh', 'bash', 'sh', or "
         "'bash-posix'"
     }
-                           .to_string(source.view()));
+                             .to_string(source.view()));
     return 2;
   }
 
-  let init_moods = shit::ArrayList<shit::mimic_mood>{shit::heap_allocator()};
+  let init_moods =
+      koshka::ArrayList<koshka::mimic_mood>{koshka::heap_allocator()};
   for (usize i = 0; i < FLAG_INIT_MOODS.count(); i++) {
-    shit::StringView entry = FLAG_INIT_MOODS.get(i);
+    koshka::StringView entry = FLAG_INIT_MOODS.get(i);
     /* A single --init-moods value may itself be comma-separated. */
     usize name_start = 0;
     for (usize j = 0; j <= entry.length; j++) {
       if (j != entry.length && entry[j] != ',') {
         continue;
       }
-      shit::StringView name =
+      koshka::StringView name =
           entry.substring_of_length(name_start, j - name_start);
       name_start = j + 1;
       if (name.is_empty()) continue;
-      shit::Maybe<shit::mimic_mood> parsed_mood = shit::parse_mood_name(name);
+      koshka::Maybe<koshka::mimic_mood> parsed_mood =
+          koshka::parse_mood_name(name);
       if (!parsed_mood.has_value()) {
-        shit::String source = "--init-moods ";
+        koshka::String source = "--init-moods ";
         let const value_position = source.count();
         source += name;
-        shit::show_message(shit::ErrorWithLocation{
-            shit::SourceLocation{value_position, name.length},
-            "Unknown --init-moods value, expected one of 'shit', 'bash', "
+        koshka::show_message(koshka::ErrorWithLocation{
+            koshka::SourceLocation{value_position, name.length},
+            "Unknown --init-moods value, expected one of 'kosh', 'bash', "
             "or 'sh'"
         }
-                               .to_string(source.view()));
+                                 .to_string(source.view()));
         return 2;
       }
       init_moods.push(*parsed_mood);
@@ -1177,12 +1182,12 @@ fn main(int argc, char **argv) -> int
   unused(is_privileged);
 
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
-    bool is_tty = shit::os::is_stdin_a_tty();
+    bool is_tty = koshka::os::is_stdin_a_tty();
 
-    let s = shit::String{shit::heap_allocator()};
+    let s = koshka::String{koshka::heap_allocator()};
     s += "Both '-s' and '-i' options were specified. Falling back to ";
     s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
-    shit::show_message(s);
+    koshka::show_message(s);
 
     if (is_tty)
       FLAG_STDIN.toggle();
@@ -1197,7 +1202,7 @@ fn main(int argc, char **argv) -> int
      file operand, then -i or no arguments. */
   if (FLAG_STDIN.is_enabled()) {
     if (!FLAG_COMMAND.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
-      shit::show_message(
+      koshka::show_message(
           "Incompatible options or arguments were specified along "
           "with '-s' option. "
           "Falling back to '-s'.");
@@ -1205,7 +1210,7 @@ fn main(int argc, char **argv) -> int
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
     if (FLAG_INTERACTIVE.is_enabled()) {
-      shit::show_message(
+      koshka::show_message(
           "Incompatible options or arguments were specified along "
           "with '-c' options. "
           "Falling back to '-c'.");
@@ -1213,11 +1218,11 @@ fn main(int argc, char **argv) -> int
     should_execute_commands = true;
   } else if (!file_names.is_empty()) {
     if (FLAG_INTERACTIVE.is_enabled()) {
-      shit::show_message("Both file argument and '-i' option were given. "
-                         "Falling back to reading files.");
+      koshka::show_message("Both file argument and '-i' option were given. "
+                           "Falling back to reading files.");
     }
     should_read_files = true;
-  } else if (FLAG_INTERACTIVE.is_enabled() || shit::os::is_stdin_a_tty()) {
+  } else if (FLAG_INTERACTIVE.is_enabled() || koshka::os::is_stdin_a_tty()) {
     should_be_interactive = true;
   } else {
     should_read_stdin = true;
@@ -1241,7 +1246,8 @@ fn main(int argc, char **argv) -> int
      arguments, while an interactive or -s shell keeps the shell name as $0 and
      takes every operand as a positional parameter. */
   let shell_name = program_path.clone();
-  let positional_params = shit::ArrayList<shit::String>{shit::heap_allocator()};
+  let positional_params =
+      koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
 
   usize first_param_index = 0;
   if ((should_read_files || should_execute_commands) && !file_names.is_empty())
@@ -1252,28 +1258,28 @@ fn main(int argc, char **argv) -> int
 
   positional_params.reserve(file_names.count() - first_param_index);
   for (usize i = first_param_index; i < file_names.count(); i++)
-    positional_params.push(shit::String{
-        shit::heap_allocator(),
-        shit::StringView{file_names[i].data(), file_names[i].count()}
+    positional_params.push(koshka::String{
+        koshka::heap_allocator(),
+        koshka::StringView{file_names[i].data(), file_names[i].count()}
     });
 
-  shit::os::unset_environment_variable("SHIT_IDENTITY");
+  koshka::os::unset_environment_variable("KOSH_IDENTITY");
   let const should_suppress_root_source_trace =
-      shit::os::get_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE")
+      koshka::os::get_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE")
           .has_value();
-  shit::os::unset_environment_variable("SHIT_INTERNAL_SUPPRESS_ROOT_TRACE");
+  koshka::os::unset_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE");
 
-  let context = shit::EvalContext{FLAG_DISABLE_EXPANSION.is_enabled(),
-                                  FLAG_VERBOSE.is_enabled(),
-                                  FLAG_EXPAND_VERBOSE.is_enabled(),
-                                  should_be_interactive,
-                                  FLAG_ERROR_EXIT.is_enabled(),
-                                  shell_name.clone(),
-                                  steal(positional_params)};
+  let context = koshka::EvalContext{FLAG_DISABLE_EXPANSION.is_enabled(),
+                                    FLAG_VERBOSE.is_enabled(),
+                                    FLAG_EXPAND_VERBOSE.is_enabled(),
+                                    should_be_interactive,
+                                    FLAG_ERROR_EXIT.is_enabled(),
+                                    shell_name.clone(),
+                                    steal(positional_params)};
 
-  shit::utils::set_quit_context(&context);
+  koshka::utils::set_quit_context(&context);
 
-  context.set_cli_invocation(shit::join_command_line(parse_argc, parse_argv));
+  context.set_cli_invocation(koshka::join_command_line(parse_argc, parse_argv));
 
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_show_ast(FLAG_AST.is_enabled());
@@ -1284,10 +1290,10 @@ fn main(int argc, char **argv) -> int
   context.set_annoying_diagnostics_enabled(
       !FLAG_SUPPRESS_ANNOYING_DIAGNOSTICS.is_enabled());
   context.set_source_traces_enabled(!FLAG_NO_TRACES.is_enabled());
-  context.set_shell_option_state(shit::shell_option_id::Privileged,
+  context.set_shell_option_state(koshka::shell_option_id::Privileged,
                                  FLAG_PRIVILEGED.is_enabled());
   context.set_login_shell(is_login_shell);
-  context.set_custom_rcfile(shit::selected_rcfile().has_value());
+  context.set_custom_rcfile(koshka::selected_rcfile().has_value());
   if (is_restricted_shell) context.request_restricted_shell();
   /* The startup files source with strictness off, since they read unset
      variables such as $BASH_VERSION on the /etc/profile path. The session
@@ -1304,7 +1310,7 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  context.set_shitbox(FLAG_ENABLE_SHITBOX.is_enabled());
+  context.set_koshkit(FLAG_ENABLE_KOSHKIT.is_enabled());
   context.set_failglob(false);
   /* Mimicry is mirrored onto the context, since the execution path in Utils
      reads it there rather than the static flag. */
@@ -1312,40 +1318,41 @@ fn main(int argc, char **argv) -> int
   context.set_monitor(should_be_interactive);
 
   /* BASH names the path used to invoke this shell, the symlink spelling such as
-     /usr/local/bin/bash when shit is symlinked to bash. */
+     /usr/local/bin/bash when kosh is symlinked to bash. */
   context.set_shell_executable_path(executable_path);
-  context.mark_exported("SHIT_IDENTITY");
-  context.mark_readonly("SHIT_IDENTITY");
+  context.mark_exported("KOSH_IDENTITY");
+  context.mark_readonly("KOSH_IDENTITY");
   /* SHELL is owned by login, getty, or the display manager, so an inherited
      value is left untouched. Only a shell that received no SHELL seeds its own
      invocation path. */
-  if (!shit::os::get_environment_variable("SHELL").has_value())
+  if (!koshka::os::get_environment_variable("SHELL").has_value())
     context.set_shell_variable("SHELL", executable_path);
-  context.set_shell_variable("PWD", shit::Path::current_directory().text());
-  context.set_shell_variable("SHIT", executable_path);
-  context.set_shell_variable("SHIT_VERSION", SHIT_VERSION_STRING);
-  context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);
-  context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
-  context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
+  context.set_shell_variable("PWD", koshka::Path::current_directory().text());
+  context.set_shell_variable("KOSH", executable_path);
+  context.set_shell_variable("KOSH_VERSION", KOSH_VERSION_STRING);
+  context.set_shell_variable("KOSH_COMMIT", KOSH_COMMIT_HASH);
+  context.set_shell_variable("KOSH_BUILD_MODE", KOSH_BUILD_MODE);
+  context.set_shell_variable("KOSH_OS", KOSH_OS_INFO);
 
   /* A bash session, a bash-posix session, or a bash flavor in the init list
      advertises BASH_VERSION so a bash rc detects it. */
-  bool should_seed_bash_identity = session_mood == shit::mimic_mood::Bash ||
-                                   session_mood == shit::mimic_mood::BashPosix;
+  bool should_seed_bash_identity =
+      session_mood == koshka::mimic_mood::Bash ||
+      session_mood == koshka::mimic_mood::BashPosix;
   for (let listed : init_moods)
-    if (listed == shit::mimic_mood::Bash ||
-        listed == shit::mimic_mood::BashPosix)
+    if (listed == koshka::mimic_mood::Bash ||
+        listed == koshka::mimic_mood::BashPosix)
       should_seed_bash_identity = true;
   context.seed_shell_identity_variables(should_seed_bash_identity);
 
   /* SHLVL counts shell nesting, incremented and exported so a child shell
      continues the count. */
   i64 shell_level = 0;
-  if (shit::Maybe<shit::String> inherited =
-          shit::os::get_environment_variable("SHLVL");
+  if (koshka::Maybe<koshka::String> inherited =
+          koshka::os::get_environment_variable("SHLVL");
       inherited.has_value())
   {
-    if (shit::ErrorOr<i64> parsed_level = inherited->view().to<i64>();
+    if (koshka::ErrorOr<i64> parsed_level = inherited->view().to<i64>();
         !parsed_level.is_error() && parsed_level.value() > 0)
       shell_level = parsed_level.value();
   }
@@ -1353,8 +1360,8 @@ fn main(int argc, char **argv) -> int
      the way bash bounds SHLVL. */
   constexpr i64 MAX_SHLVL = 999;
   if (shell_level > MAX_SHLVL) shell_level = 0;
-  shit::os::set_environment_variable(
-      "SHLVL", shit::String::from(shell_level + 1, shit::heap_allocator()));
+  koshka::os::set_environment_variable(
+      "SHLVL", koshka::String::from(shell_level + 1, koshka::heap_allocator()));
   /* The exported set must know SHLVL even on a first shell that did not inherit
      one. */
   context.mark_exported("SHLVL");
@@ -1366,13 +1373,13 @@ fn main(int argc, char **argv) -> int
      their defaults in every run. PS3 is left unset, since the select loop
      falls back to its own default. */
   if (should_be_interactive) {
-    if (!shit::os::get_environment_variable("PS1").has_value())
+    if (!koshka::os::get_environment_variable("PS1").has_value())
       context.set_shell_variable("PS1", toiletline::default_prompt_template());
   }
 
-  if (!shit::os::get_environment_variable("PS2").has_value())
+  if (!koshka::os::get_environment_variable("PS2").has_value())
     context.set_shell_variable("PS2", "> ");
-  if (!shit::os::get_environment_variable("PS4").has_value())
+  if (!koshka::os::get_environment_variable("PS4").has_value())
     context.set_shell_variable("PS4", "+ ");
 
   /* COLUMNS and LINES carry the terminal size so a config that divides by
@@ -1380,34 +1387,34 @@ fn main(int argc, char **argv) -> int
      not tracked across a later resize. */
   if (should_be_interactive) {
     u32 columns = 0, rows = 0;
-    if (shit::os::terminal_size(columns, rows)) {
+    if (koshka::os::terminal_size(columns, rows)) {
       context.set_shell_variable(
-          "COLUMNS", shit::String::from(columns, shit::heap_allocator()));
+          "COLUMNS", koshka::String::from(columns, koshka::heap_allocator()));
       context.set_shell_variable(
-          "LINES", shit::String::from(rows, shit::heap_allocator()));
+          "LINES", koshka::String::from(rows, koshka::heap_allocator()));
     }
   }
 
   bool should_quit = FLAG_ONE_COMMAND.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
-  shit::Maybe<usize> history_event_number = shit::None;
+  koshka::Maybe<usize> history_event_number = koshka::None;
 
   /* The path map is reset rather than seeded here, since the eager scan pays
      off only in interactive mode. */
-  shit::os::set_default_signal_handlers(
-      should_be_interactive ? shit::os::signal_profile::Interactive
-                            : shit::os::signal_profile::NonInteractive);
+  koshka::os::set_default_signal_handlers(
+      should_be_interactive ? koshka::os::signal_profile::Interactive
+                            : koshka::os::signal_profile::NonInteractive);
   LOG(Info, "installed the default signal handlers");
 
   /* The parse arena holds the AST and its tokens for one command, reset between
      commands. */
-  let ast_arena = shit::BumpArena{};
-  shit::AST_ARENA = &ast_arena;
+  let ast_arena = koshka::BumpArena{};
+  koshka::AST_ARENA = &ast_arena;
 
   /* Function bodies outlive the command that defined them, so the function
      arena is never reset during the run. */
-  let function_arena = shit::BumpArena{};
-  shit::FUNCTION_ARENA = &function_arena;
+  let function_arena = koshka::BumpArena{};
+  koshka::FUNCTION_ARENA = &function_arena;
 
   /* A shell with unequal ids, rescue, and --clean source nothing. */
   if (has_elevated_identity || is_rescue_mode || FLAG_CLEAN.is_enabled()) {
@@ -1425,8 +1432,8 @@ fn main(int argc, char **argv) -> int
       context.set_diagnostics_disabled(true);
       context.set_warning_level(0);
     }
-    shit::source_init_moods(context, ast_arena, init_moods, is_login_shell,
-                            should_be_interactive);
+    koshka::source_init_moods(context, ast_arena, init_moods, is_login_shell,
+                              should_be_interactive);
     if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
       context.set_diagnostics_disabled(saved_diagnostics_disabled);
       context.set_warning_level(saved_warning_level);
@@ -1454,16 +1461,16 @@ fn main(int argc, char **argv) -> int
   bool did_seed_interactive_path_map = false;
   loop
   {
-    ASSERT(!shit::os::is_child_process());
+    ASSERT(!koshka::os::is_child_process());
 
-    let script_contents = shit::String{shit::heap_allocator()};
+    let script_contents = koshka::String{koshka::heap_allocator()};
     /* The named script file flows into the diagnostics so an error reads
        path:line:col. A -c or interactive line carries no path. */
-    shit::Maybe<shit::StringView> source_filename = shit::None;
+    koshka::Maybe<koshka::StringView> source_filename = koshka::None;
     /* The root frame caret underlines the operand that produced the script
        body, the -c flag and its argument for a command string, the file name
        for a script file. Stdin and interactive runs leave it empty. */
-    shit::Maybe<shit::SourceLocation> root_frame_call_site = shit::None;
+    koshka::Maybe<koshka::SourceLocation> root_frame_call_site = koshka::None;
 
     try {
       if (should_read_files || should_read_stdin) {
@@ -1478,47 +1485,48 @@ fn main(int argc, char **argv) -> int
 #endif
           if (!is_driver_run) {
             LOG(Info, "reading the whole standard input");
-            script_contents = shit::utils::read_entire_standard_input();
+            script_contents = koshka::utils::read_entire_standard_input();
           }
         } else {
-          const shit::String &file_name = file_names[0];
-          const usize operand_offset = shit::quoted_argv_offset_until(
+          const koshka::String &file_name = file_names[0];
+          const usize operand_offset = koshka::quoted_argv_offset_until(
               parse_argc, parse_argv, file_name.view());
-          const shit::SourceLocation operand_location{
-              operand_offset, shit::shell_quoted_arg_length(file_name.view()),
-              shit::None};
-          const shit::Path script_path{file_name.view()};
+          const koshka::SourceLocation operand_location{
+              operand_offset, koshka::shell_quoted_arg_length(file_name.view()),
+              koshka::None};
+          const koshka::Path script_path{file_name.view()};
 
           if (script_path.is_directory()) {
-            shit::show_message(
-                shit::ErrorWithLocation{
+            koshka::show_message(
+                koshka::ErrorWithLocation{
                     operand_location, "Unable to execute `" + file_name.view() +
                                           "` because the file is a directory"}
                     .to_string(context.cli_invocation().view(), &context));
-            shit::utils::quit(126, shit::utils::farewell_policy::Goodbye);
+            koshka::utils::quit(126, koshka::utils::farewell_policy::Goodbye);
           }
 
           LOG(Info, "reading the script file '%s'", file_name.c_str());
-          shit::Maybe<shit::String> contents = script_path.read_entire_file();
+          koshka::Maybe<koshka::String> contents =
+              script_path.read_entire_file();
           if (!contents) {
             let const looks_like_command =
                 !file_name.view().find_character('/').has_value();
-            let hint = shit::String{shit::heap_allocator()};
+            let hint = koshka::String{koshka::heap_allocator()};
             if (looks_like_command)
               hint = "Pass -c to run this as a command string";
             let const message = "Could not open '" + file_name.view() +
-                                "': " + shit::os::last_system_error_message();
+                                "': " + koshka::os::last_system_error_message();
             if (hint.is_empty()) {
-              shit::show_message(
-                  shit::ErrorWithLocation{operand_location, message}.to_string(
-                      context.cli_invocation().view(), &context));
+              koshka::show_message(
+                  koshka::ErrorWithLocation{operand_location, message}
+                      .to_string(context.cli_invocation().view(), &context));
             } else {
-              shit::show_message(
-                  shit::ErrorWithLocationAndDetails{operand_location, message,
-                                                    hint.view()}
+              koshka::show_message(
+                  koshka::ErrorWithLocationAndDetails{operand_location, message,
+                                                      hint.view()}
                       .to_string(context.cli_invocation().view(), &context));
             }
-            shit::utils::quit(127, shit::utils::farewell_policy::Goodbye);
+            koshka::utils::quit(127, koshka::utils::farewell_policy::Goodbye);
           }
           script_contents = steal(*contents);
           source_filename = file_name.view();
@@ -1530,8 +1538,8 @@ fn main(int argc, char **argv) -> int
 
         should_quit = true;
       } else if (should_execute_commands) {
-        shit::StringView command_view = FLAG_COMMAND.next();
-        script_contents = shit::String{command_view};
+        koshka::StringView command_view = FLAG_COMMAND.next();
+        script_contents = koshka::String{command_view};
         context.set_execution_string(command_view);
         LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
@@ -1543,19 +1551,19 @@ fn main(int argc, char **argv) -> int
           usize flag_offset = 0;
           for (int a = 0; a < parse_argc; a++) {
             const usize token_length = std::strlen(parse_argv[a]);
-            const shit::StringView token{parse_argv[a], token_length};
-            const usize quoted_length = shit::shell_quoted_arg_length(token);
+            const koshka::StringView token{parse_argv[a], token_length};
+            const usize quoted_length = koshka::shell_quoted_arg_length(token);
             if (token == "-c") {
               seen_dash_c_count++;
               if (seen_dash_c_count == consumed_command_index &&
                   a + 1 < parse_argc)
               {
                 const usize argument_length =
-                    shit::shell_quoted_arg_length(shit::StringView{
+                    koshka::shell_quoted_arg_length(koshka::StringView{
                         parse_argv[a + 1], std::strlen(parse_argv[a + 1])});
                 const usize span = quoted_length + 1 + argument_length;
                 root_frame_call_site =
-                    shit::SourceLocation{flag_offset, span, shit::None};
+                    koshka::SourceLocation{flag_offset, span, koshka::None};
                 break;
               }
             }
@@ -1578,17 +1586,17 @@ fn main(int argc, char **argv) -> int
               !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled();
           toiletline::set_highlight_enabled(should_highlight);
           toiletline::set_ghost_enabled(should_highlight);
-          if (let const welcome = context.get_variable_value("SHIT_WELCOME");
+          if (let const welcome = context.get_variable_value("KOSH_WELCOME");
               welcome.has_value())
           {
-            if (!welcome->is_empty()) shit::show_message(welcome->view());
+            if (!welcome->is_empty()) koshka::show_message(welcome->view());
           } else {
-            shit::show_message(session_mood == shit::mimic_mood::Posix
-                                   ? "POSIX me harder!"
-                               : (session_mood == shit::mimic_mood::Bash ||
-                                  session_mood == shit::mimic_mood::BashPosix)
-                                   ? "Bash me harder!"
-                                   : "Welcome :3");
+            koshka::show_message(
+                session_mood == koshka::mimic_mood::Posix ? "POSIX me harder!"
+                : (session_mood == koshka::mimic_mood::Bash ||
+                   session_mood == koshka::mimic_mood::BashPosix)
+                    ? "Bash me harder!"
+                    : "Welcome :3");
           }
         } else {
           toiletline::enter_raw_mode();
@@ -1613,17 +1621,17 @@ fn main(int argc, char **argv) -> int
            prompt overwrites the marker so nothing shows. */
         if (should_be_interactive) {
           u32 marker_columns = 0, marker_rows = 0;
-          if (shit::os::terminal_size(marker_columns, marker_rows) &&
+          if (koshka::os::terminal_size(marker_columns, marker_rows) &&
               marker_columns > 0)
           {
-            shit::String eol_marker{shit::heap_allocator()};
+            koshka::String eol_marker{koshka::heap_allocator()};
             /* One allocation holds the glyph, the fill spaces, and the controls
                so the fill loop never regrows the buffer. */
             eol_marker.reserve(marker_columns + 12);
-            if (shit::colors::stdout_wants_color()) {
-              eol_marker += shit::colors::ansi::INVERSE;
+            if (koshka::colors::stdout_wants_color()) {
+              eol_marker += koshka::colors::ansi::INVERSE;
               eol_marker += "\\n";
-              eol_marker += shit::colors::ansi::RESET;
+              eol_marker += koshka::colors::ansi::RESET;
             } else {
               eol_marker += "\\n";
             }
@@ -1632,12 +1640,12 @@ fn main(int argc, char **argv) -> int
             for (u32 column = 2; column < marker_columns; column++)
               eol_marker.push(' ');
             eol_marker.push('\r');
-            shit::print(eol_marker);
-            shit::flush();
+            koshka::print(eol_marker);
+            koshka::flush();
           }
         }
 
-        shit::String prompt = toiletline::build_prompt(context);
+        koshka::String prompt = toiletline::build_prompt(context);
 
         toiletline::set_edit_mode(context.vi_mode()
                                       ? toiletline::edit_mode::Vi
@@ -1658,11 +1666,11 @@ fn main(int argc, char **argv) -> int
             /* EOF logs out only on an empty line. On a non-empty line it is
                ignored so the user can finish the command. */
             if (input.is_empty()) {
-              shit::print("^D");
-              shit::flush();
+              koshka::print("^D");
+              koshka::flush();
               toiletline::emit_newlines(input);
-              shit::utils::quit(exit_code,
-                                shit::utils::farewell_policy::Goodbye);
+              koshka::utils::quit(exit_code,
+                                  koshka::utils::farewell_policy::Goodbye);
             } else {
               toiletline::set_input(input);
               continue;
@@ -1670,15 +1678,16 @@ fn main(int argc, char **argv) -> int
             break;
           case TL_PRESSED_QUIT:
             toiletline::emit_newlines(input);
-            shit::utils::quit(exit_code, shit::utils::farewell_policy::Goodbye);
+            koshka::utils::quit(exit_code,
+                                koshka::utils::farewell_policy::Goodbye);
             break;
           case TL_PRESSED_INTERRUPT:
-            shit::print("^C");
-            shit::flush();
+            koshka::print("^C");
+            koshka::flush();
             break;
           case TL_PRESSED_SUSPEND:
-            shit::print("^Z");
-            shit::flush();
+            koshka::print("^Z");
+            koshka::flush();
             break;
           default:;
           }
@@ -1698,25 +1707,25 @@ fn main(int argc, char **argv) -> int
       } else {
         unreachable();
       }
-    } catch (const shit::Error &e) {
-      shit::show_message(e.to_string());
-      shit::utils::quit(EXIT_FAILURE);
+    } catch (const koshka::Error &e) {
+      koshka::show_message(e.to_string());
+      koshka::utils::quit(EXIT_FAILURE);
     } catch (const std::exception &e) {
-      shit::show_message(
+      koshka::show_message(
           "Uncaught exception while getting the input. Exiting.");
-      shit::show_message("Context: '" + shit::String{e.what()} + "'.");
-      shit::utils::quit(EXIT_FAILURE);
+      koshka::show_message("Context: '" + koshka::String{e.what()} + "'.");
+      koshka::utils::quit(EXIT_FAILURE);
     } catch (...) {
-      shit::show_message(
+      koshka::show_message(
           "Unexpected system explosion while getting the input. Exiting.");
-      shit::show_message("Last system message: " +
-                         shit::os::last_system_error_message());
-      shit::utils::quit(EXIT_FAILURE);
+      koshka::show_message("Last system message: " +
+                           koshka::os::last_system_error_message());
+      koshka::utils::quit(EXIT_FAILURE);
     }
 
     /* A Ctrl-C used to clear the input line must not abort the command about to
        run, so a pending interrupt is dropped here. */
-    shit::os::INTERRUPT_REQUESTED = 0;
+    koshka::os::INTERRUPT_REQUESTED = 0;
 
     /* On the final chunk a terminal external command may replace the shell
        process rather than fork, exec, and wait, the way dash execs the last
@@ -1729,10 +1738,10 @@ fn main(int argc, char **argv) -> int
         !context.has_exit_trap() && !should_print_post_run_trailer);
 
     if (context.shell_is_interactive() && !script_contents.is_empty()) {
-      shit::String ps0 = toiletline::render_ps0(context);
+      koshka::String ps0 = toiletline::render_ps0(context);
       if (!ps0.is_empty()) {
-        shit::print(ps0);
-        shit::flush();
+        koshka::print(ps0);
+        koshka::flush();
       }
     }
 
@@ -1758,30 +1767,31 @@ fn main(int argc, char **argv) -> int
 
     /* A child process reaches here when its exec() failed and printed the error
        itself. */
-    if (should_quit || shit::os::is_child_process() ||
+    if (should_quit || koshka::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
 #if !defined NDEBUG
       /* The completion test driver runs after the staged chunks, so a -c that
          registered specs is visible to the engine. */
-      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process()) {
-        exit_code = shit::run_debug_completion_driver(
+      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !koshka::os::is_child_process()) {
+        exit_code = koshka::run_debug_completion_driver(
             FLAG_DEBUG_COMPLETE_AT.value(), context);
       }
-      if (FLAG_DEBUG_HIGHLIGHT_AT.is_set() && !shit::os::is_child_process()) {
-        exit_code = shit::run_debug_highlight_driver(
+      if (FLAG_DEBUG_HIGHLIGHT_AT.is_set() && !koshka::os::is_child_process()) {
+        exit_code = koshka::run_debug_highlight_driver(
             FLAG_DEBUG_HIGHLIGHT_AT.value(), context);
       }
-      if (FLAG_DEBUG_GHOST_AT.is_set() && !shit::os::is_child_process()) {
-        exit_code =
-            shit::run_debug_ghost_driver(FLAG_DEBUG_GHOST_AT.value(), context);
+      if (FLAG_DEBUG_GHOST_AT.is_set() && !koshka::os::is_child_process()) {
+        exit_code = koshka::run_debug_ghost_driver(FLAG_DEBUG_GHOST_AT.value(),
+                                                   context);
       }
 #endif
       LOG(Info, "exiting after the final chunk with code %d", exit_code);
-      if (!shit::os::is_child_process()) context.run_exit_trap();
-      shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled()
-                                       ? shit::utils::farewell_policy::Goodbye
-                                       : shit::utils::farewell_policy::Silent);
+      if (!koshka::os::is_child_process()) context.run_exit_trap();
+      koshka::utils::quit(exit_code,
+                          FLAG_ERROR_EXIT.is_enabled()
+                              ? koshka::utils::farewell_policy::Goodbye
+                              : koshka::utils::farewell_policy::Silent);
     }
   }
 

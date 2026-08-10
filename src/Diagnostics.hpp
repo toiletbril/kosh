@@ -4,7 +4,7 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-namespace shit {
+namespace koshka {
 
 enum class diagnostic_tier : u8
 {
@@ -188,4 +188,4 @@ fn format_diagnostic_template(
 pure fn diagnostic_directive_disables(StringView comment,
                                       diagnostic_id id) wontthrow -> bool;
 
-} /* namespace shit */
+} /* namespace koshka */

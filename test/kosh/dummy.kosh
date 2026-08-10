@@ -1,0 +1,2 @@
+#!/bin/env kosh
+# a source with no command parses to a dummy node

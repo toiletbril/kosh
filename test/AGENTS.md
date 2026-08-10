@@ -14,8 +14,8 @@ explain why the process boundary is required.
 
 Place a test in the cheapest harness that can express its behavior.
 
-- `shit/` owns native shell syntax, evaluation, diagnostics, builtins, and
-  shitbox utility behavior that can run in one shell process. Each source uses
+- `kosh/` owns native shell syntax, evaluation, diagnostics, builtins, and
+  koshkit utility behavior that can run in one shell process. Each source uses
   the matching `expected/<name>.out` golden.
 - `cli/` owns executable flags, argument zero, startup processing, named script
   and standard input modes, fresh-process state, process replacement, signals,
@@ -68,9 +68,9 @@ launch recursive Make processes.
 Search all test directories before adding a case. Search by builtin name,
 utility name, diagnostic text, flag, syntax form, and expected output.
 
-A builtin or shitbox utility has one canonical behavior owner. Extend that file
+A builtin or koshkit utility has one canonical behavior owner. Extend that file
 when the new case exercises the same component. Use names such as
-`<builtin>.shit` and `shitbox_<utility>.shit` for native owners. A legacy CLI
+`<builtin>.kosh` and `koshkit_<utility>.kosh` for native owners. A legacy CLI
 owner may remain canonical when its behavior inherently needs process control.
 
 A compatibility, completion, highlighting, or terminal test may exercise the
@@ -114,7 +114,7 @@ Do not add fixed sleeps for synchronization. Use a ready marker, pipe,
 process-state check, or bounded polling loop. Retain a bounded timeout for a
 test that can block.
 
-Every shitbox rm invocation uses `--dry-run`. Temporary directory cleanup uses
+Every koshkit rm invocation uses `--dry-run`. Temporary directory cleanup uses
 the system rm behind a nonempty path guard.
 
 Use `TEST_PATH_SEPARATOR`, `TEST_NULL_DEVICE`, `TEST_PATH_ENVIRONMENT_NAME`,

@@ -9,7 +9,7 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-namespace shit {
+namespace koshka {
 
 namespace {
 
@@ -169,7 +169,7 @@ hot pure fn first_active_glob(StringView text, const Bitset &mask,
       return open_bracket;
     }
   }
-  return shit::None;
+  return koshka::None;
 }
 
 namespace {
@@ -434,7 +434,7 @@ fn EvalContext::resolve_tilde_prefix(StringView name) const throws
   }
   let const home =
       name.is_empty() ? os::get_home_directory() : os::get_home_for_user(name);
-  if (!home) return shit::None;
+  if (!home) return koshka::None;
   return String{heap_allocator(), home->text().view()};
 }
 
@@ -564,4 +564,4 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
   return values;
 }
 
-} // namespace shit
+} // namespace koshka

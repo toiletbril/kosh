@@ -1,0 +1,58 @@
+--- cat -n ---
+     1	banana
+     2	apple
+     3	cherry
+     4	apple
+--- wc ---
+ 4  4 26 fruit.txt
+--- wc -l ---
+4 fruit.txt
+--- head -n 2 ---
+banana
+apple
+--- tail -n 1 ---
+apple
+--- sort ---
+apple
+apple
+banana
+cherry
+--- sort -r ---
+cherry
+banana
+apple
+apple
+--- sort then uniq -c ---
+      2 apple
+      1 banana
+      1 cherry
+--- grep an ---
+banana
+--- grep -v apple ---
+banana
+cherry
+--- grep -i APPLE ---
+apple
+apple
+--- tr to lower ---
+abc
+--- tr -d digits ---
+abc
+--- tr reverse range ---
+kosh: 1:1: error: tr rejects a reverse range in a set.
+     1 |  koshkit tr a-c z-x
+       |  ^~~~~~~~~~~~~~~~~~
+note: Order the range endpoints so the low byte precedes the high byte.
+--- seq into head ---
+1
+2
+--- tee then read back ---
+1
+2
+1
+2
+--- seq with step ---
+2
+4
+6
+8

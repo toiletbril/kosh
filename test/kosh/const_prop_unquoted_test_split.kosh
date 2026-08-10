@@ -1,0 +1,27 @@
+#!/bin/env kosh
+# A constant assigned a literal becomes a propagation candidate, yet an unquoted
+# $k operand in a test field-splits at run time, so the optimizer must not fold
+# the verdict from the recorded single-string value. A quoted "$k" does not
+# split and still folds.
+
+# Whitespace-only value. Unquoted splits to no field, so the test is false.
+# Quoted keeps one field, so the test is true.
+k=" "
+if [ $k ]; then echo ws_unquoted_yes; else echo ws_unquoted_no; fi
+if [ "$k" ]; then echo ws_quoted_yes; else echo ws_quoted_no; fi
+
+# Empty value. Both forms are false.
+e=""
+if [ $e ]; then echo empty_unquoted_yes; else echo empty_unquoted_no; fi
+if [ "$e" ]; then echo empty_quoted_yes; else echo empty_quoted_no; fi
+
+# A value that splits into a valid multi-word test. Unquoted runs the operator,
+# quoted compares the whole literal as one non-empty string.
+m="a -o b"
+if [ $m ]; then echo multi_unquoted_yes; else echo multi_unquoted_no; fi
+if [ "$m" ]; then echo multi_quoted_yes; else echo multi_quoted_no; fi
+
+# A single-token value folds the same either way, both non-empty and true.
+s="x"
+if [ $s ]; then echo single_unquoted_yes; else echo single_unquoted_no; fi
+if [ "$s" ]; then echo single_quoted_yes; else echo single_quoted_no; fi

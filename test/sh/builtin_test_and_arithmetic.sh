@@ -66,7 +66,7 @@ fi
 # The test builtin's file comparison operators -ef, -nt, and -ot, checked
 # against dash. The timestamps are set explicitly so the ordering is stable.
 
-base=/tmp/shit_filecmp_$$
+base=/tmp/kosh_filecmp_$$
 older="$base.old"
 newer="$base.new"
 rm -f "$older" "$newer" "$base.link"
@@ -92,8 +92,8 @@ test "$older" -ef "$base.gone" || echo "missing_not_ef"
 rm -f "$older" "$newer" "$base.link"
 
 # -L and -h test the symlink-ness of a path without following it.
-target=/tmp/shit_symlink_target_fixed_$$
-link=/tmp/shit_symlink_link_fixed_$$
+target=/tmp/kosh_symlink_target_fixed_$$
+link=/tmp/kosh_symlink_link_fixed_$$
 rm -f "$link"
 : > "$target"
 ln -s "$target" "$link"

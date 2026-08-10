@@ -1,2 +1,0 @@
-#!/bin/env shit
-o=$IFS; IFS=:; set -- x:y; IFS=$o; a="p q"; set -- $a; echo $#

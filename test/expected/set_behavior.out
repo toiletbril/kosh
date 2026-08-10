@@ -4,7 +4,7 @@ rc=1
 reached
 rc=0
 == an unknown mood is rejected:
-shit: 1:12: error: Builtin `set`: Unknown --mood value 'badmood', expected 'shit', 'bash', 'sh', or 'bash-posix'.
+kosh: 1:12: error: Builtin `set`: Unknown --mood value 'badmood', expected 'kosh', 'bash', 'sh', or 'bash-posix'.
      1 |  set --mood badmood
        |             ^~~~~~~
 rc=1
@@ -28,7 +28,7 @@ physical       	off
 functrace      	off
 pipefail       	on
 failglob       	on
-shitbox        	off
+koshkit        	off
 vi             	off
 emacs          	off
 posix          	off
@@ -42,7 +42,7 @@ ok
 sh
 == default mood is strict:
 is not set
-== switching back to shit restores strictness:
+== switching back to kosh restores strictness:
 is not set
 rc-done
 notify         	off

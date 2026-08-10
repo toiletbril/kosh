@@ -3,7 +3,7 @@
 # string work, recursion, loops, and case matching. It spawns no external
 # command, so its run time measures evaluation speed rather than process
 # creation. The output is deterministic, so the same input yields the same
-# bytes on dash, bash, and shit, which lets a run double as a correctness check.
+# bytes on dash, bash, and kosh, which lets a run double as a correctness check.
 
 set -u
 

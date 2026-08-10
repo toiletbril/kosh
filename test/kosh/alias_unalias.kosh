@@ -1,0 +1,12 @@
+#!/bin/env kosh
+alias greet="echo hello"
+alias
+greet
+unalias greet
+alias
+
+alias greet='echo hi'
+unalias greet; echo "rm=$?"
+unalias missing 2>&1; echo "miss=$?"
+alias a=1 b=2; unalias -a; alias; echo "all=$?"
+hash -r; echo "hash=$?"

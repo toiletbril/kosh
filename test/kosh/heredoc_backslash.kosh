@@ -1,0 +1,25 @@
+#!/bin/env kosh
+x=VAL
+cat <<EOF
+\$x stays, \\ is one, \$ok stays, $x expands
+EOF
+
+
+cat 0<<B
+hi
+B
+
+cat <<'-EOF'
+body
+-EOF
+cat <<-'-EOF'
+	indented
+-EOF
+
+cat -n <<EOF <<EOF2 >&2
+first-a
+first-b
+EOF
+second-a
+second-b
+EOF2
