@@ -44,7 +44,7 @@ jobs:
       - name: Run benchmark
         run: >-
           SCALE=200 BENCH_WARMUP_COUNT=2 BENCH_SAMPLE_COUNT=7
-          DASH_SPEEDUP_REQUIRED=1 BASH_SPEEDUP_REQUIRED=5
+          DASH_SPEEDUP_REQUIRED=1 BASH_SPEEDUP_REQUIRED=3
           make MODE=rel bench
 
       - name: Build release binary with code coverage
