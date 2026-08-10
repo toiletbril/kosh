@@ -1282,19 +1282,10 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let const outer_loop_location =
       actx.active_loop_variables.find(m_variable_name.view());
   if (outer_loop_location != nullptr) {
-    actx.fail_shellcheck(
-        2165, m_variable_location,
-        "The nested inner loop reuses the outer loop variable '" +
-            m_variable_name.view() + "'",
-        "Use a distinct variable for the nested loop", *outer_loop_location,
-        "the outer loop first binds '" + m_variable_name.view() + "' here");
-    actx.fail_shellcheck(2167, *outer_loop_location,
-                         "The outer loop variable '" + m_variable_name.view() +
-                             "' is overwritten by the nested inner loop",
-                         "Use a distinct variable for the nested loop",
-                         m_variable_location,
-                         "the nested inner loop binds '" +
-                             m_variable_name.view() + "' again here");
+    actx.report_diagnostic(diagnostic_id::sc2165, m_variable_location,
+                           {m_variable_name.view()}, *outer_loop_location);
+    actx.report_diagnostic(diagnostic_id::sc2167, *outer_loop_location,
+                           {m_variable_name.view()}, m_variable_location);
   }
 
   let const had_outer_loop_variable = outer_loop_location != nullptr;
@@ -1327,22 +1318,11 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         start++;
       let const trimmed = body.substring(start);
       if (trimmed.starts_with(StringView{"ls "}) || trimmed == "ls")
-        actx.warn_shellcheck(
-            2045, t->source_location(),
-            "A for loop over ls output breaks filenames at whitespace",
-            "Iterate over a glob or read a delimited filename stream");
+        actx.report_diagnostic(diagnostic_id::sc2045, t->source_location());
       else if (trimmed.starts_with(StringView{"cat "}))
-        actx.warn_shellcheck(
-            2013, t->source_location(),
-            "A for over the cat output iterates IFS-split words rather "
-            "than lines",
-            "Read the lines with 'while IFS= read -r line' instead");
+        actx.report_diagnostic(diagnostic_id::sc2013, t->source_location());
       else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
-        actx.warn_shellcheck(
-            2044, t->source_location(),
-            "A for over the find output breaks a name with whitespace "
-            "apart",
-            "Use find -exec or a 'while read -r' loop over find -print0");
+        actx.report_diagnostic(diagnostic_id::sc2044, t->source_location());
     }
 
     let const source_text = analysis_source_text(actx, t->source_location());
@@ -1359,10 +1339,7 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       if (literal.view().find_character('*').has_value() ||
           literal.view().find_character('?').has_value() ||
           literal.view().find_character('[').has_value())
-        actx.warn_shellcheck(
-            2066, t->source_location(),
-            "A quoted for-loop glob remains one literal word",
-            "Leave the glob unquoted so it expands into loop values");
+        actx.report_diagnostic(diagnostic_id::sc2066, t->source_location());
     }
   }
 
@@ -1559,12 +1536,9 @@ fn CaseClause::analyze(AnalysisContext &actx,
       {
         let const &earlier = earlier_patterns[earlier_index];
         if (raw_pattern.view() == earlier.view()) {
-          actx.fail_shellcheck(
-              2221, pattern->source_location(),
-              "An earlier case pattern makes this pattern unreachable",
-              "Remove the duplicate pattern",
-              earlier_pattern_locations[earlier_index],
-              "this identical pattern matches first");
+          actx.report_diagnostic(diagnostic_id::sc2221,
+                                 pattern->source_location(), {},
+                                 earlier_pattern_locations[earlier_index]);
           is_duplicate = true;
           break;
         }
@@ -1575,12 +1549,9 @@ fn CaseClause::analyze(AnalysisContext &actx,
         {
           let const &prefix = earlier_shadow_prefixes[prefix_index];
           if (!literal.view().starts_with(prefix.view())) continue;
-          actx.fail_shellcheck(
-              2222, pattern->source_location(),
-              "An earlier case pattern shadows this pattern",
-              "Move the specific pattern before the broader pattern",
-              earlier_shadow_locations[prefix_index],
-              "this broader pattern shadows the later pattern");
+          actx.report_diagnostic(diagnostic_id::sc2222,
+                                 pattern->source_location(), {},
+                                 earlier_shadow_locations[prefix_index]);
           break;
         }
       }
@@ -1606,11 +1577,7 @@ fn CaseClause::analyze(AnalysisContext &actx,
   }
   if (!has_default_arm) {
     ASSERT(m_word != nullptr);
-    actx.warn_shellcheck(
-        2249, m_word->source_location(),
-        "This case has no default *) branch, a value no pattern "
-        "matches "
-        "is silently ignored");
+    actx.report_diagnostic(diagnostic_id::sc2249, m_word->source_location());
   }
 
   /* An arm body runs conditionally and may reassign a name, so a value recorded

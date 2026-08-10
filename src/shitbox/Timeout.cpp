@@ -201,7 +201,7 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
   let operands = ArrayList<String>{cxt.scratch_allocator()};
   try {
     operands = parse_util_operands(FLAG_LIST, args, &arg_locations,
-                                   &operand_locations);
+                                   &operand_locations, true);
   } catch (const ErrorBase &) {
     return None;
   }
@@ -245,8 +245,8 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   defer { reset_flags(FLAG_LIST); };
-  let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations,
+                                           &operand_locations, true);
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 

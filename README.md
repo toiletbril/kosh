@@ -58,19 +58,16 @@ optimization enabled. The other moods are `bash`, `bash-posix`, and `sh`. The
 `bash-posix` mood provides Bash behavior with its POSIX mode enabled.
 
 Before it runs a command, **shit** analyzes and optimizes the complete script.
-The default mood reports diagnostics for nondeterministic globs, substitutions,
-variable uses, and other risky shell constructs. The default mood rejects code
-that the analysis stage cannot prove to be strict and deterministic. The
-catalog includes roughly 50 strict checks, 20 lenient checks, and 30 annoying
-checks derived from ShellCheck, plus about a dozen native checks.
+The catalog includes about 100 checks derived from ShellCheck and about a dozen
+native analysis checks.
 
 The `--mood` option, or `-M`, selects `shit`, `bash`, `bash-posix`, or `sh`.
-The default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` selects the
-matching mood and disables diagnostics. `set --mood` changes the mood at
-runtime. In the default mood, `-W` demotes annoying errors, `-WW` also demotes
-lenient errors, and `-WWW` also demotes strict errors. In another mood, `-W`
-enables strict warnings, `-WW` also enables lenient warnings, and `-WWW` also
-enables annoying warnings.
+The default is `shit`. A binary symlinked as `sh`, `dash`, or `bash` selects
+the matching mood and disables diagnostics. `set --mood` changes the mood at
+runtime. In the default mood, `-W` retains the default severities, `-WW`
+demotes lenient errors to warnings, and `-WWW` also demotes strict errors. In
+other moods, `-W` enables strict warnings, `-WW` also enables lenient warnings,
+and `-WWW` also enables annoying warnings.
 
 The `-I` option enables mimicry. **shit** detects `sh`, `dash`, and `bash`
 shebangs and runs each script in the matching mood. The current diagnostics

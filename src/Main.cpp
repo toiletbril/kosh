@@ -285,20 +285,38 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     return EXIT_SUCCESS;
   }
   if (FLAG_LIST_CHECKS.is_enabled()) {
-    let l = String{"SHELLCHECK CHECKS\n"};
-    for (let const &check : SHELLCHECK_CHECKS) {
+    let l = String{"SHELLCHECK DIAGNOSTICS\n"};
+    for (usize index = 0; index < get_diagnostic_count(); index++) {
+      let const &definition = DIAGNOSTIC_DEFINITIONS[index];
+      if (definition.shellcheck_code == 0) continue;
+
+      char code_text[32];
       l += "  ";
-      l += check.code;
+      l += "SC";
+      l += utils::int_to_text_into(definition.shellcheck_code, code_text,
+                                   sizeof(code_text));
       l += "  ";
-      l += check.summary;
+      l += get_diagnostic_tier_name(definition.tier);
+      l += "  ";
+      l += definition.slug;
+      l += '\n';
+      l += wrap_text(StringView{definition.summary}, HELP_INDENT + 4,
+                     HELP_WRAP_WIDTH);
       l += '\n';
     }
-    l += "\nSTRICTNESS WARNINGS\n";
-    for (let const &warning : STRICTNESS_WARNINGS) {
+
+    l += "\nNATIVE ANALYSIS DIAGNOSTICS\n";
+    for (usize index = 0; index < get_diagnostic_count(); index++) {
+      let const &definition = DIAGNOSTIC_DEFINITIONS[index];
+      if (definition.shellcheck_code != 0) continue;
+
       l += "  ";
-      l += warning.name;
+      l += definition.slug;
+      l += "  ";
+      l += get_diagnostic_tier_name(definition.tier);
       l += '\n';
-      l += wrap_text(warning.summary, HELP_INDENT + 4, HELP_WRAP_WIDTH);
+      l += wrap_text(StringView{definition.summary}, HELP_INDENT + 4,
+                     HELP_WRAP_WIDTH);
       l += '\n';
     }
     print(l);

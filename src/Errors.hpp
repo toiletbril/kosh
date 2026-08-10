@@ -9,6 +9,27 @@ namespace shit {
 
 class EvalContext;
 
+enum class error_severity : u8
+{
+  Error,
+  Warning,
+  Note,
+  Trace,
+};
+
+pure inline fn get_error_severity_word(error_severity severity) wontthrow
+    -> StringView
+{
+  switch (severity) {
+  case error_severity::Error: return "error";
+  case error_severity::Warning: return "warning";
+  case error_severity::Note: return "note";
+  case error_severity::Trace: return "trace";
+  }
+  ASSERT(false);
+  return {};
+}
+
 struct SourceLocation
 {
   usize position{0};
@@ -57,7 +78,7 @@ public:
   virtual pure fn message() const wontthrow -> const String & = 0;
   virtual pure fn detail_message() const wontthrow -> StringView { return {}; }
 
-  virtual fn severity_word() const wontthrow -> StringView;
+  virtual fn get_severity() const wontthrow -> error_severity;
 
   virtual fn to_string(StringView source,
                        EvalContext *context = nullptr) const throws -> String;
@@ -119,7 +140,7 @@ class Warning : public Error
 public:
   Warning(StringView message);
 
-  fn severity_word() const wontthrow -> StringView override;
+  fn get_severity() const wontthrow -> error_severity override;
 };
 
 class WarningWithDetails : public Warning
@@ -141,7 +162,7 @@ class Note : public Error
 public:
   Note(StringView message);
 
-  fn severity_word() const wontthrow -> StringView override;
+  fn get_severity() const wontthrow -> error_severity override;
 };
 
 /* Thrown by print_to_stdout and print_to_stderr when write returns EPIPE,
@@ -220,7 +241,7 @@ class WarningWithLocation : public ErrorWithLocation
 public:
   WarningWithLocation(SourceLocation location, StringView message);
 
-  fn severity_word() const wontthrow -> StringView override;
+  fn get_severity() const wontthrow -> error_severity override;
 };
 
 class WarningWithLocationAndDetails : public WarningWithLocation
@@ -243,7 +264,7 @@ class TraceWithLocation : public ErrorWithLocation
 public:
   TraceWithLocation(SourceLocation location);
 
-  fn severity_word() const wontthrow -> StringView override;
+  fn get_severity() const wontthrow -> error_severity override;
 };
 
 class ErrorWithLocationAndDetails : public ErrorWithLocation

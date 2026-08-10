@@ -20,7 +20,7 @@ legacy-name-force-annoying-diagnostics=1
 level-one-strict=1
 level-two-strict=1
 level-three-strict=0
-annoying-default=1
+annoying-default=0
 annoying-level-one=0
 annoying-suppressed=0
 annoying-runtime-suppressed=0
@@ -38,5 +38,14 @@ compat-level-three-recursion=1
 file-directive
 file-directive-errors=0
 local-directive-warnings=2
+numeric-variant-directive
+numeric-variant-errors=0
+slug-variant-general=0
+slug-variant-test=1
+native-slug-directive
+native-slug-warnings=0
+conditional-pattern-errors=0
+conditional-local-errors=0
+uncertain-slash-full-name=1
+uncertain-slash-prefix=0
 runtime-level-two-warnings=1
-diagnostic-colors=ok

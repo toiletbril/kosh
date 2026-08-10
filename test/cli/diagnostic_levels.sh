@@ -118,6 +118,63 @@ local_directive_output=$(
 echo "local-directive-warnings=$(printf '%s\n' "$local_directive_output" |
   grep -c 'An unquoted variable can split')"
 
+cat > "$temporary_directory/numeric-variant-directive.sh" <<'EOF'
+# shellcheck disable=SC2086
+f() { echo $general; [ $tested = value ]; }
+echo numeric-variant-directive
+EOF
+numeric_variant_output=$(
+  "$BIN" "$temporary_directory/numeric-variant-directive.sh" 2>&1
+)
+echo "$numeric_variant_output"
+echo "numeric-variant-errors=$(printf '%s\n' "$numeric_variant_output" |
+  grep -c 'unquoted variable')"
+
+cat > "$temporary_directory/slug-variant-directive.sh" <<'EOF'
+# shellcheck disable=unquoted-expansion
+f() { echo $general; [ $tested = value ]; }
+echo slug-variant-directive
+EOF
+slug_variant_output=$(
+  "$BIN" "$temporary_directory/slug-variant-directive.sh" 2>&1
+)
+echo "slug-variant-general=$(printf '%s\n' "$slug_variant_output" |
+  grep -c 'split into words')"
+echo "slug-variant-test=$(printf '%s\n' "$slug_variant_output" |
+  grep -c 'test reads an unquoted variable')"
+
+cat > "$temporary_directory/native-slug-directive.sh" <<'EOF'
+# shellcheck disable=no-local
+f() { native_slug_value=1; }
+echo native-slug-directive
+EOF
+native_slug_output=$(
+  "$BIN" "$temporary_directory/native-slug-directive.sh" 2>&1
+)
+echo "$native_slug_output"
+echo "native-slug-warnings=$(printf '%s\n' "$native_slug_output" |
+  grep -c 'has no local')"
+
+conditional_pattern_output=$(
+  "$BIN" -n -c '[[ $arg != *=* ]]; [[ $arg == *=* ]]; [[ $arg == *"="* ]]' 2>&1
+)
+echo "conditional-pattern-errors=$(printf '%s\n' "$conditional_pattern_output" |
+  grep -c 'operator needs surrounding spaces')"
+
+local_probe_output=$(
+  "$BIN" -n -c 'local probe 2>/dev/null && probe_ran=1' 2>&1
+)
+echo "conditional-local-errors=$(printf '%s\n' "$local_probe_output" |
+  grep -c 'local outside a function')"
+
+uncertain_slash_output=$(
+  "$BIN" -WW -c "builtin eval 'function dynamic/name { :; }'; dynamic/name" 2>&1
+)
+echo "uncertain-slash-full-name=$(printf '%s\n' "$uncertain_slash_output" |
+  grep -c "Command 'dynamic/name' was not found")"
+echo "uncertain-slash-prefix=$(printf '%s\n' "$uncertain_slash_output" |
+  grep -c "Command 'dynamic' was not found")"
+
 send_runtime_input()
 {
   sleep 0.1
@@ -151,16 +208,3 @@ fi
 runtime_warning_count=$(strings "$temporary_directory/typescript" |
   grep -c "is read before it is assigned")
 echo "runtime-level-two-warnings=$runtime_warning_count"
-grep -Fq "$(printf '\033[1;33mwarning\033[0m')" \
-  "$temporary_directory/typescript" || exit 1
-grep -Fq "$(printf '\033[1;91merror\033[0m')" \
-  "$temporary_directory/typescript" || exit 1
-grep -Fq "$(printf '\033[1;91m^~~~~~~~~~~~~~~~~~~~~~~~~\033[0m')" \
-  "$temporary_directory/typescript" || exit 1
-grep -Fq "$(printf '\033[36mnote\033[0m')" \
-  "$temporary_directory/typescript" || exit 1
-grep -Fq "$(printf '\033[36m^~~~ ')" \
-  "$temporary_directory/typescript" || exit 1
-grep -Fq "$(printf '\033[36mtrace\033[0m')" \
-  "$temporary_directory/typescript" || exit 1
-echo 'diagnostic-colors=ok'

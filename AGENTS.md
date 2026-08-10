@@ -315,10 +315,13 @@ Analysis warnings are queued with owned messages. Unique source lines are
 highlighted in source order, then diagnostics are rendered in discovery order.
 Fatal diagnostics flush earlier warnings before they are rendered.
 
-The diagnostic catalog owns each numbered check's strict, lenient, or annoying
-tier. The default mood rejects every enabled tier. Compatibility moods expose
-the tiers as warnings through `-W`, `-WW`, and `-WWW`. Related-location notes
-use cyan carets, and every secondary detail begins with a lowercase byte.
+Diagnostics.cpp owns each analysis diagnostic's code, slug, summary, message,
+suggestion, related detail, tier, and delivery. Expression analysis reports a
+diagnostic ID with source locations and dynamic values. The default mood rejects
+strict and lenient findings and reports annoying findings as warnings.
+Compatibility moods expose the tiers as warnings through `-W`, `-WW`, and
+`-WWW`. Related-location notes use cyan carets, and every secondary detail
+begins with a lowercase byte.
 
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare shitbox utility
@@ -326,9 +329,9 @@ completion is active in the default mood and when the shitbox option is enabled.
 
 The analysis stage accepts ShellCheck `disable` comments. A leading directive
 applies to the complete file. A later directive applies to the next complete
-and-or command. Numbered checks use the shared suppression lookup. Native
-strictness diagnostics, parser errors, and runtime errors are not suppressed by
-these comments.
+and-or command. A numeric code suppresses every catalog variant under that
+code. An exact slug suppresses one numbered or native analysis variant. Parser
+errors and runtime diagnostics are not suppressed by these comments.
 
 src/Toiletline.cpp connects the editor and evaluator. The vendored editor lives
 in src/toiletline/toiletline.h. The completion bridge retains its result until

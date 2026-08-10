@@ -64,6 +64,7 @@ public:
 
   bool is_direct_pipeline_stage{false};
   bool is_inside_loop_condition{false};
+  bool is_command_status_observed{false};
   bool loop_condition_reads_input{false};
   bool is_inside_read_loop{false};
   HashSet pipeline_lost_names{heap_allocator()};
@@ -129,26 +130,12 @@ public:
     }
   }
 
-  fn warn(SourceLocation location, StringView message,
-          StringView suggestion = {},
-          diagnostic_tier tier = diagnostic_tier::Strict,
-          Maybe<SourceLocation> related_location = None,
-          StringView related_message = {}) throws -> void;
-  fn warn_shellcheck(u16 diagnostic_code, SourceLocation location,
-                     StringView message, StringView suggestion = {},
-                     Maybe<SourceLocation> related_location = None,
-                     StringView related_message = {}) throws -> void;
-  fn fail(SourceLocation location, StringView message,
-          StringView suggestion = {},
-          diagnostic_tier tier = diagnostic_tier::Strict,
-          Maybe<SourceLocation> related_location = None,
-          StringView related_message = {}) throws -> void;
-  fn fail_shellcheck(u16 diagnostic_code, SourceLocation location,
-                     StringView message, StringView suggestion = {},
-                     Maybe<SourceLocation> related_location = None,
-                     StringView related_message = {}) throws -> void;
+  fn report_diagnostic(diagnostic_id id, SourceLocation location,
+                       std::initializer_list<StringView> arguments = {},
+                       Maybe<SourceLocation> related_location = None) throws
+      -> void;
   fn flush_warnings() throws -> void;
-  pure fn is_shellcheck_suppressed(u16 diagnostic_code,
+  pure fn is_diagnostic_suppressed(diagnostic_id id,
                                    SourceLocation location) const wontthrow
       -> bool;
   fn note_variable_assignment(StringView name) throws -> void;
@@ -159,6 +146,14 @@ public:
                            StringView message) const throws -> void;
   fn print_script_backtrace_if_rooted(SourceLocation location) const throws
       -> void;
+
+private:
+  fn warn(SourceLocation location, StringView message, StringView suggestion,
+          diagnostic_tier tier, Maybe<SourceLocation> related_location,
+          StringView related_message) throws -> void;
+  fn fail(SourceLocation location, StringView message, StringView suggestion,
+          diagnostic_tier tier, Maybe<SourceLocation> related_location,
+          StringView related_message) throws -> void;
 };
 
 fn analyze_ast(const Expression *root, StringView source,

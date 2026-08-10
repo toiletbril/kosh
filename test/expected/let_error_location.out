@@ -21,3 +21,7 @@ rc=0
 == diagnostic catalog ==
 SC2219=absent
 1
+SC2024-variants=2
+SC2184-variants=1
+exported-cdpath=1
+catalog-nounset=0

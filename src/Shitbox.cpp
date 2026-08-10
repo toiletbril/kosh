@@ -172,11 +172,13 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
 
 fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
                        const ArrayList<SourceLocation> *arg_locations,
-                       ArrayList<SourceLocation> *operand_locations) throws
+                       ArrayList<SourceLocation> *operand_locations,
+                       bool should_accept_negative_number_operand) throws
     -> ArrayList<String>
 {
-  ArrayList<String> operands = parse_flags_vec(
-      flags, args, 0, nullptr, arg_locations, operand_locations);
+  ArrayList<String> operands =
+      parse_flags_vec(flags, args, 0, nullptr, arg_locations, operand_locations,
+                      {}, should_accept_negative_number_operand);
   /* The first operand is the utility name, dropped to leave the real arguments.
    */
   if (!operands.is_empty()) operands.remove(0);

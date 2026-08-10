@@ -230,13 +230,14 @@ The option is accepted without effect for compatibility.
 .TP
 .BR \-W ", " \-WW ", " \-WWW
 The analysis stage has strict, lenient, and annoying tiers. In the default
-mood,
+mood, strict and lenient diagnostics are errors, while annoying diagnostics are
+warnings. The
 .B \-W
-demotes annoying errors to warnings,
+form retains those severities,
 .B \-WW
-also demotes lenient errors, and
+demotes lenient errors to warnings, and
 .B \-WWW
-also demotes strict errors. In another mood,
+also demotes strict errors. In other moods,
 .B \-W
 enables strict diagnostics as warnings,
 .B \-WW
@@ -262,14 +263,15 @@ detail location remain visible when available.
 .TP
 .B \-\-list\-diagnostics
 The checks reported by the analysis stage are listed. The shell then exits.
+Each numbered row prints the ShellCheck code, tier, public slug, and wrapped
+summary. Each native row prints its slug, tier, and wrapped summary.
 The checks cover unsafe word splitting and globbing, misleading quoting,
 command-output iteration, test and conditional mistakes, redirection order and
 privilege boundaries, pipeline state loss, unvalidated arithmetic input,
 unreachable control flow, nonportable syntax, and dangerous file operations.
-The catalog contains roughly 50 strict checks, 20 lenient checks, and 30
-annoying checks derived from ShellCheck. About a dozen native checks cover
-shell-specific strictness and runtime state. The default mood rejects analyzed
-code until every reported error is demoted or corrected.
+The catalog contains about 100 checks derived from ShellCheck and about a dozen
+native analysis checks. The default mood rejects a script when a strict or
+lenient check reports an error.
 The source is also checked for a UTF-8 byte-order mark before the shebang or
 first command.
 .SS Interactive operation
@@ -1201,14 +1203,15 @@ mapping exists. A diagnostic may include a source line, caret, detail location,
 and trailing note. The complete source line is highlighted before terminal
 clipping.
 .PP
-In the default mood, the analysis stage rejects every construct that it proves
-is non-strict or nondeterministic. Advisory and style findings remain warnings.
-The annoying tier contains additional safety checks and style findings that can
-produce excessive reports in existing scripts.
+In the default mood, strict and lenient findings reject the script. Annoying
+findings remain warnings. The annoying tier contains additional safety checks
+and style findings that can produce excessive reports in existing scripts.
 .PP
 A comment of the form
-.B # shellcheck disable=SC2086,SC2046
-suppresses the named numbered checks. The optional
+.B # shellcheck disable=SC2086,unquoted-command-substitution
+suppresses the named analysis checks. A numeric code suppresses every variant
+under that code. A slug suppresses only its named variant. Native analysis
+checks use their slugs. The optional
 .B SC
 prefix may be omitted. The value may be quoted, repeated, set to
 .BR all ,
@@ -1218,8 +1221,8 @@ A directive before the first command applies to the complete file. A later
 directive applies to the next complete and-or command. A directive after
 .BR && ,
 .BR || ,
-or a pipe does not apply. These comments do not suppress native strictness,
-parser, or runtime diagnostics.
+or a pipe does not apply. These comments do not suppress parser or runtime
+diagnostics outside the analysis catalog.
 .PP
 Eval, command substitution, function substitution, and process substitution add
 their call sites to a source backtrace. A frame is printed once while its source

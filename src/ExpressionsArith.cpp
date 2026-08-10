@@ -102,23 +102,33 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
            conditional_word_is_numeric_literal(m_elements[i - 1].word)) ||
           (i + 1 < m_elements.count() &&
            conditional_word_is_numeric_literal(m_elements[i + 1].word)))
-        actx.warn_shellcheck(
-            2071, source_location(),
-            "The " + op + " operator compares strings lexicographically",
-            "Use an arithmetic command or a numeric -lt or -gt operator");
+        actx.report_diagnostic(diagnostic_id::sc2071, source_location(), {op});
       if (i > 0 && i + 1 < m_elements.count() &&
           conditional_word_is_literal(m_elements[i - 1].word) &&
           conditional_word_is_literal(m_elements[i + 1].word))
-        actx.warn_shellcheck(
-            2050, conditional_location,
-            "The '" + op + "' comparison has literal operands on both sides",
-            "Remove the constant condition or compare runtime data");
+        actx.report_diagnostic(diagnostic_id::sc2050, conditional_location,
+                               {op});
       continue;
     }
     if (element.kind != Kind::Operand || element.word == nullptr) continue;
 
     let const operand = element.word->raw_string();
-    if (!is_conditional_binary_operator(operand.view()) &&
+    let is_binary_operand = false;
+    if (i > 0) {
+      let const &previous = m_elements[i - 1];
+      is_binary_operand =
+          previous.kind == Kind::Less || previous.kind == Kind::Greater ||
+          (previous.kind == Kind::Operand && previous.word != nullptr &&
+           is_conditional_binary_operator(previous.word->raw_string().view()));
+    }
+    if (!is_binary_operand && i + 1 < m_elements.count()) {
+      let const &next = m_elements[i + 1];
+      is_binary_operand =
+          next.kind == Kind::Less || next.kind == Kind::Greater ||
+          (next.kind == Kind::Operand && next.word != nullptr &&
+           is_conditional_binary_operator(next.word->raw_string().view()));
+    }
+    if (!is_binary_operand && !is_conditional_binary_operator(operand.view()) &&
         element.word->kind() == Token::Kind::Word)
     {
       let const &word =
@@ -127,29 +137,23 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
         if (segment.kind == WordSegment::Kind::UnquotedText &&
             segment.text.view().find_character('=').has_value())
         {
-          actx.warn_shellcheck(
-              2077, element.word->source_location(),
-              "A conditional operator needs surrounding spaces",
-              "Place spaces around the comparison operator");
+          actx.report_diagnostic(diagnostic_id::sc2077,
+                                 element.word->source_location());
           break;
         }
     }
     if ((operand.view() == "-n" || operand.view() == "-z") &&
         i + 1 < m_elements.count() &&
         conditional_word_is_literal(m_elements[i + 1].word))
-      actx.warn_shellcheck(
-          2157, m_elements[i + 1].word->source_location(),
-          "The operand is literal, so this string test is constant",
-          "Test a variable or drop the check");
+      actx.report_diagnostic(diagnostic_id::sc2157_string,
+                             m_elements[i + 1].word->source_location());
 
     if ((operand.view() == "-e" || operand.view() == "-f" ||
          operand.view() == "-d" || operand.view() == "-L") &&
         i + 1 < m_elements.count() &&
         conditional_word_has_glob(m_elements[i + 1].word))
-      actx.warn_shellcheck(
-          2144, m_elements[i + 1].word->source_location(),
-          "A file test on a glob checks only one expanded path",
-          "Expand the glob in a loop and test each path");
+      actx.report_diagnostic(diagnostic_id::sc2144,
+                             m_elements[i + 1].word->source_location());
 
     if (!is_conditional_binary_operator(operand.view()) || i == 0 ||
         i + 1 >= m_elements.count())
@@ -163,21 +167,15 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
          conditional_word_has_glob(right));
     if (!is_pattern_operator && conditional_word_is_literal(left) &&
         conditional_word_is_literal(right))
-      actx.warn_shellcheck(
-          2050, conditional_location,
-          "The '" + operand.view() +
-              "' comparison has literal operands on both sides",
-          "Remove the constant condition or compare runtime data");
+      actx.report_diagnostic(diagnostic_id::sc2050, conditional_location,
+                             {operand.view()});
 
     if (operand.view() == "=~" && right != nullptr) {
       let const source_text =
           analysis_source_text(actx, right->source_location());
       if (!source_text.is_empty() &&
           (source_text[0] == '\'' || source_text[0] == '"'))
-        actx.warn_shellcheck(
-            2076, right->source_location(),
-            "A quoted regular expression is matched literally",
-            "Store the expression in a variable or leave it unquoted");
+        actx.report_diagnostic(diagnostic_id::sc2076, right->source_location());
     }
   }
 
@@ -271,9 +269,8 @@ fn ArithmeticCommand::analyze(AnalysisContext &actx,
 {
   unused(is_unconditional);
   if (arithmetic_reads_external_input(actx, m_expression.view()))
-    actx.fail(source_location(),
-              "External input is evaluated as arithmetic code",
-              "Validate the value as decimal digits before arithmetic");
+    actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
+                           source_location());
   /* The prepass does not parse the expression, which may assign any name, so
      every recorded constant is forgotten. */
   actx.constant_variables.clear();
@@ -375,11 +372,8 @@ fn ArrayAssignCommand::analyze(AnalysisContext &actx,
       if (segment.kind == WordSegment::Kind::CommandSubstitution &&
           !segment.is_in_double_quotes)
       {
-        actx.warn_shellcheck(
-            2207, element->source_location(),
-            "An array built from command output splits words and "
-            "expands globs",
-            "Use mapfile or readarray to preserve output records");
+        actx.report_diagnostic(diagnostic_id::sc2207,
+                               element->source_location());
         break;
       }
   }
@@ -644,11 +638,7 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         body.starts_with(StringView{"-d "}) ||
         body.starts_with(StringView{"-n "}) ||
         body.starts_with(StringView{"-z "}))
-      actx.warn_shellcheck(
-          2204, source_location(),
-          "Parentheses start a subshell rather than a file or string "
-          "test",
-          "Use [[ ... ]] or [ ... ] for the condition");
+      actx.report_diagnostic(diagnostic_id::sc2204, source_location());
   }
 
   /* An assignment in the body never changes a parent variable, so the body
@@ -751,9 +741,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
        body_source[m_name.count()] == '\n' ||
        body_source[m_name.count()] == ';'))
   {
-    actx.fail_shellcheck(2264, m_body->source_location(),
-                         "This function wrapper calls itself recursively",
-                         "Use command before the wrapped command name");
+    actx.report_diagnostic(diagnostic_id::sc2264, m_body->source_location());
   }
 
   /* The body runs later when the function is called, so it is analyzed from an

@@ -20,37 +20,31 @@ struct diagnostic_color
   StringView location{};
   StringView message{};
   StringView caret{};
-  StringView reset{};
+
+  pure fn get_reset() const wontthrow -> StringView
+  {
+    return severity.is_empty() ? StringView{} : colors::ansi::RESET;
+  }
 };
 
-cold static fn diagnostic_colors_for(StringView severity_word) throws
+cold static fn diagnostic_colors_for(error_severity severity) throws
     -> diagnostic_color
 {
   if (!colors::stderr_wants_color()) return diagnostic_color{};
 
-  if (severity_word == StringView{"error"}) {
+  switch (severity) {
+  case error_severity::Error:
     return diagnostic_color{colors::ansi::BOLD_BRIGHT_RED, colors::ansi::BOLD,
-                            colors::ansi::BOLD, colors::ansi::BOLD_BRIGHT_RED,
-                            colors::ansi::RESET};
-  }
-  if (severity_word == StringView{"warning"}) {
-    return diagnostic_color{colors::ansi::BOLD_YELLOW, colors::ansi::BOLD,
-                            colors::ansi::BOLD, colors::ansi::YELLOW,
-                            colors::ansi::RESET};
-  }
-  if (severity_word == StringView{"trace"}) {
-    return diagnostic_color{colors::ansi::CYAN,
-                            {},
-                            colors::ansi::CYAN,
-                            colors::ansi::CYAN,
-                            colors::ansi::RESET};
+                            colors::ansi::BOLD, colors::ansi::BOLD_BRIGHT_RED};
+  case error_severity::Warning:
+    return diagnostic_color{colors::ansi::YELLOW, {}, {}, colors::ansi::YELLOW};
+  case error_severity::Note:
+  case error_severity::Trace:
+    return diagnostic_color{
+        colors::ansi::CYAN, {}, colors::ansi::CYAN, colors::ansi::CYAN};
   }
 
-  return diagnostic_color{colors::ansi::CYAN,
-                          {},
-                          colors::ansi::CYAN,
-                          colors::ansi::CYAN,
-                          colors::ansi::RESET};
+  unreachable();
 }
 
 template <class T>
@@ -149,7 +143,7 @@ cold static fn get_context_pointing_to(
 
   let generated_highlights = ArrayList<highlight_span>{heap_allocator()};
   const ArrayList<highlight_span> *source_highlights = &generated_highlights;
-  if (eval_context != nullptr && !color.reset.is_empty()) {
+  if (eval_context != nullptr && !color.severity.is_empty()) {
     let *cache = eval_context->get_or_create_diagnostic_highlight_cache();
     source_highlights = cache->spans_for(source, line_position.line_start,
                                          line_position.line_end, *eval_context);
@@ -264,7 +258,7 @@ cold static fn get_context_pointing_to(
         last_char != '.' && last_char != '?' && last_char != '!')
       msg += '.';
   }
-  msg += color.reset;
+  msg += color.get_reset();
 
   return msg;
 }
@@ -276,19 +270,21 @@ cold fn ErrorBase::trailing_details_to_string() const throws -> String
   let const note = detail_message();
   if (note.is_empty()) return String{heap_allocator()};
 
-  let const color = diagnostic_colors_for(StringView{"note"});
+  let const severity = error_severity::Note;
+  let const severity_word = get_error_severity_word(severity);
+  let const color = diagnostic_colors_for(severity);
 
   let const final_byte = note[note.length - 1];
   let const note_period =
       (final_byte == '.' || final_byte == '?' || final_byte == '!') ? "" : ".";
 
-  return String{"\n"} + color.severity + "note" + color.reset + ": " +
-         color.message + note + note_period + color.reset;
+  return String{"\n"} + color.severity + severity_word + color.get_reset() +
+         ": " + color.message + note + note_period + color.get_reset();
 }
 
-cold fn ErrorBase::severity_word() const wontthrow -> StringView
+cold fn ErrorBase::get_severity() const wontthrow -> error_severity
 {
-  return "error";
+  return error_severity::Error;
 }
 
 Error::Error(StringView message) : m_message(heap_allocator(), message)
@@ -306,10 +302,12 @@ cold fn ErrorBase::to_string(StringView source,
 {
   unused(source);
   unused(context);
-  let const severity = severity_word();
+  let const severity = get_severity();
+  let const severity_word = get_error_severity_word(severity);
   let const color = diagnostic_colors_for(severity);
-  return color.severity + severity + color.reset + ": " + color.message +
-         message() + "." + color.reset + trailing_details_to_string();
+  return color.severity + severity_word + color.get_reset() + ": " +
+         color.message + message() + "." + color.get_reset() +
+         trailing_details_to_string();
 }
 
 fn Error::to_string() const throws -> String
@@ -327,14 +325,17 @@ InterruptErrorWithLocation::InterruptErrorWithLocation(SourceLocation location)
     : ErrorWithLocation(location, "Interrupted")
 {}
 
-cold fn Warning::severity_word() const wontthrow -> StringView
+cold fn Warning::get_severity() const wontthrow -> error_severity
 {
-  return "warning";
+  return error_severity::Warning;
 }
 
 Note::Note(StringView message) : Error(message) {}
 
-cold fn Note::severity_word() const wontthrow -> StringView { return "note"; }
+cold fn Note::get_severity() const wontthrow -> error_severity
+{
+  return error_severity::Note;
+}
 
 BrokenPipeExit::BrokenPipeExit() : Error("broken pipe") {}
 
@@ -358,9 +359,10 @@ fn ErrorWithLocation::to_string(StringView source,
     return ErrorBase::to_string(source, context);
 
   LOG_VARS(Debug, byte_position, byte_count);
-  let const severity = severity_word();
-  LOG(Debug, "formatting located %.*s", static_cast<int>(severity.length),
-      severity.data);
+  let const severity = get_severity();
+  let const severity_word = get_error_severity_word(severity);
+  LOG(Debug, "formatting located %.*s", static_cast<int>(severity_word.length),
+      severity_word.data);
 
   /* A position on a line continuation or a bare newline is nudged past the
      backslash-newline pair or the lone newline to the next line. */
@@ -393,11 +395,11 @@ fn ErrorWithLocation::to_string(StringView source,
   result += ':';
   result += String::from(line_byte_position, heap_allocator());
   result += ':';
-  result += color.reset;
+  result += color.get_reset();
   result += ' ';
   result += color.severity;
-  result += severity;
-  result += color.reset;
+  result += severity_word;
+  result += color.get_reset();
   if (!m_message.is_empty()) {
     result += ": ";
     result += color.message;
@@ -407,7 +409,7 @@ fn ErrorWithLocation::to_string(StringView source,
         last_char != '.' && last_char != '?' && last_char != '!')
       result += '.';
 
-    result += color.reset;
+    result += color.get_reset();
   } else {
     result += ':';
   }
@@ -446,18 +448,18 @@ WarningWithLocationAndDetails::WarningWithLocationAndDetails(
     : WarningWithLocation(steal(location), message), m_note(note)
 {}
 
-cold fn WarningWithLocation::severity_word() const wontthrow -> StringView
+cold fn WarningWithLocation::get_severity() const wontthrow -> error_severity
 {
-  return "warning";
+  return error_severity::Warning;
 }
 
 TraceWithLocation::TraceWithLocation(SourceLocation location)
     : ErrorWithLocation(steal(location), {})
 {}
 
-cold fn TraceWithLocation::severity_word() const wontthrow -> StringView
+cold fn TraceWithLocation::get_severity() const wontthrow -> error_severity
 {
-  return "trace";
+  return error_severity::Trace;
 }
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
@@ -503,7 +505,9 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
                                    details_line_position.line_start) +
       1;
 
-  let const color = diagnostic_colors_for(StringView{"note"});
+  let const severity = error_severity::Note;
+  let const severity_word = get_error_severity_word(severity);
+  let const color = diagnostic_colors_for(severity);
 
   let result = String{heap_allocator()};
   result += color.location;
@@ -516,11 +520,11 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   result += ':';
   result += String::from(details_line_byte_position, heap_allocator());
   result += ':';
-  result += color.reset;
+  result += color.get_reset();
   result += ' ';
   result += color.severity;
-  result += "note";
-  result += color.reset;
+  result += severity_word;
+  result += color.get_reset();
   result += ":\n";
 
   result += get_context_pointing_to(source, byte_position, byte_count,

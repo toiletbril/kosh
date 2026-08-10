@@ -154,8 +154,9 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
 
 fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
                        const ArrayList<SourceLocation> *arg_locations = nullptr,
-                       ArrayList<SourceLocation> *operand_locations =
-                           nullptr) throws -> ArrayList<String>;
+                       ArrayList<SourceLocation> *operand_locations = nullptr,
+                       bool should_accept_negative_number_operand =
+                           false) throws -> ArrayList<String>;
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description, const FlagList &flags) throws

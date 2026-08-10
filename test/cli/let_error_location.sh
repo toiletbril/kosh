@@ -10,8 +10,17 @@ echo "== later argument location =="
 echo "rc=$?"
 echo "== diagnostic catalog =="
 if "$BIN" --list-diagnostics | grep -q SC2219; then
-    echo "SC2219=present"
+  echo "SC2219=present"
 else
-    echo "SC2219=absent"
+  echo "SC2219=absent"
 fi
 "$BIN" --list-diagnostics | grep -c arith-assign
+catalog=$("$BIN" --list-diagnostics)
+echo "SC2024-variants=$(printf '%s\n' "$catalog" |
+  grep -c '^  SC2024  strict  sudo-')"
+echo "SC2184-variants=$(printf '%s\n' "$catalog" |
+  grep -c '^  SC2184  strict  unquoted-unset-index$')"
+echo "exported-cdpath=$(printf '%s\n' "$catalog" |
+  grep -c '^  exported-cdpath  strict$')"
+echo "catalog-nounset=$(printf '%s\n' "$catalog" |
+  grep -c '^  nounset  ')"

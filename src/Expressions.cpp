@@ -21,138 +21,6 @@
 
 namespace shit {
 
-namespace {
-
-pure fn parse_shellcheck_code(StringView text) wontthrow -> Maybe<u16>
-{
-  if (text.starts_with(StringView{"SC"})) text = text.substring(2);
-  if (!text.is_all_decimal_digits()) return None;
-
-  u32 value = 0;
-  for (usize i = 0; i < text.length; i++) {
-    value = value * 10 + static_cast<u32>(text[i] - '0');
-    if (value > UINT16_MAX) return None;
-  }
-
-  return static_cast<u16>(value);
-}
-
-pure fn shellcheck_value_disables(StringView value,
-                                  u16 diagnostic_code) wontthrow -> bool
-{
-  if (value == StringView{"all"}) return true;
-
-  usize component_start = 0;
-  while (component_start <= value.length) {
-    usize component_end = component_start;
-    while (component_end < value.length && value[component_end] != ',') {
-      component_end++;
-    }
-    let const component = value.substring_of_length(
-        component_start, component_end - component_start);
-    let const dash = component.find_character('-');
-    if (dash.has_value()) {
-      let const first =
-          parse_shellcheck_code(component.substring_of_length(0, *dash));
-      let const end = parse_shellcheck_code(component.substring(*dash + 1));
-      if (first.has_value() && end.has_value() && diagnostic_code >= *first &&
-          diagnostic_code < *end)
-      {
-        return true;
-      }
-    } else {
-      let const code = parse_shellcheck_code(component);
-      if (code.has_value() && *code == diagnostic_code) {
-        return true;
-      }
-    }
-    if (component_end == value.length) break;
-    component_start = component_end + 1;
-  }
-
-  return false;
-}
-
-pure fn shellcheck_directive_disables(StringView comment,
-                                      u16 diagnostic_code) wontthrow -> bool
-{
-  usize position = 1;
-  while (position < comment.length &&
-         (comment[position] == ' ' || comment[position] == '\t'))
-  {
-    position++;
-  }
-  let const directive_text = comment.substring(position);
-  if (!directive_text.starts_with(StringView{"shellcheck"}) ||
-      (directive_text.length > 10 && directive_text[10] != ' ' &&
-       directive_text[10] != '\t'))
-  {
-    return false;
-  }
-  position += 10;
-
-  while (position < comment.length) {
-    while (position < comment.length &&
-           (comment[position] == ' ' || comment[position] == '\t'))
-    {
-      position++;
-    }
-    if (position >= comment.length || comment[position] == '#') {
-      break;
-    }
-    if (!comment.substring(position).starts_with(StringView{"disable="})) {
-      while (position < comment.length && comment[position] != ' ' &&
-             comment[position] != '\t' && comment[position] != '#')
-      {
-        position++;
-      }
-      continue;
-    }
-    position += 8;
-
-    char quote = '\0';
-    if (position < comment.length &&
-        (comment[position] == '\'' || comment[position] == '"'))
-    {
-      quote = comment[position++];
-    }
-    let const value_start = position;
-    if (quote != '\0') {
-      while (position < comment.length && comment[position] != quote) {
-        position++;
-      }
-      if (position == comment.length) return false;
-    } else {
-      while (position < comment.length && comment[position] != ' ' &&
-             comment[position] != '\t' && comment[position] != '#')
-      {
-        position++;
-      }
-    }
-    let const value =
-        comment.substring_of_length(value_start, position - value_start);
-    if (shellcheck_value_disables(value, diagnostic_code)) return true;
-    if (quote != '\0' && position < comment.length) {
-      position++;
-    }
-  }
-
-  return false;
-}
-
-pure fn shellcheck_tier(u16 diagnostic_code) wontthrow -> diagnostic_tier
-{
-  for (let const &check : SHELLCHECK_CHECKS) {
-    let const code = parse_shellcheck_code(check.code);
-    if (code.has_value() && *code == diagnostic_code) {
-      return check.tier;
-    }
-  }
-  return diagnostic_tier::Strict;
-}
-
-} /* namespace */
-
 fn indent_for_layer(usize layer) throws -> String
 {
   let pad = String{heap_allocator()};
@@ -301,16 +169,38 @@ fn AnalysisContext::flush_warnings() throws -> void
   pending_warnings.clear();
 }
 
-fn AnalysisContext::warn_shellcheck(u16 diagnostic_code,
-                                    SourceLocation location, StringView message,
-                                    StringView suggestion,
-                                    Maybe<SourceLocation> related_location,
-                                    StringView related_message) throws -> void
+fn AnalysisContext::report_diagnostic(
+    diagnostic_id id, SourceLocation location,
+    std::initializer_list<StringView> arguments,
+    Maybe<SourceLocation> related_location) throws -> void
 {
-  if (is_shellcheck_suppressed(diagnostic_code, location)) return;
+  if (is_diagnostic_suppressed(id, location)) return;
 
-  fail(location, message, suggestion, shellcheck_tier(diagnostic_code),
-       related_location, related_message);
+  let const &definition = get_diagnostic_definition(id);
+  let const message =
+      format_diagnostic_template(definition.message_template, arguments);
+  let suggestion = String{heap_allocator()};
+  let related_message = String{heap_allocator()};
+
+  if (definition.suggestion_template.has_value()) {
+    suggestion =
+        format_diagnostic_template(*definition.suggestion_template, arguments);
+  }
+  if (definition.related_template.has_value()) {
+    related_message =
+        format_diagnostic_template(*definition.related_template, arguments);
+  }
+
+  switch (definition.delivery) {
+  case diagnostic_delivery::Policy:
+    fail(location, message.view(), suggestion.view(), definition.tier,
+         related_location, related_message.view());
+    break;
+  case diagnostic_delivery::Warning:
+    warn(location, message.view(), suggestion.view(), definition.tier,
+         related_location, related_message.view());
+    break;
+  }
 }
 
 cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
@@ -361,11 +251,17 @@ fn AnalysisContext::fail(SourceLocation location, StringView message,
     return;
   }
 
+  if (tier == diagnostic_tier::Annoying) {
+    warn(location, message, suggestion, tier, related_location,
+         related_message);
+    return;
+  }
+
   u8 demote_at_level = 0;
   switch (tier) {
-  case diagnostic_tier::Annoying: demote_at_level = 1; break;
-  case diagnostic_tier::Lenient: demote_at_level = 2; break;
   case diagnostic_tier::Strict: demote_at_level = 3; break;
+  case diagnostic_tier::Lenient: demote_at_level = 2; break;
+  case diagnostic_tier::Annoying: break;
   }
 
   if (warning_level >= demote_at_level) {
@@ -392,20 +288,8 @@ fn AnalysisContext::fail(SourceLocation location, StringView message,
   has_fatal = true;
 }
 
-fn AnalysisContext::fail_shellcheck(u16 diagnostic_code,
-                                    SourceLocation location, StringView message,
-                                    StringView suggestion,
-                                    Maybe<SourceLocation> related_location,
-                                    StringView related_message) throws -> void
-{
-  if (is_shellcheck_suppressed(diagnostic_code, location)) return;
-
-  fail(location, message, suggestion, shellcheck_tier(diagnostic_code),
-       related_location, related_message);
-}
-
-pure fn AnalysisContext::is_shellcheck_suppressed(
-    u16 diagnostic_code, SourceLocation location) const wontthrow -> bool
+pure fn AnalysisContext::is_diagnostic_suppressed(
+    diagnostic_id id, SourceLocation location) const wontthrow -> bool
 {
   if (shellcheck_suppressions == nullptr) return false;
 
@@ -420,7 +304,7 @@ pure fn AnalysisContext::is_shellcheck_suppressed(
       if (directive.position + directive.length > source.length) continue;
       let const comment =
           source.substring_of_length(directive.position, directive.length);
-      if (shellcheck_directive_disables(comment, diagnostic_code)) return true;
+      if (diagnostic_directive_disables(comment, id)) return true;
     }
   }
 
@@ -436,10 +320,7 @@ fn AnalysisContext::note_variable_assignment(StringView name) throws -> void
   if (const SourceLocation *read_location = reads_before_assignment.find(name);
       read_location != nullptr)
   {
-    fail(*read_location,
-         StringView{"The variable '"} + name +
-             "' is read before it is assigned",
-         StringView{}, diagnostic_tier::Lenient);
+    report_diagnostic(diagnostic_id::use_before_assign, *read_location, {name});
     reads_before_assignment.erase(name);
   }
 }
@@ -736,9 +617,8 @@ fn analyze_ast(const Expression *root, StringView source,
 
   if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
-    actx.fail(SourceLocation{0, 3},
-              "A UTF-8 byte-order mark precedes the script text",
-              "Save the script as UTF-8 without a byte-order mark");
+    actx.report_diagnostic(diagnostic_id::byte_order_mark,
+                           SourceLocation{0, 3});
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
@@ -1301,11 +1181,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
       let location = assignment.location;
       location.length = outer_close_position + 1 - location.position;
-      actx.fail(location,
-                StringView{"The assignment of '"} + assignment.name +
-                    "' uses array syntax instead of arithmetic",
-                StringView{"Use `let '"} + assignment.name + "=" + expression +
-                    "'` to evaluate and assign it");
+      actx.report_diagnostic(diagnostic_id::arith_assign, location,
+                             {assignment.name.view(), expression});
     }
 
     return;
@@ -1334,20 +1211,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!command_is_shadowed && actx.is_inside_read_loop &&
       command_literal == "ssh")
   {
-    actx.fail_shellcheck(
-        2095, m_args[0]->source_location(),
-        "An ssh command in a while-read loop can consume the loop input",
-        "Redirect ssh input from /dev/null or pass -n");
+    actx.report_diagnostic(diagnostic_id::sc2095, m_args[0]->source_location());
   }
 
   if (!command_is_shadowed && TEST_COMMANDS.contains(command_literal.view())) {
     for (usize i = 1; i < m_args.count(); i++) {
       let const literal = m_args[i]->raw_string();
       if (literal.view() == "=~")
-        actx.fail_shellcheck(2074, m_args[i]->source_location(),
-                             "The test builtin does not support the =~ regular "
-                             "expression operator",
-                             "Use [[ value =~ expression ]]");
+        actx.report_diagnostic(diagnostic_id::sc2074,
+                               m_args[i]->source_location());
     }
   }
 
@@ -1375,16 +1247,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (FIND_ACTIONS.contains(literal.view())) has_action = true;
     }
     if (has_exec && !has_exec_terminator && exec_location.has_value()) {
-      actx.fail_shellcheck(
-          2067, *exec_location,
-          "The find -exec action has no terminating ';' or '+'",
-          "Terminate the action with an escaped semicolon or plus");
+      actx.report_diagnostic(diagnostic_id::sc2067, *exec_location);
     }
     if (has_or && has_action && !has_group && or_location.has_value()) {
-      actx.fail_shellcheck(
-          2146, *or_location,
-          "The find expression uses -o without grouping its actions",
-          "Group each side with escaped parentheses");
+      actx.report_diagnostic(diagnostic_id::sc2146, *or_location);
     }
   }
 
@@ -1395,10 +1261,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           view_contains(raw.view(), StringView{"$@"}) ||
           view_contains(raw.view(), StringView{"$*"}))
       {
-        actx.fail_shellcheck(
-            2142, m_args[i]->source_location(),
-            "An alias body cannot receive positional arguments",
-            "Use a function when the wrapper needs arguments");
+        actx.report_diagnostic(diagnostic_id::sc2142,
+                               m_args[i]->source_location());
       }
     }
   }
@@ -1410,9 +1274,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (first_operand.view().starts_with(StringView{"x$"}) ||
         first_operand.view().starts_with(StringView{"x\"$"}))
     {
-      actx.warn_shellcheck(2268, m_args[1]->source_location(),
-                           "The x-prefix test workaround is obsolete",
-                           "Quote the variable directly");
+      actx.report_diagnostic(diagnostic_id::sc2268,
+                             m_args[1]->source_location());
     }
   }
 
@@ -1423,10 +1286,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           literal[literal.length() - 1] == ']' &&
           literal.view().find_character('-').has_value())
       {
-        actx.fail_shellcheck(
-            2021, m_args[i]->source_location(),
-            "Brackets around a tr range add literal bracket bytes",
-            "Use a quoted range without brackets");
+        actx.report_diagnostic(diagnostic_id::sc2021,
+                               m_args[i]->source_location());
       }
     }
   }
@@ -1437,16 +1298,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (source_text.length >= 2 && source_text[0] == '`' &&
         source_text[source_text.length - 1] == '`')
     {
-      actx.warn_shellcheck(
-          2006, m_args[i]->source_location(),
-          "Backticks are harder to nest than command substitutions",
-          "Use $(...) for command substitution");
+      actx.report_diagnostic(diagnostic_id::sc2006,
+                             m_args[i]->source_location());
     }
     if (view_contains(source_text, StringView{"$["}))
-      actx.warn_shellcheck(
-          2007, m_args[i]->source_location(),
-          "$[...] is the obsolete arithmetic expansion spelling",
-          "Use $((...)) for arithmetic expansion");
+      actx.report_diagnostic(diagnostic_id::sc2007,
+                             m_args[i]->source_location());
     if (m_args[i]->kind() == Token::Kind::Word) {
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
@@ -1454,10 +1311,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
             segment.text.view().find_character('$').has_value())
         {
-          actx.warn_shellcheck(
-              2004, m_args[i]->source_location(),
-              "Arithmetic variables do not need a dollar sign",
-              "Use the variable name directly inside arithmetic");
+          actx.report_diagnostic(diagnostic_id::sc2004,
+                                 m_args[i]->source_location());
           break;
         }
       }
@@ -1469,9 +1324,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       {
         continue;
       }
-      actx.fail_shellcheck(1037, m_args[i]->source_location(),
-                           "A positional parameter above nine needs braces",
-                           "Write ${10} to select positional parameter 10");
+      actx.report_diagnostic(diagnostic_id::sc1037,
+                             m_args[i]->source_location());
       break;
     }
   }
@@ -1482,10 +1336,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (command_word.segments.count() == 1 &&
         command_word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
     {
-      actx.fail_shellcheck(
-          2091, m_args[0]->source_location(),
-          "A command substitution in command position executes its output",
-          "Run the command inside the substitution directly");
+      actx.report_diagnostic(diagnostic_id::sc2091,
+                             m_args[0]->source_location());
     }
   }
 
@@ -1510,53 +1362,38 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
      so the literal text is taken separately for the test recognition. */
   let const command_raw = m_args[0]->raw_string();
   if (!command_raw.is_empty() && command_raw[0] == '-')
-    actx.warn_shellcheck(
-        2215, m_args[0]->source_location(),
-        "An option-shaped word in command position is not a command",
-        "Place the option after its command");
+    actx.report_diagnostic(diagnostic_id::sc2215, m_args[0]->source_location());
   if (command_raw.length() > 1 && command_raw[0] == '$' &&
       lexer::is_variable_name_start(command_raw[1]) &&
       command_raw.view().find_character('=').has_value())
-    actx.warn_shellcheck(2281, m_args[0]->source_location(),
-                         "An assignment name must not start with a dollar sign",
-                         "Remove the dollar sign from the assignment name");
+    actx.report_diagnostic(diagnostic_id::sc2281, m_args[0]->source_location());
   if ((command_raw.view().starts_with(StringView{"["}) &&
        command_raw.view() != "[") ||
       (command_raw.view().starts_with(StringView{"[["}) &&
        command_raw.view() != "[["))
-    actx.warn_shellcheck(
-        1035, m_args[0]->source_location(),
-        "Test brackets and operands require separating spaces",
-        "Add spaces after the opening bracket and before the close");
+    actx.report_diagnostic(diagnostic_id::sc1035, m_args[0]->source_location());
   if (command_raw.view().starts_with(StringView{"[["}) &&
       command_raw.view().find_character('=').has_value())
-    actx.warn_shellcheck(2077, m_args[0]->source_location(),
-                         "A conditional operator needs surrounding spaces",
-                         "Place spaces around the comparison operator");
+    actx.report_diagnostic(diagnostic_id::sc2077, m_args[0]->source_location());
   if (command_raw.view().starts_with(StringView{"["}) &&
       command_raw.view() != "[" && command_raw.view() != "[[" &&
       m_args.count() > 1)
   {
     let const last_raw = m_args.back()->raw_string();
     if (!last_raw.is_empty() && last_raw[last_raw.length() - 1] == ']')
-      actx.warn_shellcheck(
-          1014, m_args[0]->source_location(),
-          "Test brackets do not run the command written inside them",
-          "Run the command directly as the if condition");
+      actx.report_diagnostic(diagnostic_id::sc1014,
+                             m_args[0]->source_location());
   }
   if (m_args.count() >= 2 && m_args[1]->raw_string().view() == "=")
-    actx.warn_shellcheck(2283, m_args[1]->source_location(),
-                         "An assignment cannot contain spaces around equals",
-                         "Write NAME=value without spaces");
+    actx.report_diagnostic(diagnostic_id::sc2283, m_args[1]->source_location());
 
   for (usize i = 1; i < m_args.count(); i++) {
     let const raw = m_args[i]->raw_string();
     if (view_contains(raw.view(), StringView{".."}) &&
         raw.view().find_character('{').has_value() &&
         raw.view().find_character('$').has_value())
-      actx.warn_shellcheck(2051, m_args[i]->source_location(),
-                           "Brace ranges are expanded before variables",
-                           "Use an arithmetic loop for a variable limit");
+      actx.report_diagnostic(diagnostic_id::sc2051,
+                             m_args[i]->source_location());
   }
 
   /* An assignment builtin that sets PATH also leaves the runtime search path
@@ -1588,11 +1425,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                 source_text.starts_with(StringView{"\"~/"}) ||
                                 source_text.starts_with(StringView{"'~/"});
     if (is_quoted_home)
-      actx.warn_shellcheck(
-          2088, m_args[i]->source_location(),
-          "A quoted tilde stays literal instead of expanding to the "
-          "home directory",
-          "Leave the tilde unquoted or use a quoted $HOME expansion");
+      actx.report_diagnostic(diagnostic_id::sc2088,
+                             m_args[i]->source_location());
 
     if (!command_is_shadowed && command_literal == "echo" &&
         source_text.length >= 4 && source_text[0] == '\'' &&
@@ -1606,30 +1440,23 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
            position++)
         is_simple_name = lexer::is_variable_name(name[position]);
       if (is_simple_name)
-        actx.warn_shellcheck(
-            2016, m_args[i]->source_location(),
-            "Single quotes prevent the expansion written inside them",
-            "Use double quotes if the value should expand");
+        actx.report_diagnostic(diagnostic_id::sc2016,
+                               m_args[i]->source_location());
     }
 
     if (word.segments.count() == 1 &&
         word.segments[0].kind == WordSegment::Kind::VariableReference &&
         word.segments[0].text.view() == "*" &&
         !word.segments[0].is_in_double_quotes)
-      actx.warn_shellcheck(
-          2048, m_args[i]->source_location(),
-          "$* splits positional parameters and loses their boundaries",
-          "Use quoted \"$@\" to preserve each argument");
+      actx.report_diagnostic(diagnostic_id::sc2048,
+                             m_args[i]->source_location());
 
     for (let const &segment : word.segments)
       if (segment.kind == WordSegment::Kind::VariableReference &&
           actx.pipeline_lost_names.contains(segment.text.view()))
       {
-        actx.warn_shellcheck(
-            2031, m_args[i]->source_location(),
-            "This read sees the value from before the pipeline",
-            "Move the assignment outside the pipeline or avoid the "
-            "pipeline subshell");
+        actx.report_diagnostic(diagnostic_id::sc2031,
+                               m_args[i]->source_location());
         actx.pipeline_lost_names.remove(segment.text.view());
         break;
       }
@@ -1638,9 +1465,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
           arithmetic_reads_external_input(actx, segment.text.view()))
       {
-        actx.fail(m_args[i]->source_location(),
-                  "External input is evaluated as arithmetic code",
-                  "Validate the value as decimal digits before arithmetic");
+        actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
+                               m_args[i]->source_location());
         break;
       }
   }
@@ -1667,19 +1493,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (literal.view().starts_with("-")) continue;
       if (word.segments.count() == 1 &&
           word.segments[0].kind == WordSegment::Kind::VariableReference)
-        actx.warn_shellcheck(
-            2229, m_args[i]->source_location(),
-            "A read operand is a variable name, not a variable value",
-            "Drop the dollar sign from the variable name");
+        actx.report_diagnostic(diagnostic_id::sc2229,
+                               m_args[i]->source_location());
 
       if (actx.is_direct_pipeline_stage && !literal.view().starts_with("-")) {
         let const target = operand_target_name(literal.view());
         if (!target.is_empty()) {
-          actx.warn_shellcheck(
-              2030, m_args[i]->source_location(),
-              "This pipeline read assignment is lost when the stage "
-              "exits",
-              "Feed the loop with a redirection or process substitution");
+          actx.report_diagnostic(diagnostic_id::sc2030_read,
+                                 m_args[i]->source_location());
           actx.pipeline_lost_names.add(target);
         }
       }
@@ -1697,11 +1518,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       let const raw = m_args[i]->raw_string();
       if (raw.view().starts_with(StringView{"CDPATH="}) ||
           raw.view() == "CDPATH")
-        actx.warn_shellcheck(
-            2184, m_args[i]->source_location(),
-            "An exported CDPATH can redirect cd commands in child "
-            "scripts",
-            "Keep CDPATH unexported or clear it before running scripts");
+        actx.report_diagnostic(diagnostic_id::exported_cdpath,
+                               m_args[i]->source_location());
     }
   }
 
@@ -1715,11 +1533,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           raw.view().find_character(']').has_value() &&
           (source_text.is_empty() ||
            (source_text[0] != '\'' && source_text[0] != '"')))
-        actx.warn_shellcheck(
-            2184, m_args[i]->source_location(),
-            "An unquoted unset array index can expand as a filename "
-            "glob",
-            "Quote the complete array element name");
+        actx.report_diagnostic(diagnostic_id::sc2184,
+                               m_args[i]->source_location());
     }
   }
 
@@ -1733,10 +1548,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         if (m_args[i + 1]->kind() == Token::Kind::Word &&
             word_is_bare_glob(
                 static_cast<const tokens::WordToken *>(m_args[i + 1])->word()))
-          actx.warn_shellcheck(
-              2061, m_args[i + 1]->source_location(),
-              "The unquoted find pattern expands before find sees it",
-              "Quote the pattern so find performs the match");
+          actx.report_diagnostic(diagnostic_id::sc2061,
+                                 m_args[i + 1]->source_location());
       }
 
       if (predicate.view() == "-exec" && i + 3 < m_args.count()) {
@@ -1746,11 +1559,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         if ((shell_name.view() == "sh" || shell_name.view() == "bash") &&
             shell_flag.view() == "-c" &&
             view_contains(script.view(), StringView{"{}"}))
-          actx.warn_shellcheck(
-              2156, m_args[i + 3]->source_location(),
-              "The find result is inserted into shell source and can "
-              "execute filename text",
-              "Pass the result as an argument and reference it as $1");
+          actx.report_diagnostic(diagnostic_id::sc2156,
+                                 m_args[i + 3]->source_location());
       }
     }
   }
@@ -1761,10 +1571,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
       if (word_is_bare_glob(word))
-        actx.warn_shellcheck(
-            2060, m_args[i]->source_location(),
-            "The unquoted tr range can expand as a filename glob",
-            "Quote the range");
+        actx.report_diagnostic(diagnostic_id::sc2060,
+                               m_args[i]->source_location());
     }
   }
 
@@ -1772,9 +1580,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     for (usize i = 1; i < m_args.count(); i++) {
       let const expression = m_args[i]->raw_string();
       if (arithmetic_reads_external_input(actx, expression.view()))
-        actx.fail(m_args[i]->source_location(),
-                  "External input is evaluated as arithmetic code",
-                  "Validate the value as decimal digits before arithmetic");
+        actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
+                               m_args[i]->source_location());
     }
   }
 
@@ -1793,11 +1600,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         let const consumed = printf_consumed_argument_count(format.view());
         let const available = m_args.count() - format_index - 1;
         if (consumed > available)
-          actx.warn_shellcheck(
-              2183, m_args[format_index]->source_location(),
-              "The printf format consumes more arguments than the "
-              "command supplies",
-              "Add the missing arguments or remove format directives");
+          actx.report_diagnostic(diagnostic_id::sc2183,
+                                 m_args[format_index]->source_location());
       }
     }
   }
@@ -1805,20 +1609,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!command_is_shadowed && command_literal == "sudo") {
     for (let const &redirection : m_redirections)
       if (redirection.target != nullptr)
-        actx.warn_shellcheck(
-            2024, redirection.target->source_location(),
-            "The shell opens this redirection before sudo changes "
-            "privileges",
-            "Run a shell under sudo or pipe through sudo tee");
+        actx.report_diagnostic(diagnostic_id::sc2024_redirection,
+                               redirection.target->source_location());
     for (usize i = 1; i < m_args.count(); i++)
       if (m_args[i]->kind() == Token::Kind::Word &&
           word_is_bare_glob(
               static_cast<const tokens::WordToken *>(m_args[i])->word()))
-        actx.warn_shellcheck(
-            2024, m_args[i]->source_location(),
-            "The shell expands this glob before sudo changes "
-            "privileges",
-            "Run the glob expansion inside a shell under sudo");
+        actx.report_diagnostic(diagnostic_id::sc2024_glob,
+                               m_args[i]->source_location());
   }
 
   if (!command_is_shadowed && !TEST_COMMANDS.contains(command_literal.view()) &&
@@ -1834,10 +1632,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (command_is_assignment_builtin &&
           word.get_assignment_split().has_value())
         continue;
-      actx.warn_shellcheck(
-          2086, m_args[i]->source_location(),
-          "An unquoted variable can split into words and expand globs",
-          "Quote the expansion to keep one argument");
+      actx.report_diagnostic(diagnostic_id::sc2086_expansion,
+                             m_args[i]->source_location());
     }
   }
 
@@ -1856,20 +1652,30 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       }
       if (has_end_of_options) continue;
       if (bare_glob_can_start_with_dash(word))
-        actx.fail_shellcheck(
-            2035, m_args[i]->source_location(),
-            "A bare glob can expand to a filename that begins with '-'",
-            "Prefix the glob with a directory or place -- before it");
+        actx.report_diagnostic(diagnostic_id::sc2035,
+                               m_args[i]->source_location());
     }
   }
 
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
      so any later unresolved command must not be a hard failure. */
-  if (RUNTIME_DEFINER_COMMANDS.contains(command_literal.view())) {
+  let runtime_definer_name = String{command_literal};
+  if ((command_literal == "builtin" || command_literal == "command") &&
+      m_args.count() > 1)
+  {
+    usize wrapped_command_index = 1;
+    if (m_args[wrapped_command_index]->raw_string().view() == "--") {
+      wrapped_command_index++;
+    }
+    if (wrapped_command_index < m_args.count()) {
+      runtime_definer_name = m_args[wrapped_command_index]->raw_string();
+    }
+  }
+  if (RUNTIME_DEFINER_COMMANDS.contains(runtime_definer_name.view())) {
     LOG(Debug,
         "'%s' may define commands at run time, later resolution failures "
         "degrade to warnings",
-        command_literal.c_str());
+        runtime_definer_name.c_str());
     actx.has_seen_runtime_definer = true;
   }
 
@@ -1892,8 +1698,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (t->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
     if (word_has_malformed_glob_bracket(word)) {
-      actx.fail(t->source_location(),
-                "Malformed glob pattern, unterminated '['");
+      actx.report_diagnostic(diagnostic_id::malformed_glob,
+                             t->source_location());
     }
   }
 
@@ -1909,9 +1715,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         if (segment.kind == WordSegment::Kind::VariableReference &&
             segment.is_split_eligible())
         {
-          actx.warn_shellcheck(2086, m_args[i]->source_location(),
-                               "A test reads an unquoted variable",
-                               "Quote it to avoid an empty or split argument");
+          actx.report_diagnostic(diagnostic_id::sc2086_test,
+                                 m_args[i]->source_location());
           break;
         }
       }
@@ -1923,9 +1728,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (command_literal == "read" && !command_is_shadowed &&
       !args_have_short_flag(m_args, 'r'))
   {
-    actx.warn_shellcheck(2162, source_location(),
-                         "A read without -r mangles a backslash in the input",
-                         "Add -r to read the line literally");
+    actx.report_diagnostic(diagnostic_id::sc2162, source_location());
   }
 
   /* The bashism lints, each fired only under a POSIX shebang. echo -e/-n/-E is
@@ -1941,32 +1744,20 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (view == "-e" || view == "-n" || view == "-E" || view == "-ne" ||
           view == "-en")
       {
-        actx.warn_shellcheck(
-            3037, m_args[1]->source_location(),
-            "An echo " + view +
-                " relies on a bash builtin, the POSIX echo prints the "
-                "flag as text",
-            "Use printf instead under a sh shebang");
+        actx.report_diagnostic(diagnostic_id::sc3037,
+                               m_args[1]->source_location(), {view});
       }
     }
     if (command_literal == "declare" || command_literal == "typeset")
-      actx.warn_shellcheck(
-          3044, m_args[0]->source_location(),
-          StringView{"The "} + command_literal.view() +
-              " builtin is not in POSIX",
-          "Assign the variable plainly under a sh shebang, or switch the "
-          "shebang to bash");
+      actx.report_diagnostic(diagnostic_id::sc3044,
+                             m_args[0]->source_location(),
+                             {command_literal.view()});
     if (command_literal == "source")
-      actx.warn_shellcheck(
-          3046, m_args[0]->source_location(),
-          "The name source is the bash spelling, the POSIX dot command "
-          "is '.'",
-          "Use '.' under a sh shebang");
+      actx.report_diagnostic(diagnostic_id::sc3046,
+                             m_args[0]->source_location());
     if (command_literal == "local")
-      actx.warn_shellcheck(
-          3043, m_args[0]->source_location(),
-          "The local builtin is not in POSIX sh, the value stays global",
-          "rework the function or switch the shebang to bash");
+      actx.report_diagnostic(diagnostic_id::sc3043,
+                             m_args[0]->source_location());
     if (command_literal == "printf" && m_args.count() >= 2 &&
         m_args[1]->kind() == Token::Kind::Word &&
         static_cast<const tokens::WordToken *>(m_args[1])
@@ -1974,48 +1765,34 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                 .to_literal_string()
                 .view() == "-v")
     {
-      actx.warn_shellcheck(
-          3045, m_args[1]->source_location(),
-          "The printf -v form is a bash extension, the POSIX printf "
-          "has no -v",
-          "capture the output with a command substitution under a sh "
-          "shebang");
+      actx.report_diagnostic(diagnostic_id::sc3045,
+                             m_args[1]->source_location());
     }
     /* mapfile and its readarray alias are bash array builtins, shellcheck
        SC3030. */
     if (command_literal == "mapfile" || command_literal == "readarray")
-      actx.warn_shellcheck(
-          3030, m_args[0]->source_location(),
-          command_literal.view() +
-              " is a bash array builtin absent from POSIX sh",
-          "read the input with a while read loop or switch the shebang "
-          "to bash");
+      actx.report_diagnostic(diagnostic_id::sc3030,
+                             m_args[0]->source_location(),
+                             {command_literal.view()});
   }
 
   if (!command_is_shadowed) {
     if (command_literal == "egrep")
-      actx.warn_shellcheck(
-          2196, m_args[0]->source_location(), "The egrep command is deprecated",
-          "Use grep -E for the extended regular expression match");
+      actx.report_diagnostic(diagnostic_id::sc2196,
+                             m_args[0]->source_location());
     else if (command_literal == "fgrep")
-      actx.warn_shellcheck(2197, m_args[0]->source_location(),
-                           "The fgrep command is deprecated",
-                           "Use grep -F for the fixed string match");
+      actx.report_diagnostic(diagnostic_id::sc2197,
+                             m_args[0]->source_location());
     else if (command_literal == "expr")
-      actx.warn_shellcheck(
-          2003, m_args[0]->source_location(),
-          "An expr forks for arithmetic the shell does natively",
-          "Use $((...)) for the calculation");
-    else if (command_literal == "local" && actx.function_scope_depth == 0)
-      actx.warn_shellcheck(
-          2168, m_args[0]->source_location(),
-          "A local outside a function has no scope to bind",
-          "Declare the variable plainly or move it into a function");
+      actx.report_diagnostic(diagnostic_id::sc2003,
+                             m_args[0]->source_location());
+    else if (command_literal == "local" && actx.function_scope_depth == 0 &&
+             !actx.is_command_status_observed)
+      actx.report_diagnostic(diagnostic_id::sc2168,
+                             m_args[0]->source_location());
     else if (command_literal == "typeset" && !actx.shebang_is_posix_sh)
-      actx.fail(m_args[0]->source_location(),
-                "The typeset builtin is the ksh spelling of declare",
-                "Write declare for the clearer bash name",
-                diagnostic_tier::Annoying);
+      actx.report_diagnostic(diagnostic_id::typeset_spelling,
+                             m_args[0]->source_location());
   }
 
   if (command_literal == "echo" && !command_is_shadowed &&
@@ -2025,11 +1802,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (word.segments.count() == 1 &&
         word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
     {
-      actx.warn_shellcheck(
-          2005, m_args[0]->source_location(),
-          "An echo of a command substitution prints what the command already "
-          "prints",
-          "Run the command on its own instead");
+      actx.report_diagnostic(diagnostic_id::sc2005,
+                             m_args[0]->source_location());
     }
   }
 
@@ -2050,11 +1824,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         break;
       }
     if (action_expands_now)
-      actx.warn_shellcheck(
-          2064, m_args[1]->source_location(),
-          "The double-quoted trap action expands now, when the trap is "
-          "set, not when it fires",
-          "Single-quote it so it expands as the signal arrives");
+      actx.report_diagnostic(diagnostic_id::sc2064,
+                             m_args[1]->source_location());
   }
 
   /* A variable or command substitution in the printf format lets the data
@@ -2095,11 +1866,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       }
       if (format_has_expansion)
-        actx.warn_shellcheck(
-            2059, m_args[format_index]->source_location(),
-            "The printf format comes from a variable, the data can "
-            "inject format directives",
-            "Use printf '%s' to print it");
+        actx.report_diagnostic(diagnostic_id::sc2059,
+                               m_args[format_index]->source_location());
     }
   }
 
@@ -2124,12 +1892,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
         }
       if (!value_has_substitution) continue;
-      actx.warn_shellcheck(
-          2155, m_args[i]->source_location(),
-          "Declaring and assigning from a command substitution in one "
-          "command masks the command's exit status",
-          "Split the declaration and the assignment so a failure is "
-          "seen");
+      actx.report_diagnostic(diagnostic_id::sc2155,
+                             m_args[i]->source_location());
       break;
     }
 
@@ -2154,9 +1918,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     {
       continue;
     }
-    actx.warn_shellcheck(2046, m_args[i]->source_location(),
-                         "An unquoted command substitution splits its output",
-                         "Quote it to keep one argument");
+    actx.report_diagnostic(diagnostic_id::sc2046, m_args[i]->source_location());
   }
 
   /* rm -r with a "$var/" operand deletes / when the variable is empty,
@@ -2173,20 +1935,16 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           !word.segments[0].text.view().find_character(':').has_value() &&
           !word.segments[1].text.is_empty() && word.segments[1].text[0] == '/')
       {
-        actx.warn_shellcheck(
-            2115, m_args[i]->source_location(),
-            "A rm -r on \"$" + word.segments[0].text.view() +
-                "/\" deletes '/' when the variable is empty",
-            StringView{"write ${"} + word.segments[0].text.view() +
-                ":?} so an empty value aborts the command instead");
+        actx.report_diagnostic(diagnostic_id::sc2115,
+                               m_args[i]->source_location(),
+                               {word.segments[0].text.view()});
       }
       if (word_is_fully_literal(word)) {
         let const literal = word.to_literal_string();
         if (SYSTEM_DIRECTORIES.contains(literal.view()))
-          actx.warn_shellcheck(2114, m_args[i]->source_location(),
-                               "A rm -r targets the system directory '" +
-                                   literal.view() + "'",
-                               "double-check the path before running this");
+          actx.report_diagnostic(diagnostic_id::sc2114,
+                                 m_args[i]->source_location(),
+                                 {literal.view()});
       }
     }
   }
@@ -2209,16 +1967,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           word.segments[0].kind == WordSegment::Kind::UnquotedText &&
           word.segments[0].has_glob_metacharacter())
       {
-        actx.warn_shellcheck(
-            2062, m_args[i]->source_location(),
-            "The unquoted grep pattern can glob against the local files "
-            "before grep sees it",
-            "Quote the pattern");
+        actx.report_diagnostic(diagnostic_id::sc2062,
+                               m_args[i]->source_location());
       } else if (!view.is_empty() && view[0] == '*') {
-        actx.warn_shellcheck(
-            2063, m_args[i]->source_location(),
-            "A grep reads a regular expression, where a leading * has "
-            "nothing to repeat, this pattern looks like a glob");
+        actx.report_diagnostic(diagnostic_id::sc2063,
+                               m_args[i]->source_location());
       }
       break;
     }
@@ -2229,11 +1982,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (command_literal == "mkdir" && !command_is_shadowed &&
       args_have_short_flag(m_args, 'p') && args_have_short_flag(m_args, 'm'))
   {
-    actx.warn_shellcheck(
-        2174, m_args[0]->source_location(),
-        "A mkdir -pm applies the mode only to the deepest directory, "
-        "the "
-        "created parents keep the umask default");
+    actx.report_diagnostic(diagnostic_id::sc2174, m_args[0]->source_location());
   }
 
   /* An exit or return code outside the literal 0-255 shape errors or wraps
@@ -2253,11 +2002,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         is_in_range = !parsed_code.is_error() && parsed_code.value() <= 255;
       }
       if (!is_in_range)
-        actx.warn_shellcheck(2242, m_args[1]->source_location(),
-                             "The code '" + view +
-                                 "' is not a number from 0 to 255, " +
-                                 command_literal.view() +
-                                 " either rejects it or wraps it modulo 256");
+        actx.report_diagnostic(diagnostic_id::sc2242,
+                               m_args[1]->source_location(),
+                               {view, command_literal.view()});
     }
   }
 
@@ -2275,16 +2022,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         continue;
       }
       if (word.segments.count() == 1 && !segment.is_in_double_quotes) {
-        actx.warn_shellcheck(
-            2068, m_args[i]->source_location(),
-            "An unquoted $@ word-splits and globs each argument",
-            "Quote it as \"$@\" to pass the arguments through unchanged");
+        actx.report_diagnostic(diagnostic_id::sc2068,
+                               m_args[i]->source_location());
       } else if (word.segments.count() > 1) {
-        actx.warn_shellcheck(
-            2145, m_args[i]->source_location(),
-            "$@ inside a longer word concatenates the surrounding text "
-            "onto the first and last argument",
-            "Use $* for one joined string or a separate \"$@\" word");
+        actx.report_diagnostic(diagnostic_id::sc2145,
+                               m_args[i]->source_location());
       }
       break;
     }
@@ -2314,10 +2056,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
         }
       if (!body_runs_more_than_echo)
-        actx.warn_shellcheck(
-            2116, m_args[i]->source_location(),
-            "A command substitution wraps a useless echo",
-            "The text can be used directly without the subshell");
+        actx.report_diagnostic(diagnostic_id::sc2116,
+                               m_args[i]->source_location());
     }
   }
 
@@ -2343,11 +2083,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (is_file_output && redirection.fd == 1 && saw_stderr_to_stdout &&
           redirection.target != nullptr)
       {
-        actx.warn_shellcheck(
-            2069, redirection.target->source_location(),
-            "2>&1 before the file redirect duplicates the terminal, so "
-            "stderr stays on the terminal",
-            "Put the file redirect first as in '>file 2>&1'");
+        actx.report_diagnostic(diagnostic_id::sc2069,
+                               redirection.target->source_location());
       }
       if (redirection.target != nullptr &&
           redirection.target->kind() == Token::Kind::Word)
@@ -2360,11 +2097,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                view_contains(segment.text.view(), StringView{"--"}) ||
                segment.text.view().find_character('=').has_value()))
           {
-            actx.warn_shellcheck(
-                2257, redirection.target->source_location(),
-                "A redirection expansion can run in a child and lose "
-                "its mutation",
-                "Update the variable before forming the redirect path");
+            actx.report_diagnostic(diagnostic_id::sc2257,
+                                   redirection.target->source_location());
             break;
           }
       }
@@ -2388,14 +2122,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         if (!read_target.is_empty() &&
             write_target.view() == read_target.view())
         {
-          actx.warn_shellcheck(
-              2094, redirection.target->source_location(),
-              "The command reads and truncates '" + read_target.view() +
-                  "' at once, the truncation empties the input before "
-                  "it is read",
-              "Write to a temporary and move it over",
-              read_token->source_location(),
-              "this redirect reads the file that is later truncated");
+          actx.report_diagnostic(
+              diagnostic_id::sc2094, redirection.target->source_location(),
+              {read_target.view()}, read_token->source_location());
         }
       }
     }
@@ -2409,11 +2138,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               redirection.kind == Redirection::Kind::Heredoc ||
               redirection.kind == Redirection::Kind::HereString)
           {
-            actx.warn_shellcheck(
-                2217, m_args[0]->source_location(),
-                "The input redirect feeds '" + command_literal.view() +
-                    "', which never reads stdin, so the data is "
-                    "discarded");
+            actx.report_diagnostic(diagnostic_id::sc2217,
+                                   m_args[0]->source_location(),
+                                   {command_literal.view()});
             break;
           }
     }
@@ -2442,15 +2169,13 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (view == "==" && i >= 2 &&
           !is_test_binary_operator_word(previous_literal.view()))
       {
-        actx.warn_shellcheck(3014, m_args[i]->source_location(),
-                             "== is undefined in POSIX test",
-                             "Use = for string equality");
+        actx.report_diagnostic(diagnostic_id::sc3014,
+                               m_args[i]->source_location());
       }
       let const previous_is_bang = previous_literal.view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
-        actx.warn_shellcheck(2166, m_args[i]->source_location(),
-                             "A test with -a or -o is obsolescent",
-                             "Join two tests with && or || instead");
+        actx.report_diagnostic(diagnostic_id::sc2166,
+                               m_args[i]->source_location());
       } else if (view == "!" && i + 1 < m_args.count() &&
                  m_args[i + 1]->kind() == Token::Kind::Word)
       {
@@ -2458,13 +2183,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                              ->word()
                              .to_literal_string();
         if (next.view() == "-z") {
-          actx.warn_shellcheck(2236, m_args[i]->source_location(),
-                               "A negated -z is just -n",
-                               "Test with -n instead");
+          actx.report_diagnostic(diagnostic_id::sc2236,
+                                 m_args[i]->source_location());
         } else if (next.view() == "-n") {
-          actx.warn_shellcheck(2237, m_args[i]->source_location(),
-                               "A negated -n is just -z",
-                               "Test with -z instead");
+          actx.report_diagnostic(diagnostic_id::sc2237,
+                                 m_args[i]->source_location());
         } else if (i + 2 < m_args.count() &&
                    m_args[i + 2]->kind() == Token::Kind::Word)
         {
@@ -2475,10 +2198,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                              .to_literal_string();
           let const inverse = negated_test_operator(op.view());
           if (inverse.has_value()) {
-            actx.warn_shellcheck(
-                2335, m_args[i]->source_location(),
-                StringView{"A negated "} + op + " is just " + inverse.value(),
-                StringView{"Drop the ! and use "} + inverse.value());
+            actx.report_diagnostic(diagnostic_id::sc2335,
+                                   m_args[i]->source_location(),
+                                   {op.view(), inverse.value()});
           }
         }
       }
@@ -2508,9 +2230,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                               ->word()
                               .to_literal_string();
       if (!(operand.view().length >= 1 && operand.view()[0] == '-')) {
-        actx.warn_shellcheck(2244, m_args[1]->source_location(),
-                             "A one-operand test is the nonempty-string test",
-                             "Write it with -n to read clearer");
+        actx.report_diagnostic(diagnostic_id::sc2244,
+                               m_args[1]->source_location());
       }
     }
 
@@ -2530,10 +2251,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         let const &next =
             static_cast<const tokens::WordToken *>(m_args[i + 1])->word();
         if (word_is_fully_literal(next))
-          actx.warn_shellcheck(2157, m_args[i + 1]->source_location(),
-                               "The operand is a literal, so this " + view +
-                                   " test is constant",
-                               "Test a variable or drop the check");
+          actx.report_diagnostic(diagnostic_id::sc2157,
+                                 m_args[i + 1]->source_location(), {view});
       }
 
       if (is_test_numeric_operator_word(view)) {
@@ -2547,11 +2266,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           if (!word_is_fully_literal(operand)) continue;
           let const operand_literal = operand.to_literal_string();
           if (!view_is_integer_literal(operand_literal.view()))
-            actx.warn_shellcheck(
-                2170, m_args[side]->source_location(),
-                "The numeric comparison " + view + " reads '" +
-                    operand_literal.view() +
-                    "', which is not a number, so the test errors at run time");
+            actx.report_diagnostic(diagnostic_id::sc2170,
+                                   m_args[side]->source_location(),
+                                   {view, operand_literal.view()});
         }
       }
 
@@ -2565,10 +2282,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           if (right_literal.view().find_character('*').has_value() ||
               right_literal.view().find_character('?').has_value())
           {
-            actx.warn_shellcheck(
-                2081, m_args[i + 1]->source_location(),
-                "[ and test compare strings byte for byte and never glob-match",
-                "Use a case or the [[ ]] form for the pattern");
+            actx.report_diagnostic(diagnostic_id::sc2081,
+                                   m_args[i + 1]->source_location());
           }
         }
       }
@@ -2579,11 +2294,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           word.segments[0].kind == WordSegment::Kind::VariableReference &&
           word.segments[0].text.view() == "?")
       {
-        actx.warn_shellcheck(
-            2181, m_args[i]->source_location(),
-            "Testing $? checks the exit status indirectly",
-            "Test the command directly with if or && so an intervening command "
-            "cannot clobber the status");
+        actx.report_diagnostic(diagnostic_id::sc2181,
+                               m_args[i]->source_location());
       }
     }
   }
@@ -2606,12 +2318,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           }
         }
         if (does_name_a_prefix) {
-          let const message =
-              StringView{"The assignment prefix does not affect this "
-                         "command, '"} +
-              segment.text + StringView{"' is read before it is set"};
-          actx.fail(m_args[i]->source_location(), message, {},
-                    diagnostic_tier::Lenient);
+          actx.report_diagnostic(diagnostic_id::assignment_prefix_read,
+                                 m_args[i]->source_location(),
+                                 {segment.text.view()});
           break;
         }
       }
@@ -2630,34 +2339,30 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       !command_is_shadowed && !command_was_resolved &&
       !actx.tested_command_names.contains(*name))
   {
+    let const diagnostic = actx.has_seen_runtime_definer
+                               ? diagnostic_id::unresolved_command_uncertain
+                               : diagnostic_id::unresolved_command;
     let diagnostic_location = m_args[0]->source_location();
     let reported_name = name->view();
-    if (unavailable.has_value()) {
+    if (unavailable.has_value() &&
+        diagnostic == diagnostic_id::unresolved_command)
+    {
       diagnostic_location = unavailable->location;
       reported_name = unavailable->reported_prefix.view();
     }
-    let const message =
-        StringView{"Command '"} + reported_name + StringView{"' was not found"};
-    /* A close name is offered as a did-you-mean hint on a trailing note. */
     let local_names = ArrayList<String>{heap_allocator()};
     actx.defined_functions.for_each(
         [&](StringView n) throws { local_names.push(String{n}); });
     actx.known_aliases.for_each([&](StringView n)
                                     throws { local_names.push(String{n}); });
-    let suggestion_note = String{heap_allocator()};
-    if (Maybe<String> suggestion =
-            utils::suggest_command(StringView{*name}, local_names))
-    {
-      suggestion_note = "Did you mean '" + *suggestion + "'?";
+    let const suggestion =
+        utils::suggest_command(StringView{*name}, local_names);
+    if (suggestion.has_value()) {
+      actx.report_diagnostic(diagnostic, diagnostic_location,
+                             {reported_name, suggestion->view()});
+    } else {
+      actx.report_diagnostic(diagnostic, diagnostic_location, {reported_name});
     }
-    /* A missing command is a fatal analysis error. After a dot, source, or eval
-       the command may be defined by code the prepass cannot see, so it is only
-       a warning there. */
-    if (actx.has_seen_runtime_definer)
-      actx.warn(diagnostic_location, message, suggestion_note.view());
-    else
-      actx.fail(diagnostic_location, message, suggestion_note.view(),
-                diagnostic_tier::Lenient);
   }
 
   /* A recorded constant survives only across an environment-neutral command
@@ -2807,10 +2512,8 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
             !actx.defined_functions.contains(name->view()) &&
             !actx.known_aliases.contains(name->view()) && file_is_plain_operand)
         {
-          actx.warn_shellcheck(
-              2002, cat_args[0]->source_location(), "A useless cat",
-              "Give the file to the next command directly instead of piping "
-              "cat");
+          actx.report_diagnostic(diagnostic_id::sc2002,
+                                 cat_args[0]->source_location());
         }
       }
     }
@@ -2843,18 +2546,15 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         if (raw.view() == "-0" || raw.view() == "--null") has_null_flag = true;
       }
       if (!has_null_flag)
-        actx.warn_shellcheck(
-            2038, next->args()[0]->source_location(),
-            "An xargs splits the find output on whitespace and quotes",
-            "Pair find -print0 with xargs -0 or use find -exec");
+        actx.report_diagnostic(diagnostic_id::sc2038,
+                               next->args()[0]->source_location());
     }
 
     if (!next_is_user && NON_STDIN_READERS.contains(next_name->view())) {
       if (!args_have_stdin_operand(next->args()))
-        actx.warn_shellcheck(2216, next->args()[0]->source_location(),
-                             "The pipe feeds '" + next_name->view() +
-                                 "', which never reads stdin, so the upstream "
-                                 "output is discarded");
+        actx.report_diagnostic(diagnostic_id::sc2216,
+                               next->args()[0]->source_location(),
+                               {next_name->view()});
     }
 
     let const stage_is_user =
@@ -2867,19 +2567,14 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     /* ps piped into grep races the process table and matches the grep itself,
        shellcheck SC2009. */
     if (stage_name->view() == "ps" && !stage_is_user && next_is_grep)
-      actx.warn_shellcheck(
-          2009, next->args()[0]->source_location(),
-          "Grepping the ps output races the process table and matches the grep "
-          "itself",
-          "Use pgrep to match a process by name");
+      actx.report_diagnostic(diagnostic_id::sc2009,
+                             next->args()[0]->source_location());
 
     /* ls piped into grep mangles a name with a space or newline, shellcheck
        SC2010. */
     if (stage_name->view() == "ls" && !stage_is_user && next_is_grep)
-      actx.warn_shellcheck(
-          2010, next->args()[0]->source_location(),
-          "Grepping the ls listing mangles a name with a space or a newline",
-          "Match the names with a glob or with find instead");
+      actx.report_diagnostic(diagnostic_id::sc2010,
+                             next->args()[0]->source_location());
 
     /* grep feeding wc -l counts matches with a second process, shellcheck
        SC2126. */
@@ -2888,10 +2583,8 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         next->args().count() == 2 &&
         next->args()[1]->raw_string().view() == "-l")
     {
-      actx.warn_shellcheck(
-          2126, stage->args()[0]->source_location(),
-          "Counting grep output with wc -l runs an extra process",
-          "Use grep -c to count the matching lines directly");
+      actx.report_diagnostic(diagnostic_id::sc2126,
+                             stage->args()[0]->source_location());
     }
   }
 
@@ -2976,22 +2669,17 @@ fn CompoundList::analyze(AnalysisContext &actx,
         if (name->view() == "cd" && i + 1 < m_nodes.count() &&
             m_nodes[i + 1]->kind() == CompoundListCondition::Kind::None)
         {
-          actx.fail_shellcheck(2164, simple->args()[0]->source_location(),
-                               "This cd is unchecked, so later commands can "
-                               "run in the wrong directory",
-                               "Stop or return when cd fails");
+          actx.report_diagnostic(diagnostic_id::sc2164,
+                                 simple->args()[0]->source_location());
         }
         if (name->view() == "exec" && simple->args().count() > 1 &&
             i + 1 < m_nodes.count())
         {
           let const next_command = m_nodes[i + 1]->command();
           ASSERT(next_command != nullptr);
-          actx.warn_shellcheck(
-              2093, simple->args()[0]->source_location(),
-              "Commands after exec do not run when exec succeeds",
-              "Remove exec or remove the unreachable commands",
-              next_command->source_location(),
-              "this is the first command skipped after exec");
+          actx.report_diagnostic(diagnostic_id::sc2093,
+                                 simple->args()[0]->source_location(), {},
+                                 next_command->source_location());
         }
       }
     }
@@ -3011,9 +2699,8 @@ fn CompoundList::analyze(AnalysisContext &actx,
                           TEST_COMMANDS.contains(middle_name->view());
       }
       if (!is_test_command)
-        actx.warn_shellcheck(2015, m_nodes[i]->source_location(),
-                             "A && B || C also runs C when B fails",
-                             "Use an if statement when C is the else branch");
+        actx.report_diagnostic(diagnostic_id::sc2015,
+                               m_nodes[i]->source_location());
     }
   }
 
@@ -3048,16 +2735,14 @@ fn CompoundList::analyze(AnalysisContext &actx,
       repeated_append_location = current_location;
     }
     if (repeated_append_count == 3)
-      actx.warn_shellcheck(
-          2129, repeated_append_location,
-          "Several commands append to the same file separately",
-          "Apply one append redirection to a grouped command", current_location,
-          "this later append belongs under the same redirection");
+      actx.report_diagnostic(diagnostic_id::sc2129, repeated_append_location,
+                             {}, current_location);
   }
 
   let saved_tested_command_names = actx.tested_command_names.clone();
   const CompoundListCondition *previous_node = nullptr;
-  for (let const node : m_nodes) {
+  for (usize i = 0; i < m_nodes.count(); i++) {
+    let const node = m_nodes[i];
     ASSERT(node != nullptr);
 
     if (node->kind() != CompoundListCondition::Kind::And) {
@@ -3074,7 +2759,13 @@ fn CompoundList::analyze(AnalysisContext &actx,
        is conditional. */
     let const node_unconditional =
         is_unconditional && node->kind() == CompoundListCondition::Kind::None;
+    let const was_command_status_observed = actx.is_command_status_observed;
+    actx.is_command_status_observed =
+        was_command_status_observed ||
+        (i + 1 < m_nodes.count() &&
+         m_nodes[i + 1]->kind() != CompoundListCondition::Kind::None);
     node->analyze(actx, node_unconditional);
+    actx.is_command_status_observed = was_command_status_observed;
     previous_node = node;
   }
   if (!actx.should_retain_tested_command_names)

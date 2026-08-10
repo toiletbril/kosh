@@ -97,18 +97,13 @@ fn AssignCommand::analyze(AnalysisContext &actx,
     if (segment.kind == WordSegment::Kind::VariableReference &&
         segment.text.view() == "@")
     {
-      actx.fail_shellcheck(
-          2124, source_location(),
-          "A scalar assignment from $@ loses argument boundaries",
-          "Assign one value or use an array");
+      actx.report_diagnostic(diagnostic_id::sc2124, source_location());
       break;
     }
     if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
         segment.text.view().find_character('$').has_value())
     {
-      actx.warn_shellcheck(2004, source_location(),
-                           "Arithmetic variables do not need a dollar sign",
-                           "Use the variable name directly inside arithmetic");
+      actx.report_diagnostic(diagnostic_id::sc2004, source_location());
     }
   }
 
@@ -121,9 +116,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                                        .substring(*first_colon + 1)
                                        .starts_with(StringView{"~/"}))))
   {
-    actx.fail_shellcheck(2147, source_location(),
-                         "A tilde inside PATH remains literal",
-                         "Expand HOME before assigning PATH");
+    actx.report_diagnostic(diagnostic_id::sc2147, source_location());
   }
 
   let const prompt_has_control_escape =
@@ -136,9 +129,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   if (m_assignment->key().view() == "PS1" && prompt_has_control_escape &&
       !prompt_has_display_guards)
   {
-    actx.warn_shellcheck(2025, source_location(),
-                         "PS1 control escapes need balanced display guards",
-                         "Wrap nonprinting prompt escapes in \\[ and \\]");
+    actx.report_diagnostic(diagnostic_id::sc2025, source_location());
   }
 
   /* The fold reads the constant table, so it runs before the table records this
@@ -148,10 +139,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   let const &name = m_assignment->key();
 
   if (actx.is_direct_pipeline_stage) {
-    actx.warn_shellcheck(
-        2030, source_location(),
-        "This pipeline assignment is lost when the stage exits",
-        "Move the assignment outside the pipeline");
+    actx.report_diagnostic(diagnostic_id::sc2030_assignment, source_location());
     actx.pipeline_lost_names.add(name.view());
   }
 
@@ -169,10 +157,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       let const subscript = name.view().substring_of_length(
           *bracket + 1, name.length() - *bracket - 2);
       if (actx.external_input_names.contains(subscript))
-        actx.fail(source_location(),
-                  "An array subscript from external input is evaluated as "
-                  "arithmetic code",
-                  "Validate the subscript as decimal digits before using it");
+        actx.report_diagnostic(diagnostic_id::external_array_subscript,
+                               source_location());
     }
     actx.note_variable_assignment(base);
     LOG(All,
@@ -191,12 +177,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       !(actx.eval_context != nullptr &&
         actx.eval_context->get_variable_value(name.view()).has_value()))
   {
-    actx.fail(source_location(),
-              StringView{"This assignment to '"} + name +
-                  "' in a function has no local, so the value leaks to the "
-                  "global scope",
-              "Declare it with local to keep it inside the function",
-              diagnostic_tier::Annoying);
+    actx.report_diagnostic(diagnostic_id::no_local, source_location(),
+                           {name.view()});
   }
 
   if (actx.function_scope_depth == 0 && is_unconditional &&
