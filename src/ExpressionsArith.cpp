@@ -70,15 +70,17 @@ cold static fn conditional_word_is_numeric_literal(const Token *token) throws
   return !view.is_empty() && view.is_all_decimal_digits();
 }
 
+constexpr PackedStringKey CONDITIONAL_BINARY_OPERATOR_KEYS[] = {
+    SSK("="),   SSK("=="),  SSK("!="),  SSK("=~"),  SSK("-eq"),
+    SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"), SSK("-ge"),
+    SSK("-ef"), SSK("-nt"), SSK("-ot"),
+};
+constexpr StaticStringSet CONDITIONAL_BINARY_OPERATORS{
+    CONDITIONAL_BINARY_OPERATOR_KEYS};
+
 cold static fn is_conditional_binary_operator(StringView op) wontthrow -> bool
 {
-  static const StringView OPERATORS[] = {
-      "=",   "==",  "!=",  "=~",  "-eq", "-ne", "-lt",
-      "-le", "-gt", "-ge", "-ef", "-nt", "-ot",
-  };
-  for (let const candidate : OPERATORS)
-    if (candidate == op) return true;
-  return false;
+  return CONDITIONAL_BINARY_OPERATORS.contains(op);
 }
 
 fn ConditionalCommand::analyze(AnalysisContext &actx,
@@ -113,6 +115,11 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
     if (element.kind != Kind::Operand || element.word == nullptr) continue;
 
     let const operand = element.word->raw_string();
+    if (operand.view() == ">=" || operand.view() == "<=") {
+      actx.report_diagnostic(diagnostic_id::sc2122,
+                             element.word->source_location(), {operand.view()});
+    }
+
     let is_binary_operand = false;
     if (i > 0) {
       let const &previous = m_elements[i - 1];
@@ -161,6 +168,15 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
 
     let const left = m_elements[i - 1].word;
     let const right = m_elements[i + 1].word;
+    /* A conditional prefers = over -eq for text, so an -eq or -ne against a
+       non-integer literal is reported as SC2130 here. */
+    let const should_prefer_string_comparison =
+        operand.view() == "-eq" || operand.view() == "-ne";
+    check_numeric_comparison_operand(actx, operand.view(), left,
+                                     should_prefer_string_comparison);
+    check_numeric_comparison_operand(actx, operand.view(), right,
+                                     should_prefer_string_comparison);
+
     const bool is_pattern_operator =
         operand.view() == "=~" ||
         ((operand.view() == "=" || operand.view() == "==") &&
@@ -271,6 +287,8 @@ fn ArithmeticCommand::analyze(AnalysisContext &actx,
   if (arithmetic_reads_external_input(actx, m_expression.view()))
     actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                            source_location());
+
+  check_arithmetic_test_operators(actx, m_expression.view(), source_location());
 
   if (actx.shebang_is_posix_sh) {
     actx.report_diagnostic(diagnostic_id::sc3006, source_location());

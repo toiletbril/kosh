@@ -361,6 +361,36 @@
                 [CompoundListCondition, None]
                   [SimpleCommand ":"]
   [CompoundListCondition, None]
+    [FunctionDefinition "test_operator_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "let" "counter -lt limit"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" ">=" "$right" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "-foo" "$right" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-foo" "$right" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "-gt" "1.5" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "-gt" "count+1" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "recursive_wrapper" "==" "value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-5" "-gt" "3" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "--help" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-verbose" "=" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-e" "$left" "-a" "-e" "$right" "]"]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -1769,6 +1799,190 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "test_operator_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "let"
+]
+[Word
+  DoubleQuoted "counter -lt limit"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Literal ">"
+  Unquoted "="
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-foo"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-foo"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "1.5"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "notanumber"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "count+1"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "recursive_wrapper"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "value"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-5"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "--help"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-verbose"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -2235,15 +2449,55 @@ note: Move the specific pattern before the broader pattern.
 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
    141 |    case value in
        |         ^~~~~
-151:21: warning: This function wrapper calls itself recursively.
-   151 |  recursive_wrapper() { recursive_wrapper "$@"; }
+152:7: warning: The '-lt' operator belongs to test, arithmetic reads it as a subtraction.
+   152 |    let "counter -lt limit"
+       |        ^~~~~~~~~~~~~~~~~~~
+note: Use the symbolic form such as `<` or `>` inside arithmetic.
+153:14: warning: The '>=' operator does not exist in test.
+   153 |    [[ "$left" >= "$right" ]]
+       |               ^~
+note: Negate the opposite comparison, as in `! a < b`.
+154:13: warning: The '>=' operator does not exist in test.
+   154 |    [ "$left" \>= "$right" ]
+       |              ^~~
+note: Negate the opposite comparison, as in `! a < b`.
+155:13: warning: The '-foo' operator is not a known test operator.
+   155 |    [ "$left" -foo "$right" ]
+       |              ^~~~
+note: Check the operator spelling or quote the operand.
+156:5: warning: The '-foo' operator is not a known test operator.
+   156 |    [ -foo "$right" ]
+       |      ^~~~
+note: Check the operator spelling or quote the operand.
+157:17: warning: The '-gt' operator compares integers, '1.5' carries a fraction.
+   157 |    [ "$left" -gt 1.5 ]
+       |                  ^~~
+note: Compare the decimals with `bc` or `awk`.
+158:18: warning: The `-eq` operator compares integers, 'notanumber' is not an integer.
+   158 |    [[ "$left" -eq notanumber ]]
+       |                   ^~~~~~~~~~
+note: Use `=` to compare the text.
+159:17: warning: Test brackets compare 'count+1' as text, the arithmetic is not evaluated.
+   159 |    [ "$left" -gt count+1 ]
+       |                  ^~~~~~~
+note: Evaluate the numbers with `$((...))` before the comparison.
+160:21: warning: The `==` comparison runs 'recursive_wrapper' as a command.
+   160 |    recursive_wrapper == value
+       |                      ^~
+note: Write `[ x = y ]` to compare the values.
+164:16: warning: A test with -a or -o is obsolescent.
+   164 |    [ -e "$left" -a -e "$right" ]
+       |                 ^~
+note: Join two tests with && or || instead.
+167:21: warning: This function wrapper calls itself recursively.
+   167 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                      ^
 note: Use command before the wrapped command name.
-156:8: warning: An unquoted variable can split into words and expand globs.
-   156 |    echo $reported
+172:8: warning: An unquoted variable can split into words and expand globs.
+   172 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 106 warnings.
+Encountered 116 warnings.
 done
 done
 done

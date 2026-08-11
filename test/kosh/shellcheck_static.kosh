@@ -148,6 +148,22 @@ annoying_safety_diagnostics() {
   esac
 }
 
+test_operator_diagnostics() {
+  let "counter -lt limit"
+  [[ "$left" >= "$right" ]]
+  [ "$left" \>= "$right" ]
+  [ "$left" -foo "$right" ]
+  [ -foo "$right" ]
+  [ "$left" -gt 1.5 ]
+  [[ "$left" -eq notanumber ]]
+  [ "$left" -gt count+1 ]
+  recursive_wrapper == value
+  [ -5 -gt 3 ]
+  [ --help ]
+  [ -verbose = "$left" ]
+  [ -e "$left" -a -e "$right" ]
+}
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {

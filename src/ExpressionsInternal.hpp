@@ -55,6 +55,13 @@ fn check_posix_word_portability(AnalysisContext &actx,
 fn check_posix_arithmetic_operators(AnalysisContext &actx,
                                     StringView expression,
                                     SourceLocation location) throws -> void;
+fn check_arithmetic_test_operators(AnalysisContext &actx, StringView expression,
+                                   SourceLocation location) throws -> void;
+fn check_numeric_comparison_operand(AnalysisContext &actx,
+                                    StringView operator_view,
+                                    const Token *operand_token,
+                                    bool should_prefer_string_comparison) throws
+    -> void;
 
 /* The borrowed inputs one simple command's name-keyed checks read. The walk in
    SimpleCommand::analyze computes each field once and the check bodies in

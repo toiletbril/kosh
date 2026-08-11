@@ -32,6 +32,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a positional parameter above nine needs braces",
       "A positional parameter above nine needs braces",
       "Write ${10} to select positional parameter 10", None, Strict, Policy),
+    D(1106, "arithmetic-test-operator",
+      "arithmetic uses the symbolic comparison operators",
+      "The '{0}' operator belongs to test, arithmetic reads it as a "
+      "subtraction",
+      "Use the symbolic form such as `<` or `>` inside arithmetic", None,
+      Strict, Policy),
     D(2002, "useless-cat",
       "a useless cat can pass its file to the next command", "A useless cat",
       "Give the file to the next command directly instead of piping cat", None,
@@ -134,6 +140,14 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2051, "variable-brace-range", "brace ranges expand before variables",
       "Brace ranges are expanded before variables",
       "Use an arithmetic loop for a variable limit", None, Lenient, Policy),
+    D(2057, "unknown-binary-test-operator",
+      "the operand slot holds an unknown binary operator",
+      "The '{0}' operator is not a known test operator",
+      "Check the operator spelling or quote the operand", None, Strict, Policy),
+    D(2058, "unknown-unary-test-operator",
+      "the operator slot holds an unknown unary operator",
+      "The '{0}' operator is not a known test operator",
+      "Check the operator spelling or quote the operand", None, Strict, Policy),
     D(2059, "variable-printf-format",
       "a variable printf format can inject directives",
       "The printf format comes from a variable, the data can inject format "
@@ -183,6 +197,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The {0} operator compares strings lexicographically",
       "Use an arithmetic command or a numeric -lt or -gt operator", None,
       Lenient, Policy),
+    D(2072, "decimal-numeric-comparison",
+      "a numeric operator compares integers only",
+      "The '{0}' operator compares integers, '{1}' carries a fraction",
+      "Compare the decimals with `bc` or `awk`", None, Strict, Policy),
     D(2074, "test-regex-operator",
       "the test builtin does not support regex matching",
       "The test builtin does not support the =~ regular expression operator",
@@ -242,6 +260,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A command substitution wraps a useless echo",
       "The text can be used directly without the subshell", None, Annoying,
       Policy),
+    D(2122, "invalid-comparison-operator",
+      "the comparison operator does not exist in test",
+      "The '{0}' operator does not exist in test",
+      "Negate the opposite comparison, as in `! a < b`", None, Strict, Policy),
     D(2124, "scalar-at-assignment",
       "a scalar assignment from $@ loses boundaries",
       "A scalar assignment from $@ loses argument boundaries",
@@ -254,6 +276,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Several commands append to the same file separately",
       "Apply one append redirection to a grouped command",
       "this later append belongs under the same redirection", Annoying, Policy),
+    D(2130, "integer-comparison-on-text",
+      "the `-eq` operator compares integers only",
+      "The `-eq` operator compares integers, '{0}' is not an integer",
+      "Use `=` to compare the text", None, Strict, Policy),
     D(2142, "alias-positional-arguments",
       "an alias body cannot receive positional arguments",
       "An alias body cannot receive positional arguments",
@@ -399,6 +425,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "This case has no default *) branch, a value no pattern matches is "
       "silently ignored",
       None, None, Annoying, Policy),
+    D(2255, "test-arithmetic-operand",
+      "test brackets do not evaluate arithmetic",
+      "Test brackets compare '{0}' as text, the arithmetic is not evaluated",
+      "Evaluate the numbers with `$((...))` before the comparison", None,
+      Lenient, Policy),
     D(2257, "redirection-mutation", "redirection expansion can lose mutation",
       "A redirection expansion can run in a child and lose its mutation",
       "Update the variable before forming the redirect path", None, Strict,
@@ -417,6 +448,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "an assignment cannot contain spaces around equals",
       "An assignment cannot contain spaces around equals",
       "Write NAME=value without spaces", None, Strict, Policy),
+    D(2284, "comparison-as-command",
+      "a comparison written as a command runs the left operand",
+      "The `==` comparison runs '{0}' as a command",
+      "Write `[ x = y ]` to compare the values", None, Strict, Policy),
     D(2335, "negated-numeric-comparison",
       "a negated numeric comparison has a direct operator",
       "A negated {0} is just {1}", "Drop the ! and use {1}", None, Annoying,
@@ -1006,6 +1041,113 @@ cold fn is_test_numeric_operator_word(StringView op) wontthrow -> bool
   return TEST_NUMERIC_OPERATORS.contains(op);
 }
 
+/* The unary operators of test, gathered from the test builtin and the
+   conditional evaluator, for the SC2057 and SC2058 lints. -a and -o are listed
+   because they also join two conditions. */
+constexpr PackedStringKey TEST_UNARY_OPERATOR_KEYS[] = {
+    SSK("-a"), SSK("-b"), SSK("-c"), SSK("-d"), SSK("-e"), SSK("-f"), SSK("-g"),
+    SSK("-h"), SSK("-k"), SSK("-n"), SSK("-o"), SSK("-p"), SSK("-r"), SSK("-s"),
+    SSK("-t"), SSK("-u"), SSK("-v"), SSK("-w"), SSK("-x"), SSK("-z"), SSK("-G"),
+    SSK("-L"), SSK("-N"), SSK("-O"), SSK("-R"), SSK("-S"),
+};
+constexpr StaticStringSet TEST_UNARY_OPERATORS{TEST_UNARY_OPERATOR_KEYS};
+
+cold fn is_known_test_operator_word(StringView op) wontthrow -> bool
+{
+  return TEST_UNARY_OPERATORS.contains(op) ||
+         TEST_BINARY_OPERATORS.contains(op);
+}
+
+/* The words that open a fresh condition, so the word after one of them sits in
+   the unary operator slot. */
+constexpr PackedStringKey TEST_CONDITION_OPENER_KEYS[] = {
+    SSK("!"),
+    SSK("("),
+    SSK("-a"),
+    SSK("-o"),
+};
+constexpr StaticStringSet TEST_CONDITION_OPENERS{TEST_CONDITION_OPENER_KEYS};
+
+cold fn is_test_condition_opener_word(StringView word) wontthrow -> bool
+{
+  return TEST_CONDITION_OPENERS.contains(word);
+}
+
+/* An operator name carries a letter after the dash, which keeps a negative
+   number such as -5 out of the unknown-operator lints. */
+cold fn view_looks_like_test_operator(StringView view) wontthrow -> bool
+{
+  if (view.length < 2 || view[0] != '-') return false;
+
+  let const byte = view[1];
+
+  return lexer::is_variable_name_start(byte) && byte != '_';
+}
+
+cold fn view_has_decimal_fraction(StringView view) wontthrow -> bool
+{
+  usize position = 0;
+  if (position < view.length) {
+    switch (view[position]) {
+    case '-':
+    case '+': position++; break;
+    default: break;
+    }
+  }
+
+  let const integer_start = position;
+  while (position < view.length && lexer::is_number(view[position]))
+    position++;
+
+  if (position == integer_start) return false;
+
+  if (position >= view.length || view[position] != '.') return false;
+
+  position++;
+
+  let const fraction_start = position;
+  while (position < view.length && lexer::is_number(view[position]))
+    position++;
+
+  return position > fraction_start && position == view.length;
+}
+
+pure fn is_arithmetic_operand_byte(char byte) wontthrow -> bool
+{
+  if (lexer::is_variable_name(byte)) return true;
+
+  switch (byte) {
+  case '$':
+  case '}':
+  case ')': return true;
+  default: return false;
+  }
+}
+
+/* A multiplicative or additive operator between two operand bytes, which reads
+   as arithmetic the test builtin never evaluates. The minus sign is left out
+   because a date such as 2019-01-01 carries the same shape. */
+cold fn view_has_arithmetic_operator(StringView view) wontthrow -> bool
+{
+  for (usize position = 1; position + 1 < view.length; position++) {
+    switch (view[position]) {
+    case '+':
+    case '*':
+    case '/':
+    case '%': break;
+    default: continue;
+    }
+
+    if (!is_arithmetic_operand_byte(view[position - 1])) continue;
+
+    if (!is_arithmetic_operand_byte(view[position + 1])) continue;
+
+    return true;
+  }
+
+  return false;
+}
+
 cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
 {
   for (let const &segment : word.segments)
@@ -1209,14 +1351,11 @@ fn check_posix_arithmetic_operators(AnalysisContext &actx,
     let const byte = expression[position];
     if (expression[position + 1] != byte) continue;
 
-    if (byte == '+') {
-      has_increment = true;
-    } else if (byte == '-') {
-      has_decrement = true;
-    } else if (byte == '*') {
-      has_exponent = true;
-    } else {
-      continue;
+    switch (byte) {
+    case '+': has_increment = true; break;
+    case '-': has_decrement = true; break;
+    case '*': has_exponent = true; break;
+    default: continue;
     }
 
     position++;
@@ -1227,6 +1366,60 @@ fn check_posix_arithmetic_operators(AnalysisContext &actx,
   if (has_decrement)
     actx.report_diagnostic(diagnostic_id::sc3018, location, {"--"});
   if (has_exponent) actx.report_diagnostic(diagnostic_id::sc3019, location);
+}
+
+fn check_arithmetic_test_operators(AnalysisContext &actx, StringView expression,
+                                   SourceLocation location) throws -> void
+{
+  for (usize position = 0; position + 3 <= expression.length; position++) {
+    if (expression[position] != '-') continue;
+
+    if (position > 0 && !lexer::is_whitespace(expression[position - 1]))
+      continue;
+
+    let const after = position + 3;
+    if (after < expression.length && !lexer::is_whitespace(expression[after]))
+      continue;
+
+    let const candidate = expression.substring_of_length(position, 3);
+    if (is_test_numeric_operator_word(candidate)) {
+      actx.report_diagnostic(diagnostic_id::sc1106, location, {candidate});
+      return;
+    }
+  }
+}
+
+fn check_numeric_comparison_operand(AnalysisContext &actx,
+                                    StringView operator_view,
+                                    const Token *operand_token,
+                                    bool should_prefer_string_comparison) throws
+    -> void
+{
+  if (operand_token == nullptr || operand_token->kind() != Token::Kind::Word) {
+    return;
+  }
+
+  if (!is_test_numeric_operator_word(operator_view)) return;
+
+  let const location = operand_token->source_location();
+  let const &word =
+      static_cast<const tokens::WordToken *>(operand_token)->word();
+  if (!word_is_fully_literal(word)) return;
+
+  let const literal = word.to_literal_string();
+  if (view_is_integer_literal(literal.view())) return;
+
+  if (view_has_arithmetic_operator(literal.view())) {
+    actx.report_diagnostic(diagnostic_id::sc2255, location, {literal.view()});
+  } else if (view_has_decimal_fraction(literal.view())) {
+    actx.report_diagnostic(diagnostic_id::sc2072, location,
+                           {operator_view, literal.view()});
+  } else if (should_prefer_string_comparison) {
+    actx.report_diagnostic(diagnostic_id::sc2130, location, {literal.view()});
+  } else {
+    actx.report_diagnostic(diagnostic_id::sc2170, location,
+                           {operator_view, literal.view()});
+  }
 }
 
 fn check_posix_word_portability(AnalysisContext &actx,
@@ -1444,6 +1637,11 @@ fn check_command_word_shape(AnalysisContext &actx,
 
   if (args.count() >= 2 && args[1]->raw_view() == StringView{"="})
     actx.report_diagnostic(diagnostic_id::sc2283, args[1]->source_location());
+
+  if (args.count() >= 2 && args[1]->raw_view() == StringView{"=="}) {
+    actx.report_diagnostic(diagnostic_id::sc2284, args[1]->source_location(),
+                           {command_literal});
+  }
 }
 
 fn check_operand_lints_after_scan(AnalysisContext &actx,
@@ -1565,6 +1763,9 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
       if (arithmetic_reads_external_input(actx, expression.view()))
         actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                                args[i]->source_location());
+
+      check_arithmetic_test_operators(actx, expression.view(),
+                                      args[i]->source_location());
 
       if (actx.shebang_is_posix_sh) {
         check_posix_arithmetic_operators(actx, expression.view(),
@@ -2171,6 +2372,44 @@ fn check_test_operand_lints(AnalysisContext &actx,
     }
     let const previous_is_bang = previous_literal.view() == "!";
 
+    /* A dash-led word that names no operator, shellcheck SC2057 and SC2058.
+       The word after a condition opener sits in the unary slot, the word after
+       a plain operand sits in the binary slot, and the word after a known
+       operator is an operand. */
+    if (view_looks_like_test_operator(view) && view[1] != '-' &&
+        !is_known_test_operator_word(view))
+    {
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      let const is_unary_slot =
+          i == 1 || is_test_condition_opener_word(previous_literal.view());
+      let is_string_operand = false;
+      if (is_unary_slot && i + 1 < args.count() &&
+          args[i + 1]->kind() == Token::Kind::Word)
+      {
+        /* A three-word test compares strings when the middle word is a binary
+           operator, so [ -verbose = "$1" ] holds an operand. */
+        let const next = static_cast<const tokens::WordToken *>(args[i + 1])
+                             ->word()
+                             .to_literal_string();
+        is_string_operand = is_test_binary_operator_word(next.view());
+      }
+
+      if (!is_string_operand && word_is_fully_literal(word)) {
+        if (is_unary_slot) {
+          actx.report_diagnostic(diagnostic_id::sc2058,
+                                 args[i]->source_location(), {view});
+        } else if (!is_known_test_operator_word(previous_literal.view())) {
+          actx.report_diagnostic(diagnostic_id::sc2057,
+                                 args[i]->source_location(), {view});
+        }
+      }
+    }
+
+    if (view == ">=" || view == "<=") {
+      actx.report_diagnostic(diagnostic_id::sc2122, args[i]->source_location(),
+                             {view});
+    }
+
     if (is_posix) {
       let const is_operator_slot =
           i >= 2 && !is_test_binary_operator_word(previous_literal.view());
@@ -2271,14 +2510,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
         if (side == 0 || side >= operand_end ||
             args[side]->kind() != Token::Kind::Word)
           continue;
-        let const &operand =
-            static_cast<const tokens::WordToken *>(args[side])->word();
-        if (!word_is_fully_literal(operand)) continue;
-        let const operand_literal = operand.to_literal_string();
-        if (!view_is_integer_literal(operand_literal.view()))
-          actx.report_diagnostic(diagnostic_id::sc2170,
-                                 args[side]->source_location(),
-                                 {view, operand_literal.view()});
+        check_numeric_comparison_operand(actx, view, args[side], false);
       }
     }
 
