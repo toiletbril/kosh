@@ -271,6 +271,13 @@ fn ArithmeticCommand::analyze(AnalysisContext &actx,
   if (arithmetic_reads_external_input(actx, m_expression.view()))
     actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                            source_location());
+
+  if (actx.shebang_is_posix_sh) {
+    actx.report_diagnostic(diagnostic_id::sc3006, source_location());
+    check_posix_arithmetic_operators(actx, m_expression.view(),
+                                     source_location());
+  }
+
   /* The prepass does not parse the expression, which may assign any name, so
      every recorded constant is forgotten. */
   actx.constant_variables.clear();

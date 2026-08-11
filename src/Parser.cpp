@@ -1215,8 +1215,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
       } else {
         /* Kept in source order so a later assignment sees an earlier one and a
            repeated name accumulates, which a map would lose. */
-        local_vars.push(prefix_assignment{
-            a->key().clone(), Word{a->value_word()}, a->is_append()});
+        local_vars.push(
+            prefix_assignment{a->key().clone(), Word{a->value_word()},
+                              a->source_location(), a->is_append()});
       }
     } break;
 

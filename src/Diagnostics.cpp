@@ -435,9 +435,34 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The $'...' quoting form is a bash extension absent from POSIX sh",
       "Use printf to produce the escapes under a sh shebang", None, Strict,
       Policy),
+    D(3006, "posix-standalone-arithmetic",
+      "a standalone ((...)) is undefined in POSIX sh",
+      "The standalone ((...)) command is a bash extension absent from POSIX sh",
+      "Use the : $((...)) form under a sh shebang", None, Strict, Policy),
+    D(3012, "posix-test-lexicographical",
+      "a lexicographical comparison is undefined in POSIX test",
+      "The {0} comparison in test is undefined in POSIX sh",
+      "Compare with expr or a case statement under a sh shebang", None, Strict,
+      Policy),
+    D(3013, "posix-test-file-comparison",
+      "a file comparison operator is undefined in POSIX test",
+      "The {0} operator in test is undefined in POSIX sh",
+      "Compare the timestamps with find or ls under a sh shebang", None, Strict,
+      Policy),
     D(3014, "posix-test-equals", "== is undefined in POSIX test",
       "== is undefined in POSIX test", "Use = for string equality", None,
       Strict, Policy),
+    D(3017, "posix-test-unary-a", "a unary -a is undefined in POSIX test",
+      "The unary -a in test is undefined in POSIX sh", "Use -e instead", None,
+      Strict, Policy),
+    D(3018, "posix-arithmetic-increment",
+      "the increment operators are undefined in POSIX sh",
+      "The {0} operator in arithmetic is undefined in POSIX sh",
+      "Write the assignment out under a sh shebang", None, Strict, Policy),
+    D(3019, "posix-arithmetic-exponent",
+      "the exponent operator is undefined in POSIX sh",
+      "The ** operator in arithmetic is undefined in POSIX sh",
+      "Multiply the value out under a sh shebang", None, Strict, Policy),
     D(3020, "posix-both-streams-redirect",
       "the &> redirection is absent from POSIX sh",
       "The &> redirection is a bash extension absent from POSIX sh",
@@ -457,6 +482,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a file descriptor above nine is undefined in POSIX sh",
       "The file descriptor {0} is outside the range POSIX sh defines",
       "Use a descriptor from 0 to 9 under a sh shebang", None, Strict, Policy),
+    D(3024, "posix-append-assignment",
+      "the += assignment is absent from POSIX sh",
+      "The += assignment to {0} is a bash extension absent from POSIX sh",
+      "Write NAME=\"$NAME\"value under a sh shebang", None, Strict, Policy),
     D(3025, "posix-network-device",
       "the network devices are absent from POSIX sh",
       "The path {0} is a bash network device that POSIX sh leaves undefined",
@@ -490,6 +519,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An echo {0} relies on a bash builtin, the POSIX echo prints the flag as "
       "text",
       "Use printf instead under a sh shebang", None, Strict, Policy),
+    D(3038, "posix-exec-flag", "exec flags are absent from POSIX sh",
+      "The exec {0} flag is a bash extension absent from POSIX sh",
+      "Drop the flag under a sh shebang", None, Strict, Policy),
+    D(3039, "posix-let", "let is absent from POSIX sh",
+      "The let builtin is a bash extension absent from POSIX sh",
+      "Use the : $((...)) form under a sh shebang", None, Strict, Policy),
     D(3043, "posix-local", "local is absent from POSIX sh",
       "The local builtin is not in POSIX sh, the value stays global",
       "rework the function or switch the shebang to bash", None, Strict,
@@ -507,6 +542,24 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "source is the bash spelling of the POSIX dot command",
       "The name source is the bash spelling, the POSIX dot command is '.'",
       "Use '.' under a sh shebang", None, Strict, Policy),
+    D(3047, "posix-trap-err", "the ERR trap is absent from POSIX sh",
+      "The ERR condition is a bash extension absent from POSIX sh",
+      "Check the status after each command under a sh shebang", None, Strict,
+      Policy),
+    D(3048, "posix-trap-sig-prefix",
+      "a SIG prefixed signal name is undefined in POSIX sh",
+      "The SIG prefix on {0} is undefined in POSIX sh",
+      "Name the signal without the SIG prefix under a sh shebang", None, Strict,
+      Policy),
+    D(3049, "posix-trap-signal-case",
+      "a lowercase signal name is undefined in POSIX sh",
+      "The signal name {0} is undefined in POSIX sh because it is not "
+      "uppercase",
+      "Name the signal in uppercase under a sh shebang", None, Strict, Policy),
+    D(3050, "posix-printf-quote",
+      "the printf %q directive is absent from POSIX sh",
+      "The printf %q directive is a bash extension absent from POSIX sh",
+      "Quote the value another way under a sh shebang", None, Strict, Policy),
     D(3053, "posix-indirect-expansion",
       "indirect expansion is absent from POSIX sh",
       "The indirect expansion of {0} is a bash extension absent from POSIX sh",
@@ -832,6 +885,7 @@ constexpr static_string_entry<analysis_command_info>
         C("egrep", Egrep, NO_COMMAND_GROUP),
         C("eval", Eval,
           COMMAND_GROUP_RUNTIME_DEFINER | COMMAND_GROUP_VARIABLE_PROBE),
+        C("exec", Exec, NO_COMMAND_GROUP),
         C("exit", Exit, NO_COMMAND_GROUP),
         C("export", Export, EXPORT_GROUPS),
         C("expr", Expr, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
@@ -927,6 +981,20 @@ cold fn is_test_binary_operator_word(StringView op) wontthrow -> bool
   return TEST_BINARY_OPERATORS.contains(op);
 }
 
+/* The file comparison operators of test, absent from POSIX, for the SC3013
+   lint. */
+constexpr PackedStringKey TEST_FILE_COMPARISON_KEYS[] = {
+    SSK("-ef"),
+    SSK("-nt"),
+    SSK("-ot"),
+};
+constexpr StaticStringSet TEST_FILE_COMPARISONS{TEST_FILE_COMPARISON_KEYS};
+
+cold fn is_test_file_comparison_word(StringView op) wontthrow -> bool
+{
+  return TEST_FILE_COMPARISONS.contains(op);
+}
+
 /* The numeric comparison operators of test, for the SC2170 lint. */
 constexpr PackedStringKey TEST_NUMERIC_OPERATOR_KEYS[] = {
     SSK("-eq"), SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"), SSK("-ge"),
@@ -950,7 +1018,9 @@ cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
   return true;
 }
 
-cold fn printf_consumed_argument_count(StringView format) wontthrow -> usize
+cold fn printf_consumed_argument_count(StringView format,
+                                       bool &has_quote_conversion) wontthrow
+    -> usize
 {
   usize count = 0;
   for (usize i = 0; i < format.length; i++) {
@@ -987,6 +1057,8 @@ cold fn printf_consumed_argument_count(StringView format) wontthrow -> usize
         i++;
       if (i + 1 < format.length) i++;
     }
+    if (i < format.length && format[i] == 'q') has_quote_conversion = true;
+
     count++;
   }
 
@@ -1125,6 +1197,38 @@ fn check_posix_parameter_expansion(AnalysisContext &actx,
 
 } /* namespace */
 
+fn check_posix_arithmetic_operators(AnalysisContext &actx,
+                                    StringView expression,
+                                    SourceLocation location) throws -> void
+{
+  let has_increment = false;
+  let has_decrement = false;
+  let has_exponent = false;
+
+  for (usize position = 0; position + 1 < expression.length; position++) {
+    let const byte = expression[position];
+    if (expression[position + 1] != byte) continue;
+
+    if (byte == '+') {
+      has_increment = true;
+    } else if (byte == '-') {
+      has_decrement = true;
+    } else if (byte == '*') {
+      has_exponent = true;
+    } else {
+      continue;
+    }
+
+    position++;
+  }
+
+  if (has_increment)
+    actx.report_diagnostic(diagnostic_id::sc3018, location, {"++"});
+  if (has_decrement)
+    actx.report_diagnostic(diagnostic_id::sc3018, location, {"--"});
+  if (has_exponent) actx.report_diagnostic(diagnostic_id::sc3019, location);
+}
+
 fn check_posix_word_portability(AnalysisContext &actx,
                                 const WordSegment &segment,
                                 SourceLocation fallback_location) throws -> void
@@ -1159,6 +1263,10 @@ fn check_posix_word_portability(AnalysisContext &actx,
 
   case WordSegment::Kind::VariableReference:
     check_posix_parameter_expansion(actx, segment, text, fallback_location);
+    break;
+
+  case WordSegment::Kind::ArithmeticExpansion:
+    check_posix_arithmetic_operators(actx, text, do_get_location());
     break;
 
   case WordSegment::Kind::LiteralText:
@@ -1457,6 +1565,11 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
       if (arithmetic_reads_external_input(actx, expression.view()))
         actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                                args[i]->source_location());
+
+      if (actx.shebang_is_posix_sh) {
+        check_posix_arithmetic_operators(actx, expression.view(),
+                                         args[i]->source_location());
+      }
     }
     break;
 
@@ -1472,11 +1585,18 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
           static_cast<const tokens::WordToken *>(args[format_index])->word();
       if (word_is_fully_literal(format_word)) {
         let const format = format_word.to_literal_string();
-        let const consumed = printf_consumed_argument_count(format.view());
+        let has_quote_conversion = false;
+        let const consumed =
+            printf_consumed_argument_count(format.view(), has_quote_conversion);
         let const available = args.count() - format_index - 1;
         if (consumed > available)
           actx.report_diagnostic(diagnostic_id::sc2183,
                                  args[format_index]->source_location());
+
+        if (has_quote_conversion && actx.shebang_is_posix_sh) {
+          actx.report_diagnostic(diagnostic_id::sc3050,
+                                 args[format_index]->source_location());
+        }
       }
     }
     break;
@@ -1498,6 +1618,60 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
   default: break;
   }
 }
+
+namespace {
+
+fn check_posix_trap_conditions(AnalysisContext &actx,
+                               const ArrayList<const Token *> &args) throws
+    -> void
+{
+  for (usize i = 2; i < args.count(); i++) {
+    if (args[i]->kind() != Token::Kind::Word) continue;
+
+    let const literal = static_cast<const tokens::WordToken *>(args[i])
+                            ->word()
+                            .to_literal_string();
+    let const view = literal.view();
+    if (view.is_empty()) continue;
+
+    if (view == "ERR") {
+      actx.report_diagnostic(diagnostic_id::sc3047, args[i]->source_location());
+      continue;
+    }
+
+    let uppercase = String{heap_allocator()};
+    let has_lowercase = false;
+
+    for (usize position = 0; position < view.length; position++) {
+      let const byte = view[position];
+      if (byte >= 'a' && byte <= 'z') {
+        has_lowercase = true;
+        uppercase.push(static_cast<char>(byte - 'a' + 'A'));
+      } else {
+        uppercase.push(byte);
+      }
+    }
+
+    let const has_sig_prefix =
+        uppercase.view().starts_with(StringView{"SIG"}) && view.length > 3;
+    let const bare =
+        has_sig_prefix ? uppercase.view().substring(3) : uppercase.view();
+    let const names_a_signal =
+        bare == "EXIT" || os::signal_number_from_name(bare).has_value();
+
+    if (has_sig_prefix && names_a_signal) {
+      actx.report_diagnostic(diagnostic_id::sc3048, args[i]->source_location(),
+                             {view});
+    }
+
+    if (has_lowercase && names_a_signal) {
+      actx.report_diagnostic(diagnostic_id::sc3049, args[i]->source_location(),
+                             {view});
+    }
+  }
+}
+
+} /* namespace */
 
 fn check_command_name_lints(AnalysisContext &actx,
                             const command_lint_input &input) throws -> void
@@ -1615,6 +1789,23 @@ fn check_command_name_lints(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc2064,
                                args[1]->source_location());
     }
+    if (is_posix) check_posix_trap_conditions(actx, args);
+    break;
+
+  case command_name_id::Exec:
+    if (is_posix && args.count() >= 2 && args[1]->kind() == Token::Kind::Word) {
+      let const flag = static_cast<const tokens::WordToken *>(args[1])
+                           ->word()
+                           .to_literal_string();
+      let const view = flag.view();
+      if (view.length >= 2 && view[0] == '-' && view != "--")
+        actx.report_diagnostic(diagnostic_id::sc3038,
+                               args[1]->source_location(), {view});
+    }
+    break;
+
+  case command_name_id::Let:
+    if (is_posix) actx.report_diagnostic(diagnostic_id::sc3039, location);
     break;
 
   case command_name_id::Printf: {
@@ -1952,6 +2143,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
     return;
 
   let const &args = input.args;
+  let const is_posix = actx.shebang_is_posix_sh;
 
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
      SC2166, warned only past the first operand and not after a !. A negated -z
@@ -1978,6 +2170,22 @@ fn check_test_operand_lints(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc3014, args[i]->source_location());
     }
     let const previous_is_bang = previous_literal.view() == "!";
+
+    if (is_posix) {
+      let const is_operator_slot =
+          i >= 2 && !is_test_binary_operator_word(previous_literal.view());
+      if ((view == "<" || view == ">") && is_operator_slot) {
+        actx.report_diagnostic(diagnostic_id::sc3012,
+                               args[i]->source_location(), {view});
+      } else if (is_test_file_comparison_word(view) && is_operator_slot) {
+        actx.report_diagnostic(diagnostic_id::sc3013,
+                               args[i]->source_location(), {view});
+      } else if (view == "-a" && (i == 1 || previous_is_bang)) {
+        actx.report_diagnostic(diagnostic_id::sc3017,
+                               args[i]->source_location());
+      }
+    }
+
     if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
       actx.report_diagnostic(diagnostic_id::sc2166, args[i]->source_location());
     } else if (view == "!" && i + 1 < args.count() &&

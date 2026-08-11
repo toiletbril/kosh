@@ -296,6 +296,7 @@ struct prefix_assignment
 {
   String name;
   Word value;
+  SourceLocation location;
   bool is_append;
 };
 

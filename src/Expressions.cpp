@@ -1010,9 +1010,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A PATH=... prefix leaves the runtime search path unknown to the prepass, so
      the not-found check for the prefixed command and everything after it stays
      quiet. */
-  for (let const &var : m_local_vars)
+  for (let const &var : m_local_vars) {
     if (var.name.view() == "PATH")
       actx.should_silence_unresolved_commands = true;
+
+    if (actx.shebang_is_posix_sh && var.is_append) {
+      actx.report_diagnostic(diagnostic_id::sc3024, var.location,
+                             {var.name.view()});
+    }
+  }
 
   if (m_args.is_empty()) {
     for (let const &assignment : m_array_args) {

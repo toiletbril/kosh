@@ -68,6 +68,58 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "plain"]
   [CompoundListCondition, None]
+    [FunctionDefinition "operator_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "counter + 1"]
+          [CompoundListCondition, None]
+            [SimpleCommand ":" "$((counter++))"]
+          [CompoundListCondition, None]
+            [SimpleCommand ":" "$((counter--))"]
+          [CompoundListCondition, None]
+            [SimpleCommand ":" "$((base ** exponent))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "alpha" "<" "beta" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "alpha" ">" "beta" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "first" "-nt" "second" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "first" "-ef" "second" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-a" "present" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "alpha" "=" "beta" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-e" "present" "]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "command_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign LIST+=extra]
+          [CompoundListCondition, None]
+            [SimpleCommand "env"]
+          [CompoundListCondition, None]
+            [SimpleCommand "exec" "-c" "env"]
+          [CompoundListCondition, None]
+            [SimpleCommand "let" "value=1"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "cleanup" "ERR"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "cleanup" "SIGINT"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "cleanup" "int"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "cleanup" "INT"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "cleanup" "EXIT"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "%q\n" "$value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "%s\n" "$value"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "lint_only"
@@ -304,6 +356,237 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "operator_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "counter"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion "counter++"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion "counter--"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion "base ** exponent"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "alpha"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "beta"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "alpha"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "beta"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "-nt"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "present"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "alpha"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "beta"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "present"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "command_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "LIST+=extra"
+]
+[Word
+  Unquoted "PREFIX+=extra"
+]
+[Word
+  Unquoted "env"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "env"
+]
+[Word
+  Unquoted "let"
+]
+[Word
+  Unquoted "value=1"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "cleanup"
+]
+[Word
+  Unquoted "ERR"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "cleanup"
+]
+[Word
+  Unquoted "SIGINT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "cleanup"
+]
+[Word
+  Unquoted "int"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "cleanup"
+]
+[Word
+  Unquoted "INT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "cleanup"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%q\n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -417,6 +700,81 @@ note: Open the connection with a network client under a sh shebang.
     36 |    echo glob >prefix*.log
        |               ^~~~~~~~~~~
 note: Name the file explicitly under a sh shebang.
-Encountered 27 warnings.
+40:3: warning: The standalone ((...)) command is a bash extension absent from POSIX sh.
+    40 |    ((counter + 1))
+       |    ^~~~~~~~~~~~~~~
+note: Use the : $((...)) form under a sh shebang.
+41:8: warning: The ++ operator in arithmetic is undefined in POSIX sh.
+    41 |    : $((counter++))
+       |         ^~~~~~~~~
+note: Write the assignment out under a sh shebang.
+42:8: warning: The -- operator in arithmetic is undefined in POSIX sh.
+    42 |    : $((counter--))
+       |         ^~~~~~~~~
+note: Write the assignment out under a sh shebang.
+43:8: warning: The ** operator in arithmetic is undefined in POSIX sh.
+    43 |    : $((base ** exponent))
+       |         ^~~~~~~~~~~~~~~~
+note: Multiply the value out under a sh shebang.
+44:11: warning: The < comparison in test is undefined in POSIX sh.
+    44 |    [ alpha \< beta ]
+       |            ^~
+note: Compare with expr or a case statement under a sh shebang.
+45:11: warning: The > comparison in test is undefined in POSIX sh.
+    45 |    [ alpha \> beta ]
+       |            ^~
+note: Compare with expr or a case statement under a sh shebang.
+46:11: warning: The -nt operator in test is undefined in POSIX sh.
+    46 |    [ first -nt second ]
+       |            ^~~
+note: Compare the timestamps with find or ls under a sh shebang.
+47:11: warning: The -ef operator in test is undefined in POSIX sh.
+    47 |    [ first -ef second ]
+       |            ^~~
+note: Compare the timestamps with find or ls under a sh shebang.
+48:5: warning: The unary -a in test is undefined in POSIX sh.
+    48 |    [ -a present ]
+       |      ^~
+note: Use -e instead.
+55:3: warning: Commands after exec do not run when exec succeeds.
+    55 |    exec -c env
+       |    ^~~~
+56:3: details:
+    56 |    let value=1
+       |    ^~~~~~~~~~~ this is the first command skipped after exec.
+note: Remove exec or remove the unreachable commands.
+53:3: warning: The += assignment to LIST is a bash extension absent from POSIX sh.
+    53 |    LIST+=extra
+       |    ^~~~~~~~~~~
+note: Write NAME="$NAME"value under a sh shebang.
+54:3: warning: The += assignment to PREFIX is a bash extension absent from POSIX sh.
+    54 |    PREFIX+=extra env
+       |    ^~~~~~~~~~~~~
+note: Write NAME="$NAME"value under a sh shebang.
+55:8: warning: The exec -c flag is a bash extension absent from POSIX sh.
+    55 |    exec -c env
+       |         ^~
+note: Drop the flag under a sh shebang.
+56:3: warning: The let builtin is a bash extension absent from POSIX sh.
+    56 |    let value=1
+       |    ^~~
+note: Use the : $((...)) form under a sh shebang.
+57:18: warning: The ERR condition is a bash extension absent from POSIX sh.
+    57 |    trap 'cleanup' ERR
+       |                   ^~~
+note: Check the status after each command under a sh shebang.
+58:18: warning: The SIG prefix on SIGINT is undefined in POSIX sh.
+    58 |    trap 'cleanup' SIGINT
+       |                   ^~~~~~
+note: Name the signal without the SIG prefix under a sh shebang.
+59:18: warning: The signal name int is undefined in POSIX sh because it is not uppercase.
+    59 |    trap 'cleanup' int
+       |                   ^~~
+note: Name the signal in uppercase under a sh shebang.
+62:10: warning: The printf %q directive is a bash extension absent from POSIX sh.
+    62 |    printf '%q\n' "$value"
+       |           ^~~~~~
+note: Quote the value another way under a sh shebang.
+Encountered 45 warnings.
 done
 [Code 0]

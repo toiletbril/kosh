@@ -36,4 +36,30 @@ redirect_only() {
   echo glob >prefix*.log
   echo plain >plain.log 2>&1
 }
+operator_only() {
+  ((counter + 1))
+  : $((counter++))
+  : $((counter--))
+  : $((base ** exponent))
+  [ alpha \< beta ]
+  [ alpha \> beta ]
+  [ first -nt second ]
+  [ first -ef second ]
+  [ -a present ]
+  [ alpha = beta ]
+  [ -e present ]
+}
+command_only() {
+  LIST+=extra
+  PREFIX+=extra env
+  exec -c env
+  let value=1
+  trap 'cleanup' ERR
+  trap 'cleanup' SIGINT
+  trap 'cleanup' int
+  trap 'cleanup' INT
+  trap 'cleanup' EXIT
+  printf '%q\n' "$value"
+  printf '%s\n' "$value"
+}
 echo done

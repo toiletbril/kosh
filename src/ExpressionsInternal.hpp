@@ -52,6 +52,9 @@ fn check_posix_word_portability(AnalysisContext &actx,
                                 const WordSegment &segment,
                                 SourceLocation fallback_location) throws
     -> void;
+fn check_posix_arithmetic_operators(AnalysisContext &actx,
+                                    StringView expression,
+                                    SourceLocation location) throws -> void;
 
 /* The borrowed inputs one simple command's name-keyed checks read. The walk in
    SimpleCommand::analyze computes each field once and the check bodies in

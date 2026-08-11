@@ -93,6 +93,11 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 {
   ASSERT(m_assignment != nullptr);
 
+  if (actx.shebang_is_posix_sh && m_assignment->is_append()) {
+    actx.report_diagnostic(diagnostic_id::sc3024, source_location(),
+                           {m_assignment->key().view()});
+  }
+
   for (let const &segment : m_assignment->value_word().segments) {
     if (actx.shebang_is_posix_sh)
       check_posix_word_portability(actx, segment, source_location());
