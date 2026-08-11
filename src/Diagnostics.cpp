@@ -1,7 +1,10 @@
 #include "Diagnostics.hpp"
 
+#include "ExpressionsInternal.hpp"
+#include "Lexer.hpp"
 #include "PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
+#include "Tokens.hpp"
 
 namespace koshka {
 
@@ -806,5 +809,1017 @@ fn get_analysis_command_info(StringView name) throws -> analysis_command_info
 
   return analysis_command_info{command_name_id::Unknown, NO_COMMAND_GROUP};
 }
+
+namespace expressions {
+
+namespace {
+
+/* The direct test operator a leading ! collapses into, for the SC2335 lint.
+   None for an operator with no negated shortcut. */
+constexpr static_string_entry<StringView> NEGATED_TEST_OPERATOR_ENTRIES[] = {
+    {SSK("-eq"), StringView{"-ne", 3}},
+    {SSK("-ne"), StringView{"-eq", 3}},
+    {SSK("-lt"), StringView{"-ge", 3}},
+    {SSK("-ge"), StringView{"-lt", 3}},
+    {SSK("-gt"), StringView{"-le", 3}},
+    {SSK("-le"), StringView{"-gt", 3}},
+    {SSK("="),   StringView{"!=", 2} },
+    {SSK("!="),  StringView{"=", 1}  },
+};
+constexpr StaticStringMap NEGATED_TEST_OPERATORS{NEGATED_TEST_OPERATOR_ENTRIES};
+
+cold fn negated_test_operator(StringView op) wontthrow -> Maybe<StringView>
+{
+  return NEGATED_TEST_OPERATORS.find(op);
+}
+
+/* The binary operators of test, used to tell a == in the operator slot from a
+   literal == operand, so the SC3014 lint does not flag [ x = == ]. */
+constexpr PackedStringKey TEST_BINARY_OPERATOR_KEYS[] = {
+    SSK("="),   SSK("=="),  SSK("!="),  SSK("<"),   SSK(">"),
+    SSK("-eq"), SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"),
+    SSK("-ge"), SSK("-ef"), SSK("-nt"), SSK("-ot"),
+};
+constexpr StaticStringSet TEST_BINARY_OPERATORS{TEST_BINARY_OPERATOR_KEYS};
+
+cold fn is_test_binary_operator_word(StringView op) wontthrow -> bool
+{
+  return TEST_BINARY_OPERATORS.contains(op);
+}
+
+/* The numeric comparison operators of test, for the SC2170 lint. */
+constexpr PackedStringKey TEST_NUMERIC_OPERATOR_KEYS[] = {
+    SSK("-eq"), SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"), SSK("-ge"),
+};
+constexpr StaticStringSet TEST_NUMERIC_OPERATORS{TEST_NUMERIC_OPERATOR_KEYS};
+
+cold fn is_test_numeric_operator_word(StringView op) wontthrow -> bool
+{
+  return TEST_NUMERIC_OPERATORS.contains(op);
+}
+
+cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
+{
+  for (let const &segment : word.segments)
+    if (segment.kind != WordSegment::Kind::LiteralText &&
+        segment.kind != WordSegment::Kind::UnquotedText &&
+        segment.kind != WordSegment::Kind::DoubleQuotedText)
+    {
+      return false;
+    }
+  return true;
+}
+
+cold fn printf_consumed_argument_count(StringView format) wontthrow -> usize
+{
+  usize count = 0;
+  for (usize i = 0; i < format.length; i++) {
+    if (format[i] != '%' || i + 1 >= format.length) continue;
+    i++;
+    if (format[i] == '%') continue;
+
+    while (i < format.length &&
+           (format[i] == '-' || format[i] == '+' || format[i] == ' ' ||
+            format[i] == '#' || format[i] == '0'))
+      i++;
+    if (i >= format.length) break;
+    if (format[i] == '*') {
+      count++;
+      i++;
+    } else
+      while (i < format.length && (format[i] >= '0' && format[i] <= '9'))
+        i++;
+    if (i < format.length && format[i] == '.') {
+      i++;
+      if (i < format.length && format[i] == '*') {
+        count++;
+        i++;
+      } else
+        while (i < format.length && (format[i] >= '0' && format[i] <= '9'))
+          i++;
+    }
+    while (i < format.length &&
+           (format[i] == 'h' || format[i] == 'l' || format[i] == 'L' ||
+            format[i] == 'j' || format[i] == 'z' || format[i] == 't'))
+      i++;
+    if (i < format.length && format[i] == '(') {
+      while (i < format.length && format[i] != ')')
+        i++;
+      if (i + 1 < format.length) i++;
+    }
+    count++;
+  }
+
+  return count;
+}
+
+cold pure fn view_is_integer_literal(StringView view) wontthrow -> bool
+{
+  usize start = view.length >= 1 && view[0] == '-' ? 1 : 0;
+  return start < view.length && view.substring(start).is_all_decimal_digits();
+}
+
+cold fn args_have_short_flag(const ArrayList<const Token *> &args,
+                             char letter) throws -> bool
+{
+  for (usize i = 1; i < args.count(); i++) {
+    if (args[i]->kind() != Token::Kind::Word) continue;
+    let const literal = static_cast<const tokens::WordToken *>(args[i])
+                            ->word()
+                            .to_literal_string();
+    let const view = literal.view();
+    if (view.length >= 2 && view[0] == '-' && view[1] != '-' &&
+        view.find_character(letter).has_value())
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* The top-level system directories rm -r must never aim at, the SC2114
+   table. */
+constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
+    SSK("/"),     SSK("/bin"), SSK("/boot"), SSK("/dev"),  SSK("/etc"),
+    SSK("/home"), SSK("/lib"), SSK("/proc"), SSK("/root"), SSK("/sbin"),
+    SSK("/sys"),  SSK("/usr"), SSK("/var"),
+};
+constexpr StaticStringSet SYSTEM_DIRECTORIES{SYSTEM_DIRECTORY_KEYS};
+
+constexpr PackedStringKey FIND_ACTION_KEYS[] = {
+    SSK("-delete"), SSK("-exec"),    SSK("-execdir"), SSK("-fls"),
+    SSK("-fprint"), SSK("-fprint0"), SSK("-fprintf"), SSK("-ls"),
+    SSK("-ok"),     SSK("-okdir"),   SSK("-print"),   SSK("-print0"),
+    SSK("-printf"), SSK("-prune"),   SSK("-quit"),    SSK("-used")};
+constexpr StaticStringSet FIND_ACTIONS{FIND_ACTION_KEYS};
+
+} /* namespace */
+
+fn check_operand_lints_before_scan(AnalysisContext &actx,
+                                   const command_lint_input &input) throws
+    -> void
+{
+  if (input.command_is_shadowed) return;
+
+  let const &args = input.args;
+
+  if (input.is_in_group(COMMAND_GROUP_TEST)) {
+    for (usize i = 1; i < args.count(); i++) {
+      let const literal = args[i]->raw_string();
+      if (literal.view() == "=~")
+        actx.report_diagnostic(diagnostic_id::sc2074,
+                               args[i]->source_location());
+    }
+
+    if (args.count() >= 4) {
+      let const first_operand = args[1]->raw_string();
+      if (first_operand.view().starts_with(StringView{"x$"}) ||
+          first_operand.view().starts_with(StringView{"x\"$"}))
+      {
+        actx.report_diagnostic(diagnostic_id::sc2268,
+                               args[1]->source_location());
+      }
+    }
+
+    return;
+  }
+
+  switch (input.command_id()) {
+  case command_name_id::Find: {
+    bool has_exec = false;
+    bool has_exec_terminator = false;
+    bool has_or = false;
+    bool has_group = false;
+    bool has_action = false;
+    Maybe<SourceLocation> exec_location{};
+    Maybe<SourceLocation> or_location{};
+    for (usize i = 1; i < args.count(); i++) {
+      let const literal = args[i]->raw_string();
+      if (literal.view() == "-exec" || literal.view() == "-execdir") {
+        has_exec = true;
+        exec_location = args[i]->source_location();
+      } else if (has_exec && (literal.view() == ";" || literal.view() == "+")) {
+        has_exec_terminator = true;
+      } else if (literal.view() == "-o") {
+        has_or = true;
+        or_location = args[i]->source_location();
+      } else if (literal.view() == "(" || literal.view() == ")") {
+        has_group = true;
+      }
+      if (FIND_ACTIONS.contains(literal.view())) has_action = true;
+    }
+    if (has_exec && !has_exec_terminator && exec_location.has_value())
+      actx.report_diagnostic(diagnostic_id::sc2067, *exec_location);
+    if (has_or && has_action && !has_group && or_location.has_value())
+      actx.report_diagnostic(diagnostic_id::sc2146, *or_location);
+    break;
+  }
+
+  case command_name_id::Alias:
+    for (usize i = 1; i < args.count(); i++) {
+      let const raw = args[i]->raw_string();
+      if (view_contains(raw.view(), StringView{"$1"}) ||
+          view_contains(raw.view(), StringView{"$@"}) ||
+          view_contains(raw.view(), StringView{"$*"}))
+      {
+        actx.report_diagnostic(diagnostic_id::sc2142,
+                               args[i]->source_location());
+      }
+    }
+    break;
+
+  case command_name_id::Tr:
+    for (usize i = 1; i < args.count() && i <= 2; i++) {
+      let const literal = args[i]->raw_string();
+      if (literal.length() >= 5 && literal[0] == '[' &&
+          literal[literal.length() - 1] == ']' &&
+          literal.view().find_character('-').has_value())
+      {
+        actx.report_diagnostic(diagnostic_id::sc2021,
+                               args[i]->source_location());
+      }
+    }
+    break;
+
+  case command_name_id::Echo:
+    if (args.count() == 2 && args[1]->kind() == Token::Kind::Word) {
+      let const &word = static_cast<const tokens::WordToken *>(args[1])->word();
+      if (word.segments.count() == 1 &&
+          word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
+      {
+        actx.report_diagnostic(diagnostic_id::sc2005,
+                               args[0]->source_location());
+      }
+    }
+    break;
+
+  default: break;
+  }
+}
+
+/* A name like [ holds a glob metacharacter that static_command_name rejects,
+   so the literal text is taken separately for the test recognition. */
+fn check_command_word_shape(AnalysisContext &actx,
+                            const command_lint_input &input) throws -> void
+{
+  let const &args = input.args;
+  let const command_literal = input.command_literal;
+  let const location = input.command_location();
+
+  if (!command_literal.is_empty() && command_literal[0] == '-')
+    actx.report_diagnostic(diagnostic_id::sc2215, location);
+
+  if (command_literal.length > 1 && command_literal[0] == '$' &&
+      lexer::is_variable_name_start(command_literal[1]) &&
+      command_literal.find_character('=').has_value())
+    actx.report_diagnostic(diagnostic_id::sc2281, location);
+
+  if ((command_literal.starts_with(StringView{"["}) &&
+       command_literal != "[") ||
+      (command_literal.starts_with(StringView{"[["}) &&
+       command_literal != "[["))
+    actx.report_diagnostic(diagnostic_id::sc1035, location);
+
+  if (command_literal.starts_with(StringView{"[["}) &&
+      command_literal.find_character('=').has_value())
+    actx.report_diagnostic(diagnostic_id::sc2077, location);
+
+  if (command_literal.starts_with(StringView{"["}) && command_literal != "[" &&
+      command_literal != "[[" && args.count() > 1)
+  {
+    String last_storage{heap_allocator()};
+    let const last_raw = borrowed_token_text(args.back(), last_storage);
+    if (!last_raw.is_empty() && last_raw[last_raw.length - 1] == ']')
+      actx.report_diagnostic(diagnostic_id::sc1014, location);
+  }
+
+  if (args.count() >= 2 && args[1]->raw_view() == StringView{"="})
+    actx.report_diagnostic(diagnostic_id::sc2283, args[1]->source_location());
+}
+
+fn check_operand_lints_after_scan(AnalysisContext &actx,
+                                  const command_lint_input &input) throws
+    -> void
+{
+  if (input.command_is_shadowed) return;
+
+  let const &args = input.args;
+
+  switch (input.command_id()) {
+  case command_name_id::Read: {
+    let should_skip_option_operand = false;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      let const literal = word.to_literal_string();
+      if (should_skip_option_operand) {
+        should_skip_option_operand = false;
+        continue;
+      }
+      if (literal.view() == "-p" || literal.view() == "-t" ||
+          literal.view() == "-n" || literal.view() == "-N" ||
+          literal.view() == "-d" || literal.view() == "-u" ||
+          literal.view() == "-i")
+      {
+        should_skip_option_operand = true;
+        continue;
+      }
+      if (literal.view().starts_with("-")) continue;
+      if (word.segments.count() == 1 &&
+          word.segments[0].kind == WordSegment::Kind::VariableReference)
+        actx.report_diagnostic(diagnostic_id::sc2229,
+                               args[i]->source_location());
+
+      if (actx.is_direct_pipeline_stage && !literal.view().starts_with("-")) {
+        let const target = operand_target_name(literal.view());
+        if (!target.is_empty()) {
+          actx.report_diagnostic(diagnostic_id::sc2030_read,
+                                 args[i]->source_location());
+          actx.pipeline_lost_names.add(target);
+        }
+      }
+      if (!literal.view().starts_with("-")) {
+        let const target = operand_target_name(literal.view());
+        if (!target.is_empty()) actx.external_input_names.add(target);
+      }
+    }
+    break;
+  }
+
+  case command_name_id::Export:
+    if (!args_have_short_flag(args, 'n')) {
+      for (usize i = 1; i < args.count(); i++) {
+        let const raw = args[i]->raw_string();
+        if (raw.view().starts_with(StringView{"CDPATH="}) ||
+            raw.view() == "CDPATH")
+          actx.report_diagnostic(diagnostic_id::exported_cdpath,
+                                 args[i]->source_location());
+      }
+    }
+    break;
+
+  case command_name_id::Unset:
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const raw = args[i]->raw_string();
+      let const source_text =
+          analysis_source_text(actx, args[i]->source_location());
+      if (raw.view().find_character('[').has_value() &&
+          raw.view().find_character(']').has_value() &&
+          (source_text.is_empty() ||
+           (source_text[0] != '\'' && source_text[0] != '"')))
+        actx.report_diagnostic(diagnostic_id::sc2184,
+                               args[i]->source_location());
+    }
+    break;
+
+  case command_name_id::Find:
+    for (usize i = 1; i + 1 < args.count(); i++) {
+      let const predicate = args[i]->raw_string();
+      if (predicate.view() == "-name" || predicate.view() == "-iname" ||
+          predicate.view() == "-path" || predicate.view() == "-ipath" ||
+          predicate.view() == "-regex")
+      {
+        if (args[i + 1]->kind() == Token::Kind::Word &&
+            word_is_bare_glob(
+                static_cast<const tokens::WordToken *>(args[i + 1])->word()))
+          actx.report_diagnostic(diagnostic_id::sc2061,
+                                 args[i + 1]->source_location());
+      }
+
+      if (predicate.view() == "-exec" && i + 3 < args.count()) {
+        let const shell_name = args[i + 1]->raw_string();
+        let const shell_flag = args[i + 2]->raw_string();
+        let const script = args[i + 3]->raw_string();
+        if ((shell_name.view() == "sh" || shell_name.view() == "bash") &&
+            shell_flag.view() == "-c" &&
+            view_contains(script.view(), StringView{"{}"}))
+          actx.report_diagnostic(diagnostic_id::sc2156,
+                                 args[i + 3]->source_location());
+      }
+    }
+    break;
+
+  case command_name_id::Tr:
+    for (usize i = 1; i < args.count() && i <= 2; i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      if (word_is_bare_glob(word))
+        actx.report_diagnostic(diagnostic_id::sc2060,
+                               args[i]->source_location());
+    }
+    break;
+
+  case command_name_id::Let:
+    for (usize i = 1; i < args.count(); i++) {
+      let const expression = args[i]->raw_string();
+      if (arithmetic_reads_external_input(actx, expression.view()))
+        actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
+                               args[i]->source_location());
+    }
+    break;
+
+  case command_name_id::Printf: {
+    usize format_index = 1;
+    if (format_index < args.count() &&
+        args[format_index]->raw_string().view() == "-v")
+      format_index += 2;
+    if (format_index < args.count() &&
+        args[format_index]->kind() == Token::Kind::Word)
+    {
+      let const &format_word =
+          static_cast<const tokens::WordToken *>(args[format_index])->word();
+      if (word_is_fully_literal(format_word)) {
+        let const format = format_word.to_literal_string();
+        let const consumed = printf_consumed_argument_count(format.view());
+        let const available = args.count() - format_index - 1;
+        if (consumed > available)
+          actx.report_diagnostic(diagnostic_id::sc2183,
+                                 args[format_index]->source_location());
+      }
+    }
+    break;
+  }
+
+  case command_name_id::Sudo:
+    for (let const &redirection : input.redirections)
+      if (redirection.target != nullptr)
+        actx.report_diagnostic(diagnostic_id::sc2024_redirection,
+                               redirection.target->source_location());
+    for (usize i = 1; i < args.count(); i++)
+      if (args[i]->kind() == Token::Kind::Word &&
+          word_is_bare_glob(
+              static_cast<const tokens::WordToken *>(args[i])->word()))
+        actx.report_diagnostic(diagnostic_id::sc2024_glob,
+                               args[i]->source_location());
+    break;
+
+  default: break;
+  }
+}
+
+fn check_command_name_lints(AnalysisContext &actx,
+                            const command_lint_input &input) throws -> void
+{
+  let const &args = input.args;
+  let const location = input.command_location();
+
+  /* An unquoted variable inside a test silently breaks when it is empty or
+     splits. This stays a warning even at the strict default, since the split
+     may be intended. */
+  if (input.is_in_group(COMMAND_GROUP_TEST)) {
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      for (let const &segment : word.segments) {
+        if (segment.kind == WordSegment::Kind::VariableReference &&
+            segment.is_split_eligible())
+        {
+          actx.report_diagnostic(diagnostic_id::sc2086_test,
+                                 args[i]->source_location());
+          break;
+        }
+      }
+    }
+  }
+
+  if (input.command_is_shadowed) return;
+
+  let const is_posix = actx.shebang_is_posix_sh;
+
+  switch (input.command_id()) {
+  case command_name_id::Read:
+    /* read without -r lets a backslash escape the next byte, mangling a line,
+       shellcheck SC2162. */
+    if (!args_have_short_flag(args, 'r'))
+      actx.report_diagnostic(diagnostic_id::sc2162,
+                             input.command_source_location);
+    break;
+
+  case command_name_id::Echo:
+    if (is_posix && args.count() >= 2 && args[1]->kind() == Token::Kind::Word) {
+      let const flag = static_cast<const tokens::WordToken *>(args[1])
+                           ->word()
+                           .to_literal_string();
+      let const view = flag.view();
+      if (view == "-e" || view == "-n" || view == "-E" || view == "-ne" ||
+          view == "-en")
+        actx.report_diagnostic(diagnostic_id::sc3037,
+                               args[1]->source_location(), {view});
+    }
+    break;
+
+  case command_name_id::Declare:
+    if (is_posix)
+      actx.report_diagnostic(diagnostic_id::sc3044, location,
+                             {input.command_literal});
+    break;
+
+  case command_name_id::Typeset:
+    if (is_posix) {
+      actx.report_diagnostic(diagnostic_id::sc3044, location,
+                             {input.command_literal});
+    } else {
+      actx.report_diagnostic(diagnostic_id::typeset_spelling, location);
+    }
+    break;
+
+  case command_name_id::Source:
+    if (is_posix) actx.report_diagnostic(diagnostic_id::sc3046, location);
+    break;
+
+  case command_name_id::Local:
+    if (is_posix) actx.report_diagnostic(diagnostic_id::sc3043, location);
+    if (actx.function_scope_depth == 0 && !actx.is_command_status_observed)
+      actx.report_diagnostic(diagnostic_id::sc2168, location);
+    break;
+
+  /* mapfile and its readarray alias are bash array builtins, shellcheck
+     SC3030. */
+  case command_name_id::Mapfile:
+  case command_name_id::Readarray:
+    if (is_posix)
+      actx.report_diagnostic(diagnostic_id::sc3030, location,
+                             {input.command_literal});
+    break;
+
+  case command_name_id::Egrep:
+    actx.report_diagnostic(diagnostic_id::sc2196, location);
+    break;
+
+  case command_name_id::Fgrep:
+    actx.report_diagnostic(diagnostic_id::sc2197, location);
+    break;
+
+  case command_name_id::Expr:
+    actx.report_diagnostic(diagnostic_id::sc2003, location);
+    break;
+
+  /* A double-quoted trap action expands at set time, not when it fires,
+     shellcheck SC2064. The action is the first operand. */
+  case command_name_id::Trap:
+    if (args.count() >= 2 && args[1]->kind() == Token::Kind::Word) {
+      let const &action =
+          static_cast<const tokens::WordToken *>(args[1])->word();
+      let action_expands_now = false;
+      for (let const &segment : action.segments)
+        if (segment.is_in_double_quotes &&
+            (segment.kind == WordSegment::Kind::VariableReference ||
+             segment.kind == WordSegment::Kind::CommandSubstitution))
+        {
+          action_expands_now = true;
+          break;
+        }
+      if (action_expands_now)
+        actx.report_diagnostic(diagnostic_id::sc2064,
+                               args[1]->source_location());
+    }
+    break;
+
+  case command_name_id::Printf: {
+    if (is_posix && args.count() >= 2 && args[1]->kind() == Token::Kind::Word &&
+        static_cast<const tokens::WordToken *>(args[1])
+                ->word()
+                .to_literal_string()
+                .view() == "-v")
+    {
+      actx.report_diagnostic(diagnostic_id::sc3045, args[1]->source_location());
+    }
+
+    /* A variable or command substitution in the printf format lets the data
+       control the directives, shellcheck SC2059. The format is the first
+       non-option word, and a -- forces the next word as the format. */
+    usize format_index = 0;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) {
+        format_index = i;
+        break;
+      }
+      let const literal = static_cast<const tokens::WordToken *>(args[i])
+                              ->word()
+                              .to_literal_string();
+      let const view = literal.view();
+      if (view == "--") {
+        if (i + 1 < args.count()) format_index = i + 1;
+        break;
+      }
+      if (!(view.length >= 1 && view[0] == '-')) {
+        format_index = i;
+        break;
+      }
+    }
+
+    if (format_index != 0 && args[format_index]->kind() == Token::Kind::Word) {
+      let const &format =
+          static_cast<const tokens::WordToken *>(args[format_index])->word();
+      bool format_has_expansion = false;
+      for (let const &segment : format.segments) {
+        if (segment.kind == WordSegment::Kind::VariableReference ||
+            segment.kind == WordSegment::Kind::CommandSubstitution)
+        {
+          format_has_expansion = true;
+          break;
+        }
+      }
+      if (format_has_expansion)
+        actx.report_diagnostic(diagnostic_id::sc2059,
+                               args[format_index]->source_location());
+    }
+    break;
+  }
+
+  default: break;
+  }
+}
+
+fn check_command_value_lints(AnalysisContext &actx,
+                             const command_lint_input &input) throws -> void
+{
+  if (input.command_is_shadowed) return;
+
+  let const &args = input.args;
+
+  /* A declaration builtin that assigns from a command substitution, such as
+     local x=$(cmd), reports its own success rather than the command's status,
+     shellcheck SC2155. The value rides an Assignment token. */
+  if (input.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN)) {
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Assignment) continue;
+      let const &value =
+          static_cast<const tokens::Assignment *>(args[i])->value_word();
+      let value_has_substitution = false;
+      for (let const &segment : value.segments)
+        if (segment.kind == WordSegment::Kind::CommandSubstitution) {
+          value_has_substitution = true;
+          break;
+        }
+      if (!value_has_substitution) continue;
+      actx.report_diagnostic(diagnostic_id::sc2155, args[i]->source_location());
+      break;
+    }
+  }
+
+  switch (input.command_id()) {
+  /* rm -r with a "$var/" operand deletes / when the variable is empty,
+     shellcheck SC2115. A literal top-level system directory is SC2114. */
+  case command_name_id::Rm:
+    if (!args_have_short_flag(args, 'r')) break;
+
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      if (word.segments.count() >= 2 &&
+          word.segments[0].kind == WordSegment::Kind::VariableReference &&
+          !word.segments[0].text.view().find_character(':').has_value() &&
+          !word.segments[1].text.is_empty() && word.segments[1].text[0] == '/')
+      {
+        actx.report_diagnostic(diagnostic_id::sc2115,
+                               args[i]->source_location(),
+                               {word.segments[0].text.view()});
+      }
+      if (word_is_fully_literal(word)) {
+        let const literal = word.to_literal_string();
+        if (SYSTEM_DIRECTORIES.contains(literal.view()))
+          actx.report_diagnostic(diagnostic_id::sc2114,
+                                 args[i]->source_location(), {literal.view()});
+      }
+    }
+    break;
+
+  /* The grep pattern lints. An unquoted pattern with a glob metacharacter is
+     SC2062, a pattern with a leading * that has nothing to repeat is SC2063.
+     The pattern is the first word past the options. */
+  case command_name_id::Grep:
+  case command_name_id::Egrep:
+  case command_name_id::Fgrep:
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      let const literal = word.to_literal_string();
+      let const view = literal.view();
+      if (view.length >= 1 && view[0] == '-') continue;
+      if (word.segments.count() == 1 &&
+          word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+          word.segments[0].has_glob_metacharacter())
+      {
+        actx.report_diagnostic(diagnostic_id::sc2062,
+                               args[i]->source_location());
+      } else if (!view.is_empty() && view[0] == '*') {
+        actx.report_diagnostic(diagnostic_id::sc2063,
+                               args[i]->source_location());
+      }
+      break;
+    }
+    break;
+
+  /* mkdir -pm applies the mode only to the deepest directory, shellcheck
+     SC2174. */
+  case command_name_id::Mkdir:
+    if (args_have_short_flag(args, 'p') && args_have_short_flag(args, 'm'))
+      actx.report_diagnostic(diagnostic_id::sc2174, input.command_location());
+    break;
+
+  /* An exit or return code outside the literal 0-255 shape errors or wraps
+     modulo 256, shellcheck SC2242. */
+  case command_name_id::Exit:
+  case command_name_id::Return:
+    if (args.count() >= 2 && args[1]->kind() == Token::Kind::Word) {
+      let const &operand =
+          static_cast<const tokens::WordToken *>(args[1])->word();
+      if (word_is_fully_literal(operand)) {
+        let const literal = operand.to_literal_string();
+        let const view = literal.view();
+        let is_in_range = view_is_integer_literal(view) && view[0] != '-';
+        if (is_in_range) {
+          let const parsed_code = view.to<i64>();
+          is_in_range = !parsed_code.is_error() && parsed_code.value() <= 255;
+        }
+        if (!is_in_range)
+          actx.report_diagnostic(diagnostic_id::sc2242,
+                                 args[1]->source_location(),
+                                 {view, input.command_literal});
+      }
+    }
+    break;
+
+  default: break;
+  }
+}
+
+/* The redirection lints. 2>&1 before the stdout file redirect is SC2069,
+   reading and truncating the same file is SC2094, an input redirect into a
+   non-stdin command is SC2217. */
+fn check_redirection_lints(AnalysisContext &actx,
+                           const command_lint_input &input) throws -> void
+{
+  let saw_stderr_to_stdout = false;
+  /* An owned String, since the view of a to_literal_string() temporary would
+     dangle past the statement. */
+  String read_target{heap_allocator()};
+  const Token *read_token = nullptr;
+
+  for (let const &redirection : input.redirections) {
+    if (redirection.kind == Redirection::Kind::DuplicateOutput &&
+        redirection.fd == 2 && redirection.dup_fd == 1)
+    {
+      saw_stderr_to_stdout = true;
+      continue;
+    }
+    let const is_file_output =
+        redirection.kind == Redirection::Kind::TruncateOutput ||
+        redirection.kind == Redirection::Kind::TruncateOutputOverride;
+    if (is_file_output && redirection.fd == 1 && saw_stderr_to_stdout &&
+        redirection.target != nullptr)
+    {
+      actx.report_diagnostic(diagnostic_id::sc2069,
+                             redirection.target->source_location());
+    }
+    if (redirection.target != nullptr &&
+        redirection.target->kind() == Token::Kind::Word)
+    {
+      let const &target_word =
+          static_cast<const tokens::WordToken *>(redirection.target)->word();
+      for (let const &segment : target_word.segments)
+        if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
+            (view_contains(segment.text.view(), StringView{"++"}) ||
+             view_contains(segment.text.view(), StringView{"--"}) ||
+             segment.text.view().find_character('=').has_value()))
+        {
+          actx.report_diagnostic(diagnostic_id::sc2257,
+                                 redirection.target->source_location());
+          break;
+        }
+    }
+    if (redirection.kind == Redirection::Kind::ReadInput &&
+        redirection.target != nullptr &&
+        redirection.target->kind() == Token::Kind::Word)
+    {
+      read_target = static_cast<const tokens::WordToken *>(redirection.target)
+                        ->word()
+                        .to_literal_string();
+      read_token = redirection.target;
+    }
+    if (is_file_output && redirection.target != nullptr &&
+        redirection.target->kind() == Token::Kind::Word &&
+        read_token != nullptr)
+    {
+      let const write_target =
+          static_cast<const tokens::WordToken *>(redirection.target)
+              ->word()
+              .to_literal_string();
+      if (!read_target.is_empty() && write_target.view() == read_target.view())
+      {
+        actx.report_diagnostic(
+            diagnostic_id::sc2094, redirection.target->source_location(),
+            {read_target.view()}, read_token->source_location());
+      }
+    }
+  }
+
+  if (input.redirections.is_empty() || input.command_is_shadowed) return;
+  if (!input.is_in_group(COMMAND_GROUP_NON_STDIN_READER)) return;
+  if (args_have_stdin_operand(input.args)) return;
+
+  for (let const &redirection : input.redirections)
+    if (redirection.kind == Redirection::Kind::ReadInput ||
+        redirection.kind == Redirection::Kind::Heredoc ||
+        redirection.kind == Redirection::Kind::HereString)
+    {
+      actx.report_diagnostic(diagnostic_id::sc2217, input.command_location(),
+                             {input.command_literal});
+      break;
+    }
+}
+
+fn check_test_operand_lints(AnalysisContext &actx,
+                            const command_lint_input &input) throws -> void
+{
+  if (!input.is_in_group(COMMAND_GROUP_TEST) || input.command_is_shadowed)
+    return;
+
+  let const &args = input.args;
+
+  /* Obsolescent or redundant test forms. -a or -o joining two conditions is
+     SC2166, warned only past the first operand and not after a !. A negated -z
+     or -n is SC2236 and SC2237. */
+  for (usize i = 1; i < args.count(); i++) {
+    if (args[i]->kind() != Token::Kind::Word) continue;
+    let const literal = static_cast<const tokens::WordToken *>(args[i])
+                            ->word()
+                            .to_literal_string();
+    let const view = literal.view();
+    /* The literal of the previous word, empty for a non-word predecessor. */
+    let const previous_literal =
+        args[i - 1]->kind() == Token::Kind::Word
+            ? static_cast<const tokens::WordToken *>(args[i - 1])
+                  ->word()
+                  .to_literal_string()
+            : String{heap_allocator()};
+    /* == is a bashism in test, shellcheck SC3014, warned only when == sits in
+       the operator slot so [ x = == ] comparing the literal == is left
+       alone. */
+    if (view == "==" && i >= 2 &&
+        !is_test_binary_operator_word(previous_literal.view()))
+    {
+      actx.report_diagnostic(diagnostic_id::sc3014, args[i]->source_location());
+    }
+    let const previous_is_bang = previous_literal.view() == "!";
+    if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
+      actx.report_diagnostic(diagnostic_id::sc2166, args[i]->source_location());
+    } else if (view == "!" && i + 1 < args.count() &&
+               args[i + 1]->kind() == Token::Kind::Word)
+    {
+      let const next = static_cast<const tokens::WordToken *>(args[i + 1])
+                           ->word()
+                           .to_literal_string();
+      if (next.view() == "-z") {
+        actx.report_diagnostic(diagnostic_id::sc2236,
+                               args[i]->source_location());
+      } else if (next.view() == "-n") {
+        actx.report_diagnostic(diagnostic_id::sc2237,
+                               args[i]->source_location());
+      } else if (i + 2 < args.count() &&
+                 args[i + 2]->kind() == Token::Kind::Word)
+      {
+        /* The ! X OP Y shape where OP has a direct negated form, shellcheck
+           SC2335. */
+        let const op = static_cast<const tokens::WordToken *>(args[i + 2])
+                           ->word()
+                           .to_literal_string();
+        let const inverse = negated_test_operator(op.view());
+        if (inverse.has_value()) {
+          actx.report_diagnostic(diagnostic_id::sc2335,
+                                 args[i]->source_location(),
+                                 {op.view(), inverse.value()});
+        }
+      }
+    }
+  }
+
+  /* A single-operand test with no operator is the nonempty-string test,
+     shellcheck SC2244. A flag-shaped operand is left alone so [ -n ] is not
+     told to use -n. */
+  usize operand_end = args.count();
+  bool bracket_form_is_closed = true;
+  if (input.command_id() == command_name_id::SingleBracket ||
+      input.command_id() == command_name_id::DoubleBracket)
+  {
+    bracket_form_is_closed =
+        args.count() >= 2 &&
+        args[args.count() - 1]->kind() == Token::Kind::Word &&
+        static_cast<const tokens::WordToken *>(args[args.count() - 1])
+                ->word()
+                .to_literal_string()
+                .view() ==
+            (input.command_id() == command_name_id::SingleBracket ? "]" : "]]");
+    if (bracket_form_is_closed) operand_end = args.count() - 1;
+  }
+  if (bracket_form_is_closed && operand_end == 2 &&
+      args[1]->kind() == Token::Kind::Word)
+  {
+    let const operand = static_cast<const tokens::WordToken *>(args[1])
+                            ->word()
+                            .to_literal_string();
+    if (!(operand.view().length >= 1 && operand.view()[0] == '-'))
+      actx.report_diagnostic(diagnostic_id::sc2244, args[1]->source_location());
+  }
+
+  /* The operand-shape lints over the closed operand range. A -z or -n on a
+     literal operand is SC2157, a numeric comparison against a non-numeric
+     literal is SC2170, and a = or == against a glob literal is SC2081. */
+  for (usize i = 1; i < operand_end; i++) {
+    if (args[i]->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+    let const literal = word.to_literal_string();
+    let const view = literal.view();
+
+    if ((view == "-z" || view == "-n") && i + 1 < operand_end &&
+        args[i + 1]->kind() == Token::Kind::Word)
+    {
+      let const &next =
+          static_cast<const tokens::WordToken *>(args[i + 1])->word();
+      if (word_is_fully_literal(next))
+        actx.report_diagnostic(diagnostic_id::sc2157,
+                               args[i + 1]->source_location(), {view});
+    }
+
+    if (is_test_numeric_operator_word(view)) {
+      for (usize side = i - 1; side <= i + 1; side += 2) {
+        /* Index zero is the command word, never an operand. */
+        if (side == 0 || side >= operand_end ||
+            args[side]->kind() != Token::Kind::Word)
+          continue;
+        let const &operand =
+            static_cast<const tokens::WordToken *>(args[side])->word();
+        if (!word_is_fully_literal(operand)) continue;
+        let const operand_literal = operand.to_literal_string();
+        if (!view_is_integer_literal(operand_literal.view()))
+          actx.report_diagnostic(diagnostic_id::sc2170,
+                                 args[side]->source_location(),
+                                 {view, operand_literal.view()});
+      }
+    }
+
+    if (input.command_id() != command_name_id::DoubleBracket &&
+        (view == "=" || view == "==") && i + 1 < operand_end &&
+        args[i + 1]->kind() == Token::Kind::Word)
+    {
+      let const &right =
+          static_cast<const tokens::WordToken *>(args[i + 1])->word();
+      if (word_is_fully_literal(right)) {
+        let const right_literal = right.to_literal_string();
+        if (right_literal.view().find_character('*').has_value() ||
+            right_literal.view().find_character('?').has_value())
+        {
+          actx.report_diagnostic(diagnostic_id::sc2081,
+                                 args[i + 1]->source_location());
+        }
+      }
+    }
+
+    /* A test against $? checks the exit status indirectly, shellcheck
+       SC2181. */
+    if (word.segments.count() == 1 &&
+        word.segments[0].kind == WordSegment::Kind::VariableReference &&
+        word.segments[0].text.view() == "?")
+    {
+      actx.report_diagnostic(diagnostic_id::sc2181, args[i]->source_location());
+    }
+  }
+}
+
+/* A prefix assignment does not affect the expansion on the same command, so a
+   reference to one of its names reads the old value. */
+fn check_prefix_assignment_reads(AnalysisContext &actx,
+                                 const command_lint_input &input) throws -> void
+{
+  if (input.local_vars.is_empty()) return;
+
+  let const &args = input.args;
+
+  for (usize i = 1; i < args.count(); i++) {
+    if (args[i]->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+    for (let const &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::VariableReference) continue;
+      const StringView referenced{segment.text.data(), segment.text.count()};
+      bool does_name_a_prefix = false;
+      for (let const &var : input.local_vars) {
+        if (var.name.view() == referenced) {
+          does_name_a_prefix = true;
+          break;
+        }
+      }
+      if (does_name_a_prefix) {
+        actx.report_diagnostic(diagnostic_id::assignment_prefix_read,
+                               args[i]->source_location(),
+                               {segment.text.view()});
+        break;
+      }
+    }
+  }
+}
+
+} /* namespace expressions */
 
 } /* namespace koshka */

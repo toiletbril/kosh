@@ -44,6 +44,59 @@ pure fn view_contains(StringView view, StringView needle) wontthrow -> bool;
 pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
                                         StringView expression) wontthrow
     -> bool;
+cold fn word_is_bare_glob(const Word &word) wontthrow -> bool;
+fn operand_target_name(StringView text) wontthrow -> StringView;
+cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
+    -> bool;
+
+/* The borrowed inputs one simple command's name-keyed checks read. The walk in
+   SimpleCommand::analyze computes each field once and the check bodies in
+   Diagnostics.cpp take them as parameters, so a check adds no traversal. */
+struct command_lint_input
+{
+  const ArrayList<const Token *> &args;
+  const ArrayList<Redirection> &redirections;
+  const ArrayList<prefix_assignment> &local_vars;
+  SourceLocation command_source_location;
+  StringView command_literal;
+  analysis_command_info command_info;
+  bool command_is_shadowed;
+
+  pure fn command_id() const wontthrow -> command_name_id
+  {
+    return command_info.id;
+  }
+
+  pure fn is_in_group(u32 group) const wontthrow -> bool
+  {
+    return command_info.is_in_group(group);
+  }
+
+  pure fn command_location() const wontthrow -> SourceLocation
+  {
+    return args[0]->source_location();
+  }
+};
+
+fn check_operand_lints_before_scan(AnalysisContext &actx,
+                                   const command_lint_input &input) throws
+    -> void;
+fn check_command_word_shape(AnalysisContext &actx,
+                            const command_lint_input &input) throws -> void;
+fn check_operand_lints_after_scan(AnalysisContext &actx,
+                                  const command_lint_input &input) throws
+    -> void;
+fn check_command_name_lints(AnalysisContext &actx,
+                            const command_lint_input &input) throws -> void;
+fn check_command_value_lints(AnalysisContext &actx,
+                             const command_lint_input &input) throws -> void;
+fn check_redirection_lints(AnalysisContext &actx,
+                           const command_lint_input &input) throws -> void;
+fn check_test_operand_lints(AnalysisContext &actx,
+                            const command_lint_input &input) throws -> void;
+fn check_prefix_assignment_reads(AnalysisContext &actx,
+                                 const command_lint_input &input) throws
+    -> void;
 
 alwaysinline fn set_and_return_exit_status(EvalContext &cxt,
                                            i64 status) wontthrow -> i64
