@@ -103,7 +103,7 @@
   [CompoundListCondition, None]
     [SimpleCommand]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "[$a][$b][$c]"]
+    [SimpleCommand "echo" "[$w][$b][$c]"]
   [CompoundListCondition, None]
     [SimpleCommand]
   [CompoundListCondition, None]
@@ -383,11 +383,11 @@
   Unquoted "done"
 ]
 [Word
-  Unquoted "a=1"
+  Unquoted "w=1"
 ]
 [Word
   Unquoted "b="
-  Variable "a"
+  Variable "w"
 ]
 [Word
   Unquoted "c="
@@ -398,7 +398,7 @@
 ]
 [Word
   DoubleQuoted "["
-  Variable "a"
+  Variable "w"
   DoubleQuoted "]["
   Variable "b"
   DoubleQuoted "]["

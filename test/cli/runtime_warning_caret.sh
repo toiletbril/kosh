@@ -13,7 +13,7 @@ previous_statement=3
 previous_statement=4
 for f in $UNSET_LIST; do :; done
 previous_statement=5
-a=( $UNSET_ELEM )
+a=( "$UNSET_ELEM" )
 EOF
 "$BIN" -WWW "$script" 2>&1 | grep -E 'warning' | sed "s|$script|SCRIPT|"
 rm -f "$script"

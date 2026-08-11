@@ -625,21 +625,10 @@ fn ArrayAssignCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
-  for (let const element : m_elements) {
-    if (element->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(element)->word();
-    for (let const &segment : word.segments)
-      if (segment.kind == WordSegment::Kind::CommandSubstitution &&
-          !segment.is_in_double_quotes)
-      {
-        actx.report_diagnostic(diagnostic_id::sc2207,
-                               element->source_location());
-        break;
-      }
-  }
 
   /* The name is no longer a scalar literal, so the constant table forgets it.
    */
+  actx.array_valued_names.add(m_name.view());
   actx.constant_variables.erase(m_name.view());
 }
 

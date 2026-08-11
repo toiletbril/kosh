@@ -29,6 +29,7 @@ echo "appended=${e[2]}"
 g=()
 echo "empty_n=${#g[@]}"
 flags= pvars=(p) specs=(s1 s2)
+# shellcheck disable=SC2128
 echo "seq=$pvars ${specs[1]}"
 f() { local a=(1 2); echo "local_arr=${a[1]}"; }
 f

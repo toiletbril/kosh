@@ -664,6 +664,38 @@
           [CompoundListCondition, None]
             [SimpleCommand "x\n"]
   [CompoundListCondition, None]
+    [FunctionDefinition "array_name_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$entries"]
+          [CompoundListCondition, None]
+            [Assign entries=scalar]
+          [CompoundListCondition, None]
+            [Assign entries+=tail]
+          [CompoundListCondition, None]
+            [Assign grid[1][2]=corner]
+          [CompoundListCondition, None]
+            [SimpleCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "declare" "-a" "declared"]
+          [CompoundListCondition, None]
+            [Assign declared=flat]
+          [CompoundListCondition, None]
+            [SimpleCommand "mapfile" "-t" "filled"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$filled"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "quoted_value_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign options=-t "one two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "wc" "$options"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3462,6 +3494,94 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "array_name_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "entries="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "entries"
+]
+[Word
+  Unquoted "entries=scalar"
+]
+[Word
+  Unquoted "entries+=tail"
+]
+[Word
+  Unquoted "grid[1][2]=corner"
+]
+[Word
+  Unquoted "spread="
+]
+[Word
+  Variable "loose"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "declared"
+]
+[Word
+  Unquoted "declared=flat"
+]
+[Word
+  Unquoted "mapfile"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "filled"
+]
+[Word
+  Unquoted "/etc/hosts"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "filled"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "quoted_value_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "options="
+  Literal "-t "one two""
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Variable "options"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -3719,6 +3839,10 @@ note: Iterate over a glob or read a delimited filename stream.
     84 |    for file in "*.mp3"; do echo "$file"; done
        |                ^~~~~~~
 note: Leave the glob unquoted so it expands into loop values.
+85:10: warning: An array built from command output splits words and expands globs.
+    85 |    files=($(printf '%s\n' one two))
+       |           ^~~~~~~~~~~~~~~~~~~~~~~~
+note: Use mapfile or readarray to preserve output records.
 86:16: warning: A bare glob can expand to a filename that begins with '-'.
     86 |    find . -name *.ogg
        |                 ^~~~~
@@ -4457,26 +4581,77 @@ note: Write `first=$(...)` around the complete pipeline.
    285 |    swallowed=printf 'x\n'
        |    ^~~~~~~~~~~~~~~~
 note: Write `swallowed=$(...)` to assign the command output.
-288:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   288 |  false && break
+290:8: warning: The name 'entries' holds an array, and an expansion without a subscript reads the first element alone.
+   290 |    echo "$entries"
+       |         ^~~~~~~~~~
+note: Write `${entries[@]}` to expand every element.
+291:3: warning: The name 'entries' holds an array, and this assignment replaces it with one string in the first element.
+   291 |    entries=scalar
+       |    ^~~~~~~~~~~~~~
+note: Write `entries=( ... )` to keep the array.
+291:3: warning: This assignment to 'entries' in a function has no local, so the value leaks to the global scope.
+   291 |    entries=scalar
+       |    ^~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+292:3: warning: The name 'entries' holds an array, and a scalar append changes the first element.
+   292 |    entries+=tail
+       |    ^~~~~~~~~~~~~
+note: Write `entries+=( ... )` to append an element.
+293:3: warning: The name 'grid[1][2]' carries several subscripts, and the shell has no multidimensional array.
+   293 |    grid[1][2]=corner
+       |    ^~~~~~~~~~~~~~~~~
+note: Flatten the index, or use an associative array.
+294:11: warning: The expansion in this array element splits on whitespace and expands globs.
+   294 |    spread=($loose)
+       |            ^~~~~~
+note: Quote the element, or split the value with `mapfile` or `read -a`.
+296:3: warning: The name 'declared' holds an array, and this assignment replaces it with one string in the first element.
+   296 |    declared=flat
+       |    ^~~~~~~~~~~~~
+note: Write `declared=( ... )` to keep the array.
+298:8: warning: The name 'filled' holds an array, and an expansion without a subscript reads the first element alone.
+   298 |    echo "$filled"
+       |         ^~~~~~~~~
+note: Write `${filled[@]}` to expand every element.
+302:3: warning: This assignment to 'options' in a function has no local, so the value leaks to the global scope.
+   302 |    options='-t "one two"'
+       |    ^~~~~~~~~~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+302:3: warning: The value of 'options' carries quote bytes, and the expansion keeps them as text.
+   302 |    options='-t "one two"'
+       |    ^~~~~~~~~~~~~~~~~~~~~~
+note: Use an array, or set the positional parameters with `set --`.
+303:6: warning: The expansion of 'options' keeps its quote bytes, so the shell does not regroup the words.
+   303 |    wc $options
+       |       ^~~~~~~~
+302:3: details:
+   302 |    options='-t "one two"'
+       |    ^~~~~~~~~~~~~~~~~~~~~~ 'options' is assigned here.
+note: Use an array, or set the positional parameters with `set --`.
+303:6: warning: An unquoted variable can split into words and expand globs.
+   303 |    wc $options
+       |       ^~~~~~~~
+note: Quote the expansion to keep one argument.
+306:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   306 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-289:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   289 |  false && continue
+307:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   307 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-291:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   291 |  recursive_wrapper() { recursive_wrapper "$@"; }
+309:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   309 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-291:1: details:
-   291 |  recursive_wrapper() { recursive_wrapper "$@"; }
+309:1: details:
+   309 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-296:8: warning: An unquoted variable can split into words and expand globs.
-   296 |    echo $reported
+314:8: warning: An unquoted variable can split into words and expand globs.
+   314 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 237 warnings.
+Encountered 250 warnings.
 done
 done
 done

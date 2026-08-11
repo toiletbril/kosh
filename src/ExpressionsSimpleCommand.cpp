@@ -116,14 +116,19 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 
   let has_unquoted_pattern = false;
   let has_only_literal_segments = true;
+  let has_quoted_literal_value = false;
   for (let const &segment : m_assignment->value_word().segments) {
     if (actx.shebang_is_posix_sh)
       check_posix_word_portability(actx, segment, source_location());
 
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
-    case WordSegment::Kind::UnquotedText:
-    case WordSegment::Kind::DoubleQuotedText: break;
+    case WordSegment::Kind::DoubleQuotedText:
+      if (segment.text.view().find_character('"').has_value())
+        has_quoted_literal_value = true;
+      break;
+
+    case WordSegment::Kind::UnquotedText: break;
 
     default: has_only_literal_segments = false; break;
     }
@@ -153,7 +158,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       actx,
       assignment_lint_input{m_assignment->key().view(), raw_assignment.view(),
                             source_location(), m_assignment->is_append(),
-                            has_unquoted_pattern, has_only_literal_segments});
+                            has_unquoted_pattern, has_only_literal_segments,
+                            has_quoted_literal_value});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
@@ -207,6 +213,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                                source_location());
     }
     actx.note_variable_assignment(base);
+    actx.array_valued_names.add(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
         "assignment",

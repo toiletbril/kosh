@@ -75,6 +75,15 @@ public:
   bool is_inside_read_loop{false};
   HashSet pipeline_lost_names{heap_allocator()};
   HashSet external_input_names{heap_allocator()};
+
+  /* A name proven to hold an array, so a bare expansion of it reads one element
+     and a scalar assignment to it drops the rest. */
+  HashSet array_valued_names{heap_allocator()};
+
+  /* Where a name whose literal value carries quote bytes was assigned, read
+     when that name is expanded as a command word. */
+  StringMap<SourceLocation> quoted_literal_assignments{heap_allocator()};
+
   StringMap<SourceLocation> active_loop_variables{heap_allocator()};
 
   /* The lookup is lazy, and null in a context with no live shell. */

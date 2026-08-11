@@ -37,7 +37,7 @@ NOPE=hidden
 printenv NOPE
 echo done
 
-a=1 b=$a c=$b; echo "[$a][$b][$c]"
+w=1 b=$w c=$b; echo "[$w][$b][$c]"
 x=foo x+=bar; echo "[$x]"
 y=1 y=2; echo "[$y]"
 

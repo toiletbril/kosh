@@ -285,6 +285,24 @@ assignment_pipeline_diagnostics() {
   swallowed=printf 'x\n'
 }
 
+array_name_diagnostics() {
+  entries=(one two)
+  echo "$entries"
+  entries=scalar
+  entries+=tail
+  grid[1][2]=corner
+  spread=($loose)
+  declare -a declared
+  declared=flat
+  mapfile -t filled < /etc/hosts
+  echo "$filled"
+}
+
+quoted_value_diagnostics() {
+  options='-t "one two"'
+  wc $options
+}
+
 false && break
 false && continue
 

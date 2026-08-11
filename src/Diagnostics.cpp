@@ -348,6 +348,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A quoted tilde stays literal instead of expanding to the home directory",
       "Leave the tilde unquoted or use a quoted $HOME expansion", None, Lenient,
       Policy),
+    D(2089, "quoted-value-assignment", "quotes stored in a value stay literal",
+      "The value of '{0}' carries quote bytes, and the expansion keeps them as "
+      "text",
+      "Use an array, or set the positional parameters with `set --`", None,
+      Lenient, Policy),
+    D(2090, "quoted-value-expansion",
+      "an expanded value keeps its quotes literal",
+      "The expansion of '{0}' keeps its quote bytes, so the shell does not "
+      "regroup the words",
+      "Use an array, or set the positional parameters with `set --`",
+      "'{0}' is assigned here", Lenient, Policy),
     D(2091, "substitution-command-position",
       "a command substitution in command position executes its output",
       "A command substitution in command position executes its output",
@@ -454,6 +465,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Counting grep output with wc -l runs an extra process",
       "Use grep -c to count the matching lines directly", None, Annoying,
       Policy),
+    D(2128, "array-without-subscript",
+      "an array without a subscript expands to one element",
+      "The name '{0}' holds an array, and an expansion without a subscript "
+      "reads the first element alone",
+      "Write `${{0}[@]}` to expand every element", None, Strict, Policy),
     D(2129, "repeated-append", "several appends can share one redirection",
       "Several commands append to the same file separately",
       "Apply one append redirection to a grouped command",
@@ -589,6 +605,19 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The `time` keyword times only a simple command in POSIX sh",
       "Run the compound command through `sh -c` and time that", None, Strict,
       Policy),
+    D(2178, "array-assigned-string", "an array name is reassigned as a scalar",
+      "The name '{0}' holds an array, and this assignment replaces it with one "
+      "string in the first element",
+      "Write `{0}=( ... )` to keep the array", None, Strict, Policy),
+    D(2179, "array-appended-string",
+      "a scalar append on an array name adds nothing",
+      "The name '{0}' holds an array, and a scalar append changes the first "
+      "element",
+      "Write `{0}+=( ... )` to append an element", None, Strict, Policy),
+    D(2180, "multidimensional-array", "a shell array has one dimension",
+      "The name '{0}' carries several subscripts, and the shell has no "
+      "multidimensional array",
+      "Flatten the index, or use an associative array", None, Strict, Policy),
     D(2181, "indirect-exit-status-test",
       "test the command instead of testing $?",
       "Testing $? checks the exit status indirectly",
@@ -658,6 +687,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2205, "subshell-as-condition", "a subshell is not a test expression",
       "A `( )` subshell runs its contents, it does not test them",
       "Write the condition as `[ ... ]`", None, Strict, Policy),
+    D(2206, "array-element-splitting",
+      "an unquoted element splits into several array entries",
+      "The expansion in this array element splits on whitespace and expands "
+      "globs",
+      "Quote the element, or split the value with `mapfile` or `read -a`", None,
+      Lenient, Policy),
     D(2207, "array-from-command-output",
       "an array from command output splits and globs",
       "An array built from command output splits words and expands globs",
@@ -2463,21 +2498,41 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
   switch (input.command_id()) {
   case command_name_id::Read: {
     let should_skip_option_operand = false;
+    let should_take_array_target = false;
     for (usize i = 1; i < args.count(); i++) {
       if (args[i]->kind() != Token::Kind::Word) continue;
       let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
       let const literal = word.to_literal_string();
       if (should_skip_option_operand) {
         should_skip_option_operand = false;
+        if (should_take_array_target) {
+          should_take_array_target = false;
+          let const target = operand_target_name(literal.view());
+          if (!target.is_empty()) {
+            actx.array_valued_names.add(target);
+            actx.external_input_names.add(target);
+          }
+        }
+
         continue;
       }
-      if (literal.view() == "-p" || literal.view() == "-t" ||
-          literal.view() == "-n" || literal.view() == "-N" ||
-          literal.view() == "-d" || literal.view() == "-u" ||
-          literal.view() == "-i")
-      {
-        should_skip_option_operand = true;
-        continue;
+      if (literal.view().length == 2 && literal.view()[0] == '-') {
+        switch (literal.view()[1]) {
+        case 'a':
+          should_skip_option_operand = true;
+          should_take_array_target = true;
+          continue;
+
+        case 'd':
+        case 'i':
+        case 'n':
+        case 'N':
+        case 'p':
+        case 't':
+        case 'u': should_skip_option_operand = true; continue;
+
+        default: break;
+        }
       }
       if (literal.view().starts_with("-")) continue;
       if (word.segments.count() == 1 &&
@@ -2935,11 +2990,55 @@ fn check_command_name_lints(AnalysisContext &actx,
   /* mapfile and its readarray alias are bash array builtins, shellcheck
      SC3030. */
   case command_name_id::Mapfile:
-  case command_name_id::Readarray:
+  case command_name_id::Readarray: {
     if (is_posix)
       actx.report_diagnostic(diagnostic_id::sc3030, location,
                              {input.command_literal});
+
+    /* The filled array is the last plain operand, so the index is kept and its
+       text is read once the loop has settled on it. */
+    let filled_name_index = args.count();
+    let should_skip_option_operand = false;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      let const literal = static_cast<const tokens::WordToken *>(args[i])
+                              ->word()
+                              .to_literal_string();
+      let const view = literal.view();
+      if (should_skip_option_operand) {
+        should_skip_option_operand = false;
+        continue;
+      }
+      if (view.length == 2 && view[0] == '-') {
+        switch (view[1]) {
+        case 'C':
+        case 'c':
+        case 'd':
+        case 'n':
+        case 'O':
+        case 's':
+        case 'u': should_skip_option_operand = true; continue;
+
+        default: continue;
+        }
+      }
+      if (view.length >= 2 && view[0] == '-') continue;
+      if (!operand_target_name(view).is_empty()) filled_name_index = i;
+    }
+
+    if (filled_name_index == args.count()) {
+      actx.array_valued_names.add(StringView{"MAPFILE"});
+      break;
+    }
+
+    let const filled =
+        static_cast<const tokens::WordToken *>(args[filled_name_index])
+            ->word()
+            .to_literal_string();
+    actx.array_valued_names.add(operand_target_name(filled.view()));
     break;
+  }
 
   /* Nothing surrounds a break outside a loop, shellcheck SC2104 and SC2105. A
      function body starts its own loop depth, so a call from inside a loop does
@@ -3109,19 +3208,54 @@ fn check_command_value_lints(AnalysisContext &actx,
      local x=$(cmd), reports its own success rather than the command's status,
      shellcheck SC2155. The value rides an Assignment token. */
   if (input.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN)) {
+    let has_reported_substitution_value = false;
+    let does_declare_an_array = false;
     for (usize i = 1; i < args.count(); i++) {
-      if (args[i]->kind() != Token::Kind::Assignment) continue;
-      let const &value =
-          static_cast<const tokens::Assignment *>(args[i])->value_word();
-      let value_has_substitution = false;
-      for (let const &segment : value.segments)
-        if (segment.kind == WordSegment::Kind::CommandSubstitution) {
-          value_has_substitution = true;
-          break;
+      if (args[i]->kind() == Token::Kind::Assignment) {
+        let const *assignment =
+            static_cast<const tokens::Assignment *>(args[i]);
+        if (does_declare_an_array)
+          actx.array_valued_names.add(assignment->key().view());
+
+        if (has_reported_substitution_value) continue;
+
+        let value_has_substitution = false;
+        for (let const &segment : assignment->value_word().segments)
+          if (segment.kind == WordSegment::Kind::CommandSubstitution) {
+            value_has_substitution = true;
+            break;
+          }
+        if (!value_has_substitution) continue;
+
+        actx.report_diagnostic(diagnostic_id::sc2155,
+                               args[i]->source_location());
+        has_reported_substitution_value = true;
+        continue;
+      }
+
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      let const literal = static_cast<const tokens::WordToken *>(args[i])
+                              ->word()
+                              .to_literal_string();
+      let const view = literal.view();
+
+      /* A grouped -aA flag list declares an array, and every other letter in
+         the group changes an unrelated attribute. */
+      if (view.length >= 2 && view[0] == '-') {
+        if (view.find_character('a').has_value() ||
+            view.find_character('A').has_value())
+        {
+          does_declare_an_array = true;
         }
-      if (!value_has_substitution) continue;
-      actx.report_diagnostic(diagnostic_id::sc2155, args[i]->source_location());
-      break;
+
+        continue;
+      }
+
+      if (!does_declare_an_array) continue;
+
+      let const target = operand_target_name(view);
+      if (!target.is_empty()) actx.array_valued_names.add(target);
     }
   }
 
@@ -3937,6 +4071,37 @@ fn check_assignment_value_shape(AnalysisContext &actx,
     let const id =
         value[0] == '$' ? diagnostic_id::sc2099 : diagnostic_id::sc2100;
     actx.report_diagnostic(id, input.location, {input.name});
+  }
+
+  let const first_bracket = input.name.find_character('[');
+  if (input.has_quoted_literal_value && input.has_only_literal_segments &&
+      !first_bracket.has_value())
+  {
+    actx.quoted_literal_assignments.set(input.name, input.location);
+  }
+
+  if (!first_bracket.has_value()) {
+    /* A scalar assignment to an array name touches the first element alone,
+       shellcheck SC2178 and SC2179. */
+    if (actx.array_valued_names.count() != 0 &&
+        actx.array_valued_names.contains(input.name))
+    {
+      let const id =
+          input.is_append ? diagnostic_id::sc2179 : diagnostic_id::sc2178;
+      actx.report_diagnostic(id, input.location, {input.name});
+    }
+
+    return;
+  }
+
+  /* A second subscript makes the name a multidimensional array, which the shell
+     does not have, shellcheck SC2180. */
+  let const after_first = input.name.substring(*first_bracket + 1);
+  let const closer = after_first.find_character(']');
+  if (closer.has_value() &&
+      after_first.substring(*closer + 1).find_character('[').has_value())
+  {
+    actx.report_diagnostic(diagnostic_id::sc2180, input.location, {input.name});
   }
 }
 

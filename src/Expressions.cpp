@@ -927,6 +927,23 @@ pure fn is_split_exempt_variable_name(StringView name) wontthrow -> bool
   }
 }
 
+/* A spread, a positional list, and a length read carry their own diagnostics,
+   so only a plain scalar name splits into several array elements. */
+pure fn reference_is_plain_scalar_name(StringView name) wontthrow -> bool
+{
+  if (name.is_empty()) return false;
+
+  switch (name[0]) {
+  case '#':
+  case '*':
+  case '@': return false;
+
+  default: break;
+  }
+
+  return !name.find_character('[').has_value();
+}
+
 cold fn word_is_bare_glob(const Word &word) wontthrow -> bool
 {
   return word.segments.count() == 1 &&
@@ -1086,6 +1103,44 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
+  for (let const &assignment : m_array_args) {
+    actx.note_variable_assignment(assignment.name.view());
+    actx.array_valued_names.add(assignment.name.view());
+    actx.constant_variables.erase(assignment.name.view());
+
+    for (let const element : assignment.elements) {
+      if (element->kind() != Token::Kind::Word) continue;
+
+      let const &word = static_cast<const tokens::WordToken *>(element)->word();
+      let has_unquoted_substitution = false;
+      let has_unquoted_reference = false;
+      for (let const &segment : word.segments) {
+        if (segment.is_in_double_quotes) continue;
+
+        switch (segment.kind) {
+        case WordSegment::Kind::CommandSubstitution:
+          has_unquoted_substitution = true;
+          break;
+
+        case WordSegment::Kind::VariableReference:
+          if (reference_is_plain_scalar_name(segment.text.view()))
+            has_unquoted_reference = true;
+          break;
+
+        default: break;
+        }
+      }
+
+      if (has_unquoted_substitution) {
+        actx.report_diagnostic(diagnostic_id::sc2207,
+                               element->source_location());
+      } else if (has_unquoted_reference) {
+        actx.report_diagnostic(diagnostic_id::sc2206,
+                               element->source_location());
+      }
+    }
+  }
+
   if (m_args.is_empty()) {
     for (let const &assignment : m_array_args) {
       if (assignment.elements.count() < 2) continue;
@@ -1203,6 +1258,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       !command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
       command_id != command_name_id::Echo &&
       command_id != command_name_id::Printf;
+  let const should_check_array_reads = actx.array_valued_names.count() != 0;
+  let const should_check_quoted_values =
+      actx.quoted_literal_assignments.count() != 0;
   bool has_end_of_options = false;
 
   for (usize i = 0; i < m_args.count(); i++) {
@@ -1267,6 +1325,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     bool has_bracket_byte = false;
     usize echo_only_substitution_count = 0;
     StringView lost_pipeline_name{};
+    StringView bare_array_name{};
+    StringView quoted_value_name{};
+    const SourceLocation *quoted_value_assignment = nullptr;
 
     if (word != nullptr) {
       for (let const &segment : word->segments) {
@@ -1334,6 +1395,19 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           {
             has_split_eligible_variable = true;
           }
+          if (should_check_array_reads && bare_array_name.is_empty() &&
+              actx.array_valued_names.contains(referenced))
+          {
+            bare_array_name = referenced;
+          }
+          if (should_check_quoted_values && quoted_value_name.is_empty() &&
+              segment.is_split_eligible())
+          {
+            quoted_value_assignment =
+                actx.quoted_literal_assignments.find(referenced);
+            if (quoted_value_assignment != nullptr)
+              quoted_value_name = referenced;
+          }
           break;
         }
 
@@ -1377,6 +1451,22 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
       if (has_bare_star_reference)
         actx.report_diagnostic(diagnostic_id::sc2048, arg_location);
+
+      if (!bare_array_name.is_empty()) {
+        actx.report_diagnostic(diagnostic_id::sc2128, arg_location,
+                               {bare_array_name});
+      }
+
+      /* The pair is reported once for each assignment, so the name is dropped
+         after the first split-eligible read reaches it. */
+      if (!quoted_value_name.is_empty()) {
+        let const assignment_location = *quoted_value_assignment;
+        actx.report_diagnostic(diagnostic_id::sc2089, assignment_location,
+                               {quoted_value_name});
+        actx.report_diagnostic(diagnostic_id::sc2090, arg_location,
+                               {quoted_value_name}, assignment_location);
+        actx.quoted_literal_assignments.erase(quoted_value_name);
+      }
 
       if (!lost_pipeline_name.is_empty()) {
         actx.report_diagnostic(diagnostic_id::sc2031, arg_location);
