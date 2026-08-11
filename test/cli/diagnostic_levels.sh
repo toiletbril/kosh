@@ -82,9 +82,9 @@ echo "compat-level-two-obsolete=$(printf '%s\n' "$compat_level_two" |
 echo "compat-level-three-obsolete=$(printf '%s\n' "$compat_level_three" |
   grep -c 'obsolete arithmetic expansion')"
 echo "compat-level-two-recursion=$(printf '%s\n' "$compat_level_two" |
-  grep -c 'wrapper calls itself recursively')"
+  grep -c 'function calls itself recursively')"
 echo "compat-level-three-recursion=$(printf '%s\n' "$compat_level_three" |
-  grep -c 'wrapper calls itself recursively')"
+  grep -c 'function calls itself recursively')"
 
 cat > "$temporary_directory/file-directive.sh" <<'EOF'
 # shellcheck disable=SC2164

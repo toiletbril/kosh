@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2078,SC2193,SC2212
 test -s /dev/null; echo $?
 test 5 -le 10; echo $?
 test abc -eq 5; echo $?

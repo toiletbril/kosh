@@ -734,11 +734,11 @@
   DoubleQuoted "group_and="
   Variable "?"
 ]
-4:6: warning: The numeric comparison -eq reads 'abc', which is not a number, so the test errors at run time.
-     4 |  test abc -eq 5; echo $?
+5:6: warning: The numeric comparison -eq reads 'abc', which is not a number, so the test errors at run time.
+     5 |  test abc -eq 5; echo $?
        |       ^~~
 1
 0
-4:6: error: Builtin `test`: Cannot compare with '-eq', 'abc' is not an integer.
-     4 |  test abc -eq 5; echo $?
+5:6: error: Builtin `test`: Cannot compare with '-eq', 'abc' is not an integer.
+     5 |  test abc -eq 5; echo $?
        |       ^~~

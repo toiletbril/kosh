@@ -62,6 +62,7 @@ fn check_numeric_comparison_operand(AnalysisContext &actx,
                                     const Token *operand_token,
                                     bool should_prefer_string_comparison) throws
     -> void;
+pure fn is_test_unary_operator_word(StringView op) wontthrow -> bool;
 
 /* The borrowed inputs one simple command's name-keyed checks read. The walk in
    SimpleCommand::analyze computes each field once and the check bodies in

@@ -23,6 +23,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "if runs a command directly, not inside test brackets",
       "Test brackets do not run the command written inside them",
       "Run the command directly as the if condition", None, Strict, Policy),
+    D(1019, "missing-unary-operand", "a unary test operator takes one operand",
+      "The '{0}' operator expects an operand, '{1}' is another operator",
+      "Give the operator its operand before the comparison", None, Strict,
+      Policy),
     D(1035, "test-bracket-spacing",
       "test brackets and operands require separating spaces",
       "Test brackets and operands require separating spaces",
@@ -140,6 +144,16 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2051, "variable-brace-range", "brace ranges expand before variables",
       "Brace ranges are expanded before variables",
       "Use an arithmetic loop for a variable limit", None, Lenient, Policy),
+    D(2055, "or-between-inequalities",
+      "an or between two inequalities is always true",
+      "The '{0}' operand fails only one of the two `!=` tests, so the `||` is "
+      "always true",
+      "Join the two inequalities with `&&`", None, Strict, Policy),
+    D(2056, "test-or-between-inequalities",
+      "a test -o between two inequalities is always true",
+      "The '{0}' operand fails only one of the two `!=` tests, so the `-o` is "
+      "always true",
+      "Join the two inequalities with `-a`", None, Strict, Policy),
     D(2057, "unknown-binary-test-operator",
       "the operand slot holds an unknown binary operator",
       "The '{0}' operator is not a known test operator",
@@ -213,6 +227,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a conditional operator needs surrounding spaces",
       "A conditional operator needs surrounding spaces",
       "Place spaces around the comparison operator", None, Strict, Policy),
+    D(2078, "constant-test-operand",
+      "a bare literal operand makes the test constant",
+      "The '{0}' operand is a literal, so the test never changes",
+      "Add the `$` when a variable was meant", None, Strict, Policy),
     D(2081, "test-glob-match", "test cannot glob-match strings",
       "[ and test compare strings byte for byte and never glob-match",
       "Use a case or the [[ ]] form for the pattern", None, Lenient, Policy),
@@ -318,6 +336,20 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2157, "literal-test", "a literal test operand makes the test constant",
       "The operand is a literal, so this {0} test is constant",
       "Test a variable or drop the check", None, Annoying, Policy),
+    D(2158, "bracketed-false",
+      "the brackets around `false` invert what the word means",
+      "`[ false ]` tests the nonempty word `false`, so it succeeds",
+      "Drop the brackets and write `false`", None, Strict, Policy),
+    D(2159, "bracketed-zero",
+      "the brackets around `0` invert what the digit means",
+      "`[ 0 ]` tests the nonempty word `0`, so it succeeds",
+      "Write `false` for a failing condition", None, Strict, Policy),
+    D(2160, "bracketed-true", "the brackets around `true` add nothing",
+      "`[ true ]` tests the nonempty word `true`, the brackets add nothing",
+      "Drop the brackets and write `true`", None, Annoying, Policy),
+    D(2161, "bracketed-one", "the brackets around `1` add nothing",
+      "`[ 1 ]` tests the nonempty word `1`, the brackets add nothing",
+      "Write `true` for a succeeding condition", None, Annoying, Policy),
     D(2162, "read-without-r", "read without -r mangles backslashes",
       "A read without -r mangles a backslash in the input",
       "Add -r to read the line literally", None, Lenient, Policy),
@@ -366,6 +398,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "an unquoted unset array index can expand as a glob",
       "An unquoted unset array index can expand as a filename glob",
       "Quote the complete array element name", None, Strict, Policy),
+    D(2193, "impossible-comparison", "the compared literals can never be equal",
+      "The literals '{0}' and '{1}' differ, so the comparison never succeeds",
+      "Compare a variable, or correct the operand spelling", None, Strict,
+      Policy),
     D(2196, "deprecated-egrep", "egrep is deprecated",
       "The egrep command is deprecated",
       "Use grep -E for the extended regular expression match", None, Annoying,
@@ -382,6 +418,9 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An array built from command output splits words and expands globs",
       "Use mapfile or readarray to preserve output records", None, Strict,
       Policy),
+    D(2212, "empty-test", "an empty test always fails",
+      "A test with no operand always fails",
+      "Write `false` for a failing condition", None, Strict, Policy),
     D(2215, "option-command-position", "an option-shaped word is not a command",
       "An option-shaped word in command position is not a command",
       "Place the option after its command", None, Strict, Policy),
@@ -418,6 +457,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The code '{0}' is not a number from 0 to 255, {1} either rejects it or "
       "wraps it modulo 256",
       None, None, Lenient, Policy),
+    D(2243, "one-operand-output-test",
+      "a one-operand test on output checks for printed bytes",
+      "A one-operand test on command output only checks that something was "
+      "printed",
+      "Write it with `-n`, or drop the brackets to check the exit status", None,
+      Annoying, Policy),
     D(2244, "one-operand-test", "a one-operand test is a nonempty-string test",
       "A one-operand test is the nonempty-string test",
       "Write it with -n to read clearer", None, Annoying, Policy),
@@ -425,6 +470,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "This case has no default *) branch, a value no pattern matches is "
       "silently ignored",
       None, None, Annoying, Policy),
+    D(2252, "or-between-bracket-inequalities",
+      "an or between two bracketed inequalities is always true",
+      "The '{0}' operand fails only one of the two `!=` tests, so the `||` is "
+      "always true",
+      "Join the two tests with `&&`", None, Strict, Policy),
     D(2255, "test-arithmetic-operand",
       "test brackets do not evaluate arithmetic",
       "Test brackets compare '{0}' as text, the arithmetic is not evaluated",
@@ -435,8 +485,9 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Update the variable before forming the redirect path", None, Strict,
       Policy),
     D(2264, "recursive-wrapper", "a function wrapper calls itself recursively",
-      "This function wrapper calls itself recursively",
-      "Use command before the wrapped command name", None, Strict, Policy),
+      "The '{0}' function calls itself recursively",
+      "Use `command` before the wrapped command name", "'{0}' is defined here",
+      Strict, Policy),
     D(2268, "x-prefix-test", "the x-prefix test workaround is obsolete",
       "The x-prefix test workaround is obsolete", "Quote the variable directly",
       None, Annoying, Policy),
@@ -1058,6 +1109,15 @@ cold fn is_known_test_operator_word(StringView op) wontthrow -> bool
          TEST_BINARY_OPERATORS.contains(op);
 }
 
+} /* namespace */
+
+cold fn is_test_unary_operator_word(StringView op) wontthrow -> bool
+{
+  return TEST_UNARY_OPERATORS.contains(op);
+}
+
+namespace {
+
 /* The words that open a fresh condition, so the word after one of them sits in
    the unary operator slot. */
 constexpr PackedStringKey TEST_CONDITION_OPENER_KEYS[] = {
@@ -1071,6 +1131,41 @@ constexpr StaticStringSet TEST_CONDITION_OPENERS{TEST_CONDITION_OPENER_KEYS};
 cold fn is_test_condition_opener_word(StringView word) wontthrow -> bool
 {
   return TEST_CONDITION_OPENERS.contains(word);
+}
+
+/* The words a bracketed constant condition can hold, whose diagnostic names the
+   builtin the author meant. */
+enum class bracketed_constant_kind : u8
+{
+  False,
+  Zero,
+  True,
+  One,
+};
+
+constexpr static_string_entry<bracketed_constant_kind>
+    BRACKETED_CONSTANT_ENTRIES[] = {
+        {SSK("0"),     bracketed_constant_kind::Zero },
+        {SSK("1"),     bracketed_constant_kind::One  },
+        {SSK("false"), bracketed_constant_kind::False},
+        {SSK("true"),  bracketed_constant_kind::True },
+};
+constexpr StaticStringMap BRACKETED_CONSTANTS{BRACKETED_CONSTANT_ENTRIES};
+
+/* The left operand of an X != Y triple centered on operator_index, absent when
+   the words there do not form one. The raw view is compared, so "$name" and
+   $name stay distinct. */
+cold fn test_inequality_left_operand(const ArrayList<const Token *> &args,
+                                     usize operator_index,
+                                     usize operand_end) wontthrow
+    -> Maybe<StringView>
+{
+  if (operator_index == 0 || operator_index + 1 >= operand_end) return None;
+
+  let const op = args[operator_index]->raw_view();
+  if (!op.has_value() || *op != StringView{"!="}) return None;
+
+  return args[operator_index - 1]->raw_view();
 }
 
 /* An operator name carries a letter after the dash, which keeps a negative
@@ -2346,6 +2441,24 @@ fn check_test_operand_lints(AnalysisContext &actx,
   let const &args = input.args;
   let const is_posix = actx.shebang_is_posix_sh;
 
+  /* The operand range excludes the closing bracket, so the operator loop and
+     the operand loop share one bound. */
+  usize operand_end = args.count();
+  bool bracket_form_is_closed = true;
+  if (input.command_id() == command_name_id::SingleBracket ||
+      input.command_id() == command_name_id::DoubleBracket)
+  {
+    bracket_form_is_closed =
+        args.count() >= 2 &&
+        args[args.count() - 1]->kind() == Token::Kind::Word &&
+        static_cast<const tokens::WordToken *>(args[args.count() - 1])
+                ->word()
+                .to_literal_string()
+                .view() ==
+            (input.command_id() == command_name_id::SingleBracket ? "]" : "]]");
+    if (bracket_form_is_closed) operand_end = args.count() - 1;
+  }
+
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
      SC2166, warned only past the first operand and not after a !. A negated -z
      or -n is SC2236 and SC2237. */
@@ -2425,6 +2538,17 @@ fn check_test_operand_lints(AnalysisContext &actx,
       }
     }
 
+    /* Two inequalities on the same operand joined by -o hold for every value,
+       shellcheck SC2056. */
+    if (view == "-o" && i >= 3) {
+      let const before = test_inequality_left_operand(args, i - 2, operand_end);
+      let const after = test_inequality_left_operand(args, i + 2, operand_end);
+      if (before.has_value() && after.has_value() && *before == *after) {
+        actx.report_diagnostic(diagnostic_id::sc2056,
+                               args[i]->source_location(), {*before});
+      }
+    }
+
     if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
       actx.report_diagnostic(diagnostic_id::sc2166, args[i]->source_location());
     } else if (view == "!" && i + 1 < args.count() &&
@@ -2457,32 +2581,52 @@ fn check_test_operand_lints(AnalysisContext &actx,
     }
   }
 
-  /* A single-operand test with no operator is the nonempty-string test,
-     shellcheck SC2244. A flag-shaped operand is left alone so [ -n ] is not
-     told to use -n. */
-  usize operand_end = args.count();
-  bool bracket_form_is_closed = true;
-  if (input.command_id() == command_name_id::SingleBracket ||
-      input.command_id() == command_name_id::DoubleBracket)
-  {
-    bracket_form_is_closed =
-        args.count() >= 2 &&
-        args[args.count() - 1]->kind() == Token::Kind::Word &&
-        static_cast<const tokens::WordToken *>(args[args.count() - 1])
-                ->word()
-                .to_literal_string()
-                .view() ==
-            (input.command_id() == command_name_id::SingleBracket ? "]" : "]]");
-    if (bracket_form_is_closed) operand_end = args.count() - 1;
-  }
+  /* A test with no operand always fails, shellcheck SC2212. */
+  if (bracket_form_is_closed && operand_end == 1)
+    actx.report_diagnostic(diagnostic_id::sc2212, input.command_location());
+
+  /* A single-operand test with no operator is the nonempty-string test. A
+     bracketed true, false, 0 or 1 reads as the builtin and is SC2158 through
+     SC2161, another literal is the constant condition SC2078, command output is
+     SC2243, and a variable is SC2244. A flag-shaped operand is left alone so
+     [ -n ] is not told to use -n. */
   if (bracket_form_is_closed && operand_end == 2 &&
       args[1]->kind() == Token::Kind::Word)
   {
-    let const operand = static_cast<const tokens::WordToken *>(args[1])
-                            ->word()
-                            .to_literal_string();
-    if (!(operand.view().length >= 1 && operand.view()[0] == '-'))
-      actx.report_diagnostic(diagnostic_id::sc2244, args[1]->source_location());
+    let const &word = static_cast<const tokens::WordToken *>(args[1])->word();
+    let const operand = word.to_literal_string();
+    let const view = operand.view();
+    let const location = args[1]->source_location();
+    let const is_literal = word_is_fully_literal(word);
+    let const constant = is_literal ? BRACKETED_CONSTANTS.find(view) : None;
+
+    if (constant.has_value()) {
+      switch (*constant) {
+      case bracketed_constant_kind::False:
+        actx.report_diagnostic(diagnostic_id::sc2158, location);
+        break;
+      case bracketed_constant_kind::Zero:
+        actx.report_diagnostic(diagnostic_id::sc2159, location);
+        break;
+      case bracketed_constant_kind::True:
+        actx.report_diagnostic(diagnostic_id::sc2160, location);
+        break;
+      case bracketed_constant_kind::One:
+        actx.report_diagnostic(diagnostic_id::sc2161, location);
+        break;
+      }
+    } else if (view.length == 0 || view[0] != '-') {
+      if (is_literal) {
+        actx.report_diagnostic(diagnostic_id::sc2078, location, {view});
+      } else if (word.segments.count() == 1 &&
+                 word.segments[0].kind ==
+                     WordSegment::Kind::CommandSubstitution)
+      {
+        actx.report_diagnostic(diagnostic_id::sc2243, location);
+      } else {
+        actx.report_diagnostic(diagnostic_id::sc2244, location);
+      }
+    }
   }
 
   /* The operand-shape lints over the closed operand range. A -z or -n on a
@@ -2527,6 +2671,18 @@ fn check_test_operand_lints(AnalysisContext &actx,
         {
           actx.report_diagnostic(diagnostic_id::sc2081,
                                  args[i + 1]->source_location());
+        } else if (i >= 2 && args[i - 1]->kind() == Token::Kind::Word) {
+          /* Two differing literals never compare equal, shellcheck SC2193. */
+          let const &left =
+              static_cast<const tokens::WordToken *>(args[i - 1])->word();
+          let const left_literal = left.to_literal_string();
+          if (word_is_fully_literal(left) &&
+              left_literal.view() != right_literal.view())
+          {
+            actx.report_diagnostic(diagnostic_id::sc2193,
+                                   args[i]->source_location(),
+                                   {left_literal.view(), right_literal.view()});
+          }
         }
       }
     }

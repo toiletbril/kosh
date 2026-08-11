@@ -1744,6 +1744,33 @@ cold fn CompoundListCondition::try_static_condition_verdict(
   return m_cmd->try_static_condition_verdict(actx);
 }
 
+/* The X token of a bracketed X != Y test the node holds, null when the node
+   holds anything else. */
+cold static fn
+node_inequality_left_operand(const CompoundListCondition *node) wontthrow
+    -> const Token *
+{
+  const Command *held = node->command();
+  if (held == nullptr) return nullptr;
+
+  const SimpleCommand *command = held->as_simple_command();
+  if (command == nullptr) return nullptr;
+
+  let const &args = command->args();
+  if (args.count() != 5) return nullptr;
+
+  let const name = args[0]->raw_view();
+  if (!name.has_value() || *name != StringView{"["}) return nullptr;
+
+  let const closer = args[4]->raw_view();
+  if (!closer.has_value() || *closer != StringView{"]"}) return nullptr;
+
+  let const op = args[2]->raw_view();
+  if (!op.has_value() || *op != StringView{"!="}) return nullptr;
+
+  return args[1];
+}
+
 fn CompoundList::analyze(AnalysisContext &actx,
                          bool is_unconditional) const throws -> void
 {
@@ -1844,6 +1871,21 @@ fn CompoundList::analyze(AnalysisContext &actx,
       {
         previous_node->append_presence_tested_command_names(
             actx, actx.tested_command_names, false);
+
+        /* Two inequalities on the same operand hold for every value, shellcheck
+           SC2252. */
+        let const before = node_inequality_left_operand(previous_node);
+        let const after = node_inequality_left_operand(node);
+        if (before != nullptr && after != nullptr) {
+          let const before_view = before->raw_view();
+          let const after_view = after->raw_view();
+          if (before_view.has_value() && after_view.has_value() &&
+              *before_view == *after_view)
+          {
+            actx.report_diagnostic(diagnostic_id::sc2252,
+                                   after->source_location(), {*after_view});
+          }
+        }
       }
     }
 

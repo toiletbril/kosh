@@ -20,6 +20,11 @@
      2 |  [ a == b ]
        |      ^~
 note: Use = for string equality.
+2:5: warning: The literals 'a' and 'b' differ, so the comparison never succeeds.
+     2 |  [ a == b ]
+       |      ^~
+note: Compare a variable, or correct the operand spelling.
+Encountered 2 warnings.
 2:3: error: Builtin `[`: '==' is a bashism, use = for string equality in POSIX mode.
      2 |  [ a == b ]
        |    ^

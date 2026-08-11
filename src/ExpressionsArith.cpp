@@ -83,6 +83,51 @@ cold static fn is_conditional_binary_operator(StringView op) wontthrow -> bool
   return CONDITIONAL_BINARY_OPERATORS.contains(op);
 }
 
+/* The operator an element spells when it is one, so a < or a > reaches the same
+   comparison as a worded operator. */
+cold static fn
+conditional_operator_view(const conditional_element &element) wontthrow
+    -> Maybe<StringView>
+{
+  using Kind = conditional_element::Kind;
+  switch (element.kind) {
+  case Kind::Less: return StringView{"<"};
+  case Kind::Greater: return StringView{">"};
+  case Kind::Operand: break;
+  default: return None;
+  }
+
+  if (element.word == nullptr) return None;
+
+  let const view = element.word->raw_view();
+  if (!view.has_value() || !is_conditional_binary_operator(*view)) return None;
+
+  return view;
+}
+
+/* The left operand of an X != Y triple whose operator sits at operator_index,
+   absent when the elements there do not form one. The raw view is compared, so
+   "$name" and $name stay distinct. */
+cold static fn conditional_inequality_left_operand(
+    const ArrayList<conditional_element> &elements,
+    usize operator_index) wontthrow -> Maybe<StringView>
+{
+  using Kind = conditional_element::Kind;
+  if (operator_index == 0 || operator_index + 1 >= elements.count())
+    return None;
+
+  let const &op = elements[operator_index];
+  if (op.kind != Kind::Operand || op.word == nullptr) return None;
+
+  let const op_view = op.word->raw_view();
+  if (!op_view.has_value() || *op_view != StringView{"!="}) return None;
+
+  let const &left = elements[operator_index - 1];
+  if (left.kind != Kind::Operand || left.word == nullptr) return None;
+
+  return left.word->raw_view();
+}
+
 fn ConditionalCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -112,9 +157,36 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
                                {op});
       continue;
     }
+
+    /* Two inequalities on the same operand hold for every value, shellcheck
+       SC2055. */
+    if (element.kind == Kind::Or && i >= 3) {
+      let const before = conditional_inequality_left_operand(m_elements, i - 2);
+      let const after = conditional_inequality_left_operand(m_elements, i + 2);
+      if (before.has_value() && after.has_value() && *before == *after) {
+        actx.report_diagnostic(diagnostic_id::sc2055,
+                               m_elements[i + 1].word->source_location(),
+                               {*before});
+      }
+    }
+
     if (element.kind != Kind::Operand || element.word == nullptr) continue;
 
     let const operand = element.word->raw_string();
+
+    /* A unary operator followed by a binary operator lost its operand,
+       shellcheck SC1019. */
+    if (is_test_unary_operator_word(operand.view()) &&
+        i + 1 < m_elements.count())
+    {
+      let const next_operator = conditional_operator_view(m_elements[i + 1]);
+      if (next_operator.has_value()) {
+        actx.report_diagnostic(diagnostic_id::sc1019,
+                               element.word->source_location(),
+                               {operand.view(), *next_operator});
+      }
+    }
+
     if (operand.view() == ">=" || operand.view() == "<=") {
       actx.report_diagnostic(diagnostic_id::sc2122,
                              element.word->source_location(), {operand.view()});
@@ -749,7 +821,11 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
        body_source[m_name.count()] == '\n' ||
        body_source[m_name.count()] == ';'))
   {
-    actx.report_diagnostic(diagnostic_id::sc2264, m_body->source_location());
+    let const call_location =
+        SourceLocation{static_cast<usize>(body_source.data - actx.source.data),
+                       m_name.count(), m_body->source_location().filename};
+    actx.report_diagnostic(diagnostic_id::sc2264, call_location,
+                           {m_name.view()}, source_location());
   }
 
   /* The body runs later when the function is called, so it is analyzed from an

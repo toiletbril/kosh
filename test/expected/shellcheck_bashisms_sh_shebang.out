@@ -736,6 +736,10 @@ note: Compare the timestamps with find or ls under a sh shebang.
     48 |    [ -a present ]
        |      ^~
 note: Use -e instead.
+49:11: warning: The literals 'alpha' and 'beta' differ, so the comparison never succeeds.
+    49 |    [ alpha = beta ]
+       |            ^
+note: Compare a variable, or correct the operand spelling.
 55:3: warning: Commands after exec do not run when exec succeeds.
     55 |    exec -c env
        |    ^~~~
@@ -775,6 +779,6 @@ note: Name the signal in uppercase under a sh shebang.
     62 |    printf '%q\n' "$value"
        |           ^~~~~~
 note: Quote the value another way under a sh shebang.
-Encountered 45 warnings.
+Encountered 46 warnings.
 done
 [Code 0]

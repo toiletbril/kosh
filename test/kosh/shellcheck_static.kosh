@@ -164,6 +164,24 @@ test_operator_diagnostics() {
   [ -e "$left" -a -e "$right" ]
 }
 
+constant_test_diagnostics() {
+  [ ]
+  [ false ]
+  [ 0 ]
+  [ true ]
+  [ 1 ]
+  [ literal ]
+  [ "$(ls)" ]
+  [ "$left" ]
+  [ -n ]
+  [ a = b ]
+  [ "$left" = b ]
+  [ "$left" != a -o "$left" != b ]
+  [[ $left != a || $left != b ]]
+  [ "$left" != a ] || [ "$left" != b ]
+  [[ -z == foo ]]
+}
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {

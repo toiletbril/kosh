@@ -391,6 +391,42 @@
           [CompoundListCondition, None]
             [SimpleCommand "[" "-e" "$left" "-a" "-e" "$right" "]"]
   [CompoundListCondition, None]
+    [FunctionDefinition "constant_test_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "false" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "0" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "true" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "1" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "literal" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$(ls)" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "a" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "!=" "a" "-o" "$left" "!=" "b" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "!=" "a" "]"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "[" "$left" "!=" "b" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -1983,6 +2019,219 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "constant_test_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "literal"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  CommandSubstitution "ls"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -2136,6 +2385,10 @@ note: Drop the ! and use -ne.
     59 |  [ ! a = b ]
        |    ^
 note: Drop the ! and use !=.
+59:7: warning: The literals 'a' and 'b' differ, so the comparison never succeeds.
+    59 |  [ ! a = b ]
+       |        ^
+note: Compare a variable, or correct the operand spelling.
 62:8: warning: The printf format comes from a variable, the data can inject format directives.
     62 |  printf "$1"
        |         ^~~~
@@ -2489,15 +2742,82 @@ note: Write `[ x = y ]` to compare the values.
    164 |    [ -e "$left" -a -e "$right" ]
        |                 ^~
 note: Join two tests with && or || instead.
-167:21: warning: This function wrapper calls itself recursively.
-   167 |  recursive_wrapper() { recursive_wrapper "$@"; }
-       |                      ^
-note: Use command before the wrapped command name.
-172:8: warning: An unquoted variable can split into words and expand globs.
-   172 |    echo $reported
+168:3: warning: A test with no operand always fails.
+   168 |    [ ]
+       |    ^
+note: Write `false` for a failing condition.
+169:5: warning: `[ false ]` tests the nonempty word `false`, so it succeeds.
+   169 |    [ false ]
+       |      ^~~~~
+note: Drop the brackets and write `false`.
+170:5: warning: `[ 0 ]` tests the nonempty word `0`, so it succeeds.
+   170 |    [ 0 ]
+       |      ^
+note: Write `false` for a failing condition.
+171:5: warning: `[ true ]` tests the nonempty word `true`, the brackets add nothing.
+   171 |    [ true ]
+       |      ^~~~
+note: Drop the brackets and write `true`.
+172:5: warning: `[ 1 ]` tests the nonempty word `1`, the brackets add nothing.
+   172 |    [ 1 ]
+       |      ^
+note: Write `true` for a succeeding condition.
+173:5: warning: The 'literal' operand is a literal, so the test never changes.
+   173 |    [ literal ]
+       |      ^~~~~~~
+note: Add the `$` when a variable was meant.
+174:5: warning: A one-operand test on command output only checks that something was printed.
+   174 |    [ "$(ls)" ]
+       |      ^~~~~~~
+note: Write it with `-n`, or drop the brackets to check the exit status.
+175:5: warning: A one-operand test is the nonempty-string test.
+   175 |    [ "$left" ]
+       |      ^~~~~~~
+note: Write it with -n to read clearer.
+177:7: warning: The literals 'a' and 'b' differ, so the comparison never succeeds.
+   177 |    [ a = b ]
+       |        ^
+note: Compare a variable, or correct the operand spelling.
+179:18: warning: The '$left' operand fails only one of the two `!=` tests, so the `-o` is always true.
+   179 |    [ "$left" != a -o "$left" != b ]
+       |                   ^~
+note: Join the two inequalities with `-a`.
+179:18: warning: A test with -a or -o is obsolescent.
+   179 |    [ "$left" != a -o "$left" != b ]
+       |                   ^~
+note: Join two tests with && or || instead.
+180:20: warning: The '$left' operand fails only one of the two `!=` tests, so the `||` is always true.
+   180 |    [[ $left != a || $left != b ]]
+       |                     ^~~~~
+note: Join the two inequalities with `&&`.
+181:25: warning: The '$left' operand fails only one of the two `!=` tests, so the `||` is always true.
+   181 |    [ "$left" != a ] || [ "$left" != b ]
+       |                          ^~~~~~~
+note: Join the two tests with `&&`.
+182:6: warning: The '-z' operator expects an operand, '==' is another operator.
+   182 |    [[ -z == foo ]]
+       |       ^~
+note: Give the operator its operand before the comparison.
+182:9: warning: The operand is literal, so this string test is constant.
+   182 |    [[ -z == foo ]]
+       |          ^~
+note: Test a variable or drop the check.
+182:3: warning: The '==' comparison has literal operands on both sides.
+   182 |    [[ -z == foo ]]
+       |    ^~~~~~~~~~~~~~~
+note: Remove the constant condition or compare runtime data.
+185:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   185 |  recursive_wrapper() { recursive_wrapper "$@"; }
+       |                        ^~~~~~~~~~~~~~~~~
+185:1: details:
+   185 |  recursive_wrapper() { recursive_wrapper "$@"; }
+       |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
+note: Use `command` before the wrapped command name.
+190:8: warning: An unquoted variable can split into words and expand globs.
+   190 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 116 warnings.
+Encountered 133 warnings.
 done
 done
 done
