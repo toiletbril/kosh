@@ -732,6 +732,32 @@
           [CompoundListCondition, None]
             [SimpleCommand "spaced" "+=" "tail"]
   [CompoundListCondition, None]
+    [FunctionDefinition "redirection_semantics_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand]
+              [SimpleCommand "grep" "foo"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cat" "file"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "gzcat" "a"]
+              [SimpleCommand "grep" "x"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "env"]
+              [SimpleCommand "grep" "ANDROID"]
+          [CompoundListCondition, None]
+            [SimpleCommand "grep" "foo"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "host"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "host"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3696,6 +3722,99 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "redirection_semantics_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "report.txt"
+]
+[Word
+  Unquoted "file.txt"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "gzcat"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "today.log"
+]
+[Word
+  Unquoted "env"
+]
+[Word
+  Unquoted "environment.txt"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "ANDROID"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "in1"
+]
+[Word
+  Unquoted "in2"
+]
+[Word
+  Unquoted "out1"
+]
+[Word
+  Unquoted "out2"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "host"
+]
+[Word
+  Unquoted "BARE"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "host"
+]
+[Word
+  DoubleQuoted "QUOTED"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -4822,26 +4941,64 @@ note: Rename the variable to start with a letter or an underscore.
    322 |    spaced += tail
        |           ^~
 note: Write NAME+=value without spaces, or quote the operator to pass it through.
-325:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   325 |  false && break
+326:5: warning: The redirection is attached to no command, so no data is read or written.
+   326 |    > report.txt
+       |      ^~~~~~~~~~
+note: Attach the redirection to its command, or write `: > file` for the truncation.
+327:5: warning: The pipeline stage holds a redirection and no command, so it moves no data.
+   327 |    < file.txt | grep foo
+       |      ^~~~~~~~
+note: Attach the redirection to the command that reads it.
+328:14: warning: The redirect opens a file named 'tr', and the command never runs.
+   328 |    cat file > tr
+       |               ^~
+note: Feed `tr` through a pipe, or quote the name to write the file.
+329:22: warning: The input redirection takes precedence, so the pipe into 'grep' is closed.
+   329 |    gzcat a | grep x < today.log
+       |                       ^~~~~~~~~
+note: Pass the file as an operand, or merge the inputs into one stream.
+330:9: warning: The output redirection takes precedence, so the pipe out of 'env' is closed.
+   330 |    env > environment.txt | grep ANDROID
+       |          ^~~~~~~~~~~~~~~
+note: Use `tee` to write the file and feed the pipe.
+331:20: warning: The redirect to 'in2' competes with an earlier redirect for the same descriptor.
+   331 |    grep foo < in1 < in2 > out1 > out2
+       |                     ^~~
+331:14: details:
+   331 |    grep foo < in1 < in2 > out1 > out2
+       |               ^~~ this earlier redirect claims the same descriptor.
+note: Pass the files as operands, or use `tee` for several outputs.
+331:33: warning: The redirect to 'out2' competes with an earlier redirect for the same descriptor.
+   331 |    grep foo < in1 < in2 > out1 > out2
+       |                                  ^~~~
+331:26: details:
+   331 |    grep foo < in1 < in2 > out1 > out2
+       |                           ^~~~ this earlier redirect claims the same descriptor.
+note: Pass the files as operands, or use `tee` for several outputs.
+332:3: warning: The here document body is expanded here before `ssh` sends it.
+   332 |    ssh host <<BARE
+       |    ^~~
+note: Quote the delimiter to send the body unexpanded.
+340:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   340 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-326:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   326 |  false && continue
+341:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   341 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-328:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   328 |  recursive_wrapper() { recursive_wrapper "$@"; }
+343:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   343 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-328:1: details:
-   328 |  recursive_wrapper() { recursive_wrapper "$@"; }
+343:1: details:
+   343 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-333:8: warning: An unquoted variable can split into words and expand globs.
-   333 |    echo $reported
+348:8: warning: An unquoted variable can split into words and expand globs.
+   348 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 269 warnings.
+Encountered 277 warnings.
 done
 done
 done

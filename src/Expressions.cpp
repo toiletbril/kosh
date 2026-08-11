@@ -1142,6 +1142,19 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   if (m_args.is_empty()) {
+    /* A bare redirection opens its target and nothing reads or writes it,
+       shellcheck SC2188 and SC2189. An assignment-only command is the SC2036
+       shape and is reported by the pipeline. */
+    if (!m_redirections.is_empty() && m_local_vars.is_empty() &&
+        m_array_args.is_empty())
+    {
+      let const id = actx.is_direct_pipeline_stage ? diagnostic_id::sc2189
+                                                   : diagnostic_id::sc2188;
+      let const target = m_redirections[0].target;
+      actx.report_diagnostic(id, target != nullptr ? target->source_location()
+                                                   : source_location());
+    }
+
     for (let const &assignment : m_array_args) {
       if (assignment.elements.count() < 2) continue;
 
@@ -1784,6 +1797,22 @@ cold fn SimpleCommand::try_static_condition_verdict(
   return optimizer::simple_command_static_verdict(m_args, actx);
 }
 
+/* The redirection that takes the descriptor away from the pipe, or null when
+   the stage leaves it alone. */
+pure fn find_pipe_overriding_redirection(const SimpleCommand *stage,
+                                         bool wants_output) wontthrow
+    -> const Redirection *
+{
+  for (let const &redirection : stage->redirections()) {
+    let const claims_stream = wants_output ? redirection.opens_output_file()
+                                           : redirection.opens_input_source();
+    if (claims_stream && redirection.fd == (wants_output ? 1 : 0))
+      return &redirection;
+  }
+
+  return nullptr;
+}
+
 fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
@@ -1857,6 +1886,24 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     const SimpleCommand *next = m_commands[i + 1]->as_simple_command();
     if (stage == nullptr || next == nullptr) continue;
     if (stage->args().is_empty() || next->args().is_empty()) continue;
+
+    /* One descriptor cannot hold both a pipe and a file, and the redirection
+       wins, shellcheck SC2259 and SC2260. Each stage is visited once as the
+       feeding side and once as the receiving side. */
+    let const output_override = find_pipe_overriding_redirection(stage, true);
+    if (output_override != nullptr && output_override->target != nullptr) {
+      actx.report_diagnostic(
+          diagnostic_id::sc2260, output_override->target->source_location(),
+          {stage->args()[0]->raw_view().value_or(StringView{})});
+    }
+
+    let const input_override = find_pipe_overriding_redirection(next, false);
+    if (input_override != nullptr && input_override->target != nullptr) {
+      actx.report_diagnostic(
+          diagnostic_id::sc2259, input_override->target->source_location(),
+          {next->args()[0]->raw_view().value_or(StringView{})});
+    }
+
     let const stage_name = static_command_name(stage->args()[0]);
     let const next_name = static_command_name(next->args()[0]);
     if (!stage_name.has_value() || !next_name.has_value()) continue;

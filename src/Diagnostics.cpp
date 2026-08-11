@@ -344,6 +344,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "an unquoted test variable can split or vanish",
       "A test reads an unquoted variable",
       "Quote it to avoid an empty or split argument", None, Strict, Policy),
+    D(2087, "unquoted-heredoc-delimiter",
+      "an unquoted here document delimiter expands on this host",
+      "The here document body is expanded here before `ssh` sends it",
+      "Quote the delimiter to send the body unexpanded", None, Lenient, Policy),
     D(2088, "quoted-tilde", "a quoted tilde remains literal",
       "A quoted tilde stays literal instead of expanding to the home directory",
       "Leave the tilde unquoted or use a quoted $HOME expansion", None, Lenient,
@@ -652,6 +656,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Some `find` implementations have no default path, so this search walks "
       "nothing",
       "Write `.` as the path before the expression", None, Lenient, Policy),
+    D(2188, "redirection-without-command", "a redirection has no command",
+      "The redirection is attached to no command, so no data is read or "
+      "written",
+      "Attach the redirection to its command, or write `: > file` for the "
+      "truncation",
+      None, Lenient, Policy),
+    D(2189, "pipeline-stage-without-command", "a pipeline stage has no command",
+      "The pipeline stage holds a redirection and no command, so it moves no "
+      "data",
+      "Attach the redirection to the command that reads it", None, Strict,
+      Policy),
     D(2193, "impossible-comparison", "the compared literals can never be equal",
       "The literals '{0}' and '{1}' differ, so the comparison never succeeds",
       "Compare a variable, or correct the operand spelling", None, Strict,
@@ -793,6 +808,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Test with -n instead", None, Annoying, Policy),
     D(2237, "negated-n", "a negated -n is -z", "A negated -n is just -z",
       "Test with -z instead", None, Annoying, Policy),
+    D(2238, "redirection-to-command-name",
+      "a redirection target names a command",
+      "The redirect opens a file named '{0}', and the command never runs",
+      "Feed `{0}` through a pipe, or quote the name to write the file", None,
+      Strict, Policy),
     D(2240, "posix-dot-arguments", "the POSIX dot command takes no argument",
       "The POSIX `.` command reads a file and takes no argument, so '{0}' "
       "never "
@@ -840,6 +860,23 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A redirection expansion can run in a child and lose its mutation",
       "Update the variable before forming the redirect path", None, Strict,
       Policy),
+    D(2259, "redirection-overrides-input-pipe",
+      "a redirection overrides the piped input",
+      "The input redirection takes precedence, so the pipe into '{0}' is "
+      "closed",
+      "Pass the file as an operand, or merge the inputs into one stream", None,
+      Strict, Policy),
+    D(2260, "redirection-overrides-output-pipe",
+      "a redirection overrides the piped output",
+      "The output redirection takes precedence, so the pipe out of '{0}' is "
+      "closed",
+      "Use `tee` to write the file and feed the pipe", None, Strict, Policy),
+    D(2261, "competing-redirections",
+      "several redirections compete for one descriptor",
+      "The redirect to '{0}' competes with an earlier redirect for the same "
+      "descriptor",
+      "Pass the files as operands, or use `tee` for several outputs",
+      "this earlier redirect claims the same descriptor", Strict, Policy),
     D(2264, "recursive-wrapper", "a function wrapper calls itself recursively",
       "The '{0}' function calls itself recursively",
       "Use `command` before the wrapped command name", "'{0}' is defined here",
@@ -3658,6 +3695,19 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
   }
 }
 
+/* A bare word naming one of these programs is almost always a missing command
+   substitution or a missing pipe, shellcheck SC2209 and SC2238. Words that read
+   naturally as data, such as test, id, set, true, and echo, are left out. */
+constexpr PackedStringKey COMMAND_NAME_VALUE_KEYS[] = {
+    SSK("awk"),   SSK("cat"),    SSK("chmod"), SSK("chown"), SSK("cp"),
+    SSK("curl"),  SSK("docker"), SSK("git"),   SSK("grep"),  SSK("hostname"),
+    SSK("ln"),    SSK("ls"),     SSK("mkdir"), SSK("mv"),    SSK("printf"),
+    SSK("pwd"),   SSK("rm"),     SSK("rmdir"), SSK("sed"),   SSK("ssh"),
+    SSK("sudo"),  SSK("touch"),  SSK("tr"),    SSK("uname"), SSK("whoami"),
+    SSK("xargs"),
+};
+constexpr StaticStringSet COMMAND_NAME_VALUES{COMMAND_NAME_VALUE_KEYS};
+
 cold fn plain_output_redirection_spelling(Redirection::Kind kind) wontthrow
     -> Maybe<StringView>
 {
@@ -3684,6 +3734,10 @@ fn check_redirection_lints(AnalysisContext &actx,
   const Token *read_token = nullptr;
   let const is_test_command =
       input.is_in_group(COMMAND_GROUP_TEST) && !input.command_is_shadowed;
+  /* Descriptors 0 through 9 are the ones a script writes, and the location of
+     the first claim is kept so the second claim can point back at it. */
+  SourceLocation claimed_fd_locations[10]{};
+  u16 claimed_fd_mask = 0;
 
   for (let const &redirection : input.redirections) {
     if (redirection.kind == Redirection::Kind::DuplicateOutput &&
@@ -3697,6 +3751,38 @@ fn check_redirection_lints(AnalysisContext &actx,
     if (is_posix) {
       check_posix_redirection_portability(actx, redirection,
                                           input.command_location());
+    }
+
+    /* A descriptor points at one file, so a second claim silently wins and the
+       first is lost, shellcheck SC2261. */
+    if (redirection.claims_descriptor() && redirection.fd >= 0 &&
+        redirection.fd < 10 && redirection.target != nullptr)
+    {
+      let const fd_bit = static_cast<u16>(1u << redirection.fd);
+      if ((claimed_fd_mask & fd_bit) != 0) {
+        actx.report_diagnostic(
+            diagnostic_id::sc2261, redirection.target->source_location(),
+            {redirection.target->raw_view().value_or(StringView{})},
+            claimed_fd_locations[redirection.fd]);
+      } else {
+        claimed_fd_mask |= fd_bit;
+        claimed_fd_locations[redirection.fd] =
+            redirection.target->source_location();
+      }
+    }
+
+    /* The local shell expands an unquoted here document body before ssh sends
+       it, so the remote host receives values from this host, shellcheck
+       SC2087. */
+    if (redirection.kind == Redirection::Kind::Heredoc &&
+        redirection.should_expand_heredoc &&
+        input.command_id() == command_name_id::Ssh &&
+        !input.command_is_shadowed)
+    {
+      actx.report_diagnostic(diagnostic_id::sc2087,
+                             redirection.target != nullptr
+                                 ? redirection.target->source_location()
+                                 : input.command_location());
     }
 
     let const is_file_output =
@@ -3733,6 +3819,21 @@ fn check_redirection_lints(AnalysisContext &actx,
           actx.report_diagnostic(diagnostic_id::sc2210,
                                  redirection.target->source_location(),
                                  {*digits});
+        }
+
+        /* Quoting the name states that a file is meant, and the word literal
+           drops the quotes, so the source text decides, shellcheck SC2238. */
+        if (digits.has_value() && COMMAND_NAME_VALUES.contains(*digits)) {
+          let const target_source =
+              redirection.target->source_location().get_source_text(
+                  actx.source);
+          if (target_source.has_value() && !target_source->is_empty() &&
+              (*target_source)[0] != '"' && (*target_source)[0] != '\'')
+          {
+            actx.report_diagnostic(diagnostic_id::sc2238,
+                                   redirection.target->source_location(),
+                                   {*digits});
+          }
         }
       }
     }
@@ -4258,19 +4359,6 @@ pure fn value_has_written_escape(StringView value) wontthrow -> bool
 
   return false;
 }
-
-/* A value naming one of these programs is almost always a missing command
-   substitution, shellcheck SC2209. Words that read naturally as data, such as
-   test, id, set, true, and echo, are left out. */
-constexpr PackedStringKey COMMAND_NAME_VALUE_KEYS[] = {
-    SSK("awk"),   SSK("cat"),    SSK("chmod"), SSK("chown"), SSK("cp"),
-    SSK("curl"),  SSK("docker"), SSK("git"),   SSK("grep"),  SSK("hostname"),
-    SSK("ln"),    SSK("ls"),     SSK("mkdir"), SSK("mv"),    SSK("printf"),
-    SSK("pwd"),   SSK("rm"),     SSK("rmdir"), SSK("sed"),   SSK("ssh"),
-    SSK("sudo"),  SSK("touch"),  SSK("tr"),    SSK("uname"), SSK("whoami"),
-    SSK("xargs"),
-};
-constexpr StaticStringSet COMMAND_NAME_VALUES{COMMAND_NAME_VALUE_KEYS};
 
 } /* namespace */
 

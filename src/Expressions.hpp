@@ -420,6 +420,36 @@ public:
   bool can_dup_be_filename;
   bool is_both_streams_spelling;
   const Token *fd_allocation_name_token;
+
+  pure fn opens_output_file() const wontthrow -> bool
+  {
+    switch (kind) {
+    case Kind::TruncateOutput:
+    case Kind::TruncateOutputOverride:
+    case Kind::AppendOutput: return true;
+
+    default: return false;
+    }
+  }
+
+  pure fn opens_input_source() const wontthrow -> bool
+  {
+    switch (kind) {
+    case Kind::ReadInput:
+    case Kind::ReadWrite:
+    case Kind::Heredoc:
+    case Kind::HereString: return true;
+
+    default: return false;
+    }
+  }
+
+  /* A duplication and a close copy a descriptor that is already open, so only
+     these forms compete with a pipe or with a second redirect for fd. */
+  pure fn claims_descriptor() const wontthrow -> bool
+  {
+    return opens_output_file() || opens_input_source();
+  }
 };
 
 class SimpleCommand : public Command
