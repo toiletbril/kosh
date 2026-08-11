@@ -198,6 +198,22 @@ test_grouping_diagnostics() {
   if ( [[ -f "$left" ]] ); then echo found; fi
 }
 
+test_operand_expansion_diagnostics() {
+  [ "$@" = one ]
+  [ "${values[@]}" = one ]
+  [ {a,b} = one ]
+  [ *.txt = one ]
+  [ -d *.txt ]
+  [ -v arr[i] ]
+  [ -n $value ]
+  [[ "$@" = one ]]
+  [[ {a,b} = one ]]
+  [[ *.txt = one ]]
+  [[ "$left" = $right ]]
+  [[ "$left" != $right ]]
+  [[ "$left" =~ *.txt ]]
+}
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {

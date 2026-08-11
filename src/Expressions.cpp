@@ -925,6 +925,63 @@ cold fn word_is_bare_glob(const Word &word) wontthrow -> bool
          word.segments[0].has_glob_metacharacter();
 }
 
+/* A brace expansion needs a comma or a range inside its braces, so a lone brace
+   in a path is left alone. */
+cold static fn view_has_brace_expansion(StringView text) wontthrow -> bool
+{
+  let const open = text.find_character('{');
+  if (!open.has_value()) return false;
+
+  for (usize position = *open + 1; position < text.length; position++) {
+    switch (text[position]) {
+    case '}': return false;
+    case ',': return true;
+    case '.':
+      if (position + 1 < text.length && text[position + 1] == '.') return true;
+      break;
+    default: break;
+    }
+  }
+
+  return false;
+}
+
+cold fn classify_test_operand(const Word &word) wontthrow -> test_operand_shape
+{
+  test_operand_shape shape;
+
+  for (let const &segment : word.segments) {
+    switch (segment.kind) {
+    case WordSegment::Kind::VariableReference: {
+      if (!segment.is_in_double_quotes) shape.has_unquoted_expansion = true;
+
+      let const name = segment.text.view();
+      if (name == "@" || (name.length >= 3 &&
+                          name.substring(name.length - 3) == StringView{"[@]"}))
+      {
+        shape.has_array_spread = true;
+      }
+      break;
+    }
+
+    case WordSegment::Kind::CommandSubstitution:
+    case WordSegment::Kind::FunctionSubstitution:
+      if (!segment.is_in_double_quotes) shape.has_unquoted_expansion = true;
+      break;
+
+    case WordSegment::Kind::UnquotedText:
+      if (segment.has_glob_metacharacter()) shape.has_unquoted_glob = true;
+      if (view_has_brace_expansion(segment.text.view()))
+        shape.has_brace_expansion = true;
+      break;
+
+    default: break;
+    }
+  }
+
+  return shape;
+}
+
 cold fn bare_glob_can_start_with_dash(const Word &word) wontthrow -> bool
 {
   if (!word_is_bare_glob(word)) return false;

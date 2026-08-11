@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2245
 d=$(mktemp -d)
 cd "$d"
 [ -e *.zzz ] && echo bracket-exists || echo bracket-no-match

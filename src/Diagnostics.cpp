@@ -145,6 +145,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2048, "unquoted-star", "$* splits positional parameters",
       "$* splits positional parameters and loses their boundaries",
       "Use quoted \"$@\" to preserve each argument", None, Strict, Policy),
+    D(2049, "regex-operator-takes-glob",
+      "the regex operator was given a glob pattern",
+      "The `=~` operator takes a regular expression, '{0}' reads as a glob",
+      "Compare with `=` for a glob, or write the pattern as a regex", None,
+      Strict, Policy),
     D(2050, "constant-comparison", "a conditional compares two constant values",
       "The '{0}' comparison has literal operands on both sides",
       "Remove the constant condition or compare runtime data", None, Annoying,
@@ -152,6 +157,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2051, "variable-brace-range", "brace ranges expand before variables",
       "Brace ranges are expanded before variables",
       "Use an arithmetic loop for a variable limit", None, Lenient, Policy),
+    D(2053, "unquoted-conditional-right-operand",
+      "an unquoted right operand is matched as a glob",
+      "The right side of `{0}` inside `[[ ]]` is matched as a glob, not "
+      "compared",
+      "Quote '{1}' so the comparison stays literal", None, Strict, Policy),
     D(2055, "or-between-inequalities",
       "an or between two inequalities is always true",
       "The '{0}' operand fails only one of the two `!=` tests, so the `||` is "
@@ -218,6 +228,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "2>&1 before the file redirect duplicates the terminal, so stderr stays "
       "on the terminal",
       "Put the file redirect first as in '>file 2>&1'", None, Strict, Policy),
+    D(2070, "unquoted-nonempty-test",
+      "an unquoted operand breaks the nonempty test",
+      "The `-n` operand is unquoted, so an empty value leaves `-n` with no "
+      "operand",
+      "Quote the operand, or use the `[[ ]]` form", None, Strict, Policy),
     D(2071, "string-numeric-operator",
       "a string operator compares lexicographically",
       "The {0} operator compares strings lexicographically",
@@ -442,6 +457,32 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2197, "deprecated-fgrep", "fgrep is deprecated",
       "The fgrep command is deprecated",
       "Use grep -F for the fixed string match", None, Annoying, Policy),
+    D(2198, "array-operand-in-test", "an array does not fit one test operand",
+      "The `[ ]` test takes one word per operand, '{0}' expands to every "
+      "element",
+      "Loop over the elements, or join them with `*`", None, Strict, Policy),
+    D(2199, "array-operand-in-conditional",
+      "an array concatenates inside double brackets",
+      "A `[[ ]]` expression concatenates '{0}' into one word",
+      "Loop over the elements, or write `*` in place of `@`", None, Strict,
+      Policy),
+    D(2200, "brace-expansion-in-test",
+      "a brace expansion does not fit one test operand",
+      "The `[ ]` test takes one word per operand, '{0}' expands to several",
+      "Loop over the expanded words", None, Strict, Policy),
+    D(2201, "brace-expansion-in-conditional",
+      "a brace expansion stays literal inside double brackets",
+      "A `[[ ]]` expression leaves '{0}' unexpanded",
+      "Loop over the expanded words", None, Strict, Policy),
+    D(2202, "glob-operand-in-test", "a glob does not fit one test operand",
+      "The `[ ]` test takes one word per operand, '{0}' expands to every "
+      "match",
+      "Loop over the matches", None, Strict, Policy),
+    D(2203, "glob-operand-in-conditional",
+      "a glob stays literal inside double brackets",
+      "A `[[ ]]` expression matches a glob only to the right of `=` or `!=`, "
+      "so '{0}' stays literal",
+      "Loop over the matches", None, Strict, Policy),
     D(2204, "parentheses-subshell",
       "parentheses start a subshell instead of a test",
       "Parentheses start a subshell rather than a file or string test",
@@ -454,6 +495,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An array built from command output splits words and expands globs",
       "Use mapfile or readarray to preserve output records", None, Strict,
       Policy),
+    D(2208, "unquoted-set-variable-operand", "the -v operand expands as a glob",
+      "The `-v` operand '{0}' carries glob characters, so the shell expands it "
+      "before the test runs",
+      "Quote the name, or use the `[[ ]]` form", None, Strict, Policy),
     D(2210, "numeric-redirection-target",
       "a redirection target of digits is not a descriptor",
       "The redirect writes to the file named '{0}', it does not name a "
@@ -517,6 +562,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2244, "one-operand-test", "a one-operand test is a nonempty-string test",
       "A one-operand test is the nonempty-string test",
       "Write it with -n to read clearer", None, Annoying, Policy),
+    D(2245, "file-test-on-glob-in-test",
+      "a file test reaches only the first expanded path",
+      "The `{0}` test runs against the first path '{1}' expands to",
+      "Loop over the matches to test each one", None, Lenient, Policy),
     D(2249, "case-without-default", "a case without a default can miss input",
       "This case has no default *) branch, a value no pattern matches is "
       "silently ignored",
@@ -1158,6 +1207,22 @@ cold fn is_known_test_operator_word(StringView op) wontthrow -> bool
 {
   return TEST_UNARY_OPERATORS.contains(op) ||
          TEST_BINARY_OPERATORS.contains(op);
+}
+
+/* The unary operators that take a path, for the SC2245 lint. -a is left out
+   because it also joins two conditions, -t takes a descriptor, and -n and -z
+   belong to SC2157. */
+constexpr PackedStringKey TEST_PATH_UNARY_OPERATOR_KEYS[] = {
+    SSK("-b"), SSK("-c"), SSK("-d"), SSK("-e"), SSK("-f"), SSK("-g"), SSK("-h"),
+    SSK("-k"), SSK("-p"), SSK("-r"), SSK("-s"), SSK("-u"), SSK("-w"), SSK("-x"),
+    SSK("-G"), SSK("-L"), SSK("-N"), SSK("-O"), SSK("-S"),
+};
+constexpr StaticStringSet TEST_PATH_UNARY_OPERATORS{
+    TEST_PATH_UNARY_OPERATOR_KEYS};
+
+cold fn is_test_path_unary_operator_word(StringView op) wontthrow -> bool
+{
+  return TEST_PATH_UNARY_OPERATORS.contains(op);
 }
 
 } /* namespace */
@@ -2624,6 +2689,46 @@ fn check_test_operand_lints(AnalysisContext &actx,
     if (view == ">=" || view == "<=") {
       actx.report_diagnostic(diagnostic_id::sc2122, args[i]->source_location(),
                              {view});
+    }
+
+    /* The bracket test takes one word per operand, so an operand that expands
+       to several words leaves the test with a stray argument. The shape is read
+       once from the segments the word already holds. */
+    if (i < operand_end) {
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      let const shape = classify_test_operand(word);
+      let const written =
+          analysis_source_text(actx, args[i]->source_location());
+      let const previous = previous_literal.view();
+
+      if (shape.has_array_spread) {
+        actx.report_diagnostic(diagnostic_id::sc2198,
+                               args[i]->source_location(), {written});
+      }
+
+      if (shape.has_brace_expansion) {
+        actx.report_diagnostic(diagnostic_id::sc2200,
+                               args[i]->source_location(), {written});
+      }
+
+      if (shape.has_unquoted_glob) {
+        if (previous == "-v") {
+          actx.report_diagnostic(diagnostic_id::sc2208,
+                                 args[i]->source_location(), {written});
+        } else if (is_test_path_unary_operator_word(previous)) {
+          actx.report_diagnostic(diagnostic_id::sc2245,
+                                 args[i]->source_location(),
+                                 {previous, written});
+        } else if (!is_test_binary_operator_word(previous)) {
+          actx.report_diagnostic(diagnostic_id::sc2202,
+                                 args[i]->source_location(), {written});
+        }
+      }
+
+      if (shape.has_unquoted_expansion && previous == "-n") {
+        actx.report_diagnostic(diagnostic_id::sc2070,
+                               args[i]->source_location());
+      }
     }
 
     if (is_posix) {

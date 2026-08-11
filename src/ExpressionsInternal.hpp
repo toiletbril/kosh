@@ -45,6 +45,18 @@ pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
                                         StringView expression) wontthrow
     -> bool;
 cold fn word_is_bare_glob(const Word &word) wontthrow -> bool;
+
+/* What one test operand expands to, gathered in the segment walk the operand
+   loop already performs. */
+struct test_operand_shape
+{
+  bool has_array_spread{false};
+  bool has_brace_expansion{false};
+  bool has_unquoted_glob{false};
+  bool has_unquoted_expansion{false};
+};
+
+cold fn classify_test_operand(const Word &word) wontthrow -> test_operand_shape;
 fn operand_target_name(StringView text) wontthrow -> StringView;
 cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
     -> bool;

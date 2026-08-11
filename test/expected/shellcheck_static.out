@@ -488,6 +488,36 @@
                 [CompoundListCondition, None]
                   [SimpleCommand "echo" "found"]
   [CompoundListCondition, None]
+    [FunctionDefinition "test_operand_expansion_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$@" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$values[@]" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "{a,b}" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "*.txt" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-d" "*.txt" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-v" "arr[i]" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "$value" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -2563,6 +2593,201 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "test_operand_expansion_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "values[@]"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "{a,b}"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "arr[i]"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "{a,b}"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "=~"
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -3225,18 +3450,90 @@ note: Remove the parentheses.
    198 |    if ( [[ -f "$left" ]] ); then echo found; fi
        |       ^
 note: Remove the parentheses.
-201:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   201 |  recursive_wrapper() { recursive_wrapper "$@"; }
+202:5: warning: The `[ ]` test takes one word per operand, '"$@"' expands to every element.
+   202 |    [ "$@" = one ]
+       |      ^~~~
+note: Loop over the elements, or join them with `*`.
+203:5: warning: The `[ ]` test takes one word per operand, '"${values[@]}"' expands to every element.
+   203 |    [ "${values[@]}" = one ]
+       |      ^~~~~~~~~~~~~~
+note: Loop over the elements, or join them with `*`.
+204:5: warning: The `[ ]` test takes one word per operand, '{a,b}' expands to several.
+   204 |    [ {a,b} = one ]
+       |      ^~~~~
+note: Loop over the expanded words.
+204:11: warning: The literals '{a,b}' and 'one' differ, so the comparison never succeeds.
+   204 |    [ {a,b} = one ]
+       |            ^
+note: Compare a variable, or correct the operand spelling.
+205:5: warning: The `[ ]` test takes one word per operand, '*.txt' expands to every match.
+   205 |    [ *.txt = one ]
+       |      ^~~~~
+note: Loop over the matches.
+205:11: warning: The literals '*.txt' and 'one' differ, so the comparison never succeeds.
+   205 |    [ *.txt = one ]
+       |            ^
+note: Compare a variable, or correct the operand spelling.
+206:8: warning: The `-d` test runs against the first path '*.txt' expands to.
+   206 |    [ -d *.txt ]
+       |         ^~~~~
+note: Loop over the matches to test each one.
+207:8: warning: The `-v` operand 'arr[i]' carries glob characters, so the shell expands it before the test runs.
+   207 |    [ -v arr[i] ]
+       |         ^~~~~~
+note: Quote the name, or use the `[[ ]]` form.
+208:8: warning: A test reads an unquoted variable.
+   208 |    [ -n $value ]
+       |         ^~~~~~
+note: Quote it to avoid an empty or split argument.
+208:8: warning: The `-n` operand is unquoted, so an empty value leaves `-n` with no operand.
+   208 |    [ -n $value ]
+       |         ^~~~~~
+note: Quote the operand, or use the `[[ ]]` form.
+209:6: warning: A `[[ ]]` expression concatenates '"$@"' into one word.
+   209 |    [[ "$@" = one ]]
+       |       ^~~~
+note: Loop over the elements, or write `*` in place of `@`.
+210:6: warning: A `[[ ]]` expression leaves '{a,b}' unexpanded.
+   210 |    [[ {a,b} = one ]]
+       |       ^~~~~
+note: Loop over the expanded words.
+210:3: warning: The '=' comparison has literal operands on both sides.
+   210 |    [[ {a,b} = one ]]
+       |    ^~~~~~~~~~~~~~~~~
+note: Remove the constant condition or compare runtime data.
+211:6: warning: A `[[ ]]` expression matches a glob only to the right of `=` or `!=`, so '*.txt' stays literal.
+   211 |    [[ *.txt = one ]]
+       |       ^~~~~
+note: Loop over the matches.
+211:3: warning: The '=' comparison has literal operands on both sides.
+   211 |    [[ *.txt = one ]]
+       |    ^~~~~~~~~~~~~~~~~
+note: Remove the constant condition or compare runtime data.
+212:16: warning: The right side of `=` inside `[[ ]]` is matched as a glob, not compared.
+   212 |    [[ "$left" = $right ]]
+       |                 ^~~~~~
+note: Quote '$right' so the comparison stays literal.
+213:17: warning: The right side of `!=` inside `[[ ]]` is matched as a glob, not compared.
+   213 |    [[ "$left" != $right ]]
+       |                  ^~~~~~
+note: Quote '$right' so the comparison stays literal.
+214:17: warning: The `=~` operator takes a regular expression, '*.txt' reads as a glob.
+   214 |    [[ "$left" =~ *.txt ]]
+       |                  ^~~~~
+note: Compare with `=` for a glob, or write the pattern as a regex.
+217:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   217 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-201:1: details:
-   201 |  recursive_wrapper() { recursive_wrapper "$@"; }
+217:1: details:
+   217 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-206:8: warning: An unquoted variable can split into words and expand globs.
-   206 |    echo $reported
+222:8: warning: An unquoted variable can split into words and expand globs.
+   222 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 155 warnings.
+Encountered 173 warnings.
 done
 done
 done

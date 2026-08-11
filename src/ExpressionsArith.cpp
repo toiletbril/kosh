@@ -147,6 +147,33 @@ constexpr static_string_entry<conditional_misuse_kind>
 };
 constexpr StaticStringMap CONDITIONAL_MISUSES{CONDITIONAL_MISUSE_ENTRIES};
 
+/* The path tests whose glob operand is already reported as SC2144, so the
+   general glob operand lint leaves the word after them alone. */
+constexpr PackedStringKey CONDITIONAL_PATH_TEST_KEYS[] = {
+    SSK("-L"),
+    SSK("-d"),
+    SSK("-e"),
+    SSK("-f"),
+};
+constexpr StaticStringSet CONDITIONAL_PATH_TESTS{CONDITIONAL_PATH_TEST_KEYS};
+
+/* The equality operators, whose right side is matched as a glob pattern while
+   the regex operator takes a regular expression. */
+constexpr PackedStringKey CONDITIONAL_EQUALITY_OPERATOR_KEYS[] = {
+    SSK("!="),
+    SSK("="),
+    SSK("=="),
+};
+constexpr StaticStringSet CONDITIONAL_EQUALITY_OPERATORS{
+    CONDITIONAL_EQUALITY_OPERATOR_KEYS};
+
+/* Every operator that matches its right side against a pattern, where a glob
+   there is the point of the comparison. */
+cold static fn is_conditional_pattern_operator(StringView op) wontthrow -> bool
+{
+  return op == StringView{"=~"} || CONDITIONAL_EQUALITY_OPERATORS.contains(op);
+}
+
 /* A -a or a -o joins two parts only when a finished operand precedes it, so the
    unary file and option tests keep their leading position. */
 cold static fn
@@ -268,6 +295,48 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
                              element.word->source_location(), {operand.view()});
     }
 
+    /* A double bracket expression takes its operand as one word and never
+       expands it, so an array, a brace expansion, or a glob written there does
+       not reach the values the author meant. The shape is read once from the
+       segments the word already holds. */
+    if (element.word->kind() == Token::Kind::Word) {
+      let const &operand_word =
+          static_cast<const tokens::WordToken *>(element.word)->word();
+      let const shape = classify_test_operand(operand_word);
+
+      if (shape.has_array_spread || shape.has_brace_expansion ||
+          shape.has_unquoted_glob)
+      {
+        let const written =
+            analysis_source_text(actx, element.word->source_location());
+
+        if (shape.has_array_spread) {
+          actx.report_diagnostic(diagnostic_id::sc2199,
+                                 element.word->source_location(), {written});
+        }
+
+        if (shape.has_brace_expansion) {
+          actx.report_diagnostic(diagnostic_id::sc2201,
+                                 element.word->source_location(), {written});
+        }
+
+        if (shape.has_unquoted_glob) {
+          let const previous =
+              i > 0 && m_elements[i - 1].kind == Kind::Operand &&
+                      m_elements[i - 1].word != nullptr
+                  ? m_elements[i - 1].word->raw_string()
+                  : String{heap_allocator()};
+
+          if (!is_conditional_pattern_operator(previous.view()) &&
+              !CONDITIONAL_PATH_TESTS.contains(previous.view()))
+          {
+            actx.report_diagnostic(diagnostic_id::sc2203,
+                                   element.word->source_location(), {written});
+          }
+        }
+      }
+    }
+
     let is_binary_operand = false;
     if (i > 0) {
       let const &previous = m_elements[i - 1];
@@ -303,8 +372,7 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2157_string,
                              m_elements[i + 1].word->source_location());
 
-    if ((operand.view() == "-e" || operand.view() == "-f" ||
-         operand.view() == "-d" || operand.view() == "-L") &&
+    if (CONDITIONAL_PATH_TESTS.contains(operand.view()) &&
         i + 1 < m_elements.count() &&
         conditional_word_has_glob(m_elements[i + 1].word))
       actx.report_diagnostic(diagnostic_id::sc2144,
@@ -334,12 +402,36 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2050, conditional_location,
                              {operand.view()});
 
+    /* The right side of an equality comparison is a glob pattern, so an
+       unquoted variable there matches instead of comparing, shellcheck
+       SC2053. */
+    if (right != nullptr && right->kind() == Token::Kind::Word &&
+        CONDITIONAL_EQUALITY_OPERATORS.contains(operand.view()))
+    {
+      let const &right_word =
+          static_cast<const tokens::WordToken *>(right)->word();
+      if (right_word.segments.count() == 1 &&
+          right_word.segments[0].kind == WordSegment::Kind::VariableReference &&
+          !right_word.segments[0].is_in_double_quotes)
+      {
+        actx.report_diagnostic(
+            diagnostic_id::sc2053, right->source_location(),
+            {operand.view(),
+             analysis_source_text(actx, right->source_location())});
+      }
+    }
+
     if (operand.view() == "=~" && right != nullptr) {
       let const source_text =
           analysis_source_text(actx, right->source_location());
-      if (!source_text.is_empty() &&
-          (source_text[0] == '\'' || source_text[0] == '"'))
+      if (source_text.is_empty()) continue;
+
+      if (source_text[0] == '\'' || source_text[0] == '"') {
         actx.report_diagnostic(diagnostic_id::sc2076, right->source_location());
+      } else if (source_text[0] == '*' || source_text[0] == '?') {
+        actx.report_diagnostic(diagnostic_id::sc2049, right->source_location(),
+                               {source_text});
+      }
     }
   }
 
