@@ -540,6 +540,34 @@
           [CompoundListCondition, None]
             [SimpleCommand "xargs" "-i" "echo" "replaced"]
   [CompoundListCondition, None]
+    [FunctionDefinition "text_utility_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "echo" "$value"]
+              [SimpleCommand "wc" "-c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sed" "s/old/new/" "file"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "true"]
+              [SimpleCommand "ls"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-exec" "echo" "$(basename x)" ";"]
+          [CompoundListCondition, None]
+            [SimpleCommand "tr" "a-z" "A-Z"]
+          [CompoundListCondition, None]
+            [SimpleCommand "tr" "hello" "world"]
+          [CompoundListCondition, None]
+            [SimpleCommand "grep" "file*" "list"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "line\n"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "$(grep needle file)" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "plain\n" "one" "two"]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -2885,6 +2913,117 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "text_utility_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Literal "s/old/new/"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-exec"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "basename x"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "a-z"
+]
+[Word
+  Unquoted "A-Z"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Literal "hello"
+]
+[Word
+  Literal "world"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "file*"
+]
+[Word
+  Unquoted "list"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "line\n"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  CommandSubstitution "grep needle file"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "plain\n"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -2943,9 +3082,10 @@ note: Use find -exec or a 'while read -r' loop over find -print0.
      7 |    find . | xargs echo
        |             ^~~~~
 note: Pair find -print0 with xargs -0 or use find -exec.
-8:10: warning: The pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.
+8:10: warning: The pipe feeds `echo`, which never reads stdin, so the upstream output is discarded.
      8 |    true | echo discarded
        |           ^~~~
+note: Remove the pipe, or forward the input with `cat`.
 13:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
     13 |    command 2>&1 > out.log
        |                   ^~~~~~~
@@ -2979,6 +3119,10 @@ note: Test a variable or drop the check.
     23 |    [ "$x" = "glob*" ] && echo c
        |             ^~~~~~~
 note: Use a case or the [[ ]] form for the pattern.
+24:8: warning: The complete `grep` output is collected to learn whether one line matched.
+    24 |    [ -n "$(ls | grep x)" ] && echo d
+       |         ^~~~~~~~~~~~~~~~
+note: Use `grep -q` and test its exit status.
 28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
     28 |  case a in a) ;; esac
        |       ^
@@ -3647,18 +3791,65 @@ note: Add the link name, or write `.` explicitly.
    224 |    xargs -i echo replaced < list
        |    ^~~~~
 note: Use `-I` with an explicit replacement string instead.
-227:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   227 |  recursive_wrapper() { recursive_wrapper "$@"; }
+228:3: warning: The `echo` output is counted by `wc`, where the shell knows the length on its own.
+   228 |    echo "$value" | wc -c
+       |    ^~~~
+note: Use `${#variable}` instead.
+229:7: warning: The `sed` script 's/old/new/' replaces plain text, which the shell does without a fork.
+   229 |    sed 's/old/new/' file
+       |        ^~~~~~~~~~~~
+note: Use `${variable//search/replace}` instead.
+230:10: warning: The pipe feeds 'ls', which never reads stdin, so the upstream output is discarded.
+   230 |    true | ls
+       |           ^~
+231:21: warning: The substitution in the `find` action expands before `find` runs, not once for each file.
+   231 |    find . -exec echo $(basename x) \;
+       |                      ^~~~~~~~~~~~~
+note: Move the substitution into `-exec sh -c` so it runs for each file.
+231:21: warning: An unquoted command substitution splits its output.
+   231 |    find . -exec echo $(basename x) \;
+       |                      ^~~~~~~~~~~~~
+note: Quote it to keep one argument.
+232:6: warning: The `a-z` range in `tr` leaves an accented letter untranslated.
+   232 |    tr a-z A-Z
+       |       ^~~
+note: Use `[:lower:]` instead.
+232:10: warning: The `A-Z` range in `tr` leaves an accented letter untranslated.
+   232 |    tr a-z A-Z
+       |           ^~~
+note: Use `[:upper:]` instead.
+233:6: warning: The `tr` set 'hello' repeats a letter, and `tr` translates one character at a time.
+   233 |    tr 'hello' 'world'
+       |       ^~~~~~~
+note: Use `sed` to replace a word.
+234:8: warning: In the regular expression 'file*' the star repeats the preceding character, where a glob would match any text.
+   234 |    grep 'file*' list
+       |         ^~~~~~~
+note: Write `.*` for any text, or match the names with a glob.
+235:8: warning: The `echo` operand holds '\n', which `echo` prints as written.
+   235 |    echo 'line\n'
+       |         ^~~~~~~~
+note: Use `printf` instead.
+236:8: warning: The complete `grep` output is collected to learn whether one line matched.
+   236 |    [ -n "$(grep needle file)" ]
+       |         ^~~~~~~~~~~~~~~~~~~~~
+note: Use `grep -q` and test its exit status.
+237:10: warning: The printf format consumes no argument, so the remaining operands are ignored.
+   237 |    printf 'plain\n' one two
+       |           ^~~~~~~~~
+note: Add a format directive, or remove the extra operands.
+240:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   240 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-227:1: details:
-   227 |  recursive_wrapper() { recursive_wrapper "$@"; }
+240:1: details:
+   240 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-232:8: warning: An unquoted variable can split into words and expand globs.
-   232 |    echo $reported
+245:8: warning: An unquoted variable can split into words and expand globs.
+   245 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 180 warnings.
+Encountered 193 warnings.
 done
 done
 done

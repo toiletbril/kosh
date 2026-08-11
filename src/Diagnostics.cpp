@@ -50,6 +50,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "subtraction",
       "Use the symbolic form such as `<` or `>` inside arithmetic", None,
       Strict, Policy),
+    D(2000, "echo-piped-into-wc",
+      "the shell knows a string length without a pipeline",
+      "The `echo` output is counted by `wc`, where the shell knows the length "
+      "on its own",
+      "Use `${#variable}` instead", None, Annoying, Policy),
+    D(2001, "sed-plain-substitution", "the sed script is a plain substitution",
+      "The `sed` script '{0}' replaces plain text, which the shell does "
+      "without a fork",
+      "Use `${variable//search/replace}` instead", None, Annoying, Policy),
     D(2002, "useless-cat",
       "a useless cat can pass its file to the next command", "A useless cat",
       "Give the file to the next command directly instead of piping cat", None,
@@ -76,6 +85,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "$[...] is the obsolete arithmetic expansion spelling",
       "$[...] is the obsolete arithmetic expansion spelling",
       "Use $((...)) for arithmetic expansion", None, Annoying, Policy),
+    D(2008, "pipeline-into-echo", "a pipeline feeds echo, which ignores stdin",
+      "The pipe feeds `echo`, which never reads stdin, so the upstream output "
+      "is discarded",
+      "Remove the pipe, or forward the input with `cat`", None, Lenient,
+      Policy),
     D(2009, "grep-ps", "grepping ps output races the process table",
       "Grepping the ps output races the process table and matches the grep "
       "itself",
@@ -97,15 +111,36 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A for over the cat output iterates IFS-split words rather than lines",
       "Read the lines with 'while IFS= read -r line' instead", None, Strict,
       Policy),
+    D(2014, "find-exec-substitution",
+      "a substitution in the find action expands once",
+      "The substitution in the `find` action expands before `find` runs, not "
+      "once for each file",
+      "Move the substitution into `-exec sh -c` so it runs for each file", None,
+      Lenient, Policy),
     D(2015, "and-or-else", "A && B || C also runs C when B fails",
       "A && B || C also runs C when B fails",
       "Use an if statement when C is the else branch", None, Annoying, Policy),
     D(2016, "single-quoted-expansion", "single quotes prevent expansion",
       "Single quotes prevent the expansion written inside them",
       "Use double quotes if the value should expand", None, Lenient, Policy),
+    D(2018, "tr-lowercase-range", "the a-z range covers ASCII only",
+      "The `a-z` range in `tr` leaves an accented letter untranslated",
+      "Use `[:lower:]` instead", None, Annoying, Policy),
+    D(2019, "tr-uppercase-range", "the A-Z range covers ASCII only",
+      "The `A-Z` range in `tr` leaves an accented letter untranslated",
+      "Use `[:upper:]` instead", None, Annoying, Policy),
+    D(2020, "tr-word-set", "tr translates characters, not words",
+      "The `tr` set '{0}' repeats a letter, and `tr` translates one character "
+      "at a time",
+      "Use `sed` to replace a word", None, Lenient, Policy),
     D(2021, "tr-bracket-range", "brackets around tr ranges add literal bytes",
       "Brackets around a tr range add literal bracket bytes",
       "Use a quoted range without brackets", None, Annoying, Policy),
+    D(2022, "grep-repetition-pattern", "the grep pattern repeats one character",
+      "In the regular expression '{0}' the star repeats the preceding "
+      "character, where a glob would match any text",
+      "Write `.*` for any text, or match the names with a glob", None, Lenient,
+      Policy),
     D(2024, "sudo-glob", "sudo does not elevate shell glob expansion",
       "The shell expands this glob before sudo changes privileges",
       "Run the glob expansion inside a shell under sudo", None, Strict, Policy),
@@ -115,6 +150,9 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2025, "prompt-display-guards", "PS1 control escapes need display guards",
       "PS1 control escapes need balanced display guards",
       "Wrap nonprinting prompt escapes in \\[ and \\]", None, Annoying, Policy),
+    D(2028, "echo-escape-sequence", "echo prints an escape sequence literally",
+      "The `echo` operand holds '{0}', which `echo` prints as written",
+      "Use `printf` instead", None, Lenient, Policy),
     D(2030, "pipeline-assignment",
       "a pipeline assignment is lost when its stage exits",
       "This pipeline assignment is lost when the stage exits",
@@ -355,6 +393,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An alias body cannot receive positional arguments",
       "Use a function when the wrapper needs arguments", None, Annoying,
       Policy),
+    D(2143, "tested-grep-output", "the grep output is tested for a match",
+      "The complete `grep` output is collected to learn whether one line "
+      "matched",
+      "Use `grep -q` and test its exit status", None, Lenient, Policy),
     D(2144, "glob-file-test", "a file test on a glob checks one expanded path",
       "A file test on a glob checks only one expanded path",
       "Expand the glob in a loop and test each path", None, Strict, Policy),
@@ -446,6 +488,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Test the command directly with if or && so an intervening command "
       "cannot clobber the status",
       None, Annoying, Policy),
+    D(2182, "printf-ignored-arguments",
+      "the printf format consumes no arguments",
+      "The printf format consumes no argument, so the remaining operands are "
+      "ignored",
+      "Add a format directive, or remove the extra operands", None, Lenient,
+      Policy),
     D(2183, "printf-missing-arguments",
       "printf has fewer arguments than its format consumes",
       "The printf format consumes more arguments than the command supplies",
@@ -1125,6 +1173,7 @@ constexpr static_string_entry<analysis_command_info>
         C("return", Return, NO_COMMAND_GROUP),
         C("rm", Rm, COMMAND_GROUP_NON_STDIN_READER),
         C("rmdir", Rmdir, COMMAND_GROUP_NON_STDIN_READER),
+        C("sed", Sed, NO_COMMAND_GROUP),
         C("seq", Seq, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("sleep", Sleep, COMMAND_GROUP_NON_STDIN_READER),
         C("source", Source, COMMAND_GROUP_RUNTIME_DEFINER),
@@ -1389,6 +1438,174 @@ cold fn view_has_arithmetic_operator(StringView view) wontthrow -> bool
   return false;
 }
 
+/* A letter that appears twice in a tr set, which reads as a word rather than as
+   a set of characters. Case is kept apart because tr keeps it apart. */
+cold fn view_repeats_a_letter(StringView view) wontthrow -> bool
+{
+  u32 seen_lowercase = 0;
+  u32 seen_uppercase = 0;
+
+  for (usize position = 0; position < view.length; position++) {
+    let const byte = view[position];
+    if (byte >= 'a' && byte <= 'z') {
+      let const letter_bit = 1u << static_cast<u32>(byte - 'a');
+      if ((seen_lowercase & letter_bit) != 0) return true;
+      seen_lowercase |= letter_bit;
+    } else if (byte >= 'A' && byte <= 'Z') {
+      let const letter_bit = 1u << static_cast<u32>(byte - 'A');
+      if ((seen_uppercase & letter_bit) != 0) return true;
+      seen_uppercase |= letter_bit;
+    }
+  }
+
+  return false;
+}
+
+/* A pattern whose only regular expression byte is a star that follows an
+   ordinary byte. The author wrote a glob, where the star repeats one character
+   instead of matching any text. */
+cold fn view_is_glob_shaped_pattern(StringView view) wontthrow -> bool
+{
+  bool has_repetition = false;
+
+  for (usize position = 0; position < view.length; position++) {
+    switch (view[position]) {
+    case '*':
+      if (position == 0) return false;
+      has_repetition = true;
+      break;
+    case '.':
+    case '^':
+    case '$':
+    case '[':
+    case ']':
+    case '(':
+    case ')':
+    case '{':
+    case '}':
+    case '+':
+    case '?':
+    case '|':
+    case '\\': return false;
+    default: break;
+    }
+  }
+
+  return has_repetition;
+}
+
+/* A sed script of the s<delimiter>search<delimiter>replacement<delimiter> shape
+   whose fields hold no regular expression byte, so a parameter expansion
+   replaces the text without a fork. */
+cold fn view_is_plain_substitution_script(StringView view) wontthrow -> bool
+{
+  if (view.length < 4 || view[0] != 's') return false;
+
+  let const delimiter = view[1];
+  if (lexer::is_variable_name(delimiter) || delimiter == '\\') return false;
+
+  usize field_count = 1;
+  for (usize position = 2; position < view.length; position++) {
+    let const byte = view[position];
+    if (byte == delimiter) {
+      field_count++;
+      continue;
+    }
+
+    if (field_count == 3) {
+      if (byte != 'g') return false;
+      continue;
+    }
+
+    switch (byte) {
+    case '.':
+    case '*':
+    case '^':
+    case '$':
+    case '[':
+    case ']':
+    case '(':
+    case ')':
+    case '{':
+    case '}':
+    case '+':
+    case '?':
+    case '|':
+    case '&':
+    case '\\': return false;
+    default: break;
+    }
+  }
+
+  return field_count == 3;
+}
+
+/* The escape sequence a shell echo prints as written, for the printf
+   suggestion. The returned view spans the backslash and the letter behind
+   it. */
+cold fn find_echo_escape_sequence(StringView view) wontthrow -> StringView
+{
+  for (usize position = 0; position + 1 < view.length; position++) {
+    if (view[position] != '\\') continue;
+
+    switch (view[position + 1]) {
+    case 'a':
+    case 'b':
+    case 'e':
+    case 'f':
+    case 'n':
+    case 'r':
+    case 't':
+    case 'v':
+    case '0': return view.substring_of_length(position, 2);
+    default: position++;
+    }
+  }
+
+  return {};
+}
+
+/* An echo option bundle that names the escape handling, so the operand text is
+   written the way the author intends. */
+cold fn view_settles_echo_escapes(StringView view) wontthrow -> bool
+{
+  if (view.length < 2 || view[0] != '-') return false;
+
+  bool has_escape_letter = false;
+  for (usize position = 1; position < view.length; position++) {
+    switch (view[position]) {
+    case 'e':
+    case 'E': has_escape_letter = true; break;
+    case 'n': break;
+    default: return false;
+    }
+  }
+
+  return has_escape_letter;
+}
+
+/* The command that produces the output of a substitution body. The body is read
+   back to its last pipe, since that stage writes what the caller collects. */
+cold fn substitution_runs_pattern_matcher(StringView body) throws -> bool
+{
+  usize start = 0;
+  for (usize position = 0; position < body.length; position++)
+    if (body[position] == '|') start = position + 1;
+
+  while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
+    start++;
+
+  usize end = start;
+  while (end < body.length && body[end] != ' ' && body[end] != '\t' &&
+         body[end] != '\n')
+    end++;
+
+  if (end == start) return false;
+
+  return get_analysis_command_info(body.substring_of_length(start, end - start))
+      .is_in_group(COMMAND_GROUP_PATTERN_MATCHER);
+}
+
 cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
 {
   for (let const &segment : word.segments)
@@ -1399,6 +1616,28 @@ cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
       return false;
     }
   return true;
+}
+
+cold fn token_has_command_substitution(const Token *token) wontthrow -> bool
+{
+  if (token->kind() != Token::Kind::Word) return false;
+
+  for (let const &segment :
+       static_cast<const tokens::WordToken *>(token)->word().segments)
+    if (segment.kind == WordSegment::Kind::CommandSubstitution) return true;
+
+  return false;
+}
+
+cold fn token_has_ansi_c_quote(const Token *token) wontthrow -> bool
+{
+  if (token->kind() != Token::Kind::Word) return false;
+
+  for (let const &segment :
+       static_cast<const tokens::WordToken *>(token)->word().segments)
+    if (segment.was_ansi_c_quoted) return true;
+
+  return false;
 }
 
 cold fn printf_consumed_argument_count(StringView format,
@@ -1821,6 +2060,7 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
     bool has_action = false;
     bool has_path_operand = false;
     bool is_before_path_operand = true;
+    bool is_inside_exec_action = false;
     Maybe<SourceLocation> exec_location{};
     Maybe<SourceLocation> or_location{};
     for (usize i = 1; i < args.count(); i++) {
@@ -1837,9 +2077,16 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
 
       if (literal.view() == "-exec" || literal.view() == "-execdir") {
         has_exec = true;
+        is_inside_exec_action = true;
         exec_location = args[i]->source_location();
       } else if (has_exec && (literal.view() == ";" || literal.view() == "+")) {
         has_exec_terminator = true;
+        is_inside_exec_action = false;
+      } else if (is_inside_exec_action &&
+                 token_has_command_substitution(args[i]))
+      {
+        actx.report_diagnostic(diagnostic_id::sc2014,
+                               args[i]->source_location());
       } else if (literal.view() == "-o") {
         has_or = true;
         or_location = args[i]->source_location();
@@ -1871,19 +2118,34 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
     break;
 
   case command_name_id::Tr:
-    for (usize i = 1; i < args.count() && i <= 2; i++) {
+    for (usize i = 1; i < args.count(); i++) {
       let const literal = args[i]->raw_string();
-      if (literal.length() >= 5 && literal[0] == '[' &&
+      let const set_view = literal.view();
+
+      if (i <= 2 && literal.length() >= 5 && literal[0] == '[' &&
           literal[literal.length() - 1] == ']' &&
-          literal.view().find_character('-').has_value())
+          set_view.find_character('-').has_value())
       {
         actx.report_diagnostic(diagnostic_id::sc2021,
                                args[i]->source_location());
       }
+
+      if (set_view == "a-z") {
+        actx.report_diagnostic(diagnostic_id::sc2018,
+                               args[i]->source_location());
+      } else if (set_view == "A-Z") {
+        actx.report_diagnostic(diagnostic_id::sc2019,
+                               args[i]->source_location());
+      } else if (!set_view.is_empty() && set_view[0] != '-' &&
+                 set_view[0] != '[' && view_repeats_a_letter(set_view))
+      {
+        actx.report_diagnostic(diagnostic_id::sc2020,
+                               args[i]->source_location(), {set_view});
+      }
     }
     break;
 
-  case command_name_id::Echo:
+  case command_name_id::Echo: {
     if (args.count() == 2 && args[1]->kind() == Token::Kind::Word) {
       let const &word = static_cast<const tokens::WordToken *>(args[1])->word();
       if (word.segments.count() == 1 &&
@@ -1892,6 +2154,50 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc2005,
                                args[0]->source_location());
       }
+    }
+
+    StringView escape_sequence{};
+    Maybe<SourceLocation> escape_location{};
+    for (usize i = 1; i < args.count(); i++) {
+      let const operand_text =
+          analysis_source_text(actx, args[i]->source_location());
+
+      if (view_settles_echo_escapes(operand_text)) {
+        escape_location = None;
+        break;
+      }
+
+      if (escape_location.has_value()) continue;
+      if (token_has_ansi_c_quote(args[i])) continue;
+
+      escape_sequence = find_echo_escape_sequence(operand_text);
+      if (!escape_sequence.is_empty())
+        escape_location = args[i]->source_location();
+    }
+
+    if (escape_location.has_value())
+      actx.report_diagnostic(diagnostic_id::sc2028, *escape_location,
+                             {escape_sequence});
+    break;
+  }
+
+  case command_name_id::Sed:
+    for (usize i = 1; i < args.count(); i++) {
+      let const literal = args[i]->raw_string();
+      let const script_view = literal.view();
+
+      if (script_view.starts_with(StringView{"-f"})) break;
+
+      if (!script_view.is_empty() && script_view[0] == '-') {
+        continue;
+      }
+
+      if (view_is_plain_substitution_script(script_view)) {
+        actx.report_diagnostic(diagnostic_id::sc2001,
+                               args[i]->source_location(), {script_view});
+      }
+
+      break;
     }
     break;
 
@@ -2086,9 +2392,15 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
 
   case command_name_id::Printf: {
     usize format_index = 1;
-    if (format_index < args.count() &&
-        args[format_index]->raw_string().view() == "-v")
-      format_index += 2;
+    if (format_index < args.count()) {
+      let const leading = args[format_index]->raw_string();
+      if (leading.view() == "-v") {
+        format_index += 2;
+      } else if (leading.view() == "--") {
+        format_index++;
+      }
+    }
+
     if (format_index < args.count() &&
         args[format_index]->kind() == Token::Kind::Word)
     {
@@ -2100,9 +2412,13 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
         let const consumed =
             printf_consumed_argument_count(format.view(), has_quote_conversion);
         let const available = args.count() - format_index - 1;
-        if (consumed > available)
+        if (consumed > available) {
           actx.report_diagnostic(diagnostic_id::sc2183,
                                  args[format_index]->source_location());
+        } else if (consumed == 0 && available > 0) {
+          actx.report_diagnostic(diagnostic_id::sc2182,
+                                 args[format_index]->source_location());
+        }
 
         if (has_quote_conversion && actx.shebang_is_posix_sh) {
           actx.report_diagnostic(diagnostic_id::sc3050,
@@ -2430,17 +2746,26 @@ fn check_command_value_lints(AnalysisContext &actx,
     break;
 
   /* The grep pattern lints. An unquoted pattern with a glob metacharacter is
-     SC2062, a pattern with a leading * that has nothing to repeat is SC2063.
+     SC2062, a pattern with a leading * that has nothing to repeat is SC2063,
+     and a glob-shaped pattern whose star repeats one character is SC2022.
      The pattern is the first word past the options. */
   case command_name_id::Grep:
   case command_name_id::Egrep:
-  case command_name_id::Fgrep:
+  case command_name_id::Fgrep: {
+    let is_fixed_string_mode = input.command_id() == command_name_id::Fgrep;
     for (usize i = 1; i < args.count(); i++) {
       if (args[i]->kind() != Token::Kind::Word) continue;
       let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
       let const literal = word.to_literal_string();
       let const view = literal.view();
-      if (view.length >= 1 && view[0] == '-') continue;
+      if (view.length >= 1 && view[0] == '-') {
+        if (view.find_character('F').has_value() ||
+            view.starts_with(StringView{"--fixed-strings"}))
+        {
+          is_fixed_string_mode = true;
+        }
+        continue;
+      }
       if (word.segments.count() == 1 &&
           word.segments[0].kind == WordSegment::Kind::UnquotedText &&
           word.segments[0].has_glob_metacharacter())
@@ -2450,10 +2775,14 @@ fn check_command_value_lints(AnalysisContext &actx,
       } else if (!view.is_empty() && view[0] == '*') {
         actx.report_diagnostic(diagnostic_id::sc2063,
                                args[i]->source_location());
+      } else if (!is_fixed_string_mode && view_is_glob_shaped_pattern(view)) {
+        actx.report_diagnostic(diagnostic_id::sc2022,
+                               args[i]->source_location(), {view});
       }
       break;
     }
     break;
+  }
 
   /* mkdir -pm applies the mode only to the deepest directory, shellcheck
      SC2174. */
@@ -2958,8 +3287,9 @@ fn check_test_operand_lints(AnalysisContext &actx,
   }
 
   /* The operand-shape lints over the closed operand range. A -z or -n on a
-     literal operand is SC2157, a numeric comparison against a non-numeric
-     literal is SC2170, and a = or == against a glob literal is SC2081. */
+     literal operand is SC2157, the same test on collected matcher output is
+     SC2143, a numeric comparison against a non-numeric literal is SC2170, and a
+     = or == against a glob literal is SC2081. */
   for (usize i = 1; i < operand_end; i++) {
     if (args[i]->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
@@ -2971,9 +3301,18 @@ fn check_test_operand_lints(AnalysisContext &actx,
     {
       let const &next =
           static_cast<const tokens::WordToken *>(args[i + 1])->word();
-      if (word_is_fully_literal(next))
+      if (word_is_fully_literal(next)) {
         actx.report_diagnostic(diagnostic_id::sc2157,
                                args[i + 1]->source_location(), {view});
+      } else if (next.segments.count() == 1 &&
+                 next.segments[0].kind ==
+                     WordSegment::Kind::CommandSubstitution &&
+                 substitution_runs_pattern_matcher(
+                     next.segments[0].text.view()))
+      {
+        actx.report_diagnostic(diagnostic_id::sc2143,
+                               args[i + 1]->source_location());
+      }
     }
 
     if (is_test_numeric_operator_word(view)) {

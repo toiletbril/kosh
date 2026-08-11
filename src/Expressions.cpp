@@ -1712,13 +1712,33 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         next_info.is_in_group(COMMAND_GROUP_NON_STDIN_READER) &&
         !args_have_stdin_operand(next->args()))
     {
-      actx.report_diagnostic(diagnostic_id::sc2216,
-                             next->args()[0]->source_location(), {*next_name});
+      if (next_info.id == command_name_id::Echo) {
+        actx.report_diagnostic(diagnostic_id::sc2008,
+                               next->args()[0]->source_location());
+      } else {
+        actx.report_diagnostic(diagnostic_id::sc2216,
+                               next->args()[0]->source_location(),
+                               {*next_name});
+      }
     }
 
     if (stage_is_user) continue;
 
     switch (stage_info.id) {
+    /* echo feeding wc -c measures a string whose length the shell already
+       knows, shellcheck SC2000. */
+    case command_name_id::Echo:
+      if (next_info.id == command_name_id::Wc && !next_is_user &&
+          stage->args().count() == 2 && next->args().count() == 2)
+      {
+        let const count_flag = next->args()[1]->raw_string();
+        if (count_flag.view() == "-c" || count_flag.view() == "-m") {
+          actx.report_diagnostic(diagnostic_id::sc2000,
+                                 stage->args()[0]->source_location());
+        }
+      }
+      break;
+
     /* find piped into xargs splits a name at every blank, shellcheck SC2038. */
     case command_name_id::Find: {
       if (!next_is_xargs) break;

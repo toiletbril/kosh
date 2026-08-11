@@ -224,6 +224,19 @@ file_command_diagnostics() {
   xargs -i echo replaced < list
 }
 
+text_utility_diagnostics() {
+  echo "$value" | wc -c
+  sed 's/old/new/' file
+  true | ls
+  find . -exec echo $(basename x) \;
+  tr a-z A-Z
+  tr 'hello' 'world'
+  grep 'file*' list
+  echo 'line\n'
+  [ -n "$(grep needle file)" ]
+  printf 'plain\n' one two
+}
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {
