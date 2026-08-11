@@ -67,8 +67,9 @@ fn check_posix_word_portability(AnalysisContext &actx,
 fn check_posix_arithmetic_operators(AnalysisContext &actx,
                                     StringView expression,
                                     SourceLocation location) throws -> void;
-fn check_arithmetic_test_operators(AnalysisContext &actx, StringView expression,
-                                   SourceLocation location) throws -> void;
+fn check_arithmetic_expression_lints(AnalysisContext &actx,
+                                     StringView expression,
+                                     SourceLocation location) throws -> void;
 fn check_numeric_comparison_operand(AnalysisContext &actx,
                                     StringView operator_view,
                                     const Token *operand_token,

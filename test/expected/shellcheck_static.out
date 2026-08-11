@@ -758,6 +758,24 @@
           [CompoundListCondition, None]
             [SimpleCommand "ssh" "host"]
   [CompoundListCondition, None]
+    [FunctionDefinition "arithmetic_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((a / b * c))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((a * b / c))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((1.5 + 2))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((010 + 1))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((0x1F + 1))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "$((count + 1))"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand " total / parts * scale "]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3815,6 +3833,63 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "arithmetic_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "a / b * c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "a * b / c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.5 + 2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "010 + 1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0x1F + 1"
+]
+[Word
+  ArithmeticExpansion "count + 1"
+]
+[Word
+  Unquoted "total"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "parts"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "scale"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -4979,26 +5054,46 @@ note: Pass the files as operands, or use `tee` for several outputs.
    332 |    ssh host <<BARE
        |    ^~~
 note: Quote the delimiter to send the body unexpanded.
-340:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   340 |  false && break
+341:11: warning: The division truncates before the multiplication, so the result loses precision.
+   341 |    echo $((a / b * c))
+       |            ^~~~~~~~~
+note: Write `a*c/b` to multiply first.
+343:11: warning: The arithmetic evaluates integers, so the decimal '1.5' is a syntax error.
+   343 |    echo $((1.5 + 2))
+       |            ^~~~~~~
+note: Compute the value with `bc` or `awk`.
+344:11: warning: The literal '010' begins with a zero, so it is read in base eight.
+   344 |    echo $((010 + 1))
+       |            ^~~~~~~
+note: Drop the leading zero, or write `10#010` for base ten.
+346:3: warning: The expansion produces a number and the shell then runs it as a command.
+   346 |    $((count + 1))
+       |    ^~~~~~~~~~~~~~
+note: Drop the `$` for `(( ))`, or write `_=$(( ))` to keep the value.
+347:3: warning: The division truncates before the multiplication, so the result loses precision.
+   347 |    (( total / parts * scale ))
+       |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Write `a*c/b` to multiply first.
+350:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   350 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-341:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   341 |  false && continue
+351:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   351 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-343:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   343 |  recursive_wrapper() { recursive_wrapper "$@"; }
+353:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   353 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-343:1: details:
-   343 |  recursive_wrapper() { recursive_wrapper "$@"; }
+353:1: details:
+   353 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-348:8: warning: An unquoted variable can split into words and expand globs.
-   348 |    echo $reported
+358:8: warning: An unquoted variable can split into words and expand globs.
+   358 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 277 warnings.
+Encountered 282 warnings.
 done
 done
 done

@@ -528,7 +528,8 @@ fn ArithmeticCommand::analyze(AnalysisContext &actx,
     actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                            source_location());
 
-  check_arithmetic_test_operators(actx, m_expression.view(), source_location());
+  check_arithmetic_expression_lints(actx, m_expression.view(),
+                                    source_location());
 
   if (actx.shebang_is_posix_sh) {
     actx.report_diagnostic(diagnostic_id::sc3006, source_location());

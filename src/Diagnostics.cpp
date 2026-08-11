@@ -123,6 +123,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2016, "single-quoted-expansion", "single quotes prevent expansion",
       "Single quotes prevent the expansion written inside them",
       "Use double quotes if the value should expand", None, Lenient, Policy),
+    D(2017, "integer-division-first",
+      "an integer division before a multiplication truncates",
+      "The division truncates before the multiplication, so the result loses "
+      "precision",
+      "Write `a*c/b` to multiply first", None, Annoying, Policy),
     D(2018, "tr-lowercase-range", "the a-z range covers ASCII only",
       "The `a-z` range in `tr` leaves an accented letter untranslated",
       "Use `[:lower:]` instead", None, Annoying, Policy),
@@ -334,9 +339,22 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a bare literal operand makes the test constant",
       "The '{0}' operand is a literal, so the test never changes",
       "Add the `$` when a variable was meant", None, Strict, Policy),
+    D(2079, "arithmetic-decimal", "shell arithmetic works on integers only",
+      "The arithmetic evaluates integers, so the decimal '{0}' is a syntax "
+      "error",
+      "Compute the value with `bc` or `awk`", None, Strict, Policy),
+    D(2080, "octal-literal", "a leading zero selects octal",
+      "The literal '{0}' begins with a zero, so it is read in base eight",
+      "Drop the leading zero, or write `10#{0}` for base ten", None, Lenient,
+      Policy),
     D(2081, "test-glob-match", "test cannot glob-match strings",
       "[ and test compare strings byte for byte and never glob-match",
       "Use a case or the [[ ]] form for the pattern", None, Lenient, Policy),
+    D(2084, "arithmetic-expansion-as-command",
+      "the arithmetic result runs as a command",
+      "The expansion produces a number and the shell then runs it as a command",
+      "Drop the `$` for `(( ))`, or write `_=$(( ))` to keep the value", None,
+      Strict, Policy),
     D(2086, "unquoted-expansion", "an unquoted variable can split and glob",
       "An unquoted variable can split into words and expand globs",
       "Quote the expansion to keep one argument", None, Strict, Policy),
@@ -2231,23 +2249,113 @@ fn check_posix_arithmetic_operators(AnalysisContext &actx,
   if (has_exponent) actx.report_diagnostic(diagnostic_id::sc3019, location);
 }
 
-fn check_arithmetic_test_operators(AnalysisContext &actx, StringView expression,
-                                   SourceLocation location) throws -> void
+fn check_arithmetic_expression_lints(AnalysisContext &actx,
+                                     StringView expression,
+                                     SourceLocation location) throws -> void
 {
-  for (usize position = 0; position + 3 <= expression.length; position++) {
-    if (expression[position] != '-') continue;
+  let has_reported_test_operator = false;
+  let has_reported_decimal = false;
+  let has_reported_octal = false;
+  let has_reported_precision_loss = false;
+  /* A division truncates its result, so a multiplication that follows it in the
+     same term multiplies the truncated value, shellcheck SC2017. Any operator
+     that ends the term clears the flag. */
+  let has_pending_division = false;
 
-    if (position > 0 && !lexer::is_whitespace(expression[position - 1]))
-      continue;
+  for (usize position = 0; position < expression.length; position++) {
+    switch (expression[position]) {
+    case '/':
+      if (position + 1 < expression.length &&
+          (expression[position + 1] == '/' || expression[position + 1] == '='))
+      {
+        position++;
+        has_pending_division = false;
+        break;
+      }
+      has_pending_division = true;
+      break;
 
-    let const after = position + 3;
-    if (after < expression.length && !lexer::is_whitespace(expression[after]))
-      continue;
+    case '*':
+      if (position + 1 < expression.length && expression[position + 1] == '*') {
+        position++;
+        has_pending_division = false;
+        break;
+      }
+      if (has_pending_division && !has_reported_precision_loss) {
+        actx.report_diagnostic(diagnostic_id::sc2017, location);
+        has_reported_precision_loss = true;
+      }
+      has_pending_division = false;
+      break;
 
-    let const candidate = expression.substring_of_length(position, 3);
-    if (is_test_numeric_operator_word(candidate)) {
-      actx.report_diagnostic(diagnostic_id::sc1106, location, {candidate});
-      return;
+    case '-': {
+      has_pending_division = false;
+      if (has_reported_test_operator) break;
+      if (position + 3 > expression.length) break;
+      if (position > 0 && !lexer::is_whitespace(expression[position - 1]))
+        break;
+
+      let const after = position + 3;
+      if (after < expression.length && !lexer::is_whitespace(expression[after]))
+        break;
+
+      let const candidate = expression.substring_of_length(position, 3);
+      if (is_test_numeric_operator_word(candidate)) {
+        actx.report_diagnostic(diagnostic_id::sc1106, location, {candidate});
+        has_reported_test_operator = true;
+      }
+      break;
+    }
+
+    case '+':
+    case '(':
+    case ')':
+    case ',':
+    case ';':
+    case '?':
+    case ':':
+    case '|':
+    case '&':
+    case '^':
+    case '=':
+    case '<':
+    case '>':
+    case '%': has_pending_division = false; break;
+
+    default: {
+      if (!lexer::is_variable_name(expression[position])) break;
+
+      /* The whole name or number is consumed so the scan never restarts inside
+         one and reads a suffix as a fresh literal. */
+      let const start = position;
+      while (position + 1 < expression.length &&
+             (lexer::is_variable_name(expression[position + 1]) ||
+              expression[position + 1] == '.'))
+      {
+        position++;
+      }
+
+      let const word =
+          expression.substring_of_length(start, position + 1 - start);
+      if (!lexer::is_number(word[0])) break;
+
+      let const dot = word.find_character('.');
+      if (dot.has_value() && *dot + 1 < word.length &&
+          lexer::is_number(word[*dot + 1]) && !has_reported_decimal)
+      {
+        actx.report_diagnostic(diagnostic_id::sc2079, location, {word});
+        has_reported_decimal = true;
+        break;
+      }
+
+      if (word[0] == '0' && word.length > 1 && word.is_all_decimal_digits() &&
+          !has_reported_octal)
+      {
+        actx.report_diagnostic(diagnostic_id::sc2080, location, {word});
+        has_reported_octal = true;
+      }
+      break;
+    }
     }
   }
 }
@@ -2955,8 +3063,8 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                                args[i]->source_location());
 
-      check_arithmetic_test_operators(actx, expression.view(),
-                                      args[i]->source_location());
+      check_arithmetic_expression_lints(actx, expression.view(),
+                                        args[i]->source_location());
 
       if (actx.shebang_is_posix_sh) {
         check_posix_arithmetic_operators(actx, expression.view(),

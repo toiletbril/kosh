@@ -1360,6 +1360,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         switch (segment.kind) {
         case WordSegment::Kind::ArithmeticExpansion:
           quote_sandwich_state = 0;
+          check_arithmetic_expression_lints(
+              actx, segment.text.view(),
+              segment.get_source_location(arg_location.filename)
+                  .value_or(arg_location));
           if (!has_dollar_in_arithmetic &&
               segment.text.view().find_character('$').has_value())
           {
@@ -1462,6 +1466,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         default: quote_sandwich_state = 0; break;
         }
       }
+    }
+
+    /* The command word expands to a number and the shell then looks that number
+       up as a program, shellcheck SC2084. */
+    if (!is_operand && word != nullptr && word->segments.count() == 1 &&
+        word->segments[0].kind == WordSegment::Kind::ArithmeticExpansion)
+    {
+      actx.report_diagnostic(diagnostic_id::sc2084, arg_location);
     }
 
     if (has_quote_sandwich) {

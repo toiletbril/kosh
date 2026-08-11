@@ -1,5 +1,6 @@
 #!/bin/env kosh
 # Bash arithmetic extensions run in the default mood.
+# shellcheck disable=SC2080
 echo $((2 ** 10))
 echo $((-2 ** 2))
 echo $((2 ** 3 ** 2))

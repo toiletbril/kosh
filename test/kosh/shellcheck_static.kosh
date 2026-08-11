@@ -337,6 +337,16 @@ echo "$HOSTNAME"
 QUOTED
 }
 
+arithmetic_diagnostics() {
+  echo $((a / b * c))
+  echo $((a * b / c))
+  echo $((1.5 + 2))
+  echo $((010 + 1))
+  echo $((0x1F + 1))
+  $((count + 1))
+  (( total / parts * scale ))
+}
+
 false && break
 false && continue
 

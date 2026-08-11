@@ -1125,72 +1125,72 @@
   DoubleQuoted "backoff="
   Variable "?"
 ]
-30:23: warning: An unquoted variable can split into words and expand globs.
-    30 |  echo $((y = 7)); echo $y
+31:23: warning: An unquoted variable can split into words and expand globs.
+    31 |  echo $((y = 7)); echo $y
        |                        ^~
 note: Quote the expansion to keep one argument.
-45:27: warning: An unquoted variable can split into words and expand globs.
-    45 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
+46:27: warning: An unquoted variable can split into words and expand globs.
+    46 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
        |                            ^~
 note: Quote the expansion to keep one argument.
-45:53: warning: An unquoted variable can split into words and expand globs.
-    45 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
+46:53: warning: An unquoted variable can split into words and expand globs.
+    46 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
        |                                                      ^~
 note: Quote the expansion to keep one argument.
-45:125: warning: An unquoted variable can split into words and expand globs.
-    45 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
+46:125: warning: An unquoted variable can split into words and expand globs.
+    46 |  x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i
        |                                                                                                                              ^~
 note: Quote the expansion to keep one argument.
-61:33: warning: An unquoted variable can split into words and expand globs.
-    61 |  x=1; echo $((1 || (x=9))); echo $x
-       |                                  ^~
-note: Quote the expansion to keep one argument.
 62:33: warning: An unquoted variable can split into words and expand globs.
-    62 |  x=1; echo $((0 && (x=9))); echo $x
+    62 |  x=1; echo $((1 || (x=9))); echo $x
        |                                  ^~
 note: Quote the expansion to keep one argument.
 63:33: warning: An unquoted variable can split into words and expand globs.
-    63 |  x=1; echo $((0 || (x=9))); echo $x
+    63 |  x=1; echo $((0 && (x=9))); echo $x
        |                                  ^~
 note: Quote the expansion to keep one argument.
 64:33: warning: An unquoted variable can split into words and expand globs.
-    64 |  x=1; echo $((1 && (x=9))); echo $x
+    64 |  x=1; echo $((0 || (x=9))); echo $x
        |                                  ^~
 note: Quote the expansion to keep one argument.
-65:43: warning: An unquoted variable can split into words and expand globs.
-    65 |  x=5; echo $((1 || (x=9) || (x=10))); echo $x
+65:33: warning: An unquoted variable can split into words and expand globs.
+    65 |  x=1; echo $((1 && (x=9))); echo $x
+       |                                  ^~
+note: Quote the expansion to keep one argument.
+66:43: warning: An unquoted variable can split into words and expand globs.
+    66 |  x=5; echo $((1 || (x=9) || (x=10))); echo $x
        |                                            ^~
 note: Quote the expansion to keep one argument.
-82:39: warning: An unquoted variable can split into words and expand globs.
-    82 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
-       |                                        ^~
-note: Quote the expansion to keep one argument.
-82:42: warning: An unquoted variable can split into words and expand globs.
-    82 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
-       |                                           ^~
-note: Quote the expansion to keep one argument.
 83:39: warning: An unquoted variable can split into words and expand globs.
-    83 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
+    83 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
        |                                        ^~
 note: Quote the expansion to keep one argument.
 83:42: warning: An unquoted variable can split into words and expand globs.
-    83 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
+    83 |  c=1; x=9; r=$((c ? 5 : (x=99))); echo $r $x
        |                                           ^~
 note: Quote the expansion to keep one argument.
-84:44: warning: An unquoted variable can split into words and expand globs.
-    84 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
-       |                                             ^~
+84:39: warning: An unquoted variable can split into words and expand globs.
+    84 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
+       |                                        ^~
 note: Quote the expansion to keep one argument.
-84:47: warning: An unquoted variable can split into words and expand globs.
-    84 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
-       |                                                ^~
+84:42: warning: An unquoted variable can split into words and expand globs.
+    84 |  c=0; x=9; r=$((c ? (x=77) : 5)); echo $r $x
+       |                                           ^~
 note: Quote the expansion to keep one argument.
 85:44: warning: An unquoted variable can split into words and expand globs.
-    85 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
+    85 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |                                             ^~
 note: Quote the expansion to keep one argument.
 85:47: warning: An unquoted variable can split into words and expand globs.
-    85 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
+    85 |  c=1; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
+       |                                                ^~
+note: Quote the expansion to keep one argument.
+86:44: warning: An unquoted variable can split into words and expand globs.
+    86 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
+       |                                             ^~
+note: Quote the expansion to keep one argument.
+86:47: warning: An unquoted variable can split into words and expand globs.
+    86 |  c=0; x=9; r=$((c ? (x=77) : (x=88))); echo $r $x
        |                                                ^~
 note: Quote the expansion to keep one argument.
 Encountered 17 warnings.
