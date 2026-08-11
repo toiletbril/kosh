@@ -321,7 +321,12 @@ A diagnostic line carries no program name prefix. It begins with its source
 location when the mapping exists.
 
 Diagnostics.cpp owns each analysis diagnostic's code, slug, summary, message,
-suggestion, related detail, tier, and delivery. Expression analysis reports a
+suggestion, related detail, tier, and delivery. It also owns the command name
+dispatch table and the command-keyed check bodies. SimpleCommand::analyze
+gathers the borrowed arguments, redirections, prefix assignments, command
+literal, and dispatch record into one command_lint_input and hands that bundle
+to the check entry points, so a new check adds no traversal. Expressions.cpp
+keeps the walk and the reporting funnel. Expression analysis reports a
 diagnostic ID with source locations and dynamic values. The default mood rejects
 strict and lenient findings and reports annoying findings as warnings.
 Compatibility moods expose the tiers as warnings through `-W`, `-WW`, and
