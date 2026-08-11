@@ -26,4 +26,14 @@ word_only() {
   echo "${text:-default}"
   echo "${#text}"
 }
+redirect_only() {
+  echo both &>out.log
+  echo append &>>out.log
+  echo dup >&outfile
+  exec {logfd}>trace.log
+  echo high 12>high.log
+  echo net >/dev/tcp/example.com/80
+  echo glob >prefix*.log
+  echo plain >plain.log 2>&1
+}
 echo done

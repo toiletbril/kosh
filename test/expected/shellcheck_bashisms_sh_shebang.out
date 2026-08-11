@@ -48,6 +48,26 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$#text"]
   [CompoundListCondition, None]
+    [FunctionDefinition "redirect_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "both"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "append"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "dup"]
+          [CompoundListCondition, None]
+            [SimpleCommand "exec"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "high"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "net"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "glob"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "plain"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "lint_only"
@@ -194,6 +214,96 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "redirect_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "both"
+]
+[Word
+  Unquoted "out.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "append"
+]
+[Word
+  Unquoted "out.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dup"
+]
+[Word
+  Unquoted "outfile"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "{logfd}"
+]
+[Word
+  Unquoted "trace.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "high"
+]
+[Word
+  Unquoted "12"
+]
+[Word
+  Unquoted "high.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "net"
+]
+[Word
+  Unquoted "/dev/tcp/example.com/80"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "glob"
+]
+[Word
+  Unquoted "prefix*.log"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "plain"
+]
+[Word
+  Unquoted "plain.log"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -279,6 +389,34 @@ note: Use sed or a case dispatch under a sh shebang.
     25 |    echo "$RANDOM"
        |           ^~~~~~
 note: Compute the value another way under a sh shebang.
-Encountered 20 warnings.
+30:15: warning: The &> redirection is a bash extension absent from POSIX sh.
+    30 |    echo both &>out.log
+       |                ^~~~~~~
+note: Write the file redirect and 2>&1 separately under a sh shebang.
+31:18: warning: The &> redirection is a bash extension absent from POSIX sh.
+    31 |    echo append &>>out.log
+       |                   ^~~~~~~
+note: Write the file redirect and 2>&1 separately under a sh shebang.
+32:14: warning: The >& redirection to outfile is a bash extension absent from POSIX sh.
+    32 |    echo dup >&outfile
+       |               ^~~~~~~
+note: Write the file redirect and 2>&1 separately under a sh shebang.
+33:8: warning: The named file descriptor {logfd} is a bash extension absent from POSIX sh.
+    33 |    exec {logfd}>trace.log
+       |         ^~~~~~~
+note: Name a fixed descriptor number under a sh shebang.
+34:16: warning: The file descriptor 12 is outside the range POSIX sh defines.
+    34 |    echo high 12>high.log
+       |                 ^~~~~~~~
+note: Use a descriptor from 0 to 9 under a sh shebang.
+35:13: warning: The path /dev/tcp/example.com/80 is a bash network device that POSIX sh leaves undefined.
+    35 |    echo net >/dev/tcp/example.com/80
+       |              ^~~~~~~~~~~~~~~~~~~~~~~
+note: Open the connection with a network client under a sh shebang.
+36:14: warning: The redirection target prefix*.log is a glob that POSIX sh leaves undefined.
+    36 |    echo glob >prefix*.log
+       |               ^~~~~~~~~~~
+note: Name the file explicitly under a sh shebang.
+Encountered 27 warnings.
 done
 [Code 0]

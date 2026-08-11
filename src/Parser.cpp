@@ -765,6 +765,7 @@ fn Parser::build_both_streams_redirection(
   build_file_or_dup_redirection(
       1, is_append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
       op_location, first_location, out, /*fd_was_explicit=*/true);
+  out.back().is_both_streams_spelling = true;
   out.push(stderr_to_stdout_dup());
 }
 

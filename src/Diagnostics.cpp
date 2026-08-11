@@ -438,6 +438,30 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(3014, "posix-test-equals", "== is undefined in POSIX test",
       "== is undefined in POSIX test", "Use = for string equality", None,
       Strict, Policy),
+    D(3020, "posix-both-streams-redirect",
+      "the &> redirection is absent from POSIX sh",
+      "The &> redirection is a bash extension absent from POSIX sh",
+      "Write the file redirect and 2>&1 separately under a sh shebang", None,
+      Strict, Policy),
+    D(3021, "posix-dup-to-filename",
+      "a >& with a filename is absent from POSIX sh",
+      "The >& redirection to {0} is a bash extension absent from POSIX sh",
+      "Write the file redirect and 2>&1 separately under a sh shebang", None,
+      Strict, Policy),
+    D(3022, "posix-named-descriptor",
+      "a named file descriptor is absent from POSIX sh",
+      "The named file descriptor {0} is a bash extension absent from POSIX sh",
+      "Name a fixed descriptor number under a sh shebang", None, Strict,
+      Policy),
+    D(3023, "posix-descriptor-range",
+      "a file descriptor above nine is undefined in POSIX sh",
+      "The file descriptor {0} is outside the range POSIX sh defines",
+      "Use a descriptor from 0 to 9 under a sh shebang", None, Strict, Policy),
+    D(3025, "posix-network-device",
+      "the network devices are absent from POSIX sh",
+      "The path {0} is a bash network device that POSIX sh leaves undefined",
+      "Open the connection with a network client under a sh shebang", None,
+      Strict, Policy),
     D(3026, "posix-glob-caret",
       "a ^ in a bracket expression is not a POSIX negation",
       "A ^ opens the bracket expression {0} where POSIX sh negates with !",
@@ -451,6 +475,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "{0} is a bash array builtin absent from POSIX sh",
       "read the input with a while read loop or switch the shebang to bash",
       None, Strict, Policy),
+    D(3031, "posix-glob-redirect",
+      "a glob redirection target is undefined in POSIX sh",
+      "The redirection target {0} is a glob that POSIX sh leaves undefined",
+      "Name the file explicitly under a sh shebang", None, Strict, Policy),
     D(3034, "posix-file-substitution", "$(<file) is absent from POSIX sh",
       "The $(<file) form is a bash shorthand absent from POSIX sh",
       "Use $(cat file) under a sh shebang", None, Strict, Policy),
@@ -1759,6 +1787,58 @@ fn check_command_value_lints(AnalysisContext &actx,
   }
 }
 
+namespace {
+
+fn check_posix_redirection_portability(AnalysisContext &actx,
+                                       const Redirection &redirection,
+                                       SourceLocation fallback_location) throws
+    -> void
+{
+  let const do_get_location = [&]() -> SourceLocation {
+    return redirection.target != nullptr ? redirection.target->source_location()
+                                         : fallback_location;
+  };
+
+  if (redirection.fd_allocation_name_token != nullptr) {
+    let const name = redirection.fd_allocation_name_token->raw_view();
+    actx.report_diagnostic(
+        diagnostic_id::sc3022,
+        redirection.fd_allocation_name_token->source_location(),
+        {name.value_or(StringView{})});
+  }
+
+  let const descriptor =
+      redirection.fd > redirection.dup_fd ? redirection.fd : redirection.dup_fd;
+  if (descriptor > 9) {
+    let const descriptor_text = String::from(descriptor, heap_allocator());
+    actx.report_diagnostic(diagnostic_id::sc3023, do_get_location(),
+                           {descriptor_text.view()});
+  }
+
+  if (redirection.is_both_streams_spelling)
+    actx.report_diagnostic(diagnostic_id::sc3020, do_get_location());
+
+  if (redirection.target == nullptr) return;
+
+  let const target_text = redirection.target->raw_view();
+  if (!target_text.has_value()) return;
+
+  let const view = *target_text;
+  if (redirection.kind == Redirection::Kind::DuplicateOutput &&
+      redirection.can_dup_be_filename)
+  {
+    actx.report_diagnostic(diagnostic_id::sc3021, do_get_location(), {view});
+  }
+
+  if (view.starts_with(StringView{"/dev/tcp/"}) ||
+      view.starts_with(StringView{"/dev/udp/"}))
+  {
+    actx.report_diagnostic(diagnostic_id::sc3025, do_get_location(), {view});
+  }
+}
+
+} /* namespace */
+
 /* The redirection lints. 2>&1 before the stdout file redirect is SC2069,
    reading and truncating the same file is SC2094, an input redirect into a
    non-stdin command is SC2217. */
@@ -1778,6 +1858,13 @@ fn check_redirection_lints(AnalysisContext &actx,
       saw_stderr_to_stdout = true;
       continue;
     }
+
+    let const is_posix = actx.shebang_is_posix_sh;
+    if (is_posix) {
+      check_posix_redirection_portability(actx, redirection,
+                                          input.command_location());
+    }
+
     let const is_file_output =
         redirection.kind == Redirection::Kind::TruncateOutput ||
         redirection.kind == Redirection::Kind::TruncateOutputOverride;
@@ -1792,7 +1879,14 @@ fn check_redirection_lints(AnalysisContext &actx,
     {
       let const &target_word =
           static_cast<const tokens::WordToken *>(redirection.target)->word();
-      for (let const &segment : target_word.segments)
+      let has_glob_target = false;
+
+      for (let const &segment : target_word.segments) {
+        if (is_posix && !has_glob_target) {
+          has_glob_target =
+              segment.has_live_glob_chars() && segment.has_glob_metacharacter();
+        }
+
         if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
             (view_contains(segment.text.view(), StringView{"++"}) ||
              view_contains(segment.text.view(), StringView{"--"}) ||
@@ -1802,6 +1896,13 @@ fn check_redirection_lints(AnalysisContext &actx,
                                  redirection.target->source_location());
           break;
         }
+      }
+
+      if (has_glob_target) {
+        actx.report_diagnostic(
+            diagnostic_id::sc3031, redirection.target->source_location(),
+            {redirection.target->raw_view().value_or(StringView{})});
+      }
     }
     if (redirection.kind == Redirection::Kind::ReadInput &&
         redirection.target != nullptr &&
