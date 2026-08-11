@@ -285,13 +285,6 @@ fn SelectLoop::analyze(AnalysisContext &actx,
   m_body->analyze(actx, false);
 }
 
-cold fn SelectLoop::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_body != nullptr);
-  m_body->register_defined_functions(actx);
-}
-
 CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
                              String condition, String step,
                              const Expression *body)
@@ -446,13 +439,6 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
 
   actx.constant_variables.clear();
   m_body->analyze(actx, false);
-}
-
-cold fn CStyleForLoop::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_body != nullptr);
-  m_body->register_defined_functions(actx);
 }
 
 pure fn CStyleForLoop::condition_clause() const wontthrow -> StringView
@@ -648,14 +634,11 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
-  let const had_registered_definitions =
-      actx.has_registered_definitions_in_scope;
-  actx.has_registered_definitions_in_scope = false;
+  actx.apply_scope_definitions(m_analysis_scope_definitions);
   m_body->analyze(actx, is_unconditional);
   actx.constant_variables = steal(saved_constants);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
-  actx.has_registered_definitions_in_scope = had_registered_definitions;
 }
 
 FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
@@ -753,23 +736,14 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = HashSet{heap_allocator()};
-  let const had_registered_definitions =
-      actx.has_registered_definitions_in_scope;
-  actx.has_registered_definitions_in_scope = false;
+  actx.apply_scope_definitions(m_analysis_scope_definitions);
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
   actx.function_scope_depth--;
-  actx.has_registered_definitions_in_scope = had_registered_definitions;
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
-}
-
-cold fn FunctionDefinition::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  actx.add_defined_function(m_name);
 }
 
 RedirectedCommand::RedirectedCommand(SourceLocation location,
@@ -802,14 +776,6 @@ fn RedirectedCommand::analyze(AnalysisContext &actx,
   ASSERT(m_child != nullptr);
 
   m_child->analyze(actx, is_unconditional);
-}
-
-cold fn RedirectedCommand::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_child != nullptr);
-
-  m_child->register_defined_functions(actx);
 }
 
 fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64

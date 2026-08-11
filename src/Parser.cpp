@@ -45,6 +45,56 @@ fn Parser::take_shellcheck_suppressions() throws
   return steal(m_shellcheck_suppressions);
 }
 
+fn Parser::take_analysis_scope_definitions() throws
+    -> ArrayList<analysis_scope_definition>
+{
+  return steal(m_analysis_scope_definitions);
+}
+
+fn Parser::record_analysis_scope_definition(StringView name,
+                                            bool is_alias) throws -> void
+{
+  if (!m_should_collect_analysis_scopes) return;
+
+  m_analysis_scope_definitions.push(
+      analysis_scope_definition{String{name}, is_alias});
+}
+
+fn Parser::record_analysis_alias_definitions(
+    const ArrayList<const Token *> &args) throws -> void
+{
+  if (!m_should_collect_analysis_scopes || args.is_empty()) return;
+
+  let const command_view = args[0]->raw_view();
+  if (!command_view.has_value() || *command_view != "alias") return;
+
+  for (usize i = 1; i < args.count(); i++) {
+    let const text = args[i]->raw_string();
+    let const equals_position = text.find_character('=');
+    if (equals_position.has_value() && *equals_position > 0)
+      record_analysis_scope_definition(
+          StringView{text.data(), *equals_position}, true);
+  }
+}
+
+mustuse fn Parser::open_analysis_scope() const wontthrow -> usize
+{
+  return m_analysis_scope_definitions.count();
+}
+
+fn Parser::close_analysis_scope(usize scope_mark) throws
+    -> ArrayList<analysis_scope_definition>
+{
+  let harvested = ArrayList<analysis_scope_definition>{heap_allocator()};
+  for (usize i = scope_mark; i < m_analysis_scope_definitions.count(); i++)
+    harvested.push(steal(m_analysis_scope_definitions[i]));
+
+  while (m_analysis_scope_definitions.count() > scope_mark)
+    m_analysis_scope_definitions.pop_back();
+
+  return harvested;
+}
+
 hot pure static fn kind_in(Token::Kind kind,
                            std::initializer_list<Token::Kind> set) wontthrow
     -> bool
@@ -977,6 +1027,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
   let do_build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
 
+    record_analysis_alias_definitions(args_accumulator);
+
     SimpleCommand *c = m_lexer.arena().create<SimpleCommand>(
         *source_location, steal(args_accumulator));
     if (local_vars.count() != 0) c->set_local_vars(steal(local_vars));
@@ -1747,6 +1799,7 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   LOG(Debug, "parsing a subshell at byte %zu",
       open->source_location().position);
 
+  let const scope_mark = open_analysis_scope();
   Expression *body = parse_command_list({Token::Kind::RightParen});
 
   Token *close = m_lexer.next_shell_token();
@@ -1759,6 +1812,7 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
 
   let subshell =
       m_lexer.arena().create<Subshell>(open->source_location(), body);
+  subshell->set_analysis_scope_definitions(close_analysis_scope(scope_mark));
   const SourceLocation close_location = close->source_location();
   subshell->set_source_end_position(close_location.position +
                                     close_location.length);
@@ -2032,6 +2086,9 @@ fn Parser::finish_function_body(SourceLocation location, StringView name) throws
 {
   skip_newlines_after_pipe();
 
+  record_analysis_scope_definition(name, false);
+  let const scope_mark = open_analysis_scope();
+
   /* The body is parsed into the persistent function arena so it outlives the
      per-command arena reset. */
   BumpArena &per_command_arena = m_lexer.arena();
@@ -2048,6 +2105,7 @@ fn Parser::finish_function_body(SourceLocation location, StringView name) throws
      text from the source. */
   let definition =
       m_lexer.arena().create<FunctionDefinition>(location, name, body);
+  definition->set_analysis_scope_definitions(close_analysis_scope(scope_mark));
   definition->set_source_end_position(body->source_end_position());
   return definition;
 }

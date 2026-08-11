@@ -184,6 +184,14 @@ struct shellcheck_suppression
   ArrayList<shellcheck_selector> selectors;
 };
 
+/* The name is owned because the parser releases its source copy before
+   analysis runs. */
+struct analysis_scope_definition
+{
+  String name;
+  bool is_alias;
+};
+
 extern const diagnostic_definition DIAGNOSTIC_DEFINITIONS[];
 
 pure fn get_diagnostic_definition(diagnostic_id id) wontthrow

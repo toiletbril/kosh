@@ -393,6 +393,19 @@ static fn run_script_contents(const String &script_contents,
 
     let shellcheck_suppressions =
         ArrayList<shellcheck_suppression>{heap_allocator()};
+    let analysis_scope_definitions =
+        ArrayList<analysis_scope_definition>{heap_allocator()};
+
+    /* POSIX and bash mode skip the analysis stage, -W forces it on as warnings,
+       and --no-diagnostics always skips it. The live context is read so a mood
+       switch or a runtime set -o no-diagnostics flips it. The verdict is known
+       before parsing, so the parser skips its analysis inputs. */
+    let const run_analysis =
+        precompiled_ast == nullptr &&
+        (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
+         ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
+           context.warnings_enabled()) &&
+          !context.diagnostics_disabled()));
 
     /* A precompiled tree lives in a caller-owned arena that outlives this call.
      */
@@ -404,6 +417,7 @@ static fn run_script_contents(const String &script_contents,
           Lexer{String{script_contents.view()}, ast_arena,
                 context.show_lexed_words(), filename, context.mood()}
       };
+      p.set_should_collect_analysis_scopes(run_analysis);
 
       /* A file with any parse error must not run, so every error is collected
          and reported at once. */
@@ -429,17 +443,9 @@ static fn run_script_contents(const String &script_contents,
         }
       }
       shellcheck_suppressions = p.take_shellcheck_suppressions();
+      analysis_scope_definitions = p.take_analysis_scope_definitions();
     }
 
-    /* POSIX and bash mode skip the analysis stage, -W forces it on as warnings,
-       and --no-diagnostics always skips it. The live context is read so a mood
-       switch or a runtime set -o no-diagnostics flips it. */
-    let const run_analysis =
-        precompiled_ast == nullptr &&
-        (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
-         ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
-           context.warnings_enabled()) &&
-          !context.diagnostics_disabled()));
     LOG(Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
     /* An interactive -W chunk runs right away and the runtime reports a missing
@@ -466,7 +472,7 @@ static fn run_script_contents(const String &script_contents,
           context.warnings_enabled() && context.shell_is_interactive(),
           context.mood() == mimic_mood::Default,
           context.annoying_diagnostics_enabled(), shellcheck_suppressions,
-          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+          analysis_scope_definitions, FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",

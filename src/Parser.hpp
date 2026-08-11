@@ -26,6 +26,13 @@ public:
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   fn take_shellcheck_suppressions() throws -> ArrayList<shellcheck_suppression>;
 
+  fn set_should_collect_analysis_scopes(bool should_collect) wontthrow -> void
+  {
+    m_should_collect_analysis_scopes = should_collect;
+  }
+  fn take_analysis_scope_definitions() throws
+      -> ArrayList<analysis_scope_definition>;
+
 private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;
 
@@ -43,7 +50,21 @@ private:
   usize m_parentheses_depth{0};
   bool m_should_stop_after_top_level_unit{false};
   bool m_has_parsed_source_command{false};
+  bool m_should_collect_analysis_scopes{false};
   ArrayList<shellcheck_suppression> m_shellcheck_suppressions{heap_allocator()};
+
+  /* A scope owns the tail from its mark, which the enclosing parse function
+     harvests when it closes. */
+  ArrayList<analysis_scope_definition> m_analysis_scope_definitions{
+      heap_allocator()};
+
+  fn record_analysis_scope_definition(StringView name, bool is_alias) throws
+      -> void;
+  fn record_analysis_alias_definitions(
+      const ArrayList<const Token *> &args) throws -> void;
+  mustuse fn open_analysis_scope() const wontthrow -> usize;
+  fn close_analysis_scope(usize scope_mark) throws
+      -> ArrayList<analysis_scope_definition>;
 
   mustuse fn parse_simple_command() throws -> Command *;
 

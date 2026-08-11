@@ -869,21 +869,6 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.constant_variables.clear();
 }
 
-cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
-    -> void
-{
-  /* A function defined in a branch is callable from a sibling and must be
-     registered before the ordered walk warns about a forward reference. */
-  for (let const &[ condition, body ] : m_branches) {
-    ASSERT(condition != nullptr);
-    ASSERT(body != nullptr);
-    condition->register_defined_functions(actx);
-    body->register_defined_functions(actx);
-  }
-
-  if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
-}
-
 pure fn IfClause::branches() const wontthrow -> const ArrayList<if_branch> &
 {
   return m_branches;
@@ -1057,16 +1042,6 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.is_inside_read_loop = was_inside_read_loop;
   actx.should_silence_unresolved_commands = was_silenced;
   actx.tested_command_names = steal(saved_tested_command_names);
-}
-
-cold fn WhileLoop::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_condition != nullptr);
-  ASSERT(m_body != nullptr);
-
-  m_condition->register_defined_functions(actx);
-  m_body->register_defined_functions(actx);
 }
 
 pure fn WhileLoop::condition() const wontthrow -> const Expression *
@@ -1353,14 +1328,6 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   m_body->analyze(actx, false);
 }
 
-cold fn ForLoop::register_defined_functions(AnalysisContext &actx) const throws
-    -> void
-{
-  ASSERT(m_body != nullptr);
-
-  m_body->register_defined_functions(actx);
-}
-
 fn ForLoop::as_for_loop() const wontthrow -> const ForLoop * { return this; }
 
 pure fn ForLoop::has_in_clause() const wontthrow -> bool
@@ -1585,15 +1552,6 @@ fn CaseClause::analyze(AnalysisContext &actx,
   actx.constant_variables.clear();
 }
 
-cold fn CaseClause::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  for (let const &item : m_items) {
-    ASSERT(item.body != nullptr);
-    item.body->register_defined_functions(actx);
-  }
-}
-
 BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}
@@ -1638,16 +1596,6 @@ fn BraceGroup::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
 
   m_body->analyze(actx, is_unconditional);
-}
-
-cold fn BraceGroup::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_body != nullptr);
-
-  /* A function defined in a brace group leaks to the enclosing scope, so it is
-     registered before the ordered walk. Subshell does not forward here. */
-  m_body->register_defined_functions(actx);
 }
 
 } // namespace expressions

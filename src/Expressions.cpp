@@ -437,12 +437,6 @@ fn Expression::analyze(AnalysisContext &actx,
   unused(is_unconditional);
 }
 
-cold fn Expression::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  unused(actx);
-}
-
 fn Expression::append_presence_tested_command_names(
     const AnalysisContext &actx, HashSet &names,
     bool status_is_success) const throws -> void
@@ -653,6 +647,7 @@ fn analyze_ast(const Expression *root, StringView source,
                bool silence_unresolved_commands, bool is_default_mood,
                bool should_emit_annoying_diagnostics,
                const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
+               const ArrayList<analysis_scope_definition> &scope_definitions,
                bool show_optimizer_state) throws -> bool
 {
   ASSERT(root != nullptr);
@@ -709,11 +704,12 @@ fn analyze_ast(const Expression *root, StringView source,
       actx.shebang_is_posix_sh ? "armed" : "off");
 
   /* A function or alias defined by an earlier command resolves, so the already
-     registered names seed the prepass. */
+     registered names seed the top-level scope. */
   known_functions.for_each(
       [&actx](StringView name) { actx.add_defined_function(name); });
   known_aliases.for_each(
       [&actx](StringView name) { actx.add_known_alias(name); });
+  actx.apply_scope_definitions(scope_definitions);
 
   root->analyze(actx, true);
 
@@ -903,25 +899,6 @@ fn DummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
 }
 
 cold fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
-
-cold fn SimpleCommand::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  if (m_args.is_empty()) return;
-
-  let const command_view = m_args[0]->raw_view();
-  if (!command_view.has_value() || *command_view != "alias") return;
-
-  /* An alias defined anywhere in the input resolves a later use of its name, so
-     each alias name is recorded before the resolution check. The name is taken
-     from the raw token text up to the '='. */
-  for (usize i = 1; i < m_args.count(); i++) {
-    let const text = m_args[i]->raw_string();
-    let const equals_position = text.find_character('=');
-    if (equals_position.has_value() && *equals_position > 0)
-      actx.add_known_alias(StringView{text.data(), *equals_position});
-  }
-}
 
 /* The direct test operator a leading ! collapses into, for the SC2335 lint.
    None for an operator with no negated shortcut. */
@@ -2696,14 +2673,6 @@ fn CompoundListCondition::append_presence_tested_command_names(
   m_cmd->append_presence_tested_command_names(actx, names, status_is_success);
 }
 
-cold fn CompoundListCondition::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_cmd != nullptr);
-
-  m_cmd->register_defined_functions(actx);
-}
-
 cold fn CompoundListCondition::try_static_condition_verdict(
     const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
@@ -2718,16 +2687,6 @@ cold fn CompoundListCondition::try_static_condition_verdict(
 fn CompoundList::analyze(AnalysisContext &actx,
                          bool is_unconditional) const throws -> void
 {
-  let const owns_definition_registration =
-      !actx.has_registered_definitions_in_scope;
-  if (owns_definition_registration) {
-    actx.has_registered_definitions_in_scope = true;
-    for (let const node : m_nodes) {
-      ASSERT(node != nullptr);
-      node->register_defined_functions(actx);
-    }
-  }
-
   for (usize i = 0; i < m_nodes.count(); i++) {
     ASSERT(m_nodes[i] != nullptr);
     let const command = m_nodes[i]->command();
@@ -2843,8 +2802,6 @@ fn CompoundList::analyze(AnalysisContext &actx,
   }
   if (!actx.should_retain_tested_command_names)
     actx.tested_command_names = steal(saved_tested_command_names);
-  if (owns_definition_registration)
-    actx.has_registered_definitions_in_scope = false;
 }
 
 fn CompoundList::append_presence_tested_command_names(
@@ -2854,15 +2811,6 @@ fn CompoundList::append_presence_tested_command_names(
   if (m_nodes.count() != 1 || m_nodes[0] == nullptr) return;
   m_nodes[0]->append_presence_tested_command_names(actx, names,
                                                    status_is_success);
-}
-
-cold fn CompoundList::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  for (let const node : m_nodes) {
-    ASSERT(node != nullptr);
-    node->register_defined_functions(actx);
-  }
 }
 
 cold fn CompoundList::try_static_condition_verdict(
@@ -2889,17 +2837,6 @@ fn IfStatement::analyze(AnalysisContext &actx,
   /* A branch may have reassigned a name, so a value recorded before this if is
      no longer proven in the block after it. */
   actx.constant_variables.clear();
-}
-
-cold fn IfStatement::register_defined_functions(
-    AnalysisContext &actx) const throws -> void
-{
-  ASSERT(m_condition != nullptr);
-  ASSERT(m_then != nullptr);
-
-  m_condition->register_defined_functions(actx);
-  m_then->register_defined_functions(actx);
-  if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
 }
 
 } /* namespace expressions */

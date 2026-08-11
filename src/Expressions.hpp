@@ -87,7 +87,6 @@ public:
 
   HashSet tested_command_names{heap_allocator()};
   bool should_retain_tested_command_names{false};
-  bool has_registered_definitions_in_scope{false};
 
   bool should_trace_optimizer{false};
   usize optimizer_folded_arithmetic{0};
@@ -114,6 +113,18 @@ public:
     if (known_aliases.contains(name)) return;
     known_aliases.add(name);
     known_alias_insertions.push(String{name});
+  }
+
+  fn apply_scope_definitions(
+      const ArrayList<analysis_scope_definition> &definitions) throws -> void
+  {
+    for (let const &definition : definitions) {
+      if (definition.is_alias) {
+        add_known_alias(definition.name.view());
+      } else {
+        add_defined_function(definition.name.view());
+      }
+    }
   }
 
   fn rollback_defined_functions(usize insertion_count) throws -> void
@@ -170,6 +181,7 @@ fn analyze_ast(const Expression *root, StringView source,
                bool silence_unresolved_commands, bool is_default_mood,
                bool should_emit_annoying_diagnostics,
                const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
+               const ArrayList<analysis_scope_definition> &scope_definitions,
                bool show_optimizer_state = false) throws -> bool;
 
 class Expression
@@ -221,9 +233,6 @@ public:
   virtual fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void;
 
-  virtual fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void;
-
   virtual fn append_presence_tested_command_names(
       const AnalysisContext &actx, HashSet &names,
       bool status_is_success) const throws -> void;
@@ -259,9 +268,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
-      -> void override;
-
-  fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
 protected:
@@ -426,9 +432,6 @@ public:
                                           bool status_is_success) const throws
       -> void override;
 
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
-
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
 
@@ -480,9 +483,6 @@ public:
                                           HashSet &names,
                                           bool status_is_success) const throws
       -> void override;
-
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
 
@@ -515,8 +515,6 @@ public:
   fn append_presence_tested_command_names(const AnalysisContext &actx,
                                           HashSet &names,
                                           bool status_is_success) const throws
-      -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
@@ -596,9 +594,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
-
   pure fn branches() const wontthrow -> const ArrayList<if_branch> &;
   pure fn otherwise() const wontthrow -> const Expression *;
 
@@ -641,9 +636,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
-
   pure fn condition() const wontthrow -> const Expression *;
   pure fn is_until() const wontthrow -> bool;
 
@@ -675,9 +667,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
-
   fn as_for_loop() const wontthrow -> const ForLoop * override;
 
   pure fn has_in_clause() const wontthrow -> bool;
@@ -720,8 +709,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -740,9 +727,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
-
   fn can_evaluate_in_process_substitution(
       const EvalContext &cxt, HashSet &active_functions) const throws
       -> bool override;
@@ -764,10 +748,18 @@ public:
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
 
+  fn set_analysis_scope_definitions(
+      ArrayList<analysis_scope_definition> definitions) wontthrow -> void
+  {
+    m_analysis_scope_definitions = steal(definitions);
+  }
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   const Expression *m_body;
+  ArrayList<analysis_scope_definition> m_analysis_scope_definitions{
+      heap_allocator()};
 };
 
 class ConditionalCommand : public CompoundCommand
@@ -823,9 +815,6 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
-
   pure fn condition_clause() const wontthrow -> StringView;
 
   /* The init runs once before the condition even when the condition folds to
@@ -870,8 +859,6 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -914,8 +901,6 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -938,14 +923,20 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-  fn register_defined_functions(AnalysisContext &actx) const throws
-      -> void override;
+
+  fn set_analysis_scope_definitions(
+      ArrayList<analysis_scope_definition> definitions) wontthrow -> void
+  {
+    m_analysis_scope_definitions = steal(definitions);
+  }
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   String m_name;
   const Expression *m_body;
+  ArrayList<analysis_scope_definition> m_analysis_scope_definitions{
+      heap_allocator()};
 };
 
 class ConstantNumber : public Expression
