@@ -881,6 +881,28 @@
             [SimpleCommand "echo" "$suppressed"]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$reported"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "source_byte_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "“curly”"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "‘curly’"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ls" "–l"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "inside ” quotes"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "inside ’ quotes"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "source_byte_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "spaced word"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "carriagereturn"]
 [Word
   Unquoted "lint_only"
 ]
@@ -4272,6 +4294,102 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "source_byte_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "“curly”"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "‘curly’"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "–l"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "inside ” quotes"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "inside ’ quotes"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "source_byte_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "spaced word"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "carriagereturn"
+]
+[Word
+  Unquoted "}"
+]
+397:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
+   397 |    echo “curly”
+       |         ^
+note: Delete it and retype an ASCII quote.
+397:14: warning: The Unicode quote 'U+201D' is ordinary text, so it opens no quoted string.
+   397 |    echo “curly”
+       |               ^
+note: Delete it and retype an ASCII quote.
+398:8: warning: The Unicode quote 'U+2018' is ordinary text, so it opens no quoted string.
+   398 |    echo ‘curly’
+       |         ^
+note: Delete it and retype an ASCII quote.
+398:14: warning: The Unicode quote 'U+2019' is ordinary text, so it opens no quoted string.
+   398 |    echo ‘curly’
+       |               ^
+note: Delete it and retype an ASCII quote.
+399:6: warning: The Unicode dash 'U+2013' is not the ASCII minus, so the shell reads it as ordinary text.
+   399 |    ls –l
+       |       ^
+note: Delete it and retype an ASCII minus.
+400:16: warning: The Unicode quote 'U+201D' inside this double-quoted string is printed as text.
+   400 |    echo "inside ” quotes"
+       |                 ^
+note: Delete it and retype an ASCII quote, or single-quote the string to keep it literal.
+401:16: warning: The Unicode quote 'U+2019' inside this single-quoted string is printed as text.
+   401 |    echo 'inside ’ quotes'
+       |                 ^
+note: Delete it and retype an ASCII quote, or double-quote the string to keep it literal.
+404:14: warning: The Unicode space 'U+00A0' does not separate words, the shell reads it as part of one word.
+   404 |    echo spaced word
+       |               ^
+note: Delete it and retype an ASCII space.
+405:17: warning: A carriage return in the script text is read as data, not as a line ending.
+   405 |    echo 'carriagereturn'
+       |                  ^
+note: Convert the file to Unix line endings with `tr -d '\r'`.
 3:8: warning: A bare glob can expand to a filename that begins with '-'.
      3 |    grep *.txt file
        |         ^~~~~
@@ -5518,7 +5636,7 @@ note: Use `command` before the wrapped command name.
    393 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 304 warnings.
+Encountered 313 warnings.
 done
 done
 done

@@ -392,3 +392,15 @@ directive_scope() {
   echo $suppressed
   echo $reported
 }
+
+source_byte_diagnostics() {
+  echo “curly”
+  echo ‘curly’
+  ls –l
+  echo "inside ” quotes"
+  echo 'inside ’ quotes'
+}
+source_byte_diagnostics() {
+  echo spaced word
+  echo 'carriagereturn'
+}

@@ -23,6 +23,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "if runs a command directly, not inside test brackets",
       "Test brackets do not run the command written inside them",
       "Run the command directly as the if condition", None, Strict, Policy),
+    D(1017, "literal-carriage-return", "the script holds a carriage return",
+      "A carriage return in the script text is read as data, not as a line "
+      "ending",
+      "Convert the file to Unix line endings with `tr -d '\\r'`", None, Lenient,
+      Policy),
+    D(1018, "unicode-space", "a Unicode space does not separate words",
+      "The Unicode space '{0}' does not separate words, the shell reads it as "
+      "part of one word",
+      "Delete it and retype an ASCII space", None, Strict, Policy),
     D(1019, "missing-unary-operand", "a unary test operator takes one operand",
       "The '{0}' operator expects an operand, '{1}' is another operator",
       "Give the operator its operand before the comparison", None, Strict,
@@ -44,12 +53,37 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a positional parameter above nine needs braces",
       "A positional parameter above nine needs braces",
       "Write ${10} to select positional parameter 10", None, Strict, Policy),
+    D(1082, "byte-order-mark", "a byte-order mark precedes the script",
+      "A UTF-8 byte-order mark precedes the script text",
+      "Save the script as UTF-8 without a byte-order mark", None, Strict,
+      Policy),
+    D(1100, "unicode-dash", "a Unicode dash is not the ASCII minus",
+      "The Unicode dash '{0}' is not the ASCII minus, so the shell reads it as "
+      "ordinary text",
+      "Delete it and retype an ASCII minus", None, Strict, Policy),
     D(1106, "arithmetic-test-operator",
       "arithmetic uses the symbolic comparison operators",
       "The '{0}' operator belongs to test, arithmetic reads it as a "
       "subtraction",
       "Use the symbolic form such as `<` or `>` inside arithmetic", None,
       Strict, Policy),
+    D(1110, "unicode-quote", "a Unicode quote does not quote anything",
+      "The Unicode quote '{0}' is ordinary text, so it opens no quoted string",
+      "Delete it and retype an ASCII quote", None, Strict, Policy),
+    D(1111, "unicode-quote-in-double-quotes",
+      "a Unicode double quote inside a quoted string is literal",
+      "The Unicode quote '{0}' inside this double-quoted string is printed as "
+      "text",
+      "Delete it and retype an ASCII quote, or single-quote the string to keep "
+      "it literal",
+      None, Annoying, Policy),
+    D(1112, "unicode-quote-in-single-quotes",
+      "a Unicode single quote inside a quoted string is literal",
+      "The Unicode quote '{0}' inside this single-quoted string is printed as "
+      "text",
+      "Delete it and retype an ASCII quote, or double-quote the string to keep "
+      "it literal",
+      None, Annoying, Policy),
     D(2000, "echo-piped-into-wc",
       "the shell knows a string length without a pipeline",
       "The `echo` output is counted by `wc`, where the shell knows the length "
@@ -1201,10 +1235,6 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The assignment prefix does not affect this command, '{0}' is read "
       "before it is set",
       None, None, Lenient, Policy),
-    D(0, "byte-order-mark", "a byte-order mark precedes the script",
-      "A UTF-8 byte-order mark precedes the script text",
-      "Save the script as UTF-8 without a byte-order mark", None, Strict,
-      Policy),
     D(0, "exported-cdpath", "an exported CDPATH can redirect child scripts",
       "An exported CDPATH can redirect cd commands in child scripts",
       "Keep CDPATH unexported or clear it before running scripts", None, Strict,
@@ -4849,6 +4879,378 @@ fn check_case_option_coverage(AnalysisContext &actx,
   if (!tally.has_default_arm && !tally.has_question_arm) {
     actx.report_diagnostic(diagnostic_id::sc2220, input.case_location, {},
                            input.getopts_location);
+  }
+}
+
+namespace {
+
+/* Which quoting a byte sits inside, which decides whether a homoglyph is read
+   as syntax or as text. */
+enum class source_scan_state : u8
+{
+  Normal,
+  SingleQuoted,
+  DoubleQuoted,
+  Comment,
+};
+
+enum class homoglyph_kind : u8
+{
+  None,
+  SingleQuote,
+  DoubleQuote,
+  Dash,
+  Space,
+};
+
+struct decoded_codepoint
+{
+  u32 value;
+  usize length;
+};
+
+constexpr u64 HIGH_BITS = 0x8080808080808080ULL;
+constexpr u64 LOW_BITS = 0x0101010101010101ULL;
+constexpr u64 CARRIAGE_RETURNS = 0x0d0d0d0d0d0d0d0dULL;
+
+alwaysinline pure fn chunk_holds_scanned_byte(u64 chunk) wontthrow -> bool
+{
+  let const differences = chunk ^ CARRIAGE_RETURNS;
+  let const holds_carriage_return =
+      (differences - LOW_BITS) & ~differences & HIGH_BITS;
+
+  return ((chunk & HIGH_BITS) | holds_carriage_return) != 0;
+}
+
+/* Whether the source holds a byte the classification below could report. A
+   script is almost always plain ASCII, so this eight-byte-at-a-time answer
+   keeps the classifying walk off the common path. */
+pure fn source_holds_scanned_byte(StringView source) wontthrow -> bool
+{
+  usize at = 0;
+  while (at + sizeof(u64) <= source.length) {
+    u64 chunk = 0;
+    __builtin_memcpy(&chunk, source.data + at, sizeof(u64));
+    if (chunk_holds_scanned_byte(chunk)) return true;
+    at += sizeof(u64);
+  }
+
+  for (; at < source.length; at++) {
+    let const byte = static_cast<u8>(source[at]);
+    if (byte >= 0x80 || byte == '\r') return true;
+  }
+
+  return false;
+}
+
+pure fn decode_utf8(StringView source, usize at) wontthrow -> decoded_codepoint
+{
+  let const first = static_cast<u8>(source[at]);
+  usize length = 0;
+  u32 value = 0;
+
+  switch (first & 0xf8) {
+  case 0xc0:
+  case 0xc8:
+  case 0xd0:
+  case 0xd8:
+    length = 2;
+    value = first & 0x1fu;
+    break;
+
+  case 0xe0:
+  case 0xe8:
+    length = 3;
+    value = first & 0x0fu;
+    break;
+
+  case 0xf0:
+    length = 4;
+    value = first & 0x07u;
+    break;
+
+  default: return decoded_codepoint{0, 1};
+  }
+
+  if (at + length > source.length) return decoded_codepoint{0, 1};
+
+  for (usize i = 1; i < length; i++) {
+    let const continuation = static_cast<u8>(source[at + i]);
+    if ((continuation & 0xc0) != 0x80) return decoded_codepoint{0, 1};
+    value = (value << 6) | (continuation & 0x3fu);
+  }
+
+  return decoded_codepoint{value, length};
+}
+
+pure fn classify_codepoint(u32 codepoint) wontthrow -> homoglyph_kind
+{
+  switch (codepoint) {
+  case 0x2018:
+  case 0x2019:
+  case 0x201a:
+  case 0x201b:
+  case 0x2032:
+  case 0x2035: return homoglyph_kind::SingleQuote;
+
+  case 0x201c:
+  case 0x201d:
+  case 0x201e:
+  case 0x201f:
+  case 0x2033:
+  case 0x2036: return homoglyph_kind::DoubleQuote;
+
+  case 0x2010:
+  case 0x2011:
+  case 0x2012:
+  case 0x2013:
+  case 0x2014:
+  case 0x2015:
+  case 0x2043:
+  case 0x2212:
+  case 0xfe58:
+  case 0xfe63:
+  case 0xff0d: return homoglyph_kind::Dash;
+
+  case 0x00a0:
+  case 0x2000:
+  case 0x2001:
+  case 0x2002:
+  case 0x2003:
+  case 0x2004:
+  case 0x2005:
+  case 0x2006:
+  case 0x2007:
+  case 0x2008:
+  case 0x2009:
+  case 0x200a:
+  case 0x200b:
+  case 0x202f:
+  case 0x205f:
+  case 0x3000:
+  case 0xfeff: return homoglyph_kind::Space;
+
+  default: return homoglyph_kind::None;
+  }
+}
+
+/* A slanted single quote inside a double-quoted string, and a slanted double
+   quote inside a single-quoted string, are the literal typography upstream
+   allows, so they answer None. */
+pure fn homoglyph_diagnostic(homoglyph_kind kind,
+                             source_scan_state state) wontthrow
+    -> Maybe<diagnostic_id>
+{
+  if (state == source_scan_state::Comment) return None;
+
+  switch (kind) {
+  case homoglyph_kind::SingleQuote:
+    if (state == source_scan_state::Normal) return diagnostic_id::sc1110;
+    if (state == source_scan_state::SingleQuoted) return diagnostic_id::sc1112;
+    return None;
+
+  case homoglyph_kind::DoubleQuote:
+    if (state == source_scan_state::Normal) return diagnostic_id::sc1110;
+    if (state == source_scan_state::DoubleQuoted) return diagnostic_id::sc1111;
+    return None;
+
+  case homoglyph_kind::Dash:
+    if (state == source_scan_state::Normal) return diagnostic_id::sc1100;
+    return None;
+
+  case homoglyph_kind::Space:
+    if (state == source_scan_state::Normal) return diagnostic_id::sc1018;
+    return None;
+
+  default: return None;
+  }
+}
+
+fn codepoint_spelling(u32 codepoint) throws -> String
+{
+  constexpr char HEX_DIGITS[] = "0123456789ABCDEF";
+
+  let spelling = String{"U+"};
+  for (let shift = codepoint > 0xffff ? 20 : 12; shift >= 0; shift -= 4)
+    spelling.push(HEX_DIGITS[(codepoint >> shift) & 0xf]);
+
+  return spelling;
+}
+
+pure fn byte_precedes_comment(char byte) wontthrow -> bool
+{
+  switch (byte) {
+  case ' ':
+  case '\t':
+  case '\n':
+  case '\r':
+  case ';':
+  case '&':
+  case '|':
+  case '(':
+  case ')': return true;
+
+  default: return false;
+  }
+}
+
+pure fn byte_ends_here_document_delimiter(char byte) wontthrow -> bool
+{
+  switch (byte) {
+  case ' ':
+  case '\t':
+  case '\n':
+  case '\r':
+  case ';':
+  case '&':
+  case '|':
+  case '<':
+  case '>':
+  case '(':
+  case ')': return true;
+
+  default: return false;
+  }
+}
+
+/* The offset just past the here-document terminator. A body holds prose, where
+   a slanted quote or a Unicode dash is ordinary text. */
+pure fn skip_here_document(StringView source, usize at) wontthrow -> usize
+{
+  usize cursor = at + 2;
+  if (cursor < source.length && source[cursor] == '-') cursor++;
+
+  while (cursor < source.length &&
+         (source[cursor] == ' ' || source[cursor] == '\t'))
+    cursor++;
+
+  usize delimiter_start = cursor;
+  usize delimiter_end = cursor;
+
+  if (cursor < source.length &&
+      (source[cursor] == '\'' || source[cursor] == '"'))
+  {
+    let const quote = source[cursor];
+    cursor++;
+    delimiter_start = cursor;
+    while (cursor < source.length && source[cursor] != quote)
+      cursor++;
+    delimiter_end = cursor;
+  } else {
+    while (cursor < source.length &&
+           !byte_ends_here_document_delimiter(source[cursor]))
+      cursor++;
+    delimiter_end = cursor;
+  }
+
+  if (delimiter_end == delimiter_start) return at + 2;
+
+  let const delimiter = source.substring_of_length(
+      delimiter_start, delimiter_end - delimiter_start);
+
+  while (cursor < source.length && source[cursor] != '\n')
+    cursor++;
+
+  while (cursor < source.length) {
+    cursor++;
+
+    usize line_start = cursor;
+    while (line_start < source.length && source[line_start] == '\t')
+      line_start++;
+
+    usize line_end = line_start;
+    while (line_end < source.length && source[line_end] != '\n')
+      line_end++;
+
+    if (line_end - line_start == delimiter.length &&
+        source.substring_of_length(line_start, delimiter.length) == delimiter)
+    {
+      return line_end;
+    }
+
+    cursor = line_end;
+  }
+
+  return source.length;
+}
+
+} /* namespace */
+
+fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
+{
+  if (!source_holds_scanned_byte(source)) return;
+
+  let state = source_scan_state::Normal;
+  let was_carriage_return_reported = false;
+  usize at = 0;
+
+  while (at < source.length) {
+    let const byte = static_cast<u8>(source[at]);
+
+    if (byte >= 0x80) {
+      let const decoded = decode_utf8(source, at);
+      let const id =
+          homoglyph_diagnostic(classify_codepoint(decoded.value), state);
+
+      /* A leading byte-order mark is already reported as its own finding. */
+      if (id.has_value() && at != 0) {
+        let const spelling = codepoint_spelling(decoded.value);
+        actx.report_diagnostic(*id, SourceLocation{at, decoded.length},
+                               {spelling.view()});
+      }
+
+      at += decoded.length;
+      continue;
+    }
+
+    if (byte == '\r' && !was_carriage_return_reported) {
+      was_carriage_return_reported = true;
+      actx.report_diagnostic(diagnostic_id::sc1017, SourceLocation{at, 1});
+    }
+
+    switch (state) {
+    case source_scan_state::Normal:
+      switch (byte) {
+      case '\'': state = source_scan_state::SingleQuoted; break;
+      case '"': state = source_scan_state::DoubleQuoted; break;
+      case '\\': at++; break;
+
+      case '#':
+        if (at == 0 || byte_precedes_comment(source[at - 1]))
+          state = source_scan_state::Comment;
+        break;
+
+      case '<':
+        if (at + 2 < source.length && source[at + 1] == '<' &&
+            source[at + 2] != '<')
+        {
+          at = skip_here_document(source, at);
+          continue;
+        }
+        break;
+
+      default: break;
+      }
+      break;
+
+    case source_scan_state::SingleQuoted:
+      if (byte == '\'') state = source_scan_state::Normal;
+      break;
+
+    case source_scan_state::DoubleQuoted:
+      switch (byte) {
+      case '"': state = source_scan_state::Normal; break;
+      case '\\': at++; break;
+      default: break;
+      }
+      break;
+
+    case source_scan_state::Comment:
+      if (byte == '\n') state = source_scan_state::Normal;
+      break;
+    }
+
+    at++;
   }
 }
 

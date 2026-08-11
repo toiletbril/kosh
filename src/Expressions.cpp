@@ -669,8 +669,9 @@ fn analyze_ast(const Expression *root, StringView source,
 
   if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
-    actx.report_diagnostic(diagnostic_id::byte_order_mark,
-                           SourceLocation{0, 3});
+    actx.report_diagnostic(diagnostic_id::sc1082, SourceLocation{0, 3});
+
+  expressions::check_source_bytes(actx, source);
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter

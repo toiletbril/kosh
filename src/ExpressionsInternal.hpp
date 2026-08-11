@@ -157,6 +157,10 @@ fn check_case_option_coverage(AnalysisContext &actx,
                               const case_lint_input &input,
                               const case_arm_tally &tally) throws -> void;
 
+/* The homoglyph and carriage return findings the syntax tree cannot carry,
+   since a token holds the bytes without their surrounding quoting. */
+fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void;
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;
