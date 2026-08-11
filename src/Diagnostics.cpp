@@ -559,35 +559,72 @@ static pure fn parse_diagnostic_code(StringView text) wontthrow -> Maybe<u16>
   return static_cast<u16>(value);
 }
 
-static pure fn diagnostic_selector_matches(
-    StringView selector, const diagnostic_definition &definition) wontthrow
-    -> bool
+pure fn shellcheck_selector_disables(const shellcheck_selector &selector,
+                                     StringView source,
+                                     diagnostic_id id) wontthrow -> bool
 {
-  if (selector == StringView{"all"}) return true;
-  if (selector == StringView{definition.slug}) return true;
+  let const &definition = get_diagnostic_definition(id);
 
-  let const code = parse_diagnostic_code(selector);
-  if (code.has_value()) {
+  switch (selector.kind) {
+  case shellcheck_selector_kind::All: return true;
+  case shellcheck_selector_kind::Slug:
+    return source.substring_of_length(selector.slug.position,
+                                      selector.slug.length) ==
+           StringView{definition.slug};
+  case shellcheck_selector_kind::Code:
     return definition.shellcheck_code != 0 &&
-           *code == definition.shellcheck_code;
+           definition.shellcheck_code == selector.code_start;
+  case shellcheck_selector_kind::CodeRange:
+    return definition.shellcheck_code != 0 &&
+           definition.shellcheck_code >= selector.code_start &&
+           definition.shellcheck_code < selector.code_end;
   }
 
-  let const separator = selector.find_character('-');
-  if (!separator.has_value()) return false;
-
-  let const range_start =
-      parse_diagnostic_code(selector.substring_of_length(0, *separator));
-  let const range_end =
-      parse_diagnostic_code(selector.substring(*separator + 1));
-  if (!range_start.has_value() || !range_end.has_value()) return false;
-
-  return definition.shellcheck_code != 0 &&
-         definition.shellcheck_code >= *range_start &&
-         definition.shellcheck_code < *range_end;
+  return false;
 }
 
-static pure fn diagnostic_value_disables(
-    StringView value, const diagnostic_definition &definition) wontthrow -> bool
+static fn
+push_resolved_selector(StringView source, StringView text,
+                       ArrayList<shellcheck_selector> &selectors) throws -> void
+{
+  if (text == StringView{"all"}) {
+    selectors.push(shellcheck_selector{shellcheck_selector_kind::All});
+    return;
+  }
+
+  if (let const code = parse_diagnostic_code(text); code.has_value()) {
+    selectors.push(shellcheck_selector{
+        shellcheck_selector_kind::Code, {0, 0},
+         *code, 0
+    });
+    return;
+  }
+
+  if (let const separator = text.find_character('-'); separator.has_value()) {
+    let const range_start =
+        parse_diagnostic_code(text.substring_of_length(0, *separator));
+    let const range_end = parse_diagnostic_code(text.substring(*separator + 1));
+    if (range_start.has_value() && range_end.has_value()) {
+      selectors.push(shellcheck_selector{
+          shellcheck_selector_kind::CodeRange,
+          {0, 0},
+          *range_start,
+          *range_end
+      });
+      return;
+    }
+  }
+
+  let const slug_position = static_cast<usize>(text.data - source.data);
+  selectors.push(shellcheck_selector{
+      shellcheck_selector_kind::Slug, {slug_position, text.length},
+       0, 0
+  });
+}
+
+static fn collect_comma_separated_selectors(
+    StringView source, StringView value,
+    ArrayList<shellcheck_selector> &selectors) throws -> void
 {
   usize component_start = 0;
   while (component_start <= value.length) {
@@ -595,20 +632,24 @@ static pure fn diagnostic_value_disables(
     while (component_end < value.length && value[component_end] != ',') {
       component_end++;
     }
-    let const component = value.substring_of_length(
-        component_start, component_end - component_start);
-    if (diagnostic_selector_matches(component, definition)) return true;
+    push_resolved_selector(
+        source,
+        value.substring_of_length(component_start,
+                                  component_end - component_start),
+        selectors);
     if (component_end == value.length) break;
     component_start = component_end + 1;
   }
-
-  return false;
 }
 
-pure fn diagnostic_directive_disables(StringView comment,
-                                      diagnostic_id id) wontthrow -> bool
+fn collect_shellcheck_selectors(
+    StringView source, shellcheck_directive_span comment_span,
+    ArrayList<shellcheck_selector> &selectors) throws -> void
 {
-  let const &definition = get_diagnostic_definition(id);
+  if (comment_span.position + comment_span.length > source.length) return;
+
+  let const comment =
+      source.substring_of_length(comment_span.position, comment_span.length);
   usize position = 1;
   while (position < comment.length &&
          (comment[position] == ' ' || comment[position] == '\t'))
@@ -620,7 +661,7 @@ pure fn diagnostic_directive_disables(StringView comment,
       (directive_text.length > 10 && directive_text[10] != ' ' &&
        directive_text[10] != '\t'))
   {
-    return false;
+    return;
   }
   position += 10;
 
@@ -652,7 +693,7 @@ pure fn diagnostic_directive_disables(StringView comment,
       while (position < comment.length && comment[position] != quote) {
         position++;
       }
-      if (position == comment.length) return false;
+      if (position == comment.length) return;
     } else {
       while (position < comment.length && comment[position] != ' ' &&
              comment[position] != '\t' && comment[position] != '#')
@@ -660,13 +701,12 @@ pure fn diagnostic_directive_disables(StringView comment,
         position++;
       }
     }
-    let const value =
-        comment.substring_of_length(value_start, position - value_start);
-    if (diagnostic_value_disables(value, definition)) return true;
+    collect_comma_separated_selectors(
+        source,
+        comment.substring_of_length(value_start, position - value_start),
+        selectors);
     if (quote != '\0' && position < comment.length) position++;
   }
-
-  return false;
 }
 
 namespace {

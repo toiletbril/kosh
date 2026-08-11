@@ -358,11 +358,8 @@ pure fn AnalysisContext::is_diagnostic_suppressed(
       continue;
     }
 
-    for (let const &directive : suppression.directives) {
-      if (directive.position + directive.length > source.length) continue;
-      let const comment =
-          source.substring_of_length(directive.position, directive.length);
-      if (diagnostic_directive_disables(comment, id)) return true;
+    for (let const &selector : suppression.selectors) {
+      if (shellcheck_selector_disables(selector, source, id)) return true;
     }
   }
 
@@ -603,64 +600,49 @@ fn command_resolves(
   return was_resolved;
 }
 
-/* Only an unquoted '[' or ']' is active, so a quoted "[" or an escaped \[ stays
-   literal and never opens a bracket expression. */
-struct glob_scan_byte
+enum class bracket_scan_state
 {
-  char ch;
-  bool is_glob_active;
+  Outside,     /* no bracket expression is open */
+  AfterOpen,   /* the byte after '[', where a '!' or '^' negates the class */
+  InsideClass, /* the closing ']' has not been reached */
 };
-
-fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<glob_scan_byte>
-{
-  ArrayList<glob_scan_byte> bytes{heap_allocator()};
-  for (let const &segment : word.segments) {
-    const bool is_active = segment.has_live_glob_chars();
-    for (usize i = 0; i < segment.text.count(); i++) {
-      bytes.push(glob_scan_byte{segment.text[i], is_active});
-    }
-  }
-  return bytes;
-}
 
 /* The scan mirrors the matcher in utils::glob_matches, where an active '[' with
    no closing ']' is a literal, so only a '[' that opens a class and never
-   closes is malformed. Returns true when malformed. */
-fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
+   closes is malformed. A '[' as the last byte cannot open a class, which is why
+   only InsideClass ends malformed. Returns true when malformed. */
+pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool
 {
-  const ArrayList<glob_scan_byte> bytes = collect_glob_scan_bytes(word);
+  let state = bracket_scan_state::Outside;
 
-  usize position = 0;
-  while (position < bytes.count()) {
-    if (!(bytes[position].is_glob_active && bytes[position].ch == '[')) {
-      position++;
-      continue;
+  for (let const &segment : word.segments) {
+    /* Only an unquoted '[' or ']' is active, so a quoted "[" or an escaped \[
+       stays literal and never opens a bracket expression. */
+    let const is_glob_active = segment.has_live_glob_chars();
+
+    for (usize i = 0; i < segment.text.count(); i++) {
+      let const byte = segment.text[i];
+
+      switch (state) {
+      case bracket_scan_state::Outside:
+        if (is_glob_active && byte == '[')
+          state = bracket_scan_state::AfterOpen;
+        break;
+
+      case bracket_scan_state::AfterOpen:
+        state = bracket_scan_state::InsideClass;
+        if (byte == '!' || byte == '^') break;
+        if (byte == ']') state = bracket_scan_state::Outside;
+        break;
+
+      case bracket_scan_state::InsideClass:
+        if (byte == ']') state = bracket_scan_state::Outside;
+        break;
+      }
     }
-
-    /* A '[' as the last byte cannot open a class and stays literal. */
-    usize scan = position + 1;
-    if (scan >= bytes.count()) {
-      position++;
-      continue;
-    }
-
-    /* A leading '!' or '^' negates the class, mirroring the matcher which skips
-       either one before scanning for the closing ']'. */
-    if (bytes[scan].ch == '!' || bytes[scan].ch == '^') {
-      scan++;
-    }
-
-    /* A leading ']' stays in view so [^] and [!] both open and close the
-       degenerate class the way the matcher accepts them. */
-    for (; scan < bytes.count(); scan++)
-      if (bytes[scan].ch == ']') break;
-
-    if (scan == bytes.count()) return true;
-
-    position = scan + 1;
   }
 
-  return false;
+  return state == bracket_scan_state::InsideClass;
 }
 
 } /* namespace */
@@ -997,17 +979,22 @@ cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
   return true;
 }
 
-cold fn word_has_split_eligible_variable(const Word &word) wontthrow -> bool
+/* The special parameters carry their own splitting rules, so quoting advice
+   never applies to them. */
+pure fn is_split_exempt_variable_name(StringView name) wontthrow -> bool
 {
-  for (let const &segment : word.segments)
-    if (segment.kind == WordSegment::Kind::VariableReference &&
-        segment.is_split_eligible() && segment.text.view() != "@" &&
-        segment.text.view() != "*" && segment.text.view() != "?" &&
-        segment.text.view() != "#" && segment.text.view() != "$" &&
-        segment.text.view() != "!" && segment.text.view() != "-")
-      return true;
+  if (name.length != 1) return false;
 
-  return false;
+  switch (name[0]) {
+  case '@':
+  case '*':
+  case '?':
+  case '#':
+  case '$':
+  case '!':
+  case '-': return true;
+  default: return false;
+  }
 }
 
 cold fn word_is_bare_glob(const Word &word) wontthrow -> bool
@@ -1382,6 +1369,16 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   bool has_command_substitution_argument = false;
   let const should_scan_for_useless_echo =
       actx.should_report(diagnostic_id::sc2116);
+  let const should_scan_for_malformed_glob =
+      actx.should_report(diagnostic_id::malformed_glob);
+  let const should_check_unquoted_expansion =
+      !command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
+      !command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET);
+  let const should_check_dash_glob =
+      !command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
+      command_id != command_name_id::Echo &&
+      command_id != command_name_id::Printf;
+  bool has_end_of_options = false;
 
   for (usize i = 0; i < m_args.count(); i++) {
     let const arg = m_args[i];
@@ -1441,13 +1438,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     bool has_bare_star_reference = false;
     bool has_spread_alone_unquoted = false;
     bool has_spread_in_longer_word = false;
+    bool has_split_eligible_variable = false;
     bool has_bracket_byte = false;
     usize echo_only_substitution_count = 0;
     StringView lost_pipeline_name{};
 
     if (word != nullptr) {
       for (let const &segment : word->segments) {
-        if (!has_bracket_byte && segment.has_live_glob_chars() &&
+        if (should_scan_for_malformed_glob && !has_bracket_byte &&
+            segment.has_live_glob_chars() &&
             segment.text.view().find_character('[').has_value())
         {
           has_bracket_byte = true;
@@ -1502,6 +1501,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           {
             lost_pipeline_name = referenced;
           }
+          if (!has_split_eligible_variable && segment.is_split_eligible() &&
+              !is_split_exempt_variable_name(referenced))
+          {
+            has_split_eligible_variable = true;
+          }
           break;
         }
 
@@ -1554,6 +1558,21 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (has_external_arithmetic_read) {
         actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                                arg_location);
+      }
+
+      if (should_check_unquoted_expansion && has_split_eligible_variable &&
+          !(command_is_assignment_builtin &&
+            word->get_assignment_split().has_value()))
+      {
+        actx.report_diagnostic(diagnostic_id::sc2086_expansion, arg_location);
+      }
+
+      if (should_check_dash_glob && !has_end_of_options) {
+        if (arg->raw_view() == StringView{"--"}) {
+          has_end_of_options = true;
+        } else if (bare_glob_can_start_with_dash(*word)) {
+          actx.report_diagnostic(diagnostic_id::sc2035, arg_location);
+        }
       }
     }
 
@@ -1801,43 +1820,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               static_cast<const tokens::WordToken *>(m_args[i])->word()))
         actx.report_diagnostic(diagnostic_id::sc2024_glob,
                                m_args[i]->source_location());
-  }
-
-  if (!command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
-      !command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET))
-  {
-    for (usize i = 1; i < m_args.count(); i++) {
-      if (m_args[i]->kind() != Token::Kind::Word) continue;
-      let const &word =
-          static_cast<const tokens::WordToken *>(m_args[i])->word();
-      if (!word_has_split_eligible_variable(word)) continue;
-      if (command_is_assignment_builtin &&
-          word.get_assignment_split().has_value())
-        continue;
-      actx.report_diagnostic(diagnostic_id::sc2086_expansion,
-                             m_args[i]->source_location());
-    }
-  }
-
-  if (!command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
-      command_id != command_name_id::Echo &&
-      command_id != command_name_id::Printf)
-  {
-    bool has_end_of_options = false;
-    for (usize i = 1; i < m_args.count(); i++) {
-      if (m_args[i]->kind() != Token::Kind::Word) continue;
-      let const &word =
-          static_cast<const tokens::WordToken *>(m_args[i])->word();
-      let const literal = word.to_literal_string();
-      if (literal.view() == "--") {
-        has_end_of_options = true;
-        continue;
-      }
-      if (has_end_of_options) continue;
-      if (bare_glob_can_start_with_dash(word))
-        actx.report_diagnostic(diagnostic_id::sc2035,
-                               m_args[i]->source_location());
-    }
   }
 
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,

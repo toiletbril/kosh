@@ -383,11 +383,15 @@ hot fn Parser::parse_command_list(
           is_source_command && !m_has_parsed_source_command;
       if (is_source_command) m_has_parsed_source_command = true;
       if (!directives.is_empty()) {
+        let const source = m_lexer.source();
+        let selectors = ArrayList<shellcheck_selector>{heap_allocator()};
+        for (let const &directive : directives)
+          collect_shellcheck_selectors(source, directive, selectors);
         m_shellcheck_suppressions.push(shellcheck_suppression{
             maybe_time->source_location().position,
             is_first_source_command ? static_cast<usize>(-1)
                                     : maybe_time->source_location().position,
-            steal(directives)});
+            steal(selectors)});
         if (!is_first_source_command)
           active_shellcheck_suppression = m_shellcheck_suppressions.count() - 1;
       }

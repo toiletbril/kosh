@@ -1997,14 +1997,14 @@ note: Iterate over a glob or read a delimited filename stream.
     84 |    for file in "*.mp3"; do echo "$file"; done
        |                ^~~~~~~
 note: Leave the glob unquoted so it expands into loop values.
-86:16: warning: The unquoted find pattern expands before find sees it.
-    86 |    find . -name *.ogg
-       |                 ^~~~~
-note: Quote the pattern so find performs the match.
 86:16: warning: A bare glob can expand to a filename that begins with '-'.
     86 |    find . -name *.ogg
        |                 ^~~~~
 note: Prefix the glob with a directory or place -- before it.
+86:16: warning: The unquoted find pattern expands before find sees it.
+    86 |    find . -name *.ogg
+       |                 ^~~~~
+note: Quote the pattern so find performs the match.
 87:22: warning: The find result is inserted into shell source and can execute filename text.
     87 |    find . -exec sh -c 'echo {}' \;
        |                       ^~~~~~~~~

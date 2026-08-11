@@ -159,11 +159,29 @@ struct shellcheck_directive_span
   usize length;
 };
 
+enum class shellcheck_selector_kind
+{
+  All,       /* every catalog entry is disabled */
+  Slug,      /* one native or numbered variant is named */
+  Code,      /* every variant under one ShellCheck code is named */
+  CodeRange, /* every code in [code_start, code_end) is named */
+};
+
+/* The slug is a span because the parser's source copy is released before the
+   analysis stage reads the suppressions. */
+struct shellcheck_selector
+{
+  shellcheck_selector_kind kind{shellcheck_selector_kind::All};
+  shellcheck_directive_span slug{0, 0};
+  u16 code_start{0};
+  u16 code_end{0};
+};
+
 struct shellcheck_suppression
 {
   usize start_position;
   usize end_position;
-  ArrayList<shellcheck_directive_span> directives;
+  ArrayList<shellcheck_selector> selectors;
 };
 
 extern const diagnostic_definition DIAGNOSTIC_DEFINITIONS[];
@@ -185,8 +203,12 @@ pure inline fn get_diagnostic_tier_name(diagnostic_tier tier) wontthrow
 fn format_diagnostic_template(
     const char *text_template,
     std::initializer_list<StringView> arguments = {}) throws -> String;
-pure fn diagnostic_directive_disables(StringView comment,
-                                      diagnostic_id id) wontthrow -> bool;
+fn collect_shellcheck_selectors(
+    StringView source, shellcheck_directive_span comment_span,
+    ArrayList<shellcheck_selector> &selectors) throws -> void;
+pure fn shellcheck_selector_disables(const shellcheck_selector &selector,
+                                     StringView source,
+                                     diagnostic_id id) wontthrow -> bool;
 
 enum class command_name_id : u16
 {
