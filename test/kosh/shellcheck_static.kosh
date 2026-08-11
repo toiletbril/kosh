@@ -214,6 +214,16 @@ test_operand_expansion_diagnostics() {
   [[ "$left" =~ *.txt ]]
 }
 
+file_command_diagnostics() {
+  ls | xargs rm
+  ls | wc -l
+  find -name '*.txt'
+  mv file.txt
+  cp -r dir
+  ln -s target
+  xargs -i echo replaced < list
+}
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {

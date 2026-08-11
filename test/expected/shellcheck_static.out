@@ -518,6 +518,28 @@
           [CompoundListCondition, None]
             [ConditionalCommand]
   [CompoundListCondition, None]
+    [FunctionDefinition "file_command_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "xargs" "rm"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "wc" "-l"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "-name" "*.txt"]
+          [CompoundListCondition, None]
+            [SimpleCommand "mv" "file.txt"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cp" "-r" "dir"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ln" "-s" "target"]
+          [CompoundListCondition, None]
+            [SimpleCommand "xargs" "-i" "echo" "replaced"]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -2788,6 +2810,81 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "file_command_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "-name"
+]
+[Word
+  Literal "*.txt"
+]
+[Word
+  Unquoted "mv"
+]
+[Word
+  Unquoted "file.txt"
+]
+[Word
+  Unquoted "cp"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "dir"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "target"
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "-i"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "replaced"
+]
+[Word
+  Unquoted "list"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -3522,18 +3619,46 @@ note: Quote '$right' so the comparison stays literal.
    214 |    [[ "$left" =~ *.txt ]]
        |                  ^~~~~
 note: Compare with `=` for a glob, or write the pattern as a regex.
-217:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   217 |  recursive_wrapper() { recursive_wrapper "$@"; }
+218:8: warning: The `ls` listing splits a name with a space or a newline before `xargs` reads it.
+   218 |    ls | xargs rm
+       |         ^~~~~
+note: Use `find -print0` with `xargs -0`, or `find -exec`.
+219:3: warning: The `ls` listing mangles a name with a space or a newline when it is read as data.
+   219 |    ls | wc -l
+       |    ^~
+note: Use `find`, or match the names with a glob.
+220:3: warning: Some `find` implementations have no default path, so this search walks nothing.
+   220 |    find -name '*.txt'
+       |    ^~~~
+note: Write `.` as the path before the expression.
+221:6: warning: The `mv` command is given 'file.txt' alone, so no destination is named.
+   221 |    mv file.txt
+       |       ^~~~~~~~
+note: Add the destination path.
+222:9: warning: The `cp` command is given 'dir' alone, so no destination is named.
+   222 |    cp -r dir
+       |          ^~~
+note: Add the destination path.
+223:9: warning: The `ln` command is given 'target' alone, so no link name is named.
+   223 |    ln -s target
+       |          ^~~~~~
+note: Add the link name, or write `.` explicitly.
+224:3: warning: The `xargs -i` flag is deprecated.
+   224 |    xargs -i echo replaced < list
+       |    ^~~~~
+note: Use `-I` with an explicit replacement string instead.
+227:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   227 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-217:1: details:
-   217 |  recursive_wrapper() { recursive_wrapper "$@"; }
+227:1: details:
+   227 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-222:8: warning: An unquoted variable can split into words and expand globs.
-   222 |    echo $reported
+232:8: warning: An unquoted variable can split into words and expand globs.
+   232 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 173 warnings.
+Encountered 180 warnings.
 done
 done
 done

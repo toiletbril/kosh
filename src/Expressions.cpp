@@ -1687,8 +1687,8 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     }
   }
 
-  /* The stage-pair lints. find piped into xargs is SC2038, a pipe into a
-     non-stdin command is SC2216. */
+  /* The stage-pair lints. A pipe into a non-stdin command is SC2216, and the
+     remaining codes are keyed on the stage that feeds the pipe. */
   for (usize i = 0; i + 1 < m_commands.count(); i++) {
     const SimpleCommand *stage = m_commands[i]->as_simple_command();
     const SimpleCommand *next = m_commands[i + 1]->as_simple_command();
@@ -1699,11 +1699,30 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     if (!stage_name.has_value() || !next_name.has_value()) continue;
     let const next_is_user = actx.defined_functions.contains(*next_name) ||
                              actx.known_aliases.contains(*next_name);
+    let const stage_is_user = actx.defined_functions.contains(*stage_name) ||
+                              actx.known_aliases.contains(*stage_name);
+    let const stage_info = get_analysis_command_info(*stage_name);
+    let const next_info = get_analysis_command_info(*next_name);
+    let const next_is_pattern_matcher =
+        next_info.is_in_group(COMMAND_GROUP_PATTERN_MATCHER);
+    let const next_is_xargs =
+        next_info.id == command_name_id::Xargs && !next_is_user;
 
-    if (*stage_name == "find" && *next_name == "xargs" && !next_is_user &&
-        !actx.defined_functions.contains(*stage_name) &&
-        !actx.known_aliases.contains(*stage_name))
+    if (!next_is_user &&
+        next_info.is_in_group(COMMAND_GROUP_NON_STDIN_READER) &&
+        !args_have_stdin_operand(next->args()))
     {
+      actx.report_diagnostic(diagnostic_id::sc2216,
+                             next->args()[0]->source_location(), {*next_name});
+    }
+
+    if (stage_is_user) continue;
+
+    switch (stage_info.id) {
+    /* find piped into xargs splits a name at every blank, shellcheck SC2038. */
+    case command_name_id::Find: {
+      if (!next_is_xargs) break;
+
       let has_null_flag = false;
       for (usize a = 1; a < stage->args().count() && !has_null_flag; a++)
         if (stage->args()[a]->raw_string().view() == "-print0")
@@ -1712,45 +1731,50 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         let const raw = next->args()[a]->raw_string();
         if (raw.view() == "-0" || raw.view() == "--null") has_null_flag = true;
       }
+
       if (!has_null_flag)
         actx.report_diagnostic(diagnostic_id::sc2038,
                                next->args()[0]->source_location());
+      break;
     }
 
-    if (!next_is_user && get_analysis_command_info(*next_name)
-                             .is_in_group(COMMAND_GROUP_NON_STDIN_READER))
-    {
-      if (!args_have_stdin_operand(next->args()))
-        actx.report_diagnostic(diagnostic_id::sc2216,
-                               next->args()[0]->source_location(),
-                               {*next_name});
-    }
-
-    let const stage_is_user = actx.defined_functions.contains(*stage_name) ||
-                              actx.known_aliases.contains(*stage_name);
-    let const next_is_grep =
-        *next_name == "grep" || *next_name == "egrep" || *next_name == "fgrep";
+    /* The ls listing loses a name that holds a space or a newline. Grep reading
+       it is shellcheck SC2010, xargs reading it is SC2011, and any other reader
+       is SC2012. */
+    case command_name_id::Ls:
+      if (next_is_pattern_matcher) {
+        actx.report_diagnostic(diagnostic_id::sc2010,
+                               next->args()[0]->source_location());
+      } else if (next_is_xargs) {
+        actx.report_diagnostic(diagnostic_id::sc2011,
+                               next->args()[0]->source_location());
+      } else {
+        actx.report_diagnostic(diagnostic_id::sc2012,
+                               stage->args()[0]->source_location());
+      }
+      break;
 
     /* ps piped into grep races the process table and matches the grep itself,
        shellcheck SC2009. */
-    if (*stage_name == "ps" && !stage_is_user && next_is_grep)
-      actx.report_diagnostic(diagnostic_id::sc2009,
-                             next->args()[0]->source_location());
-
-    /* ls piped into grep mangles a name with a space or newline, shellcheck
-       SC2010. */
-    if (*stage_name == "ls" && !stage_is_user && next_is_grep)
-      actx.report_diagnostic(diagnostic_id::sc2010,
-                             next->args()[0]->source_location());
+    case command_name_id::Ps:
+      if (next_is_pattern_matcher)
+        actx.report_diagnostic(diagnostic_id::sc2009,
+                               next->args()[0]->source_location());
+      break;
 
     /* grep feeding wc -l counts matches with a second process, shellcheck
        SC2126. */
-    if (*stage_name == "grep" && !stage_is_user && *next_name == "wc" &&
-        !next_is_user && next->args().count() == 2 &&
-        next->args()[1]->raw_string().view() == "-l")
-    {
-      actx.report_diagnostic(diagnostic_id::sc2126,
-                             stage->args()[0]->source_location());
+    case command_name_id::Grep:
+      if (next_info.id == command_name_id::Wc && !next_is_user &&
+          next->args().count() == 2 &&
+          next->args()[1]->raw_string().view() == "-l")
+      {
+        actx.report_diagnostic(diagnostic_id::sc2126,
+                               stage->args()[0]->source_location());
+      }
+      break;
+
+    default: break;
     }
   }
 

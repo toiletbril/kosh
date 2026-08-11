@@ -84,6 +84,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Grepping the ls listing mangles a name with a space or a newline",
       "Match the names with a glob or with find instead", None, Lenient,
       Policy),
+    D(2011, "xargs-ls", "piping ls into xargs mangles names",
+      "The `ls` listing splits a name with a space or a newline before `xargs` "
+      "reads it",
+      "Use `find -print0` with `xargs -0`, or `find -exec`", None, Lenient,
+      Policy),
+    D(2012, "ls-output-as-data", "the ls listing is read as data",
+      "The `ls` listing mangles a name with a space or a newline when it is "
+      "read as data",
+      "Use `find`, or match the names with a glob", None, Annoying, Policy),
     D(2013, "for-command-output", "for over command output iterates words",
       "A for over the cat output iterates IFS-split words rather than lines",
       "Read the lines with 'while IFS= read -r line' instead", None, Strict,
@@ -446,6 +455,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "an unquoted unset array index can expand as a glob",
       "An unquoted unset array index can expand as a filename glob",
       "Quote the complete array element name", None, Strict, Policy),
+    D(2185, "find-without-path", "find is given no path to search",
+      "Some `find` implementations have no default path, so this search walks "
+      "nothing",
+      "Write `.` as the path before the expression", None, Lenient, Policy),
     D(2193, "impossible-comparison", "the compared literals can never be equal",
       "The literals '{0}' and '{1}' differ, so the comparison never succeeds",
       "Compare a variable, or correct the operand spelling", None, Strict,
@@ -531,6 +544,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An earlier case pattern shadows this pattern",
       "Move the specific pattern before the broader pattern",
       "this broader pattern shadows the later pattern", Annoying, Policy),
+    D(2224, "move-without-destination", "the move has no destination",
+      "The `mv` command is given '{0}' alone, so no destination is named",
+      "Add the destination path", None, Strict, Policy),
+    D(2225, "copy-without-destination", "the copy has no destination",
+      "The `cp` command is given '{0}' alone, so no destination is named",
+      "Add the destination path", None, Strict, Policy),
+    D(2226, "link-without-destination", "the link has no destination",
+      "The `ln` command is given '{0}' alone, so no link name is named",
+      "Add the link name, or write `.` explicitly", None, Strict, Policy),
     D(2229, "read-variable-dollar",
       "read expects a variable name without a dollar sign",
       "A read operand is a variable name, not a variable value",
@@ -588,6 +610,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The '{0}' function calls itself recursively",
       "Use `command` before the wrapped command name", "'{0}' is defined here",
       Strict, Policy),
+    D(2267, "deprecated-xargs-replace", "the xargs -i flag is deprecated",
+      "The `xargs -i` flag is deprecated",
+      "Use `-I` with an explicit replacement string instead", None, Annoying,
+      Policy),
     D(2268, "x-prefix-test", "the x-prefix test workaround is obsolete",
       "The x-prefix test workaround is obsolete", "Quote the variable directly",
       None, Annoying, Policy),
@@ -1068,7 +1094,7 @@ constexpr static_string_entry<analysis_command_info>
         C("declare", Declare, DECLARATION_GROUPS),
         C("dirname", Dirname, NEUTRAL_READER_GROUPS),
         C("echo", Echo, NEUTRAL_READER_GROUPS),
-        C("egrep", Egrep, NO_COMMAND_GROUP),
+        C("egrep", Egrep, COMMAND_GROUP_PATTERN_MATCHER),
         C("eval", Eval,
           COMMAND_GROUP_RUNTIME_DEFINER | COMMAND_GROUP_VARIABLE_PROBE),
         C("exec", Exec, NO_COMMAND_GROUP),
@@ -1076,20 +1102,22 @@ constexpr static_string_entry<analysis_command_info>
         C("export", Export, EXPORT_GROUPS),
         C("expr", Expr, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("false", False, NEUTRAL_READER_GROUPS),
-        C("fgrep", Fgrep, NO_COMMAND_GROUP),
+        C("fgrep", Fgrep, COMMAND_GROUP_PATTERN_MATCHER),
         C("find", Find, NO_COMMAND_GROUP),
         C("getopts", Getopts, COMMAND_GROUP_VARIABLE_TARGET),
-        C("grep", Grep, NO_COMMAND_GROUP),
+        C("grep", Grep, COMMAND_GROUP_PATTERN_MATCHER),
         C("hostname", Hostname, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("id", Id, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("kill", Kill, COMMAND_GROUP_NON_STDIN_READER),
         C("let", Let, COMMAND_GROUP_VARIABLE_PROBE),
         C("ln", Ln, COMMAND_GROUP_NON_STDIN_READER),
         C("local", Local, DECLARATION_GROUPS),
+        C("ls", Ls, COMMAND_GROUP_NON_STDIN_READER),
         C("mapfile", Mapfile, COMMAND_GROUP_VARIABLE_TARGET),
         C("mkdir", Mkdir, COMMAND_GROUP_NON_STDIN_READER),
         C("mv", Mv, COMMAND_GROUP_NON_STDIN_READER),
         C("printf", Printf, COMMAND_GROUP_NON_STDIN_READER),
+        C("ps", Ps, COMMAND_GROUP_NON_STDIN_READER),
         C("pwd", Pwd, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("read", Read, COMMAND_GROUP_VARIABLE_TARGET),
         C("readarray", Readarray, COMMAND_GROUP_VARIABLE_TARGET),
@@ -1112,8 +1140,10 @@ constexpr static_string_entry<analysis_command_info>
         C("uname", Uname, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("unlink", Unlink, COMMAND_GROUP_NON_STDIN_READER),
         C("unset", Unset, COMMAND_GROUP_VARIABLE_PROBE),
+        C("wc", Wc, NO_COMMAND_GROUP),
         C("which", Which, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("whoami", Whoami, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
+        C("xargs", Xargs, NO_COMMAND_GROUP),
 };
 
 #undef C
@@ -1442,6 +1472,44 @@ cold fn args_have_short_flag(const ArrayList<const Token *> &args,
   return false;
 }
 
+/* The lone operand of a move, a copy or a link, for the missing destination
+   lints. None is returned when a destination is named, when a flag supplies the
+   destination, or when an operand carries an expansion that could bring more
+   words with it. */
+cold fn single_literal_file_operand(const ArrayList<const Token *> &args) throws
+    -> Maybe<const Token *>
+{
+  const Token *lone_operand = nullptr;
+
+  for (usize i = 1; i < args.count(); i++) {
+    if (args[i]->kind() != Token::Kind::Word) return None;
+
+    let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+    if (!word_is_fully_literal(word)) return None;
+
+    let const literal = word.to_literal_string();
+    let const view = literal.view();
+    if (view.is_empty()) return None;
+
+    if (view[0] == '-') {
+      if (view == "--" || view == "-t" ||
+          view.starts_with(StringView{"--target-directory"}))
+      {
+        return None;
+      }
+
+      continue;
+    }
+
+    if (lone_operand != nullptr) return None;
+    lone_operand = args[i];
+  }
+
+  if (lone_operand == nullptr) return None;
+
+  return lone_operand;
+}
+
 /* The top-level system directories rm -r must never aim at, the SC2114
    table. */
 constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
@@ -1457,6 +1525,13 @@ constexpr PackedStringKey FIND_ACTION_KEYS[] = {
     SSK("-ok"),     SSK("-okdir"),   SSK("-print"),   SSK("-print0"),
     SSK("-printf"), SSK("-prune"),   SSK("-quit"),    SSK("-used")};
 constexpr StaticStringSet FIND_ACTIONS{FIND_ACTION_KEYS};
+
+/* The find options that stand before the search paths, so the path lint keeps
+   reading past them. -f takes the path itself and counts as a path. */
+constexpr PackedStringKey FIND_LEADING_OPTION_KEYS[] = {
+    SSK("-E"), SSK("-H"), SSK("-L"), SSK("-P"),
+    SSK("-d"), SSK("-s"), SSK("-x"), SSK("-X")};
+constexpr StaticStringSet FIND_LEADING_OPTIONS{FIND_LEADING_OPTION_KEYS};
 
 constexpr PackedStringKey BASH_ONLY_VARIABLE_KEYS[] = {
     SSK("BASHOPTS"),      SSK("BASHPID"),
@@ -1744,10 +1819,22 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
     bool has_or = false;
     bool has_group = false;
     bool has_action = false;
+    bool has_path_operand = false;
+    bool is_before_path_operand = true;
     Maybe<SourceLocation> exec_location{};
     Maybe<SourceLocation> or_location{};
     for (usize i = 1; i < args.count(); i++) {
       let const literal = args[i]->raw_string();
+
+      if (is_before_path_operand &&
+          !FIND_LEADING_OPTIONS.contains(literal.view()))
+      {
+        is_before_path_operand = false;
+        has_path_operand = literal.view() == "-f" ||
+                           (!literal.is_empty() && literal[0] != '-' &&
+                            literal.view() != "(" && literal.view() != "!");
+      }
+
       if (literal.view() == "-exec" || literal.view() == "-execdir") {
         has_exec = true;
         exec_location = args[i]->source_location();
@@ -1765,6 +1852,8 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2067, *exec_location);
     if (has_or && has_action && !has_group && or_location.has_value())
       actx.report_diagnostic(diagnostic_id::sc2146, *or_location);
+    if (!has_path_operand)
+      actx.report_diagnostic(diagnostic_id::sc2185, input.command_location());
     break;
   }
 
@@ -2394,6 +2483,37 @@ fn check_command_value_lints(AnalysisContext &actx,
                                  {view, input.command_literal});
       }
     }
+    break;
+
+  /* A move, a copy or a link given one operand names no destination,
+     shellcheck SC2224, SC2225 and SC2226. */
+  case command_name_id::Cp:
+  case command_name_id::Ln:
+  case command_name_id::Mv: {
+    let const operand = single_literal_file_operand(args);
+    if (!operand.has_value()) break;
+
+    let missing_destination = diagnostic_id::sc2224;
+    switch (input.command_id()) {
+    case command_name_id::Cp:
+      missing_destination = diagnostic_id::sc2225;
+      break;
+    case command_name_id::Ln:
+      missing_destination = diagnostic_id::sc2226;
+      break;
+    default: break;
+    }
+
+    actx.report_diagnostic(missing_destination, (*operand)->source_location(),
+                           {(*operand)->raw_string().view()});
+    break;
+  }
+
+  /* GNU xargs kept -i for compatibility and documents -I in its place,
+     shellcheck SC2267. */
+  case command_name_id::Xargs:
+    if (args_have_short_flag(args, 'i'))
+      actx.report_diagnostic(diagnostic_id::sc2267, input.command_location());
     break;
 
   default: break;

@@ -36,6 +36,8 @@ enum class diagnostic_id : u16
   sc2007,
   sc2009,
   sc2010,
+  sc2011,
+  sc2012,
   sc2013,
   sc2015,
   sc2016,
@@ -124,6 +126,7 @@ enum class diagnostic_id : u16
   sc2181,
   sc2183,
   sc2184,
+  sc2185,
   sc2193,
   sc2196,
   sc2197,
@@ -144,6 +147,9 @@ enum class diagnostic_id : u16
   sc2217,
   sc2221,
   sc2222,
+  sc2224,
+  sc2225,
+  sc2226,
   sc2229,
   sc2233,
   sc2234,
@@ -158,6 +164,7 @@ enum class diagnostic_id : u16
   sc2255,
   sc2257,
   sc2264,
+  sc2267,
   sc2268,
   sc2281,
   sc2283,
@@ -329,10 +336,12 @@ enum class command_name_id : u16
   Let,
   Ln,
   Local,
+  Ls,
   Mapfile,
   Mkdir,
   Mv,
   Printf,
+  Ps,
   Pwd,
   Read,
   Readarray,
@@ -356,8 +365,10 @@ enum class command_name_id : u16
   Uname,
   Unlink,
   Unset,
+  Wc,
   Which,
   Whoami,
+  Xargs,
 };
 
 constexpr u32 COMMAND_GROUP_TEST = 1u << 0;
@@ -368,6 +379,7 @@ constexpr u32 COMMAND_GROUP_VARIABLE_PROBE = 1u << 4;
 constexpr u32 COMMAND_GROUP_VARIABLE_TARGET = 1u << 5;
 constexpr u32 COMMAND_GROUP_NON_STDIN_READER = 1u << 6;
 constexpr u32 COMMAND_GROUP_ENVIRONMENT_NEUTRAL = 1u << 7;
+constexpr u32 COMMAND_GROUP_PATTERN_MATCHER = 1u << 8;
 
 struct analysis_command_info
 {
