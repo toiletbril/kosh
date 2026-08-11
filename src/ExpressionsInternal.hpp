@@ -48,6 +48,10 @@ cold fn word_is_bare_glob(const Word &word) wontthrow -> bool;
 fn operand_target_name(StringView text) wontthrow -> StringView;
 cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
     -> bool;
+fn check_posix_word_portability(AnalysisContext &actx,
+                                const WordSegment &segment,
+                                SourceLocation fallback_location) throws
+    -> void;
 
 /* The borrowed inputs one simple command's name-keyed checks read. The walk in
    SimpleCommand::analyze computes each field once and the check bodies in

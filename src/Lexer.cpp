@@ -799,6 +799,8 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           for (usize k = 0; k < decoded.count(); k++)
             do_append_char(WordSegment::Kind::LiteralText, decoded[k]);
         }
+
+        word.segments.back().was_ansi_c_quoted = true;
         continue;
       }
 

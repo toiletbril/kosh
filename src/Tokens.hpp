@@ -52,6 +52,7 @@ public:
   String text;
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
+  bool was_ansi_c_quoted{false};
   bool is_substitution_cache_in_function_arena{false};
   mutable bool has_folded_arithmetic_result{false};
 
@@ -77,6 +78,7 @@ public:
   {
     let copy =
         WordSegment{kind, text.clone(), is_in_double_quotes, is_greedy_name};
+    copy.was_ansi_c_quoted = was_ansi_c_quoted;
     copy.is_substitution_cache_in_function_arena =
         is_substitution_cache_in_function_arena;
     if (has_folded_arithmetic_result)

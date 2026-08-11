@@ -421,14 +421,43 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a negated numeric comparison has a direct operator",
       "A negated {0} is just {1}", "Drop the ! and use {1}", None, Annoying,
       Policy),
+    D(3001, "posix-process-substitution",
+      "process substitution is absent from POSIX sh",
+      "The <(...) process substitution is a bash extension absent from POSIX "
+      "sh",
+      "Use a named pipe or a temporary file under a sh shebang", None, Strict,
+      Policy),
+    D(3002, "posix-extglob", "extended globs are absent from POSIX sh",
+      "The extended glob {0} is a bash extension absent from POSIX sh",
+      "Use a case statement or a plain glob under a sh shebang", None, Strict,
+      Policy),
+    D(3003, "posix-ansi-c-quoting", "$'...' quoting is absent from POSIX sh",
+      "The $'...' quoting form is a bash extension absent from POSIX sh",
+      "Use printf to produce the escapes under a sh shebang", None, Strict,
+      Policy),
     D(3014, "posix-test-equals", "== is undefined in POSIX test",
       "== is undefined in POSIX test", "Use = for string equality", None,
       Strict, Policy),
+    D(3026, "posix-glob-caret",
+      "a ^ in a bracket expression is not a POSIX negation",
+      "A ^ opens the bracket expression {0} where POSIX sh negates with !",
+      "Use [! ...] under a sh shebang", None, Strict, Policy),
+    D(3028, "posix-bash-variable",
+      "the variable is defined by bash and not by POSIX sh",
+      "{0} is a bash variable that POSIX sh leaves undefined",
+      "Compute the value another way under a sh shebang", None, Strict, Policy),
     D(3030, "posix-array-reader",
       "mapfile and readarray are absent from POSIX sh",
       "{0} is a bash array builtin absent from POSIX sh",
       "read the input with a while read loop or switch the shebang to bash",
       None, Strict, Policy),
+    D(3034, "posix-file-substitution", "$(<file) is absent from POSIX sh",
+      "The $(<file) form is a bash shorthand absent from POSIX sh",
+      "Use $(cat file) under a sh shebang", None, Strict, Policy),
+    D(3035, "posix-backtick-file-substitution",
+      "`<file` is absent from POSIX sh",
+      "The `<file` form is a bash shorthand absent from POSIX sh",
+      "Use $(cat file) under a sh shebang", None, Strict, Policy),
     D(3037, "posix-echo-flag", "echo flags are not in POSIX echo",
       "An echo {0} relies on a bash builtin, the POSIX echo prints the flag as "
       "text",
@@ -450,6 +479,29 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "source is the bash spelling of the POSIX dot command",
       "The name source is the bash spelling, the POSIX dot command is '.'",
       "Use '.' under a sh shebang", None, Strict, Policy),
+    D(3053, "posix-indirect-expansion",
+      "indirect expansion is absent from POSIX sh",
+      "The indirect expansion of {0} is a bash extension absent from POSIX sh",
+      "Use eval or a case dispatch under a sh shebang", None, Strict, Policy),
+    D(3054, "posix-array-reference", "arrays are absent from POSIX sh",
+      "The array reference {0} is a bash extension absent from POSIX sh",
+      "Use the positional parameters under a sh shebang", None, Strict, Policy),
+    D(3055, "posix-array-key-expansion",
+      "array key expansion is absent from POSIX sh",
+      "The array key expansion of {0} is a bash extension absent from POSIX sh",
+      "Use the positional parameters under a sh shebang", None, Strict, Policy),
+    D(3056, "posix-name-prefix-expansion",
+      "name matching prefixes are absent from POSIX sh",
+      "The name prefix expansion of {0} is a bash extension absent from POSIX "
+      "sh",
+      "List the names explicitly under a sh shebang", None, Strict, Policy),
+    D(3057, "posix-string-indexing", "string indexing is absent from POSIX sh",
+      "The substring expansion of {0} is a bash extension absent from POSIX sh",
+      "Use expr or cut under a sh shebang", None, Strict, Policy),
+    D(3060, "posix-string-replacement",
+      "string replacement is absent from POSIX sh",
+      "The string replacement in {0} is a bash extension absent from POSIX sh",
+      "Use sed or a case dispatch under a sh shebang", None, Strict, Policy),
     D(0, "arith-assign", "array syntax was used for arithmetic assignment",
       "The assignment of '{0}' uses array syntax instead of arithmetic",
       "Use `let '{0}={1}'` to evaluate and assign it", None, Strict, Policy),
@@ -953,7 +1005,168 @@ constexpr PackedStringKey FIND_ACTION_KEYS[] = {
     SSK("-printf"), SSK("-prune"),   SSK("-quit"),    SSK("-used")};
 constexpr StaticStringSet FIND_ACTIONS{FIND_ACTION_KEYS};
 
+constexpr PackedStringKey BASH_ONLY_VARIABLE_KEYS[] = {
+    SSK("BASHOPTS"),      SSK("BASHPID"),
+    SSK("BASH_ALIASES"),  SSK("BASH_ARGC"),
+    SSK("BASH_ARGV"),     SSK("BASH_COMMAND"),
+    SSK("BASH_LINENO"),   SSK("BASH_REMATCH"),
+    SSK("BASH_SOURCE"),   SSK("BASH_SUBSHELL"),
+    SSK("BASH_VERSINFO"), SSK("BASH_VERSION"),
+    SSK("COMP_CWORD"),    SSK("COMP_LINE"),
+    SSK("COMP_POINT"),    SSK("COMP_WORDS"),
+    SSK("DIRSTACK"),      SSK("EPOCHREALTIME"),
+    SSK("EPOCHSECONDS"),  SSK("EUID"),
+    SSK("FUNCNAME"),      SSK("GROUPS"),
+    SSK("HOSTNAME"),      SSK("HOSTTYPE"),
+    SSK("MACHTYPE"),      SSK("OSTYPE"),
+    SSK("PIPESTATUS"),    SSK("PROMPT_COMMAND"),
+    SSK("RANDOM"),        SSK("SECONDS"),
+    SSK("SHELLOPTS"),     SSK("SHLVL"),
+    SSK("SRANDOM"),       SSK("UID"),
+};
+constexpr StaticStringSet BASH_ONLY_VARIABLES{BASH_ONLY_VARIABLE_KEYS};
+
+fn check_posix_parameter_expansion(AnalysisContext &actx,
+                                   const WordSegment &segment, StringView text,
+                                   SourceLocation fallback_location) throws
+    -> void
+{
+  if (text.is_empty()) return;
+
+  let const do_get_location = [&]() -> SourceLocation {
+    return segment.get_source_location(fallback_location.filename)
+        .value_or(fallback_location);
+  };
+
+  if (text[0] == '!') {
+    if (text.length < 2) return;
+
+    if (text.find_character('[').has_value()) {
+      actx.report_diagnostic(diagnostic_id::sc3055, do_get_location(), {text});
+      return;
+    }
+
+    let const last = text[text.length - 1];
+    if (last == '*' || last == '@') {
+      actx.report_diagnostic(diagnostic_id::sc3056, do_get_location(), {text});
+      return;
+    }
+
+    actx.report_diagnostic(diagnostic_id::sc3053, do_get_location(), {text});
+    return;
+  }
+
+  const usize name_start = text[0] == '#' ? 1 : 0;
+  usize position = name_start;
+  while (position < text.length && lexer::is_variable_name(text[position]))
+    position++;
+
+  if (position == name_start) return;
+
+  let const name = text.substring_of_length(name_start, position - name_start);
+  if (BASH_ONLY_VARIABLES.contains(name)) {
+    actx.report_diagnostic(diagnostic_id::sc3028, do_get_location(), {name});
+    return;
+  }
+
+  if (position >= text.length) return;
+
+  switch (text[position]) {
+  case '[':
+    actx.report_diagnostic(diagnostic_id::sc3054, do_get_location(), {text});
+    break;
+
+  case '/':
+    actx.report_diagnostic(diagnostic_id::sc3060, do_get_location(), {text});
+    break;
+
+  case ':': {
+    let const modifier = position + 1 < text.length ? text[position + 1] : '\0';
+    if (modifier == '-' || modifier == '=' || modifier == '?' ||
+        modifier == '+')
+    {
+      break;
+    }
+    actx.report_diagnostic(diagnostic_id::sc3057, do_get_location(), {text});
+    break;
+  }
+
+  default: break;
+  }
+}
+
 } /* namespace */
+
+fn check_posix_word_portability(AnalysisContext &actx,
+                                const WordSegment &segment,
+                                SourceLocation fallback_location) throws -> void
+{
+  let const text = segment.text.view();
+  let const do_get_location = [&]() -> SourceLocation {
+    return segment.get_source_location(fallback_location.filename)
+        .value_or(fallback_location);
+  };
+
+  switch (segment.kind) {
+  case WordSegment::Kind::ProcessSubstitution:
+    actx.report_diagnostic(diagnostic_id::sc3001, do_get_location());
+    break;
+
+  case WordSegment::Kind::CommandSubstitution: {
+    usize position = 0;
+    while (position < text.length &&
+           (text[position] == ' ' || text[position] == '\t'))
+      position++;
+
+    if (position >= text.length || text[position] != '<') break;
+
+    let const location = do_get_location();
+    let const source_text = analysis_source_text(actx, location);
+    let const spelling = !source_text.is_empty() && source_text[0] == '`'
+                             ? diagnostic_id::sc3035
+                             : diagnostic_id::sc3034;
+    actx.report_diagnostic(spelling, location);
+    break;
+  }
+
+  case WordSegment::Kind::VariableReference:
+    check_posix_parameter_expansion(actx, segment, text, fallback_location);
+    break;
+
+  case WordSegment::Kind::LiteralText:
+    if (segment.was_ansi_c_quoted)
+      actx.report_diagnostic(diagnostic_id::sc3003, do_get_location());
+    break;
+
+  case WordSegment::Kind::UnquotedText: {
+    let has_extended_glob = false;
+    let has_caret_bracket = false;
+    for (usize position = 0; position + 1 < text.length; position++) {
+      let const following = text[position + 1];
+      if (following != '(' && following != '^') continue;
+
+      if (following == '(') {
+        has_extended_glob |= lexer::is_extglob_operator(text[position]);
+      } else {
+        has_caret_bracket |= text[position] == '[';
+      }
+
+      if (has_extended_glob && has_caret_bracket) break;
+    }
+
+    if (!has_extended_glob && !has_caret_bracket) break;
+
+    let const location = do_get_location();
+    if (has_extended_glob)
+      actx.report_diagnostic(diagnostic_id::sc3002, location, {text});
+    if (has_caret_bracket)
+      actx.report_diagnostic(diagnostic_id::sc3026, location, {text});
+    break;
+  }
+
+  default: break;
+  }
+}
 
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws

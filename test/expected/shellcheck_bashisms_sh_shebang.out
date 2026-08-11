@@ -14,6 +14,40 @@
           [CompoundListCondition, None]
             [SimpleCommand "source" "library.sh"]
   [CompoundListCondition, None]
+    [FunctionDefinition "word_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "cat" "<echo substituted"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "!(excluded)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a	b"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[^a]tail"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$(<file)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$(<file)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$!indirect"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$array[0]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$!array[@]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$!prefix*"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$text:1:2"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$text/from/to"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$RANDOM"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$text:-default"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$#text"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "lint_only"
@@ -64,6 +98,102 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "word_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "!(excluded)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "a	b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "[^a]tail"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "<file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "<file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!indirect"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "array[0]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!array[@]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!prefix*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "text:1:2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "text/from/to"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "RANDOM"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "text:-default"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#text"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -89,6 +219,66 @@ note: Assign the variable plainly under a sh shebang, or switch the shebang to b
     10 |    source library.sh
        |    ^~~~~~
 note: Use '.' under a sh shebang.
-Encountered 5 warnings.
+13:7: warning: The <(...) process substitution is a bash extension absent from POSIX sh.
+    13 |    cat <(echo substituted)
+       |        ^~~~~~~~~~~~~~~~~~~
+note: Use a named pipe or a temporary file under a sh shebang.
+14:8: warning: The extended glob !(excluded) is a bash extension absent from POSIX sh.
+    14 |    echo !(excluded)
+       |         ^~~~~~~~~~~
+note: Use a case statement or a plain glob under a sh shebang.
+15:8: warning: The $'...' quoting form is a bash extension absent from POSIX sh.
+    15 |    echo $'a\tb'
+       |         ^~~~~~~
+note: Use printf to produce the escapes under a sh shebang.
+16:8: warning: A ^ opens the bracket expression [^a]tail where POSIX sh negates with !
+    16 |    echo [^a]tail
+       |         ^~~~~~~~
+note: Use [! ...] under a sh shebang.
+17:3: warning: An echo of a command substitution prints what the command already prints.
+    17 |    echo "$(<file)"
+       |    ^~~~
+note: Run the command on its own instead.
+17:9: warning: The $(<file) form is a bash shorthand absent from POSIX sh.
+    17 |    echo "$(<file)"
+       |          ^~~~~~~~
+note: Use $(cat file) under a sh shebang.
+18:3: warning: An echo of a command substitution prints what the command already prints.
+    18 |    echo "`<file`"
+       |    ^~~~
+note: Run the command on its own instead.
+18:9: warning: The `<file` form is a bash shorthand absent from POSIX sh.
+    18 |    echo "`<file`"
+       |          ^~~~~~~
+note: Use $(cat file) under a sh shebang.
+19:11: warning: The indirect expansion of !indirect is a bash extension absent from POSIX sh.
+    19 |    echo "${!indirect}"
+       |            ^~~~~~~~~
+note: Use eval or a case dispatch under a sh shebang.
+20:11: warning: The array reference array[0] is a bash extension absent from POSIX sh.
+    20 |    echo "${array[0]}"
+       |            ^~~~~~~~
+note: Use the positional parameters under a sh shebang.
+21:11: warning: The array key expansion of !array[@] is a bash extension absent from POSIX sh.
+    21 |    echo "${!array[@]}"
+       |            ^~~~~~~~~
+note: Use the positional parameters under a sh shebang.
+22:11: warning: The name prefix expansion of !prefix* is a bash extension absent from POSIX sh.
+    22 |    echo "${!prefix*}"
+       |            ^~~~~~~~
+note: List the names explicitly under a sh shebang.
+23:11: warning: The substring expansion of text:1:2 is a bash extension absent from POSIX sh.
+    23 |    echo "${text:1:2}"
+       |            ^~~~~~~~
+note: Use expr or cut under a sh shebang.
+24:11: warning: The string replacement in text/from/to is a bash extension absent from POSIX sh.
+    24 |    echo "${text/from/to}"
+       |            ^~~~~~~~~~~~
+note: Use sed or a case dispatch under a sh shebang.
+25:10: warning: RANDOM is a bash variable that POSIX sh leaves undefined.
+    25 |    echo "$RANDOM"
+       |           ^~~~~~
+note: Compute the value another way under a sh shebang.
+Encountered 20 warnings.
 done
 [Code 0]

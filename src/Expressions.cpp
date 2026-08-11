@@ -1198,6 +1198,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
     if (word != nullptr) {
       for (let const &segment : word->segments) {
+        if (actx.shebang_is_posix_sh)
+          check_posix_word_portability(actx, segment, arg_location);
+
         if (should_scan_for_malformed_glob && !has_bracket_byte &&
             segment.has_live_glob_chars() &&
             segment.text.view().find_character('[').has_value())

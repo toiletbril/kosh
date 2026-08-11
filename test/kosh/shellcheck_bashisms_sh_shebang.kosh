@@ -9,4 +9,21 @@ lint_only() {
   typeset scoped
   source library.sh
 }
+word_only() {
+  cat <(echo substituted)
+  echo !(excluded)
+  echo $'a\tb'
+  echo [^a]tail
+  echo "$(<file)"
+  echo "`<file`"
+  echo "${!indirect}"
+  echo "${array[0]}"
+  echo "${!array[@]}"
+  echo "${!prefix*}"
+  echo "${text:1:2}"
+  echo "${text/from/to}"
+  echo "$RANDOM"
+  echo "${text:-default}"
+  echo "${#text}"
+}
 echo done

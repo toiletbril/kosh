@@ -94,6 +94,9 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   ASSERT(m_assignment != nullptr);
 
   for (let const &segment : m_assignment->value_word().segments) {
+    if (actx.shebang_is_posix_sh)
+      check_posix_word_portability(actx, segment, source_location());
+
     if (segment.kind == WordSegment::Kind::VariableReference &&
         segment.text.view() == "@")
     {
