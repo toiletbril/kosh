@@ -19,6 +19,10 @@ namespace koshka {
    diagnostic_delivery::delivery}
 
 const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
+    D(1008, "unrecognized-shebang", "the shebang names an unknown interpreter",
+      "The shebang names '{0}', which is not a shell this analysis knows",
+      "Name a shell such as `sh` or `bash` in the shebang", None, Annoying,
+      Policy),
     D(1014, "direct-command-in-test",
       "if runs a command directly, not inside test brackets",
       "Test brackets do not run the command written inside them",
@@ -57,10 +61,16 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A UTF-8 byte-order mark precedes the script text",
       "Save the script as UTF-8 without a byte-order mark", None, Strict,
       Policy),
+    D(1084, "swapped-shebang", "the shebang characters are swapped",
+      "The first line begins with `!#`, so the shell reads it as a command",
+      "Write `#!` at the start of the line", None, Strict, Policy),
     D(1100, "unicode-dash", "a Unicode dash is not the ASCII minus",
       "The Unicode dash '{0}' is not the ASCII minus, so the shell reads it as "
       "ordinary text",
       "Delete it and retype an ASCII minus", None, Strict, Policy),
+    D(1104, "shebang-missing-hash", "the shebang is missing its hash",
+      "The first line begins with `!`, a shebang begins with `#!`",
+      "Write `#!` at the start of the line", None, Strict, Policy),
     D(1106, "arithmetic-test-operator",
       "arithmetic uses the symbolic comparison operators",
       "The '{0}' operator belongs to test, arithmetic reads it as a "
@@ -84,6 +94,20 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Delete it and retype an ASCII quote, or double-quote the string to keep "
       "it literal",
       None, Annoying, Policy),
+    D(1113, "shebang-missing-bang", "the shebang is missing its bang",
+      "The first line is an ordinary comment, a shebang begins with `#!`",
+      "Write `#!` at the start of the line", None, Strict, Policy),
+    D(1114, "shebang-leading-space", "whitespace precedes the shebang",
+      "Whitespace precedes the shebang, so the first two bytes are not `#!`",
+      "Move `#!` to the start of the line", None, Strict, Policy),
+    D(1115, "shebang-inner-space",
+      "the shebang holds a space between its characters",
+      "A space separates `#` from `!`, so the line is an ordinary comment",
+      "Write `#!` with nothing between them", None, Strict, Policy),
+    D(1128, "shebang-not-first-line", "the shebang is not on the first line",
+      "The shebang is not on the first line, so it is an ordinary comment",
+      "Move the shebang to the first line and keep the comments below it", None,
+      Strict, Policy),
     D(2000, "echo-piped-into-wc",
       "the shell knows a string length without a pipeline",
       "The `echo` output is counted by `wc`, where the shell knows the length "
@@ -439,6 +463,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a command in a while-read loop can consume loop input",
       "An ssh command in a while-read loop can consume the loop input",
       "Redirect ssh input from /dev/null or pass -n", None, Annoying, Policy),
+    D(2096, "shebang-parameter-count", "a shebang takes at most one parameter",
+      "The shebang passes more than one parameter, most systems hand the rest "
+      "over as one argument",
+      "Keep one parameter and move the options into the script", None, Lenient,
+      Policy),
     D(2099, "arithmetic-assignment-expansion",
       "an assignment concatenates instead of adding",
       "The value of '{0}' is joined as text, and the arithmetic is not "
@@ -575,6 +604,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2147, "literal-tilde-path", "a tilde inside PATH remains literal",
       "A tilde inside PATH remains literal",
       "Expand HOME before assigning PATH", None, Lenient, Policy),
+    D(2148, "missing-shebang", "the script names no interpreter",
+      "The script names no interpreter, so the analysis cannot tell which "
+      "shell it targets",
+      "Add a shebang such as `#!/bin/sh` on the first line", None, Annoying,
+      Policy),
     D(2151, "return-extra-operands", "return takes one status",
       "The `return` builtin takes one number from 0 to 255, so the operands "
       "after the first are ignored",
@@ -910,6 +944,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The redirect opens a file named '{0}', and the command never runs",
       "Feed `{0}` through a pipe, or quote the name to write the file", None,
       Strict, Policy),
+    D(2239, "shebang-relative-interpreter", "the shebang names a relative path",
+      "The shebang names '{0}', which is not an absolute path",
+      "Write an absolute path, or use `#!/usr/bin/env` to search PATH", None,
+      Strict, Policy),
     D(2240, "posix-dot-arguments", "the POSIX dot command takes no argument",
       "The POSIX `.` command reads a file and takes no argument, so '{0}' "
       "never "
@@ -939,6 +977,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a file test reaches only the first expanded path",
       "The `{0}` test runs against the first path '{1}' expands to",
       "Loop over the matches to test each one", None, Lenient, Policy),
+    D(2246, "shebang-directory-interpreter", "the shebang names a directory",
+      "The shebang names '{0}', which ends in a slash and names a directory",
+      "Remove the trailing slash so the shebang names the interpreter file",
+      None, Strict, Policy),
     D(2249, "case-without-default", "a case without a default can miss input",
       "This case has no default *) branch, a value no pattern matches is "
       "silently ignored",
@@ -5252,6 +5294,231 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
 
     at++;
   }
+}
+
+namespace {
+
+constexpr PackedStringKey KNOWN_SHELL_KEYS[] = {
+    SSK("ash"),  SSK("bash"), SSK("bosh"),  SSK("busybox"), SSK("dash"),
+    SSK("kosh"), SSK("ksh"),  SSK("ksh88"), SSK("ksh93"),   SSK("mksh"),
+    SSK("posh"), SSK("sh"),   SSK("yash"),  SSK("zsh"),
+};
+constexpr StaticStringSet KNOWN_SHELLS{KNOWN_SHELL_KEYS};
+
+pure fn byte_separates_shebang_words(char byte) wontthrow -> bool
+{
+  switch (byte) {
+  case ' ':
+  case '\t': return true;
+
+  default: return false;
+  }
+}
+
+pure fn path_base_name(StringView path) wontthrow -> StringView
+{
+  usize at = path.length;
+  while (at > 0 && path[at - 1] != '/')
+    at--;
+
+  return path.substring(at);
+}
+
+/* One left-to-right reader over the shebang line, so the interpreter, its
+   parameters, and their spans come from one walk. */
+struct shebang_word_reader
+{
+  StringView line;
+  usize at{0};
+  usize word_start{0};
+
+  fn read_next_word() wontthrow -> StringView
+  {
+    while (at < line.length && byte_separates_shebang_words(line[at]))
+      at++;
+
+    word_start = at;
+    while (at < line.length && !byte_separates_shebang_words(line[at]))
+      at++;
+
+    return line.substring_of_length(word_start, at - word_start);
+  }
+
+  pure fn word_location() const wontthrow -> SourceLocation
+  {
+    return SourceLocation{word_start, at - word_start};
+  }
+};
+
+/* Whether a later line in the leading comment block opens with the shebang
+   bytes. A misplaced shebang sits under a copyright header, so the walk stops
+   at the first line that is neither blank nor a comment. */
+pure fn header_holds_shebang(StringView source, usize first_line_end) wontthrow
+    -> bool
+{
+  usize at = first_line_end;
+
+  while (at < source.length) {
+    at++;
+
+    usize line_start = at;
+    while (line_start < source.length &&
+           byte_separates_shebang_words(source[line_start]))
+      line_start++;
+
+    if (line_start + 1 < source.length && source[line_start] == '#' &&
+        source[line_start + 1] == '!')
+    {
+      return true;
+    }
+
+    if (line_start < source.length && source[line_start] != '#' &&
+        source[line_start] != '\n')
+    {
+      return false;
+    }
+
+    while (at < source.length && source[at] != '\n')
+      at++;
+  }
+
+  return false;
+}
+
+} /* namespace */
+
+fn check_shebang(AnalysisContext &actx, StringView source,
+                 bool is_named_script_file) throws -> void
+{
+  usize line_end = 0;
+  while (line_end < source.length && source[line_end] != '\n')
+    line_end++;
+
+  let const first_line = source.substring_of_length(0, line_end);
+
+  usize at = 0;
+  while (at < first_line.length && byte_separates_shebang_words(first_line[at]))
+    at++;
+
+  let const indent_length = at;
+
+  /* A leading `!` is the negation operator, so only a following path reads as
+     a mistyped shebang. */
+  if (at < first_line.length && first_line[at] == '!') {
+    let const is_swapped = at + 2 < first_line.length &&
+                           first_line[at + 1] == '#' &&
+                           first_line[at + 2] == '/';
+
+    if (is_swapped) {
+      actx.report_diagnostic(diagnostic_id::sc1084, SourceLocation{at, 2});
+      return;
+    }
+
+    if (at + 1 < first_line.length && first_line[at + 1] == '/')
+      actx.report_diagnostic(diagnostic_id::sc1104, SourceLocation{at, 1});
+
+    return;
+  }
+
+  let const has_hash = at < first_line.length && first_line[at] == '#';
+  usize bang_at = has_hash ? at + 1 : at;
+  while (bang_at < first_line.length &&
+         byte_separates_shebang_words(first_line[bang_at]))
+    bang_at++;
+
+  let const has_bang =
+      has_hash && bang_at < first_line.length && first_line[bang_at] == '!';
+
+  if (!has_bang) {
+    if (header_holds_shebang(source, line_end)) {
+      actx.report_diagnostic(diagnostic_id::sc1128, SourceLocation{at, 1});
+      return;
+    }
+
+    /* A comment naming an absolute path is the shebang written without its
+       bang. */
+    if (has_hash && bang_at < first_line.length && first_line[bang_at] == '/') {
+      actx.report_diagnostic(diagnostic_id::sc1113, SourceLocation{at, 1});
+      return;
+    }
+
+    /* A script without a shebang runs correctly, so the missing interpreter is
+       reported only when diagnostics were asked for. */
+    if (is_named_script_file && actx.warning_level != 0)
+      actx.report_diagnostic(diagnostic_id::sc2148, SourceLocation{0, 1});
+
+    return;
+  }
+
+  if (indent_length != 0)
+    actx.report_diagnostic(diagnostic_id::sc1114,
+                           SourceLocation{0, indent_length});
+
+  if (bang_at != at + 1) {
+    actx.report_diagnostic(diagnostic_id::sc1115,
+                           SourceLocation{at + 1, bang_at - at - 1});
+  }
+
+  let reader = shebang_word_reader{first_line, bang_at + 1, bang_at + 1};
+  let const interpreter = reader.read_next_word();
+  let const interpreter_location = reader.word_location();
+
+  if (interpreter.is_empty()) return;
+
+  if (interpreter[0] != '/') {
+    actx.report_diagnostic(diagnostic_id::sc2239, interpreter_location,
+                           {interpreter});
+  }
+
+  if (interpreter[interpreter.length - 1] == '/') {
+    actx.report_diagnostic(diagnostic_id::sc2246, interpreter_location,
+                           {interpreter});
+  }
+
+  let const interpreter_name = path_base_name(interpreter);
+  let const names_env = interpreter_name == StringView{"env"};
+
+  usize parameter_count = 0;
+  let shell_argument = StringView{};
+  let shell_argument_location = interpreter_location;
+  let has_split_string_flag = false;
+
+  for (;;) {
+    let const word = reader.read_next_word();
+    if (word.is_empty()) break;
+
+    if (shell_argument.is_empty() && word[0] != '-') {
+      shell_argument = word;
+      shell_argument_location = reader.word_location();
+    }
+
+    if (word == StringView{"-S"} ||
+        word.starts_with(StringView{"--split-string"}))
+      has_split_string_flag = true;
+
+    parameter_count++;
+  }
+
+  /* `env -S` splits its own argument, so the words after it are not separate
+     shebang parameters. */
+  if (parameter_count > 1 && !(names_env && has_split_string_flag))
+    actx.report_diagnostic(diagnostic_id::sc2096, interpreter_location);
+
+  let const shell_name =
+      names_env ? path_base_name(shell_argument) : interpreter_name;
+  let const shell_name_location =
+      names_env ? shell_argument_location : interpreter_location;
+
+  if (shell_name.is_empty()) return;
+
+  if (!KNOWN_SHELLS.contains(shell_name)) {
+    actx.report_diagnostic(diagnostic_id::sc1008, shell_name_location,
+                           {shell_name});
+    return;
+  }
+
+  if (shell_name == StringView{"dash"} || shell_name == StringView{"sh"})
+    actx.shebang_is_posix_sh = true;
 }
 
 } /* namespace expressions */

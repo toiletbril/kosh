@@ -653,7 +653,8 @@ fn analyze_ast(const Expression *root, StringView source,
                bool should_emit_annoying_diagnostics,
                const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
                const ArrayList<analysis_scope_definition> &scope_definitions,
-               bool show_optimizer_state) throws -> bool
+               bool is_named_script_file, bool show_optimizer_state) throws
+    -> bool
 {
   ASSERT(root != nullptr);
 
@@ -673,38 +674,7 @@ fn analyze_ast(const Expression *root, StringView source,
 
   expressions::check_source_bytes(actx, source);
 
-  /* A leading shebang that names a POSIX shell gates the bashism lints. The
-     first line is scanned for a contained 'dash', or for an 'sh' interpreter
-     name without 'bash' or 'kosh'. This shell's own name also ends in 'sh'. */
-  if (source.length >= 2 && source[0] == '#' && source[1] == '!') {
-    usize line_end = 0;
-    while (line_end < source.length && source[line_end] != '\n')
-      line_end++;
-    let const first_line = source.substring_of_length(0, line_end);
-    let contains_dash = false;
-    let contains_bash = false;
-    let contains_kosh = false;
-    let interpreter_is_sh = false;
-    for (usize i = 0; i + 4 <= first_line.length; i++) {
-      if (first_line.substring(i).starts_with(StringView{"dash"}))
-        contains_dash = true;
-      if (first_line.substring(i).starts_with(StringView{"bash"}))
-        contains_bash = true;
-      if (first_line.substring(i).starts_with(StringView{"kosh"}))
-        contains_kosh = true;
-    }
-    /* A trailing 'sh' at the line end is the sh program name. */
-    if (first_line.length >= 2 &&
-        first_line.substring(first_line.length - 2) == StringView{"sh"})
-    {
-      interpreter_is_sh = true;
-    }
-    if (contains_dash ||
-        (interpreter_is_sh && !contains_bash && !contains_kosh))
-    {
-      actx.shebang_is_posix_sh = true;
-    }
-  }
+  expressions::check_shebang(actx, source, is_named_script_file);
 
   LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
       actx.shebang_is_posix_sh ? "armed" : "off");

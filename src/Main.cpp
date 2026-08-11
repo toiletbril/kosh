@@ -472,7 +472,8 @@ static fn run_script_contents(const String &script_contents,
           context.warnings_enabled() && context.shell_is_interactive(),
           context.mood() == mimic_mood::Default,
           context.annoying_diagnostics_enabled(), shellcheck_suppressions,
-          analysis_scope_definitions, FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+          analysis_scope_definitions, filename.has_value(),
+          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",

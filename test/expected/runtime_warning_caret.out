@@ -1,6 +1,6 @@
-SCRIPT:2:9: warning: The variable 'UNSET_COND' is not set, it expands to empty.
-SCRIPT:4:6: warning: The variable 'UNSET_SUBJECT' is not set, it expands to empty.
-SCRIPT:6:4: warning: The variable 'UNSET_ARITH' is not set, it expands to empty.
-SCRIPT:8:10: warning: The variable 'UNSET_LIST' is not set, it expands to empty.
-SCRIPT:10:6: warning: The variable 'UNSET_ELEM' is not set, it expands to empty.
+SCRIPT:3:9: warning: The variable 'UNSET_COND' is not set, it expands to empty.
+SCRIPT:5:6: warning: The variable 'UNSET_SUBJECT' is not set, it expands to empty.
+SCRIPT:7:4: warning: The variable 'UNSET_ARITH' is not set, it expands to empty.
+SCRIPT:9:10: warning: The variable 'UNSET_LIST' is not set, it expands to empty.
+SCRIPT:11:6: warning: The variable 'UNSET_ELEM' is not set, it expands to empty.
 rc=0

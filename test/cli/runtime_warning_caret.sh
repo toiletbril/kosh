@@ -4,6 +4,7 @@ unset KOSH_FLAGS
 # literal points at its own line rather than the statement before it.
 script=$(mktemp)
 cat > "$script" <<'EOF'
+#!/bin/kosh
 previous_statement=1
 [[ x = "$UNSET_COND" ]]
 previous_statement=2

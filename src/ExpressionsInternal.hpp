@@ -161,6 +161,11 @@ fn check_case_option_coverage(AnalysisContext &actx,
    since a token holds the bytes without their surrounding quoting. */
 fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void;
 
+/* The shebang findings and the POSIX gate, read from one walk of the first
+   line. */
+fn check_shebang(AnalysisContext &actx, StringView source,
+                 bool is_named_script_file) throws -> void;
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;

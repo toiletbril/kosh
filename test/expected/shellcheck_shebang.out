@@ -1,0 +1,73 @@
+== unknown_interpreter ==
+1:3: warning: The shebang names 'perl', which is not a shell this analysis knows.
+     1 |  #!/bin/perl
+       |    ^~~~~~~~~
+note: Name a shell such as `sh` or `bash` in the shebang.
+== swapped ==
+1:1: warning: The first line begins with `!#`, so the shell reads it as a command.
+     1 |  !#/bin/sh
+       |  ^~
+note: Write `#!` at the start of the line.
+swapped.kosh:1:1: warning: Command '!#' was not found.
+     1 |  !#/bin/sh
+       |  ^~
+Encountered 2 warnings.
+== missing_hash ==
+1:1: warning: The first line begins with `!`, a shebang begins with `#!`.
+     1 |  !/bin/sh
+       |  ^
+note: Write `#!` at the start of the line.
+missing_hash.kosh:1:1: warning: Command '!' was not found.
+     1 |  !/bin/sh
+       |  ^
+Encountered 2 warnings.
+== missing_bang ==
+1:1: warning: The first line is an ordinary comment, a shebang begins with `#!`.
+     1 |  # /bin/sh
+       |  ^
+note: Write `#!` at the start of the line.
+== leading_space ==
+1:1: warning: Whitespace precedes the shebang, so the first two bytes are not `#!`.
+     1 |    #!/bin/sh
+       |  ^~
+note: Move `#!` to the start of the line.
+== inner_space ==
+1:2: warning: A space separates `#` from `!`, so the line is an ordinary comment.
+     1 |  # !/bin/sh
+       |   ^
+note: Write `#!` with nothing between them.
+== not_first_line ==
+1:1: warning: The shebang is not on the first line, so it is an ordinary comment.
+     1 |  # Copyright 2018
+       |  ^
+note: Move the shebang to the first line and keep the comments below it.
+== parameter_count ==
+1:3: warning: The shebang passes more than one parameter, most systems hand the rest over as one argument.
+     1 |  #!/bin/sh -e -u
+       |    ^~~~~~~
+note: Keep one parameter and move the options into the script.
+== missing_shebang ==
+1:1: warning: The script names no interpreter, so the analysis cannot tell which shell it targets.
+     1 |  echo hi
+       |  ^
+note: Add a shebang such as `#!/bin/sh` on the first line.
+== relative_interpreter ==
+1:3: warning: The shebang names 'bin/sh', which is not an absolute path.
+     1 |  #!bin/sh
+       |    ^~~~~~
+note: Write an absolute path, or use `#!/usr/bin/env` to search PATH.
+== directory_interpreter ==
+1:3: warning: The shebang names '/bin/sh/', which ends in a slash and names a directory.
+     1 |  #!/bin/sh/
+       |    ^~~~~~~~
+note: Remove the trailing slash so the shebang names the interpreter file.
+== env_split_string ==
+== plain_sh ==
+== leading_negation ==
+== ordinary_comment_header ==
+1:1: warning: The script names no interpreter, so the analysis cannot tell which shell it targets.
+     1 |  # Copyright 2018
+       |  ^
+note: Add a shebang such as `#!/bin/sh` on the first line.
+== stdin carries no shebang ==
+rc=0
