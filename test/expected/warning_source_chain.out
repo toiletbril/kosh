@@ -1,14 +1,14 @@
-kosh: INNER:2:9: warning: The variable 'UNSET_CHAIN' is not set, it expands to empty.
+INNER:2:9: warning: The variable 'UNSET_CHAIN' is not set, it expands to empty.
      2 |  [[ x = "$UNSET_CHAIN" ]]
        |          ^~~~~~~~~~~~
 note: Replace it with ${UNSET_CHAIN-} if empty expansion is desired.
-kosh: OUTER:2:3: trace:
+OUTER:2:3: trace:
      2 |  . INNER
        |    ^~~~~~~~~~~~~~~~~~~
-kosh: 1:0: trace:
+1:0: trace:
      1 |  . OUTER
        |    ^~~~~~~~~~~~~~~~~~~
-kosh: 1:0: trace:
+1:0: trace:
      1 |  KOSH -WWW -c '. OUTER'
 0
 rc=0

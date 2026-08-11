@@ -193,7 +193,7 @@
 [Word
   Variable "redirect_file"
 ]
-kosh: 9:25: warning: An unquoted variable can split into words and expand globs.
+9:25: warning: An unquoted variable can split into words and expand globs.
      9 |  for n in 1 2 3; do echo $n; done > "$redirect_file"
        |                          ^~
 note: Quote the expansion to keep one argument.

@@ -3,7 +3,7 @@ rc=1
 == caller 0 inside a function prints line and source:
 4 SRC
 == caller with a non-numeric operand is a located error:
-kosh: 1:8: error: Builtin `caller`: 'abc' is not a whole number.
+1:8: error: Builtin `caller`: 'abc' is not a whole number.
      1 |  caller abc
        |         ^~~
 note: The frame index must be a whole number such as `caller 0`.

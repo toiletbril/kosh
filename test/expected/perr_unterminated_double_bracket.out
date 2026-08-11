@@ -1,6 +1,6 @@
-kosh: 2:1: error: Unterminated '[['.
+2:1: error: Unterminated '[['.
      2 |  [[ a == b
        |  ^~
-kosh: 2:10: details:
+2:10: details:
      2 |  [[ a == b
        |           ^ expected ']]'.

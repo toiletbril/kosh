@@ -24,7 +24,7 @@ lib
 unlink rc=0
 0
 --- unlink a directory fails ---
-kosh: 1:1: error: unlink: cannot unlink 'a': it is a directory.
+1:1: error: unlink: cannot unlink 'a': it is a directory.
      1 |  koshkit unlink a
        |  ^~~~~~~~~~~~~~~~
 rc=1

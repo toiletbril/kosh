@@ -4,13 +4,19 @@ one.txt
 two.txt
 rc=0
 --- unknown flag on a symlinked utility reports an error, not a crash ---
-kosh: 1:6: error: tail: Unknown flag '--bogus'.
+1:6: error: tail: Unknown flag '--bogus'.
      1 |  tail --bogus
        |       ^~~~~~~
 note: Use `--` before an operand that begins with a dash.
 rc=1
 --- a symlinked utility reports the kosh version on --version ---
 1
+--- a symlinked utility opens its help with the bundled banner ---
+
+  This utility is bundled with the Koshka shell and runs from the kosh binary
+  reached through a symlink, not a system program of the same name.
+--- the koshkit form opens with the description instead ---
+DESCRIPTION
 == a symlink was installed for head:
 head-linked
 == a symlinked head routes its own -c flag to the utility:

@@ -6,7 +6,7 @@ finished
 echo hello from make
 hello from make
 --- missing target ---
-kosh: 1:1: error: There is no rule to make the target 'nope'.
+1:1: error: There is no rule to make the target 'nope'.
      1 |  koshkit make nope
        |  ^~~~~~~~~~~~~~~~~
 rc=2
@@ -21,7 +21,7 @@ tag=[debug]
 built
 rc=0
 --- failing recipe aborts ---
-kosh: 1:1: error: The recipe for the target 'broken' failed with status 1.
+1:1: error: The recipe for the target 'broken' failed with status 1.
      1 |  koshkit make broken
        |  ^~~~~~~~~~~~~~~~~~~
 rc=2

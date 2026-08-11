@@ -484,7 +484,7 @@ rc=0
 start
 end
 == unguarded still errors:
-kosh: 31:1: error: Command 'totally-nonexistent-command' was not found.
+31:1: error: Command 'totally-nonexistent-command' was not found.
     31 |  totally-nonexistent-command
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 rc=127

@@ -1,25 +1,25 @@
 == alias:
-kosh: 1:1: error: Builtin `alias`: The alias 'missing_name' was not found.
+1:1: error: Builtin `alias`: The alias 'missing_name' was not found.
      1 |  alias missing_name
        |  ^~~~~~~~~~~~~~~~~~
 rc=1
 == hash:
-kosh: 1:1: error: Builtin `hash`: The command 'missing_name' was not found.
+1:1: error: Builtin `hash`: The command 'missing_name' was not found.
      1 |  hash missing_name
        |  ^~~~~~~~~~~~~~~~~
 rc=1
 == command verbose:
-kosh: 1:1: error: Builtin `command`: The command 'missing_name' was not found.
+1:1: error: Builtin `command`: The command 'missing_name' was not found.
      1 |  command -V missing_name
        |  ^~~~~~~~~~~~~~~~~~~~~~~
 rc=1
 == jobspec:
-kosh: 1:1: error: Builtin `jobs`: Unable to list the job '%999' because no such job exists.
+1:1: error: Builtin `jobs`: Unable to list the job '%999' because no such job exists.
      1 |  jobs %999
        |  ^~~~~~~~~
 rc=1
 == timeout command:
-kosh: 1:1: error: timeout: command 'missing_name' was not found.
+1:1: error: timeout: command 'missing_name' was not found.
      1 |  koshkit timeout 1 missing_name
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 rc=127

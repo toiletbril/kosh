@@ -45,12 +45,12 @@
   DoubleQuoted "code="
   Variable "?"
 ]
-kosh: 3:8: warning: The variable 'nope' is not set, it expands to empty.
+3:8: warning: The variable 'nope' is not set, it expands to empty.
      3 |  echo "[$nope]"
        |         ^~~~~
 note: Replace it with ${nope-} if empty expansion is desired.
 []
-kosh: 5:8: error: Unable to expand 'nope' because the parameter is not set.
+5:8: error: Unable to expand 'nope' because the parameter is not set.
      5 |  (echo "$nope")
        |         ^~~~~
 note: Replace it with ${nope-} if empty expansion is desired.

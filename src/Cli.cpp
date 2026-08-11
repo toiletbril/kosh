@@ -926,7 +926,6 @@ cold fn show_message(StringView err) throws -> void
     print_error("\n");
     MESSAGE_LEADING_NEWLINE_ARMED = false;
   }
-  print_error("kosh: ");
   print_error(err);
   print_error("\n");
 }

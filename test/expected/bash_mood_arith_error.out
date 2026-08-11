@@ -1,13 +1,13 @@
 == bash mood reports an arithmetic error and goes on to the next line, matching bash:
 before
-kosh: 2:6: error: Division by zero.
+2:6: error: Division by zero.
      2 |  echo $((1/0))
        |       ^~~~~~~~
 note: The right operand evaluated to 0.
 after
 rc=0
 == the strict default mood aborts the run on an arithmetic error:
-kosh: 1:6: error: Division by zero.
+1:6: error: Division by zero.
      1 |  echo $((1/0)); echo after
        |       ^~~~~~~~
 note: The right operand evaluated to 0.
@@ -16,7 +16,7 @@ rc=1
 after
 rc=0
 == bash mood still continues past a readonly reassignment, matching bash:
-kosh: 1:15: error: Unable to assign 'r' because it is read only.
+1:15: error: Unable to assign 'r' because it is read only.
      1 |  readonly r=1; r=2; echo after
        |                ^~~
 after

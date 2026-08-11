@@ -23,6 +23,12 @@ echo "rc=$?"
 echo "--- a symlinked utility reports the kosh version on --version ---"
 ./tail --version | grep -c "Koshka Shell"
 
+echo "--- a symlinked utility opens its help with the bundled banner ---"
+./tail --help | head -3
+
+echo "--- the koshkit form opens with the description instead ---"
+"$BIN" -c 'koshkit tail --help' | head -1
+
 unset KOSH_FLAGS
 # koshkit --assimilate installs a symlink to the binary named for each utility
 # into a directory, the busybox-style install. A symlinked invocation routes its

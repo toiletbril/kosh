@@ -87,7 +87,7 @@
 [Word
   Unquoted "2"
 ]
-kosh: 6:1: warning: The assignment of 'A' uses array syntax instead of arithmetic.
+6:1: warning: The assignment of 'A' uses array syntax instead of arithmetic.
      6 |  A=((2 + 2))
        |  ^~~~~~~~~~~
 note: Use `let 'A=2 + 2'` to evaluate and assign it.

@@ -1,12 +1,12 @@
 == logout in a non-login shell is refused:
-kosh: 1:1: error: Builtin `logout`: Cannot use 'logout' in a non-login shell.
+1:1: error: Builtin `logout`: Cannot use 'logout' in a non-login shell.
      1 |  logout
        |  ^~~~~~
-kosh: note: `exit` may be used instead.
+note: `exit` may be used instead.
 rc=1
 == logout with a non-numeric operand is a located error:
-kosh: 1:1: error: Builtin `logout`: Cannot use 'logout' in a non-login shell.
+1:1: error: Builtin `logout`: Cannot use 'logout' in a non-login shell.
      1 |  logout abc
        |  ^~~~~~~~~~
-kosh: note: `exit` may be used instead.
+note: `exit` may be used instead.
 rc=1

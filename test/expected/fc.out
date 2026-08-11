@@ -1031,20 +1031,20 @@ echo second
 first
 second
 == selection errors ==
-kosh: 111:7: error: Builtin `fc`: no command found.
+111:7: error: Builtin `fc`: no command found.
    111 |  fc -s missing-prefix
        |        ^~~~~~~~~~~~~~
 missing-rc=1
-kosh: 113:7: error: Builtin `fc`: no command found.
+113:7: error: Builtin `fc`: no command found.
    113 |  fc -s -0
        |        ^~
 zero-rc=1
 return 7
-kosh: fc:1:1: error: Builtin `return`: can only `return' from a function or sourced script.
+fc:1:1: error: Builtin `return`: can only `return' from a function or sourced script.
      1 |  return 7
        |  ^~~~~~~~
 execute-return-rc=2
-kosh: 121:4: error: Builtin `fc`: Unknown flag '-v'.
+121:4: error: Builtin `fc`: Unknown flag '-v'.
    121 |  fc -v
        |     ^~
 note: Use `--` before an operand that begins with a dash.

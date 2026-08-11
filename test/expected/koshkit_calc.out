@@ -11,17 +11,17 @@
 === variable read ===
 42
 === located parse error ===
-kosh: 1:4: error: Unfinished expression.
+1:4: error: Unfinished expression.
      1 |  1 +
        |     ^
 note: An operand is missing.
 === located division by zero ===
-kosh: 1:6: error: Division by zero.
+1:6: error: Division by zero.
      1 |  5 / 0
        |       ^
 note: The right operand evaluated to 0.
 === no expression ===
-kosh: 1:1: error: calc has no expression to evaluate.
+1:1: error: calc has no expression to evaluate.
      1 |  koshkit calc
        |  ^~~~~~~~~~~~
 note: Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or enter the interactive prompt with `-i`.
@@ -39,24 +39,24 @@ rc=1
 1
 0
 == an unset variable is a located capitalized error, not a silent zero:
-kosh: 1:1: error: The variable 'nope' is not set.
+1:1: error: The variable 'nope' is not set.
      1 |  nope
        |  ^~~~
 == a set but empty variable reads zero, only an unset name is an error:
 0
 == an empty assignment is rejected rather than binding an empty value:
-kosh: 1:1: error: Assignment to 'z' needs a value.
+1:1: error: Assignment to 'z' needs a value.
      1 |  z =
        |  ^
 == a division by zero is a located capitalized error:
-kosh: 1:6: error: Division by zero.
+1:6: error: Division by zero.
      1 |  1 / 0
        |       ^
 note: The right operand evaluated to 0.
 == an unset name inside a stored formula errors when the formula reads:
-kosh: error: The variable 'base' is not set.
+error: The variable 'base' is not set.
 == a located error carets the bad token:
-kosh: 1:15: error: Unexpected '.0' after the expression.
+1:15: error: Unexpected '.0' after the expression.
      1 |  2312312 / 1323.0
        |                ^~
 note: An operator is missing between two values.
@@ -66,7 +66,7 @@ note: An operator is missing between two values.
 1180591620717411303424
 == -i evaluates each piped line, continuing past a bad one:
 2
-kosh: 1:1: error: The variable 'bad' is not set.
+1:1: error: The variable 'bad' is not set.
      1 |  bad +
        |  ^~~
 100
@@ -76,7 +76,7 @@ kosh: 1:1: error: The variable 'bad' is not set.
 == --pipe is the long form:
 42
 == no expression off a pipe reports a verbose error:
-kosh: 1:1: error: calc has no expression to evaluate.
+1:1: error: calc has no expression to evaluate.
      1 |  koshkit calc
        |  ^~~~~~~~~~~~
 note: Pass an expression such as `calc '2 + 2'`, read a pipe with `-p`, or enter the interactive prompt with `-i`.

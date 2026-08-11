@@ -20,7 +20,7 @@ KOSH_ANSI_RESET  []
 KOSH_ANSI_BOGUS  [MISSING]
 stored=[stored]
 sh_green=[]
-kosh: 1:15: error: Unable to expand 'KOSH_ANSI_NOPE' because the parameter is not set.
+1:15: error: Unable to expand 'KOSH_ANSI_NOPE' because the parameter is not set.
      1 |  set -u; echo "${KOSH_ANSI_NOPE}"
        |                ^~~~~~~~~~~~~~~~~
 note: Replace it with ${KOSH_ANSI_NOPE-} if empty expansion is desired.

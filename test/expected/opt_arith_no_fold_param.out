@@ -23,7 +23,7 @@
 [Word
   ArithmeticExpansion "0x10+1"
 ]
-kosh: 3:9: warning: The variable 'notrecorded' is not set, it expands to empty.
+3:9: warning: The variable 'notrecorded' is not set, it expands to empty.
      3 |  echo $((notrecorded+1))
        |          ^~~~~~~~~~~
 note: Replace it with ${notrecorded-} if empty expansion is desired.

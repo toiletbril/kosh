@@ -5,4 +5,4 @@ unset KOSH_FLAGS
 # and the dbg binary names.
 echo "== a long flag matches its whole name, not a prefix:"
 "$BIN" --helpXYZ -c 'echo unreached' 2>&1 | head -1 |
-  sed 's/^kosh: [0-9]*:[0-9]*: //'
+  sed 's/^[0-9]*:[0-9]*: //'

@@ -11,11 +11,11 @@
 --- mv -v names the move ---
 renamed 'copy.txt' -> 'moved.txt'
 --- utility error is located in the bash mood ---
-kosh: 1:1: error: cp: Not enough arguments.
+1:1: error: cp: Not enough arguments.
      1 |  koshkit cp
        |  ^~~~~~~~~~
-kosh: note: Try `cp --help` for more info.
+note: Try `cp --help` for more info.
 --- and a missing operand is located in the bash mood ---
-kosh: 1:1: error: ls: cannot access '/no/such/path': no such file or directory.
+1:1: error: ls: cannot access '/no/such/path': no such file or directory.
      1 |  koshkit ls /no/such/path
        |  ^~~~~~~~~~~~~~~~~~~~~~~~

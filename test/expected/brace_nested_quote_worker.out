@@ -31,14 +31,15 @@
 [Word
   Unquoted "echo"
 ]
-kosh: 2:15: warning: An unquoted variable can split into words and expand globs.
+2:15: warning: An unquoted variable can split into words and expand globs.
      2 |  printf "[%s]" ${y:-${z:-"a}b"}}
        |                ^~~~~~~~~~~~~~~~~
 note: Quote the expansion to keep one argument.
-kosh: 4:15: warning: An unquoted variable can split into words and expand globs.
+4:15: warning: An unquoted variable can split into words and expand globs.
      4 |  printf "[%s]" ${y:-${z:-$(echo "}")}}
        |                ^~~~~~~~~~~~~~~~~~~~~~~
 note: Quote the expansion to keep one argument.
+Encountered 2 warnings.
 [a}b]
 [}]
 [Code 0]

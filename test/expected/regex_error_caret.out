@@ -1,4 +1,4 @@
-kosh: 1:11: error: The regular expression '(' is invalid.
+1:11: error: The regular expression '(' is invalid.
      1 |  [[ abc =~ ( ]]
        |            ^
 note: The pattern must be a valid extended regular expression.

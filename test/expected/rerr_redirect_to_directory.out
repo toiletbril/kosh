@@ -26,7 +26,7 @@
   Variable "TEST_TEMP_DIRECTORY"
   DoubleQuoted "/redirect-directory"
 ]
-kosh: 3:11: error: Could not open '.test-work/redirect-directory': Is a directory.
+3:11: error: Could not open '.test-work/redirect-directory': Is a directory.
      3 |  echo hi > "$TEST_TEMP_DIRECTORY/redirect-directory"
        |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 [Code 2]

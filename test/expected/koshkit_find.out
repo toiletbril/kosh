@@ -26,11 +26,11 @@ a/b/c
 a/b/c/three.txt
 a/b/two.log
 --- find unknown predicate ---
-kosh: 1:1: error: find: unknown predicate '-bogus'.
+1:1: error: find: unknown predicate '-bogus'.
      1 |  koshkit find . -bogus
        |  ^~~~~~~~~~~~~~~~~~~~~
 --- find missing -name argument ---
-kosh: 1:1: error: find: -name expects a pattern.
+1:1: error: find: -name expects a pattern.
      1 |  koshkit find . -name
        |  ^~~~~~~~~~~~~~~~~~~~
 note: Pass a glob after `-name`, e.g. `-name '*.c'`.

@@ -17,7 +17,7 @@
 [Word
   Unquoted "done"
 ]
-kosh: 2:10: warning: Command 'nosuchcmd_xyz' was not found.
+2:10: warning: Command 'nosuchcmd_xyz' was not found.
      2 |  false && nosuchcmd_xyz
        |           ^~~~~~~~~~~~~
 done

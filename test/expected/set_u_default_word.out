@@ -26,7 +26,7 @@
 [Word
   Unquoted "unreachable"
 ]
-kosh: 3:18: error: Unable to expand 'y' because the parameter is not set.
+3:18: error: Unable to expand 'y' because the parameter is not set.
      3 |  printf '%s' "${x-$y}"
        |                   ^~
 note: Replace it with ${y-} if empty expansion is desired.

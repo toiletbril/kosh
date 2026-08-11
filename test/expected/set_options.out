@@ -151,6 +151,6 @@ on=0
 off=0
 one three count=3
 bundled=0
-kosh: 6:5: error: Builtin `set`: Unknown option '-Z'.
+6:5: error: Builtin `set`: Unknown option '-Z'.
      6 |  set -Z 2>&1; echo "bad=$?"
        |      ^~

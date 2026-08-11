@@ -1,6 +1,6 @@
-kosh: SCRIPT:2:9: warning: The variable 'UNSET_COND' is not set, it expands to empty.
-kosh: SCRIPT:4:6: warning: The variable 'UNSET_SUBJECT' is not set, it expands to empty.
-kosh: SCRIPT:6:4: warning: The variable 'UNSET_ARITH' is not set, it expands to empty.
-kosh: SCRIPT:8:10: warning: The variable 'UNSET_LIST' is not set, it expands to empty.
-kosh: SCRIPT:10:5: warning: The variable 'UNSET_ELEM' is not set, it expands to empty.
+SCRIPT:2:9: warning: The variable 'UNSET_COND' is not set, it expands to empty.
+SCRIPT:4:6: warning: The variable 'UNSET_SUBJECT' is not set, it expands to empty.
+SCRIPT:6:4: warning: The variable 'UNSET_ARITH' is not set, it expands to empty.
+SCRIPT:8:10: warning: The variable 'UNSET_LIST' is not set, it expands to empty.
+SCRIPT:10:5: warning: The variable 'UNSET_ELEM' is not set, it expands to empty.
 rc=0

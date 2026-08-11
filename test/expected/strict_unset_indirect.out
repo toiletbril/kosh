@@ -40,12 +40,12 @@
 [Word
   Unquoted "not-reached"
 ]
-kosh: 3:2: warning: The variable 'missing_target' is not set, it expands to empty.
+3:2: warning: The variable 'missing_target' is not set, it expands to empty.
      3 |  (echo "${!ref}")
        |   ^~~~~~~~~~~~~~
 note: Replace it with ${missing_target-} if empty expansion is desired.
 
 target-form=0
-kosh: 5:6: error: Unable to expand 'nope' because the parameter is not set.
+5:6: error: Unable to expand 'nope' because the parameter is not set.
      5 |  echo "${!nope}"
        |       ^~~~~~~~~~

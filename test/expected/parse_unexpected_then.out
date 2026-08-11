@@ -1,3 +1,3 @@
-kosh: 2:1: error: 'then' has no matching 'if'.
+2:1: error: 'then' has no matching 'if'.
      2 |  then
        |  ^~~~

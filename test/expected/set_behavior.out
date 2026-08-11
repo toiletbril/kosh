@@ -4,7 +4,7 @@ rc=1
 reached
 rc=0
 == an unknown mood is rejected:
-kosh: 1:12: error: Builtin `set`: Unknown --mood value 'badmood', expected 'kosh', 'bash', 'sh', or 'bash-posix'.
+1:12: error: Builtin `set`: Unknown --mood value 'badmood', expected 'kosh', 'bash', 'sh', or 'bash-posix'.
      1 |  set --mood badmood
        |             ^~~~~~~
 rc=1

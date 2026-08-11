@@ -57,14 +57,15 @@
 [Word
   CommandSubstitution "printf %s "$PRG""
 ]
-kosh: 5:1: warning: An echo of a command substitution prints what the command already prints.
+5:1: warning: An echo of a command substitution prints what the command already prints.
      5 |  echo "`echo \"$PRG\"`"
        |  ^~~~
 note: Run the command on its own instead.
-kosh: 6:1: warning: An echo of a command substitution prints what the command already prints.
+6:1: warning: An echo of a command substitution prints what the command already prints.
      6 |  echo "`printf %s \"$PRG\"`"
        |  ^~~~
 note: Run the command on its own instead.
+Encountered 2 warnings.
 arg=</foo/bar/..>
 /foo/bar/retrace
 /foo/bar/retrace

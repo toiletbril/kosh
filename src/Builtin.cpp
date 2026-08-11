@@ -198,7 +198,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error("kosh: " + builtin_error_message(ec.program(), message) + "\n");
+    print_error(builtin_error_message(ec.program(), message) + "\n");
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
@@ -217,7 +217,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error("kosh: " + builtin_error_message(ec.program(), message) + "\n");
+    print_error(builtin_error_message(ec.program(), message) + "\n");
 }
 
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
@@ -242,7 +242,7 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error(String{"kosh: "} + program_name + ": Not enough arguments.\n");
+    print_error(String{program_name} + ": Not enough arguments.\n");
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
                    .to_string());
   return 2;
@@ -256,7 +256,7 @@ fn report_usage_error(EvalContext &cxt, SourceLocation location,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error(String{"kosh: "} + program_name + ": Not enough arguments.\n");
+    print_error(String{program_name} + ": Not enough arguments.\n");
   show_message(Note{String{"Try `"} + program_name + " --help` for more info"}
                    .to_string());
   return 2;

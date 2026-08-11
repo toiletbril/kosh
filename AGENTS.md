@@ -313,7 +313,12 @@ invalidates checkpoints and cached spans.
 
 Analysis warnings are queued with owned messages. Unique source lines are
 highlighted in source order, then diagnostics are rendered in discovery order.
-Fatal diagnostics flush earlier warnings before they are rendered.
+Fatal diagnostics flush earlier warnings before they are rendered. An analysis
+run that reported two or more diagnostics closes with a counted summary line.
+The warning count is yellow and the error count is bold bright red.
+
+A diagnostic line carries no program name prefix. It begins with its source
+location when the mapping exists.
 
 Diagnostics.cpp owns each analysis diagnostic's code, slug, summary, message,
 suggestion, related detail, tier, and delivery. Expression analysis reports a

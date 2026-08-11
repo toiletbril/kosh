@@ -1,21 +1,21 @@
 == bench points at the failing command, not the whole bench line:
-kosh: 1:19: error: Builtin `bench`: the command `--color` exited with status 1.
+1:19: error: Builtin `bench`: the command `--color` exited with status 1.
      1 |  bench --runs 1 ls --color
 == kill points at the bad pid, not the whole kill line:
-kosh: 1:6: error: Builtin `kill`: 'notapid' is not a valid job or process id.
+1:6: error: Builtin `kill`: 'notapid' is not a valid job or process id.
      1 |  kill notapid
 == break points at the bad count, not the whole break line:
-kosh: 1:24: error: break count '0' is out of range.
+1:24: error: break count '0' is out of range.
      1 |  for i in 1 2; do break 0; done
 == exit points at the bad status, not the whole exit line:
-kosh: 1:6: error: Builtin `exit`: 'notanumber' is not a numeric exit status.
+1:6: error: Builtin `exit`: 'notanumber' is not a numeric exit status.
      1 |  exit notanumber
 == umask points at the bad mask, not the whole umask line:
-kosh: 1:7: error: Builtin `umask`: Unable to set the file creation mask because '0999' is not a valid octal mask.
+1:7: error: Builtin `umask`: Unable to set the file creation mask because '0999' is not a valid octal mask.
      1 |  umask 0999
 == set points at the bad option, not the whole set line:
-kosh: 1:5: error: Builtin `set`: Unknown option '-Z'.
+1:5: error: Builtin `set`: Unknown option '-Z'.
      1 |  set -Z
 == z points at the bad query, not the whole z line:
-kosh: 1:3: error: Builtin `z`: No matching directory for 'no_such_dir_xyz'.
+1:3: error: Builtin `z`: No matching directory for 'no_such_dir_xyz'.
      1 |  z no_such_dir_xyz

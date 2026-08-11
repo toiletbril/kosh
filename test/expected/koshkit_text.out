@@ -39,7 +39,7 @@ abc
 --- tr -d digits ---
 abc
 --- tr reverse range ---
-kosh: 1:1: error: tr rejects a reverse range in a set.
+1:1: error: tr rejects a reverse range in a set.
      1 |  koshkit tr a-c z-x
        |  ^~~~~~~~~~~~~~~~~~
 note: Order the range endpoints so the low byte precedes the high byte.

@@ -1,20 +1,20 @@
 == direct command:
-kosh: 1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
+1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
      1 |  ./notexec; printf "rc=%s\n" "$?"
        |  ^~~~~~~~~
 rc=126
 == pipeline stage:
-kosh: 1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
+1:1: error: Unable to execute `TMPDIR/notexec`: Permission denied.
      1 |  ./notexec | koshkit cat; printf "pipeline=%s first=%s\n" "$?" "${PIPESTATUS[0]}"
        |  ^~~~~~~~~
 pipeline=0 first=126
 == exec command:
-kosh: 1:6: error: Unable to execute `TMPDIR/notexec`: Permission denied.
+1:6: error: Unable to execute `TMPDIR/notexec`: Permission denied.
      1 |  exec ./notexec
        |       ^~~~~~~~~
 rc=126
 == script argument is a directory:
-kosh: 1:9: error: Unable to execute `scriptdir` because the file is a directory.
+1:9: error: Unable to execute `scriptdir` because the file is a directory.
      1 |  ./shell scriptdir
        |          ^~~~~~~~~
 rc=126

@@ -23,7 +23,7 @@ printf 'substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
     "$(printf '%s\n' "$out" | grep -Fc 'echo $(no_such_substitution_xyz)')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:6: trace:')"
+    "$(printf '%s\n' "$out" | grep -c '^1:6: trace:')"
 
 out=$("$BIN" --no-diagnostics \
     -c 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}' 2>&1)
@@ -32,7 +32,7 @@ printf 'nested substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
     "$(printf '%s\n' "$out" |
         grep -Fc 'echo ${UNSET_TRACE_POLICY:-$(no_such_nested_substitution_xyz)}')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:28: trace:')"
+    "$(printf '%s\n' "$out" | grep -c '^1:28: trace:')"
 
 check_expansion_trace()
 {
@@ -44,7 +44,7 @@ check_expansion_trace()
         "$label" \
         "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
         "$(printf '%s\n' "$out" | grep -c 'error:')" \
-        "$(printf '%s\n' "$out" | grep -c "kosh: 1:$site: trace:")"
+        "$(printf '%s\n' "$out" | grep -c "^1:$site: trace:")"
 }
 
 check_expansion_trace pattern 23 \
@@ -87,20 +87,20 @@ printf 'function substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
     "$(printf '%s\n' "$out" |
         grep -Fc 'echo ${ no_such_function_substitution_xyz; }')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:6: trace:')"
+    "$(printf '%s\n' "$out" | grep -c '^1:6: trace:')"
 
 out=$("$BIN" --no-diagnostics \
     -c 'case X=$(no_such_case_copy_xyz) in *) :;; esac' 2>&1)
 printf 'case assignment copy traces=%s errors=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:8: trace:')"
+    "$(printf '%s\n' "$out" | grep -c '^1:8: trace:')"
 
 out=$("$BIN" --no-diagnostics -c 'echo ${X:-$(if)}' 2>&1)
 printf 'substitution parse traces=%s errors=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:11: trace:')"
+    "$(printf '%s\n' "$out" | grep -c '^1:11: trace:')"
 
 out=$("$BIN" --no-diagnostics -c 'echo $(echo ${X:-$(if)})' 2>&1)
 printf 'nested parse traces=%s errors=%s\n' \
@@ -116,7 +116,7 @@ esac
 printf 'process substitution traces=%s errors=%s sites=%s order=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:13: trace:')" \
+    "$(printf '%s\n' "$out" | grep -c '^1:13: trace:')" \
     "$process_order"
 
 out=$("$BIN" --no-diagnostics \
@@ -124,7 +124,7 @@ out=$("$BIN" --no-diagnostics \
 printf 'process eval traces=%s errors=%s inner-sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')" \
-    "$(printf '%s\n' "$out" | grep -c 'kosh: 1:1: trace:')"
+    "$(printf '%s\n' "$out" | grep -c '^1:1: trace:')"
 
 out=$("$BIN" --no-diagnostics \
     -c 'koshkit cat <(echo prefix >&2; eval no_such_prefixed_process_eval_xyz)' \

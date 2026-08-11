@@ -514,30 +514,31 @@
   Variable "NOPE"
   Unquoted "b"
 ]
-kosh: 3:6: warning: An unquoted variable can split into words and expand globs.
+3:6: warning: An unquoted variable can split into words and expand globs.
      3 |  echo $FOO
        |       ^~~~
 note: Quote the expansion to keep one argument.
-kosh: 4:6: warning: An unquoted variable can split into words and expand globs.
+4:6: warning: An unquoted variable can split into words and expand globs.
      4 |  echo ${FOO}
        |       ^~~~~~
 note: Quote the expansion to keep one argument.
-kosh: 45:6: warning: An unquoted variable can split into words and expand globs.
+45:6: warning: An unquoted variable can split into words and expand globs.
     45 |  echo $Y
        |       ^~
 note: Quote the expansion to keep one argument.
-kosh: 53:6: warning: An unquoted variable can split into words and expand globs.
+53:6: warning: An unquoted variable can split into words and expand globs.
     53 |  echo $X
        |       ^~
 note: Quote the expansion to keep one argument.
-kosh: 57:6: warning: An unquoted variable can split into words and expand globs.
+57:6: warning: An unquoted variable can split into words and expand globs.
     57 |  echo $NOPE end
        |       ^~~~~
 note: Quote the expansion to keep one argument.
-kosh: 59:6: warning: An unquoted variable can split into words and expand globs.
+59:6: warning: An unquoted variable can split into words and expand globs.
     59 |  echo a${NOPE}b
        |       ^~~~~~~~~
 note: Quote the expansion to keep one argument.
+Encountered 6 warnings.
 bar
 bar
 bar and more

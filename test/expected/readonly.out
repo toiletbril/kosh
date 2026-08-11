@@ -102,6 +102,6 @@
   DoubleQuoted "after="
   Variable "R"
 ]
-kosh: 3:1: error: Unable to assign 'x' because it is read only.
+3:1: error: Unable to assign 'x' because it is read only.
      3 |  x=2; echo "assign=$?"
        |  ^~~

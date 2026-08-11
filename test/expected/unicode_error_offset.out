@@ -13,7 +13,7 @@
   Unquoted "does_not_exist*"
 ]
 юникод
-kosh: 2:14: error: A glob pattern in command position is rarely intended as a command name.
+2:14: error: A glob pattern in command position is rarely intended as a command name.
      2 |  echo юникод; does_not_exist*
        |               ^~~~~~~~~~~~~~~
 note: Quote it to run a literal name, or list the matches with compgen -G.

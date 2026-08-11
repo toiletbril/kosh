@@ -29,7 +29,7 @@ calc
 == type skips a blocked candidate before a runnable candidate:
 runnable
 == a missing name reports not found:
-kosh: 1:1: error: Builtin `type`: The command 'missing_xyz' was not found.
+1:1: error: Builtin `type`: The command 'missing_xyz' was not found.
      1 |  type missing_xyz
        |  ^~~~~~~~~~~~~~~~
 rc=1

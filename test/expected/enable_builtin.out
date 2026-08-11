@@ -13,7 +13,7 @@ rc=0
 == enable -s returns 0:
 rc=0
 == enable nosuchbuiltin reports and exits 1:
-kosh: 1:8: error: Builtin `enable`: 'nosuchbuiltin' is not a shell builtin.
+1:8: error: Builtin `enable`: 'nosuchbuiltin' is not a shell builtin.
      1 |  enable nosuchbuiltin
        |         ^~~~~~~~~~~~~
 rc=1

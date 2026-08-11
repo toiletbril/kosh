@@ -9,10 +9,10 @@ rm: would remove 'tree/sub'
 rm: would remove 'tree'
 tree still present
 == rm refuses '.' and the root directory, before any removal:
-kosh: 1:1: error: rm: refusing to remove '.' or '..' directory: skipping '.'.
+1:1: error: rm: refusing to remove '.' or '..' directory: skipping '.'.
      1 |  koshkit rm --dry-run .
        |  ^~~~~~~~~~~~~~~~~~~~~~
-kosh: 1:1: error: rm: refusing to remove the root directory: skipping '/'.
+1:1: error: rm: refusing to remove the root directory: skipping '/'.
      1 |  koshkit rm --dry-run /
        |  ^~~~~~~~~~~~~~~~~~~~~~
 == rm -rf . is refused (count of the refusal):

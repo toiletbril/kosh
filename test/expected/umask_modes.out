@@ -68,6 +68,6 @@
 ]
 0022
 u=rwx,g=rx,o=rx
-kosh: 4:7: error: Builtin `umask`: Unable to set the file creation mask because '0999' is not a valid octal mask.
+4:7: error: Builtin `umask`: Unable to set the file creation mask because '0999' is not a valid octal mask.
      4 |  umask 0999 2>&1; echo "badoct=$?"
        |        ^~~~

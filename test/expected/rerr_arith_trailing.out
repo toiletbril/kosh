@@ -7,7 +7,7 @@
 [Word
   ArithmeticExpansion "1 2"
 ]
-kosh: 2:6: error: Unexpected '2' after the expression.
+2:6: error: Unexpected '2' after the expression.
      2 |  echo $((1 2))
        |       ^~~~~~~~
 note: An operator is missing between two values.

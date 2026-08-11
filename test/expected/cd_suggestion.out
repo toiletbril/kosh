@@ -1,107 +1,107 @@
 == transposition:
-kosh: 1:4: error: The directory 'soruce' does not exist.
+1:4: error: The directory 'soruce' does not exist.
      1 |  cd soruce
        |     ^~~~~~
 note: Did you mean `source`?
 == nested path:
-kosh: 1:12: error: The directory 'project/nseted' does not exist.
+1:12: error: The directory 'project/nseted' does not exist.
      1 |  cd project/nseted
        |             ^~~~~~
 note: Did you mean `project/nested`?
 == directory symlink:
-kosh: 1:4: error: The directory 'linked-directroy' does not exist.
+1:4: error: The directory 'linked-directroy' does not exist.
      1 |  cd linked-directroy
        |     ^~~~~~~~~~~~~~~~
 note: Did you mean `linked-directory`?
 == quoted suggestion:
-kosh: 1:5: error: The directory 'space dri' does not exist.
+1:5: error: The directory 'space dri' does not exist.
      1 |  cd "space dri"
        |      ^~~~~~~~~
 note: Did you mean `'space dir'`?
 == regular file is excluded:
-kosh: 1:4: error: The directory 'regular-fiel' does not exist.
+1:4: error: The directory 'regular-fiel' does not exist.
      1 |  cd regular-fiel
        |     ^~~~~~~~~~~~
 note: Check the spelling or create it with `mkdir -p`.
 == distant miss:
-kosh: 1:4: error: The directory 'nowhere-near' does not exist.
+1:4: error: The directory 'nowhere-near' does not exist.
      1 |  cd nowhere-near
        |     ^~~~~~~~~~~~
 note: Check the spelling or create it with `mkdir -p`.
 == first missing expanded component:
-kosh: 1:27: error: The directory '<tmp>/expanded-parent/miss' does not exist.
+1:27: error: The directory '<tmp>/expanded-parent/miss' does not exist.
      1 |  cd "$BASE/expanded-parent/miss/tail"
        |                            ^~~~
 note: Check the spelling or create it with `mkdir -p`.
 == intermediate regular file:
-kosh: 1:4: error: The path 'regular-file' is not a directory.
+1:4: error: The path 'regular-file' is not a directory.
      1 |  cd regular-file/child
        |     ^~~~~~~~~~~~
 == direct regular file:
-kosh: 1:4: error: The path 'regular-file' is not a directory.
+1:4: error: The path 'regular-file' is not a directory.
      1 |  cd regular-file
        |     ^~~~~~~~~~~~
 == option terminator and missing tail:
-kosh: 1:15: error: The directory 'project/nseted' does not exist.
+1:15: error: The directory 'project/nseted' does not exist.
      1 |  cd -- project/nseted/tail
        |                ^~~~~~
 note: Did you mean `project/nested`?
 == one-byte missing component:
-kosh: 1:4: error: The directory 'x' does not exist.
+1:4: error: The directory 'x' does not exist.
      1 |  cd x/tail
        |     ^
 note: Check the spelling or create it with `mkdir -p`.
 == dot traversal:
-kosh: 1:15: error: The directory 'project/../miss' does not exist.
+1:15: error: The directory 'project/../miss' does not exist.
      1 |  cd project/../miss/tail
        |                ^~~~
 note: Check the spelling or create it with `mkdir -p`.
 == logical symlink traversal:
-kosh: 1:15: error: The directory 'logical/nseted' does not exist.
+1:15: error: The directory 'logical/nseted' does not exist.
      1 |  cd -L logical/nseted/tail
        |                ^~~~~~
 note: Did you mean `logical/nested`?
 == analyzed command path first missing component:
-kosh: 1:11: error: Command './project/miss' was not found.
+1:11: error: Command './project/miss' was not found.
      1 |  ./project/miss/tail
        |            ^~~~
 == runtime command path first missing component:
-kosh: 1:11: error: Command './project/miss' was not found.
+1:11: error: Command './project/miss' was not found.
      1 |  ./project/miss/tail
        |            ^~~~
 == exec command path first missing component:
-kosh: 1:16: error: Command './project/miss' was not found.
+1:16: error: Command './project/miss' was not found.
      1 |  exec ./project/miss/tail
        |                 ^~~~
 == analyzed command path preserves missing dot-dot component:
-kosh: 1:3: error: Command './missing' was not found.
+1:3: error: Command './missing' was not found.
      1 |  ./missing/../other
        |    ^~~~~~~
 == runtime command path preserves missing dot-dot component:
-kosh: 1:3: error: Command './missing' was not found.
+1:3: error: Command './missing' was not found.
      1 |  ./missing/../other
        |    ^~~~~~~
 == exec command path preserves missing dot-dot component:
-kosh: 1:8: error: Command './missing' was not found.
+1:8: error: Command './missing' was not found.
      1 |  exec ./missing/../other
        |         ^~~~~~~
 == cd preserves missing dot-dot component:
-kosh: 1:4: error: The directory 'missing' does not exist.
+1:4: error: The directory 'missing' does not exist.
      1 |  cd missing/../existing
        |     ^~~~~~~
 note: Check the spelling or create it with `mkdir -p`.
 == logical cd preserves symlink traversal:
 <tmp>/sibling
 == analyzed trailing separator preserves missing dot-dot component:
-kosh: 1:3: error: Command './missing' was not found.
+1:3: error: Command './missing' was not found.
      1 |  ./missing/../existing/
        |    ^~~~~~~
 == runtime trailing separator preserves missing dot-dot component:
-kosh: 1:3: error: Command './missing' was not found.
+1:3: error: Command './missing' was not found.
      1 |  ./missing/../existing/
        |    ^~~~~~~
 == exec trailing separator preserves missing dot-dot component:
-kosh: 1:8: error: Command './missing' was not found.
+1:8: error: Command './missing' was not found.
      1 |  exec ./missing/../existing/
        |         ^~~~~~~
 == command path preserves symlink traversal:
@@ -110,12 +110,12 @@ symlink-target
 <tmp>/cdpath/sibling
 raw traversal missing=1 caret=1 executed=0
 == CDPATH physical traversal preserves symlink semantics:
-kosh: 1:15: error: The directory 'link/../sibling' does not exist.
+1:15: error: The directory 'link/../sibling' does not exist.
      1 |  cd -P link/../sibling && pwd
        |                ^~~~~~~
 note: Check the spelling or create it with `mkdir -p`.
 == native separator:
-kosh: 1:13: error: The directory 'project/nseted' does not exist.
+1:13: error: The directory 'project/nseted' does not exist.
      1 |  cd 'project/nseted/tail'
        |              ^~~~~~
 note: Did you mean `project/nested`?

@@ -35,6 +35,8 @@ class AnalysisContext
 public:
   StringView source;
   bool has_fatal{false};
+  usize reported_warning_count{0};
+  usize reported_error_count{0};
   u8 warning_level{0};
   bool is_default_mood{true};
   bool should_emit_annoying_diagnostics{true};
@@ -135,6 +137,7 @@ public:
                        Maybe<SourceLocation> related_location = None) throws
       -> void;
   fn flush_warnings() throws -> void;
+  fn print_diagnostic_summary() const throws -> void;
   pure fn is_diagnostic_suppressed(diagnostic_id id,
                                    SourceLocation location) const wontthrow
       -> bool;

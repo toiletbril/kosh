@@ -24,7 +24,7 @@
   DoubleQuoted "x="
   Variable "x"
 ]
-kosh: 3:7: error: Builtin `unset`: Unable to unset 'x' because it is read only.
+3:7: error: Builtin `unset`: Unable to unset 'x' because it is read only.
      3 |  unset x
        |        ^
 x=1

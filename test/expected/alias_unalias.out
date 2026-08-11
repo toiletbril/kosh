@@ -133,7 +133,7 @@
 alias greet='echo hello'
 hello
 rm=0
-kosh: 10:1: error: Builtin `unalias`: The alias 'missing' was not found.
+10:1: error: Builtin `unalias`: The alias 'missing' was not found.
     10 |  unalias missing 2>&1; echo "miss=$?"
        |  ^~~~~~~~~~~~~~~
 miss=1

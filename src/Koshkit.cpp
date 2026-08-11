@@ -162,10 +162,10 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
     show_message(e.to_string());
     return 1;
   } catch (const std::exception &e) {
-    show_message("kosh: " + String{util_name} + ": " + e.what());
+    show_message(String{util_name} + ": " + e.what());
     return 1;
   } catch (...) {
-    show_message("kosh: " + String{util_name} + ": unexpected error");
+    show_message(String{util_name} + ": unexpected error");
     return 1;
   }
 }
@@ -390,7 +390,7 @@ fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
-    print_error("kosh: " + String{message} + "\n");
+    print_error(String{message} + "\n");
 }
 
 fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,

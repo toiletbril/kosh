@@ -81,7 +81,7 @@
 [Word
   Unquoted "}"
 ]
-kosh: 4:11: warning: An unquoted variable can split into words and expand globs.
+4:11: warning: An unquoted variable can split into words and expand globs.
      4 |  y=5; echo x${y}z
        |            ^~~~~~
 note: Quote the expansion to keep one argument.

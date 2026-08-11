@@ -32,7 +32,6 @@ static fn report_break_out_of_range(const ExecContext &ec, EvalContext &cxt,
     show_message(located.to_string(source->view(), &cxt));
   } else {
     let fallback = String{cxt.scratch_allocator()};
-    fallback += "kosh: ";
     fallback.append(message.view());
     fallback += "\n";
     print_error(fallback.view());

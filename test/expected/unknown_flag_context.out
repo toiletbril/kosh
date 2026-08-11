@@ -1,10 +1,10 @@
 == builtin unknown flag carries the Builtin prefix:
-kosh: 1:8: error: Builtin `enable`: Unknown flag '--badflag'.
+1:8: error: Builtin `enable`: Unknown flag '--badflag'.
      1 |  enable --badflag
        |         ^~~~~~~~~
 note: Use `--` before an operand that begins with a dash.
 == koshkit unknown flag carries the koshkit util prefix:
-kosh: 1:12: error: koshkit ls: Unknown flag '--dasdas'.
+1:12: error: koshkit ls: Unknown flag '--dasdas'.
      1 |  koshkit ls --dasdas
        |             ^~~~~~~~
 note: Use `--` before an operand that begins with a dash.

@@ -919,7 +919,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       if (preflight_status.has_value()) {
         let const error =
             ErrorWithLocation{preflight_location, preflight_message.view()};
-        let diagnostic = String{cxt.scratch_allocator(), "kosh: "};
+        let diagnostic = String{cxt.scratch_allocator()};
         diagnostic += error.to_string(
             source != nullptr ? source->view() : StringView{}, &cxt);
         diagnostic.push('\n');

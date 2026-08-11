@@ -24,7 +24,7 @@
   Unquoted "not-reached"
 ]
 before
-kosh: 3:10: warning: The variable 'nope' is not set, it expands to empty.
+3:10: warning: The variable 'nope' is not set, it expands to empty.
      3 |  echo "${#nope}"
        |           ^~~~
 note: Replace it with ${nope-} if empty expansion is desired.

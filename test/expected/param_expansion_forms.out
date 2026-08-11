@@ -562,7 +562,7 @@
 [Word
   Variable "v%%"*"*"
 ]
-kosh: 46:47: warning: An unquoted variable can split into words and expand globs.
+46:47: warning: An unquoted variable can split into words and expand globs.
     46 |  a=b; b=hi; foo1=1; foo2=2; echo "${!a}"; echo ${!foo*}
        |                                                ^~~~~~~~
 note: Quote the expansion to keep one argument.

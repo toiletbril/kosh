@@ -46,51 +46,52 @@
   Unquoted "c"
   Variable "d"
 ]
-kosh: 2:3: warning: An unquoted variable can split into words and expand globs.
+2:3: warning: An unquoted variable can split into words and expand globs.
      2 |  : $foo ${bar}
        |    ^~~~
 note: Quote the expansion to keep one argument.
-kosh: 2:8: warning: An unquoted variable can split into words and expand globs.
+2:8: warning: An unquoted variable can split into words and expand globs.
      2 |  : $foo ${bar}
        |         ^~~~~~
 note: Quote the expansion to keep one argument.
-kosh: 4:3: warning: An unquoted variable can split into words and expand globs.
+4:3: warning: An unquoted variable can split into words and expand globs.
      4 |  : pre$foo "lead${bar}tail"
        |    ^~~~~~~
 note: Quote the expansion to keep one argument.
-kosh: 5:3: warning: An unquoted variable can split into words and expand globs.
+5:3: warning: An unquoted variable can split into words and expand globs.
      5 |  : a${b}c$d
        |    ^~~~~~~~
 note: Quote the expansion to keep one argument.
-kosh: 2:3: warning: The variable 'foo' is not set, it expands to empty.
+Encountered 4 warnings.
+2:3: warning: The variable 'foo' is not set, it expands to empty.
      2 |  : $foo ${bar}
        |    ^~~~
 note: Replace it with ${foo-} if empty expansion is desired.
-kosh: 2:8: warning: The variable 'bar' is not set, it expands to empty.
+2:8: warning: The variable 'bar' is not set, it expands to empty.
      2 |  : $foo ${bar}
        |         ^~~~~~
 note: Replace it with ${bar-} if empty expansion is desired.
-kosh: 3:4: warning: The variable 'foo' is not set, it expands to empty.
+3:4: warning: The variable 'foo' is not set, it expands to empty.
      3 |  : "$foo" "${bar}"
        |     ^~~~
 note: Replace it with ${foo-} if empty expansion is desired.
-kosh: 3:11: warning: The variable 'bar' is not set, it expands to empty.
+3:11: warning: The variable 'bar' is not set, it expands to empty.
      3 |  : "$foo" "${bar}"
        |            ^~~~~~
 note: Replace it with ${bar-} if empty expansion is desired.
-kosh: 4:6: warning: The variable 'foo' is not set, it expands to empty.
+4:6: warning: The variable 'foo' is not set, it expands to empty.
      4 |  : pre$foo "lead${bar}tail"
        |       ^~~~
 note: Replace it with ${foo-} if empty expansion is desired.
-kosh: 4:16: warning: The variable 'bar' is not set, it expands to empty.
+4:16: warning: The variable 'bar' is not set, it expands to empty.
      4 |  : pre$foo "lead${bar}tail"
        |                 ^~~~~~
 note: Replace it with ${bar-} if empty expansion is desired.
-kosh: 5:4: warning: The variable 'b' is not set, it expands to empty.
+5:4: warning: The variable 'b' is not set, it expands to empty.
      5 |  : a${b}c$d
        |     ^~~~
 note: Replace it with ${b-} if empty expansion is desired.
-kosh: 5:9: warning: The variable 'd' is not set, it expands to empty.
+5:9: warning: The variable 'd' is not set, it expands to empty.
      5 |  : a${b}c$d
        |          ^~
 note: Replace it with ${d-} if empty expansion is desired.

@@ -24,7 +24,7 @@
   Unquoted "not-reached"
 ]
 before
-kosh: 3:7: warning: The variable '1' is not set, it expands to empty.
+3:7: warning: The variable '1' is not set, it expands to empty.
      3 |  echo "$1"
        |        ^~
 note: Replace it with ${1-} if empty expansion is desired.

@@ -8,7 +8,7 @@
 3
 rc=0
 === sh mood, empty PATH, not found ===
-kosh: 1:8: error: Command 'seq' was not found.
+1:8: error: Command 'seq' was not found.
      1 |  PATH=; seq 3
        |         ^~~
 note: Did you mean `set`?
@@ -35,17 +35,17 @@ seq is a built-in utility
 === which reports the enabled fallback ===
 seq
 === a builtin name is not a koshkit utility ===
-kosh: 1:9: error: koshkit has no utility named 'echo'.
+1:9: error: koshkit has no utility named 'echo'.
      1 |  koshkit echo routed via koshkit
        |          ^~~~
 rc=1
 === the koshkit name does not recurse ===
-kosh: 1:9: error: koshkit has no utility named 'koshkit'.
+1:9: error: koshkit has no utility named 'koshkit'.
      1 |  koshkit koshkit
        |          ^~~~~~~
 rc=1
 === unknown utility errors ===
-kosh: 1:9: error: koshkit has no utility named 'nope'.
+1:9: error: koshkit has no utility named 'nope'.
      1 |  koshkit nope
        |          ^~~~
 rc=1

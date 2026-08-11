@@ -307,7 +307,7 @@
 [Word
   Unquoted "after"
 ]
-kosh: 7:25: warning: An unquoted variable can split into words and expand globs.
+7:25: warning: An unquoted variable can split into words and expand globs.
      7 |  for x in 1 2 3; do echo $x; break; done
        |                          ^~
 note: Quote the expansion to keep one argument.
@@ -320,7 +320,7 @@ end-continue
 loop_done
 after-break
 after-continue
-kosh: 18:24: error: break count '0' is out of range.
+18:24: error: break count '0' is out of range.
     18 |  for i in 1 2; do break 0; echo unreached; done
        |                         ^
 after

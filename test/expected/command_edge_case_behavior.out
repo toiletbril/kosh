@@ -5,12 +5,12 @@ x=hello
 == an unquoted heredoc leaves a dollar-single-quote literal:
 $'\n'
 == pkill rejects an empty pattern:
-kosh: 1:1: error: pkill requires a non-empty pattern.
+1:1: error: pkill requires a non-empty pattern.
      1 |  koshkit pkill ""
        |  ^~~~~~~~~~~~~~~~
 note: Pass a pattern, e.g. `pkill ssh`.
 == cp -r of a directory into itself is refused, not infinite:
-kosh: 1:1: error: cp: cannot copy 'sub' into itself.
+1:1: error: cp: cannot copy 'sub' into itself.
      1 |  koshkit cp -r sub sub
        |  ^~~~~~~~~~~~~~~~~~~~~
 note: The destination is inside the source directory.

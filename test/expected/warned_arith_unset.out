@@ -77,19 +77,19 @@
 [Word
   Unquoted "continued"
 ]
-kosh: 3:9: warning: The variable 'never_counted' is not set, it expands to empty.
+3:9: warning: The variable 'never_counted' is not set, it expands to empty.
      3 |  echo $((never_counted + 1))
        |          ^~~~~~~~~~~~~
 note: Replace it with ${never_counted-} if empty expansion is desired.
 1
 continued
-kosh: 8:6: warning: The glob pattern '*.zzz_nomatch_downgrade' matched no file, it expands to its literal text, which is rarely intended.
+8:6: warning: The glob pattern '*.zzz_nomatch_downgrade' matched no file, it expands to its literal text, which is rarely intended.
      8 |  echo *.zzz_nomatch_downgrade
        |       ^~~~~~~~~~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G '*.zzz_nomatch_downgrade' or relax with set +o failglob.
 *.zzz_nomatch_downgrade
 continued
-kosh: 12:13: warning: The variable 'never_piped' is not set, it expands to empty.
+12:13: warning: The variable 'never_piped' is not set, it expands to empty.
     12 |  echo "value=$never_piped" | cat
        |              ^~~~~~~~~~~~
 note: Replace it with ${never_piped-} if empty expansion is desired.

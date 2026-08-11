@@ -1,33 +1,33 @@
 --- plain ---
-kosh: 1:1: error: This file is not a directory.
+1:1: error: This file is not a directory.
 refused
 rc=126
 --- exec ---
-kosh: 1:6: error: This file is not a directory.
+1:6: error: This file is not a directory.
 refused
 rc=126
 --- timeout ---
-kosh: 1:19: error: koshkit timeout: This file is not a directory.
+1:19: error: koshkit timeout: This file is not a directory.
 refused
 rc=126
 --- timeout-pipeline ---
-kosh: 1:36: error: koshkit timeout: This file is not a directory.
+1:36: error: koshkit timeout: This file is not a directory.
 refused
 rc=126
 --- command ---
-kosh: 1:9: error: This file is not a directory.
+1:9: error: This file is not a directory.
 refused
 rc=126
 --- env ---
-kosh: 1:13: error: This file is not a directory.
+1:13: error: This file is not a directory.
 refused
 rc=126
 --- symlink ---
-kosh: 1:1: error: This file is not a directory.
+1:1: error: This file is not a directory.
 refused
 rc=126
 --- pipeline ---
-kosh: 1:18: error: This file is not a directory.
+1:18: error: This file is not a directory.
 refused
 rc=126
 --- directory remains a directory ---

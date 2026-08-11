@@ -146,7 +146,7 @@ child
 parent
 child
 cdpath=0
-kosh: 14:15: error: The directory '.test-work/nonexistent-xyz-dir' does not exist.
+14:15: error: The directory '.test-work/nonexistent-xyz-dir' does not exist.
     14 |  cd .test-work/nonexistent-xyz-dir 2>&-
        |                ^~~~~~~~~~~~~~~~~~~
 note: Check the spelling or create it with `mkdir -p`.

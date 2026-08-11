@@ -39,4 +39,4 @@ echo "== a forged PWD does not change the saved directory:"
 echo "== the home directory abbreviates to ~:"
 HOME="$dir" "$BIN" -c "cd '$dir' || exit; pushd '$dir/a'" 2>&1 | scrub
 echo "== popd on an empty stack reports an error:"
-"$BIN" -c "cd '$dir' || exit; popd" 2>&1 | scrub | sed 's/^kosh: [0-9]*:[0-9]*: //'
+"$BIN" -c "cd '$dir' || exit; popd" 2>&1 | scrub | sed 's/^[0-9]*:[0-9]*: //'

@@ -332,11 +332,11 @@ constexpr char REMOTE_PREFLIGHT_TEXT[] = R"SH(set -eu
 expected_system=$2
 expected_machine=$3
 if ! remote_system=$(uname -s 2>/dev/null); then
-  printf '%s\n' 'kosh: assimilate: Cannot determine the remote operating system.' >&2
+  printf '%s\n' 'assimilate: Cannot determine the remote operating system.' >&2
   exit 125
 fi
 if ! remote_machine=$(uname -m 2>/dev/null); then
-  printf '%s\n' 'kosh: assimilate: Cannot determine the remote architecture.' >&2
+  printf '%s\n' 'assimilate: Cannot determine the remote architecture.' >&2
   exit 125
 fi
 case $expected_machine in
@@ -352,7 +352,7 @@ machine_matches=0
 [ "$expected_system" = any ] || [ "$expected_system" = "$remote_system" ] || system_matches=1
 [ "$expected_machine" = any ] || [ "$expected_machine" = "$remote_machine" ] || machine_matches=1
 if [ "$system_matches" -ne 0 ] || [ "$machine_matches" -ne 0 ]; then
-  printf 'kosh: assimilate: Cannot install a %s/%s binary on %s/%s.\n' \
+  printf 'assimilate: Cannot install a %s/%s binary on %s/%s.\n' \
     "$expected_system" "$expected_machine" "$remote_system" "$remote_machine" >&2
   exit 126
 fi

@@ -37,7 +37,7 @@
   DoubleQuoted "] n="
   Variable "#"
 ]
-kosh: 2:25: warning: An unquoted variable can split into words and expand globs.
+2:25: warning: An unquoted variable can split into words and expand globs.
      2 |  IFS=:; x=a::b:c; set -- $x; echo "[$1][$2][$3][$4] n=$#"
        |                          ^~
 note: Quote the expansion to keep one argument.

@@ -93,6 +93,8 @@ fn AnalysisContext::warn(SourceLocation location, StringView message,
     return;
   }
 
+  reported_warning_count++;
+
   if (!should_trace_optimizer) {
     pending_warnings.push(
         pending_analysis_warning{location, String{message}, String{suggestion},
@@ -167,6 +169,41 @@ fn AnalysisContext::flush_warnings() throws -> void
     print_script_backtrace_if_rooted(warning.location);
   }
   pending_warnings.clear();
+}
+
+cold fn AnalysisContext::print_diagnostic_summary() const throws -> void
+{
+  if (reported_warning_count + reported_error_count < 2) return;
+
+  let const wants_color = colors::stderr_wants_color();
+  let const warning_color = wants_color ? colors::ansi::YELLOW : StringView{};
+  let const error_color =
+      wants_color ? colors::ansi::BOLD_BRIGHT_RED : StringView{};
+  let const reset = wants_color ? colors::ansi::RESET : StringView{};
+
+  let summary = String{"Encountered "};
+
+  if (reported_warning_count > 0) {
+    summary.append(warning_color);
+    summary.append(String::from(reported_warning_count, heap_allocator()));
+    summary.append(reported_warning_count == 1 ? " warning" : " warnings");
+    summary.append(reset);
+  }
+
+  if (reported_warning_count > 0 && reported_error_count > 0) {
+    summary.append(" and ");
+  }
+
+  if (reported_error_count > 0) {
+    summary.append(error_color);
+    summary.append(String::from(reported_error_count, heap_allocator()));
+    summary.append(reported_error_count == 1 ? " error" : " errors");
+    summary.append(reset);
+  }
+
+  summary.append(".");
+
+  show_message(summary.view());
 }
 
 fn AnalysisContext::report_diagnostic(
@@ -271,6 +308,7 @@ fn AnalysisContext::fail(SourceLocation location, StringView message,
   }
 
   flush_warnings();
+  reported_error_count++;
 
   if (related_location.has_value()) {
     let const located = ErrorWithLocation{location, message};
@@ -685,6 +723,8 @@ fn analyze_ast(const Expression *root, StringView source,
     summary.append(" compounds eliminated");
     actx.trace_optimizer_line(summary.view());
   }
+
+  actx.print_diagnostic_summary();
 
   return !actx.has_fatal;
 }

@@ -1,6 +1,6 @@
-kosh: 3:1: error: Unterminated string literal.
+3:1: error: Unterminated string literal.
      3 |  "unterminated
        |  ^~~~~~~~~~~~~
-kosh: 3:14: details:
+3:14: details:
      3 |  "unterminated
        |               ^ Expected " here.

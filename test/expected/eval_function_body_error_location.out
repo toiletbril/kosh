@@ -1,31 +1,31 @@
 == default mood, literal eval argument ==
-kosh: 1:32: warning: Command 'f' was not found.
+1:32: warning: Command 'f' was not found.
      1 |  eval "f(){ echo \$((1/0)); }"; f
        |                                 ^
 note: Did you mean ':'?
-kosh: eval:2:8: error: Division by zero.
+eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1
 == bash mood, literal eval argument ==
-kosh: eval:2:8: error: Division by zero.
+eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1
 == default mood, eval of a variable ==
-kosh: 1:61: warning: Command 'h' was not found.
+1:61: warning: Command 'h' was not found.
      1 |  code=$(printf "%s" "h(){ echo \$((1/0)); }"); eval "$code"; h
        |                                                              ^
 note: Did you mean ':'?
-kosh: eval:2:8: error: Division by zero.
+eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.
 rc=1
 == bash mood, function keyword form ==
-kosh: eval:2:8: error: Division by zero.
+eval:2:8: error: Division by zero.
      2 |  { echo $((1/0)); }
        |         ^~~~~~~~
 note: The right operand evaluated to 0.

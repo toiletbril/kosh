@@ -69,25 +69,26 @@
 [Word
   Unquoted "done"
 ]
-kosh: 6:8: warning: An echo -e relies on a bash builtin, the POSIX echo prints the flag as text.
+6:8: warning: An echo -e relies on a bash builtin, the POSIX echo prints the flag as text.
      6 |    echo -e escaped
        |         ^~
 note: Use printf instead under a sh shebang.
-kosh: 7:8: warning: An echo -n relies on a bash builtin, the POSIX echo prints the flag as text.
+7:8: warning: An echo -n relies on a bash builtin, the POSIX echo prints the flag as text.
      7 |    echo -n nonewline
        |         ^~
 note: Use printf instead under a sh shebang.
-kosh: 8:3: warning: The declare builtin is not in POSIX.
+8:3: warning: The declare builtin is not in POSIX.
      8 |    declare -A assoc
        |    ^~~~~~~
 note: Assign the variable plainly under a sh shebang, or switch the shebang to bash.
-kosh: 9:3: warning: The typeset builtin is not in POSIX.
+9:3: warning: The typeset builtin is not in POSIX.
      9 |    typeset scoped
        |    ^~~~~~~
 note: Assign the variable plainly under a sh shebang, or switch the shebang to bash.
-kosh: 10:3: warning: The name source is the bash spelling, the POSIX dot command is '.'.
+10:3: warning: The name source is the bash spelling, the POSIX dot command is '.'.
     10 |    source library.sh
        |    ^~~~~~
 note: Use '.' under a sh shebang.
+Encountered 5 warnings.
 done
 [Code 0]

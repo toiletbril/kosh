@@ -40,10 +40,10 @@
 [Word
   Unquoted "after"
 ]
-kosh: 2:5: warning: == is undefined in POSIX test.
+2:5: warning: == is undefined in POSIX test.
      2 |  [ x == x ] && echo eq || echo neq
        |      ^~
 note: Use = for string equality.
-kosh: 2:3: error: Builtin `[`: '==' is a bashism, use = for string equality in POSIX mode.
+2:3: error: Builtin `[`: '==' is a bashism, use = for string equality in POSIX mode.
      2 |  [ x == x ] && echo eq || echo neq
        |    ^

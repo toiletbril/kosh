@@ -1,6 +1,6 @@
-kosh: 2:1: error: Unterminated case.
+2:1: error: Unterminated case.
      2 |  case x in
        |  ^~~~
-kosh: 2:10: details:
+2:10: details:
      2 |  case x in
        |           ^ expected a pattern to start an arm, or 'esac' to end the case.
