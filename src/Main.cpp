@@ -397,6 +397,8 @@ static fn run_script_contents(const String &script_contents,
         ArrayList<analysis_scope_definition>{heap_allocator()};
     let shellcheck_directive_spans =
         ArrayList<shellcheck_directive_span>{heap_allocator()};
+    let heredoc_terminator_misses =
+        ArrayList<heredoc_terminator_miss>{heap_allocator()};
 
     /* POSIX and bash mode skip the analysis stage, -W forces it on as warnings,
        and --no-diagnostics always skips it. The live context is read so a mood
@@ -447,6 +449,7 @@ static fn run_script_contents(const String &script_contents,
       shellcheck_suppressions = p.take_shellcheck_suppressions();
       analysis_scope_definitions = p.take_analysis_scope_definitions();
       shellcheck_directive_spans = p.take_shellcheck_directive_spans();
+      heredoc_terminator_misses = p.take_heredoc_terminator_misses();
     }
 
     LOG(Debug, "the analysis stage %s for this chunk",
@@ -476,7 +479,8 @@ static fn run_script_contents(const String &script_contents,
           context.mood() == mimic_mood::Default,
           context.annoying_diagnostics_enabled(), shellcheck_suppressions,
           analysis_scope_definitions, shellcheck_directive_spans,
-          filename.has_value(), FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+          heredoc_terminator_misses, filename.has_value(),
+          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",

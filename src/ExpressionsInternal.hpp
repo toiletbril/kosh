@@ -173,6 +173,13 @@ fn check_shellcheck_directives(
     AnalysisContext &actx, StringView source,
     const ArrayList<shellcheck_directive_span> &directives) throws -> void;
 
+/* The terminator findings the lexer recorded for a here-document that ran to
+   the end of the source. The list is empty for a script whose here-documents
+   all closed. */
+fn check_heredoc_terminators(
+    AnalysisContext &actx, StringView source,
+    const ArrayList<heredoc_terminator_miss> &misses) throws -> void;
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;

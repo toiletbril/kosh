@@ -19,10 +19,39 @@ namespace koshka {
    diagnostic_delivery::delivery}
 
 const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
+    D(1000, "literal-dollar-in-quotes",
+      "a literal dollar sign is written with a backslash",
+      "The double-quoted string ends right after `$`, so the shell reads the "
+      "dollar sign as ordinary text",
+      "Write `\\$` inside the quotes and keep the string in one piece", None,
+      Annoying, Policy),
+    D(1001, "ineffective-escape", "the backslash before a letter is dropped",
+      "The escape '{0}' has no meaning here, so the shell reads it as a plain "
+      "'{1}'",
+      "Quote the backslash, or build the byte with `printf`", None, Annoying,
+      Policy),
+    D(1003, "escaped-single-quote",
+      "a single-quoted string cannot hold a single quote",
+      "A backslash carries no meaning inside single quotes, so this one closes "
+      "the string and stays in the text",
+      "Write the quote as `'\\''` outside the single-quoted run", None,
+      Annoying, Policy),
+    D(1004, "escaped-newline-in-quotes",
+      "a backslash inside single quotes does not continue the line",
+      "The backslash and the line ending are both kept in the single-quoted "
+      "text",
+      "Close the quote, break the line, and reopen the quote", None, Annoying,
+      Policy),
     D(1008, "unrecognized-shebang", "the shebang names an unknown interpreter",
       "The shebang names '{0}', which is not a shell this analysis knows",
       "Name a shell such as `sh` or `bash` in the shebang", None, Annoying,
       Policy),
+    D(1012, "literal-control-escape",
+      "the backslash before a control letter is dropped",
+      "The escape '{0}' has no meaning here, so the shell reads it as a plain "
+      "'{1}'",
+      "Build the byte with `printf`, or write it inside `$'...'`", None,
+      Annoying, Policy),
     D(1014, "direct-command-in-test",
       "if runs a command directly, not inside test brackets",
       "Test brackets do not run the command written inside them",
@@ -57,6 +86,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a positional parameter above nine needs braces",
       "A positional parameter above nine needs braces",
       "Write ${10} to select positional parameter 10", None, Strict, Policy),
+    D(1039, "indented-heredoc-terminator",
+      "the here-document terminator carries indentation",
+      "The line holding '{0}' is indented, so it does not close the "
+      "here-document and the rest of the file is read as body text",
+      "Move the terminator to the first column", None, Strict, Policy),
+    D(1040, "tab-indented-heredoc-terminator",
+      "the here-document terminator carries indentation",
+      "The line holding '{0}' is indented with tabs, so it does not close the "
+      "here-document and the rest of the file is read as body text",
+      "Write `<<-` in place of `<<` to strip the leading tabs", None, Strict,
+      Policy),
     D(1082, "byte-order-mark", "a byte-order mark precedes the script",
       "A UTF-8 byte-order mark precedes the script text",
       "Save the script as UTF-8 without a byte-order mark", None, Strict,
@@ -68,6 +108,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The Unicode dash '{0}' is not the ASCII minus, so the shell reads it as "
       "ordinary text",
       "Delete it and retype an ASCII minus", None, Strict, Policy),
+    D(1101, "blank-after-continuation",
+      "a line continuation ends the line at the backslash",
+      "A blank follows the backslash, so the backslash escapes that blank and "
+      "the line does not continue",
+      "Delete the blanks between the backslash and the line ending", None,
+      Annoying, Policy),
     D(1104, "shebang-missing-hash", "the shebang is missing its hash",
       "The first line begins with `!`, a shebang begins with `#!`",
       "Write `#!` at the start of the line", None, Strict, Policy),
@@ -111,6 +157,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "the shebang holds a space between its characters",
       "A space separates `#` from `!`, so the line is an ordinary comment",
       "Write `#!` with nothing between them", None, Strict, Policy),
+    D(1118, "blank-after-heredoc-terminator",
+      "the here-document terminator stands alone on its line",
+      "A blank follows '{0}', so the line does not close the here-document and "
+      "the rest of the file is read as body text",
+      "Delete the blanks that follow the terminator", None, Strict, Policy),
     D(1123, "directive-before-clause",
       "a directive belongs before a complete command",
       "The directive sits before '{0}', which continues the command above it, "
@@ -136,6 +187,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The shebang is not on the first line, so it is an ordinary comment",
       "Move the shebang to the first line and keep the comments below it", None,
       Strict, Policy),
+    D(1135, "quote-break-for-dollar",
+      "a literal dollar sign is written with a backslash",
+      "The double-quoted string is closed right after `$` so the dollar sign "
+      "stays literal, and the word continues after it",
+      "Write `\\$` inside the quotes and keep the string in one piece", None,
+      Annoying, Policy),
+    D(1143, "continuation-in-comment",
+      "a comment does not continue onto the next line",
+      "The backslash closes a comment, so the command above it ends here",
+      "Move the comment above the command, or wrap it in `` `# ...` ``", None,
+      Annoying, Policy),
     D(2000, "echo-piped-into-wc",
       "the shell knows a string length without a pipeline",
       "The `echo` output is counted by `wc`, where the shell knows the length "
@@ -4964,6 +5026,58 @@ enum class source_scan_state : u8
   Comment,
 };
 
+constexpr u8 SCAN_ACTS_NORMAL = 1U << 0U;
+constexpr u8 SCAN_ACTS_SINGLE_QUOTED = 1U << 1U;
+constexpr u8 SCAN_ACTS_DOUBLE_QUOTED = 1U << 2U;
+constexpr u8 SCAN_ACTS_COMMENT = 1U << 3U;
+constexpr u8 SCAN_ACTS_EVERYWHERE = SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED |
+                                    SCAN_ACTS_DOUBLE_QUOTED | SCAN_ACTS_COMMENT;
+
+struct source_scan_table
+{
+  u8 acting_states[256];
+};
+
+/* The states in which a byte changes the scan below. A run of bytes that acts
+   in no state is stepped over at once, which keeps a long word, a long comment,
+   and a long quoted string off the per-byte dispatch. */
+consteval fn build_source_scan_table() -> source_scan_table
+{
+  source_scan_table table{};
+
+  for (usize byte = 0x80; byte < 256; byte++)
+    table.acting_states[byte] = SCAN_ACTS_EVERYWHERE;
+
+  table.acting_states[static_cast<u8>('\r')] = SCAN_ACTS_EVERYWHERE;
+  table.acting_states[static_cast<u8>('\n')] = SCAN_ACTS_EVERYWHERE;
+  table.acting_states[static_cast<u8>('\\')] =
+      SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED | SCAN_ACTS_DOUBLE_QUOTED;
+  table.acting_states[static_cast<u8>('\'')] =
+      SCAN_ACTS_NORMAL | SCAN_ACTS_SINGLE_QUOTED;
+  table.acting_states[static_cast<u8>('"')] =
+      SCAN_ACTS_NORMAL | SCAN_ACTS_DOUBLE_QUOTED;
+
+  for (let const byte : "#< \t;&|()")
+    table.acting_states[static_cast<u8>(byte)] |= SCAN_ACTS_NORMAL;
+
+  return table;
+}
+
+constexpr source_scan_table SOURCE_SCAN = build_source_scan_table();
+
+alwaysinline pure fn skip_plain_bytes(StringView source, usize at,
+                                      u8 acting_state) wontthrow -> usize
+{
+  while (at + 1 < source.length &&
+         (SOURCE_SCAN.acting_states[static_cast<u8>(source[at + 1])] &
+          acting_state) == 0)
+  {
+    at++;
+  }
+
+  return at;
+}
+
 enum class homoglyph_kind : u8
 {
   None,
@@ -4982,14 +5096,18 @@ struct decoded_codepoint
 constexpr u64 HIGH_BITS = 0x8080808080808080ULL;
 constexpr u64 LOW_BITS = 0x0101010101010101ULL;
 constexpr u64 CARRIAGE_RETURNS = 0x0d0d0d0d0d0d0d0dULL;
+constexpr u64 BACKSLASHES = 0x5c5c5c5c5c5c5c5cULL;
+
+alwaysinline pure fn chunk_holds_byte(u64 chunk, u64 repeated) wontthrow -> u64
+{
+  let const differences = chunk ^ repeated;
+  return (differences - LOW_BITS) & ~differences & HIGH_BITS;
+}
 
 alwaysinline pure fn chunk_holds_scanned_byte(u64 chunk) wontthrow -> bool
 {
-  let const differences = chunk ^ CARRIAGE_RETURNS;
-  let const holds_carriage_return =
-      (differences - LOW_BITS) & ~differences & HIGH_BITS;
-
-  return ((chunk & HIGH_BITS) | holds_carriage_return) != 0;
+  return ((chunk & HIGH_BITS) | chunk_holds_byte(chunk, CARRIAGE_RETURNS) |
+          chunk_holds_byte(chunk, BACKSLASHES)) != 0;
 }
 
 /* Whether the source holds a byte the classification below could report. A
@@ -5007,7 +5125,7 @@ pure fn source_holds_scanned_byte(StringView source) wontthrow -> bool
 
   for (; at < source.length; at++) {
     let const byte = static_cast<u8>(source[at]);
-    if (byte >= 0x80 || byte == '\r') return true;
+    if (byte >= 0x80 || byte == '\r' || byte == '\\') return true;
   }
 
   return false;
@@ -5244,6 +5362,45 @@ pure fn skip_here_document(StringView source, usize at) wontthrow -> usize
   return source.length;
 }
 
+pure fn byte_is_ascii_letter(char byte) wontthrow -> bool
+{
+  return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z');
+}
+
+/* The letters whose escape reads as a control byte in other languages. */
+pure fn escape_names_control_byte(char byte) wontthrow -> bool
+{
+  switch (byte) {
+  case 'n':
+  case 'r':
+  case 't': return true;
+
+  default: return false;
+  }
+}
+
+fn escape_spelling(char escaped) throws -> String
+{
+  let spelling = String{"\\"};
+  spelling.push(escaped);
+
+  return spelling;
+}
+
+/* Whether the line ending just above the given line start carries a
+   continuation, which is what makes a commented-out backslash matter. */
+pure fn line_above_continues(StringView source, usize line_start) wontthrow
+    -> bool
+{
+  if (line_start < 2) return false;
+  if (source[line_start - 1] != '\n') return false;
+
+  usize ending = line_start - 1;
+  if (source[ending - 1] == '\r') ending--;
+
+  return ending > 0 && source[ending - 1] == '\\';
+}
+
 } /* namespace */
 
 fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
@@ -5252,6 +5409,9 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
 
   let state = source_scan_state::Normal;
   let was_carriage_return_reported = false;
+  let is_command_position = true;
+  usize comment_line_start = 0;
+  usize line_start = 0;
   usize at = 0;
 
   while (at < source.length) {
@@ -5281,46 +5441,142 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
     switch (state) {
     case source_scan_state::Normal:
       switch (byte) {
-      case '\'': state = source_scan_state::SingleQuoted; break;
-      case '"': state = source_scan_state::DoubleQuoted; break;
-      case '\\': at++; break;
+      case '\'':
+        state = source_scan_state::SingleQuoted;
+        is_command_position = false;
+        break;
+
+      case '"':
+        state = source_scan_state::DoubleQuoted;
+        is_command_position = false;
+        break;
+
+      case '\\': {
+        let const escaped = at + 1 < source.length ? source[at + 1] : '\0';
+
+        if (escaped == ' ' || escaped == '\t') {
+          usize blank_end = at + 1;
+          while (blank_end < source.length &&
+                 (source[blank_end] == ' ' || source[blank_end] == '\t'))
+          {
+            blank_end++;
+          }
+
+          if (blank_end < source.length && source[blank_end] == '\n') {
+            actx.report_diagnostic(diagnostic_id::sc1101,
+                                   SourceLocation{at, blank_end - at});
+          }
+        } else if (byte_is_ascii_letter(escaped) && !is_command_position) {
+          let const spelling = escape_spelling(escaped);
+          actx.report_diagnostic(
+              escape_names_control_byte(escaped) ? diagnostic_id::sc1012
+                                                 : diagnostic_id::sc1001,
+              SourceLocation{at, 2},
+              {spelling.view(), source.substring_of_length(at + 1, 1)});
+        }
+
+        is_command_position = false;
+        at++;
+        break;
+      }
 
       case '#':
-        if (at == 0 || byte_precedes_comment(source[at - 1]))
+        if (at == 0 || byte_precedes_comment(source[at - 1])) {
           state = source_scan_state::Comment;
+          comment_line_start = line_start;
+        }
         break;
 
       case '<':
+        is_command_position = false;
         if (at + 2 < source.length && source[at + 1] == '<' &&
             source[at + 2] != '<')
         {
           at = skip_here_document(source, at);
+          line_start = at;
+          while (line_start > 0 && source[line_start - 1] != '\n')
+            line_start--;
           continue;
         }
         break;
 
-      default: break;
+      case ' ':
+      case '\t':
+      case '\r': break;
+
+      case '\n':
+      case ';':
+      case '&':
+      case '|':
+      case '(':
+      case ')': is_command_position = true; break;
+
+      default:
+        is_command_position = false;
+        at = skip_plain_bytes(source, at, SCAN_ACTS_NORMAL);
+        break;
       }
       break;
 
     case source_scan_state::SingleQuoted:
-      if (byte == '\'') state = source_scan_state::Normal;
+      switch (byte) {
+      case '\'': state = source_scan_state::Normal; break;
+
+      /* The backslash carries no meaning here, so the byte behind it is read
+         as source and the scan does not step over it. */
+      case '\\':
+        if (at + 1 < source.length) {
+          if (source[at + 1] == '\'') {
+            actx.report_diagnostic(diagnostic_id::sc1003,
+                                   SourceLocation{at, 2});
+          } else if (source[at + 1] == '\n' && at > 0) {
+            /* The caret reaches back one byte because a span that opens on a
+               continuation is rendered against the line below it. */
+            actx.report_diagnostic(diagnostic_id::sc1004,
+                                   SourceLocation{at - 1, 2});
+          }
+        }
+        break;
+
+      default:
+        at = skip_plain_bytes(source, at, SCAN_ACTS_SINGLE_QUOTED);
+        break;
+      }
       break;
 
     case source_scan_state::DoubleQuoted:
       switch (byte) {
       case '"': state = source_scan_state::Normal; break;
       case '\\': at++; break;
-      default: break;
+
+      default:
+        at = skip_plain_bytes(source, at, SCAN_ACTS_DOUBLE_QUOTED);
+        break;
       }
       break;
 
     case source_scan_state::Comment:
-      if (byte == '\n') state = source_scan_state::Normal;
+      if (byte != '\n') {
+        at = skip_plain_bytes(source, at, SCAN_ACTS_COMMENT);
+        break;
+      }
+
+      if (at > 1 && source[at - 1] == '\\' &&
+          line_above_continues(source, comment_line_start))
+      {
+        actx.report_diagnostic(diagnostic_id::sc1143,
+                               SourceLocation{at - 2, 2});
+      }
+
+      state = source_scan_state::Normal;
+      is_command_position = true;
       break;
     }
 
+    /* An escape case consumes its escaped byte, so the last consumed byte is
+       read rather than the byte the state switch dispatched on. */
     at++;
+    if (source[at - 1] == '\n') line_start = at;
   }
 }
 
@@ -5784,6 +6040,36 @@ fn check_shellcheck_directives(
       actx.report_diagnostic(
           diagnostic_id::sc1124,
           SourceLocation{directive.position, directive.length});
+    }
+  }
+}
+
+fn check_heredoc_terminators(
+    AnalysisContext &actx, StringView source,
+    const ArrayList<heredoc_terminator_miss> &misses) throws -> void
+{
+  for (let const &miss : misses) {
+    let const terminator =
+        source.substring_of_length(miss.position, miss.length);
+
+    switch (miss.kind) {
+    case heredoc_miss_kind::IndentedTerminator:
+      actx.report_diagnostic(diagnostic_id::sc1039,
+                             SourceLocation{miss.position, miss.length},
+                             {terminator});
+      break;
+
+    case heredoc_miss_kind::TabIndentedTerminator:
+      actx.report_diagnostic(diagnostic_id::sc1040,
+                             SourceLocation{miss.position, miss.length},
+                             {terminator});
+      break;
+
+    case heredoc_miss_kind::TrailingBlankTerminator:
+      actx.report_diagnostic(diagnostic_id::sc1118,
+                             SourceLocation{miss.position, miss.length},
+                             {terminator});
+      break;
     }
   }
 }

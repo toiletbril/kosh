@@ -211,6 +211,7 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
                const ArrayList<analysis_scope_definition> &scope_definitions,
                const ArrayList<shellcheck_directive_span> &directive_spans,
+               const ArrayList<heredoc_terminator_miss> &heredoc_misses,
                bool is_named_script_file,
                bool show_optimizer_state = false) throws -> bool;
 

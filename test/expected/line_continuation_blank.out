@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "one" " "]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "two"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Literal " "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "two"
+]
+one  
+two
+[Code 0]

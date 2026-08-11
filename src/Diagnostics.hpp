@@ -21,7 +21,12 @@ enum class diagnostic_delivery : u8
 
 enum class diagnostic_id : u16
 {
+  sc1000,
+  sc1001,
+  sc1003,
+  sc1004,
   sc1008,
+  sc1012,
   sc1014,
   sc1017,
   sc1018,
@@ -30,9 +35,12 @@ enum class diagnostic_id : u16
   sc1029,
   sc1035,
   sc1037,
+  sc1039,
+  sc1040,
   sc1082,
   sc1084,
   sc1100,
+  sc1101,
   sc1104,
   sc1106,
   sc1107,
@@ -42,11 +50,14 @@ enum class diagnostic_id : u16
   sc1113,
   sc1114,
   sc1115,
+  sc1118,
   sc1123,
   sc1124,
   sc1125,
   sc1126,
   sc1128,
+  sc1135,
+  sc1143,
   sc2000,
   sc2001,
   sc2002,
@@ -344,6 +355,22 @@ struct shellcheck_directive_span
 {
   usize position;
   usize length;
+};
+
+enum class heredoc_miss_kind : u8
+{
+  IndentedTerminator,    /* a blank other than a stripped tab leads the line */
+  TabIndentedTerminator, /* tabs lead the line and `<<-` was not written */
+  TrailingBlankTerminator, /* a blank follows the token */
+};
+
+/* A body line that reads as the terminator once its blanks are removed, kept
+   only for a here-document that ran to the end of the source. */
+struct heredoc_terminator_miss
+{
+  usize position;
+  usize length;
+  heredoc_miss_kind kind;
 };
 
 enum class shellcheck_selector_kind

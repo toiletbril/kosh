@@ -30,6 +30,11 @@ public:
   {
     return m_lexer.take_shellcheck_directive_spans();
   }
+  fn take_heredoc_terminator_misses() throws
+      -> ArrayList<heredoc_terminator_miss>
+  {
+    return m_lexer.take_heredoc_terminator_misses();
+  }
 
   fn set_should_collect_analysis_scopes(bool should_collect) wontthrow -> void
   {

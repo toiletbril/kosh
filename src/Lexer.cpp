@@ -229,6 +229,15 @@ fn Lexer::take_shellcheck_directive_spans() throws
   return spans;
 }
 
+fn Lexer::take_heredoc_terminator_misses() throws
+    -> ArrayList<heredoc_terminator_miss>
+{
+  let misses = steal(m_heredoc_terminator_misses);
+  m_heredoc_terminator_misses =
+      ArrayList<heredoc_terminator_miss>{heap_allocator()};
+  return misses;
+}
+
 pure fn Lexer::is_at_source_end() const wontthrow -> bool
 {
   return m_cursor_position >= m_source.length();
@@ -291,6 +300,11 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
     -> usize
 {
   usize position = start;
+  bool did_find_delimiter = false;
+  bool has_near_miss = false;
+  heredoc_terminator_miss near_miss{0, 0,
+                                    heredoc_miss_kind::IndentedTerminator};
+
   loop
   {
     if (position >= m_source.length()) break;
@@ -315,10 +329,50 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
     const let stripped =
         m_source.substring_of_length(stripped_offset, stripped_length);
     const bool is_delimiter = (delimiter == stripped);
+    did_find_delimiter = did_find_delimiter || is_delimiter;
+
+    if (!is_delimiter && !has_near_miss && line_length > delimiter.length) {
+      usize content_start = line_offset;
+      usize content_end = line_offset + line_length;
+      while (content_start < content_end && (m_source[content_start] == ' ' ||
+                                             m_source[content_start] == '\t'))
+      {
+        content_start++;
+      }
+      while (content_end > content_start &&
+             (m_source[content_end - 1] == ' ' ||
+              m_source[content_end - 1] == '\t' ||
+              m_source[content_end - 1] == '\r'))
+      {
+        content_end--;
+      }
+
+      if (content_end - content_start == delimiter.length &&
+          m_source.substring_of_length(content_start, delimiter.length) ==
+              delimiter)
+      {
+        let const leading_length = content_start - line_offset;
+        let is_tab_indentation = leading_length > 0;
+        for (usize at = line_offset; at < content_start; at++)
+          is_tab_indentation = is_tab_indentation && m_source[at] == '\t';
+
+        has_near_miss = true;
+        near_miss = heredoc_terminator_miss{
+            content_start, delimiter.length,
+            leading_length == 0  ? heredoc_miss_kind::TrailingBlankTerminator
+            : is_tab_indentation ? heredoc_miss_kind::TabIndentedTerminator
+                                 : heredoc_miss_kind::IndentedTerminator};
+      }
+    }
+
     const let raw = m_source.substring_of_length(line_offset, line_length);
     if (!emit_line(raw, has_newline, is_delimiter)) break;
     if (!has_newline) break;
   }
+
+  if (!did_find_delimiter && has_near_miss)
+    m_heredoc_terminator_misses.push(near_miss);
+
   return position;
 }
 

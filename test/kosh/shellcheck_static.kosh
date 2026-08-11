@@ -423,3 +423,17 @@ source_byte_diagnostics() {
   echo spaced word
   echo 'carriagereturn'
 }
+
+escape_style_diagnostics() {
+  echo Yay \o/
+  spacing=foo\tbar
+  echo 'no way it\'
+  quoted='long \
+text'
+  echo "The apples are $""1 each"
+  echo "$"
+  \ls -l
+  sed \
+  # -e "middle" \
+  -e x file
+}

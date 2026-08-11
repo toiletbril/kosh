@@ -1,0 +1,4 @@
+echo before
+: <<EOF
+echo body
+  EOF

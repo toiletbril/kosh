@@ -1,0 +1,3 @@
+test/expected/*.out -whitespace
+test/kosh/heredoc_terminator_blank.kosh -whitespace
+test/kosh/line_continuation_blank.kosh -whitespace

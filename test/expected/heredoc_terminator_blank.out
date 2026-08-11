@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "EOF"
+]
+4:1: warning: A blank follows 'EOF', so the line does not close the here-document and the rest of the file is read as body text.
+     4 |  EOF 
+       |  ^~~
+note: Delete the blanks that follow the terminator.
+before
+[Code 0]

@@ -935,6 +935,29 @@
             [SimpleCommand "echo" "spaced word"]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "carriagereturn"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "escape_style_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "Yay" "o/"]
+          [CompoundListCondition, None]
+            [Assign spacing=footbar]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "no way it\"]
+          [CompoundListCondition, None]
+            [Assign quoted=long \
+text]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "The apples are $1 each"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ls" "-l"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sed"]
+          [CompoundListCondition, None]
+            [SimpleCommand "-e" "x" "file"]
 [Word
   Unquoted "lint_only"
 ]
@@ -4470,6 +4493,72 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "escape_style_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "Yay"
+]
+[Word
+  Literal "o"
+  Unquoted "/"
+]
+[Word
+  Unquoted "spacing=foo"
+  Literal "t"
+  Unquoted "bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "no way it\"
+]
+[Word
+  Unquoted "quoted="
+  Literal "long \
+text"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "The apples are $1 each"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "$"
+]
+[Word
+  Literal "l"
+  Unquoted "s"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "}"
+]
 416:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
    416 |    echo “curly”
        |         ^
@@ -4506,6 +4595,26 @@ note: Delete it and retype an ASCII space.
    424 |    echo 'carriagereturn'
        |                  ^
 note: Convert the file to Unix line endings with `tr -d '\r'`.
+428:12: warning: The escape '\o' has no meaning here, so the shell reads it as a plain 'o'.
+   428 |    echo Yay \o/
+       |             ^~
+note: Quote the backslash, or build the byte with `printf`.
+429:14: warning: The escape '\t' has no meaning here, so the shell reads it as a plain 't'.
+   429 |    spacing=foo\tbar
+       |               ^~
+note: Build the byte with `printf`, or write it inside `$'...'`.
+430:18: warning: A backslash carries no meaning inside single quotes, so this one closes the string and stays in the text.
+   430 |    echo 'no way it\'
+       |                   ^~
+note: Write the quote as `'\''` outside the single-quoted run.
+431:15: warning: The backslash and the line ending are both kept in the single-quoted text.
+   431 |    quoted='long \
+       |                ^~
+note: Close the quote, break the line, and reopen the quote.
+437:16: warning: The backslash closes a comment, so the command above it ends here.
+   437 |    # -e "middle" \
+       |                 ^~
+note: Move the comment above the command, or wrap it in `` `# ...` ``.
 397:16: warning: The directive names 'foobar', which is not a directive key, so the directive is ignored.
    397 |    # shellcheck foobar=baz
        |                 ^~~~~~
@@ -5772,7 +5881,27 @@ note: Use `command` before the wrapped command name.
    393 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 318 warnings.
+429:3: warning: This assignment to 'spacing' in a function has no local, so the value leaks to the global scope.
+   429 |    spacing=foo\tbar
+       |    ^~~~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+431:3: warning: This assignment to 'quoted' in a function has no local, so the value leaks to the global scope.
+   431 |    quoted='long \
+       |    ^~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+433:8: warning: The double-quoted string is closed right after `$` so the dollar sign stays literal, and the word continues after it.
+   433 |    echo "The apples are $""1 each"
+       |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Write `\$` inside the quotes and keep the string in one piece.
+434:8: warning: The double-quoted string ends right after `$`, so the shell reads the dollar sign as ordinary text.
+   434 |    echo "$"
+       |         ^~~
+note: Write `\$` inside the quotes and keep the string in one piece.
+438:3: warning: An option-shaped word in command position is not a command.
+   438 |    -e x file
+       |    ^~
+note: Place the option after its command.
+Encountered 328 warnings.
 done
 done
 done

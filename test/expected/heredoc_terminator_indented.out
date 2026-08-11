@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "EOF"
+]
+4:3: warning: The line holding 'EOF' is indented, so it does not close the here-document and the rest of the file is read as body text.
+     4 |    EOF
+       |    ^~~
+note: Move the terminator to the first column.
+before
+[Code 0]

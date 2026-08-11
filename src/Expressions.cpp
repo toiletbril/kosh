@@ -654,6 +654,7 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
                const ArrayList<analysis_scope_definition> &scope_definitions,
                const ArrayList<shellcheck_directive_span> &directive_spans,
+               const ArrayList<heredoc_terminator_miss> &heredoc_misses,
                bool is_named_script_file, bool show_optimizer_state) throws
     -> bool
 {
@@ -678,6 +679,8 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_shebang(actx, source, is_named_script_file);
 
   expressions::check_shellcheck_directives(actx, source, directive_spans);
+
+  expressions::check_heredoc_terminators(actx, source, heredoc_misses);
 
   LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
       actx.shebang_is_posix_sh ? "armed" : "off");
@@ -1270,6 +1273,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     bool has_double_dot = false;
     bool has_open_brace = false;
     bool has_dollar_byte = false;
+    bool has_quote_break_for_dollar = false;
+    bool has_literal_dollar_in_quotes = false;
 
     for (usize position = 0; position < source_text.length; position++) {
       let const byte = source_text[position];
@@ -1294,6 +1299,18 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
             source_text[position + 2] <= '9')
         {
           has_multi_digit_positional = true;
+        }
+        /* The quote that follows leaves the dollar sign literal. The word is
+           read no further only when the quote also closes the word, and a
+           dollar sign that carries text before it is ordinary prose. */
+        if (position + 1 < source_text.length &&
+            source_text[position + 1] == '"')
+        {
+          if (position + 2 < source_text.length) {
+            has_quote_break_for_dollar = true;
+          } else if (position > 0 && source_text[position - 1] == '"') {
+            has_literal_dollar_in_quotes = true;
+          }
         }
       }
     }
@@ -1459,6 +1476,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2140, arg_location,
                              {quote_sandwich_word});
     }
+
+    if (has_quote_break_for_dollar)
+      actx.report_diagnostic(diagnostic_id::sc1135, arg_location);
+
+    if (has_literal_dollar_in_quotes)
+      actx.report_diagnostic(diagnostic_id::sc1000, arg_location);
 
     if (has_dollar_in_arithmetic)
       actx.report_diagnostic(diagnostic_id::sc2004, arg_location);
