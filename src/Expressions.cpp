@@ -653,6 +653,7 @@ fn analyze_ast(const Expression *root, StringView source,
                bool should_emit_annoying_diagnostics,
                const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
                const ArrayList<analysis_scope_definition> &scope_definitions,
+               const ArrayList<shellcheck_directive_span> &directive_spans,
                bool is_named_script_file, bool show_optimizer_state) throws
     -> bool
 {
@@ -675,6 +676,8 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_source_bytes(actx, source);
 
   expressions::check_shebang(actx, source, is_named_script_file);
+
+  expressions::check_shellcheck_directives(actx, source, directive_spans);
 
   LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
       actx.shebang_is_posix_sh ? "armed" : "off");

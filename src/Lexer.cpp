@@ -220,6 +220,15 @@ fn Lexer::take_shellcheck_directives() throws
   return directives;
 }
 
+fn Lexer::take_shellcheck_directive_spans() throws
+    -> ArrayList<shellcheck_directive_span>
+{
+  let spans = steal(m_shellcheck_directive_spans);
+  m_shellcheck_directive_spans =
+      ArrayList<shellcheck_directive_span>{heap_allocator()};
+  return spans;
+}
+
 pure fn Lexer::is_at_source_end() const wontthrow -> bool
 {
   return m_cursor_position >= m_source.length();
@@ -482,7 +491,11 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
       let const comment_start = i;
       while (chop_character(i) != '\n' && chop_character(i) != lexer::CEOF)
         i++;
-      if (m_should_collect_shellcheck_directives) {
+      /* The comment is classified whether or not a command is claiming
+         directives, since the analysis stage reports a misplaced directive that
+         no command would claim. The leading byte compare rejects an ordinary
+         comment before anything is read. */
+      {
         let comment = m_source.view().substring_of_length(
             m_cursor_position + comment_start, i - comment_start);
         usize content_position = 1;
@@ -497,8 +510,13 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
             (directive_text.length == 10 || directive_text[10] == ' ' ||
              directive_text[10] == '\t'))
         {
-          m_pending_shellcheck_directives.push(shellcheck_directive_span{
-              m_cursor_position + comment_start, i - comment_start});
+          let const span = shellcheck_directive_span{
+              m_cursor_position + comment_start, i - comment_start};
+
+          if (m_should_collect_shellcheck_directives)
+            m_pending_shellcheck_directives.push(span);
+
+          m_shellcheck_directive_spans.push(span);
         }
       }
       continue;

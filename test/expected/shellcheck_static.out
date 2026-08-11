@@ -882,6 +882,38 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$reported"]
   [CompoundListCondition, None]
+    [FunctionDefinition "directive_placement_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "one"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "three"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "false"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "four"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "false"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "five"]
+          [CompoundListCondition, None]
+            [CaseClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+  [CompoundListCondition, None]
     [FunctionDefinition "source_byte_diagnostics"]
       [BraceGroup]
         [CompoundList]
@@ -4295,6 +4327,90 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "directive_placement_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "three"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "four"
+]
+[Word
+  Unquoted "elif"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "five"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "source_byte_diagnostics"
 ]
 [Word
@@ -4354,42 +4470,62 @@
 [Word
   Unquoted "}"
 ]
-397:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
-   397 |    echo “curly”
+416:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
+   416 |    echo “curly”
        |         ^
 note: Delete it and retype an ASCII quote.
-397:14: warning: The Unicode quote 'U+201D' is ordinary text, so it opens no quoted string.
-   397 |    echo “curly”
+416:14: warning: The Unicode quote 'U+201D' is ordinary text, so it opens no quoted string.
+   416 |    echo “curly”
        |               ^
 note: Delete it and retype an ASCII quote.
-398:8: warning: The Unicode quote 'U+2018' is ordinary text, so it opens no quoted string.
-   398 |    echo ‘curly’
+417:8: warning: The Unicode quote 'U+2018' is ordinary text, so it opens no quoted string.
+   417 |    echo ‘curly’
        |         ^
 note: Delete it and retype an ASCII quote.
-398:14: warning: The Unicode quote 'U+2019' is ordinary text, so it opens no quoted string.
-   398 |    echo ‘curly’
+417:14: warning: The Unicode quote 'U+2019' is ordinary text, so it opens no quoted string.
+   417 |    echo ‘curly’
        |               ^
 note: Delete it and retype an ASCII quote.
-399:6: warning: The Unicode dash 'U+2013' is not the ASCII minus, so the shell reads it as ordinary text.
-   399 |    ls –l
+418:6: warning: The Unicode dash 'U+2013' is not the ASCII minus, so the shell reads it as ordinary text.
+   418 |    ls –l
        |       ^
 note: Delete it and retype an ASCII minus.
-400:16: warning: The Unicode quote 'U+201D' inside this double-quoted string is printed as text.
-   400 |    echo "inside ” quotes"
+419:16: warning: The Unicode quote 'U+201D' inside this double-quoted string is printed as text.
+   419 |    echo "inside ” quotes"
        |                 ^
 note: Delete it and retype an ASCII quote, or single-quote the string to keep it literal.
-401:16: warning: The Unicode quote 'U+2019' inside this single-quoted string is printed as text.
-   401 |    echo 'inside ’ quotes'
+420:16: warning: The Unicode quote 'U+2019' inside this single-quoted string is printed as text.
+   420 |    echo 'inside ’ quotes'
        |                 ^
 note: Delete it and retype an ASCII quote, or double-quote the string to keep it literal.
-404:14: warning: The Unicode space 'U+00A0' does not separate words, the shell reads it as part of one word.
-   404 |    echo spaced word
+423:14: warning: The Unicode space 'U+00A0' does not separate words, the shell reads it as part of one word.
+   423 |    echo spaced word
        |               ^
 note: Delete it and retype an ASCII space.
-405:17: warning: A carriage return in the script text is read as data, not as a line ending.
-   405 |    echo 'carriagereturn'
+424:17: warning: A carriage return in the script text is read as data, not as a line ending.
+   424 |    echo 'carriagereturn'
        |                  ^
 note: Convert the file to Unix line endings with `tr -d '\r'`.
+397:16: warning: The directive names 'foobar', which is not a directive key, so the directive is ignored.
+   397 |    # shellcheck foobar=baz
+       |                 ^~~~~~
+note: Use `disable`, `enable`, `shell`, `source`, `source-path`, or `external-sources`.
+399:31: warning: The directive holds 'not', which is not a `key=value` pair, so the directive is ignored.
+   399 |    # shellcheck disable=SC2153 not a misspelling
+       |                                ^~~
+note: Write the directive as `key=value`, such as `disable=SC2034`.
+401:14: warning: The directive follows a command on the same line, so nothing is suppressed.
+   401 |    echo three # shellcheck disable=SC2034
+       |               ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Move the directive to its own line above the command.
+404:3: warning: The directive sits before 'elif', which continues the command above it, so nothing is suppressed.
+   404 |    # shellcheck disable=SC2086
+       |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Move the directive above the complete command.
+410:3: warning: The directive sits before a case branch, so nothing is suppressed.
+   410 |    # shellcheck disable=SC2086
+       |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Move the directive above the `case` command.
 3:8: warning: A bare glob can expand to a filename that begins with '-'.
      3 |    grep *.txt file
        |         ^~~~~
@@ -5636,7 +5772,7 @@ note: Use `command` before the wrapped command name.
    393 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 313 warnings.
+Encountered 318 warnings.
 done
 done
 done

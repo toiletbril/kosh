@@ -25,6 +25,11 @@ public:
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   fn take_shellcheck_suppressions() throws -> ArrayList<shellcheck_suppression>;
+  fn take_shellcheck_directive_spans() throws
+      -> ArrayList<shellcheck_directive_span>
+  {
+    return m_lexer.take_shellcheck_directive_spans();
+  }
 
   fn set_should_collect_analysis_scopes(bool should_collect) wontthrow -> void
   {

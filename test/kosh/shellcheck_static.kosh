@@ -393,6 +393,25 @@ directive_scope() {
   echo $reported
 }
 
+directive_placement_diagnostics() {
+  # shellcheck foobar=baz
+  echo one
+  # shellcheck disable=SC2153 not a misspelling
+  echo two
+  echo three # shellcheck disable=SC2034
+  if false; then
+    echo four
+  # shellcheck disable=SC2086
+  elif false; then
+    echo five
+  fi
+  case "$1" in
+  first) : ;;
+  # shellcheck disable=SC2086
+  *) : ;;
+  esac
+}
+
 source_byte_diagnostics() {
   echo “curly”
   echo ‘curly’

@@ -104,6 +104,8 @@ public:
       -> void;
   fn take_shellcheck_directives() throws
       -> ArrayList<shellcheck_directive_span>;
+  fn take_shellcheck_directive_spans() throws
+      -> ArrayList<shellcheck_directive_span>;
 
   fn register_heredoc(StringView delimiter, bool should_strip_tabs) throws
       -> const heredoc_contents *;
@@ -142,6 +144,8 @@ protected:
   bool m_last_shell_token_was_newline{false};
   bool m_should_collect_shellcheck_directives{false};
   ArrayList<shellcheck_directive_span> m_pending_shellcheck_directives{
+      heap_allocator()};
+  ArrayList<shellcheck_directive_span> m_shellcheck_directive_spans{
       heap_allocator()};
   /* Each body is allocated in the arena, so its address is stable and it
      outlives the lexer. A parsed redirection holds a pointer into one, and the

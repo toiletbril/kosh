@@ -77,6 +77,13 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "subtraction",
       "Use the symbolic form such as `<` or `>` inside arithmetic", None,
       Strict, Policy),
+    D(1107, "unknown-shellcheck-directive",
+      "the directive names an unknown key",
+      "The directive names '{0}', which is not a directive key, so the "
+      "directive is ignored",
+      "Use `disable`, `enable`, `shell`, `source`, `source-path`, or "
+      "`external-sources`",
+      None, Annoying, Policy),
     D(1110, "unicode-quote", "a Unicode quote does not quote anything",
       "The Unicode quote '{0}' is ordinary text, so it opens no quoted string",
       "Delete it and retype an ASCII quote", None, Strict, Policy),
@@ -104,6 +111,27 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "the shebang holds a space between its characters",
       "A space separates `#` from `!`, so the line is an ordinary comment",
       "Write `#!` with nothing between them", None, Strict, Policy),
+    D(1123, "directive-before-clause",
+      "a directive belongs before a complete command",
+      "The directive sits before '{0}', which continues the command above it, "
+      "so nothing is suppressed",
+      "Move the directive above the complete command", None, Annoying, Policy),
+    D(1124, "directive-before-case-branch",
+      "a directive belongs before a complete command",
+      "The directive sits before a case branch, so nothing is suppressed",
+      "Move the directive above the `case` command", None, Annoying, Policy),
+    D(1125, "malformed-shellcheck-directive",
+      "a directive takes a key and a value",
+      "The directive holds '{0}', which is not a `key=value` pair, so the "
+      "directive is ignored",
+      "Write the directive as `key=value`, such as `disable=SC2034`", None,
+      Annoying, Policy),
+    D(1126, "directive-after-command",
+      "a directive belongs before the command it covers",
+      "The directive follows a command on the same line, so nothing is "
+      "suppressed",
+      "Move the directive to its own line above the command", None, Annoying,
+      Policy),
     D(1128, "shebang-not-first-line", "the shebang is not on the first line",
       "The shebang is not on the first line, so it is an ordinary comment",
       "Move the shebang to the first line and keep the comments below it", None,
@@ -5519,6 +5547,245 @@ fn check_shebang(AnalysisContext &actx, StringView source,
 
   if (shell_name == StringView{"dash"} || shell_name == StringView{"sh"})
     actx.shebang_is_posix_sh = true;
+}
+
+namespace {
+
+constexpr PackedStringKey DIRECTIVE_KEY_KEYS[] = {
+    SSK("disable"), SSK("enable"), SSK("external-sources"),
+    SSK("shell"),   SSK("source"), SSK("source-path"),
+};
+constexpr StaticStringSet DIRECTIVE_KEYS{DIRECTIVE_KEY_KEYS};
+
+/* A word that continues the command above it, so a directive placed before it
+   covers nothing. */
+constexpr PackedStringKey CLAUSE_KEYWORD_KEYS[] = {
+    SSK("do"),   SSK("done"), SSK("elif"), SSK("else"),
+    SSK("esac"), SSK("fi"),   SSK("then"), SSK("}"),
+};
+constexpr StaticStringSet CLAUSE_KEYWORDS{CLAUSE_KEYWORD_KEYS};
+
+constexpr usize DIRECTIVE_KEYWORD_LENGTH = 10;
+
+pure fn byte_is_blank(char byte) wontthrow -> bool
+{
+  switch (byte) {
+  case ' ':
+  case '\t': return true;
+
+  default: return false;
+  }
+}
+
+pure fn find_line_start(StringView source, usize position) wontthrow -> usize
+{
+  usize at = position;
+  while (at > 0 && source[at - 1] != '\n')
+    at--;
+
+  return at;
+}
+
+pure fn only_blanks_precede(StringView source, usize line_start,
+                            usize position) wontthrow -> bool
+{
+  for (usize at = line_start; at < position; at++) {
+    if (!byte_is_blank(source[at])) return false;
+  }
+
+  return true;
+}
+
+/* The first word below the directive, with blank lines and further comments
+   skipped. */
+pure fn read_word_below_directive(StringView source, usize after) wontthrow
+    -> StringView
+{
+  usize at = after;
+
+  loop
+  {
+    while (at < source.length &&
+           (byte_is_blank(source[at]) || source[at] == '\n'))
+    {
+      at++;
+    }
+
+    if (at >= source.length) return {};
+
+    if (source[at] != '#') break;
+
+    while (at < source.length && source[at] != '\n')
+      at++;
+  }
+
+  let const word_start = at;
+  while (at < source.length && !byte_is_blank(source[at]) && source[at] != '\n')
+  {
+    at++;
+  }
+
+  return source.substring_of_length(word_start, at - word_start);
+}
+
+/* The last line above the directive that carries a command, with blank lines
+   and further comments skipped. Trailing blanks are dropped so the terminator
+   is the final byte. */
+pure fn read_line_above_directive(StringView source, usize line_start) wontthrow
+    -> StringView
+{
+  usize end = line_start;
+
+  while (end > 0) {
+    end--;
+
+    let const start = find_line_start(source, end);
+    usize content_start = start;
+    while (content_start < end && byte_is_blank(source[content_start]))
+      content_start++;
+
+    usize content_end = end;
+    while (content_end > content_start &&
+           byte_is_blank(source[content_end - 1]))
+      content_end--;
+
+    if (content_start < content_end && source[content_start] != '#')
+      return source.substring_of_length(content_start,
+                                        content_end - content_start);
+
+    end = start;
+  }
+
+  return {};
+}
+
+pure fn line_opens_case_branch(StringView line) wontthrow -> bool
+{
+  if (line.length >= 2 && line[line.length - 1] == ';' &&
+      line[line.length - 2] == ';')
+  {
+    return true;
+  }
+
+  if (line.length >= 2 && line[line.length - 1] == '&' &&
+      line[line.length - 2] == ';')
+  {
+    return true;
+  }
+
+  if (line.length >= 2 && line[line.length - 1] == 'n' &&
+      line[line.length - 2] == 'i' &&
+      (line.length == 2 || byte_is_blank(line[line.length - 3])))
+  {
+    return true;
+  }
+
+  return false;
+}
+
+pure fn word_holds_case_pattern(StringView word) wontthrow -> bool
+{
+  for (usize at = 0; at < word.length; at++) {
+    if (word[at] == '(') return false;
+    if (word[at] == ')') return true;
+  }
+
+  return false;
+}
+
+/* SC1107 and SC1125, read from the tokens after the directive keyword. One
+   finding closes the scan, since a malformed directive is usually followed by
+   prose that would report again on every word. */
+fn check_directive_body(AnalysisContext &actx, StringView source,
+                        shellcheck_directive_span span,
+                        usize body_position) throws -> void
+{
+  let const comment_end = span.position + span.length;
+  usize at = span.position + body_position;
+
+  while (at < comment_end) {
+    while (at < comment_end && byte_is_blank(source[at]))
+      at++;
+
+    if (at >= comment_end) return;
+
+    let const token_start = at;
+    while (at < comment_end && !byte_is_blank(source[at]))
+      at++;
+
+    let const token = source.substring_of_length(token_start, at - token_start);
+
+    usize separator_position = 0;
+    while (separator_position < token.length &&
+           token[separator_position] != '=')
+      separator_position++;
+
+    if (separator_position == token.length) {
+      actx.report_diagnostic(diagnostic_id::sc1125,
+                             SourceLocation{token_start, token.length},
+                             {token});
+      return;
+    }
+
+    let const key = token.substring_of_length(0, separator_position);
+
+    if (!DIRECTIVE_KEYS.contains(key)) {
+      actx.report_diagnostic(diagnostic_id::sc1107,
+                             SourceLocation{token_start, key.length}, {key});
+      return;
+    }
+  }
+}
+
+} /* namespace */
+
+fn check_shellcheck_directives(
+    AnalysisContext &actx, StringView source,
+    const ArrayList<shellcheck_directive_span> &directives) throws -> void
+{
+  usize previous_position = static_cast<usize>(-1);
+
+  for (let const &directive : directives) {
+    if (directive.position == previous_position) continue;
+    previous_position = directive.position;
+
+    usize body_position = 1;
+    while (body_position < directive.length &&
+           byte_is_blank(source[directive.position + body_position]))
+    {
+      body_position++;
+    }
+    body_position += DIRECTIVE_KEYWORD_LENGTH;
+
+    check_directive_body(actx, source, directive, body_position);
+
+    let const line_start = find_line_start(source, directive.position);
+
+    if (!only_blanks_precede(source, line_start, directive.position)) {
+      actx.report_diagnostic(
+          diagnostic_id::sc1126,
+          SourceLocation{directive.position, directive.length});
+      continue;
+    }
+
+    let const word_below = read_word_below_directive(
+        source, directive.position + directive.length);
+
+    if (CLAUSE_KEYWORDS.contains(word_below)) {
+      actx.report_diagnostic(
+          diagnostic_id::sc1123,
+          SourceLocation{directive.position, directive.length}, {word_below});
+      continue;
+    }
+
+    if (word_holds_case_pattern(word_below) &&
+        line_opens_case_branch(read_line_above_directive(source, line_start)))
+    {
+      actx.report_diagnostic(
+          diagnostic_id::sc1124,
+          SourceLocation{directive.position, directive.length});
+    }
+  }
 }
 
 } /* namespace expressions */

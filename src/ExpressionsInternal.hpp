@@ -166,6 +166,13 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void;
 fn check_shebang(AnalysisContext &actx, StringView source,
                  bool is_named_script_file) throws -> void;
 
+/* The placement and spelling findings for the directive comments the lexer
+   recorded. A directive comment is rare, so this walk touches almost no
+   script. */
+fn check_shellcheck_directives(
+    AnalysisContext &actx, StringView source,
+    const ArrayList<shellcheck_directive_span> &directives) throws -> void;
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;
