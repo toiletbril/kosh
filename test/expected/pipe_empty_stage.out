@@ -9,6 +9,6 @@
 [Word
   Unquoted "cat"
 ]
-2:1: error: A pipeline stage expanded to no command to run.
-     2 |  x=1 | cat
+3:1: error: A pipeline stage expanded to no command to run.
+     3 |  x=1 | cat
        |  ^~~

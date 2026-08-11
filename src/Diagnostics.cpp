@@ -189,6 +189,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A bare glob can expand to a filename that begins with '-'",
       "Prefix the glob with a directory or place -- before it", None, Annoying,
       Policy),
+    D(2036, "piped-assignment-stage",
+      "an assignment feeding a pipe assigns nothing from the pipeline",
+      "The assignment to '{0}' runs as the first stage, so the pipeline output "
+      "is not assigned",
+      "Write `{0}=$(...)` around the complete pipeline", None, Strict, Policy),
+    D(2037, "assignment-ate-command",
+      "an assignment prefix swallowed the command name",
+      "The value of '{0}' is read as a name, and '{1}' becomes the command",
+      "Write `{0}=$(...)` to assign the command output", None, Strict, Policy),
     D(2038, "find-xargs-names", "find piped to xargs breaks on special names",
       "An xargs splits the find output on whitespace and quotes",
       "Pair find -print0 with xargs -0 or use find -exec", None, Strict,
@@ -359,6 +368,18 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a command in a while-read loop can consume loop input",
       "An ssh command in a while-read loop can consume the loop input",
       "Redirect ssh input from /dev/null or pass -n", None, Annoying, Policy),
+    D(2099, "arithmetic-assignment-expansion",
+      "an assignment concatenates instead of adding",
+      "The value of '{0}' is joined as text, and the arithmetic is not "
+      "evaluated",
+      "Write `{0}=$(( ... ))` to evaluate the arithmetic", None, Strict,
+      Policy),
+    D(2100, "arithmetic-assignment-literal",
+      "an assignment stores the expression instead of its value",
+      "The value of '{0}' is stored as text, and the arithmetic is not "
+      "evaluated",
+      "Write `{0}=$(( ... ))` to evaluate the arithmetic", None, Strict,
+      Policy),
     D(2103, "directory-change-and-back", "a subshell avoids the return trip",
       "A later `cd -` undoes this directory change, and a subshell restores "
       "the directory on its own",
@@ -413,10 +434,22 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "the comparison operator does not exist in test",
       "The '{0}' operator does not exist in test",
       "Negate the opposite comparison, as in `! a < b`", None, Strict, Policy),
+    D(2123, "search-path-overwritten",
+      "an assignment replaces the command search path",
+      "The PATH variable holds the command search path, and this assignment "
+      "replaces it with '{0}'",
+      "Name the variable something else, or keep `$PATH` in the value", None,
+      Lenient, Policy),
     D(2124, "scalar-at-assignment",
       "a scalar assignment from $@ loses boundaries",
       "A scalar assignment from $@ loses argument boundaries",
       "Assign one value or use an array", None, Lenient, Policy),
+    D(2125, "literal-glob-assignment",
+      "a glob in an assignment value stays literal",
+      "The value of '{0}' keeps the pattern as text, because an assignment "
+      "does not expand it",
+      "Quote the value when the pattern is data, or use an array", None,
+      Lenient, Policy),
     D(2126, "grep-wc-count", "wc -l on grep output runs an extra process",
       "Counting grep output with wc -l runs an extra process",
       "Use grep -c to count the matching lines directly", None, Annoying,
@@ -3774,6 +3807,20 @@ fn check_test_operand_lints(AnalysisContext &actx,
   }
 }
 
+namespace {
+
+/* The variables whose value is a command name by convention, so an ordinary
+   prefix assignment to one of them is not a swallowed command. */
+constexpr PackedStringKey COMMAND_VALUED_VARIABLE_KEYS[] = {
+    SSK("BROWSER"), SSK("CC"),     SSK("CXX"),      SSK("DIFFPROG"),
+    SSK("EDITOR"),  SSK("FCEDIT"), SSK("MANPAGER"), SSK("PAGER"),
+    SSK("SHELL"),   SSK("VISUAL"),
+};
+constexpr StaticStringSet COMMAND_VALUED_VARIABLES{
+    COMMAND_VALUED_VARIABLE_KEYS};
+
+} /* namespace */
+
 /* A prefix assignment does not affect the expansion on the same command, so a
    reference to one of its names reads the old value. */
 fn check_prefix_assignment_reads(AnalysisContext &actx,
@@ -3782,6 +3829,31 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
   if (input.local_vars.is_empty()) return;
 
   let const &args = input.args;
+
+  /* One prefix assignment whose value names a command leaves the next word as
+     the command name, shellcheck SC2037. A variable that holds a command name
+     by convention keeps its ordinary use. */
+  if (input.local_vars.count() == 1 && !input.command_literal.is_empty()) {
+    let const &value = input.local_vars[0].value;
+    let const value_is_bare_word =
+        value.segments.count() == 1 &&
+        (value.segments[0].kind == WordSegment::Kind::UnquotedText ||
+         value.segments[0].kind == WordSegment::Kind::LiteralText);
+    if (value_is_bare_word) {
+      let const assigned = value.segments[0].text.view();
+      let const name = input.local_vars[0].name.view();
+      let const value_names_a_command =
+          !COMMAND_VALUED_VARIABLES.contains(name) &&
+          get_analysis_command_info(assigned).id != command_name_id::Unknown &&
+          get_analysis_command_info(input.command_literal).id ==
+              command_name_id::Unknown;
+      if (input.command_literal[0] == '-' || value_names_a_command) {
+        actx.report_diagnostic(diagnostic_id::sc2037,
+                               input.local_vars[0].location,
+                               {name, input.command_literal});
+      }
+    }
+  }
 
   for (usize i = 1; i < args.count(); i++) {
     if (args[i]->kind() != Token::Kind::Word) continue;
@@ -3803,6 +3875,68 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
         break;
       }
     }
+  }
+}
+
+namespace {
+
+/* An arithmetic value assigns text unless it is wrapped, so the operand shape
+   is read from the raw assignment. */
+pure fn value_is_self_arithmetic(StringView name, StringView value) wontthrow
+    -> bool
+{
+  usize position = 0;
+  if (position < value.length && value[position] == '$') position++;
+
+  if (position + name.length > value.length) return false;
+  if (value.substring_of_length(position, name.length) != name) return false;
+  position += name.length;
+
+  if (position >= value.length) return false;
+
+  switch (value[position]) {
+  case '+':
+  case '-':
+  case '*':
+  case '/': position++; break;
+
+  default: return false;
+  }
+
+  if (position >= value.length) return false;
+
+  return value.substring(position).is_all_decimal_digits();
+}
+
+} /* namespace */
+
+fn check_assignment_value_shape(AnalysisContext &actx,
+                                const assignment_lint_input &input) throws
+    -> void
+{
+  let const equals = input.raw_assignment.find_character('=');
+  if (!equals.has_value()) return;
+
+  let const value = input.raw_assignment.substring(*equals + 1);
+
+  if (input.has_unquoted_pattern) {
+    actx.report_diagnostic(diagnostic_id::sc2125, input.location, {input.name});
+  }
+
+  /* PATH without a separator and without its own value replaces the search
+     path, shellcheck SC2123. An expanded value may already hold a path list. */
+  if (input.name == "PATH" && !input.is_append && !value.is_empty() &&
+      input.has_only_literal_segments &&
+      !value.find_character(':').has_value() &&
+      !view_contains(value, StringView{"PATH"}))
+  {
+    actx.report_diagnostic(diagnostic_id::sc2123, input.location, {value});
+  }
+
+  if (value_is_self_arithmetic(input.name, value)) {
+    let const id =
+        value[0] == '$' ? diagnostic_id::sc2099 : diagnostic_id::sc2100;
+    actx.report_diagnostic(id, input.location, {input.name});
   }
 }
 

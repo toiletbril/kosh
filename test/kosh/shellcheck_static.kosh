@@ -270,6 +270,21 @@ trap_condition_diagnostics() {
   trap - EXIT
 }
 
+assignment_value_diagnostics() {
+  local counter=0
+  counter=$counter+1
+  counter=counter+1
+  PATH=/opt/local/bin
+  pattern=*.txt
+  braces=file{a,b}.txt
+}
+
+assignment_pipeline_diagnostics() {
+  piped=value | wc -l
+  first=one second=two | wc -l
+  swallowed=printf 'x\n'
+}
+
 false && break
 false && continue
 

@@ -105,6 +105,22 @@ struct command_lint_input
   }
 };
 
+/* The borrowed inputs one assignment's value checks read. The segment walk in
+   AssignCommand::analyze computes the pattern bit and the raw view once. */
+struct assignment_lint_input
+{
+  StringView name;
+  StringView raw_assignment;
+  SourceLocation location;
+  bool is_append;
+  bool has_unquoted_pattern;
+  bool has_only_literal_segments;
+};
+
+fn check_assignment_value_shape(AnalysisContext &actx,
+                                const assignment_lint_input &input) throws
+    -> void;
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;

@@ -1682,6 +1682,25 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   if (m_commands.count() > 1) {
     ASSERT(m_commands[0] != nullptr);
     const SimpleCommand *first_stage = m_commands[0]->as_simple_command();
+
+    /* An assignment-only first stage runs beside the pipeline and reads nothing
+       from it, shellcheck SC2036. The parser splits a lone assignment into an
+       AssignCommand and keeps several as prefixes on an empty command. */
+    if (m_commands[0]->is_assignment()) {
+      const AssignCommand *assign = m_commands[0]->as_assign_command();
+      if (assign != nullptr) {
+        actx.report_diagnostic(diagnostic_id::sc2036,
+                               m_commands[0]->source_location(),
+                               {assign->assignment()->key().view()});
+      }
+    } else if (first_stage != nullptr && first_stage->args().is_empty() &&
+               !first_stage->local_vars().is_empty())
+    {
+      actx.report_diagnostic(diagnostic_id::sc2036,
+                             first_stage->local_vars()[0].location,
+                             {first_stage->local_vars()[0].name.view()});
+    }
+
     if (first_stage != nullptr) {
       let const &cat_args = first_stage->args();
       if (cat_args.count() == 2) {

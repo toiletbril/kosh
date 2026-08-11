@@ -634,6 +634,36 @@
           [CompoundListCondition, None]
             [SimpleCommand "trap" "-" "EXIT"]
   [CompoundListCondition, None]
+    [FunctionDefinition "assignment_value_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "counter=0"]
+          [CompoundListCondition, None]
+            [Assign counter=$counter+1]
+          [CompoundListCondition, None]
+            [Assign counter=counter+1]
+          [CompoundListCondition, None]
+            [Assign PATH=/opt/local/bin]
+          [CompoundListCondition, None]
+            [Assign pattern=*.txt]
+          [CompoundListCondition, None]
+            [Assign braces=file{a,b}.txt]
+  [CompoundListCondition, None]
+    [FunctionDefinition "assignment_pipeline_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand]
+              [SimpleCommand "wc" "-l"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand]
+              [SimpleCommand "wc" "-l"]
+          [CompoundListCondition, None]
+            [SimpleCommand "x\n"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3364,6 +3394,74 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "assignment_value_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "counter=0"
+]
+[Word
+  Unquoted "counter="
+  Variable "counter"
+  Unquoted "+1"
+]
+[Word
+  Unquoted "counter=counter+1"
+]
+[Word
+  Unquoted "PATH=/opt/local/bin"
+]
+[Word
+  Unquoted "pattern=*.txt"
+]
+[Word
+  Unquoted "braces=file{a,b}.txt"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "assignment_pipeline_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "piped=value"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "first=one"
+]
+[Word
+  Unquoted "second=two"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "swallowed=printf"
+]
+[Word
+  Literal "x\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -4319,26 +4417,66 @@ note: Remove the condition, since the kernel delivers this signal unconditionall
    268 |    trap 'helper_function' SIGSTOP
        |                           ^~~~~~~
 note: Remove the condition, since the kernel delivers this signal unconditionally.
-273:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   273 |  false && break
+275:3: warning: The value of 'counter' is joined as text, and the arithmetic is not evaluated.
+   275 |    counter=$counter+1
+       |    ^~~~~~~~~~~~~~~~~~
+note: Write `counter=$(( ... ))` to evaluate the arithmetic.
+276:3: warning: The value of 'counter' is stored as text, and the arithmetic is not evaluated.
+   276 |    counter=counter+1
+       |    ^~~~~~~~~~~~~~~~~
+note: Write `counter=$(( ... ))` to evaluate the arithmetic.
+277:3: warning: The PATH variable holds the command search path, and this assignment replaces it with '/opt/local/bin'.
+   277 |    PATH=/opt/local/bin
+       |    ^~~~~~~~~~~~~~~~~~~
+note: Name the variable something else, or keep `$PATH` in the value.
+278:3: warning: The value of 'pattern' keeps the pattern as text, because an assignment does not expand it.
+   278 |    pattern=*.txt
+       |    ^~~~~~~~~~~~~
+note: Quote the value when the pattern is data, or use an array.
+278:3: warning: This assignment to 'pattern' in a function has no local, so the value leaks to the global scope.
+   278 |    pattern=*.txt
+       |    ^~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+279:3: warning: The value of 'braces' keeps the pattern as text, because an assignment does not expand it.
+   279 |    braces=file{a,b}.txt
+       |    ^~~~~~~~~~~~~~~~~~~~
+note: Quote the value when the pattern is data, or use an array.
+279:3: warning: This assignment to 'braces' in a function has no local, so the value leaks to the global scope.
+   279 |    braces=file{a,b}.txt
+       |    ^~~~~~~~~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+283:3: warning: The assignment to 'piped' runs as the first stage, so the pipeline output is not assigned.
+   283 |    piped=value | wc -l
+       |    ^~~~~~~~~~~
+note: Write `piped=$(...)` around the complete pipeline.
+284:3: warning: The assignment to 'first' runs as the first stage, so the pipeline output is not assigned.
+   284 |    first=one second=two | wc -l
+       |    ^~~~~~~~~
+note: Write `first=$(...)` around the complete pipeline.
+285:3: warning: The value of 'swallowed' is read as a name, and 'x\n' becomes the command.
+   285 |    swallowed=printf 'x\n'
+       |    ^~~~~~~~~~~~~~~~
+note: Write `swallowed=$(...)` to assign the command output.
+288:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   288 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-274:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   274 |  false && continue
+289:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   289 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-276:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   276 |  recursive_wrapper() { recursive_wrapper "$@"; }
+291:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   291 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-276:1: details:
-   276 |  recursive_wrapper() { recursive_wrapper "$@"; }
+291:1: details:
+   291 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-281:8: warning: An unquoted variable can split into words and expand globs.
-   281 |    echo $reported
+296:8: warning: An unquoted variable can split into words and expand globs.
+   296 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 227 warnings.
+Encountered 237 warnings.
 done
 done
 done

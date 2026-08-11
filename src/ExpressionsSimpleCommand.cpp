@@ -70,6 +70,22 @@ static fn word_is_safe_for_in_process_substitution(const Word &word) wontthrow
   return true;
 }
 
+/* A brace expansion needs a comma between the braces, so a lone brace stays
+   data. A question mark is common inside a plain URL, so only the star counts
+   as a glob here. */
+static pure fn segment_holds_literal_pattern(StringView text) wontthrow -> bool
+{
+  if (text.find_character('*').has_value()) return true;
+
+  let const open = text.find_character('{');
+  if (!open.has_value()) return false;
+
+  let const comma = text.substring(*open).find_character(',');
+  if (!comma.has_value()) return false;
+
+  return text.substring(*open + *comma).find_character('}').has_value();
+}
+
 AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
     : Command(location), m_assignment(a)
 {}
@@ -98,9 +114,25 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                            {m_assignment->key().view()});
   }
 
+  let has_unquoted_pattern = false;
+  let has_only_literal_segments = true;
   for (let const &segment : m_assignment->value_word().segments) {
     if (actx.shebang_is_posix_sh)
       check_posix_word_portability(actx, segment, source_location());
+
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::UnquotedText:
+    case WordSegment::Kind::DoubleQuotedText: break;
+
+    default: has_only_literal_segments = false; break;
+    }
+
+    if (segment.kind == WordSegment::Kind::UnquotedText &&
+        segment_holds_literal_pattern(segment.text.view()))
+    {
+      has_unquoted_pattern = true;
+    }
 
     if (segment.kind == WordSegment::Kind::VariableReference &&
         segment.text.view() == "@")
@@ -116,6 +148,12 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   }
 
   let const raw_assignment = m_assignment->raw_string();
+
+  check_assignment_value_shape(
+      actx,
+      assignment_lint_input{m_assignment->key().view(), raw_assignment.view(),
+                            source_location(), m_assignment->is_append(),
+                            has_unquoted_pattern, has_only_literal_segments});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
