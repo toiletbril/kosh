@@ -25,7 +25,13 @@ fn window_function_body_error(EvalContext &cxt,
                               ErrorWithLocation &error) wontthrow
     -> Maybe<StringView>;
 
-fn static_command_name(const Token *token) throws -> Maybe<String>;
+fn static_command_name(const Token *token) throws -> Maybe<StringView>;
+
+/* The token's raw text without a copy when the token owns its bytes. A token
+   that composes its text on demand writes into storage, which the caller keeps
+   alive for as long as the returned view is read. */
+fn borrowed_token_text(const Token *token, String &storage) throws
+    -> StringView;
 
 namespace expressions {
 

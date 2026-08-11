@@ -188,4 +188,91 @@ fn format_diagnostic_template(
 pure fn diagnostic_directive_disables(StringView comment,
                                       diagnostic_id id) wontthrow -> bool;
 
+enum class command_name_id : u16
+{
+  Unknown,
+  Alias,
+  Arch,
+  Basename,
+  Builtin,
+  Chmod,
+  Chown,
+  Colon,
+  Command,
+  Cp,
+  Date,
+  Declare,
+  Dirname,
+  Dot,
+  DoubleBracket,
+  Echo,
+  Egrep,
+  Eval,
+  Exit,
+  Export,
+  Expr,
+  False,
+  Fgrep,
+  Find,
+  Getopts,
+  Grep,
+  Hostname,
+  Id,
+  Kill,
+  Let,
+  Ln,
+  Local,
+  Mapfile,
+  Mkdir,
+  Mv,
+  Printf,
+  Pwd,
+  Read,
+  Readarray,
+  Readonly,
+  Return,
+  Rm,
+  Rmdir,
+  Seq,
+  SingleBracket,
+  Sleep,
+  Source,
+  Ssh,
+  Sudo,
+  Test,
+  Touch,
+  Tr,
+  Trap,
+  True,
+  Tty,
+  Typeset,
+  Uname,
+  Unlink,
+  Unset,
+  Which,
+  Whoami,
+};
+
+constexpr u32 COMMAND_GROUP_TEST = 1u << 0;
+constexpr u32 COMMAND_GROUP_DECLARATION_BUILTIN = 1u << 1;
+constexpr u32 COMMAND_GROUP_ASSIGNMENT_BUILTIN = 1u << 2;
+constexpr u32 COMMAND_GROUP_RUNTIME_DEFINER = 1u << 3;
+constexpr u32 COMMAND_GROUP_VARIABLE_PROBE = 1u << 4;
+constexpr u32 COMMAND_GROUP_VARIABLE_TARGET = 1u << 5;
+constexpr u32 COMMAND_GROUP_NON_STDIN_READER = 1u << 6;
+constexpr u32 COMMAND_GROUP_ENVIRONMENT_NEUTRAL = 1u << 7;
+
+struct analysis_command_info
+{
+  command_name_id id;
+  u32 group_flags;
+
+  mustuse pure fn is_in_group(u32 group) const wontthrow -> bool
+  {
+    return (group_flags & group) != 0;
+  }
+};
+
+fn get_analysis_command_info(StringView name) throws -> analysis_command_info;
+
 } /* namespace koshka */

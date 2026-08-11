@@ -206,11 +206,31 @@ cold fn AnalysisContext::print_diagnostic_summary() const throws -> void
   show_message(summary.view());
 }
 
+pure fn AnalysisContext::should_report(diagnostic_id id) const wontthrow -> bool
+{
+  let const tier = get_diagnostic_definition(id).tier;
+
+  if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
+    return false;
+  }
+  if (is_default_mood) return true;
+
+  u8 required_level = 0;
+  switch (tier) {
+  case diagnostic_tier::Strict: required_level = 1; break;
+  case diagnostic_tier::Lenient: required_level = 2; break;
+  case diagnostic_tier::Annoying: required_level = 3; break;
+  }
+
+  return warning_level >= required_level;
+}
+
 fn AnalysisContext::report_diagnostic(
     diagnostic_id id, SourceLocation location,
     std::initializer_list<StringView> arguments,
     Maybe<SourceLocation> related_location) throws -> void
 {
+  if (!should_report(id)) return;
   if (is_diagnostic_suppressed(id, location)) return;
 
   let const &definition = get_diagnostic_definition(id);
@@ -487,7 +507,7 @@ fn Expression::can_evaluate_in_process_substitution(
   return false;
 }
 
-fn static_command_name(const Token *token) throws -> Maybe<String>
+fn static_command_name(const Token *token) throws -> Maybe<StringView>
 {
   ASSERT(token != nullptr);
 
@@ -495,7 +515,6 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
 
-  let name = String{heap_allocator()};
   for (let const &segment : word.segments) {
     /* Any expansion segment makes the name a runtime value, so its raw bytes
        must not pass for the program text. */
@@ -510,9 +529,21 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
         if (lexer::is_expandable_char(segment.text[i])) return koshka::None;
       }
     }
-    name.append(segment.text.view());
   }
-  return name;
+
+  return word.constant_value();
+}
+
+fn borrowed_token_text(const Token *token, String &storage) throws -> StringView
+{
+  ASSERT(token != nullptr);
+
+  let const borrowed = token->raw_view();
+  if (borrowed.has_value()) return *borrowed;
+
+  storage = token->raw_string();
+
+  return storage.view();
 }
 
 namespace {
@@ -528,17 +559,17 @@ fn expanded_command_path(StringView name, Allocator allocator) throws -> String
 }
 
 fn command_resolves(
-    const String &name, SourceLocation location, const AnalysisContext &actx,
+    StringView name, SourceLocation location, const AnalysisContext &actx,
     Maybe<utils::unavailable_path_source_component> &unavailable) throws -> bool
 {
   if (name.is_empty()) return false;
-  if (search_builtin(name.view()).has_value()) return true;
+  if (search_builtin(name).has_value()) return true;
   /* The prepass runs only in the default mood, where a coreutil falls back to
      its koshkit implementation, so a koshkit name resolves without a PATH
      binary. */
-  if (koshkit::find_util(name.view()).has_value()) return true;
-  if (os::has_directory_separator(name.view())) {
-    let const expanded = expanded_command_path(name.view(), heap_allocator());
+  if (koshkit::find_util(name).has_value()) return true;
+  if (os::has_directory_separator(name)) {
+    let const expanded = expanded_command_path(name, heap_allocator());
     let const typed_path = Path{expanded.view()};
     let const was_resolved =
         typed_path.has_trailing_separator()
@@ -548,7 +579,7 @@ fn command_resolves(
     if (was_resolved) return true;
 
     let const target = typed_path.to_absolute_without_normalizing();
-    let raw_operand = name.view();
+    let raw_operand = name;
     if (let source_text = location.get_source_text(actx.source))
       raw_operand = *source_text;
     unavailable = utils::locate_first_unavailable_path_component(
@@ -562,11 +593,12 @@ fn command_resolves(
                           : os::get_environment_variable("PATH")};
   const bool was_resolved =
       resolver
-          .search(name.view(), ProgramResolver::SearchMode::First,
+          .search(name, ProgramResolver::SearchMode::First,
                   ProgramResolver::Requirement::Regular,
                   ProgramResolver::CachePolicy::Bypass)
           .count() != 0;
-  LOG(Debug, "scanning PATH for '%s', the command was %s", name.c_str(),
+  LOG(Debug, "scanning PATH for '%.*s', the command was %s",
+      static_cast<int>(name.length), name.data,
       was_resolved ? "found" : "not found");
   return was_resolved;
 }
@@ -893,7 +925,10 @@ cold fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
 cold fn SimpleCommand::register_defined_functions(
     AnalysisContext &actx) const throws -> void
 {
-  if (m_args.is_empty() || m_args[0]->raw_string() != "alias") return;
+  if (m_args.is_empty()) return;
+
+  let const command_view = m_args[0]->raw_view();
+  if (!command_view.has_value() || *command_view != "alias") return;
 
   /* An alias defined anywhere in the input resolves a later use of its name, so
      each alias name is recorded before the resolution check. The name is taken
@@ -1052,9 +1087,39 @@ cold pure fn view_is_integer_literal(StringView view) wontthrow -> bool
 cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
 {
   if (needle.length == 0 || needle.length > view.length) return false;
-  for (usize i = 0; i + needle.length <= view.length; i++)
-    if (view.substring(i).starts_with(needle)) return true;
+
+  let const last_start = view.length - needle.length;
+  for (usize start = 0; start <= last_start; start++) {
+    if (view[start] != needle[0]) continue;
+
+    usize matched = 1;
+    while (matched < needle.length && view[start + matched] == needle[matched])
+      matched++;
+
+    if (matched == needle.length) return true;
+  }
+
   return false;
+}
+
+cold pure fn substitution_body_is_bare_echo(StringView body) wontthrow -> bool
+{
+  usize start = 0;
+  while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
+    start++;
+
+  let const trimmed = body.substring(start);
+  if (!trimmed.starts_with(StringView{"echo "}) && trimmed != "echo")
+    return false;
+
+  for (usize i = 0; i < trimmed.length; i++)
+    if (trimmed[i] == '|' || trimmed[i] == ';' || trimmed[i] == '&' ||
+        trimmed[i] == '<' || trimmed[i] == '>' || trimmed[i] == '`')
+    {
+      return false;
+    }
+
+  return true;
 }
 
 cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
@@ -1085,16 +1150,6 @@ cold fn args_have_short_flag(const ArrayList<const Token *> &args,
   return false;
 }
 
-/* The commands that never read stdin, so a pipe or input redirect into one
-   silently discards the upstream data, shellcheck SC2216 and SC2217. */
-constexpr PackedStringKey NON_STDIN_READER_KEYS[] = {
-    SSK("rm"),      SSK("echo"),  SSK("printf"), SSK("true"),  SSK("false"),
-    SSK("mkdir"),   SSK("rmdir"), SSK("touch"),  SSK("chmod"), SSK("chown"),
-    SSK("cp"),      SSK("mv"),    SSK("ln"),     SSK("kill"),  SSK("basename"),
-    SSK("dirname"), SSK("sleep"), SSK("unlink"),
-};
-constexpr StaticStringSet NON_STDIN_READERS{NON_STDIN_READER_KEYS};
-
 /* The top-level system directories rm -r must never aim at, the SC2114
    table. */
 constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
@@ -1104,42 +1159,12 @@ constexpr PackedStringKey SYSTEM_DIRECTORY_KEYS[] = {
 };
 constexpr StaticStringSet SYSTEM_DIRECTORIES{SYSTEM_DIRECTORY_KEYS};
 
-constexpr PackedStringKey TEST_COMMAND_KEYS[] = {SSK("["), SSK("test"),
-                                                 SSK("[[")};
-constexpr StaticStringSet TEST_COMMANDS{TEST_COMMAND_KEYS};
-
-constexpr PackedStringKey DECLARATION_BUILTIN_KEYS[] = {
-    SSK("local"), SSK("declare"), SSK("typeset")};
-constexpr StaticStringSet DECLARATION_BUILTINS{DECLARATION_BUILTIN_KEYS};
-
-constexpr PackedStringKey RUNTIME_DEFINER_KEYS[] = {SSK("."), SSK("source"),
-                                                    SSK("eval"), SSK("alias")};
-constexpr StaticStringSet RUNTIME_DEFINER_COMMANDS{RUNTIME_DEFINER_KEYS};
-
 constexpr PackedStringKey FIND_ACTION_KEYS[] = {
     SSK("-delete"), SSK("-exec"),    SSK("-execdir"), SSK("-fls"),
     SSK("-fprint"), SSK("-fprint0"), SSK("-fprintf"), SSK("-ls"),
     SSK("-ok"),     SSK("-okdir"),   SSK("-print"),   SSK("-print0"),
     SSK("-printf"), SSK("-prune"),   SSK("-quit"),    SSK("-used")};
 constexpr StaticStringSet FIND_ACTIONS{FIND_ACTION_KEYS};
-
-constexpr PackedStringKey ASSIGNMENT_BUILTIN_KEYS[] = {
-    SSK("export"), SSK("readonly"), SSK("local"), SSK("declare"),
-    SSK("typeset")};
-constexpr StaticStringSet ASSIGNMENT_BUILTINS{ASSIGNMENT_BUILTIN_KEYS};
-
-constexpr PackedStringKey VARIABLE_PROBE_COMMAND_KEYS[] = {
-    SSK("["), SSK("test"), SSK("[["), SSK("unset"), SSK("let"), SSK("eval"),
-};
-constexpr StaticStringSet VARIABLE_PROBE_COMMANDS{VARIABLE_PROBE_COMMAND_KEYS};
-
-constexpr PackedStringKey VARIABLE_TARGET_COMMAND_KEYS[] = {
-    SSK("read"),    SSK("mapfile"),  SSK("readarray"),
-    SSK("getopts"), SSK("declare"),  SSK("typeset"),
-    SSK("export"),  SSK("readonly"), SSK("local"),
-};
-constexpr StaticStringSet VARIABLE_TARGET_COMMANDS{
-    VARIABLE_TARGET_COMMAND_KEYS};
 
 fn operand_target_name(StringView text) wontthrow -> StringView
 {
@@ -1235,18 +1260,23 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
-  let const command_literal =
-      m_args[0]->kind() == Token::Kind::Word
-          ? static_cast<const tokens::WordToken *>(m_args[0])
-                ->word()
-                .to_literal_string()
-          : m_args[0]->raw_string();
+  let const borrowed_command_literal = m_args[0]->raw_view();
+  let const command_literal_storage = borrowed_command_literal.has_value()
+                                          ? String{heap_allocator()}
+                                          : m_args[0]->raw_string();
+  let const command_literal = borrowed_command_literal.has_value()
+                                  ? *borrowed_command_literal
+                                  : command_literal_storage.view();
   let const command_is_shadowed =
-      actx.defined_functions.contains(command_literal.view()) ||
-      actx.known_aliases.contains(command_literal.view());
+      actx.defined_functions.contains(command_literal) ||
+      actx.known_aliases.contains(command_literal);
+  let const command_info = get_analysis_command_info(command_literal);
+  let const command_id = command_info.id;
+  let const command_is_assignment_builtin =
+      command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN);
 
   if (!command_is_shadowed && actx.is_inside_loop_condition &&
-      command_literal == "read")
+      command_id == command_name_id::Read)
   {
     actx.loop_condition_reads_input = true;
   }
@@ -1254,12 +1284,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   append_presence_tested_command_names(actx, actx.tested_command_names, true);
 
   if (!command_is_shadowed && actx.is_inside_read_loop &&
-      command_literal == "ssh")
+      command_id == command_name_id::Ssh)
   {
     actx.report_diagnostic(diagnostic_id::sc2095, m_args[0]->source_location());
   }
 
-  if (!command_is_shadowed && TEST_COMMANDS.contains(command_literal.view())) {
+  if (!command_is_shadowed && command_info.is_in_group(COMMAND_GROUP_TEST)) {
     for (usize i = 1; i < m_args.count(); i++) {
       let const literal = m_args[i]->raw_string();
       if (literal.view() == "=~")
@@ -1268,7 +1298,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "find") {
+  if (!command_is_shadowed && command_id == command_name_id::Find) {
     bool has_exec = false;
     bool has_exec_terminator = false;
     bool has_or = false;
@@ -1299,7 +1329,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "alias") {
+  if (!command_is_shadowed && command_id == command_name_id::Alias) {
     for (usize i = 1; i < m_args.count(); i++) {
       let const raw = m_args[i]->raw_string();
       if (view_contains(raw.view(), StringView{"$1"}) ||
@@ -1312,7 +1342,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && TEST_COMMANDS.contains(command_literal.view()) &&
+  if (!command_is_shadowed && command_info.is_in_group(COMMAND_GROUP_TEST) &&
       m_args.count() >= 4)
   {
     let const first_operand = m_args[1]->raw_string();
@@ -1324,7 +1354,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "tr") {
+  if (!command_is_shadowed && command_id == command_name_id::Tr) {
     for (usize i = 1; i < m_args.count() && i <= 2; i++) {
       let const literal = m_args[i]->raw_string();
       if (literal.length() >= 5 && literal[0] == '[' &&
@@ -1337,42 +1367,219 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  for (usize i = 0; i < m_args.count(); i++) {
-    let const source_text =
-        analysis_source_text(actx, m_args[i]->source_location());
-    if (source_text.length >= 2 && source_text[0] == '`' &&
-        source_text[source_text.length - 1] == '`')
+  if (command_id == command_name_id::Echo && !command_is_shadowed &&
+      m_args.count() == 2 && m_args[1]->kind() == Token::Kind::Word)
+  {
+    let const &word = static_cast<const tokens::WordToken *>(m_args[1])->word();
+    if (word.segments.count() == 1 &&
+        word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
     {
-      actx.report_diagnostic(diagnostic_id::sc2006,
-                             m_args[i]->source_location());
+      actx.report_diagnostic(diagnostic_id::sc2005,
+                             m_args[0]->source_location());
     }
-    if (view_contains(source_text, StringView{"$["}))
-      actx.report_diagnostic(diagnostic_id::sc2007,
-                             m_args[i]->source_location());
-    if (m_args[i]->kind() == Token::Kind::Word) {
-      let const &word =
-          static_cast<const tokens::WordToken *>(m_args[i])->word();
-      for (let const &segment : word.segments) {
-        if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
-            segment.text.view().find_character('$').has_value())
+  }
+
+  bool has_command_substitution_argument = false;
+  let const should_scan_for_useless_echo =
+      actx.should_report(diagnostic_id::sc2116);
+
+  for (usize i = 0; i < m_args.count(); i++) {
+    let const arg = m_args[i];
+    let const arg_location = arg->source_location();
+    let const source_text = analysis_source_text(actx, arg_location);
+    let const is_operand = i >= 1;
+    const Word *const word =
+        arg->kind() == Token::Kind::Word
+            ? &static_cast<const tokens::WordToken *>(arg)->word()
+            : nullptr;
+
+    bool has_dollar_bracket = false;
+    bool has_multi_digit_positional = false;
+    bool has_double_dot = false;
+    bool has_open_brace = false;
+    bool has_dollar_byte = false;
+
+    for (usize position = 0; position < source_text.length; position++) {
+      let const byte = source_text[position];
+
+      if (byte == '{') {
+        has_open_brace = true;
+      } else if (byte == '.') {
+        if (position + 1 < source_text.length &&
+            source_text[position + 1] == '.')
+          has_double_dot = true;
+      } else if (byte == '$') {
+        has_dollar_byte = true;
+        if (position + 1 < source_text.length &&
+            source_text[position + 1] == '[')
         {
-          actx.report_diagnostic(diagnostic_id::sc2004,
-                                 m_args[i]->source_location());
-          break;
+          has_dollar_bracket = true;
+        }
+        if (position + 2 < source_text.length &&
+            source_text[position + 1] >= '1' &&
+            source_text[position + 1] <= '9' &&
+            source_text[position + 2] >= '0' &&
+            source_text[position + 2] <= '9')
+        {
+          has_multi_digit_positional = true;
         }
       }
     }
-    for (usize position = 0; position + 2 < source_text.length; position++) {
-      if (source_text[position] != '$' || source_text[position + 1] < '1' ||
-          source_text[position + 1] > '9' || source_text[position + 2] < '0' ||
-          source_text[position + 2] > '9')
-      {
-        continue;
-      }
-      actx.report_diagnostic(diagnostic_id::sc1037,
-                             m_args[i]->source_location());
-      break;
+
+    if (source_text.length >= 2 && source_text[0] == '`' &&
+        source_text[source_text.length - 1] == '`')
+    {
+      actx.report_diagnostic(diagnostic_id::sc2006, arg_location);
     }
+
+    if (has_dollar_bracket)
+      actx.report_diagnostic(diagnostic_id::sc2007, arg_location);
+
+    bool has_dollar_in_arithmetic = false;
+    bool has_external_arithmetic_read = false;
+    bool has_unquoted_command_substitution = false;
+    bool has_bare_star_reference = false;
+    bool has_spread_alone_unquoted = false;
+    bool has_spread_in_longer_word = false;
+    bool has_bracket_byte = false;
+    usize echo_only_substitution_count = 0;
+    StringView lost_pipeline_name{};
+
+    if (word != nullptr) {
+      for (let const &segment : word->segments) {
+        if (!has_bracket_byte && segment.has_live_glob_chars() &&
+            segment.text.view().find_character('[').has_value())
+        {
+          has_bracket_byte = true;
+        }
+
+        switch (segment.kind) {
+        case WordSegment::Kind::ArithmeticExpansion:
+          if (!has_dollar_in_arithmetic &&
+              segment.text.view().find_character('$').has_value())
+          {
+            has_dollar_in_arithmetic = true;
+          }
+          if (is_operand && !has_external_arithmetic_read &&
+              arithmetic_reads_external_input(actx, segment.text.view()))
+          {
+            has_external_arithmetic_read = true;
+          }
+          break;
+
+        case WordSegment::Kind::CommandSubstitution:
+          has_command_substitution_argument = true;
+          if (!segment.is_in_double_quotes)
+            has_unquoted_command_substitution = true;
+          if (should_scan_for_useless_echo &&
+              substitution_body_is_bare_echo(segment.text.view()))
+          {
+            echo_only_substitution_count++;
+          }
+          break;
+
+        case WordSegment::Kind::FunctionSubstitution:
+          actx.has_seen_runtime_definer = true;
+          break;
+
+        case WordSegment::Kind::VariableReference: {
+          let const referenced = segment.text.view();
+          if (!is_operand) break;
+          if (word->segments.count() == 1 && referenced == "*" &&
+              !segment.is_in_double_quotes)
+          {
+            has_bare_star_reference = true;
+          }
+          if (referenced == "@" && !has_spread_alone_unquoted &&
+              !has_spread_in_longer_word)
+          {
+            has_spread_alone_unquoted =
+                word->segments.count() == 1 && !segment.is_in_double_quotes;
+            has_spread_in_longer_word = word->segments.count() > 1;
+          }
+          if (lost_pipeline_name.is_empty() &&
+              actx.pipeline_lost_names.contains(referenced))
+          {
+            lost_pipeline_name = referenced;
+          }
+          break;
+        }
+
+        default: break;
+        }
+      }
+    }
+
+    if (has_dollar_in_arithmetic)
+      actx.report_diagnostic(diagnostic_id::sc2004, arg_location);
+
+    if (has_multi_digit_positional)
+      actx.report_diagnostic(diagnostic_id::sc1037, arg_location);
+
+    if (is_operand && has_double_dot && has_open_brace && has_dollar_byte)
+      actx.report_diagnostic(diagnostic_id::sc2051, arg_location);
+
+    if (word != nullptr && is_operand) {
+      const bool is_quoted_home = source_text == "\"~\"" ||
+                                  source_text == "'~'" ||
+                                  source_text.starts_with(StringView{"\"~/"}) ||
+                                  source_text.starts_with(StringView{"'~/"});
+      if (is_quoted_home)
+        actx.report_diagnostic(diagnostic_id::sc2088, arg_location);
+
+      if (!command_is_shadowed && command_id == command_name_id::Echo &&
+          source_text.length >= 4 && source_text[0] == '\'' &&
+          source_text[1] == '$' && source_text[source_text.length - 1] == '\'')
+      {
+        let const referenced =
+            source_text.substring_of_length(2, source_text.length - 3);
+        bool is_simple_name = !referenced.is_empty() &&
+                              lexer::is_variable_name_start(referenced[0]);
+        for (usize position = 1; position < referenced.length && is_simple_name;
+             position++)
+          is_simple_name = lexer::is_variable_name(referenced[position]);
+
+        if (is_simple_name)
+          actx.report_diagnostic(diagnostic_id::sc2016, arg_location);
+      }
+
+      if (has_bare_star_reference)
+        actx.report_diagnostic(diagnostic_id::sc2048, arg_location);
+
+      if (!lost_pipeline_name.is_empty()) {
+        actx.report_diagnostic(diagnostic_id::sc2031, arg_location);
+        actx.pipeline_lost_names.remove(lost_pipeline_name);
+      }
+
+      if (has_external_arithmetic_read) {
+        actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
+                               arg_location);
+      }
+    }
+
+    if (word != nullptr && has_bracket_byte &&
+        word_has_malformed_glob_bracket(*word))
+    {
+      actx.report_diagnostic(diagnostic_id::malformed_glob, arg_location);
+    }
+
+    if (is_operand && word != nullptr && has_unquoted_command_substitution &&
+        !(command_is_assignment_builtin &&
+          word->get_assignment_split().has_value()))
+    {
+      actx.report_diagnostic(diagnostic_id::sc2046, arg_location);
+    }
+
+    if (is_operand && command_id != command_name_id::DoubleBracket) {
+      if (has_spread_alone_unquoted) {
+        actx.report_diagnostic(diagnostic_id::sc2068, arg_location);
+      } else if (has_spread_in_longer_word) {
+        actx.report_diagnostic(diagnostic_id::sc2145, arg_location);
+      }
+    }
+
+    for (usize report = 0; report < echo_only_substitution_count; report++)
+      actx.report_diagnostic(diagnostic_id::sc2116, arg_location);
   }
 
   if (m_args[0]->kind() == Token::Kind::Word) {
@@ -1390,7 +1597,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
      so their names are recorded and the leak warning stays quiet for a later
      assignment. */
   if (actx.function_scope_depth > 0 && name.has_value() &&
-      DECLARATION_BUILTINS.contains(name->view()))
+      command_info.is_in_group(COMMAND_GROUP_DECLARATION_BUILTIN))
   {
     for (usize i = 1; i < m_args.count(); i++) {
       let const word = m_args[i]->kind() == Token::Kind::Word
@@ -1405,46 +1612,37 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* A name like [ holds a glob metacharacter that static_command_name rejects,
      so the literal text is taken separately for the test recognition. */
-  let const command_raw = m_args[0]->raw_string();
-  if (!command_raw.is_empty() && command_raw[0] == '-')
+  if (!command_literal.is_empty() && command_literal[0] == '-')
     actx.report_diagnostic(diagnostic_id::sc2215, m_args[0]->source_location());
-  if (command_raw.length() > 1 && command_raw[0] == '$' &&
-      lexer::is_variable_name_start(command_raw[1]) &&
-      command_raw.view().find_character('=').has_value())
+  if (command_literal.length > 1 && command_literal[0] == '$' &&
+      lexer::is_variable_name_start(command_literal[1]) &&
+      command_literal.find_character('=').has_value())
     actx.report_diagnostic(diagnostic_id::sc2281, m_args[0]->source_location());
-  if ((command_raw.view().starts_with(StringView{"["}) &&
-       command_raw.view() != "[") ||
-      (command_raw.view().starts_with(StringView{"[["}) &&
-       command_raw.view() != "[["))
+  if ((command_literal.starts_with(StringView{"["}) &&
+       command_literal != "[") ||
+      (command_literal.starts_with(StringView{"[["}) &&
+       command_literal != "[["))
     actx.report_diagnostic(diagnostic_id::sc1035, m_args[0]->source_location());
-  if (command_raw.view().starts_with(StringView{"[["}) &&
-      command_raw.view().find_character('=').has_value())
+  if (command_literal.starts_with(StringView{"[["}) &&
+      command_literal.find_character('=').has_value())
     actx.report_diagnostic(diagnostic_id::sc2077, m_args[0]->source_location());
-  if (command_raw.view().starts_with(StringView{"["}) &&
-      command_raw.view() != "[" && command_raw.view() != "[[" &&
-      m_args.count() > 1)
+  if (command_literal.starts_with(StringView{"["}) && command_literal != "[" &&
+      command_literal != "[[" && m_args.count() > 1)
   {
-    let const last_raw = m_args.back()->raw_string();
-    if (!last_raw.is_empty() && last_raw[last_raw.length() - 1] == ']')
+    String last_storage{heap_allocator()};
+    let const last_raw = borrowed_token_text(m_args.back(), last_storage);
+    if (!last_raw.is_empty() && last_raw[last_raw.length - 1] == ']')
       actx.report_diagnostic(diagnostic_id::sc1014,
                              m_args[0]->source_location());
   }
-  if (m_args.count() >= 2 && m_args[1]->raw_string().view() == "=")
+  if (m_args.count() >= 2 && m_args[1]->raw_view() == StringView{"="})
     actx.report_diagnostic(diagnostic_id::sc2283, m_args[1]->source_location());
-
-  for (usize i = 1; i < m_args.count(); i++) {
-    let const raw = m_args[i]->raw_string();
-    if (view_contains(raw.view(), StringView{".."}) &&
-        raw.view().find_character('{').has_value() &&
-        raw.view().find_character('$').has_value())
-      actx.report_diagnostic(diagnostic_id::sc2051,
-                             m_args[i]->source_location());
-  }
 
   /* An assignment builtin that sets PATH also leaves the runtime search path
      unknown to the prepass. */
   if (name.has_value() &&
-      (ASSIGNMENT_BUILTINS.contains(name->view()) || *name == "unset"))
+      (command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN) ||
+       command_id == command_name_id::Unset))
   {
     for (usize i = 1; i < m_args.count(); i++) {
       let const word = m_args[i]->kind() == Token::Kind::Word
@@ -1457,66 +1655,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  /* A user-defined function or alias of a builtin name runs that user code, so
-     a lint that keys on the builtin name must stay quiet here. */
-  for (usize i = 1; i < m_args.count(); i++) {
-    if (m_args[i]->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
-    let const source_text =
-        analysis_source_text(actx, m_args[i]->source_location());
-
-    const bool is_quoted_home = source_text == "\"~\"" ||
-                                source_text == "'~'" ||
-                                source_text.starts_with(StringView{"\"~/"}) ||
-                                source_text.starts_with(StringView{"'~/"});
-    if (is_quoted_home)
-      actx.report_diagnostic(diagnostic_id::sc2088,
-                             m_args[i]->source_location());
-
-    if (!command_is_shadowed && command_literal == "echo" &&
-        source_text.length >= 4 && source_text[0] == '\'' &&
-        source_text[1] == '$' && source_text[source_text.length - 1] == '\'')
-    {
-      let const name =
-          source_text.substring_of_length(2, source_text.length - 3);
-      bool is_simple_name =
-          !name.is_empty() && lexer::is_variable_name_start(name[0]);
-      for (usize position = 1; position < name.length && is_simple_name;
-           position++)
-        is_simple_name = lexer::is_variable_name(name[position]);
-      if (is_simple_name)
-        actx.report_diagnostic(diagnostic_id::sc2016,
-                               m_args[i]->source_location());
-    }
-
-    if (word.segments.count() == 1 &&
-        word.segments[0].kind == WordSegment::Kind::VariableReference &&
-        word.segments[0].text.view() == "*" &&
-        !word.segments[0].is_in_double_quotes)
-      actx.report_diagnostic(diagnostic_id::sc2048,
-                             m_args[i]->source_location());
-
-    for (let const &segment : word.segments)
-      if (segment.kind == WordSegment::Kind::VariableReference &&
-          actx.pipeline_lost_names.contains(segment.text.view()))
-      {
-        actx.report_diagnostic(diagnostic_id::sc2031,
-                               m_args[i]->source_location());
-        actx.pipeline_lost_names.remove(segment.text.view());
-        break;
-      }
-
-    for (let const &segment : word.segments)
-      if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
-          arithmetic_reads_external_input(actx, segment.text.view()))
-      {
-        actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
-                               m_args[i]->source_location());
-        break;
-      }
-  }
-
-  if (!command_is_shadowed && command_literal == "read") {
+  if (!command_is_shadowed && command_id == command_name_id::Read) {
     let should_skip_option_operand = false;
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
@@ -1556,7 +1695,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "export" &&
+  if (!command_is_shadowed && command_id == command_name_id::Export &&
       !args_have_short_flag(m_args, 'n'))
   {
     for (usize i = 1; i < m_args.count(); i++) {
@@ -1568,7 +1707,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "unset") {
+  if (!command_is_shadowed && command_id == command_name_id::Unset) {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const raw = m_args[i]->raw_string();
@@ -1583,7 +1722,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "find") {
+  if (!command_is_shadowed && command_id == command_name_id::Find) {
     for (usize i = 1; i + 1 < m_args.count(); i++) {
       let const predicate = m_args[i]->raw_string();
       if (predicate.view() == "-name" || predicate.view() == "-iname" ||
@@ -1610,7 +1749,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "tr") {
+  if (!command_is_shadowed && command_id == command_name_id::Tr) {
     for (usize i = 1; i < m_args.count() && i <= 2; i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
@@ -1621,7 +1760,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "let") {
+  if (!command_is_shadowed && command_id == command_name_id::Let) {
     for (usize i = 1; i < m_args.count(); i++) {
       let const expression = m_args[i]->raw_string();
       if (arithmetic_reads_external_input(actx, expression.view()))
@@ -1630,7 +1769,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "printf") {
+  if (!command_is_shadowed && command_id == command_name_id::Printf) {
     usize format_index = 1;
     if (format_index < m_args.count() &&
         m_args[format_index]->raw_string().view() == "-v")
@@ -1651,7 +1790,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && command_literal == "sudo") {
+  if (!command_is_shadowed && command_id == command_name_id::Sudo) {
     for (let const &redirection : m_redirections)
       if (redirection.target != nullptr)
         actx.report_diagnostic(diagnostic_id::sc2024_redirection,
@@ -1664,11 +1803,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                m_args[i]->source_location());
   }
 
-  if (!command_is_shadowed && !TEST_COMMANDS.contains(command_literal.view()) &&
-      !VARIABLE_TARGET_COMMANDS.contains(command_literal.view()))
+  if (!command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
+      !command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET))
   {
-    let const command_is_assignment_builtin =
-        ASSIGNMENT_BUILTINS.contains(command_literal.view());
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
@@ -1682,8 +1819,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (!command_is_shadowed && !TEST_COMMANDS.contains(command_literal.view()) &&
-      command_literal != "echo" && command_literal != "printf")
+  if (!command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
+      command_id != command_name_id::Echo &&
+      command_id != command_name_id::Printf)
   {
     bool has_end_of_options = false;
     for (usize i = 1; i < m_args.count(); i++) {
@@ -1705,7 +1843,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
      so any later unresolved command must not be a hard failure. */
   let runtime_definer_name = String{command_literal};
-  if ((command_literal == "builtin" || command_literal == "command") &&
+  bool is_runtime_definer =
+      command_info.is_in_group(COMMAND_GROUP_RUNTIME_DEFINER);
+
+  if ((command_id == command_name_id::Builtin ||
+       command_id == command_name_id::Command) &&
       m_args.count() > 1)
   {
     usize wrapped_command_index = 1;
@@ -1714,9 +1856,13 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
     if (wrapped_command_index < m_args.count()) {
       runtime_definer_name = m_args[wrapped_command_index]->raw_string();
+      is_runtime_definer =
+          get_analysis_command_info(runtime_definer_name.view())
+              .is_in_group(COMMAND_GROUP_RUNTIME_DEFINER);
     }
   }
-  if (RUNTIME_DEFINER_COMMANDS.contains(runtime_definer_name.view())) {
+
+  if (is_runtime_definer) {
     LOG(Debug,
         "'%s' may define commands at run time, later resolution failures "
         "degrade to warnings",
@@ -1724,34 +1870,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.has_seen_runtime_definer = true;
   }
 
-  /* A funsub argument, ${ ...; }, runs its body in the current shell, so a
-     function it defines persists where the prepass cannot see it. */
-  for (let const t : m_args) {
-    if (t->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(t)->word();
-    for (let const &segment : word.segments) {
-      if (segment.kind == WordSegment::Kind::FunctionSubstitution) {
-        actx.has_seen_runtime_definer = true;
-        break;
-      }
-    }
-  }
-
-  /* An unterminated bracket expression would throw at run time, and the fault
-     is visible from the word bytes alone. */
-  for (let const t : m_args) {
-    if (t->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(t)->word();
-    if (word_has_malformed_glob_bracket(word)) {
-      actx.report_diagnostic(diagnostic_id::malformed_glob,
-                             t->source_location());
-    }
-  }
-
   /* An unquoted variable inside a test silently breaks when it is empty or
      splits. This stays a warning even at the strict default, since the split
      may be intended. */
-  if (TEST_COMMANDS.contains(command_literal.view())) {
+  if (command_info.is_in_group(COMMAND_GROUP_TEST)) {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
@@ -1770,7 +1892,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* read without -r lets a backslash escape the next byte, mangling a line,
      shellcheck SC2162. */
-  if (command_literal == "read" && !command_is_shadowed &&
+  if (command_id == command_name_id::Read && !command_is_shadowed &&
       !args_have_short_flag(m_args, 'r'))
   {
     actx.report_diagnostic(diagnostic_id::sc2162, source_location());
@@ -1779,7 +1901,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* The bashism lints, each fired only under a POSIX shebang. echo -e/-n/-E is
      SC3037, declare and typeset are SC3044, source is SC3046. */
   if (actx.shebang_is_posix_sh && !command_is_shadowed) {
-    if (command_literal == "echo" && m_args.count() >= 2 &&
+    if (command_id == command_name_id::Echo && m_args.count() >= 2 &&
         m_args[1]->kind() == Token::Kind::Word)
     {
       let const flag = static_cast<const tokens::WordToken *>(m_args[1])
@@ -1793,17 +1915,20 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                m_args[1]->source_location(), {view});
       }
     }
-    if (command_literal == "declare" || command_literal == "typeset")
+    if (command_id == command_name_id::Declare ||
+        command_id == command_name_id::Typeset)
+    {
       actx.report_diagnostic(diagnostic_id::sc3044,
-                             m_args[0]->source_location(),
-                             {command_literal.view()});
-    if (command_literal == "source")
+                             m_args[0]->source_location(), {command_literal});
+    }
+
+    if (command_id == command_name_id::Source)
       actx.report_diagnostic(diagnostic_id::sc3046,
                              m_args[0]->source_location());
-    if (command_literal == "local")
+    if (command_id == command_name_id::Local)
       actx.report_diagnostic(diagnostic_id::sc3043,
                              m_args[0]->source_location());
-    if (command_literal == "printf" && m_args.count() >= 2 &&
+    if (command_id == command_name_id::Printf && m_args.count() >= 2 &&
         m_args[1]->kind() == Token::Kind::Word &&
         static_cast<const tokens::WordToken *>(m_args[1])
                 ->word()
@@ -1815,46 +1940,51 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
     /* mapfile and its readarray alias are bash array builtins, shellcheck
        SC3030. */
-    if (command_literal == "mapfile" || command_literal == "readarray")
+    if (command_id == command_name_id::Mapfile ||
+        command_id == command_name_id::Readarray)
+    {
       actx.report_diagnostic(diagnostic_id::sc3030,
-                             m_args[0]->source_location(),
-                             {command_literal.view()});
+                             m_args[0]->source_location(), {command_literal});
+    }
   }
 
   if (!command_is_shadowed) {
-    if (command_literal == "egrep")
+    switch (command_id) {
+    case command_name_id::Egrep:
       actx.report_diagnostic(diagnostic_id::sc2196,
                              m_args[0]->source_location());
-    else if (command_literal == "fgrep")
+      break;
+
+    case command_name_id::Fgrep:
       actx.report_diagnostic(diagnostic_id::sc2197,
                              m_args[0]->source_location());
-    else if (command_literal == "expr")
+      break;
+
+    case command_name_id::Expr:
       actx.report_diagnostic(diagnostic_id::sc2003,
                              m_args[0]->source_location());
-    else if (command_literal == "local" && actx.function_scope_depth == 0 &&
-             !actx.is_command_status_observed)
-      actx.report_diagnostic(diagnostic_id::sc2168,
-                             m_args[0]->source_location());
-    else if (command_literal == "typeset" && !actx.shebang_is_posix_sh)
-      actx.report_diagnostic(diagnostic_id::typeset_spelling,
-                             m_args[0]->source_location());
-  }
+      break;
 
-  if (command_literal == "echo" && !command_is_shadowed &&
-      m_args.count() == 2 && m_args[1]->kind() == Token::Kind::Word)
-  {
-    let const &word = static_cast<const tokens::WordToken *>(m_args[1])->word();
-    if (word.segments.count() == 1 &&
-        word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
-    {
-      actx.report_diagnostic(diagnostic_id::sc2005,
-                             m_args[0]->source_location());
+    case command_name_id::Local:
+      if (actx.function_scope_depth == 0 && !actx.is_command_status_observed) {
+        actx.report_diagnostic(diagnostic_id::sc2168,
+                               m_args[0]->source_location());
+      }
+      break;
+
+    case command_name_id::Typeset:
+      if (!actx.shebang_is_posix_sh)
+        actx.report_diagnostic(diagnostic_id::typeset_spelling,
+                               m_args[0]->source_location());
+      break;
+
+    default: break;
     }
   }
 
   /* A double-quoted trap action expands at set time, not when it fires,
      shellcheck SC2064. The action is the first operand. */
-  if (command_literal == "trap" && !command_is_shadowed &&
+  if (command_id == command_name_id::Trap && !command_is_shadowed &&
       m_args.count() >= 2 && m_args[1]->kind() == Token::Kind::Word)
   {
     let const &action =
@@ -1876,7 +2006,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A variable or command substitution in the printf format lets the data
      control the directives, shellcheck SC2059. The format is the first
      non-option word, and a -- forces the next word as the format. */
-  if (command_literal == "printf" && !command_is_shadowed) {
+  if (command_id == command_name_id::Printf && !command_is_shadowed) {
     usize format_index = 0;
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) {
@@ -1919,8 +2049,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* An unquoted command substitution splits on IFS and globs each field,
      shellcheck SC2046. An assignment-builtin operand such as export FOO=$(cmd)
      does not split in assignment context. */
-  let const command_is_assignment_builtin =
-      ASSIGNMENT_BUILTINS.contains(command_literal.view());
 
   /* A declaration builtin that assigns from a command substitution, such as
      local x=$(cmd), reports its own success rather than the command's status,
@@ -1942,33 +2070,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       break;
     }
 
-  for (usize i = 1; i < m_args.count(); i++) {
-    if (m_args[i]->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
-    bool word_has_unquoted_command_substitution = false;
-    for (let const &segment : word.segments) {
-      if (segment.kind == WordSegment::Kind::CommandSubstitution &&
-          !segment.is_in_double_quotes)
-      {
-        word_has_unquoted_command_substitution = true;
-        break;
-      }
-    }
-    if (!word_has_unquoted_command_substitution) continue;
-    /* An assignment-builtin operand does not split in assignment context. This
-       split check allocates, so it runs only for a word carrying an unquoted
-       substitution. */
-    if (command_is_assignment_builtin &&
-        word.get_assignment_split().has_value())
-    {
-      continue;
-    }
-    actx.report_diagnostic(diagnostic_id::sc2046, m_args[i]->source_location());
-  }
-
   /* rm -r with a "$var/" operand deletes / when the variable is empty,
      shellcheck SC2115. A literal top-level system directory is SC2114. */
-  if (command_literal == "rm" && !command_is_shadowed &&
+  if (command_id == command_name_id::Rm && !command_is_shadowed &&
       args_have_short_flag(m_args, 'r'))
   {
     for (usize i = 1; i < m_args.count(); i++) {
@@ -1997,8 +2101,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* The grep pattern lints. An unquoted pattern with a glob metacharacter is
      SC2062, a pattern with a leading * that has nothing to repeat is SC2063.
      The pattern is the first word past the options. */
-  if ((command_literal == "grep" || command_literal == "egrep" ||
-       command_literal == "fgrep") &&
+  if ((command_id == command_name_id::Grep ||
+       command_id == command_name_id::Egrep ||
+       command_id == command_name_id::Fgrep) &&
       !command_is_shadowed)
   {
     for (usize i = 1; i < m_args.count(); i++) {
@@ -2024,7 +2129,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* mkdir -pm applies the mode only to the deepest directory, shellcheck
      SC2174. */
-  if (command_literal == "mkdir" && !command_is_shadowed &&
+  if (command_id == command_name_id::Mkdir && !command_is_shadowed &&
       args_have_short_flag(m_args, 'p') && args_have_short_flag(m_args, 'm'))
   {
     actx.report_diagnostic(diagnostic_id::sc2174, m_args[0]->source_location());
@@ -2032,7 +2137,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* An exit or return code outside the literal 0-255 shape errors or wraps
      modulo 256, shellcheck SC2242. */
-  if ((command_literal == "exit" || command_literal == "return") &&
+  if ((command_id == command_name_id::Exit ||
+       command_id == command_name_id::Return) &&
       !command_is_shadowed && m_args.count() >= 2 &&
       m_args[1]->kind() == Token::Kind::Word)
   {
@@ -2049,60 +2155,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (!is_in_range)
         actx.report_diagnostic(diagnostic_id::sc2242,
                                m_args[1]->source_location(),
-                               {view, command_literal.view()});
-    }
-  }
-
-  /* The $@ word lints. A bare unquoted $@ is SC2068, a $@ mixed into a longer
-     word is SC2145. The [[ form gets SC2199 below. */
-  for (usize i = command_literal == "[[" ? m_args.count() : 1;
-       i < m_args.count(); i++)
-  {
-    if (m_args[i]->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
-    for (let const &segment : word.segments) {
-      if (segment.kind != WordSegment::Kind::VariableReference ||
-          segment.text.view() != "@")
-      {
-        continue;
-      }
-      if (word.segments.count() == 1 && !segment.is_in_double_quotes) {
-        actx.report_diagnostic(diagnostic_id::sc2068,
-                               m_args[i]->source_location());
-      } else if (word.segments.count() > 1) {
-        actx.report_diagnostic(diagnostic_id::sc2145,
-                               m_args[i]->source_location());
-      }
-      break;
-    }
-  }
-
-  /* A command substitution that only echoes runs a subshell for text the caller
-     already has, shellcheck SC2116. A body carrying an operator runs more than
-     the echo. */
-  for (usize i = 0; i < m_args.count(); i++) {
-    if (m_args[i]->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
-    for (let const &segment : word.segments) {
-      if (segment.kind != WordSegment::Kind::CommandSubstitution) continue;
-      let const body = segment.text.view();
-      usize start = 0;
-      while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
-        start++;
-      let const trimmed = body.substring(start);
-      if (!trimmed.starts_with(StringView{"echo "}) && trimmed != "echo")
-        continue;
-      let body_runs_more_than_echo = false;
-      for (usize b = 0; b < trimmed.length; b++)
-        if (trimmed[b] == '|' || trimmed[b] == ';' || trimmed[b] == '&' ||
-            trimmed[b] == '<' || trimmed[b] == '>' || trimmed[b] == '`')
-        {
-          body_runs_more_than_echo = true;
-          break;
-        }
-      if (!body_runs_more_than_echo)
-        actx.report_diagnostic(diagnostic_id::sc2116,
-                               m_args[i]->source_location());
+                               {view, command_literal});
     }
   }
 
@@ -2175,7 +2228,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
 
     if (!m_redirections.is_empty() && !command_is_shadowed &&
-        NON_STDIN_READERS.contains(command_literal.view()))
+        command_info.is_in_group(COMMAND_GROUP_NON_STDIN_READER))
     {
       if (!args_have_stdin_operand(m_args))
         for (let const &redirection : m_redirections)
@@ -2185,7 +2238,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           {
             actx.report_diagnostic(diagnostic_id::sc2217,
                                    m_args[0]->source_location(),
-                                   {command_literal.view()});
+                                   {command_literal});
             break;
           }
     }
@@ -2194,7 +2247,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
      SC2166, warned only past the first operand and not after a !. A negated -z
      or -n is SC2236 and SC2237. */
-  if (TEST_COMMANDS.contains(command_literal.view()) && !command_is_shadowed) {
+  if (command_info.is_in_group(COMMAND_GROUP_TEST) && !command_is_shadowed) {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const literal = static_cast<const tokens::WordToken *>(m_args[i])
@@ -2255,17 +2308,20 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A single-operand test with no operator is the nonempty-string test,
      shellcheck SC2244. A flag-shaped operand is left alone so [ -n ] is not
      told to use -n. */
-  if (TEST_COMMANDS.contains(command_literal.view()) && !command_is_shadowed) {
+  if (command_info.is_in_group(COMMAND_GROUP_TEST) && !command_is_shadowed) {
     usize operand_end = m_args.count();
     bool bracket_form_is_closed = true;
-    if (command_literal == "[" || command_literal == "[[") {
+    if (command_id == command_name_id::SingleBracket ||
+        command_id == command_name_id::DoubleBracket)
+    {
       bracket_form_is_closed =
           m_args.count() >= 2 &&
           m_args[m_args.count() - 1]->kind() == Token::Kind::Word &&
           static_cast<const tokens::WordToken *>(m_args[m_args.count() - 1])
                   ->word()
                   .to_literal_string()
-                  .view() == (command_literal == "[" ? "]" : "]]");
+                  .view() ==
+              (command_id == command_name_id::SingleBracket ? "]" : "]]");
       if (bracket_form_is_closed) operand_end = m_args.count() - 1;
     }
     if (bracket_form_is_closed && operand_end == 2 &&
@@ -2317,8 +2373,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       }
 
-      if (command_literal != "[[" && (view == "=" || view == "==") &&
-          i + 1 < operand_end && m_args[i + 1]->kind() == Token::Kind::Word)
+      if (command_id != command_name_id::DoubleBracket &&
+          (view == "=" || view == "==") && i + 1 < operand_end &&
+          m_args[i + 1]->kind() == Token::Kind::Word)
       {
         let const &right =
             static_cast<const tokens::WordToken *>(m_args[i + 1])->word();
@@ -2372,25 +2429,29 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
+  let const resolution_diagnostic =
+      actx.has_seen_runtime_definer
+          ? diagnostic_id::unresolved_command_uncertain
+          : diagnostic_id::unresolved_command;
+  /* The resolution scan reads PATH and the filesystem, so it is skipped when
+     its only diagnostic cannot reach the output. */
+  let const should_check_command_resolution =
+      name.has_value() && !actx.should_silence_unresolved_commands &&
+      !command_is_shadowed && actx.should_report(resolution_diagnostic);
+
   let unavailable = Maybe<utils::unavailable_path_source_component>{};
   let command_was_resolved = false;
-  if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed)
-  {
+  if (should_check_command_resolution) {
     command_was_resolved = command_resolves(*name, m_args[0]->source_location(),
                                             actx, unavailable);
   }
-  if (name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed && !command_was_resolved &&
+  if (should_check_command_resolution && !command_was_resolved &&
       !actx.tested_command_names.contains(*name))
   {
-    let const diagnostic = actx.has_seen_runtime_definer
-                               ? diagnostic_id::unresolved_command_uncertain
-                               : diagnostic_id::unresolved_command;
     let diagnostic_location = m_args[0]->source_location();
-    let reported_name = name->view();
+    let reported_name = *name;
     if (unavailable.has_value() &&
-        diagnostic == diagnostic_id::unresolved_command)
+        resolution_diagnostic == diagnostic_id::unresolved_command)
     {
       diagnostic_location = unavailable->location;
       reported_name = unavailable->reported_prefix.view();
@@ -2400,13 +2461,13 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         [&](StringView n) throws { local_names.push(String{n}); });
     actx.known_aliases.for_each([&](StringView n)
                                     throws { local_names.push(String{n}); });
-    let const suggestion =
-        utils::suggest_command(StringView{*name}, local_names);
+    let const suggestion = utils::suggest_command(*name, local_names);
     if (suggestion.has_value()) {
-      actx.report_diagnostic(diagnostic, diagnostic_location,
+      actx.report_diagnostic(resolution_diagnostic, diagnostic_location,
                              {reported_name, suggestion->view()});
     } else {
-      actx.report_diagnostic(diagnostic, diagnostic_location, {reported_name});
+      actx.report_diagnostic(resolution_diagnostic, diagnostic_location,
+                             {reported_name});
     }
   }
 
@@ -2414,44 +2475,30 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
      that writes no variable and runs no unseen code. Every other command
      forgets the whole table. */
   let should_clear_constants =
-      !optimizer::command_is_environment_neutral(command_literal.view());
-  if (!should_clear_constants) {
-    /* A command substitution runs arbitrary code, so even a neutral builtin
-       carrying one forgets the table. */
-    for (let const t : m_args) {
-      if (t->kind() != Token::Kind::Word) continue;
-      let const &word = static_cast<const tokens::WordToken *>(t)->word();
-      for (let const &segment : word.segments) {
-        if (segment.kind == WordSegment::Kind::CommandSubstitution) {
-          should_clear_constants = true;
-          break;
-        }
-      }
-      if (should_clear_constants) break;
-    }
-  }
+      !command_info.is_in_group(COMMAND_GROUP_ENVIRONMENT_NEUTRAL) ||
+      has_command_substitution_argument;
 
   /* A neutral builtin shadowed by a function or alias is really a call into
      user code, so it forgets the table too. */
   if (!should_clear_constants &&
-      (actx.defined_functions.contains(command_literal.view()) ||
-       actx.known_aliases.contains(command_literal.view())))
+      (actx.defined_functions.contains(command_literal) ||
+       actx.known_aliases.contains(command_literal)))
   {
     should_clear_constants = true;
   }
 
   if (should_clear_constants) {
     LOG(Debug,
-        "the command '%s' may write variables, forgetting the recorded "
+        "the command '%.*s' may write variables, forgetting the recorded "
         "constants",
-        command_literal.c_str());
+        static_cast<int>(command_literal.length), command_literal.data);
     actx.constant_variables.clear();
   }
 
   let const is_top_level_unconditional =
       actx.function_scope_depth == 0 && is_unconditional;
   if (is_top_level_unconditional && !command_is_shadowed) {
-    if (VARIABLE_TARGET_COMMANDS.contains(command_literal.view())) {
+    if (command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET)) {
       for (usize i = 1; i < m_args.count(); i++) {
         let const word = m_args[i]->kind() == Token::Kind::Word
                              ? static_cast<const tokens::WordToken *>(m_args[i])
@@ -2460,7 +2507,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                              : m_args[i]->raw_string();
         actx.note_variable_assignment(operand_target_name(word.view()));
       }
-    } else if (!VARIABLE_PROBE_COMMANDS.contains(command_literal.view())) {
+    } else if (!command_info.is_in_group(COMMAND_GROUP_VARIABLE_PROBE)) {
       for (usize i = 1; i < m_args.count(); i++) {
         if (m_args[i]->kind() != Token::Kind::Word) continue;
 
@@ -2486,26 +2533,26 @@ fn SimpleCommand::append_presence_tested_command_names(
 
   let const name = static_command_name(m_args[0]);
   if (!name.has_value()) return;
-  if (actx.defined_functions.contains(name->view()) ||
-      actx.known_aliases.contains(name->view()))
+  if (actx.defined_functions.contains(*name) ||
+      actx.known_aliases.contains(*name))
   {
     return;
   }
 
-  let const is_command_test = name->view() == "command";
-  let const is_type_or_hash = name->view() == "type" || name->view() == "hash";
+  let const is_command_test = *name == "command";
+  let const is_type_or_hash = *name == "type" || *name == "hash";
   if (!is_command_test && !is_type_or_hash) return;
 
   bool has_presence_flag = is_type_or_hash;
   for (usize i = 1; i < m_args.count(); i++) {
     let const arg = static_command_name(m_args[i]);
     if (!arg.has_value()) break;
-    if (is_command_test && (arg->view() == "-v" || arg->view() == "-V")) {
+    if (is_command_test && (*arg == "-v" || *arg == "-V")) {
       has_presence_flag = true;
       continue;
     }
-    if (arg->view().starts_with("-")) continue;
-    if (has_presence_flag) names.add(arg->view());
+    if (arg->starts_with("-")) continue;
+    if (has_presence_flag) names.add(*arg);
   }
 }
 
@@ -2553,9 +2600,9 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         let const file_is_plain_operand =
             cat_args[1]->kind() == Token::Kind::Word &&
             !raw_operand.is_empty() && raw_operand[0] != '-';
-        if (name.has_value() && name->view() == "cat" &&
-            !actx.defined_functions.contains(name->view()) &&
-            !actx.known_aliases.contains(name->view()) && file_is_plain_operand)
+        if (name.has_value() && *name == "cat" &&
+            !actx.defined_functions.contains(*name) &&
+            !actx.known_aliases.contains(*name) && file_is_plain_operand)
         {
           actx.report_diagnostic(diagnostic_id::sc2002,
                                  cat_args[0]->source_location());
@@ -2574,13 +2621,12 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     let const stage_name = static_command_name(stage->args()[0]);
     let const next_name = static_command_name(next->args()[0]);
     if (!stage_name.has_value() || !next_name.has_value()) continue;
-    let const next_is_user =
-        actx.defined_functions.contains(next_name->view()) ||
-        actx.known_aliases.contains(next_name->view());
+    let const next_is_user = actx.defined_functions.contains(*next_name) ||
+                             actx.known_aliases.contains(*next_name);
 
-    if (stage_name->view() == "find" && next_name->view() == "xargs" &&
-        !next_is_user && !actx.defined_functions.contains(stage_name->view()) &&
-        !actx.known_aliases.contains(stage_name->view()))
+    if (*stage_name == "find" && *next_name == "xargs" && !next_is_user &&
+        !actx.defined_functions.contains(*stage_name) &&
+        !actx.known_aliases.contains(*stage_name))
     {
       let has_null_flag = false;
       for (usize a = 1; a < stage->args().count() && !has_null_flag; a++)
@@ -2595,37 +2641,36 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
                                next->args()[0]->source_location());
     }
 
-    if (!next_is_user && NON_STDIN_READERS.contains(next_name->view())) {
+    if (!next_is_user && get_analysis_command_info(*next_name)
+                             .is_in_group(COMMAND_GROUP_NON_STDIN_READER))
+    {
       if (!args_have_stdin_operand(next->args()))
         actx.report_diagnostic(diagnostic_id::sc2216,
                                next->args()[0]->source_location(),
-                               {next_name->view()});
+                               {*next_name});
     }
 
-    let const stage_is_user =
-        actx.defined_functions.contains(stage_name->view()) ||
-        actx.known_aliases.contains(stage_name->view());
-    let const next_is_grep = next_name->view() == "grep" ||
-                             next_name->view() == "egrep" ||
-                             next_name->view() == "fgrep";
+    let const stage_is_user = actx.defined_functions.contains(*stage_name) ||
+                              actx.known_aliases.contains(*stage_name);
+    let const next_is_grep =
+        *next_name == "grep" || *next_name == "egrep" || *next_name == "fgrep";
 
     /* ps piped into grep races the process table and matches the grep itself,
        shellcheck SC2009. */
-    if (stage_name->view() == "ps" && !stage_is_user && next_is_grep)
+    if (*stage_name == "ps" && !stage_is_user && next_is_grep)
       actx.report_diagnostic(diagnostic_id::sc2009,
                              next->args()[0]->source_location());
 
     /* ls piped into grep mangles a name with a space or newline, shellcheck
        SC2010. */
-    if (stage_name->view() == "ls" && !stage_is_user && next_is_grep)
+    if (*stage_name == "ls" && !stage_is_user && next_is_grep)
       actx.report_diagnostic(diagnostic_id::sc2010,
                              next->args()[0]->source_location());
 
     /* grep feeding wc -l counts matches with a second process, shellcheck
        SC2126. */
-    if (stage_name->view() == "grep" && !stage_is_user &&
-        next_name->view() == "wc" && !next_is_user &&
-        next->args().count() == 2 &&
+    if (*stage_name == "grep" && !stage_is_user && *next_name == "wc" &&
+        !next_is_user && next->args().count() == 2 &&
         next->args()[1]->raw_string().view() == "-l")
     {
       actx.report_diagnostic(diagnostic_id::sc2126,
@@ -2708,16 +2753,16 @@ fn CompoundList::analyze(AnalysisContext &actx,
         command != nullptr ? command->as_simple_command() : nullptr;
     if (simple != nullptr && !simple->args().is_empty()) {
       let const name = static_command_name(simple->args()[0]);
-      if (name.has_value() && !actx.defined_functions.contains(name->view()) &&
-          !actx.known_aliases.contains(name->view()))
+      if (name.has_value() && !actx.defined_functions.contains(*name) &&
+          !actx.known_aliases.contains(*name))
       {
-        if (name->view() == "cd" && i + 1 < m_nodes.count() &&
+        if (*name == "cd" && i + 1 < m_nodes.count() &&
             m_nodes[i + 1]->kind() == CompoundListCondition::Kind::None)
         {
           actx.report_diagnostic(diagnostic_id::sc2164,
                                  simple->args()[0]->source_location());
         }
-        if (name->view() == "exec" && simple->args().count() > 1 &&
+        if (*name == "exec" && simple->args().count() > 1 &&
             i + 1 < m_nodes.count())
         {
           let const next_command = m_nodes[i + 1]->command();
@@ -2740,8 +2785,9 @@ fn CompoundList::analyze(AnalysisContext &actx,
       let is_test_command = false;
       if (middle_simple != nullptr && !middle_simple->args().is_empty()) {
         let const middle_name = static_command_name(middle_simple->args()[0]);
-        is_test_command = middle_name.has_value() &&
-                          TEST_COMMANDS.contains(middle_name->view());
+        is_test_command =
+            middle_name.has_value() && get_analysis_command_info(*middle_name)
+                                           .is_in_group(COMMAND_GROUP_TEST);
       }
       if (!is_test_command)
         actx.report_diagnostic(diagnostic_id::sc2015,

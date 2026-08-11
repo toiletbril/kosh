@@ -25,6 +25,8 @@ fn Token::operator delete(opaque *pointer) wontthrow -> void
 
 cold fn Token::to_ast_string() const throws -> String { return raw_string(); }
 
+fn Token::raw_view() const wontthrow -> Maybe<StringView> { return None; }
+
 pure fn WordSegment::is_split_eligible() const wontthrow -> bool
 {
   return kind == Kind::UnquotedText ||
@@ -339,7 +341,8 @@ namespace tokens {
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
   Token::Flags t::flags() const wontthrow { return Token::Flag::Keyword; }     \
-  String t::raw_string() const throws { return s; }
+  String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
 
 KEYWORD_TOKEN_DECLS(If, "if");
 KEYWORD_TOKEN_DECLS(Then, "then");
@@ -364,7 +367,8 @@ KEYWORD_TOKEN_DECLS(Function, "function");
   {                                                                            \
     return Token::Flag::Sentinel | Token::Flag::CompoundList;                  \
   }                                                                            \
-  String t::raw_string() const throws { return s; }
+  String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
 
 SENTINEL_TOKEN_DECLS_COMPOUND(Newline, "newline");
 SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
@@ -373,7 +377,8 @@ SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
   Token::Flags t::flags() const wontthrow { return Token::Flag::Sentinel; }    \
-  String t::raw_string() const throws { return s; }
+  String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
 
 SENTINEL_TOKEN_DECLS(EndOfFile, "end of input");
 SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
@@ -530,6 +535,7 @@ fn Operator::construct_unary_expression(const Expression *rhs) const throws
     return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;           \
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
   u8 t::unary_precedence() const wontthrow { return up; }                      \
   Expression *t::construct_binary_expression(                                  \
@@ -556,6 +562,7 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
     return Token::Flag::BinaryOperator | Token::Flag::CompoundList;            \
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
   Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
@@ -572,6 +579,7 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
     return Token::Flag::BinaryOperator;                                        \
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
   Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
@@ -607,6 +615,7 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
     return Token::Flag::UnaryOperator;                                         \
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
   u8 t::unary_precedence() const wontthrow { return up; }                      \
   Expression *t::construct_unary_expression(const Expression *rhs)             \
       const throws                                                             \

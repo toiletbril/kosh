@@ -93,14 +93,6 @@ fn try_fold_arithmetic_with_constants(StringView expression,
                                       const AnalysisContext &actx) wontthrow
     -> Maybe<i64>;
 
-/* True when the command name is proven not to mutate the shell environment, one
-   of the read-only builtins or read-only coreutils in the static table. The
-   constant-propagation bookkeeping reads this to keep a recorded constant valid
-   across such a command rather than forgetting the whole table. The caller
-   still clears the table on a command substitution, a shadowing function or
-   alias, or any env-mutating command outside the table. */
-fn command_is_environment_neutral(StringView name) throws -> bool;
-
 /* Run the transformation rules over one node to a fixpoint. The recursive
    analyze walk calls this on each node after it has analyzed the node's
    children and populated the context. The driver re-applies the rules until a

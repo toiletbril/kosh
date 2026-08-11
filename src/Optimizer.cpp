@@ -127,19 +127,6 @@ fn constant_test_verdict(const ArrayList<const Token *> &args,
   return None;
 }
 
-/* The names of commands proven not to mutate the shell environment. A command
-   outside the table is assumed to write a variable, so the constant table is
-   forgotten across it. */
-inline constexpr PackedStringKey ENVIRONMENT_NEUTRAL_KEYS[] = {
-    SSK("echo"),    SSK("true"), SSK("false"), SSK(":"),      SSK("test"),
-    SSK("["),       SSK("pwd"),  SSK("which"), SSK("whoami"), SSK("basename"),
-    SSK("dirname"), SSK("seq"),  SSK("expr"),  SSK("id"),     SSK("hostname"),
-    SSK("uname"),   SSK("date"), SSK("arch"),  SSK("tty"),
-};
-
-inline constexpr StaticStringSet ENVIRONMENT_NEUTRAL_NAMES{
-    ENVIRONMENT_NEUTRAL_KEYS};
-
 } // namespace
 
 pure fn is_plain_variable_name(StringView name) wontthrow -> bool
@@ -150,11 +137,6 @@ pure fn is_plain_variable_name(StringView name) wontthrow -> bool
     if (!lexer::is_variable_name(name[i])) return false;
   }
   return true;
-}
-
-fn command_is_environment_neutral(StringView name) throws -> bool
-{
-  return ENVIRONMENT_NEUTRAL_NAMES.contains(name);
 }
 
 fn literal_word_value(const Word &word) throws -> Maybe<String>

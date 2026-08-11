@@ -216,7 +216,7 @@ if [ "${OS-}" = Windows_NT ]; then
 fi
 if "$BIN" -X all -c ':' >/dev/null 2>&1; then
     if ! PATH="$analysis_path" \
-        "$BIN" --mood sh -W -X all -c \
+        "$BIN" --mood sh -WW -X all -c \
         "known_function() { :; }; alias known_alias=:; known_function; known_alias; $analysis_command > \"\$TEST_NULL_OUTPUT\"" \
         >/dev/null 2> "$analysis_log"
     then

@@ -2124,14 +2124,14 @@ note: Keep CDPATH unexported or clear it before running scripts.
    120 |    echo three >> style.log
        |                  ^~~~~~~~~ this later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
-121:8: warning: Backticks are harder to nest than command substitutions.
-   121 |    echo `date`
-       |         ^~~~~~
-note: Use $(...) for command substitution.
 121:3: warning: An echo of a command substitution prints what the command already prints.
    121 |    echo `date`
        |    ^~~~
 note: Run the command on its own instead.
+121:8: warning: Backticks are harder to nest than command substitutions.
+   121 |    echo `date`
+       |         ^~~~~~
+note: Use $(...) for command substitution.
 121:8: warning: An unquoted command substitution splits its output.
    121 |    echo `date`
        |         ^~~~~~

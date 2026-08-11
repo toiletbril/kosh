@@ -76,6 +76,9 @@ note: Write NAME=value without spaces.
      4 |  name = value
        |  ^~~~
 note: Did you mean 'time'?
+5:1: warning: Malformed glob pattern, unterminated '['.
+     5 |  [grep needle file]
+       |  ^~~~~
 5:1: warning: Test brackets and operands require separating spaces.
      5 |  [grep needle file]
        |  ^~~~~
@@ -84,9 +87,6 @@ note: Add spaces after the opening bracket and before the close.
      5 |  [grep needle file]
        |  ^~~~~
 note: Run the command directly as the if condition.
-5:1: warning: Malformed glob pattern, unterminated '['.
-     5 |  [grep needle file]
-       |  ^~~~~
 6:1: warning: Test brackets and operands require separating spaces.
      6 |  [[left=right]]
        |  ^~~~~~~~~~~~~~

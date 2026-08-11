@@ -266,6 +266,8 @@ public:
   virtual fn flags() const wontthrow -> Flags = 0;
   virtual fn raw_string() const throws -> String = 0;
 
+  virtual fn raw_view() const wontthrow -> Maybe<StringView>;
+
   virtual fn to_ast_string() const throws -> String;
 
   pure fn source_location() const wontthrow -> SourceLocation;
@@ -336,6 +338,7 @@ namespace tokens {
     Kind kind() const wontthrow override;                                      \
     Flags flags() const wontthrow override;                                    \
     String raw_string() const throws override;                                 \
+    Maybe<StringView> raw_view() const wontthrow override;                     \
   }
 
 TOKEN_STRUCT(If);
@@ -421,6 +424,11 @@ public:
 
   fn raw_string() const throws -> String override;
 
+  fn raw_view() const wontthrow -> Maybe<StringView> override
+  {
+    return m_value.view();
+  }
+
 protected:
   String m_value;
 };
@@ -478,6 +486,7 @@ public:
     Kind kind() const wontthrow override;                                      \
     Flags flags() const wontthrow override;                                    \
     String raw_string() const throws override;                                 \
+    Maybe<StringView> raw_view() const wontthrow override;                     \
                                                                                \
     u8 left_precedence() const wontthrow override;                             \
     Expression *                                                               \
@@ -501,6 +510,7 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
     Kind kind() const wontthrow override;                                      \
     Flags flags() const wontthrow override;                                    \
     String raw_string() const throws override;                                 \
+    Maybe<StringView> raw_view() const wontthrow override;                     \
                                                                                \
     u8 unary_precedence() const wontthrow override;                            \
     Expression *                                                               \
@@ -519,6 +529,7 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
     Kind kind() const wontthrow override;                                      \
     Flags flags() const wontthrow override;                                    \
     String raw_string() const throws override;                                 \
+    Maybe<StringView> raw_view() const wontthrow override;                     \
                                                                                \
     u8 left_precedence() const wontthrow override;                             \
     Expression *                                                               \

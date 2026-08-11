@@ -141,6 +141,11 @@ public:
   pure fn is_diagnostic_suppressed(diagnostic_id id,
                                    SourceLocation location) const wontthrow
       -> bool;
+
+  /* Whether the mood and the warning level let this code reach the output. A
+     check that costs more than a comparison asks first, and the reporting
+     funnel asks before it formats anything. */
+  pure fn should_report(diagnostic_id id) const wontthrow -> bool;
   fn note_variable_assignment(StringView name) throws -> void;
   fn note_variable_read(StringView name, SourceLocation location,
                         bool is_top_level_unconditional) throws -> void;

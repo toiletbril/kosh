@@ -328,13 +328,13 @@ fn SimpleCommand::can_evaluate_in_process_substitution(
   let const command_name = static_command_name(m_args[0]);
   if (!command_name.has_value()) return false;
 
-  if (let const function_body = cxt.find_function(command_name->view());
+  if (let const function_body = cxt.find_function(*command_name);
       function_body != nullptr)
   {
-    if (active_functions.contains(command_name->view())) return true;
+    if (active_functions.contains(*command_name)) return true;
 
-    active_functions.add(command_name->view());
-    defer { active_functions.remove(command_name->view()); };
+    active_functions.add(*command_name);
+    defer { active_functions.remove(*command_name); };
     return function_body->can_evaluate_in_process_substitution(
         cxt, active_functions);
   }
@@ -344,7 +344,7 @@ fn SimpleCommand::can_evaluate_in_process_substitution(
       SSK("local"), SSK("printf"), SSK("return"), SSK("true"),
   };
   constexpr StaticStringSet SAFE_BUILTINS{SAFE_BUILTIN_KEYS};
-  return SAFE_BUILTINS.contains(command_name->view());
+  return SAFE_BUILTINS.contains(*command_name);
 }
 
 fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
