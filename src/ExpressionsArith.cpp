@@ -731,6 +731,8 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
 
 Subshell::~Subshell() = default;
 
+fn Subshell::as_subshell() const wontthrow -> const Subshell * { return this; }
+
 cold fn Subshell::to_string() const throws -> String { return "Subshell"; }
 
 cold fn Subshell::to_ast_string(usize layer) const throws -> String

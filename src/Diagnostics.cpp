@@ -207,6 +207,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An xargs splits the find output on whitespace and quotes",
       "Pair find -print0 with xargs -0 or use find -exec", None, Strict,
       Policy),
+    D(2043, "for-over-constant-word", "the loop runs once over a constant word",
+      "The word list holds the one constant word '{0}', so the body runs once",
+      "Loop over a glob, a variable, or a command substitution", None, Lenient,
+      Policy),
     D(2044, "for-find-output",
       "for over find output breaks names with whitespace",
       "A for over the find output breaks a name with whitespace apart",
@@ -428,6 +432,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "leave",
       "Remove it, or move it into the loop it belongs to", None, Strict,
       Policy),
+    D(2106, "loop-control-in-pipeline",
+      "a loop control inside a pipeline leaves only its own subshell",
+      "Each pipeline stage runs in its own subshell, so the `{0}` leaves that "
+      "subshell and the loop keeps running",
+      "Write `||` in place of the pipe", None, Strict, Policy),
     D(2107, "and-inside-single-bracket",
       "a double ampersand does not join one test",
       "A `[ ]` test does not take `&&`, the bracket closes before it",
@@ -689,6 +698,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The literals '{0}' and '{1}' differ, so the comparison never succeeds",
       "Compare a variable, or correct the operand spelling", None, Strict,
       Policy),
+    D(2194, "constant-case-word", "the case word is constant",
+      "The case word '{0}' is constant, so the same branch is chosen every "
+      "time",
+      "Add the missing `$`, or drop the case", None, Lenient, Policy),
+    D(2195, "unmatchable-case-pattern",
+      "the pattern never matches the case word",
+      "The pattern '{0}' cannot match the case word '{1}', so its branch is "
+      "dead",
+      "Correct the pattern or the case word", None, Strict, Policy),
     D(2196, "deprecated-egrep", "egrep is deprecated",
       "The egrep command is deprecated",
       "Use grep -E for the extended regular expression match", None, Annoying,
@@ -759,6 +777,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2212, "empty-test", "an empty test always fails",
       "A test with no operand always fails",
       "Write `false` for a failing condition", None, Strict, Policy),
+    D(2213, "getopts-option-unhandled",
+      "a declared option reaches no case branch",
+      "The optstring declares '{0}', which no branch of this case handles",
+      "Add a `{0})` branch, or drop the letter from the optstring",
+      "this optstring declares the option", Lenient, Policy),
+    D(2214, "case-branch-outside-optstring",
+      "a case branch names an option the optstring omits",
+      "The optstring does not declare '{0}', so getopts never stores that "
+      "letter",
+      "Add the letter to the optstring, or remove the branch",
+      "this optstring omits the option", Lenient, Policy),
     D(2215, "option-command-position", "an option-shaped word is not a command",
       "An option-shaped word in command position is not a command",
       "Place the option after its command", None, Strict, Policy),
@@ -777,6 +806,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The `let` builtin evaluates its argument as arithmetic",
       "Write `(( ... ))`, which needs no quoting and reads as arithmetic", None,
       Annoying, Policy),
+    D(2220, "getopts-invalid-option-unhandled",
+      "an invalid option reaches no case branch",
+      "getopts stores a question mark for an unknown option, which no branch "
+      "of this case handles",
+      "Add a `*)` branch that prints the usage and exits",
+      "this loop reads the options", Annoying, Policy),
     D(2221, "duplicate-case-pattern",
       "an earlier case pattern makes this pattern unreachable",
       "An earlier case pattern makes this pattern unreachable",
@@ -809,6 +844,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2230, "which-is-nonstandard", "which is not a shell builtin",
       "The `which` program is not standard and is missing on some systems",
       "Use `command -v` instead", None, Annoying, Policy),
+    D(2231, "unquoted-expansion-in-glob",
+      "an unquoted expansion beside a glob splits on whitespace",
+      "The expansion in '{0}' is unquoted, so the path splits on whitespace "
+      "before the glob runs",
+      "Quote the expansion and leave the glob characters outside the quotes",
+      None, Annoying, Policy),
     D(2232, "sudo-runs-no-builtin", "sudo cannot run a shell builtin",
       "The `sudo` command starts an external program, so the builtin '{0}' is "
       "not found",
@@ -822,6 +863,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "the parentheses around the test add nothing",
       "The `( )` around the test starts a subshell and changes nothing else",
       "Remove the parentheses", None, Annoying, Policy),
+    D(2235, "subshell-grouping", "a subshell groups what braces group for free",
+      "The `( )` group starts a subshell, which costs a process on every run",
+      "Write `{ ...; }` to group the commands in the current shell", None,
+      Annoying, Policy),
     D(2236, "negated-z", "a negated -z is -n", "A negated -z is just -n",
       "Test with -n instead", None, Annoying, Policy),
     D(2237, "negated-n", "a negated -n is -z", "A negated -n is just -z",
@@ -864,11 +909,22 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "This case has no default *) branch, a value no pattern matches is "
       "silently ignored",
       None, None, Annoying, Policy),
+    D(2251, "negation-skips-errexit",
+      "a negated command is not a condition and skips errexit",
+      "The `!` inhibits errexit whether the command succeeds or fails, and "
+      "nothing reads the status",
+      "Write `|| exit 1` after it, or check `$?`", None, Lenient, Policy),
     D(2252, "or-between-bracket-inequalities",
       "an or between two bracketed inequalities is always true",
       "The '{0}' operand fails only one of the two `!=` tests, so the `||` is "
       "always true",
       "Join the two tests with `&&`", None, Strict, Policy),
+    D(2254, "unquoted-case-pattern",
+      "an unquoted expansion in a case pattern matches as a glob",
+      "The expansion in the pattern '{0}' is matched as a glob, not compared "
+      "literally",
+      "Quote the expansion so the pattern matches literally", None, Lenient,
+      Policy),
     D(2255, "test-arithmetic-operand",
       "test brackets do not evaluate arithmetic",
       "Test brackets compare '{0}' as text, the arithmetic is not evaluated",
@@ -3368,6 +3424,29 @@ fn check_command_name_lints(AnalysisContext &actx,
     break;
   }
 
+  /* The optstring and the name reach the case in the loop body, so the call is
+     recorded for shellcheck SC2213, SC2214 and SC2220. The views point into the
+     syntax tree, which outlives the analysis. */
+  case command_name_id::Getopts: {
+    if (args.count() < 3) break;
+    if (args[1]->kind() != Token::Kind::Word) break;
+    if (args[2]->kind() != Token::Kind::Word) break;
+
+    let const &optstring_word =
+        static_cast<const tokens::WordToken *>(args[1])->word();
+    let const &name_word =
+        static_cast<const tokens::WordToken *>(args[2])->word();
+    if (optstring_word.segments.count() != 1) break;
+    if (name_word.segments.count() != 1) break;
+    if (!word_is_fully_literal(optstring_word)) break;
+    if (!word_is_fully_literal(name_word)) break;
+
+    actx.active_getopts.optstring = optstring_word.segments[0].text.view();
+    actx.active_getopts.variable_name = name_word.segments[0].text.view();
+    actx.active_getopts.location = args[1]->source_location();
+    break;
+  }
+
   /* Nothing surrounds a break outside a loop, shellcheck SC2104 and SC2105. A
      function body starts its own loop depth, so a call from inside a loop does
      not count. */
@@ -3378,6 +3457,9 @@ fn check_command_name_lints(AnalysisContext &actx,
                                  ? diagnostic_id::sc2104
                                  : diagnostic_id::sc2105,
                              location, {input.command_literal});
+    } else if (actx.is_direct_pipeline_stage) {
+      actx.report_diagnostic(diagnostic_id::sc2106, location,
+                             {input.command_literal});
     }
     break;
 
@@ -4546,6 +4628,227 @@ fn check_assignment_value_shape(AnalysisContext &actx,
       after_first.substring(*closer + 1).find_character('[').has_value())
   {
     actx.report_diagnostic(diagnostic_id::sc2180, input.location, {input.name});
+  }
+}
+
+namespace {
+
+pure fn option_letter_index(char letter) wontthrow -> u32
+{
+  if (letter >= 'a' && letter <= 'z') return static_cast<u32>(letter - 'a');
+  if (letter >= 'A' && letter <= 'Z')
+    return static_cast<u32>(letter - 'A') + 26;
+
+  return 64;
+}
+
+pure fn segment_is_literal(const WordSegment &segment) wontthrow -> bool
+{
+  return segment.kind == WordSegment::Kind::LiteralText ||
+         segment.kind == WordSegment::Kind::UnquotedText ||
+         segment.kind == WordSegment::Kind::DoubleQuotedText;
+}
+
+pure fn literal_run_length(const Word &case_word, usize start,
+                           usize end) wontthrow -> usize
+{
+  usize length = 0;
+  for (usize i = start; i < end; i++)
+    length += case_word.segments[i].text.view().length;
+
+  return length;
+}
+
+pure fn literal_run_matches_at(const Word &case_word, usize start, usize end,
+                               StringView pattern, usize position) wontthrow
+    -> bool
+{
+  for (usize i = start; i < end; i++) {
+    let const text = case_word.segments[i].text.view();
+    if (position + text.length > pattern.length) return false;
+    if (pattern.substring_of_length(position, text.length) != text)
+      return false;
+    position += text.length;
+  }
+
+  return true;
+}
+
+/* Whether the literal chunks of the case word leave room for the pattern. An
+   expansion matches anything, so only a literal chunk can refute a match, and
+   an unproven case answers true. The leading run is held to the start of the
+   pattern and the trailing run to its end, since an expansion cannot move
+   either. */
+pure fn case_pattern_can_match_word(const Word &case_word,
+                                    StringView pattern) wontthrow -> bool
+{
+  usize first = 0;
+  usize last = case_word.segments.count();
+  usize front = 0;
+  usize back = pattern.length;
+
+  while (first < last && segment_is_literal(case_word.segments[first])) {
+    let const text = case_word.segments[first].text.view();
+    if (front + text.length > back) return false;
+    if (pattern.substring_of_length(front, text.length) != text) return false;
+    front += text.length;
+    first++;
+  }
+
+  if (first == last) return front == back;
+
+  while (last > first && segment_is_literal(case_word.segments[last - 1])) {
+    let const text = case_word.segments[last - 1].text.view();
+    if (back < front + text.length) return false;
+    if (pattern.substring_of_length(back - text.length, text.length) != text)
+      return false;
+    back -= text.length;
+    last--;
+  }
+
+  usize at = first;
+  while (at < last) {
+    if (!segment_is_literal(case_word.segments[at])) {
+      at++;
+      continue;
+    }
+
+    usize run_end = at;
+    while (run_end < last && segment_is_literal(case_word.segments[run_end]))
+      run_end++;
+
+    let const run_length = literal_run_length(case_word, at, run_end);
+    let is_found = false;
+    for (usize position = front; position + run_length <= back; position++) {
+      if (!literal_run_matches_at(case_word, at, run_end, pattern, position))
+        continue;
+      front = position + run_length;
+      is_found = true;
+      break;
+    }
+
+    if (!is_found) return false;
+
+    at = run_end;
+  }
+
+  return true;
+}
+
+} /* namespace */
+
+fn check_case_word_shape(AnalysisContext &actx,
+                         const case_lint_input &input) throws -> void
+{
+  ASSERT(input.case_word != nullptr);
+
+  if (word_is_fully_literal(*input.case_word) &&
+      !input.case_word_source.is_empty())
+  {
+    actx.report_diagnostic(diagnostic_id::sc2194, input.case_location,
+                           {input.case_word_source});
+  }
+}
+
+fn check_case_pattern_shape(AnalysisContext &actx, const case_lint_input &input,
+                            const Word &pattern_word,
+                            StringView pattern_literal,
+                            StringView pattern_source,
+                            SourceLocation pattern_location,
+                            case_arm_tally &tally) throws -> void
+{
+  let const is_bare_pattern =
+      pattern_word.segments.count() == 1 &&
+      pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText;
+
+  if (is_bare_pattern && pattern_word.segments[0].text.view() == "*") {
+    tally.has_default_arm = true;
+    return;
+  }
+
+  if (pattern_literal == "?") tally.has_question_arm = true;
+
+  let has_glob_metacharacter = false;
+  let is_literal_pattern = true;
+  let has_unquoted_expansion = false;
+
+  for (let const &segment : pattern_word.segments) {
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::UnquotedText:
+    case WordSegment::Kind::DoubleQuotedText:
+      if (segment.has_live_glob_chars() && segment.has_glob_metacharacter())
+        has_glob_metacharacter = true;
+      break;
+
+    case WordSegment::Kind::VariableReference:
+    case WordSegment::Kind::CommandSubstitution:
+    case WordSegment::Kind::ArithmeticExpansion:
+      is_literal_pattern = false;
+      if (!segment.is_in_double_quotes) has_unquoted_expansion = true;
+      break;
+
+    default: is_literal_pattern = false; break;
+    }
+  }
+
+  /* An expanded pattern is matched as a glob, so its bytes never compare
+     literally, shellcheck SC2254. */
+  if (has_unquoted_expansion && !pattern_source.is_empty()) {
+    actx.report_diagnostic(diagnostic_id::sc2254, pattern_location,
+                           {pattern_source});
+  }
+
+  /* A literal pattern with no metacharacter matches one string, so the literal
+     chunks of the case word decide it, shellcheck SC2195. */
+  if (input.case_word != nullptr && is_literal_pattern &&
+      !has_glob_metacharacter && !pattern_source.is_empty() &&
+      !input.case_word_source.is_empty() &&
+      input.case_word->segments.count() != 0 &&
+      !case_pattern_can_match_word(*input.case_word, pattern_literal))
+  {
+    actx.report_diagnostic(diagnostic_id::sc2195, pattern_location,
+                           {pattern_source, input.case_word_source},
+                           input.case_location);
+  }
+
+  if (!input.is_getopts_case) return;
+  if (pattern_literal.length != 1) return;
+
+  let const letter_index = option_letter_index(pattern_literal[0]);
+  if (letter_index == 64) return;
+
+  tally.handled_option_letters |= u64{1} << letter_index;
+
+  if (!input.getopts_optstring.find_character(pattern_literal[0]).has_value()) {
+    actx.report_diagnostic(diagnostic_id::sc2214, pattern_location,
+                           {pattern_literal}, input.getopts_location);
+  }
+}
+
+fn check_case_option_coverage(AnalysisContext &actx,
+                              const case_lint_input &input,
+                              const case_arm_tally &tally) throws -> void
+{
+  if (!input.is_getopts_case) return;
+
+  for (usize i = 0; i < input.getopts_optstring.length; i++) {
+    let const letter = input.getopts_optstring[i];
+    let const letter_index = option_letter_index(letter);
+    if (letter_index == 64) continue;
+    if ((tally.handled_option_letters & (u64{1} << letter_index)) != 0)
+      continue;
+
+    actx.report_diagnostic(diagnostic_id::sc2213, input.case_location,
+                           {input.getopts_optstring.substring_of_length(i, 1)},
+                           input.getopts_location);
+  }
+
+  /* getopts stores a question mark for an unknown option, so a case without a
+     catch-all silently skips it, shellcheck SC2220. */
+  if (!tally.has_default_arm && !tally.has_question_arm) {
+    actx.report_diagnostic(diagnostic_id::sc2220, input.case_location, {},
+                           input.getopts_location);
   }
 }
 

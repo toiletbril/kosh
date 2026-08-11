@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2194,SC2254
 # A quoted or escaped metacharacter inside a bracket class is a literal member,
 # not a class operator, and the matcher reads the same per-byte active mask the
 # rest of glob expansion uses. A high byte at or above 0x80 compares as itself,

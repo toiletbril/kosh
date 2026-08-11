@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2194
 # The malformed-glob prepass keeps a leading member ] in view and skips a
 # leading ! or ^, mirroring the matcher. A negated class still negates, a leading
 # member ] is still a member, and a bracket the matcher accepts no longer raises

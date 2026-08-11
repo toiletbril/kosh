@@ -483,6 +483,11 @@ fn Expression::as_cstyle_for_loop() const wontthrow
   return nullptr;
 }
 
+fn Expression::as_subshell() const wontthrow -> const expressions::Subshell *
+{
+  return nullptr;
+}
+
 fn Expression::try_static_condition_verdict(
     const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
@@ -2285,15 +2290,37 @@ fn CompoundList::analyze(AnalysisContext &actx,
       }
     }
 
+    let const next_node_joins =
+        i + 1 < m_nodes.count() &&
+        m_nodes[i + 1]->kind() != CompoundListCondition::Kind::None;
+
+    /* A subshell costs a process, and a brace group gives the same grouping in
+       the current shell, shellcheck SC2235. */
+    if ((node->kind() != CompoundListCondition::Kind::None ||
+         next_node_joins) &&
+        node->command() != nullptr && node->command()->as_subshell() != nullptr)
+    {
+      actx.report_diagnostic(diagnostic_id::sc2235,
+                             node->command()->source_location());
+    }
+
+    /* A negated command outside a condition inhibits errexit and leaves its
+       status unread, shellcheck SC2251. */
+    if (!actx.is_analyzing_condition && node->is_negated() &&
+        node->kind() == CompoundListCondition::Kind::None && !next_node_joins &&
+        i + 1 < m_nodes.count() && node->command() != nullptr)
+    {
+      actx.report_diagnostic(diagnostic_id::sc2251,
+                             node->command()->source_location());
+    }
+
     /* A semicolon or newline node runs whenever the list runs, an && or || node
        is conditional. */
     let const node_unconditional =
         is_unconditional && node->kind() == CompoundListCondition::Kind::None;
     let const was_command_status_observed = actx.is_command_status_observed;
     actx.is_command_status_observed =
-        was_command_status_observed ||
-        (i + 1 < m_nodes.count() &&
-         m_nodes[i + 1]->kind() != CompoundListCondition::Kind::None);
+        was_command_status_observed || next_node_joins;
     node->analyze(actx, node_unconditional);
     actx.is_command_status_observed = was_command_status_observed;
     previous_node = node;

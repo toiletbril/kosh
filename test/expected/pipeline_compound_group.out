@@ -380,40 +380,40 @@
   DoubleQuoted "neg="
   Variable "?"
 ]
-3:13: warning: A read without -r mangles a backslash in the input.
-     3 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
+4:13: warning: A read without -r mangles a backslash in the input.
+     4 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |              ^~~~~~
 note: Add -r to read the line literally.
-3:21: warning: A read without -r mangles a backslash in the input.
-     3 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
+4:21: warning: A read without -r mangles a backslash in the input.
+     4 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |                      ^~~~~~
 note: Add -r to read the line literally.
-8:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
-     8 |  echo 4 | false || echo 4;
+9:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+     9 |  echo 4 | false || echo 4;
        |           ^~~~~
-14:28: warning: A read without -r mangles a backslash in the input.
-    14 |  printf 'a\nb\nc\n' | while read l; do echo "got $l"; done
+15:28: warning: A read without -r mangles a backslash in the input.
+    15 |  printf 'a\nb\nc\n' | while read l; do echo "got $l"; done
        |                             ^~~~~~
 note: Add -r to read the line literally.
-16:8: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
-    16 |  true | false
+17:8: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+    17 |  true | false
        |         ^~~~~
-18:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
-    18 |  false | true
+19:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+    19 |  false | true
        |          ^~~~
-20:17: warning: This pipeline read assignment is lost when the stage exits.
-    20 |  false | read -r x
+21:17: warning: This pipeline read assignment is lost when the stage exits.
+    21 |  false | read -r x
        |                  ^
 note: Feed the loop with a redirection or process substitution.
-22:19: warning: This pipeline read assignment is lost when the stage exits.
-    22 |  echo hi | read -r y
+23:19: warning: This pipeline read assignment is lost when the stage exits.
+    23 |  echo hi | read -r y
        |                    ^
 note: Feed the loop with a redirection or process substitution.
-24:8: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
-    24 |  true | true
+25:8: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+    25 |  true | true
        |         ^~~~
-26:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
-    26 |  ! true | false
+27:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+    27 |  ! true | false
        |           ^~~~~
 Encountered 10 warnings.
 x

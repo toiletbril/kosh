@@ -28,7 +28,17 @@ class AssignCommand;
 class SimpleCommand;
 class ForLoop;
 class CStyleForLoop;
+class Subshell;
 } /* namespace expressions */
+
+/* The getopts call whose result the enclosing loop body reads. The views point
+   into the syntax tree, which outlives the analysis. */
+struct active_getopts_call
+{
+  StringView optstring;
+  StringView variable_name;
+  SourceLocation location;
+};
 
 class AnalysisContext
 {
@@ -85,6 +95,10 @@ public:
   StringMap<SourceLocation> quoted_literal_assignments{heap_allocator()};
 
   StringMap<SourceLocation> active_loop_variables{heap_allocator()};
+
+  /* Saved before a while condition and restored after its body, so a case in
+     the body sees the getopts call that fills its word. */
+  active_getopts_call active_getopts{};
 
   /* The lookup is lazy, and null in a context with no live shell. */
   EvalContext *eval_context{nullptr};
@@ -238,6 +252,7 @@ public:
   virtual fn as_for_loop() const wontthrow -> const expressions::ForLoop *;
   virtual fn as_cstyle_for_loop() const wontthrow
       -> const expressions::CStyleForLoop *;
+  virtual fn as_subshell() const wontthrow -> const expressions::Subshell *;
 
   /* This no-ops for arena storage and frees an ordinary heap node otherwise. */
   static fn operator delete(opaque *pointer) wontthrow->void;
@@ -798,6 +813,7 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+  fn as_subshell() const wontthrow -> const Subshell * override;
 
   fn set_analysis_scope_definitions(
       ArrayList<analysis_scope_definition> definitions) wontthrow -> void

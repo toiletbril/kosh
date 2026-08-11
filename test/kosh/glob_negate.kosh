@@ -1,3 +1,4 @@
 #!/bin/env kosh
+# shellcheck disable=SC2194
 case b in [!a]) echo y;; *) echo n;; esac
 case a in [!a]) echo y;; *) echo n;; esac

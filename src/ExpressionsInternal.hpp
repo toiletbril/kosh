@@ -124,6 +124,39 @@ fn check_assignment_value_shape(AnalysisContext &actx,
                                 const assignment_lint_input &input) throws
     -> void;
 
+/* The borrowed inputs one case clause's checks read. CaseClause::analyze fills
+   it once and the pattern loop passes it to each check body. */
+struct case_lint_input
+{
+  const Word *case_word;
+  StringView case_word_source;
+  SourceLocation case_location;
+  StringView getopts_optstring;
+  SourceLocation getopts_location;
+  bool is_getopts_case;
+};
+
+/* What the pattern loop learned about the arms it has passed. A letter is one
+   bit, with 'a' to 'z' at 0 to 25 and 'A' to 'Z' at 26 to 51. */
+struct case_arm_tally
+{
+  u64 handled_option_letters{0};
+  bool has_default_arm{false};
+  bool has_question_arm{false};
+};
+
+fn check_case_word_shape(AnalysisContext &actx,
+                         const case_lint_input &input) throws -> void;
+fn check_case_pattern_shape(AnalysisContext &actx, const case_lint_input &input,
+                            const Word &pattern_word,
+                            StringView pattern_literal,
+                            StringView pattern_source,
+                            SourceLocation pattern_location,
+                            case_arm_tally &tally) throws -> void;
+fn check_case_option_coverage(AnalysisContext &actx,
+                              const case_lint_input &input,
+                              const case_arm_tally &tally) throws -> void;
+
 fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;

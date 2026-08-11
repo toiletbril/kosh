@@ -347,6 +347,41 @@ arithmetic_diagnostics() {
   (( total / parts * scale ))
 }
 
+loop_word_diagnostics() {
+  for one_word in single; do echo "$one_word"; done
+  for entry in ${directory}/*.txt; do echo "$entry"; done
+  while true; do
+    echo hi | grep -q bye | break
+  done
+}
+
+case_shape_diagnostics() {
+  case constant in
+  constant) : ;;
+  *) : ;;
+  esac
+  case "$prefix suffix" in
+  nomatch) : ;;
+  *) : ;;
+  esac
+  case "$value" in
+  $expanded) : ;;
+  *) : ;;
+  esac
+  while getopts "ab:" chosen_option; do
+    case $chosen_option in
+    a) : ;;
+    z) : ;;
+    esac
+  done
+}
+
+compound_list_diagnostics() {
+  ( echo first || echo second ) && echo third
+  ! false
+  echo after
+}
+
 false && break
 false && continue
 

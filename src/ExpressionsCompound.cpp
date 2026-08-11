@@ -1031,6 +1031,8 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.loop_condition_reads_input = false;
   actx.should_retain_tested_command_names = true;
   let const was_analyzing_condition = actx.is_analyzing_condition;
+  let const saved_getopts = actx.active_getopts;
+  actx.active_getopts = {};
   actx.is_analyzing_condition = true;
   m_condition->analyze(actx, is_unconditional);
   actx.is_analyzing_condition = was_analyzing_condition;
@@ -1055,6 +1057,7 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.is_inside_read_loop = was_inside_read_loop;
   actx.should_silence_unresolved_commands = was_silenced;
   actx.tested_command_names = steal(saved_tested_command_names);
+  actx.active_getopts = saved_getopts;
 }
 
 pure fn WhileLoop::condition() const wontthrow -> const Expression *
@@ -1289,45 +1292,86 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       actx.active_loop_variables.erase(m_variable_name.view());
   };
 
-  /* A for over $(cat file) is shellcheck SC2013 and over $(find ...) is
-     SC2044. */
+  /* One walk of the word list decides every word-shaped finding, so a further
+     check reads the flags this loop already holds. */
+  let const word_list_holds_one_word = m_has_in_clause && m_words.count() == 1;
+
   for (let const t : m_words) {
     if (t->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    let const source_text = analysis_source_text(actx, t->source_location());
+
+    let word_is_literal = true;
+    let has_glob_character = false;
+    let has_unquoted_glob = false;
+    let has_unquoted_brace = false;
+    let has_unquoted_expansion = false;
+
     for (let const &segment : word.segments) {
-      if (segment.kind != WordSegment::Kind::CommandSubstitution ||
-          segment.is_in_double_quotes)
-      {
-        continue;
+      switch (segment.kind) {
+      case WordSegment::Kind::LiteralText:
+      case WordSegment::Kind::DoubleQuotedText:
+        if (segment.has_glob_metacharacter()) has_glob_character = true;
+        break;
+
+      case WordSegment::Kind::UnquotedText: {
+        if (segment.has_glob_metacharacter()) {
+          has_glob_character = true;
+          has_unquoted_glob = true;
+        }
+        if (segment.text.view().find_character('{').has_value())
+          has_unquoted_brace = true;
+        break;
       }
-      let const body = segment.text.view();
-      usize start = 0;
-      while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
-        start++;
-      let const trimmed = body.substring(start);
-      if (trimmed.starts_with(StringView{"ls "}) || trimmed == "ls")
-        actx.report_diagnostic(diagnostic_id::sc2045, t->source_location());
-      else if (trimmed.starts_with(StringView{"cat "}))
-        actx.report_diagnostic(diagnostic_id::sc2013, t->source_location());
-      else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
-        actx.report_diagnostic(diagnostic_id::sc2044, t->source_location());
+
+      /* A for over $(cat file) is shellcheck SC2013, over $(ls) is SC2045, and
+         over $(find ...) is SC2044. */
+      case WordSegment::Kind::CommandSubstitution: {
+        word_is_literal = false;
+        if (segment.is_in_double_quotes) break;
+        has_unquoted_expansion = true;
+
+        let const body = segment.text.view();
+        usize start = 0;
+        while (start < body.length &&
+               (body[start] == ' ' || body[start] == '\t'))
+          start++;
+        let const trimmed = body.substring(start);
+        if (trimmed.starts_with(StringView{"ls "}) || trimmed == "ls")
+          actx.report_diagnostic(diagnostic_id::sc2045, t->source_location());
+        else if (trimmed.starts_with(StringView{"cat "}))
+          actx.report_diagnostic(diagnostic_id::sc2013, t->source_location());
+        else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
+          actx.report_diagnostic(diagnostic_id::sc2044, t->source_location());
+        break;
+      }
+
+      case WordSegment::Kind::VariableReference:
+      case WordSegment::Kind::ArithmeticExpansion:
+        word_is_literal = false;
+        if (!segment.is_in_double_quotes) has_unquoted_expansion = true;
+        break;
+
+      default: word_is_literal = false; break;
+      }
     }
 
-    let const source_text = analysis_source_text(actx, t->source_location());
-    let word_is_literal = true;
-    for (let const &segment : word.segments)
-      if (segment.kind != WordSegment::Kind::LiteralText &&
-          segment.kind != WordSegment::Kind::UnquotedText &&
-          segment.kind != WordSegment::Kind::DoubleQuotedText)
-        word_is_literal = false;
-    if (source_text.length >= 2 &&
-        (source_text[0] == '\'' || source_text[0] == '"') && word_is_literal)
+    if (word_is_literal && has_glob_character && source_text.length >= 2 &&
+        (source_text[0] == '\'' || source_text[0] == '"'))
     {
-      let const literal = word.to_literal_string();
-      if (literal.view().find_character('*').has_value() ||
-          literal.view().find_character('?').has_value() ||
-          literal.view().find_character('[').has_value())
-        actx.report_diagnostic(diagnostic_id::sc2066, t->source_location());
+      actx.report_diagnostic(diagnostic_id::sc2066, t->source_location());
+    }
+
+    if (has_unquoted_expansion && has_unquoted_glob) {
+      actx.report_diagnostic(diagnostic_id::sc2231, t->source_location(),
+                             {source_text});
+    }
+
+    if (word_list_holds_one_word && word_is_literal && !has_glob_character &&
+        !has_unquoted_brace && !source_text.is_empty())
+    {
+      actx.report_diagnostic(diagnostic_id::sc2043, t->source_location(),
+                             {source_text});
     }
   }
 
@@ -1497,10 +1541,36 @@ fn CaseClause::analyze(AnalysisContext &actx,
     item.body->analyze(actx, false);
   }
 
+  ASSERT(m_word != nullptr);
+
+  let case_input = case_lint_input{};
+  case_input.case_location = m_word->source_location();
+  case_input.case_word_source =
+      analysis_source_text(actx, case_input.case_location);
+
+  if (m_word->kind() == Token::Kind::Word) {
+    case_input.case_word =
+        &static_cast<const tokens::WordToken *>(m_word)->word();
+    check_case_word_shape(actx, case_input);
+
+    /* The case reads the getopts result when its word names the variable that
+       call fills, which is what makes the arms an option catalog. */
+    let const &case_word = *case_input.case_word;
+    if (!actx.active_getopts.variable_name.is_empty() &&
+        case_word.segments.count() == 1 &&
+        case_word.segments[0].kind == WordSegment::Kind::VariableReference &&
+        case_word.segments[0].text.view() == actx.active_getopts.variable_name)
+    {
+      case_input.is_getopts_case = true;
+      case_input.getopts_optstring = actx.active_getopts.optstring;
+      case_input.getopts_location = actx.active_getopts.location;
+    }
+  }
+
   /* A case with no catch-all *) arm is shellcheck SC2249. The catch-all is an
      unquoted * glob, a single UnquotedText segment whose text is *. A quoted
      '*' matches only a literal asterisk. */
-  bool has_default_arm = false;
+  let tally = case_arm_tally{};
   let earlier_patterns = ArrayList<String>{heap_allocator()};
   let earlier_pattern_locations = ArrayList<SourceLocation>{heap_allocator()};
   let earlier_shadow_prefixes = ArrayList<String>{heap_allocator()};
@@ -1547,20 +1617,18 @@ fn CaseClause::analyze(AnalysisContext &actx,
             String{literal.view().substring_of_length(0, literal.count() - 1)});
         earlier_shadow_locations.push(pattern->source_location());
       }
-      if (pattern_word.segments.count() == 1 &&
-          pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
-          pattern_word.segments[0].text.view() == "*")
-      {
-        has_default_arm = true;
-        break;
-      }
+
+      check_case_pattern_shape(
+          actx, case_input, pattern_word, literal.view(),
+          analysis_source_text(actx, pattern->source_location()),
+          pattern->source_location(), tally);
     }
-    if (has_default_arm) break;
   }
-  if (!has_default_arm) {
-    ASSERT(m_word != nullptr);
-    actx.report_diagnostic(diagnostic_id::sc2249, m_word->source_location());
-  }
+
+  if (!tally.has_default_arm)
+    actx.report_diagnostic(diagnostic_id::sc2249, case_input.case_location);
+
+  check_case_option_coverage(actx, case_input, tally);
 
   /* An arm body runs conditionally and may reassign a name, so a value recorded
      before the case is no longer proven after it. */

@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2251
 echo x | { cat; }
 seq 1 3 | { read a; read b; echo "$a-$b"; }
 

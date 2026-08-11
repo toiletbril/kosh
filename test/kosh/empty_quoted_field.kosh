@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2043
 for x in ""; do echo "iter[$x]"; done
 for x in '' a ''; do echo "[$x]"; done
 set -- "" a ""; echo $#

@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2194,SC2195
 if true; then ( while false; do echo x; done; { echo y; } ); fi >/dev/null
 
 

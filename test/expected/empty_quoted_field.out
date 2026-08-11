@@ -332,8 +332,8 @@
   Unquoted "c"
   DoubleQuoted ""
 ]
-5:8: warning: An unquoted variable can split into words and expand globs.
-     5 |  set -- ${unset-}; echo count=$#
+6:8: warning: An unquoted variable can split into words and expand globs.
+     6 |  set -- ${unset-}; echo count=$#
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
 iter[]

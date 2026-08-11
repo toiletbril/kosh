@@ -776,6 +776,90 @@
           [CompoundListCondition, None]
             [ArithmeticCommand " total / parts * scale "]
   [CompoundListCondition, None]
+    [FunctionDefinition "loop_word_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [ForLoop "one_word"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$one_word"]
+          [CompoundListCondition, None]
+            [ForLoop "entry"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "$entry"]
+          [CompoundListCondition, None]
+            [WhileLoop]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "true"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Pipeline]
+                    [SimpleCommand "echo" "hi"]
+                    [SimpleCommand "grep" "-q" "bye"]
+                    [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "case_shape_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [CaseClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+          [CompoundListCondition, None]
+            [CaseClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+          [CompoundListCondition, None]
+            [CaseClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+          [CompoundListCondition, None]
+            [WhileLoop]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "getopts" "ab:" "chosen_option"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [CaseClause]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand ":"]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "compound_list_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Subshell]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "first"]
+                [CompoundListCondition, ||]
+                  [SimpleCommand "echo" "second"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "third"]
+          [CompoundListCondition, None]
+            [SimpleCommand "false"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "after"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3890,6 +3974,257 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "loop_word_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "one_word"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "single"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "one_word"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "entry"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "directory"
+  Unquoted "/*.txt"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "entry"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "-q"
+]
+[Word
+  Unquoted "bye"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "case_shape_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "constant"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "constant"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "prefix"
+  DoubleQuoted " suffix"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "nomatch"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "expanded"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "getopts"
+]
+[Word
+  DoubleQuoted "ab:"
+]
+[Word
+  Unquoted "chosen_option"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "chosen_option"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "z"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "compound_list_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "third"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -4001,9 +4336,17 @@ note: Use a case or the [[ ]] form for the pattern.
     24 |    [ -n "$(ls | grep x)" ] && echo d
        |         ^~~~~~~~~~~~~~~~
 note: Use `grep -q` and test its exit status.
+28:6: warning: The case word 'a' is constant, so the same branch is chosen every time.
+    28 |  case a in a) ;; esac
+       |       ^
+note: Add the missing `$`, or drop the case.
 28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
     28 |  case a in a) ;; esac
        |       ^
+29:6: warning: The case word 'a' is constant, so the same branch is chosen every time.
+    29 |  case a in *) ;; esac
+       |       ^
+note: Add the missing `$`, or drop the case.
 34:3: warning: The egrep command is deprecated.
     34 |    egrep pattern file
        |    ^~~~~
@@ -4358,6 +4701,10 @@ note: Expand HOME before assigning PATH.
    137 |    echo $[1+2]
        |         ^~~~~~
 note: Use $((...)) for arithmetic expansion.
+138:22: warning: The word list holds the one constant word 'one', so the body runs once.
+   138 |    for outer_index in one; do
+       |                       ^~~
+note: Loop over a glob, a variable, or a command substitution.
 139:9: warning: The nested inner loop reuses the outer loop variable 'outer_index'.
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~
@@ -4372,6 +4719,17 @@ note: Use a distinct variable for the nested loop.
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~ the nested inner loop binds 'outer_index' again here.
 note: Use a distinct variable for the nested loop.
+139:24: warning: The word list holds the one constant word 'two', so the body runs once.
+   139 |      for outer_index in two; do echo "$outer_index"; done
+       |                         ^~~
+note: Loop over a glob, a variable, or a command substitution.
+141:8: warning: The case word 'value' is constant, so the same branch is chosen every time.
+   141 |    case value in
+       |         ^~~~~
+note: Add the missing `$`, or drop the case.
+142:3: warning: The pattern 'same' cannot match the case word 'value', so its branch is dead.
+   142 |    same) : ;;
+       |    ^~~~
 143:3: warning: An earlier case pattern makes this pattern unreachable.
    143 |    same) : ;;
        |    ^~~~
@@ -4379,6 +4737,15 @@ note: Use a distinct variable for the nested loop.
    142 |    same) : ;;
        |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
+143:3: warning: The pattern 'same' cannot match the case word 'value', so its branch is dead.
+   143 |    same) : ;;
+       |    ^~~~
+144:3: warning: The pattern ''*'' cannot match the case word 'value', so its branch is dead.
+   144 |    '*') : ;;
+       |    ^~~
+145:3: warning: The pattern 'literal-after-star' cannot match the case word 'value', so its branch is dead.
+   145 |    literal-after-star) : ;;
+       |    ^~~~~~~~~~~~~~~~~~
 147:3: warning: An earlier case pattern shadows this pattern.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
@@ -4386,6 +4753,9 @@ note: Remove the duplicate pattern.
    146 |    prefix*) : ;;
        |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
+147:3: warning: The pattern 'prefix-value' cannot match the case word 'value', so its branch is dead.
+   147 |    prefix-value) : ;;
+       |    ^~~~~~~~~~~~
 141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
    141 |    case value in
        |         ^~~~~
@@ -5074,26 +5444,81 @@ note: Drop the `$` for `(( ))`, or write `_=$(( ))` to keep the value.
    347 |    (( total / parts * scale ))
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Write `a*c/b` to multiply first.
-350:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   350 |  false && break
+351:19: warning: The word list holds the one constant word 'single', so the body runs once.
+   351 |    for one_word in single; do echo "$one_word"; done
+       |                    ^~~~~~
+note: Loop over a glob, a variable, or a command substitution.
+352:16: warning: The expansion in '${directory}/*.txt' is unquoted, so the path splits on whitespace before the glob runs.
+   352 |    for entry in ${directory}/*.txt; do echo "$entry"; done
+       |                 ^~~~~~~~~~~~~~~~~~
+note: Quote the expansion and leave the glob characters outside the quotes.
+354:29: warning: Each pipeline stage runs in its own subshell, so the `break` leaves that subshell and the loop keeps running.
+   354 |      echo hi | grep -q bye | break
+       |                              ^~~~~
+note: Write `||` in place of the pipe.
+359:8: warning: The case word 'constant' is constant, so the same branch is chosen every time.
+   359 |    case constant in
+       |         ^~~~~~~~
+note: Add the missing `$`, or drop the case.
+364:3: warning: The pattern 'nomatch' cannot match the case word '"$prefix suffix"', so its branch is dead.
+   364 |    nomatch) : ;;
+       |    ^~~~~~~
+368:3: warning: The expansion in the pattern '$expanded' is matched as a glob, not compared literally.
+   368 |    $expanded) : ;;
+       |    ^~~~~~~~~
+note: Quote the expansion so the pattern matches literally.
+374:5: warning: The optstring does not declare 'z', so getopts never stores that letter.
+   374 |      z) : ;;
+       |      ^
+371:17: details:
+   371 |    while getopts "ab:" chosen_option; do
+       |                  ^~~~~ this optstring omits the option.
+note: Add the letter to the optstring, or remove the branch.
+372:10: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+   372 |      case $chosen_option in
+       |           ^~~~~~~~~~~~~~
+372:10: warning: The optstring declares 'b', which no branch of this case handles.
+   372 |      case $chosen_option in
+       |           ^~~~~~~~~~~~~~
+371:17: details:
+   371 |    while getopts "ab:" chosen_option; do
+       |                  ^~~~~ this optstring declares the option.
+note: Add a `b)` branch, or drop the letter from the optstring.
+372:10: warning: getopts stores a question mark for an unknown option, which no branch of this case handles.
+   372 |      case $chosen_option in
+       |           ^~~~~~~~~~~~~~
+371:17: details:
+   371 |    while getopts "ab:" chosen_option; do
+       |                  ^~~~~ this loop reads the options.
+note: Add a `*)` branch that prints the usage and exits.
+380:3: warning: The `( )` group starts a subshell, which costs a process on every run.
+   380 |    ( echo first || echo second ) && echo third
+       |    ^
+note: Write `{ ...; }` to group the commands in the current shell.
+381:5: warning: The `!` inhibits errexit whether the command succeeds or fails, and nothing reads the status.
+   381 |    ! false
+       |      ^~~~~
+note: Write `|| exit 1` after it, or check `$?`.
+385:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   385 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-351:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   351 |  false && continue
+386:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   386 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-353:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   353 |  recursive_wrapper() { recursive_wrapper "$@"; }
+388:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   388 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-353:1: details:
-   353 |  recursive_wrapper() { recursive_wrapper "$@"; }
+388:1: details:
+   388 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-358:8: warning: An unquoted variable can split into words and expand globs.
-   358 |    echo $reported
+393:8: warning: An unquoted variable can split into words and expand globs.
+   393 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 282 warnings.
+Encountered 304 warnings.
 done
 done
 done

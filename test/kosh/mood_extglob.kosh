@@ -1,4 +1,5 @@
 #!/bin/env kosh
+# shellcheck disable=SC2194
 # Extended globs match in [[ ]] and case in the default mood once shopt enables.
 shopt -s extglob
 [[ "abbbc" == a+(b)c ]] && echo plus
