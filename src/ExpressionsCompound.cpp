@@ -838,7 +838,10 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     let const was_retaining_tested_command_names =
         actx.should_retain_tested_command_names;
     actx.should_retain_tested_command_names = true;
+    let const was_analyzing_condition = actx.is_analyzing_condition;
+    actx.is_analyzing_condition = true;
     condition->analyze(actx, is_unconditional && is_first_branch);
+    actx.is_analyzing_condition = was_analyzing_condition;
     actx.should_retain_tested_command_names =
         was_retaining_tested_command_names;
     let const is_dead_branch =
@@ -1022,7 +1025,10 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.is_inside_loop_condition = true;
   actx.loop_condition_reads_input = false;
   actx.should_retain_tested_command_names = true;
+  let const was_analyzing_condition = actx.is_analyzing_condition;
+  actx.is_analyzing_condition = true;
   m_condition->analyze(actx, is_unconditional);
+  actx.is_analyzing_condition = was_analyzing_condition;
   actx.should_retain_tested_command_names = was_retaining_tested_command_names;
   let const loop_condition_reads_input = actx.loop_condition_reads_input;
   actx.is_inside_loop_condition = was_inside_loop_condition;

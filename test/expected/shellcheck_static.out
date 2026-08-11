@@ -427,6 +427,67 @@
           [CompoundListCondition, None]
             [ConditionalCommand]
   [CompoundListCondition, None]
+    [FunctionDefinition "test_grouping_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "=" "a"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "$right" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "=" "a"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "$right" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "trailing" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "written"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "-f" "$left"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "found"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "[" "-f" "$left" "]"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "found"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [ConditionalCommand]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "found"]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -2232,6 +2293,276 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "test_grouping_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "trailing"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Literal "("
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ")"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "written"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -2806,18 +3137,106 @@ note: Test a variable or drop the check.
    182 |    [[ -z == foo ]]
        |    ^~~~~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-185:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   185 |  recursive_wrapper() { recursive_wrapper "$@"; }
+186:3: warning: A `[ ]` test does not take `&&`, the bracket closes before it.
+   186 |    [ "$left" = a && "$right" = b ]
+       |    ^
+note: Write `[ a ] && [ b ]`.
+186:33: warning: The trailing `]` has no opening `[`.
+   186 |    [ "$left" = a && "$right" = b ]
+       |                                  ^
+note: Add the opening `[`, or quote the bracket when it is data.
+186:29: warning: An assignment cannot contain spaces around equals.
+   186 |    [ "$left" = a && "$right" = b ]
+       |                              ^
+note: Write NAME=value without spaces.
+187:3: warning: A `[ ]` test does not take `||`, the bracket closes before it.
+   187 |    [ "$left" = a || "$right" = b ]
+       |    ^
+note: Write `[ a ] || [ b ]`.
+187:33: warning: The trailing `]` has no opening `[`.
+   187 |    [ "$left" = a || "$right" = b ]
+       |                                  ^
+note: Add the opening `[`, or quote the bracket when it is data.
+187:29: warning: An assignment cannot contain spaces around equals.
+   187 |    [ "$left" = a || "$right" = b ]
+       |                              ^
+note: Write NAME=value without spaces.
+188:17: warning: The trailing `]` has no opening `[`.
+   188 |    echo trailing ]
+       |                  ^
+note: Add the opening `[`, or quote the bracket when it is data.
+189:18: warning: A `[[ ]]` expression joins its parts with `&&`.
+   189 |    [[ "$left" = a -a "$right" = b ]]
+       |                   ^~
+note: Write `&&` in place of `-a`.
+190:18: warning: A `[[ ]]` expression joins its parts with `||`.
+   190 |    [[ "$left" = a -o "$right" = b ]]
+       |                   ^~
+note: Write `||` in place of `-o`.
+191:6: warning: A `[[ ]]` expression takes `(` and `)` without a backslash.
+   191 |    [[ \( "$left" = a \) ]]
+       |       ^~
+note: Remove the backslash before the parenthesis.
+191:21: warning: A `[[ ]]` expression takes `(` and `)` without a backslash.
+   191 |    [[ \( "$left" = a \) ]]
+       |                      ^~
+note: Remove the backslash before the parenthesis.
+192:6: warning: A brace does not group a `[[ ]]` expression.
+   192 |    [[ { "$left" = a } ]]
+       |       ^
+note: Group the expression with `( )`.
+192:20: warning: A brace does not group a `[[ ]]` expression.
+   192 |    [[ { "$left" = a } ]]
+       |                     ^
+note: Group the expression with `( )`.
+193:15: warning: The `>` is a file redirection, not a comparison.
+   193 |    [ "$left" > "$right" ]
+       |                ^~~~~~~~
+note: Escape it as `\>`, or use the `[[ ]]` form.
+193:5: warning: A one-operand test is the nonempty-string test.
+   193 |    [ "$left" > "$right" ]
+       |      ^~~~~~~
+note: Write it with -n to read clearer.
+194:15: warning: The `<` reads a file into the test, it does not compare.
+   194 |    [ "$left" < "$right" ]
+       |                ^~~~~~~~
+note: Escape it as `\<`, or use the `[[ ]]` form.
+194:5: warning: A one-operand test is the nonempty-string test.
+   194 |    [ "$left" < "$right" ]
+       |      ^~~~~~~
+note: Write it with -n to read clearer.
+195:18: warning: The redirect writes to the file named '2', it does not name a descriptor.
+   195 |    echo written > 2
+       |                   ^
+note: Write `>&2` to reach the descriptor, or compare the numbers in a test.
+196:6: warning: A `( )` subshell runs its contents, it does not test them.
+   196 |    if ( -f "$left" ); then echo found; fi
+       |       ^
+note: Write the condition as `[ ... ]`.
+196:8: warning: An option-shaped word in command position is not a command.
+   196 |    if ( -f "$left" ); then echo found; fi
+       |         ^~
+note: Place the option after its command.
+197:6: warning: The `( )` around the test starts a subshell and changes nothing else.
+   197 |    if ( [ -f "$left" ] ); then echo found; fi
+       |       ^
+note: Remove the parentheses.
+198:6: warning: The `( )` around the condition starts a subshell and changes nothing else.
+   198 |    if ( [[ -f "$left" ]] ); then echo found; fi
+       |       ^
+note: Remove the parentheses.
+201:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   201 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-185:1: details:
-   185 |  recursive_wrapper() { recursive_wrapper "$@"; }
+201:1: details:
+   201 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-190:8: warning: An unquoted variable can split into words and expand globs.
-   190 |    echo $reported
+206:8: warning: An unquoted variable can split into words and expand globs.
+   206 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 133 warnings.
+Encountered 155 warnings.
 done
 done
 done

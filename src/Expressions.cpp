@@ -1717,6 +1717,30 @@ fn Pipeline::as_simple_command() const wontthrow -> const SimpleCommand *
   return m_commands[0]->as_simple_command();
 }
 
+/* The opening [ of a bracket test the node leaves unclosed, null when the node
+   holds anything else. */
+cold static fn
+node_unclosed_test_bracket(const CompoundListCondition *node) wontthrow
+    -> const Token *
+{
+  const Command *held = node->command();
+  if (held == nullptr) return nullptr;
+
+  const SimpleCommand *command = held->as_simple_command();
+  if (command == nullptr) return nullptr;
+
+  let const &args = command->args();
+  if (args.is_empty()) return nullptr;
+
+  let const name = args[0]->raw_view();
+  if (!name.has_value() || *name != StringView{"["}) return nullptr;
+
+  let const closer = args.back()->raw_view();
+  if (closer.has_value() && *closer == StringView{"]"}) return nullptr;
+
+  return args[0];
+}
+
 fn CompoundListCondition::analyze(AnalysisContext &actx,
                                   bool is_unconditional) const throws -> void
 {
@@ -1863,6 +1887,20 @@ fn CompoundList::analyze(AnalysisContext &actx,
   for (usize i = 0; i < m_nodes.count(); i++) {
     let const node = m_nodes[i];
     ASSERT(node != nullptr);
+
+    /* A [ test ends at its own bracket, so a joiner written inside one reaches
+       the shell instead, shellcheck SC2107 and SC2109. */
+    if (previous_node != nullptr &&
+        node->kind() != CompoundListCondition::Kind::None)
+    {
+      const Token *unclosed_bracket = node_unclosed_test_bracket(previous_node);
+      if (unclosed_bracket != nullptr) {
+        actx.report_diagnostic(node->kind() == CompoundListCondition::Kind::And
+                                   ? diagnostic_id::sc2107
+                                   : diagnostic_id::sc2109,
+                               unclosed_bracket->source_location());
+      }
+    }
 
     if (node->kind() != CompoundListCondition::Kind::And) {
       actx.tested_command_names = saved_tested_command_names.clone();

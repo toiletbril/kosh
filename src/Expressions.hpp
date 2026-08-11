@@ -87,6 +87,7 @@ public:
 
   HashSet tested_command_names{heap_allocator()};
   bool should_retain_tested_command_names{false};
+  bool is_analyzing_condition{false};
 
   bool should_trace_optimizer{false};
   usize optimizer_folded_arithmetic{0};

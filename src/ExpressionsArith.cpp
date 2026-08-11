@@ -128,6 +128,40 @@ cold static fn conditional_inequality_left_operand(
   return left.word->raw_view();
 }
 
+enum class conditional_misuse_kind : u8
+{
+  AndOperator,
+  OrOperator,
+  EscapedParenthesis,
+  BraceGroup,
+};
+
+constexpr static_string_entry<conditional_misuse_kind>
+    CONDITIONAL_MISUSE_ENTRIES[] = {
+        {SSK("-a"), conditional_misuse_kind::AndOperator       },
+        {SSK("-o"), conditional_misuse_kind::OrOperator        },
+        {SSK("("),  conditional_misuse_kind::EscapedParenthesis},
+        {SSK(")"),  conditional_misuse_kind::EscapedParenthesis},
+        {SSK("{"),  conditional_misuse_kind::BraceGroup        },
+        {SSK("}"),  conditional_misuse_kind::BraceGroup        },
+};
+constexpr StaticStringMap CONDITIONAL_MISUSES{CONDITIONAL_MISUSE_ENTRIES};
+
+/* A -a or a -o joins two parts only when a finished operand precedes it, so the
+   unary file and option tests keep their leading position. */
+cold static fn
+conditional_element_ends_operand(const conditional_element &element) wontthrow
+    -> bool
+{
+  using Kind = conditional_element::Kind;
+  if (element.kind == Kind::CloseParen) return true;
+  if (element.kind != Kind::Operand || element.word == nullptr) return false;
+
+  let const view = element.word->raw_view();
+
+  return !view.has_value() || !is_conditional_binary_operator(*view);
+}
+
 fn ConditionalCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -184,6 +218,48 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc1019,
                                element.word->source_location(),
                                {operand.view(), *next_operator});
+      }
+    }
+
+    /* The word literal drops the quotes and the escapes, so the source text
+       decides whether the operand was written as syntax or as data. */
+    let const misuse = CONDITIONAL_MISUSES.find(operand.view());
+    if (misuse.has_value()) {
+      let const written = element.word->source_location()
+                              .get_source_text(actx.source)
+                              .value_or(StringView{});
+      let const was_written_bare = written == operand.view();
+      let const follows_operand =
+          i > 0 && conditional_element_ends_operand(m_elements[i - 1]);
+
+      switch (*misuse) {
+      case conditional_misuse_kind::AndOperator:
+        if (was_written_bare && follows_operand) {
+          actx.report_diagnostic(diagnostic_id::sc2108,
+                                 element.word->source_location());
+        }
+        break;
+
+      case conditional_misuse_kind::OrOperator:
+        if (was_written_bare && follows_operand) {
+          actx.report_diagnostic(diagnostic_id::sc2110,
+                                 element.word->source_location());
+        }
+        break;
+
+      case conditional_misuse_kind::EscapedParenthesis:
+        if (written.starts_with(StringView{"\\"})) {
+          actx.report_diagnostic(diagnostic_id::sc1029,
+                                 element.word->source_location());
+        }
+        break;
+
+      case conditional_misuse_kind::BraceGroup:
+        if (was_written_bare) {
+          actx.report_diagnostic(diagnostic_id::sc1026,
+                                 element.word->source_location());
+        }
+        break;
       }
     }
 
@@ -701,10 +777,33 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
+cold static fn
+subshell_body_is_conditional_expression(StringView body) wontthrow -> bool
+{
+  if (body.length < 5) return false;
+
+  let const closer = body.substring_of_length(body.length - 2, 2);
+  if (body.starts_with(StringView{"[[ "})) return closer == StringView{"]]"};
+  if (body.starts_with(StringView{"(( "})) return closer == StringView{"))"};
+
+  return false;
+}
+
+cold static fn subshell_body_is_bracket_test(StringView body) wontthrow -> bool
+{
+  if (body.starts_with(StringView{"test "})) return true;
+
+  return body.length >= 3 && body.starts_with(StringView{"[ "}) &&
+         body[body.length - 1] == ']';
+}
+
 fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   ASSERT(m_body != nullptr);
+
+  let const was_analyzing_condition = actx.is_analyzing_condition;
+  actx.is_analyzing_condition = false;
 
   let const end_position = source_end_position();
   if (end_position > source_location().position + 1 &&
@@ -716,12 +815,27 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     while (!body.is_empty() &&
            (body[0] == ' ' || body[0] == '\t' || body[0] == '\n'))
       body = body.substring(1);
+    while (!body.is_empty() &&
+           (body[body.length - 1] == ' ' || body[body.length - 1] == '\t' ||
+            body[body.length - 1] == '\n'))
+      body = body.substring_of_length(0, body.length - 1);
+
     if (body.starts_with(StringView{"-e "}) ||
         body.starts_with(StringView{"-f "}) ||
         body.starts_with(StringView{"-d "}) ||
         body.starts_with(StringView{"-n "}) ||
         body.starts_with(StringView{"-z "}))
-      actx.report_diagnostic(diagnostic_id::sc2204, source_location());
+    {
+      actx.report_diagnostic(was_analyzing_condition ? diagnostic_id::sc2205
+                                                     : diagnostic_id::sc2204,
+                             source_location());
+    } else if (was_analyzing_condition) {
+      if (subshell_body_is_conditional_expression(body)) {
+        actx.report_diagnostic(diagnostic_id::sc2233, source_location());
+      } else if (subshell_body_is_bracket_test(body)) {
+        actx.report_diagnostic(diagnostic_id::sc2234, source_location());
+      }
+    }
   }
 
   /* An assignment in the body never changes a parent variable, so the body
@@ -736,6 +850,7 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.constant_variables = steal(saved_constants);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
+  actx.is_analyzing_condition = was_analyzing_condition;
 }
 
 FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,

@@ -182,6 +182,22 @@ constant_test_diagnostics() {
   [[ -z == foo ]]
 }
 
+test_grouping_diagnostics() {
+  [ "$left" = a && "$right" = b ]
+  [ "$left" = a || "$right" = b ]
+  echo trailing ]
+  [[ "$left" = a -a "$right" = b ]]
+  [[ "$left" = a -o "$right" = b ]]
+  [[ \( "$left" = a \) ]]
+  [[ { "$left" = a } ]]
+  [ "$left" > "$right" ]
+  [ "$left" < "$right" ]
+  echo written > 2
+  if ( -f "$left" ); then echo found; fi
+  if ( [ -f "$left" ] ); then echo found; fi
+  if ( [[ -f "$left" ]] ); then echo found; fi
+}
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {

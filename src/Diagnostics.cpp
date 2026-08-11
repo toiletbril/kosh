@@ -27,6 +27,14 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The '{0}' operator expects an operand, '{1}' is another operator",
       "Give the operator its operand before the comparison", None, Strict,
       Policy),
+    D(1026, "brace-group-in-conditional",
+      "grouping inside double brackets uses parentheses",
+      "A brace does not group a `[[ ]]` expression",
+      "Group the expression with `( )`", None, Strict, Policy),
+    D(1029, "escaped-conditional-parenthesis",
+      "double brackets take unescaped parentheses",
+      "A `[[ ]]` expression takes `(` and `)` without a backslash",
+      "Remove the backslash before the parenthesis", None, Strict, Policy),
     D(1035, "test-bracket-spacing",
       "test brackets and operands require separating spaces",
       "Test brackets and operands require separating spaces",
@@ -189,6 +197,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "when it fires",
       "Single-quote it so it expands as the signal arrives", None, Lenient,
       Policy),
+    D(2065, "test-redirection-comparison",
+      "a redirection in a test is not a comparison",
+      "The `{0}` is a file redirection, not a comparison",
+      "Escape it as `\\>`, or use the `[[ ]]` form", None, Strict, Policy),
     D(2066, "quoted-for-glob", "a quoted for-loop glob stays literal",
       "A quoted for-loop glob remains one literal word",
       "Leave the glob unquoted so it expands into loop values", None, Lenient,
@@ -215,6 +227,9 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a numeric operator compares integers only",
       "The '{0}' operator compares integers, '{1}' carries a fraction",
       "Compare the decimals with `bc` or `awk`", None, Strict, Policy),
+    D(2073, "test-input-redirection", "a less-than in a test redirects input",
+      "The `<` reads a file into the test, it does not compare",
+      "Escape it as `\\<`, or use the `[[ ]]` form", None, Strict, Policy),
     D(2074, "test-regex-operator",
       "the test builtin does not support regex matching",
       "The test builtin does not support the =~ regular expression operator",
@@ -265,6 +280,19 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a command in a while-read loop can consume loop input",
       "An ssh command in a while-read loop can consume the loop input",
       "Redirect ssh input from /dev/null or pass -n", None, Annoying, Policy),
+    D(2107, "and-inside-single-bracket",
+      "a double ampersand does not join one test",
+      "A `[ ]` test does not take `&&`, the bracket closes before it",
+      "Write `[ a ] && [ b ]`", None, Strict, Policy),
+    D(2108, "conditional-dash-a", "double brackets take a double ampersand",
+      "A `[[ ]]` expression joins its parts with `&&`",
+      "Write `&&` in place of `-a`", None, Strict, Policy),
+    D(2109, "or-inside-single-bracket", "a double pipe does not join one test",
+      "A `[ ]` test does not take `||`, the bracket closes before it",
+      "Write `[ a ] || [ b ]`", None, Strict, Policy),
+    D(2110, "conditional-dash-o", "double brackets take a double pipe",
+      "A `[[ ]]` expression joins its parts with `||`",
+      "Write `||` in place of `-o`", None, Strict, Policy),
     D(2114, "recursive-rm-system-directory", "rm -r targets a system directory",
       "A rm -r targets the system directory '{0}'",
       "double-check the path before running this", None, Strict, Policy),
@@ -378,6 +406,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The numeric comparison {0} reads '{1}', which is not a number, so the "
       "test errors at run time",
       None, None, Strict, Policy),
+    D(2171, "unmatched-closing-bracket",
+      "a trailing bracket sits outside a test",
+      "The trailing `]` has no opening `[`",
+      "Add the opening `[`, or quote the bracket when it is data", None,
+      Lenient, Policy),
     D(2174, "mkdir-parent-mode",
       "mkdir -pm applies mode only to the deepest directory",
       "A mkdir -pm applies the mode only to the deepest directory, the created "
@@ -413,11 +446,20 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "parentheses start a subshell instead of a test",
       "Parentheses start a subshell rather than a file or string test",
       "Use [[ ... ]] or [ ... ] for the condition", None, Strict, Policy),
+    D(2205, "subshell-as-condition", "a subshell is not a test expression",
+      "A `( )` subshell runs its contents, it does not test them",
+      "Write the condition as `[ ... ]`", None, Strict, Policy),
     D(2207, "array-from-command-output",
       "an array from command output splits and globs",
       "An array built from command output splits words and expands globs",
       "Use mapfile or readarray to preserve output records", None, Strict,
       Policy),
+    D(2210, "numeric-redirection-target",
+      "a redirection target of digits is not a descriptor",
+      "The redirect writes to the file named '{0}', it does not name a "
+      "descriptor",
+      "Write `>&{0}` to reach the descriptor, or compare the numbers in a test",
+      None, Lenient, Policy),
     D(2212, "empty-test", "an empty test always fails",
       "A test with no operand always fails",
       "Write `false` for a failing condition", None, Strict, Policy),
@@ -448,6 +490,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "read expects a variable name without a dollar sign",
       "A read operand is a variable name, not a variable value",
       "Drop the dollar sign from the variable name", None, Strict, Policy),
+    D(2233, "redundant-condition-parentheses",
+      "the parentheses around the condition add nothing",
+      "The `( )` around the condition starts a subshell and changes nothing "
+      "else",
+      "Remove the parentheses", None, Annoying, Policy),
+    D(2234, "redundant-test-parentheses",
+      "the parentheses around the test add nothing",
+      "The `( )` around the test starts a subshell and changes nothing else",
+      "Remove the parentheses", None, Annoying, Policy),
     D(2236, "negated-z", "a negated -z is -n", "A negated -z is just -n",
       "Test with -n instead", None, Annoying, Policy),
     D(2237, "negated-n", "a negated -n is -z", "A negated -n is just -z",
@@ -1730,6 +1781,16 @@ fn check_command_word_shape(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc1014, location);
   }
 
+  /* The word literal drops the quotes, so the source text decides whether the
+     bracket was written as syntax or as data. */
+  if (args.count() >= 2 && command_literal != "[" && command_literal != "[[" &&
+      args.back()->source_location().get_source_text(actx.source) ==
+          StringView{"]"})
+  {
+    actx.report_diagnostic(diagnostic_id::sc2171,
+                           args.back()->source_location());
+  }
+
   if (args.count() >= 2 && args[1]->raw_view() == StringView{"="})
     actx.report_diagnostic(diagnostic_id::sc2283, args[1]->source_location());
 
@@ -2324,6 +2385,17 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
   }
 }
 
+cold fn plain_output_redirection_spelling(Redirection::Kind kind) wontthrow
+    -> Maybe<StringView>
+{
+  switch (kind) {
+  case Redirection::Kind::TruncateOutput: return StringView{">"};
+  case Redirection::Kind::TruncateOutputOverride: return StringView{">|"};
+  case Redirection::Kind::AppendOutput: return StringView{">>"};
+  default: return None;
+  }
+}
+
 } /* namespace */
 
 /* The redirection lints. 2>&1 before the stdout file redirect is SC2069,
@@ -2337,6 +2409,8 @@ fn check_redirection_lints(AnalysisContext &actx,
      dangle past the statement. */
   String read_target{heap_allocator()};
   const Token *read_token = nullptr;
+  let const is_test_command =
+      input.is_in_group(COMMAND_GROUP_TEST) && !input.command_is_shadowed;
 
   for (let const &redirection : input.redirections) {
     if (redirection.kind == Redirection::Kind::DuplicateOutput &&
@@ -2361,6 +2435,35 @@ fn check_redirection_lints(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2069,
                              redirection.target->source_location());
     }
+
+    if (redirection.target != nullptr) {
+      let const output_spelling =
+          plain_output_redirection_spelling(redirection.kind);
+      let const is_input_redirection =
+          redirection.kind == Redirection::Kind::ReadInput;
+
+      if (is_test_command) {
+        if (output_spelling.has_value()) {
+          actx.report_diagnostic(diagnostic_id::sc2065,
+                                 redirection.target->source_location(),
+                                 {*output_spelling});
+        }
+        if (is_input_redirection) {
+          actx.report_diagnostic(diagnostic_id::sc2073,
+                                 redirection.target->source_location());
+        }
+      } else if (output_spelling.has_value() || is_input_redirection) {
+        let const digits = redirection.target->raw_view();
+        if (digits.has_value() && !digits->is_empty() &&
+            digits->is_all_decimal_digits())
+        {
+          actx.report_diagnostic(diagnostic_id::sc2210,
+                                 redirection.target->source_location(),
+                                 {*digits});
+        }
+      }
+    }
+
     if (redirection.target != nullptr &&
         redirection.target->kind() == Token::Kind::Word)
     {
