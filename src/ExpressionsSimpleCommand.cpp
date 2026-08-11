@@ -117,7 +117,11 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   let has_unquoted_pattern = false;
   let has_only_literal_segments = true;
   let has_quoted_literal_value = false;
+  let has_bare_literal_value = true;
   for (let const &segment : m_assignment->value_word().segments) {
+    if (segment.kind != WordSegment::Kind::UnquotedText)
+      has_bare_literal_value = false;
+
     if (actx.shebang_is_posix_sh)
       check_posix_word_portability(actx, segment, source_location());
 
@@ -159,7 +163,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       assignment_lint_input{m_assignment->key().view(), raw_assignment.view(),
                             source_location(), m_assignment->is_append(),
                             has_unquoted_pattern, has_only_literal_segments,
-                            has_quoted_literal_value});
+                            has_quoted_literal_value, has_bare_literal_value});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||

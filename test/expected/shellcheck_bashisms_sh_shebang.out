@@ -144,6 +144,12 @@
           [CompoundListCondition, None]
             [SimpleCommand "." "library.sh"]
   [CompoundListCondition, None]
+    [FunctionDefinition "positional_zero_assignment"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "$0=zero"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "lint_only"
@@ -683,6 +689,19 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "positional_zero_assignment"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Variable "0"
+  Unquoted "=zero"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -891,6 +910,10 @@ note: Quote the value another way under a sh shebang.
     70 |    . library.sh extra
        |                 ^~~~~
 note: Set the values as variables before the file is read.
-Encountered 50 warnings.
+74:3: warning: The `$0` parameter cannot be assigned in POSIX sh, so '$0=zero' runs as a command.
+    74 |    $0=zero
+       |    ^~~~~~~
+note: Assign the program name to a named variable.
+Encountered 51 warnings.
 done
 [Code 0]

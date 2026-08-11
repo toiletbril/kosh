@@ -478,6 +478,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "the `-eq` operator compares integers only",
       "The `-eq` operator compares integers, '{0}' is not an integer",
       "Use `=` to compare the text", None, Strict, Policy),
+    D(2140, "quote-sandwich", "a bare word sits between two quoted runs",
+      "The word closes a quote, leaves '{0}' bare, and opens a quote again",
+      "Quote the complete word, or escape the inner quotes", None, Lenient,
+      Policy),
+    D(2141, "literal-escape-separator",
+      "an escape written as text stays two bytes",
+      "The value of '{0}' carries a backslash and a letter, not the control "
+      "byte",
+      "Write `$'\\t'` to place the control byte", None, Lenient, Policy),
     D(2142, "alias-positional-arguments",
       "an alias body cannot receive positional arguments",
       "An alias body cannot receive positional arguments",
@@ -702,6 +711,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The `-v` operand '{0}' carries glob characters, so the shell expands it "
       "before the test runs",
       "Quote the name, or use the `[[ ]]` form", None, Strict, Policy),
+    D(2209, "command-name-as-value",
+      "an assigned command name stores the name, it does not run",
+      "The value of '{0}' is the command name '{1}', and the command never "
+      "runs",
+      "Write `{0}=$({1})` to store its output, or quote the name", None,
+      Lenient, Policy),
     D(2210, "numeric-redirection-target",
       "a redirection target of digits is not a descriptor",
       "The redirect writes to the file named '{0}', it does not name a "
@@ -739,6 +754,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "An earlier case pattern shadows this pattern",
       "Move the specific pattern before the broader pattern",
       "this broader pattern shadows the later pattern", Annoying, Policy),
+    D(2223, "unquoted-default-assignment",
+      "an unquoted default assignment is split and globbed",
+      "The default value given to '{0}' is split into words and matched "
+      "against "
+      "the filenames",
+      "Quote the expansion to keep the default intact", None, Annoying, Policy),
     D(2224, "move-without-destination", "the move has no destination",
       "The `mv` command is given '{0}' alone, so no destination is named",
       "Add the destination path", None, Strict, Policy),
@@ -830,10 +851,57 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2268, "x-prefix-test", "the x-prefix test workaround is obsolete",
       "The x-prefix test workaround is obsolete", "Quote the variable directly",
       None, Annoying, Policy),
+    D(2269, "self-assignment", "a variable is assigned its own value",
+      "The value assigned to '{0}' is the value '{0}' already holds",
+      "Remove the assignment, or name the variable the value comes from", None,
+      Lenient, Policy),
+    D(2270, "positional-assignment-name",
+      "a positional parameter cannot be assigned",
+      "A positional parameter cannot be assigned, so '{0}' runs as a command",
+      "Assign to a named variable, or compare with `[ x = y ]`", None, Strict,
+      Policy),
+    D(2271, "expanded-assignment-name",
+      "an assignment name cannot come from an expansion",
+      "An assignment name cannot come from an expansion, so '{0}' runs as a "
+      "command",
+      "Use an array, or assign through `read`", None, Strict, Policy),
+    D(2272, "equals-in-command-name", "a command name carries a double equals",
+      "The word '{0}' holds `==` and runs as a command name",
+      "Write `[ x = y ]` to compare the values", None, Strict, Policy),
+    D(2273, "triple-equals-run", "a run of equals signs runs as a command",
+      "The word '{0}' is a run of equals signs and runs as a command name",
+      "Remove the separator line, or comment it out", None, Strict, Policy),
+    D(2274, "command-name-starts-triple-equals",
+      "a command name starts with a run of equals signs",
+      "The word '{0}' starts with `===` and is neither an assignment nor a "
+      "comparison",
+      "Write `[ x = y ]` to compare the values", None, Strict, Policy),
+    D(2275, "command-name-starts-equals", "a command name starts with equals",
+      "An assignment needs a name before the equals sign, so '{0}' runs as a "
+      "command",
+      "Add the variable name before the equals sign", None, Strict, Policy),
+    D(2276, "quoted-assignment-name", "a quoted assignment name is a command",
+      "The quotes make '{0}' one command name, and no assignment is performed",
+      "Remove the quotes to assign, or write `[ x = y ]` to compare", None,
+      Strict, Policy),
+    D(2277, "positional-zero-assignment",
+      "the zeroth positional parameter cannot be assigned",
+      "The `$0` parameter cannot be assigned, so '{0}' runs as a command",
+      "Assign to `BASH_ARGV0` instead", None, Strict, Policy),
+    D(2279, "positional-zero-assignment-posix",
+      "the zeroth positional parameter cannot be assigned in POSIX sh",
+      "The `$0` parameter cannot be assigned in POSIX sh, so '{0}' runs as a "
+      "command",
+      "Assign the program name to a named variable", None, Strict, Policy),
     D(2281, "dollar-assignment-name",
       "an assignment name must not start with a dollar sign",
       "An assignment name must not start with a dollar sign",
       "Remove the dollar sign from the assignment name", None, Strict, Policy),
+    D(2282, "numeric-assignment-name",
+      "a variable name cannot start with a digit",
+      "A variable name cannot start with a digit, so '{0}' runs as a command",
+      "Rename the variable to start with a letter or an underscore", None,
+      Strict, Policy),
     D(2283, "assignment-equals-spacing",
       "an assignment cannot contain spaces around equals",
       "An assignment cannot contain spaces around equals",
@@ -842,6 +910,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a comparison written as a command runs the left operand",
       "The `==` comparison runs '{0}' as a command",
       "Write `[ x = y ]` to compare the values", None, Strict, Policy),
+    D(2285, "append-equals-spacing",
+      "an append cannot contain spaces around the operator",
+      "An append cannot contain spaces around `+=`, so '{0}' runs as a command",
+      "Write NAME+=value without spaces, or quote the operator to pass it "
+      "through",
+      None, Strict, Policy),
     D(2335, "negated-numeric-comparison",
       "a negated numeric comparison has a direct operator",
       "A negated {0} is just {1}", "Drop the ! and use {1}", None, Annoying,
@@ -2432,6 +2506,96 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
   }
 }
 
+/* The parser refuses a malformed assignment and hands the word on as a command
+   name, so the leading byte of the source text decides which of the shellcheck
+   assignment shapes was written. */
+fn check_equals_bearing_command_name(AnalysisContext &actx,
+                                     StringView command_literal,
+                                     usize equals_position,
+                                     const SourceLocation &location) throws
+    -> void
+{
+  switch (command_literal[0]) {
+  case '$': {
+    if (command_literal[1] == '0' && equals_position == 2) {
+      let const id = actx.shebang_is_posix_sh ? diagnostic_id::sc2279
+                                              : diagnostic_id::sc2277;
+      actx.report_diagnostic(id, location, {command_literal});
+
+      return;
+    }
+
+    if (command_literal[1] >= '0' && command_literal[1] <= '9') {
+      actx.report_diagnostic(diagnostic_id::sc2270, location,
+                             {command_literal});
+
+      return;
+    }
+
+    if (lexer::is_variable_name_start(command_literal[1]))
+      actx.report_diagnostic(diagnostic_id::sc2281, location);
+
+    return;
+  }
+
+  case '=': {
+    bool is_all_equals = true;
+    for (usize i = 0; i < command_literal.length; i += 1) {
+      if (command_literal[i] != '=') {
+        is_all_equals = false;
+        break;
+      }
+    }
+
+    if (is_all_equals && command_literal.length >= 3) {
+      actx.report_diagnostic(diagnostic_id::sc2273, location,
+                             {command_literal});
+
+      return;
+    }
+
+    let const id = command_literal.starts_with(StringView{"==="})
+                       ? diagnostic_id::sc2274
+                       : diagnostic_id::sc2275;
+    actx.report_diagnostic(id, location, {command_literal});
+
+    return;
+  }
+
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9':
+    actx.report_diagnostic(diagnostic_id::sc2282, location, {command_literal});
+
+    return;
+
+  default: break;
+  }
+
+  if (equals_position + 1 < command_literal.length &&
+      command_literal[equals_position + 1] == '=')
+  {
+    actx.report_diagnostic(diagnostic_id::sc2272, location, {command_literal});
+
+    return;
+  }
+
+  for (usize i = 0; i < equals_position; i += 1) {
+    if (command_literal[i] != '$') continue;
+
+    actx.report_diagnostic(diagnostic_id::sc2271, location, {command_literal});
+
+    return;
+  }
+}
+
 /* A name like [ holds a glob metacharacter that static_command_name rejects,
    so the literal text is taken separately for the test recognition. */
 fn check_command_word_shape(AnalysisContext &actx,
@@ -2444,10 +2608,24 @@ fn check_command_word_shape(AnalysisContext &actx,
   if (!command_literal.is_empty() && command_literal[0] == '-')
     actx.report_diagnostic(diagnostic_id::sc2215, location);
 
-  if (command_literal.length > 1 && command_literal[0] == '$' &&
-      lexer::is_variable_name_start(command_literal[1]) &&
-      command_literal.find_character('=').has_value())
-    actx.report_diagnostic(diagnostic_id::sc2281, location);
+  let const equals_position = command_literal.find_character('=');
+
+  if (equals_position.has_value() && command_literal.length > 1 &&
+      !command_literal.starts_with(StringView{"[["}))
+  {
+    /* The word literal drops the quotes, so the source text tells a quoted
+       assignment name apart from a bare one, shellcheck SC2276. */
+    let const command_source = location.get_source_text(actx.source);
+    if (command_source.has_value() && !command_source->is_empty() &&
+        ((*command_source)[0] == '"' || (*command_source)[0] == '\''))
+    {
+      actx.report_diagnostic(diagnostic_id::sc2276, location,
+                             {*command_source});
+    } else {
+      check_equals_bearing_command_name(actx, command_literal, *equals_position,
+                                        location);
+    }
+  }
 
   if ((command_literal.starts_with(StringView{"["}) &&
        command_literal != "[") ||
@@ -2483,6 +2661,11 @@ fn check_command_word_shape(AnalysisContext &actx,
 
   if (args.count() >= 2 && args[1]->raw_view() == StringView{"=="}) {
     actx.report_diagnostic(diagnostic_id::sc2284, args[1]->source_location(),
+                           {command_literal});
+  }
+
+  if (args.count() >= 2 && args[1]->raw_view() == StringView{"+="}) {
+    actx.report_diagnostic(diagnostic_id::sc2285, args[1]->source_location(),
                            {command_literal});
   }
 }
@@ -4042,6 +4225,53 @@ pure fn value_is_self_arithmetic(StringView name, StringView value) wontthrow
   return value.substring(position).is_all_decimal_digits();
 }
 
+/* The value keeps its quote bytes, so the surrounding pair is dropped before
+   the name is compared. */
+pure fn assignment_value_is_own_name(StringView name,
+                                     StringView value) wontthrow -> bool
+{
+  StringView inner = value;
+  if (inner.length >= 2 && inner[0] == '"' && inner[inner.length - 1] == '"')
+    inner = inner.substring_of_length(1, inner.length - 2);
+
+  if (inner.length < 2 || inner[0] != '$') return false;
+
+  if (inner.length >= 4 && inner[1] == '{' && inner[inner.length - 1] == '}')
+    return inner.substring_of_length(2, inner.length - 3) == name;
+
+  return inner.substring(1) == name;
+}
+
+pure fn value_has_written_escape(StringView value) wontthrow -> bool
+{
+  for (usize i = 0; i + 1 < value.length; i += 1) {
+    if (value[i] != '\\') continue;
+
+    switch (value[i + 1]) {
+    case 'n':
+    case 'r':
+    case 't': return true;
+
+    default: break;
+    }
+  }
+
+  return false;
+}
+
+/* A value naming one of these programs is almost always a missing command
+   substitution, shellcheck SC2209. Words that read naturally as data, such as
+   test, id, set, true, and echo, are left out. */
+constexpr PackedStringKey COMMAND_NAME_VALUE_KEYS[] = {
+    SSK("awk"),   SSK("cat"),    SSK("chmod"), SSK("chown"), SSK("cp"),
+    SSK("curl"),  SSK("docker"), SSK("git"),   SSK("grep"),  SSK("hostname"),
+    SSK("ln"),    SSK("ls"),     SSK("mkdir"), SSK("mv"),    SSK("printf"),
+    SSK("pwd"),   SSK("rm"),     SSK("rmdir"), SSK("sed"),   SSK("ssh"),
+    SSK("sudo"),  SSK("touch"),  SSK("tr"),    SSK("uname"), SSK("whoami"),
+    SSK("xargs"),
+};
+constexpr StaticStringSet COMMAND_NAME_VALUES{COMMAND_NAME_VALUE_KEYS};
+
 } /* namespace */
 
 fn check_assignment_value_shape(AnalysisContext &actx,
@@ -4071,6 +4301,24 @@ fn check_assignment_value_shape(AnalysisContext &actx,
     let const id =
         value[0] == '$' ? diagnostic_id::sc2099 : diagnostic_id::sc2100;
     actx.report_diagnostic(id, input.location, {input.name});
+  }
+
+  if (!input.is_append && assignment_value_is_own_name(input.name, value))
+    actx.report_diagnostic(diagnostic_id::sc2269, input.location, {input.name});
+
+  /* A separator written as two text bytes never becomes the control byte,
+     shellcheck SC2141. */
+  if (input.name == "IFS" && input.has_only_literal_segments &&
+      value_has_written_escape(value))
+  {
+    actx.report_diagnostic(diagnostic_id::sc2141, input.location, {input.name});
+  }
+
+  if (!input.is_append && input.has_bare_literal_value &&
+      COMMAND_NAME_VALUES.contains(value))
+  {
+    actx.report_diagnostic(diagnostic_id::sc2209, input.location,
+                           {input.name, value});
   }
 
   let const first_bracket = input.name.find_character('[');

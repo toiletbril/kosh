@@ -303,6 +303,25 @@ quoted_value_diagnostics() {
   wc $options
 }
 
+command_word_shape_diagnostics() {
+  echo "one"two"three"
+  : ${SANDWICH:=fallback}
+  same=1
+  same=$same
+  IFS="\t"
+  pager=cat
+  $1=first
+  $0=zero
+  prefix$suffix=1
+  odd.name==value
+  ===
+  ===trail
+  =lead
+  "$quoted"=42
+  9lives=cat
+  spaced += tail
+}
+
 false && break
 false && continue
 

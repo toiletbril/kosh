@@ -443,6 +443,7 @@ chmod +x "$dir/equal-staged" "$dir/equal-second/equalprobe"
 EQUAL_FIRST="$dir/equal-first" EQUAL_STAGED="$dir/equal-staged" \
     PATH="$dir/equal-first${TEST_PATH_SEPARATOR}$dir/equal-second${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c \
     'equalprobe
+    # shellcheck disable=SC2269
     PATH="$PATH"
     koshkit mv "$EQUAL_STAGED" "$EQUAL_FIRST/equalprobe"
     equalprobe'

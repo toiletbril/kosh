@@ -1323,6 +1323,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     bool has_spread_in_longer_word = false;
     bool has_split_eligible_variable = false;
     bool has_bracket_byte = false;
+    bool has_quote_sandwich = false;
+    u8 quote_sandwich_state = 0;
+    StringView quote_sandwich_word{};
     usize echo_only_substitution_count = 0;
     StringView lost_pipeline_name{};
     StringView bare_array_name{};
@@ -1343,6 +1346,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
         switch (segment.kind) {
         case WordSegment::Kind::ArithmeticExpansion:
+          quote_sandwich_state = 0;
           if (!has_dollar_in_arithmetic &&
               segment.text.view().find_character('$').has_value())
           {
@@ -1356,6 +1360,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
 
         case WordSegment::Kind::CommandSubstitution:
+          quote_sandwich_state = 0;
           has_command_substitution_argument = true;
           if (!segment.is_in_double_quotes)
             has_unquoted_command_substitution = true;
@@ -1367,12 +1372,42 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
 
         case WordSegment::Kind::FunctionSubstitution:
+          quote_sandwich_state = 0;
           actx.has_seen_runtime_definer = true;
           break;
 
+        case WordSegment::Kind::DoubleQuotedText:
+          if (quote_sandwich_state == 2) has_quote_sandwich = true;
+          quote_sandwich_state = 1;
+          break;
+
+        case WordSegment::Kind::UnquotedText:
+          if (quote_sandwich_state == 1) {
+            quote_sandwich_state = 2;
+            quote_sandwich_word = segment.text.view();
+          } else {
+            quote_sandwich_state = 0;
+          }
+          break;
+
         case WordSegment::Kind::VariableReference: {
+          quote_sandwich_state = 0;
           let const referenced = segment.text.view();
           if (!is_operand) break;
+
+          /* An unquoted default assignment is split and globbed before it is
+             stored, shellcheck SC2223. */
+          if (segment.is_split_eligible()) {
+            let const colon = referenced.find_character(':');
+            if (colon.has_value() && *colon + 1 < referenced.length &&
+                referenced[*colon + 1] == '=')
+            {
+              actx.report_diagnostic(
+                  diagnostic_id::sc2223, arg_location,
+                  {referenced.substring_of_length(0, *colon)});
+            }
+          }
+
           if (word->segments.count() == 1 && referenced == "*" &&
               !segment.is_in_double_quotes)
           {
@@ -1411,9 +1446,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
         }
 
-        default: break;
+        default: quote_sandwich_state = 0; break;
         }
       }
+    }
+
+    if (has_quote_sandwich) {
+      actx.report_diagnostic(diagnostic_id::sc2140, arg_location,
+                             {quote_sandwich_word});
     }
 
     if (has_dollar_in_arithmetic)

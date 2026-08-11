@@ -116,6 +116,7 @@ struct assignment_lint_input
   bool has_unquoted_pattern;
   bool has_only_literal_segments;
   bool has_quoted_literal_value;
+  bool has_bare_literal_value;
 };
 
 fn check_assignment_value_shape(AnalysisContext &actx,

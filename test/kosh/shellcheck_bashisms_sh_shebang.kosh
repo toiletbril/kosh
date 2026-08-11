@@ -70,4 +70,7 @@ command_only() {
   . library.sh extra
   . library.sh
 }
+positional_zero_assignment() {
+  $0=zero
+}
 echo done

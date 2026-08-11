@@ -696,6 +696,42 @@
           [CompoundListCondition, None]
             [SimpleCommand "wc" "$options"]
   [CompoundListCondition, None]
+    [FunctionDefinition "command_word_shape_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "onetwothree"]
+          [CompoundListCondition, None]
+            [SimpleCommand ":" "$SANDWICH:=fallback"]
+          [CompoundListCondition, None]
+            [Assign same=1]
+          [CompoundListCondition, None]
+            [Assign same=$same]
+          [CompoundListCondition, None]
+            [Assign IFS=\t]
+          [CompoundListCondition, None]
+            [Assign pager=cat]
+          [CompoundListCondition, None]
+            [SimpleCommand "$1=first"]
+          [CompoundListCondition, None]
+            [SimpleCommand "$0=zero"]
+          [CompoundListCondition, None]
+            [SimpleCommand "prefix$suffix=1"]
+          [CompoundListCondition, None]
+            [SimpleCommand "odd.name==value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "==="]
+          [CompoundListCondition, None]
+            [SimpleCommand "===trail"]
+          [CompoundListCondition, None]
+            [SimpleCommand "=lead"]
+          [CompoundListCondition, None]
+            [SimpleCommand "$quoted=42"]
+          [CompoundListCondition, None]
+            [SimpleCommand "9lives=cat"]
+          [CompoundListCondition, None]
+            [SimpleCommand "spaced" "+=" "tail"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3582,6 +3618,84 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "command_word_shape_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "one"
+  Unquoted "two"
+  DoubleQuoted "three"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "SANDWICH:=fallback"
+]
+[Word
+  Unquoted "same=1"
+]
+[Word
+  Unquoted "same="
+  Variable "same"
+]
+[Word
+  Unquoted "IFS="
+  DoubleQuoted "\t"
+]
+[Word
+  Unquoted "pager=cat"
+]
+[Word
+  Variable "1"
+  Unquoted "=first"
+]
+[Word
+  Variable "0"
+  Unquoted "=zero"
+]
+[Word
+  Unquoted "prefix"
+  Variable "suffix"
+  Unquoted "=1"
+]
+[Word
+  Unquoted "odd.name==value"
+]
+[Word
+  Unquoted "==="
+]
+[Word
+  Unquoted "===trail"
+]
+[Word
+  Unquoted "=lead"
+]
+[Word
+  Variable "quoted"
+  Unquoted "=42"
+]
+[Word
+  Unquoted "9lives=cat"
+]
+[Word
+  Unquoted "spaced"
+]
+[Word
+  Unquoted "+="
+]
+[Word
+  Unquoted "tail"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -4632,26 +4746,102 @@ note: Use an array, or set the positional parameters with `set --`.
    303 |    wc $options
        |       ^~~~~~~~
 note: Quote the expansion to keep one argument.
-306:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   306 |  false && break
+307:8: warning: The word closes a quote, leaves 'two' bare, and opens a quote again.
+   307 |    echo "one"two"three"
+       |         ^~~~~~~~~~~~~~~
+note: Quote the complete word, or escape the inner quotes.
+308:5: warning: The default value given to 'SANDWICH' is split into words and matched against the filenames.
+   308 |    : ${SANDWICH:=fallback}
+       |      ^~~~~~~~~~~~~~~~~~~~~
+note: Quote the expansion to keep the default intact.
+308:5: warning: An unquoted variable can split into words and expand globs.
+   308 |    : ${SANDWICH:=fallback}
+       |      ^~~~~~~~~~~~~~~~~~~~~
+note: Quote the expansion to keep one argument.
+309:3: warning: This assignment to 'same' in a function has no local, so the value leaks to the global scope.
+   309 |    same=1
+       |    ^~~~~~
+note: Declare it with local to keep it inside the function.
+310:3: warning: The value assigned to 'same' is the value 'same' already holds.
+   310 |    same=$same
+       |    ^~~~~~~~~~
+note: Remove the assignment, or name the variable the value comes from.
+310:3: warning: This assignment to 'same' in a function has no local, so the value leaks to the global scope.
+   310 |    same=$same
+       |    ^~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+311:3: warning: The value of 'IFS' carries a backslash and a letter, not the control byte.
+   311 |    IFS="\t"
+       |    ^~~~~~~~
+note: Write `$'\t'` to place the control byte.
+312:3: warning: The value of 'pager' is the command name 'cat', and the command never runs.
+   312 |    pager=cat
+       |    ^~~~~~~~~
+note: Write `pager=$(cat)` to store its output, or quote the name.
+312:3: warning: This assignment to 'pager' in a function has no local, so the value leaks to the global scope.
+   312 |    pager=cat
+       |    ^~~~~~~~~
+note: Declare it with local to keep it inside the function.
+313:3: warning: A positional parameter cannot be assigned, so '$1=first' runs as a command.
+   313 |    $1=first
+       |    ^~~~~~~~
+note: Assign to a named variable, or compare with `[ x = y ]`.
+314:3: warning: The `$0` parameter cannot be assigned, so '$0=zero' runs as a command.
+   314 |    $0=zero
+       |    ^~~~~~~
+note: Assign to `BASH_ARGV0` instead.
+315:3: warning: An assignment name cannot come from an expansion, so 'prefix$suffix=1' runs as a command.
+   315 |    prefix$suffix=1
+       |    ^~~~~~~~~~~~~~~
+note: Use an array, or assign through `read`.
+316:3: warning: The word 'odd.name==value' holds `==` and runs as a command name.
+   316 |    odd.name==value
+       |    ^~~~~~~~~~~~~~~
+note: Write `[ x = y ]` to compare the values.
+317:3: warning: The word '===' is a run of equals signs and runs as a command name.
+   317 |    ===
+       |    ^~~
+note: Remove the separator line, or comment it out.
+318:3: warning: The word '===trail' starts with `===` and is neither an assignment nor a comparison.
+   318 |    ===trail
+       |    ^~~~~~~~
+note: Write `[ x = y ]` to compare the values.
+319:3: warning: An assignment needs a name before the equals sign, so '=lead' runs as a command.
+   319 |    =lead
+       |    ^~~~~
+note: Add the variable name before the equals sign.
+320:3: warning: The quotes make '"$quoted"=42' one command name, and no assignment is performed.
+   320 |    "$quoted"=42
+       |    ^~~~~~~~~~~~
+note: Remove the quotes to assign, or write `[ x = y ]` to compare.
+321:3: warning: A variable name cannot start with a digit, so '9lives=cat' runs as a command.
+   321 |    9lives=cat
+       |    ^~~~~~~~~~
+note: Rename the variable to start with a letter or an underscore.
+322:10: warning: An append cannot contain spaces around `+=`, so 'spaced' runs as a command.
+   322 |    spaced += tail
+       |           ^~
+note: Write NAME+=value without spaces, or quote the operator to pass it through.
+325:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   325 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-307:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   307 |  false && continue
+326:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   326 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-309:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   309 |  recursive_wrapper() { recursive_wrapper "$@"; }
+328:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   328 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-309:1: details:
-   309 |  recursive_wrapper() { recursive_wrapper "$@"; }
+328:1: details:
+   328 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-314:8: warning: An unquoted variable can split into words and expand globs.
-   314 |    echo $reported
+333:8: warning: An unquoted variable can split into words and expand globs.
+   333 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 250 warnings.
+Encountered 269 warnings.
 done
 done
 done
