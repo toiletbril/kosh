@@ -61,5 +61,7 @@ command_only() {
   trap 'cleanup' EXIT
   printf '%q\n' "$value"
   printf '%s\n' "$value"
+  . library.sh extra
+  . library.sh
 }
 echo done

@@ -44,7 +44,8 @@ echo "=== command reports the enabled fallback ==="
 "$BIN" --enable-koshkit -c 'PATH=; command -v seq; command -V seq'
 
 echo "=== which reports the enabled fallback ==="
-"$BIN" --enable-koshkit -c 'PATH=; which seq' 2>&1 |
+"$BIN" --enable-koshkit -c '# shellcheck disable=SC2230
+PATH=; which seq' 2>&1 |
   ./normalize-trace.sh "$BIN"
 
 echo "=== a builtin name is not a koshkit utility ==="

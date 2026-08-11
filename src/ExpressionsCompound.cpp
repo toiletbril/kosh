@@ -1044,7 +1044,9 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let const was_inside_read_loop = actx.is_inside_read_loop;
   if (loop_condition_reads_input) actx.is_inside_read_loop = true;
   if (is_folded_to_skip()) actx.should_silence_unresolved_commands = true;
+  actx.loop_body_depth++;
   m_body->analyze(actx, false);
+  actx.loop_body_depth--;
   actx.is_inside_read_loop = was_inside_read_loop;
   actx.should_silence_unresolved_commands = was_silenced;
   actx.tested_command_names = steal(saved_tested_command_names);
@@ -1331,7 +1333,9 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   /* Clearing the constant table before the body keeps a pre-loop constant from
      being inlined into a counter the body increments. */
   actx.constant_variables.clear();
+  actx.loop_body_depth++;
   m_body->analyze(actx, false);
+  actx.loop_body_depth--;
 }
 
 fn ForLoop::as_for_loop() const wontthrow -> const ForLoop * { return this; }

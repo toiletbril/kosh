@@ -119,6 +119,10 @@
             [SimpleCommand "printf" "%q\n" "$value"]
           [CompoundListCondition, None]
             [SimpleCommand "printf" "%s\n" "$value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "." "library.sh" "extra"]
+          [CompoundListCondition, None]
+            [SimpleCommand "." "library.sh"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
@@ -584,6 +588,21 @@
   Variable "value"
 ]
 [Word
+  Unquoted "."
+]
+[Word
+  Unquoted "library.sh"
+]
+[Word
+  Unquoted "extra"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "library.sh"
+]
+[Word
   Unquoted "}"
 ]
 [Word
@@ -779,6 +798,10 @@ note: Name the signal in uppercase under a sh shebang.
     62 |    printf '%q\n' "$value"
        |           ^~~~~~
 note: Quote the value another way under a sh shebang.
-Encountered 46 warnings.
+64:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it.
+    64 |    . library.sh extra
+       |                 ^~~~~
+note: Set the values as variables before the file is read.
+Encountered 47 warnings.
 done
 [Code 0]

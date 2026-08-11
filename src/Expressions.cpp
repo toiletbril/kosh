@@ -1899,6 +1899,8 @@ node_inequality_left_operand(const CompoundListCondition *node) wontthrow
 fn CompoundList::analyze(AnalysisContext &actx,
                          bool is_unconditional) const throws -> void
 {
+  const Token *first_directory_change = nullptr;
+
   for (usize i = 0; i < m_nodes.count(); i++) {
     ASSERT(m_nodes[i] != nullptr);
     let const command = m_nodes[i]->command();
@@ -1909,11 +1911,35 @@ fn CompoundList::analyze(AnalysisContext &actx,
       if (name.has_value() && !actx.defined_functions.contains(*name) &&
           !actx.known_aliases.contains(*name))
       {
-        if (*name == "cd" && i + 1 < m_nodes.count() &&
-            m_nodes[i + 1]->kind() == CompoundListCondition::Kind::None)
-        {
-          actx.report_diagnostic(diagnostic_id::sc2164,
-                                 simple->args()[0]->source_location());
+        if (*name == "cd") {
+          if (i + 1 < m_nodes.count() &&
+              m_nodes[i + 1]->kind() == CompoundListCondition::Kind::None)
+          {
+            actx.report_diagnostic(diagnostic_id::sc2164,
+                                   simple->args()[0]->source_location());
+          }
+
+          /* A subshell restores the directory on its own, so the return trip is
+             work the shell already does, shellcheck SC2103. */
+          let is_return_trip = false;
+          if (simple->args().count() == 2 &&
+              simple->args()[1]->kind() == Token::Kind::Word)
+          {
+            is_return_trip =
+                static_cast<const tokens::WordToken *>(simple->args()[1])
+                    ->word()
+                    .to_literal_string()
+                    .view() == "-";
+          }
+
+          if (!is_return_trip) {
+            first_directory_change = simple->args()[0];
+          } else if (first_directory_change != nullptr) {
+            actx.report_diagnostic(diagnostic_id::sc2103,
+                                   first_directory_change->source_location(),
+                                   {}, simple->args()[0]->source_location());
+            first_directory_change = nullptr;
+          }
         }
         if (*name == "exec" && simple->args().count() > 1 &&
             i + 1 < m_nodes.count())

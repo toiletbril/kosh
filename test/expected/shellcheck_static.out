@@ -568,6 +568,64 @@
           [CompoundListCondition, None]
             [SimpleCommand "printf" "plain\n" "one" "two"]
   [CompoundListCondition, None]
+    [FunctionDefinition "helper_function"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "helper"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "privilege_and_builtin_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "remote" "echo $value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "-p" "22" "remote" "echo $value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "remote" "echo literal"]
+          [CompoundListCondition, None]
+            [SimpleCommand "su" "operator" "helper_function"]
+          [CompoundListCondition, None]
+            [SimpleCommand "su" "-" "-c" "helper_function"]
+          [CompoundListCondition, None]
+            [SimpleCommand "su" "operator" "whoami"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-exec" "helper_function" "{}" ";"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-execdir" "helper_function" "{}" ";"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "xargs" "helper_function"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cd" "/tmp"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cd" "-"]
+          [CompoundListCondition, None]
+            [SimpleCommand "break"]
+          [CompoundListCondition, None]
+            [SimpleCommand "set" "assigned=value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "one" "two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "exit" "one" "two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "$(echo 5)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "export" "$exported_name"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sudo" "cd" "/tmp"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sudo" "export" "FOO=1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "continue"]
+  [CompoundListCondition, None]
     [FunctionDefinition "recursive_wrapper"]
       [BraceGroup]
         [CompoundList]
@@ -3024,6 +3082,221 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "helper"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "privilege_and_builtin_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "remote"
+]
+[Word
+  DoubleQuoted "echo "
+  Variable "value"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "22"
+]
+[Word
+  Unquoted "remote"
+]
+[Word
+  DoubleQuoted "echo "
+  Variable "value"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "remote"
+]
+[Word
+  Literal "echo literal"
+]
+[Word
+  Unquoted "su"
+]
+[Word
+  Unquoted "operator"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "su"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "su"
+]
+[Word
+  Unquoted "operator"
+]
+[Word
+  Unquoted "whoami"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-exec"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "{}"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-execdir"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "{}"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "assigned=value"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  CommandSubstitution "echo 5"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Variable "exported_name"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "FOO=1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "continue"
+]
+[Word
   Unquoted "recursive_wrapper"
 ]
 [Word
@@ -3238,6 +3511,10 @@ note: The text can be used directly without the subshell.
     78 |  cat data/hello-d | cat
        |  ^~~
 note: Give the file to the next command directly instead of piping cat.
+80:1: warning: The `which` program is not standard and is missing on some systems.
+    80 |  which sh >/dev/null 2>&1
+       |  ^~~~~
+note: Use `command -v` instead.
 94:3: warning: Commands after exec do not run when exec succeeds.
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
@@ -3838,18 +4115,123 @@ note: Use `grep -q` and test its exit status.
    237 |    printf 'plain\n' one two
        |           ^~~~~~~~~
 note: Add a format directive, or remove the extra operands.
-240:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   240 |  recursive_wrapper() { recursive_wrapper "$@"; }
+252:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+   252 |    cd /tmp
+       |    ^~
+note: Stop or return when cd fails.
+253:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+   253 |    cd -
+       |    ^~
+note: Stop or return when cd fails.
+252:3: warning: A later `cd -` undoes this directory change, and a subshell restores the directory on its own.
+   252 |    cd /tmp
+       |    ^~
+253:3: details:
+   253 |    cd -
+       |    ^~ the working directory is restored here.
+note: Run the commands inside `( )` instead.
+243:14: warning: The expansion in this `ssh` operand runs on the client, not on the remote host.
+   243 |    ssh remote "echo $value"
+       |               ^~~~~~~~~~~~~
+note: Quote the operand in single quotes so the remote shell expands it.
+244:20: warning: The expansion in this `ssh` operand runs on the client, not on the remote host.
+   244 |    ssh -p 22 remote "echo $value"
+       |                     ^~~~~~~~~~~~~
+note: Quote the operand in single quotes so the remote shell expands it.
+246:15: warning: The `su` command starts a new shell, where the function 'helper_function' is not defined.
+   246 |    su operator helper_function
+       |                ^~~~~~~~~~~~~~~
+note: Move the body into its own script, or pass it with `sh -c`.
+247:11: warning: The `su` command starts a new shell, where the function 'helper_function' is not defined.
+   247 |    su - -c helper_function
+       |            ^~~~~~~~~~~~~~~
+note: Move the body into its own script, or pass it with `sh -c`.
+248:15: warning: The operand 'whoami' is handed to `su` as a command without `-c`, which not every `su` accepts.
+   248 |    su operator whoami
+       |                ^~~~~~
+note: Write `su -c` instead, or use `sudo`.
+249:16: warning: The function 'helper_function' is handed to an external command, which never sees a shell function.
+   249 |    find . -exec helper_function {} \;
+       |                 ^~~~~~~~~~~~~~~
+note: Wrap the call in `sh -c`, or move the body into its own script.
+250:19: warning: The function 'helper_function' is handed to an external command, which never sees a shell function.
+   250 |    find . -execdir helper_function {} \;
+       |                    ^~~~~~~~~~~~~~~
+note: Wrap the call in `sh -c`, or move the body into its own script.
+251:14: warning: The function 'helper_function' is handed to an external command, which never sees a shell function.
+   251 |    ls | xargs helper_function
+       |               ^~~~~~~~~~~~~~~
+note: Wrap the call in `sh -c`, or move the body into its own script.
+251:8: warning: The `ls` listing splits a name with a space or a newline before `xargs` reads it.
+   251 |    ls | xargs helper_function
+       |         ^~~~~
+note: Use `find -print0` with `xargs -0`, or `find -exec`.
+254:3: warning: The `break` command stands in a function outside any loop, where there is nothing to leave.
+   254 |    break
+       |    ^~~~~
+note: Use `return` instead.
+255:7: warning: The `set` builtin changes the shell options and the positional parameters, so 'assigned' is not assigned.
+   255 |    set assigned=value
+       |        ^~~~~~~~~~~~~~
+note: Write `assigned=value` on its own.
+256:14: warning: The `return` builtin takes one number from 0 to 255, so the operands after the first are ignored.
+   256 |    return one two
+       |               ^~~
+note: Write the other data to standard output.
+256:10: warning: The code 'one' is not a number from 0 to 255, return either rejects it or wraps it modulo 256.
+   256 |    return one two
+       |           ^~~
+257:12: warning: The `exit` builtin takes one number from 0 to 255, so the operands after the first are ignored.
+   257 |    exit one two
+       |             ^~~
+note: Write the other data to standard output.
+257:8: warning: The code 'one' is not a number from 0 to 255, exit either rejects it or wraps it modulo 256.
+   257 |    exit one two
+       |         ^~~
+258:10: warning: An unquoted command substitution splits its output.
+   258 |    return $(echo 5)
+       |           ^~~~~~~~~
+note: Quote it to keep one argument.
+258:10: warning: A command substitution wraps a useless echo.
+   258 |    return $(echo 5)
+       |           ^~~~~~~~~
+note: The text can be used directly without the subshell.
+258:10: warning: The `return` operand is command output, and a status is one number from 0 to 255.
+   258 |    return $(echo 5)
+       |           ^~~~~~~~~
+note: Print the value and return a status separately.
+259:10: warning: The `export` operand expands 'exported_name', so the exported name is the value of 'exported_name'.
+   259 |    export $exported_name
+       |           ^~~~~~~~~~~~~~
+note: Drop the dollar sign to export 'exported_name' itself.
+260:8: warning: The `sudo` command starts an external program, so the builtin 'cd' is not found.
+   260 |    sudo cd /tmp
+       |         ^~
+note: Wrap the builtin in `sudo sh -c` instead.
+261:8: warning: The `sudo` command starts an external program, so the builtin 'export' is not found.
+   261 |    sudo export FOO=1
+       |         ^~~~~~
+note: Wrap the builtin in `sudo sh -c` instead.
+264:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   264 |  false && break
+       |           ^~~~~
+note: Remove it, or move it into the loop it belongs to.
+265:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   265 |  false && continue
+       |           ^~~~~~~~
+note: Remove it, or move it into the loop it belongs to.
+267:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   267 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-240:1: details:
-   240 |  recursive_wrapper() { recursive_wrapper "$@"; }
+267:1: details:
+   267 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-245:8: warning: An unquoted variable can split into words and expand globs.
-   245 |    echo $reported
+272:8: warning: An unquoted variable can split into words and expand globs.
+   272 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 193 warnings.
+Encountered 220 warnings.
 done
 done
 done

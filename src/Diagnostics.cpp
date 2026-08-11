@@ -153,6 +153,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2028, "echo-escape-sequence", "echo prints an escape sequence literally",
       "The `echo` operand holds '{0}', which `echo` prints as written",
       "Use `printf` instead", None, Lenient, Policy),
+    D(2029, "ssh-client-side-expansion",
+      "the expansion happens on the client side",
+      "The expansion in this `ssh` operand runs on the client, not on the "
+      "remote host",
+      "Quote the operand in single quotes so the remote shell expands it", None,
+      Lenient, Policy),
     D(2030, "pipeline-assignment",
       "a pipeline assignment is lost when its stage exits",
       "This pipeline assignment is lost when the stage exits",
@@ -167,6 +173,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "This read sees the value from before the pipeline",
       "Move the assignment outside the pipeline or avoid the pipeline subshell",
       None, Strict, Policy),
+    D(2032, "su-runs-no-function", "su cannot run a shell function",
+      "The `su` command starts a new shell, where the function '{0}' is not "
+      "defined",
+      "Move the body into its own script, or pass it with `sh -c`", None,
+      Strict, Policy),
+    D(2033, "function-passed-to-command",
+      "an external command cannot run a shell function",
+      "The function '{0}' is handed to an external command, which never sees a "
+      "shell function",
+      "Wrap the call in `sh -c`, or move the body into its own script", None,
+      Strict, Policy),
     D(2035, "option-shaped-glob",
       "a bare glob can expand to an option-shaped filename",
       "A bare glob can expand to a filename that begins with '-'",
@@ -342,6 +359,21 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "a command in a while-read loop can consume loop input",
       "An ssh command in a while-read loop can consume the loop input",
       "Redirect ssh input from /dev/null or pass -n", None, Annoying, Policy),
+    D(2103, "directory-change-and-back", "a subshell avoids the return trip",
+      "A later `cd -` undoes this directory change, and a subshell restores "
+      "the directory on its own",
+      "Run the commands inside `( )` instead",
+      "the working directory is restored here", Annoying, Policy),
+    D(2104, "break-outside-loop-in-function",
+      "a function leaves through return",
+      "The `{0}` command stands in a "
+      "function outside any loop, where there is nothing to leave",
+      "Use `return` instead", None, Strict, Policy),
+    D(2105, "break-outside-loop", "break is valid only inside a loop",
+      "The `{0}` command stands outside any loop, where there is nothing to "
+      "leave",
+      "Remove it, or move it into the loop it belongs to", None, Strict,
+      Policy),
     D(2107, "and-inside-single-bracket",
       "a double ampersand does not join one test",
       "A `[ ]` test does not take `&&`, the bracket closes before it",
@@ -368,6 +400,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "A command substitution wraps a useless echo",
       "The text can be used directly without the subshell", None, Annoying,
       Policy),
+    D(2117, "su-without-command-flag", "su takes its command behind -c",
+      "The operand '{0}' is handed to `su` as a command without `-c`, which "
+      "not "
+      "every `su` accepts",
+      "Write `su -c` instead, or use `sudo`", None, Lenient, Policy),
+    D(2121, "set-as-assignment", "set does not assign a variable",
+      "The `set` builtin changes the shell options and the positional "
+      "parameters, so '{0}' is not assigned",
+      "Write `{0}=value` on its own", None, Strict, Policy),
     D(2122, "invalid-comparison-operator",
       "the comparison operator does not exist in test",
       "The '{0}' operator does not exist in test",
@@ -411,6 +452,14 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2147, "literal-tilde-path", "a tilde inside PATH remains literal",
       "A tilde inside PATH remains literal",
       "Expand HOME before assigning PATH", None, Lenient, Policy),
+    D(2151, "return-extra-operands", "return takes one status",
+      "The `return` builtin takes one number from 0 to 255, so the operands "
+      "after the first are ignored",
+      "Write the other data to standard output", None, Strict, Policy),
+    D(2152, "return-substitution-value", "return takes a status, not output",
+      "The `return` operand is command output, and a status is one number from "
+      "0 to 255",
+      "Print the value and return a status separately", None, Strict, Policy),
     D(2155, "declare-substitution-status",
       "declare and assignment can mask command status",
       "Declaring and assigning from a command substitution in one command "
@@ -447,6 +496,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2162, "read-without-r", "read without -r mangles backslashes",
       "A read without -r mangles a backslash in the input",
       "Add -r to read the line literally", None, Lenient, Policy),
+    D(2163, "export-expanded-name", "export takes a name, not a value",
+      "The `export` operand expands '{0}', so the exported name is the value "
+      "of "
+      "'{0}'",
+      "Drop the dollar sign to export '{0}' itself", None, Strict, Policy),
     D(2164, "unchecked-cd",
       "an unchecked cd can leave commands in the wrong directory",
       "This cd is unchecked, so later commands can run in the wrong directory",
@@ -605,6 +659,13 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "read expects a variable name without a dollar sign",
       "A read operand is a variable name, not a variable value",
       "Drop the dollar sign from the variable name", None, Strict, Policy),
+    D(2230, "which-is-nonstandard", "which is not a shell builtin",
+      "The `which` program is not standard and is missing on some systems",
+      "Use `command -v` instead", None, Annoying, Policy),
+    D(2232, "sudo-runs-no-builtin", "sudo cannot run a shell builtin",
+      "The `sudo` command starts an external program, so the builtin '{0}' is "
+      "not found",
+      "Wrap the builtin in `sudo sh -c` instead", None, Strict, Policy),
     D(2233, "redundant-condition-parentheses",
       "the parentheses around the condition add nothing",
       "The `( )` around the condition starts a subshell and changes nothing "
@@ -618,6 +679,17 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Test with -n instead", None, Annoying, Policy),
     D(2237, "negated-n", "a negated -n is -z", "A negated -n is just -z",
       "Test with -z instead", None, Annoying, Policy),
+    D(2240, "posix-dot-arguments", "the POSIX dot command takes no argument",
+      "The POSIX `.` command reads a file and takes no argument, so '{0}' "
+      "never "
+      "reaches it",
+      "Set the values as variables before the file is read", None, Strict,
+      Policy),
+    D(2241, "exit-extra-operands", "exit takes one status",
+      "The `exit` builtin takes one number from 0 to 255, so the operands "
+      "after "
+      "the first are ignored",
+      "Write the other data to standard output", None, Strict, Policy),
     D(2242, "invalid-status-code",
       "an exit or return code is outside 0 through 255",
       "The code '{0}' is not a number from 0 to 255, {1} either rejects it or "
@@ -1133,10 +1205,13 @@ constexpr static_string_entry<analysis_command_info>
         C("alias", Alias, COMMAND_GROUP_RUNTIME_DEFINER),
         C("arch", Arch, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("basename", Basename, NEUTRAL_READER_GROUPS),
+        C("break", Break, NO_COMMAND_GROUP),
         C("builtin", Builtin, NO_COMMAND_GROUP),
+        C("cd", Cd, NO_COMMAND_GROUP),
         C("chmod", Chmod, COMMAND_GROUP_NON_STDIN_READER),
         C("chown", Chown, COMMAND_GROUP_NON_STDIN_READER),
         C("command", Command, NO_COMMAND_GROUP),
+        C("continue", Continue, NO_COMMAND_GROUP),
         C("cp", Cp, COMMAND_GROUP_NON_STDIN_READER),
         C("date", Date, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("declare", Declare, DECLARATION_GROUPS),
@@ -1175,9 +1250,11 @@ constexpr static_string_entry<analysis_command_info>
         C("rmdir", Rmdir, COMMAND_GROUP_NON_STDIN_READER),
         C("sed", Sed, NO_COMMAND_GROUP),
         C("seq", Seq, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
+        C("set", Set, NO_COMMAND_GROUP),
         C("sleep", Sleep, COMMAND_GROUP_NON_STDIN_READER),
         C("source", Source, COMMAND_GROUP_RUNTIME_DEFINER),
         C("ssh", Ssh, NO_COMMAND_GROUP),
+        C("su", Su, NO_COMMAND_GROUP),
         C("sudo", Sudo, NO_COMMAND_GROUP),
         C("test", Test, BRACKET_GROUPS | COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("touch", Touch, COMMAND_GROUP_NON_STDIN_READER),
@@ -1793,6 +1870,63 @@ constexpr PackedStringKey BASH_ONLY_VARIABLE_KEYS[] = {
 };
 constexpr StaticStringSet BASH_ONLY_VARIABLES{BASH_ONLY_VARIABLE_KEYS};
 
+/* The builtins that have no external program of the same name, so an external
+   launcher such as sudo never finds them. echo, printf, test, pwd, true and
+   false are left out because a real program exists for each. */
+constexpr PackedStringKey SHELL_ONLY_BUILTIN_KEYS[] = {
+    SSK("."),    SSK("alias"),    SSK("cd"),      SSK("declare"), SSK("eval"),
+    SSK("exec"), SSK("export"),   SSK("getopts"), SSK("let"),     SSK("local"),
+    SSK("read"), SSK("readonly"), SSK("set"),     SSK("shift"),   SSK("source"),
+    SSK("trap"), SSK("ulimit"),   SSK("umask"),   SSK("unalias"), SSK("unset"),
+};
+constexpr StaticStringSet SHELL_ONLY_BUILTINS{SHELL_ONLY_BUILTIN_KEYS};
+
+/* An ssh short option that consumes the operand behind it, so the host lint
+   does not read that operand as the remote host. */
+pure fn ssh_option_takes_value(char letter) wontthrow -> bool
+{
+  switch (letter) {
+  case 'B':
+  case 'b':
+  case 'c':
+  case 'D':
+  case 'E':
+  case 'e':
+  case 'F':
+  case 'I':
+  case 'i':
+  case 'J':
+  case 'L':
+  case 'l':
+  case 'm':
+  case 'O':
+  case 'o':
+  case 'p':
+  case 'Q':
+  case 'R':
+  case 'S':
+  case 'W':
+  case 'w': return true;
+  default: return false;
+  }
+}
+
+/* The first word of a command line, used where a builtin hands a whole command
+   string to another shell. */
+pure fn leading_command_word(StringView text) wontthrow -> StringView
+{
+  usize start = 0;
+  while (start < text.length && (text[start] == ' ' || text[start] == '\t'))
+    start++;
+
+  usize end = start;
+  while (end < text.length && text[end] != ' ' && text[end] != '\t' &&
+         text[end] != '\n')
+    end++;
+
+  return text.substring_of_length(start, end - start);
+}
+
 fn check_posix_parameter_expansion(AnalysisContext &actx,
                                    const WordSegment &segment, StringView text,
                                    SourceLocation fallback_location) throws
@@ -2309,17 +2443,115 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
     break;
   }
 
-  case command_name_id::Export:
-    if (!args_have_short_flag(args, 'n')) {
-      for (usize i = 1; i < args.count(); i++) {
-        let const raw = args[i]->raw_string();
-        if (raw.view().starts_with(StringView{"CDPATH="}) ||
-            raw.view() == "CDPATH")
-          actx.report_diagnostic(diagnostic_id::exported_cdpath,
-                                 args[i]->source_location());
+  /* The client expands an ssh operand before the remote shell ever sees it,
+     shellcheck SC2029. The host is the first plain operand, so the command that
+     follows it is the part that runs remotely. */
+  case command_name_id::Ssh: {
+    let has_seen_host = false;
+    let should_skip_option_value = false;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      let const literal = word.to_literal_string();
+      let const view = literal.view();
+      if (should_skip_option_value) {
+        should_skip_option_value = false;
+        continue;
       }
+      if (!view.is_empty() && view[0] == '-') {
+        if (view.length >= 2 && ssh_option_takes_value(view[view.length - 1]))
+          should_skip_option_value = true;
+        continue;
+      }
+      if (!has_seen_host) {
+        has_seen_host = true;
+        continue;
+      }
+
+      for (let const &segment : word.segments)
+        if (segment.kind == WordSegment::Kind::VariableReference ||
+            segment.kind == WordSegment::Kind::CommandSubstitution)
+        {
+          actx.report_diagnostic(diagnostic_id::sc2029,
+                                 args[i]->source_location());
+          break;
+        }
     }
     break;
+  }
+
+  /* su starts a fresh shell, so a function name never resolves there,
+     shellcheck SC2032. A bare command operand without -c is SC2117. */
+  case command_name_id::Su: {
+    let is_command_value_next = false;
+    let has_seen_user = false;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      let const literal = static_cast<const tokens::WordToken *>(args[i])
+                              ->word()
+                              .to_literal_string();
+      let const view = literal.view();
+      if (is_command_value_next) {
+        let const command_word = leading_command_word(view);
+        if (actx.defined_functions.contains(command_word)) {
+          actx.report_diagnostic(diagnostic_id::sc2032,
+                                 args[i]->source_location(), {command_word});
+        }
+        break;
+      }
+      if (!view.is_empty() && view[0] == '-') {
+        if (view == "-c" || view == "--command") is_command_value_next = true;
+        continue;
+      }
+      if (!has_seen_user) {
+        has_seen_user = true;
+        continue;
+      }
+
+      if (actx.defined_functions.contains(view)) {
+        actx.report_diagnostic(diagnostic_id::sc2032,
+                               args[i]->source_location(), {view});
+      } else {
+        actx.report_diagnostic(diagnostic_id::sc2117,
+                               args[i]->source_location(), {view});
+      }
+      break;
+    }
+    break;
+  }
+
+  case command_name_id::Export: {
+    let const should_check_cdpath = !args_have_short_flag(args, 'n');
+    for (usize i = 1; i < args.count(); i++) {
+      let const raw = args[i]->raw_string();
+      if (should_check_cdpath &&
+          (raw.view().starts_with(StringView{"CDPATH="}) ||
+           raw.view() == "CDPATH"))
+      {
+        actx.report_diagnostic(diagnostic_id::exported_cdpath,
+                               args[i]->source_location());
+      }
+
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      /* export $name exports whatever the value spells, shellcheck SC2163. A
+         modifier or a brace form is left alone, since the name no longer spans
+         the whole segment. */
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      if (word.segments.count() != 1 ||
+          word.segments[0].kind != WordSegment::Kind::VariableReference)
+        continue;
+
+      let const text = word.segments[0].text.view();
+      let const name = operand_target_name(text);
+      if (!name.is_empty() && name.length == text.length)
+        actx.report_diagnostic(diagnostic_id::sc2163,
+                               args[i]->source_location(), {name});
+    }
+    break;
+  }
 
   case command_name_id::Unset:
     for (usize i = 1; i < args.count(); i++) {
@@ -2350,15 +2582,25 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
                                  args[i + 1]->source_location());
       }
 
-      if (predicate.view() == "-exec" && i + 3 < args.count()) {
-        let const shell_name = args[i + 1]->raw_string();
-        let const shell_flag = args[i + 2]->raw_string();
-        let const script = args[i + 3]->raw_string();
-        if ((shell_name.view() == "sh" || shell_name.view() == "bash") &&
-            shell_flag.view() == "-c" &&
-            view_contains(script.view(), StringView{"{}"}))
-          actx.report_diagnostic(diagnostic_id::sc2156,
-                                 args[i + 3]->source_location());
+      if (predicate.view() == "-exec" || predicate.view() == "-execdir") {
+        /* find launches the action itself, so a shell function is never found,
+           shellcheck SC2033. */
+        let const action = args[i + 1]->raw_string();
+        if (actx.defined_functions.contains(action.view())) {
+          actx.report_diagnostic(diagnostic_id::sc2033,
+                                 args[i + 1]->source_location(),
+                                 {action.view()});
+        }
+
+        if (i + 3 < args.count()) {
+          let const shell_flag = args[i + 2]->raw_string();
+          let const script = args[i + 3]->raw_string();
+          if ((action.view() == "sh" || action.view() == "bash") &&
+              shell_flag.view() == "-c" &&
+              view_contains(script.view(), StringView{"{}"}))
+            actx.report_diagnostic(diagnostic_id::sc2156,
+                                   args[i + 3]->source_location());
+        }
       }
     }
     break;
@@ -2429,18 +2671,38 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
     break;
   }
 
-  case command_name_id::Sudo:
+  case command_name_id::Sudo: {
     for (let const &redirection : input.redirections)
       if (redirection.target != nullptr)
         actx.report_diagnostic(diagnostic_id::sc2024_redirection,
                                redirection.target->source_location());
-    for (usize i = 1; i < args.count(); i++)
-      if (args[i]->kind() == Token::Kind::Word &&
-          word_is_bare_glob(
-              static_cast<const tokens::WordToken *>(args[i])->word()))
+
+    let has_seen_command_word = false;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
+      if (word_is_bare_glob(word)) {
         actx.report_diagnostic(diagnostic_id::sc2024_glob,
                                args[i]->source_location());
+      }
+
+      if (has_seen_command_word) continue;
+
+      let const literal = word.to_literal_string();
+      let const view = literal.view();
+      if (view.is_empty() || view[0] == '-') continue;
+
+      has_seen_command_word = true;
+
+      /* sudo starts an external program, so a builtin with no program of the
+         same name is never reached, shellcheck SC2232. */
+      if (SHELL_ONLY_BUILTINS.contains(view))
+        actx.report_diagnostic(diagnostic_id::sc2232,
+                               args[i]->source_location(), {view});
+    }
     break;
+  }
 
   default: break;
   }
@@ -2583,6 +2845,53 @@ fn check_command_name_lints(AnalysisContext &actx,
     if (is_posix)
       actx.report_diagnostic(diagnostic_id::sc3030, location,
                              {input.command_literal});
+    break;
+
+  /* Nothing surrounds a break outside a loop, shellcheck SC2104 and SC2105. A
+     function body starts its own loop depth, so a call from inside a loop does
+     not count. */
+  case command_name_id::Break:
+  case command_name_id::Continue:
+    if (actx.loop_body_depth == 0) {
+      actx.report_diagnostic(actx.function_scope_depth > 0
+                                 ? diagnostic_id::sc2104
+                                 : diagnostic_id::sc2105,
+                             location, {input.command_literal});
+    }
+    break;
+
+  /* set changes the options and the positional parameters, so a name=value
+     operand assigns nothing, shellcheck SC2121. */
+  case command_name_id::Set:
+    if (args.count() >= 2) {
+      /* The operand arrives as an Assignment token, since name=value keeps that
+         shape wherever it stands. */
+      let const literal = args[1]->raw_string();
+      let const view = literal.view();
+      if (!view.is_empty() && view[0] != '-' && view[0] != '+') {
+        let const target = operand_target_name(view);
+        if (!target.is_empty() && target.length < view.length &&
+            view[target.length] == '=')
+        {
+          actx.report_diagnostic(diagnostic_id::sc2121,
+                                 args[1]->source_location(), {target});
+        }
+      }
+    }
+    break;
+
+  /* The POSIX dot command reads a file and takes nothing else, shellcheck
+     SC2240. The source spelling is already reported as SC3046. */
+  case command_name_id::Dot:
+    if (is_posix && args.count() > 2) {
+      let const operand = args[2]->raw_string();
+      actx.report_diagnostic(diagnostic_id::sc2240, args[2]->source_location(),
+                             {operand.view()});
+    }
+    break;
+
+  case command_name_id::Which:
+    actx.report_diagnostic(diagnostic_id::sc2230, location);
     break;
 
   case command_name_id::Egrep:
@@ -2794,7 +3103,16 @@ fn check_command_value_lints(AnalysisContext &actx,
   /* An exit or return code outside the literal 0-255 shape errors or wraps
      modulo 256, shellcheck SC2242. */
   case command_name_id::Exit:
-  case command_name_id::Return:
+  case command_name_id::Return: {
+    let const is_return = input.command_id() == command_name_id::Return;
+
+    /* One status is all either builtin reads, shellcheck SC2151 and SC2241. */
+    if (args.count() > 2) {
+      actx.report_diagnostic(is_return ? diagnostic_id::sc2151
+                                       : diagnostic_id::sc2241,
+                             args[2]->source_location());
+    }
+
     if (args.count() >= 2 && args[1]->kind() == Token::Kind::Word) {
       let const &operand =
           static_cast<const tokens::WordToken *>(args[1])->word();
@@ -2810,9 +3128,17 @@ fn check_command_value_lints(AnalysisContext &actx,
           actx.report_diagnostic(diagnostic_id::sc2242,
                                  args[1]->source_location(),
                                  {view, input.command_literal});
+      } else if (is_return && operand.segments.count() == 1 &&
+                 operand.segments[0].kind ==
+                     WordSegment::Kind::CommandSubstitution)
+      {
+        /* Command output stands where a status belongs, shellcheck SC2152. */
+        actx.report_diagnostic(diagnostic_id::sc2152,
+                               args[1]->source_location());
       }
     }
     break;
+  }
 
   /* A move, a copy or a link given one operand names no destination,
      shellcheck SC2224, SC2225 and SC2226. */
@@ -2843,6 +3169,24 @@ fn check_command_value_lints(AnalysisContext &actx,
   case command_name_id::Xargs:
     if (args_have_short_flag(args, 'i'))
       actx.report_diagnostic(diagnostic_id::sc2267, input.command_location());
+
+    /* xargs launches the program itself, so a shell function is never found,
+       shellcheck SC2033. */
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+
+      let const literal = static_cast<const tokens::WordToken *>(args[i])
+                              ->word()
+                              .to_literal_string();
+      let const view = literal.view();
+      if (!view.is_empty() && view[0] == '-') continue;
+
+      if (actx.defined_functions.contains(view)) {
+        actx.report_diagnostic(diagnostic_id::sc2033,
+                               args[i]->source_location(), {view});
+      }
+      break;
+    }
     break;
 
   default: break;

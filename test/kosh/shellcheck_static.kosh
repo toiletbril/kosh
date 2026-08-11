@@ -237,6 +237,33 @@ text_utility_diagnostics() {
   printf 'plain\n' one two
 }
 
+helper_function() { echo helper; }
+
+privilege_and_builtin_diagnostics() {
+  ssh remote "echo $value"
+  ssh -p 22 remote "echo $value"
+  ssh remote 'echo literal'
+  su operator helper_function
+  su - -c helper_function
+  su operator whoami
+  find . -exec helper_function {} \;
+  find . -execdir helper_function {} \;
+  ls | xargs helper_function
+  cd /tmp
+  cd -
+  break
+  set assigned=value
+  return one two
+  exit one two
+  return $(echo 5)
+  export $exported_name
+  sudo cd /tmp
+  sudo export FOO=1
+}
+
+false && break
+false && continue
+
 recursive_wrapper() { recursive_wrapper "$@"; }
 
 directive_scope() {

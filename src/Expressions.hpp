@@ -53,6 +53,10 @@ public:
 
   usize function_scope_depth{0};
 
+  /* Saved and zeroed on entry to a function body, since a break inside the body
+     cannot leave a loop that only surrounds the call. */
+  usize loop_body_depth{0};
+
   /* Saved and cleared on entry to a function body and restored on exit. */
   HashSet function_local_names{heap_allocator()};
 

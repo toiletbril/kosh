@@ -547,7 +547,9 @@ fn SelectLoop::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
   actx.constant_variables.clear();
+  actx.loop_body_depth++;
   m_body->analyze(actx, false);
+  actx.loop_body_depth--;
 }
 
 CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
@@ -703,7 +705,9 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
   optimizer::optimize_node(this, actx);
 
   actx.constant_variables.clear();
+  actx.loop_body_depth++;
   m_body->analyze(actx, false);
+  actx.loop_body_depth--;
 }
 
 pure fn CStyleForLoop::condition_clause() const wontthrow -> StringView
@@ -1045,9 +1049,12 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = HashSet{heap_allocator()};
   actx.apply_scope_definitions(m_analysis_scope_definitions);
+  let const saved_loop_body_depth = actx.loop_body_depth;
+  actx.loop_body_depth = 0;
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
   actx.function_scope_depth--;
+  actx.loop_body_depth = saved_loop_body_depth;
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
   actx.rollback_defined_functions(defined_function_insertion_count);
