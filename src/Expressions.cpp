@@ -845,13 +845,20 @@ fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
 
 pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
-fn Command::set_timed(bool posix_format) wontthrow -> void
+fn Command::set_timed(bool posix_format, SourceLocation location) wontthrow
+    -> void
 {
   m_is_timed = true;
   m_is_time_posix_format = posix_format;
+  m_time_location = location;
 }
 
 pure fn Command::is_timed() const wontthrow -> bool { return m_is_timed; }
+
+pure fn Command::time_location() const wontthrow -> SourceLocation
+{
+  return m_time_location;
+}
 
 pure fn Command::time_uses_posix_format() const wontthrow -> bool
 {
@@ -870,6 +877,8 @@ pure fn Command::local_vars() const wontthrow
 }
 
 fn Command::is_assignment() const wontthrow -> bool { return false; }
+
+fn Command::is_compound_command() const wontthrow -> bool { return false; }
 
 /* A plain command node carries no redirect target of its own, so the default
    reports that. A node that does take a target overrides this. */
@@ -1648,6 +1657,11 @@ cold fn SimpleCommand::try_static_condition_verdict(
 fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
+  /* POSIX sh reads time as a utility, so it receives the first stage alone and
+     the report covers nothing else, shellcheck SC2176. */
+  if (actx.shebang_is_posix_sh && is_timed())
+    actx.report_diagnostic(diagnostic_id::sc2176, time_location());
+
   /* A multi-stage pipeline runs each stage in a forked child, so a stage
      assignment must not be recorded as a straight-line constant. A single
      command keeps the caller's unconditional context. */
@@ -1904,6 +1918,15 @@ fn CompoundList::analyze(AnalysisContext &actx,
   for (usize i = 0; i < m_nodes.count(); i++) {
     ASSERT(m_nodes[i] != nullptr);
     let const command = m_nodes[i]->command();
+
+    /* POSIX sh reads time as a utility, so it receives the compound keyword as
+       an operand and the report covers nothing, shellcheck SC2177. */
+    if (actx.shebang_is_posix_sh && command != nullptr && command->is_timed() &&
+        command->is_compound_command())
+    {
+      actx.report_diagnostic(diagnostic_id::sc2177, command->time_location());
+    }
+
     let const simple =
         command != nullptr ? command->as_simple_command() : nullptr;
     if (simple != nullptr && !simple->args().is_empty()) {

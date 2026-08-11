@@ -1,4 +1,8 @@
 == default argument location ==
+1:6: warning: The `let` builtin evaluates its argument as arithmetic.
+     1 |  a=0; let a = 2; echo unreached
+       |       ^~~
+note: Write `(( ... ))`, which needs no quoting and reads as arithmetic.
 1:12: error: Builtin `let`: Unexpected character in the arithmetic expression.
      1 |  a=0; let a = 2; echo unreached
        |             ^
@@ -19,7 +23,7 @@ note: An operand is missing.
 status=1 later=unset
 rc=0
 == diagnostic catalog ==
-SC2219=absent
+SC2219=present
 1
 SC2024-variants=2
 SC2184-variants=1

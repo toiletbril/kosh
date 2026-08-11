@@ -94,6 +94,26 @@
           [CompoundListCondition, None]
             [SimpleCommand "[" "-e" "present" "]"]
   [CompoundListCondition, None]
+    [FunctionDefinition "timed_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "printf" "timed\n"]
+              [SimpleCommand "wc" "-l"]
+          [CompoundListCondition, None]
+            [BraceGroup]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "grouped\n"]
+          [CompoundListCondition, None]
+            [Subshell]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "subshell\n"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "plain\n"]
+  [CompoundListCondition, None]
     [FunctionDefinition "command_only"]
       [BraceGroup]
         [CompoundList]
@@ -495,6 +515,63 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "timed_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "time"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "timed\n"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "time"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "grouped\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "time"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "subshell\n"
+]
+[Word
+  Unquoted "time"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "plain\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "command_only"
 ]
 [Word
@@ -759,49 +836,61 @@ note: Use -e instead.
     49 |    [ alpha = beta ]
        |            ^
 note: Compare a variable, or correct the operand spelling.
-55:3: warning: Commands after exec do not run when exec succeeds.
-    55 |    exec -c env
+54:3: warning: The `time` keyword times only a simple command in POSIX sh.
+    54 |    time { printf 'grouped\n'; }
        |    ^~~~
-56:3: details:
-    56 |    let value=1
+note: Run the compound command through `sh -c` and time that.
+55:3: warning: The `time` keyword times only a simple command in POSIX sh.
+    55 |    time ( printf 'subshell\n' )
+       |    ^~~~
+note: Run the compound command through `sh -c` and time that.
+53:3: warning: The `time` keyword times only a simple command in POSIX sh.
+    53 |    time printf 'timed\n' | wc -l
+       |    ^~~~
+note: Time one stage, or run the pipeline through `bash -c` and time that.
+61:3: warning: Commands after exec do not run when exec succeeds.
+    61 |    exec -c env
+       |    ^~~~
+62:3: details:
+    62 |    let value=1
        |    ^~~~~~~~~~~ this is the first command skipped after exec.
 note: Remove exec or remove the unreachable commands.
-53:3: warning: The += assignment to LIST is a bash extension absent from POSIX sh.
-    53 |    LIST+=extra
+59:3: warning: The += assignment to LIST is a bash extension absent from POSIX sh.
+    59 |    LIST+=extra
        |    ^~~~~~~~~~~
 note: Write NAME="$NAME"value under a sh shebang.
-54:3: warning: The += assignment to PREFIX is a bash extension absent from POSIX sh.
-    54 |    PREFIX+=extra env
+60:3: warning: The += assignment to PREFIX is a bash extension absent from POSIX sh.
+    60 |    PREFIX+=extra env
        |    ^~~~~~~~~~~~~
 note: Write NAME="$NAME"value under a sh shebang.
-55:8: warning: The exec -c flag is a bash extension absent from POSIX sh.
-    55 |    exec -c env
+61:8: warning: The exec -c flag is a bash extension absent from POSIX sh.
+    61 |    exec -c env
        |         ^~
 note: Drop the flag under a sh shebang.
-56:3: warning: The let builtin is a bash extension absent from POSIX sh.
-    56 |    let value=1
+62:3: warning: The let builtin is a bash extension absent from POSIX sh.
+    62 |    let value=1
        |    ^~~
 note: Use the : $((...)) form under a sh shebang.
-57:18: warning: The ERR condition is a bash extension absent from POSIX sh.
-    57 |    trap 'cleanup' ERR
+63:18: warning: The ERR condition is a bash extension absent from POSIX sh.
+    63 |    trap 'cleanup' ERR
        |                   ^~~
 note: Check the status after each command under a sh shebang.
-58:18: warning: The SIG prefix on SIGINT is undefined in POSIX sh.
-    58 |    trap 'cleanup' SIGINT
+64:18: warning: The SIG prefix on SIGINT is undefined in POSIX sh.
+    64 |    trap 'cleanup' SIGINT
        |                   ^~~~~~
 note: Name the signal without the SIG prefix under a sh shebang.
-59:18: warning: The signal name int is undefined in POSIX sh because it is not uppercase.
-    59 |    trap 'cleanup' int
+65:18: warning: The signal name int is undefined in POSIX sh because it is not uppercase.
+    65 |    trap 'cleanup' int
        |                   ^~~
 note: Name the signal in uppercase under a sh shebang.
-62:10: warning: The printf %q directive is a bash extension absent from POSIX sh.
-    62 |    printf '%q\n' "$value"
+68:10: warning: The printf %q directive is a bash extension absent from POSIX sh.
+    68 |    printf '%q\n' "$value"
        |           ^~~~~~
 note: Quote the value another way under a sh shebang.
-64:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it.
-    64 |    . library.sh extra
+70:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it.
+    70 |    . library.sh extra
        |                 ^~~~~
 note: Set the values as variables before the file is read.
-Encountered 47 warnings.
+Encountered 50 warnings.
 done
 [Code 0]

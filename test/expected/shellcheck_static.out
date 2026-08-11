@@ -618,6 +618,22 @@
           [CompoundListCondition, None]
             [SimpleCommand "sudo" "export" "FOO=1"]
   [CompoundListCondition, None]
+    [FunctionDefinition "trap_condition_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "9"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "15"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "KILL"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "SIGSTOP"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "INT"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "-" "EXIT"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, &&]
     [SimpleCommand "break"]
@@ -3285,6 +3301,69 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "trap_condition_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "9"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "15"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "KILL"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "SIGSTOP"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "INT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "false"
 ]
 [Word
@@ -3411,6 +3490,10 @@ note: Use grep -F for the fixed string match.
     36 |    expr 1 + 2
        |    ^~~~
 note: Use $((...)) for the calculation.
+37:3: warning: The `let` builtin evaluates its argument as arithmetic.
+    37 |    let counter=counter+1
+       |    ^~~
+note: Write `(( ... ))`, which needs no quoting and reads as arithmetic.
 38:3: warning: An echo of a command substitution prints what the command already prints.
     38 |    echo "$(date)"
        |    ^~~~
@@ -3780,6 +3863,10 @@ note: Move the specific pattern before the broader pattern.
    152 |    let "counter -lt limit"
        |        ^~~~~~~~~~~~~~~~~~~
 note: Use the symbolic form such as `<` or `>` inside arithmetic.
+152:3: warning: The `let` builtin evaluates its argument as arithmetic.
+   152 |    let "counter -lt limit"
+       |    ^~~
+note: Write `(( ... ))`, which needs no quoting and reads as arithmetic.
 153:14: warning: The '>=' operator does not exist in test.
    153 |    [[ "$left" >= "$right" ]]
        |               ^~
@@ -4212,26 +4299,46 @@ note: Wrap the builtin in `sudo sh -c` instead.
    261 |    sudo export FOO=1
        |         ^~~~~~
 note: Wrap the builtin in `sudo sh -c` instead.
-264:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
-   264 |  false && break
+265:26: warning: The trap condition '9' is a signal number, and the numbering is not the same on every system.
+   265 |    trap 'helper_function' 9
+       |                           ^
+note: Name the signal, such as `INT` or `TERM`.
+265:26: warning: The signal '9' cannot be trapped, so this handler never runs.
+   265 |    trap 'helper_function' 9
+       |                           ^
+note: Remove the condition, since the kernel delivers this signal unconditionally.
+266:26: warning: The trap condition '15' is a signal number, and the numbering is not the same on every system.
+   266 |    trap 'helper_function' 15
+       |                           ^~
+note: Name the signal, such as `INT` or `TERM`.
+267:26: warning: The signal 'KILL' cannot be trapped, so this handler never runs.
+   267 |    trap 'helper_function' KILL
+       |                           ^~~~
+note: Remove the condition, since the kernel delivers this signal unconditionally.
+268:26: warning: The signal 'SIGSTOP' cannot be trapped, so this handler never runs.
+   268 |    trap 'helper_function' SIGSTOP
+       |                           ^~~~~~~
+note: Remove the condition, since the kernel delivers this signal unconditionally.
+273:10: warning: The `break` command stands outside any loop, where there is nothing to leave.
+   273 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-265:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
-   265 |  false && continue
+274:10: warning: The `continue` command stands outside any loop, where there is nothing to leave.
+   274 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
-267:23: warning: The 'recursive_wrapper' function calls itself recursively.
-   267 |  recursive_wrapper() { recursive_wrapper "$@"; }
+276:23: warning: The 'recursive_wrapper' function calls itself recursively.
+   276 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
-267:1: details:
-   267 |  recursive_wrapper() { recursive_wrapper "$@"; }
+276:1: details:
+   276 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
 note: Use `command` before the wrapped command name.
-272:8: warning: An unquoted variable can split into words and expand globs.
-   272 |    echo $reported
+281:8: warning: An unquoted variable can split into words and expand globs.
+   281 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-Encountered 220 warnings.
+Encountered 227 warnings.
 done
 done
 done

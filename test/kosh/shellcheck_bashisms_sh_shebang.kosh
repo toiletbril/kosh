@@ -49,6 +49,12 @@ operator_only() {
   [ alpha = beta ]
   [ -e present ]
 }
+timed_only() {
+  time printf 'timed\n' | wc -l
+  time { printf 'grouped\n'; }
+  time ( printf 'subshell\n' )
+  time printf 'plain\n'
+}
 command_only() {
   LIST+=extra
   PREFIX+=extra env

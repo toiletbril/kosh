@@ -327,11 +327,13 @@ public:
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
 
-  fn set_timed(bool posix_format) wontthrow -> void;
+  fn set_timed(bool posix_format, SourceLocation location) wontthrow -> void;
   pure fn is_timed() const wontthrow -> bool;
   pure fn time_uses_posix_format() const wontthrow -> bool;
+  pure fn time_location() const wontthrow -> SourceLocation;
 
   virtual fn is_assignment() const wontthrow -> bool;
+  virtual fn is_compound_command() const wontthrow -> bool;
 
   /* The default throws the unsupported error, only a node that takes a target
      overrides it. */
@@ -343,6 +345,7 @@ protected:
   bool m_is_negated{false};
   bool m_is_timed{false};
   bool m_is_time_posix_format{false};
+  SourceLocation m_time_location{};
   ArrayList<prefix_assignment> m_local_vars{heap_allocator()};
 };
 
@@ -574,6 +577,8 @@ class CompoundCommand : public Command
 {
 public:
   CompoundCommand(SourceLocation location);
+
+  fn is_compound_command() const wontthrow -> bool override;
 
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 

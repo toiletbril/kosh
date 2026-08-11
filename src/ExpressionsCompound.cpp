@@ -705,6 +705,11 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
 
+fn CompoundCommand::is_compound_command() const wontthrow -> bool
+{
+  return true;
+}
+
 fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
     -> void
 {

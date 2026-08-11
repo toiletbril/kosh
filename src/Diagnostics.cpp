@@ -531,11 +531,31 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The trailing `]` has no opening `[`",
       "Add the opening `[`, or quote the bracket when it is data", None,
       Lenient, Policy),
+    D(2172, "trap-signal-number", "a trapped signal is named by its number",
+      "The trap condition '{0}' is a signal number, and the numbering is not "
+      "the same on every system",
+      "Name the signal, such as `INT` or `TERM`", None, Lenient, Policy),
+    D(2173, "trap-unblockable-signal",
+      "the KILL and STOP signals cannot be trapped",
+      "The signal '{0}' cannot be trapped, so this handler never runs",
+      "Remove the condition, since the kernel delivers this signal "
+      "unconditionally",
+      None, Strict, Policy),
     D(2174, "mkdir-parent-mode",
       "mkdir -pm applies mode only to the deepest directory",
       "A mkdir -pm applies the mode only to the deepest directory, the created "
       "parents keep the umask default",
       None, None, Lenient, Policy),
+    D(2176, "posix-timed-pipeline",
+      "timing a pipeline is undefined in POSIX sh",
+      "The `time` keyword times only a simple command in POSIX sh",
+      "Time one stage, or run the pipeline through `bash -c` and time that",
+      None, Strict, Policy),
+    D(2177, "posix-timed-compound",
+      "timing a compound command is undefined in POSIX sh",
+      "The `time` keyword times only a simple command in POSIX sh",
+      "Run the compound command through `sh -c` and time that", None, Strict,
+      Policy),
     D(2181, "indirect-exit-status-test",
       "test the command instead of testing $?",
       "Testing $? checks the exit status indirectly",
@@ -636,6 +656,11 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The input redirect feeds '{0}', which never reads stdin, so the data is "
       "discarded",
       None, None, Annoying, Policy),
+    D(2219, "let-arithmetic-command",
+      "an arithmetic command states the intent that let hides",
+      "The `let` builtin evaluates its argument as arithmetic",
+      "Write `(( ... ))`, which needs no quoting and reads as arithmetic", None,
+      Annoying, Policy),
     D(2221, "duplicate-case-pattern",
       "an earlier case pattern makes this pattern unreachable",
       "An earlier case pattern makes this pattern unreachable",
@@ -2710,9 +2735,14 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
 
 namespace {
 
-fn check_posix_trap_conditions(AnalysisContext &actx,
-                               const ArrayList<const Token *> &args) throws
-    -> void
+pure fn signal_name_is_unblockable(StringView bare) wontthrow -> bool
+{
+  return bare == "KILL" || bare == "STOP";
+}
+
+fn check_trap_condition_operands(AnalysisContext &actx,
+                                 const ArrayList<const Token *> &args,
+                                 bool is_posix) throws -> void
 {
   for (usize i = 2; i < args.count(); i++) {
     if (args[i]->kind() != Token::Kind::Word) continue;
@@ -2724,7 +2754,29 @@ fn check_posix_trap_conditions(AnalysisContext &actx,
     if (view.is_empty()) continue;
 
     if (view == "ERR") {
-      actx.report_diagnostic(diagnostic_id::sc3047, args[i]->source_location());
+      if (is_posix) {
+        actx.report_diagnostic(diagnostic_id::sc3047,
+                               args[i]->source_location());
+      }
+      continue;
+    }
+
+    /* A numeric condition is a signal number, and only the first few numbers
+       are fixed by POSIX, shellcheck SC2172. */
+    if (view.is_all_decimal_digits() && view.length <= 3) {
+      usize number = 0;
+      for (usize position = 0; position < view.length; position++)
+        number = number * 10 + static_cast<usize>(view[position] - '0');
+
+      actx.report_diagnostic(diagnostic_id::sc2172, args[i]->source_location(),
+                             {view});
+
+      let const name = os::signal_name_from_number(static_cast<i32>(number));
+      if (name.has_value() && signal_name_is_unblockable(name->view())) {
+        actx.report_diagnostic(diagnostic_id::sc2173,
+                               args[i]->source_location(), {view});
+      }
+
       continue;
     }
 
@@ -2747,6 +2799,15 @@ fn check_posix_trap_conditions(AnalysisContext &actx,
         has_sig_prefix ? uppercase.view().substring(3) : uppercase.view();
     let const names_a_signal =
         bare == "EXIT" || os::signal_number_from_name(bare).has_value();
+
+    /* The kernel delivers KILL and STOP without consulting the handler table,
+       shellcheck SC2173. */
+    if (names_a_signal && signal_name_is_unblockable(bare)) {
+      actx.report_diagnostic(diagnostic_id::sc2173, args[i]->source_location(),
+                             {view});
+    }
+
+    if (!is_posix) continue;
 
     if (has_sig_prefix && names_a_signal) {
       actx.report_diagnostic(diagnostic_id::sc3048, args[i]->source_location(),
@@ -2925,7 +2986,7 @@ fn check_command_name_lints(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc2064,
                                args[1]->source_location());
     }
-    if (is_posix) check_posix_trap_conditions(actx, args);
+    check_trap_condition_operands(actx, args, is_posix);
     break;
 
   case command_name_id::Exec:
@@ -2942,6 +3003,10 @@ fn check_command_name_lints(AnalysisContext &actx,
 
   case command_name_id::Let:
     if (is_posix) actx.report_diagnostic(diagnostic_id::sc3039, location);
+
+    if (args.count() >= 2)
+      actx.report_diagnostic(diagnostic_id::sc2219, location);
+
     break;
 
   case command_name_id::Printf: {

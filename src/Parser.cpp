@@ -379,6 +379,7 @@ hot fn Parser::parse_command_list(
   bool should_negate_pending = false;
   bool should_time_pending = false;
   bool is_time_posix_format = false;
+  SourceLocation time_location{};
   Maybe<usize> active_shellcheck_suppression{};
 
   let do_finish_shellcheck_suppression = [&](usize end_position) {
@@ -394,7 +395,7 @@ hot fn Parser::parse_command_list(
       should_negate_pending = false;
     }
     if (should_time_pending) {
-      pending->set_timed(is_time_posix_format);
+      pending->set_timed(is_time_posix_format, time_location);
       should_time_pending = false;
     }
     compound_list->append_node(m_lexer.arena().create<CompoundListCondition>(
@@ -446,6 +447,7 @@ hot fn Parser::parse_command_list(
           active_shellcheck_suppression = m_shellcheck_suppressions.count() - 1;
       }
       if (maybe_time->kind() == Token::Kind::Time) {
+        time_location = maybe_time->source_location();
         m_lexer.advance_past_last_peek();
         should_time_pending = true;
         Token *maybe_posix = m_lexer.peek_shell_token();

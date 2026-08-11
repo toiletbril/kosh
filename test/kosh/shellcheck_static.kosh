@@ -261,6 +261,15 @@ privilege_and_builtin_diagnostics() {
   sudo export FOO=1
 }
 
+trap_condition_diagnostics() {
+  trap 'helper_function' 9
+  trap 'helper_function' 15
+  trap 'helper_function' KILL
+  trap 'helper_function' SIGSTOP
+  trap 'helper_function' INT
+  trap - EXIT
+}
+
 false && break
 false && continue
 
