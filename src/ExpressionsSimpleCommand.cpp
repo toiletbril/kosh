@@ -206,8 +206,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
     LOG(All, "recording the constant '%s' = '%s'", name.c_str(),
         literal->c_str());
     actx.constant_variables.set(name.view(), literal->view());
-    actx.optimizer_recorded_constants++;
-    if (actx.should_trace_optimizer)
+    actx.optimizer_eliminated_count++;
+    if (actx.should_report_optimizer_diagnostics)
       actx.trace_optimizer_line(String{"recorded constant: "} + name + " = " +
                                 *literal);
   } else {

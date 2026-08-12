@@ -186,14 +186,8 @@ public:
   bool should_retain_tested_command_names{false};
   bool is_analyzing_condition{false};
 
-  bool should_trace_optimizer{false};
-  usize optimizer_folded_arithmetic{0};
-  usize optimizer_recorded_constants{0};
-  usize optimizer_folded_branches{0};
-  usize optimizer_folded_loops{0};
-  usize optimizer_eliminated_compounds{0};
-
-  bool should_print_optimizer_state{false};
+  bool should_report_optimizer_diagnostics{false};
+  usize optimizer_eliminated_count{0};
 
   ArrayList<pending_analysis_warning> pending_warnings{heap_allocator()};
 
@@ -247,6 +241,7 @@ public:
       -> void;
   fn flush_warnings() throws -> void;
   fn print_diagnostic_summary() const throws -> void;
+  fn print_optimizer_summary() const throws -> void;
   pure fn is_diagnostic_suppressed(diagnostic_id id,
                                    SourceLocation location) const wontthrow
       -> bool;
@@ -281,8 +276,6 @@ public:
   fn note_variable_read(StringView name, SourceLocation location,
                         bool is_top_level_unconditional) throws -> void;
   fn trace_optimizer_line(StringView message) const throws -> void;
-  fn trace_eliminated_node(SourceLocation location,
-                           StringView message) const throws -> void;
   fn print_script_backtrace_if_rooted(SourceLocation location) const throws
       -> void;
 
@@ -305,7 +298,7 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<shellcheck_directive_span> &directive_spans,
                const ArrayList<heredoc_terminator_miss> &heredoc_misses,
                bool is_named_script_file,
-               bool show_optimizer_state = false) throws -> bool;
+               bool report_optimizer_diagnostics = false) throws -> bool;
 
 class Expression
 {

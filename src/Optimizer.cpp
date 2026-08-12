@@ -451,8 +451,9 @@ pure fn arithmetic_has_side_effect(StringView text) wontthrow -> bool
   return false;
 }
 
-fn fold_constant_arithmetic_in_word(const Word &word,
-                                    AnalysisContext &actx) throws -> bool
+fn fold_constant_arithmetic_in_word(const Word &word, AnalysisContext &actx,
+                                    SourceLocation fallback_location) throws
+    -> bool
 {
   bool did_fold = false;
   for (let const &segment : word.segments) {
@@ -473,11 +474,15 @@ fn fold_constant_arithmetic_in_word(const Word &word,
           segment.text.view().data, static_cast<long long>(*result));
       segment.set_folded_arithmetic_result(*result);
       did_fold = true;
-      actx.optimizer_folded_arithmetic++;
-      if (actx.should_trace_optimizer)
-        actx.trace_optimizer_line(String{"folded constant arithmetic: "} +
-                                  String{segment.text.view()} + " = " +
-                                  String::from(*result, heap_allocator()));
+      actx.optimizer_eliminated_count++;
+      if (actx.should_report_optimizer_diagnostics) {
+        let const folded = String::from(*result, heap_allocator());
+        let const segment_location = segment.get_source_location(None);
+        actx.report_diagnostic(diagnostic_id::optimizer_folded_arithmetic,
+                               segment_location.has_value() ? *segment_location
+                                                            : fallback_location,
+                               {segment.text.view(), folded.view()});
+      }
     }
   }
   return did_fold;
@@ -489,7 +494,8 @@ fn fold_constant_arithmetic_in_token(const Token *token,
   if (token == nullptr) return false;
   if (token->kind() != Token::Kind::Word) return false;
   return fold_constant_arithmetic_in_word(
-      static_cast<const tokens::WordToken *>(token)->word(), actx);
+      static_cast<const tokens::WordToken *>(token)->word(), actx,
+      token->source_location());
 }
 
 /* RULE constant-arithmetic folding. */
@@ -498,7 +504,7 @@ fn rule_fold_constant_arithmetic(const Expression *node,
 {
   if (const expressions::AssignCommand *assign = node->as_assign_command()) {
     return fold_constant_arithmetic_in_word(assign->assignment()->value_word(),
-                                            actx);
+                                            actx, node->source_location());
   }
 
   if (const expressions::SimpleCommand *cmd = node->as_simple_command()) {
@@ -507,7 +513,9 @@ fn rule_fold_constant_arithmetic(const Expression *node,
       if (fold_constant_arithmetic_in_token(t, actx)) did_fold = true;
     }
     for (let const &var : cmd->local_vars()) {
-      if (fold_constant_arithmetic_in_word(var.value, actx)) did_fold = true;
+      if (fold_constant_arithmetic_in_word(var.value, actx,
+                                           node->source_location()))
+        did_fold = true;
     }
     return did_fold;
   }
@@ -538,19 +546,21 @@ fn rule_dead_branch_elimination(const Expression *node,
     if (*verdict) {
       LOG(All, "dead-branch elimination chose branch %zu", i);
       clause->set_folded_branch(i);
-      actx.optimizer_folded_branches++;
-      if (actx.should_trace_optimizer)
-        actx.trace_optimizer_line(
-            String{"folded if to branch "} +
-            String::from(static_cast<i64>(i), heap_allocator()));
+      actx.optimizer_eliminated_count++;
+      if (actx.should_report_optimizer_diagnostics) {
+        let const index = String::from(static_cast<i64>(i), heap_allocator());
+        actx.report_diagnostic(diagnostic_id::optimizer_folded_branch,
+                               node->source_location(), {index.view()});
+      }
       return true;
     }
   }
   LOG(All, "every if condition is statically false, folding to the else body");
   clause->set_folded_branch(clause->branches().count());
-  actx.optimizer_folded_branches++;
-  if (actx.should_trace_optimizer)
-    actx.trace_optimizer_line(String{"folded if to the else body"});
+  actx.optimizer_eliminated_count++;
+  if (actx.should_report_optimizer_diagnostics)
+    actx.report_diagnostic(diagnostic_id::optimizer_folded_else,
+                           node->source_location());
   return true;
 }
 
@@ -582,11 +592,11 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
   LOG(All, "loop elimination folded the %s loop to a skip",
       loop_node->is_until() ? "until" : "while");
   loop_node->set_folded_to_skip();
-  actx.optimizer_folded_loops++;
-  if (actx.should_trace_optimizer)
-    actx.trace_optimizer_line(loop_node->is_until()
-                                  ? String{"folded until loop to a skip"}
-                                  : String{"folded while loop to a skip"});
+  actx.optimizer_eliminated_count++;
+  if (actx.should_report_optimizer_diagnostics)
+    actx.report_diagnostic(
+        diagnostic_id::optimizer_folded_loop, node->source_location(),
+        {loop_node->is_until() ? StringView{"until"} : StringView{"while"}});
   return true;
 }
 
@@ -606,11 +616,10 @@ fn rule_eliminate_compound_body(const Expression *node,
   LOG(All, "compound-body elimination folded an if with no taken branch to a "
            "no-op");
   clause->set_fully_eliminated();
-  actx.optimizer_eliminated_compounds++;
-  if (actx.should_trace_optimizer)
-    actx.trace_optimizer_line(String{"eliminated if to a no-op"});
-  actx.trace_eliminated_node(node->source_location(),
-                             "Eliminated if with no reachable body");
+  actx.optimizer_eliminated_count++;
+  if (actx.should_report_optimizer_diagnostics)
+    actx.report_diagnostic(diagnostic_id::optimizer_eliminated_if,
+                           node->source_location());
   return true;
 }
 
@@ -631,11 +640,10 @@ fn rule_eliminate_empty_for(const Expression *node,
   LOG(All, "empty for-loop elimination folded a for with an empty in clause to "
            "a no-op");
   loop_node->set_fully_eliminated();
-  actx.optimizer_eliminated_compounds++;
-  if (actx.should_trace_optimizer)
-    actx.trace_optimizer_line(String{"eliminated empty for loop"});
-  actx.trace_eliminated_node(node->source_location(),
-                             "Eliminated for over an empty list");
+  actx.optimizer_eliminated_count++;
+  if (actx.should_report_optimizer_diagnostics)
+    actx.report_diagnostic(diagnostic_id::optimizer_eliminated_for,
+                           node->source_location());
   return true;
 }
 
@@ -671,11 +679,12 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
   LOG(All, "folded the c-style for condition '%.*s' to %lld",
       static_cast<int>(trimmed.length), trimmed.data,
       static_cast<long long>(*value));
-  actx.optimizer_folded_arithmetic++;
-  if (actx.should_trace_optimizer)
-    actx.trace_optimizer_line(String{"folded c-style for condition: "} +
-                              String{trimmed} + " = " +
-                              String::from(*value, heap_allocator()));
+  actx.optimizer_eliminated_count++;
+  if (actx.should_report_optimizer_diagnostics) {
+    let const folded = String::from(*value, heap_allocator());
+    actx.report_diagnostic(diagnostic_id::optimizer_folded_arithmetic,
+                           node->source_location(), {trimmed, folded.view()});
+  }
 
   /* A constant zero condition skips the body, but the init clause still runs
      once the way C semantics require, so only a blank-init loop is a proven
@@ -684,12 +693,10 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
       trim_arithmetic_whitespace(loop_node->init_clause()).length == 0;
   if (*value == 0 && init_is_blank) {
     loop_node->set_fully_eliminated();
-    actx.optimizer_eliminated_compounds++;
-    if (actx.should_trace_optimizer)
-      actx.trace_optimizer_line(String{"eliminated c-style for loop"});
-    actx.trace_eliminated_node(
-        node->source_location(),
-        "Eliminated c-style for whose condition is zero");
+    actx.optimizer_eliminated_count++;
+    if (actx.should_report_optimizer_diagnostics)
+      actx.report_diagnostic(diagnostic_id::optimizer_eliminated_cstyle_for,
+                             node->source_location());
   }
   return true;
 }

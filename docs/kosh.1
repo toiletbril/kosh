@@ -271,7 +271,7 @@ privilege boundaries, pipeline state loss, unvalidated arithmetic input,
 unreachable control flow, dangerous file operations, POSIX portability, lexical
 source bytes, and whole-script variable and function dataflow.
 The catalog contains 310 numbered rows across 306 ShellCheck codes. It also
-contains 11 native analysis checks. A code that carries more than one row
+contains 18 native analysis checks. A code that carries more than one row
 reports a distinct finding from each row. The default mood rejects a script when
 a strict or lenient check reports an error.
 The portability rows are reported only when the shebang names
@@ -307,9 +307,11 @@ The short version is displayed. The shell then exits.
 .BR \-A ", " \-\-show\-ast
 The syntax tree is printed before each command runs.
 .TP
-.B \-\-show\-optimizer\-state
-The analysis prepass decisions are traced. A located line is printed for every
-eliminated node.
+.B \-\-optimizer\-diagnostics
+The analysis prepass decisions are traced. Every folded and eliminated node is
+reported as an analysis diagnostic, and the closing line is a count of the
+eliminated statements. A compatibility mood reports them only under
+.BR \-W .
 .TP
 .BR \-E ", " \-\-show\-exit\-code
 The exit status is printed after each command.

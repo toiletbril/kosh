@@ -43,7 +43,7 @@ _kosh_complete()
 --no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-koshkit \
 --show-ast \
---show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \
+--optimizer-diagnostics --show-exit-code --show-lexed-words --show-stats --show-memory \
 "
 
   local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -r -p -M -L -I -W -WW -WWW \

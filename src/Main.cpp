@@ -115,10 +115,9 @@ FLAG(ENABLE_KOSHKIT, Bool, '\0', "enable-koshkit", Kosh,
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
-FLAG(
-    SHOW_OPTIMIZER_STATE, Bool, '\0', "show-optimizer-state", Debug,
-    "Trace the optimizer prepass and print a located line for every eliminated "
-    "node.");
+FLAG(OPTIMIZER_DIAGNOSTICS, Bool, '\0', "optimizer-diagnostics", Debug,
+     "Trace the optimizer prepass and report every folded and eliminated node "
+     "as an analysis diagnostic.");
 FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
      "Print exit code after each executed command.");
 FLAG(ESCAPE_MAP, Bool, 'R', "show-lexed-words", Debug,
@@ -406,7 +405,7 @@ static fn run_script_contents(const String &script_contents,
        before parsing, so the parser skips its analysis inputs. */
     let const run_analysis =
         precompiled_ast == nullptr &&
-        (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
+        (FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled() ||
          ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
            context.warnings_enabled()) &&
           !context.diagnostics_disabled()));
@@ -480,7 +479,7 @@ static fn run_script_contents(const String &script_contents,
           context.annoying_diagnostics_enabled(), shellcheck_suppressions,
           analysis_scope_definitions, shellcheck_directive_spans,
           heredoc_terminator_misses, filename.has_value(),
-          FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
+          FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled());
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",

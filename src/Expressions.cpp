@@ -95,26 +95,9 @@ fn AnalysisContext::warn(SourceLocation location, StringView message,
 
   reported_warning_count++;
 
-  if (!should_trace_optimizer) {
-    pending_warnings.push(
-        pending_analysis_warning{location, String{message}, String{suggestion},
-                                 related_location, String{related_message}});
-    return;
-  }
-
-  if (related_location.has_value()) {
-    let const located = WarningWithLocation{location, message};
-    show_message(located.to_string(source, eval_context));
-
-    let const related = ErrorWithLocationAndDetails{
-        location, {}, *related_location, related_message, suggestion};
-    show_message(related.details_to_string(source, eval_context));
-  } else {
-    let const located =
-        WarningWithLocationAndDetails{location, message, suggestion};
-    show_message(located.to_string(source, eval_context));
-  }
-  print_script_backtrace_if_rooted(location);
+  pending_warnings.push(
+      pending_analysis_warning{location, String{message}, String{suggestion},
+                               related_location, String{related_message}});
 }
 
 fn AnalysisContext::flush_warnings() throws -> void
@@ -206,6 +189,23 @@ cold fn AnalysisContext::print_diagnostic_summary() const throws -> void
   show_message(summary.view());
 }
 
+cold fn AnalysisContext::print_optimizer_summary() const throws -> void
+{
+  if (!should_report_optimizer_diagnostics) return;
+
+  let const wants_color = colors::stderr_wants_color();
+
+  let summary = String{"Eliminated "};
+  if (wants_color) summary.append(colors::ansi::BLUE);
+  summary.append(String::from(optimizer_eliminated_count, heap_allocator()));
+  summary.append(optimizer_eliminated_count == 1 ? " statement"
+                                                 : " statements");
+  if (wants_color) summary.append(colors::ansi::RESET);
+  summary.append(".");
+
+  show_message(summary.view());
+}
+
 pure fn AnalysisContext::should_report(diagnostic_id id) const wontthrow -> bool
 {
   let const tier = get_diagnostic_definition(id).tier;
@@ -263,20 +263,9 @@ fn AnalysisContext::report_diagnostic(
 cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
     -> void
 {
-  if (!should_trace_optimizer) return;
+  if (!should_report_optimizer_diagnostics) return;
   print_error("[optimizer] ");
   print_error(message);
-  print_error("\n");
-}
-
-cold fn AnalysisContext::trace_eliminated_node(SourceLocation location,
-                                               StringView message) const throws
-    -> void
-{
-  if (!should_print_optimizer_state) return;
-  const WarningWithLocation located{location, message};
-  print_error("[optimizer-state] ");
-  print_error(located.to_string(source, eval_context));
   print_error("\n");
 }
 
@@ -682,8 +671,8 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<analysis_scope_definition> &scope_definitions,
                const ArrayList<shellcheck_directive_span> &directive_spans,
                const ArrayList<heredoc_terminator_miss> &heredoc_misses,
-               bool is_named_script_file, bool show_optimizer_state) throws
-    -> bool
+               bool is_named_script_file,
+               bool report_optimizer_diagnostics) throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -694,8 +683,7 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.shellcheck_suppressions = &shellcheck_suppressions;
   actx.should_silence_unresolved_commands = silence_unresolved_commands;
   actx.eval_context = eval_context;
-  actx.should_print_optimizer_state = show_optimizer_state;
-  actx.should_trace_optimizer = show_optimizer_state;
+  actx.should_report_optimizer_diagnostics = report_optimizer_diagnostics;
 
   if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
@@ -727,27 +715,8 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_function_argument_dataflow(actx);
 
   actx.flush_warnings();
-
-  if (actx.should_trace_optimizer) {
-    let summary = String{"summary: "};
-    summary.append(
-        String::from(actx.optimizer_folded_arithmetic, heap_allocator()));
-    summary.append(" arithmetic folded, ");
-    summary.append(
-        String::from(actx.optimizer_recorded_constants, heap_allocator()));
-    summary.append(" constants recorded, ");
-    summary.append(
-        String::from(actx.optimizer_folded_branches, heap_allocator()));
-    summary.append(" branches folded, ");
-    summary.append(String::from(actx.optimizer_folded_loops, heap_allocator()));
-    summary.append(" loops folded, ");
-    summary.append(
-        String::from(actx.optimizer_eliminated_compounds, heap_allocator()));
-    summary.append(" compounds eliminated");
-    actx.trace_optimizer_line(summary.view());
-  }
-
   actx.print_diagnostic_summary();
+  actx.print_optimizer_summary();
 
   return !actx.has_fatal;
 }
