@@ -162,6 +162,22 @@
           [CompoundListCondition, None]
             [SimpleCommand "local" "scoped=value"]
   [CompoundListCondition, None]
+    [FunctionDefinition "compound_redirect_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [RedirectedCommand]
+              [BraceGroup]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "echo" "grouped"]
+          [CompoundListCondition, None]
+            [RedirectedCommand]
+              [BraceGroup]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "echo" "globbed"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "lint_only"
@@ -768,6 +784,45 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "compound_redirect_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "grouped"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "both.log"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "globbed"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "prefix*.log"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -996,6 +1051,14 @@ note: Capture the output with a command substitution under a `sh` shebang.
     80 |    local scoped=value
        |    ^~~~~
 note: Rework the function, or switch the shebang to bash.
-Encountered 55 warnings.
+83:23: warning: The `&>` redirection is a bash extension absent from POSIX sh.
+    83 |    { echo grouped; } &>both.log
+       |                        ^~~~~~~~
+note: Write the file redirect and `2>&1` separately under a `sh` shebang.
+84:22: warning: The redirection target 'prefix*.log' is a glob that POSIX sh leaves undefined.
+    84 |    { echo globbed; } >prefix*.log
+       |                       ^~~~~~~~~~~
+note: Name the file explicitly under a `sh` shebang.
+Encountered 57 warnings.
 done
 [Code 0]

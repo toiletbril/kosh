@@ -1004,6 +1004,40 @@ text]
             [Pipeline]
               [SimpleCommand "echo" "value"]
               [Assign tally=1]
+  [CompoundListCondition, None]
+    [FunctionDefinition "compound_redirection_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [RedirectedCommand]
+              [BraceGroup]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "echo" "grouped"]
+          [CompoundListCondition, None]
+            [RedirectedCommand]
+              [BraceGroup]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "echo" "claimed"]
+          [CompoundListCondition, None]
+            [RedirectedCommand]
+              [WhileLoop]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "true"]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "echo" "looped"]
+          [CompoundListCondition, None]
+            [RedirectedCommand]
+              [IfClause]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "true"]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "echo" "branched"]
 [Word
   Unquoted "lint_only"
 ]
@@ -4756,6 +4790,100 @@ text"
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "compound_redirection_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "grouped"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "grouped.log"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "claimed"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "claim.log"
+]
+[Word
+  Unquoted "claim.log"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "looped"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "same.txt"
+]
+[Word
+  Unquoted "same.txt"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "branched"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  DoubleQuoted "file"
+  ArithmeticExpansion "index++"
+]
+[Word
+  Unquoted "}"
+]
 416:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
    416 |    echo “curly”
        |         ^
@@ -6164,6 +6292,28 @@ note: Move the assignment outside the pipeline.
    464 |    echo value | tally=1
        |                 ^~~~~~~
 note: Declare it with `local` to keep it inside the function.
+468:28: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal.
+   468 |    { echo grouped; } 2>&1 > grouped.log
+       |                             ^~~~~~~~~~~
+note: Put the file redirect first as in `>file 2>&1`.
+469:35: warning: The redirect to 'claim.log' competes with an earlier redirect for the same descriptor.
+   469 |    { echo claimed; } > claim.log > claim.log
+       |                                    ^~~~~~~~~
+469:23: details:
+   469 |    { echo claimed; } > claim.log > claim.log
+       |                        ^~~~~~~~~ this earlier redirect claims the same descriptor.
+note: Pass the files as operands, or use `tee` for several outputs.
+470:49: warning: The command reads and truncates 'same.txt' at once, the truncation empties the input before it is read.
+   470 |    while true; do echo looped; done < same.txt > same.txt
+       |                                                  ^~~~~~~~
+470:38: details:
+   470 |    while true; do echo looped; done < same.txt > same.txt
+       |                                       ^~~~~~~~ this redirect reads the file that is later truncated.
+note: Write to a temporary and move it over.
+471:37: warning: A redirection expansion can run in a child and lose its mutation.
+   471 |    if true; then echo branched; fi > "file$((index++))"
+       |                                      ^~~~~~~~~~~~~~~~~~
+note: Update the variable before forming the redirect path.
 285:3: warning: The value of 'swallowed' is the command name 'printf', and the command never runs.
    285 |    swallowed=printf 'x\n'
        |    ^~~~~~~~~~~~~~~~
@@ -6176,7 +6326,7 @@ note: Write `pager=$(cat)` to store its output, or quote the name.
    442 |    runner=printf
        |    ^~~~~~~~~~~~~
 note: Write `runner=$(printf)` to store its output, or quote the name.
-Encountered 348 warnings.
+Encountered 352 warnings.
 done
 done
 done

@@ -463,3 +463,10 @@ stdin_and_subscript_diagnostics() {
   slots[chosen]=x
   echo value | tally=1
 }
+
+compound_redirection_diagnostics() {
+  { echo grouped; } 2>&1 > grouped.log
+  { echo claimed; } > claim.log > claim.log
+  while true; do echo looped; done < same.txt > same.txt
+  if true; then echo branched; fi > "file$((index++))"
+}

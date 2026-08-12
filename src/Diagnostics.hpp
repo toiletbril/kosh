@@ -534,6 +534,11 @@ struct analysis_command_info
   {
     return (group_flags & group) != 0;
   }
+
+  mustuse pure static fn unknown() wontthrow -> analysis_command_info
+  {
+    return analysis_command_info{command_name_id::Unknown, 0};
+  }
 };
 
 fn get_analysis_command_info(StringView name) throws -> analysis_command_info;

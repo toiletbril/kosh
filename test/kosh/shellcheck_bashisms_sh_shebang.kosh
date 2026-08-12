@@ -79,4 +79,8 @@ array_and_scope_only() {
   printf -v buffer '%s' text
   local scoped=value
 }
+compound_redirect_only() {
+  { echo grouped; } &>both.log
+  { echo globbed; } >prefix*.log
+}
 echo done

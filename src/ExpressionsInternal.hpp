@@ -111,9 +111,12 @@ struct command_lint_input
     return command_info.is_in_group(group);
   }
 
+  /* A redirected compound command carries redirections without a command word.
+     The node location stands in for the missing first argument. */
   pure fn command_location() const wontthrow -> SourceLocation
   {
-    return args[0]->source_location();
+    return args.is_empty() ? command_source_location
+                           : args[0]->source_location();
   }
 };
 
