@@ -976,6 +976,34 @@ text]
             [SimpleCommand "echo" "one", Async]
           [CompoundListCondition, None]
             [SimpleCommand "amp" "echo" "two"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "destructive_command_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "sudo" "cat" "*.log"]
+          [CompoundListCondition, None]
+            [SimpleCommand "rm" "--dry-run" "-rf" "/usr"]
+          [CompoundListCondition, None]
+            [SimpleCommand "rm" "--dry-run" "-rf" "$staging/"]
+          [CompoundListCondition, None]
+            [SimpleCommand "mkdir" "-pm" "0700" "parent/child"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "stdin_and_subscript_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "hello"]
+          [CompoundListCondition, None]
+            [SimpleCommand "typeset" "scoped=value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-r" "chosen"]
+          [CompoundListCondition, None]
+            [Assign slots[chosen]=x]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "echo" "value"]
+              [Assign tally=1]
 [Word
   Unquoted "lint_only"
 ]
@@ -4628,6 +4656,106 @@ text"
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "destructive_command_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "*.log"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "--dry-run"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Unquoted "/usr"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "--dry-run"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Variable "staging"
+  DoubleQuoted "/"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-pm"
+]
+[Word
+  Unquoted "0700"
+]
+[Word
+  Unquoted "parent/child"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "stdin_and_subscript_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "input.txt"
+]
+[Word
+  Unquoted "typeset"
+]
+[Word
+  Unquoted "scoped=value"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "chosen"
+]
+[Word
+  Unquoted "slots[chosen]=x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "value"
+]
+[Word
+  Unquoted "tally=1"
+]
+[Word
+  Unquoted "}"
+]
 416:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
    416 |    echo “curly”
        |         ^
@@ -5998,6 +6126,44 @@ note: Declare it with `local` to keep it inside the function.
    448 |    echo one &amp echo two
        |              ^~~
 note: Write the character the entity names.
+453:12: warning: A bare glob can expand to a filename that begins with `-`.
+   453 |    sudo cat *.log
+       |             ^~~~~
+note: Prefix the glob with a directory or place `--` before it.
+453:12: warning: The shell expands this glob before `sudo` changes privileges.
+   453 |    sudo cat *.log
+       |             ^~~~~
+note: Run the glob expansion inside a shell under `sudo`.
+454:20: warning: An `rm -r` targets the system directory '/usr'.
+   454 |    rm --dry-run -rf /usr
+       |                     ^~~~
+note: Double-check the path before running this.
+455:20: warning: An `rm -r` on `"$staging/"` deletes `/` when the variable is empty.
+   455 |    rm --dry-run -rf "$staging/"
+       |                     ^~~~~~~~~~~
+note: Write `${staging:?}` so an empty value aborts the command.
+456:3: warning: A `mkdir -pm` applies the mode only to the deepest directory, the created parents keep the umask default.
+   456 |    mkdir -pm 0700 parent/child
+       |    ^~~~~
+460:3: warning: The input redirect feeds 'echo', which never reads stdin, so the data is discarded.
+   460 |    echo hello < input.txt
+       |    ^~~~
+461:3: warning: The `typeset` builtin is the ksh spelling of `declare`.
+   461 |    typeset scoped=value
+       |    ^~~~~~~
+note: Write `declare` for the clearer bash name.
+463:3: warning: An array subscript from external input is evaluated as arithmetic code.
+   463 |    slots[chosen]=x
+       |    ^~~~~~~~~~~~~~~
+note: Validate the subscript as decimal digits before using it.
+464:16: warning: This pipeline assignment is lost when the stage exits.
+   464 |    echo value | tally=1
+       |                 ^~~~~~~
+note: Move the assignment outside the pipeline.
+464:16: warning: This assignment to 'tally' in a function has no `local`, the value leaks to the global scope.
+   464 |    echo value | tally=1
+       |                 ^~~~~~~
+note: Declare it with `local` to keep it inside the function.
 285:3: warning: The value of 'swallowed' is the command name 'printf', and the command never runs.
    285 |    swallowed=printf 'x\n'
        |    ^~~~~~~~~~~~~~~~
@@ -6010,7 +6176,7 @@ note: Write `pager=$(cat)` to store its output, or quote the name.
    442 |    runner=printf
        |    ^~~~~~~~~~~~~
 note: Write `runner=$(printf)` to store its output, or quote the name.
-Encountered 338 warnings.
+Encountered 348 warnings.
 done
 done
 done

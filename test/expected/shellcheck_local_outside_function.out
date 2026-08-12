@@ -1,0 +1,25 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "local" "top_level=1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "unreachable"]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "top_level=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreachable"
+]
+3:1: warning: A `local` outside a function has no scope to bind.
+     3 |  local top_level=1
+       |  ^~~~~
+note: Declare the variable plainly, or move it into a function.
+3:1: error: Builtin `local`: Unable to declare a local variable outside a function.
+     3 |  local top_level=1
+       |  ^~~~~~~~~~~~~~~~~
+note: `local` only works inside a function body.

@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "﻿#!/bin/env" "kosh"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "marked"]
+[Word
+  Unquoted "﻿#!/bin/env"
+]
+[Word
+  Unquoted "kosh"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "marked"
+]
+1:1: warning: A UTF-8 byte-order mark precedes the script text.
+     1 |  ﻿#!/bin/env kosh
+       |  ^
+note: Save the script as UTF-8 without a byte-order mark.
+1:1: warning: Command '﻿#!' was not found.
+     1 |  ﻿#!/bin/env kosh
+       |  ^~~
+Encountered 2 warnings.
+1:1: error: Command '﻿#!' was not found.
+     1 |  ﻿#!/bin/env kosh
+       |  ^~~
+marked
+[Code 0]

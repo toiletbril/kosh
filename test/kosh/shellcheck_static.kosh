@@ -447,3 +447,19 @@ command_name_assignment_diagnostics() {
 html_entity_diagnostics() {
   echo one &amp echo two
 }
+
+# The rm operands stay behind --dry-run so an accidental call destroys nothing.
+destructive_command_diagnostics() {
+  sudo cat *.log
+  rm --dry-run -rf /usr
+  rm --dry-run -rf "$staging/"
+  mkdir -pm 0700 parent/child
+}
+
+stdin_and_subscript_diagnostics() {
+  echo hello < input.txt
+  typeset scoped=value
+  read -r chosen
+  slots[chosen]=x
+  echo value | tally=1
+}

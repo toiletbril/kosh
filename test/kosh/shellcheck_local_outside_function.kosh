@@ -1,0 +1,4 @@
+#!/bin/env kosh
+# The analysis reports the missing scope, then the builtin refuses at run time.
+local top_level=1
+echo unreachable

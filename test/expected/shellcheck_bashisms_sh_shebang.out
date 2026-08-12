@@ -150,6 +150,18 @@
           [CompoundListCondition, None]
             [SimpleCommand "$0=zero"]
   [CompoundListCondition, None]
+    [FunctionDefinition "array_and_scope_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "mapfile" "-t" "lines"]
+          [CompoundListCondition, None]
+            [SimpleCommand "readarray" "-t" "rows"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "-v" "buffer" "%s" "text"]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "scoped=value"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "lint_only"
@@ -702,6 +714,60 @@
   Unquoted "}"
 ]
 [Word
+  Unquoted "array_and_scope_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "mapfile"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "roster"
+]
+[Word
+  Unquoted "readarray"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "rows"
+]
+[Word
+  Unquoted "roster"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "buffer"
+]
+[Word
+  Literal "%s"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "scoped=value"
+]
+[Word
+  Unquoted "}"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -914,6 +980,22 @@ note: Set the values as variables before the file is read.
     74 |    $0=zero
        |    ^~~~~~~
 note: Assign the program name to a named variable.
-Encountered 51 warnings.
+77:3: warning: 'mapfile' is a bash array builtin absent from POSIX sh.
+    77 |    mapfile -t lines < roster
+       |    ^~~~~~~
+note: Read the input with a `while read` loop, or switch the shebang to bash.
+78:3: warning: 'readarray' is a bash array builtin absent from POSIX sh.
+    78 |    readarray -t rows < roster
+       |    ^~~~~~~~~
+note: Read the input with a `while read` loop, or switch the shebang to bash.
+79:10: warning: The `printf -v` form is a bash extension, the POSIX `printf` has no `-v`.
+    79 |    printf -v buffer '%s' text
+       |           ^~
+note: Capture the output with a command substitution under a `sh` shebang.
+80:3: warning: The `local` builtin is not in POSIX sh, the value stays global.
+    80 |    local scoped=value
+       |    ^~~~~
+note: Rework the function, or switch the shebang to bash.
+Encountered 55 warnings.
 done
 [Code 0]

@@ -1,0 +1,3 @@
+﻿#!/bin/env kosh
+# The mark precedes the shebang, so the first line is read as a command word.
+echo marked

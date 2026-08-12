@@ -73,4 +73,10 @@ command_only() {
 positional_zero_assignment() {
   $0=zero
 }
+array_and_scope_only() {
+  mapfile -t lines < roster
+  readarray -t rows < roster
+  printf -v buffer '%s' text
+  local scoped=value
+}
 echo done

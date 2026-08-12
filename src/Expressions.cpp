@@ -2002,7 +2002,8 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     ASSERT(command != nullptr);
     const bool was_direct_pipeline_stage = actx.is_direct_pipeline_stage;
     actx.is_direct_pipeline_stage =
-        m_commands.count() > 1 && command->as_simple_command() != nullptr;
+        m_commands.count() > 1 && (command->as_simple_command() != nullptr ||
+                                   command->as_assign_command() != nullptr);
     command->analyze(actx, stage_is_unconditional);
     actx.is_direct_pipeline_stage = was_direct_pipeline_stage;
   }
