@@ -34,7 +34,7 @@
 [Word
   Unquoted "done"
 ]
-2:25: warning: An unquoted variable can split into words and expand globs.
+2:25: warning: An unquoted variable can split into words and expand globs. (SC2086)
      2 |  for x in a b c; do echo $x; done
        |                          ^~
 note: Quote the expansion to keep one argument.

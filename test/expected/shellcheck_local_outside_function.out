@@ -15,7 +15,7 @@
 [Word
   Unquoted "unreachable"
 ]
-3:1: warning: A `local` outside a function has no scope to bind.
+3:1: warning: A `local` outside a function has no scope to bind. (SC2168)
      3 |  local top_level=1
        |  ^~~~~
 note: Declare the variable plainly, or move it into a function.

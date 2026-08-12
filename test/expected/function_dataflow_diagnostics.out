@@ -1,9 +1,9 @@
 == a call passes nothing to a body that reads its arguments:
-1:1: warning: The function 'greet' reads the arguments it is called with, and no call passes any.
+1:1: warning: The function 'greet' reads the arguments it is called with, and no call passes any. (SC2120)
      1 |  greet() {
        |  ^~~~~
 note: Pass the arguments at the call, or read a named variable in place of `$1`.
-4:1: warning: The function 'greet' reads the arguments it is called with, and this call passes none.
+4:1: warning: The function 'greet' reads the arguments it is called with, and this call passes none. (SC2119)
      4 |  greet
        |  ^~~~~
 1:1: details:
@@ -20,11 +20,11 @@ rc=0
 == a modifier supplies the value, so the read does not count:
 rc=0
 == a positional read in a test operand counts:
-1:1: warning: The function 'check' reads the arguments it is called with, and no call passes any.
+1:1: warning: The function 'check' reads the arguments it is called with, and no call passes any. (SC2120)
      1 |  check() {
        |  ^~~~~
 note: Pass the arguments at the call, or read a named variable in place of `$1`.
-4:1: warning: The function 'check' reads the arguments it is called with, and this call passes none.
+4:1: warning: The function 'check' reads the arguments it is called with, and this call passes none. (SC2119)
      4 |  check
        |  ^~~~~
 1:1: details:
@@ -33,15 +33,15 @@ note: Pass the arguments at the call, or read a named variable in place of `$1`.
 note: Pass the values 'check' expects, or write `"$@"` to forward the script arguments.
 Encountered 2 warnings.
 == a positional read in an arithmetic expression counts:
-2:8: warning: Arithmetic variables do not need a dollar sign.
+2:8: warning: Arithmetic variables do not need a dollar sign. (SC2004)
      2 |    echo $((2 * $1))
        |         ^~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
-1:1: warning: The function 'double' reads the arguments it is called with, and no call passes any.
+1:1: warning: The function 'double' reads the arguments it is called with, and no call passes any. (SC2120)
      1 |  double() {
        |  ^~~~~~
 note: Pass the arguments at the call, or read a named variable in place of `$1`.
-4:1: warning: The function 'double' reads the arguments it is called with, and this call passes none.
+4:1: warning: The function 'double' reads the arguments it is called with, and this call passes none. (SC2119)
      4 |  double
        |  ^~~~~~
 1:1: details:
@@ -50,11 +50,11 @@ note: Pass the arguments at the call, or read a named variable in place of `$1`.
 note: Pass the values 'double' expects, or write `"$@"` to forward the script arguments.
 Encountered 3 warnings.
 == a positional read in a for loop word counts:
-1:1: warning: The function 'walk' reads the arguments it is called with, and no call passes any.
+1:1: warning: The function 'walk' reads the arguments it is called with, and no call passes any. (SC2120)
      1 |  walk() {
        |  ^~~~
 note: Pass the arguments at the call, or read a named variable in place of `$1`.
-4:1: warning: The function 'walk' reads the arguments it is called with, and this call passes none.
+4:1: warning: The function 'walk' reads the arguments it is called with, and this call passes none. (SC2119)
      4 |  walk
        |  ^~~~
 1:1: details:
@@ -63,7 +63,7 @@ note: Pass the arguments at the call, or read a named variable in place of `$1`.
 note: Pass the values 'walk' expects, or write `"$@"` to forward the script arguments.
 Encountered 2 warnings.
 == a call runs before the definition:
-1:1: warning: The function 'later_helper' is called here, and the definition that gives it a body runs later in the file.
+1:1: warning: The function 'later_helper' is called here, and the definition that gives it a body runs later in the file. (SC2218)
      1 |  later_helper foo
        |  ^~~~~~~~~~~~
 2:1: details:
@@ -75,11 +75,11 @@ rc=0
 == a call inside another body stays quiet:
 rc=0
 == the default mood rejects a call that passes nothing:
-1:1: error: The function 'greet' reads the arguments it is called with, and no call passes any.
+1:1: error: The function 'greet' reads the arguments it is called with, and no call passes any. (SC2120)
      1 |  greet() {
        |  ^~~~~
 note: Pass the arguments at the call, or read a named variable in place of `$1`.
-4:1: error: The function 'greet' reads the arguments it is called with, and this call passes none.
+4:1: error: The function 'greet' reads the arguments it is called with, and this call passes none. (SC2119)
      4 |  greet
        |  ^~~~~
 1:1: details:

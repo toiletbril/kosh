@@ -52,6 +52,18 @@ cold static fn diagnostic_colors_for(error_severity severity) throws
   unreachable();
 }
 
+/* An analysis message closes with its catalog code in parentheses, and that
+   closer ends the sentence. */
+pure static fn text_ends_a_sentence(StringView text) wontthrow -> bool
+{
+  if (text.is_empty()) return false;
+
+  let const last_byte = text[text.length - 1];
+
+  return last_byte == '.' || last_byte == '?' || last_byte == '!' ||
+         last_byte == ')';
+}
+
 template <class T>
   requires std::is_integral_v<T>
 cold static fn number_string_length(T value) wontthrow -> usize
@@ -257,11 +269,7 @@ cold static fn get_context_pointing_to(
     msg += ' ';
     msg += *message;
 
-    let const view = *message;
-    if (let const last_char =
-            view.is_empty() ? '\0' : view.data[view.length - 1];
-        last_char != '.' && last_char != '?' && last_char != '!')
-      msg += '.';
+    if (!text_ends_a_sentence(*message)) msg += '.';
   }
   msg += color.get_reset();
 
@@ -279,9 +287,7 @@ cold fn ErrorBase::trailing_details_to_string() const throws -> String
   let const severity_word = get_error_severity_word(severity);
   let const color = diagnostic_colors_for(severity);
 
-  let const final_byte = note[note.length - 1];
-  let const note_period =
-      (final_byte == '.' || final_byte == '?' || final_byte == '!') ? "" : ".";
+  let const note_period = text_ends_a_sentence(note) ? "" : ".";
 
   return String{"\n"} + color.severity + severity_word + color.get_reset() +
          ": " + color.message + note + note_period + color.get_reset();
@@ -310,8 +316,10 @@ cold fn ErrorBase::to_string(StringView source,
   let const severity = get_severity();
   let const severity_word = get_error_severity_word(severity);
   let const color = diagnostic_colors_for(severity);
+  let const period = text_ends_a_sentence(message()) ? "" : ".";
+
   return color.severity + severity_word + color.get_reset() + ": " +
-         color.message + message() + "." + color.get_reset() +
+         color.message + message() + period + color.get_reset() +
          trailing_details_to_string();
 }
 
@@ -410,9 +418,7 @@ fn ErrorWithLocation::to_string(StringView source,
     result += color.message;
     result += m_message;
 
-    if (let const last_char = m_message.back();
-        last_char != '.' && last_char != '?' && last_char != '!')
-      result += '.';
+    if (!text_ends_a_sentence(m_message.view())) result += '.';
 
     result += color.get_reset();
   } else {

@@ -26,7 +26,7 @@
 [Word
   Unquoted "after"
 ]
-2:3: warning: The 'hello' operand is a literal, so the test never changes.
+2:3: warning: The 'hello' operand is a literal, so the test never changes. (SC2078)
      2 |  [ hello ] && echo yes
        |    ^~~~~
 note: Add the `$` when a variable was meant.

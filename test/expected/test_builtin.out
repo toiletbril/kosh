@@ -734,7 +734,7 @@
   DoubleQuoted "group_and="
   Variable "?"
 ]
-5:6: warning: The numeric comparison `-eq` reads 'abc', and that is not a number, so the test errors at run time.
+5:6: warning: The numeric comparison `-eq` reads 'abc', and that is not a number, so the test errors at run time. (SC2170)
      5 |  test abc -eq 5; echo $?
        |       ^~~
 1

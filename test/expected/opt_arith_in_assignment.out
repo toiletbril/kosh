@@ -25,7 +25,7 @@
 [Word
   Unquoted "prefix"
 ]
-3:6: warning: An unquoted variable can split into words and expand globs.
+3:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
      3 |  echo $total
        |       ^~~~~~
 note: Quote the expansion to keep one argument.

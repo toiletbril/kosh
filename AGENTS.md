@@ -330,7 +330,9 @@ run that reported two or more diagnostics closes with a counted summary line.
 The warning count is yellow and the error count is bold bright red.
 
 A diagnostic line carries no program name prefix. It begins with its source
-location when the mapping exists.
+location when the mapping exists. An analysis message that carries a ShellCheck
+code closes with that code in parentheses after the sentence period. A closing
+parenthesis ends a sentence, so no second period is appended.
 
 Diagnostics.cpp owns each analysis diagnostic's code, slug, summary, message,
 suggestion, related detail, tier, and delivery. It also owns the command name

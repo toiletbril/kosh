@@ -92,39 +92,39 @@
 [Word
   CommandSubstitution "echo $foo"
 ]
-2:1: warning: An `echo` of a command substitution prints what the command already prints.
+2:1: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
      2 |  echo `echo hi`
        |  ^~~~
 note: Run the command on its own instead.
-2:6: warning: An unquoted command substitution splits its output.
+2:6: warning: An unquoted command substitution splits its output. (SC2046)
      2 |  echo `echo hi`
        |       ^~~~~~~~~
 note: Quote it to keep one argument.
-4:1: warning: An `echo` of a command substitution prints what the command already prints.
+4:1: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
      4 |  echo "`echo q`"
        |  ^~~~
 note: Run the command on its own instead.
-6:1: warning: An `echo` of a command substitution prints what the command already prints.
+6:1: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
      6 |  echo `(echo y) 2>/dev/null`
        |  ^~~~
 note: Run the command on its own instead.
-6:6: warning: An unquoted command substitution splits its output.
+6:6: warning: An unquoted command substitution splits its output. (SC2046)
      6 |  echo `(echo y) 2>/dev/null`
        |       ^~~~~~~~~~~~~~~~~~~~~~
 note: Quote it to keep one argument.
-7:1: warning: An `echo` of a command substitution prints what the command already prints.
+7:1: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
      7 |  echo `echo "a b"`
        |  ^~~~
 note: Run the command on its own instead.
-7:6: warning: An unquoted command substitution splits its output.
+7:6: warning: An unquoted command substitution splits its output. (SC2046)
      7 |  echo `echo "a b"`
        |       ^~~~~~~~~~~~
 note: Quote it to keep one argument.
-9:10: warning: An `echo` of a command substitution prints what the command already prints.
+9:10: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
      9 |  foo=bar; echo `echo \$foo`
        |           ^~~~
 note: Run the command on its own instead.
-9:15: warning: An unquoted command substitution splits its output.
+9:15: warning: An unquoted command substitution splits its output. (SC2046)
      9 |  foo=bar; echo `echo \$foo`
        |                ^~~~~~~~~~~~
 note: Quote it to keep one argument.

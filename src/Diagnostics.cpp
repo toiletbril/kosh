@@ -1547,6 +1547,24 @@ fn format_diagnostic_template(
   return result;
 }
 
+fn append_diagnostic_code(String &message, u16 shellcheck_code) throws -> void
+{
+  if (shellcheck_code == 0) return;
+  if (message.is_empty()) return;
+
+  if (let const last_byte = message.back();
+      last_byte != '.' && last_byte != '?' && last_byte != '!')
+  {
+    message += '.';
+  }
+
+  char code_text[32];
+  message += " (SC";
+  message +=
+      utils::int_to_text_into(shellcheck_code, code_text, sizeof(code_text));
+  message += ')';
+}
+
 static pure fn parse_diagnostic_code(StringView text) wontthrow -> Maybe<u16>
 {
   if (text.length >= 2 && text[0] == 'S' && text[1] == 'C') {

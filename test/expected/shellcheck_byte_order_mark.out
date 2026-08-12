@@ -15,7 +15,7 @@
 [Word
   Unquoted "marked"
 ]
-1:1: warning: A UTF-8 byte-order mark precedes the script text.
+1:1: warning: A UTF-8 byte-order mark precedes the script text. (SC1082)
      1 |  ﻿#!/bin/env kosh
        |  ^
 note: Save the script as UTF-8 without a byte-order mark.

@@ -46,19 +46,19 @@
   Unquoted "c"
   Variable "d"
 ]
-4:3: warning: An unquoted variable can split into words and expand globs.
+4:3: warning: An unquoted variable can split into words and expand globs. (SC2086)
      4 |  : $foo ${bar}
        |    ^~~~
 note: Quote the expansion to keep one argument.
-4:8: warning: An unquoted variable can split into words and expand globs.
+4:8: warning: An unquoted variable can split into words and expand globs. (SC2086)
      4 |  : $foo ${bar}
        |         ^~~~~~
 note: Quote the expansion to keep one argument.
-6:6: warning: An unquoted variable can split into words and expand globs.
+6:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
      6 |  : pre$foo "lead${bar}tail"
        |       ^~~~
 note: Quote the expansion to keep one argument.
-7:4: warning: An unquoted variable can split into words and expand globs.
+7:4: warning: An unquoted variable can split into words and expand globs. (SC2086)
      7 |  : a${b}c$d
        |     ^~~~
 note: Quote the expansion to keep one argument.

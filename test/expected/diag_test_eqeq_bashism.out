@@ -40,7 +40,7 @@
 [Word
   Unquoted "after"
 ]
-2:5: warning: `==` is undefined in POSIX `test`.
+2:5: warning: `==` is undefined in POSIX `test`. (SC3014)
      2 |  [ x == x ] && echo eq || echo neq
        |      ^~
 note: Use `=` for string equality.

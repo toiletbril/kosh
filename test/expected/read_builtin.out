@@ -347,35 +347,35 @@
 [Word
   Unquoted "}"
 ]
-2:22: warning: A `read` without `-r` mangles a backslash in the input.
+2:22: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
      2 |  printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
        |                       ^~~~~~~~~~~~~~~
 note: Add `-r` to read the line literally.
-3:22: warning: A `read` without `-r` mangles a backslash in the input.
+3:22: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
      3 |  printf '1 2 3\n' | { read -a arr; echo "n=${#arr[@]} a0=${arr[0]} a2=${arr[2]}"; }
        |                       ^~~~~~~~~~~
 note: Add `-r` to read the line literally.
-4:20: warning: A `read` without `-r` mangles a backslash in the input.
+4:20: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
      4 |  printf 'noeol' | { read v; echo "rc=$? v=$v"; }
        |                     ^~~~~~
 note: Add `-r` to read the line literally.
-10:1: warning: A `read` without `-r` mangles a backslash in the input.
+10:1: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
     10 |  read x < "$file"
        |  ^~~~~~
 note: Add `-r` to read the line literally.
-13:1: warning: A `read` without `-r` mangles a backslash in the input.
+13:1: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
     13 |  read y < "$file"
        |  ^~~~~~
 note: Add `-r` to read the line literally.
-17:28: warning: A `read` without `-r` mangles a backslash in the input.
+17:28: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
     17 |  printf 'x::y\n' | { IFS=:; read a b c; echo "[$a][$b][$c]"; }
        |                             ^~~~~~~~~~
 note: Add `-r` to read the line literally.
-19:7: warning: A `read` without `-r` mangles a backslash in the input.
+19:7: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
     19 |  IFS=- read a b c d <<IN
        |        ^~~~~~~~~~~~
 note: Add `-r` to read the line literally.
-22:47: warning: A `read` without `-r` mangles a backslash in the input.
+22:47: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
     22 |  echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }
        |                                                ^~~~~~~~~~
 note: Add `-r` to read the line literally.

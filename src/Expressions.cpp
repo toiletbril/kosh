@@ -234,8 +234,10 @@ fn AnalysisContext::report_diagnostic(
   if (is_diagnostic_suppressed(id, location)) return;
 
   let const &definition = get_diagnostic_definition(id);
-  let const message =
+  let message =
       format_diagnostic_template(definition.message_template, arguments);
+  append_diagnostic_code(message, definition.shellcheck_code);
+
   let suggestion = String{heap_allocator()};
   let related_message = String{heap_allocator()};
 

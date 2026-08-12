@@ -1212,6 +1212,11 @@ mapping exists. A diagnostic may include a source line, caret, detail location,
 and trailing note. The complete source line is highlighted before terminal
 clipping.
 .PP
+An analysis message that carries a ShellCheck code closes with that code in
+parentheses, as in
+.BR "An unquoted variable can split into words and expand globs. (SC2086)" .
+A native analysis message carries no code.
+.PP
 In the default mood, strict and lenient findings reject the script. Annoying
 findings remain warnings. The annoying tier contains additional safety checks
 and style findings that can produce excessive reports in existing scripts.

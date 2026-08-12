@@ -80,7 +80,7 @@
 [Word
   Unquoted "fi"
 ]
-4:6: warning: A test reads an unquoted variable.
+4:6: warning: A test reads an unquoted variable. (SC2086)
      4 |  if [ $x = 5 ]; then echo unquoted_no_fold; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.

@@ -332,7 +332,7 @@
   Unquoted "c"
   DoubleQuoted ""
 ]
-6:8: warning: An unquoted variable can split into words and expand globs.
+6:8: warning: An unquoted variable can split into words and expand globs. (SC2086)
      6 |  set -- ${unset-}; echo count=$#
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.

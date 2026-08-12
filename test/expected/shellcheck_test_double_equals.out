@@ -16,11 +16,11 @@
 [Word
   Unquoted "]"
 ]
-2:5: warning: `==` is undefined in POSIX `test`.
+2:5: warning: `==` is undefined in POSIX `test`. (SC3014)
      2 |  [ a == b ]
        |      ^~
 note: Use `=` for string equality.
-2:5: warning: The literals 'a' and 'b' differ, so the comparison never succeeds.
+2:5: warning: The literals 'a' and 'b' differ, so the comparison never succeeds. (SC2193)
      2 |  [ a == b ]
        |      ^~
 note: Compare a variable, or correct the operand spelling.

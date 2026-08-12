@@ -1,5 +1,5 @@
 == default argument location ==
-1:6: warning: The `let` builtin evaluates its argument as arithmetic.
+1:6: warning: The `let` builtin evaluates its argument as arithmetic. (SC2219)
      1 |  a=0; let a = 2; echo unreached
        |       ^~~
 note: Write `(( ... ))` for the arithmetic.

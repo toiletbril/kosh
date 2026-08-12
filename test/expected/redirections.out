@@ -81,7 +81,7 @@
   DoubleQuoted "close="
   Variable "?"
 ]
-4:14: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal.
+4:14: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal. (SC2069)
      4 |  echo x 2>&1 >/dev/null; echo "dup=done"
        |               ^~~~~~~~~
 note: Put the file redirect first as in `>file 2>&1`.
