@@ -958,6 +958,24 @@ text]
             [SimpleCommand "sed"]
           [CompoundListCondition, None]
             [SimpleCommand "-e" "x" "file"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "command_name_assignment_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign runner=printf]
+          [CompoundListCondition, None]
+            [Assign linker=ln]
+          [CompoundListCondition, None]
+            [SimpleCommand "$linker" "-s" "target" "link"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "html_entity_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "one", Async]
+          [CompoundListCondition, None]
+            [SimpleCommand "amp" "echo" "two"]
 [Word
   Unquoted "lint_only"
 ]
@@ -4559,6 +4577,57 @@ text"
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "command_name_assignment_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "runner=printf"
+]
+[Word
+  Unquoted "linker=ln"
+]
+[Word
+  Variable "linker"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "target"
+]
+[Word
+  Unquoted "link"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "html_entity_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "amp"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "}"
+]
 416:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string.
    416 |    echo “curly”
        |         ^
@@ -5638,10 +5707,6 @@ note: Write `piped=$(...)` around the complete pipeline.
    284 |    first=one second=two | wc -l
        |    ^~~~~~~~~
 note: Write `first=$(...)` around the complete pipeline.
-285:3: warning: The value of 'swallowed' is the command name 'printf', and the command never runs.
-   285 |    swallowed=printf 'x\n'
-       |    ^~~~~~~~~~~~~~~~
-note: Write `swallowed=$(printf)` to store its output, or quote the name.
 285:3: warning: The value of 'swallowed' is read as a name, and 'x\n' becomes the command.
    285 |    swallowed=printf 'x\n'
        |    ^~~~~~~~~~~~~~~~
@@ -5725,10 +5790,6 @@ note: Declare it with local to keep it inside the function.
    311 |    IFS="\t"
        |    ^~~~~~~~
 note: Write `$'\t'` to place the control byte.
-312:3: warning: The value of 'pager' is the command name 'cat', and the command never runs.
-   312 |    pager=cat
-       |    ^~~~~~~~~
-note: Write `pager=$(cat)` to store its output, or quote the name.
 312:3: warning: This assignment to 'pager' in a function has no local, so the value leaks to the global scope.
    312 |    pager=cat
        |    ^~~~~~~~~
@@ -5925,7 +5986,31 @@ note: Write `\$` inside the quotes and keep the string in one piece.
    438 |    -e x file
        |    ^~
 note: Place the option after its command.
-Encountered 334 warnings.
+442:3: warning: This assignment to 'runner' in a function has no local, so the value leaks to the global scope.
+   442 |    runner=printf
+       |    ^~~~~~~~~~~~~
+note: Declare it with local to keep it inside the function.
+443:3: warning: This assignment to 'linker' in a function has no local, so the value leaks to the global scope.
+   443 |    linker=ln
+       |    ^~~~~~~~~
+note: Declare it with local to keep it inside the function.
+448:13: warning: The command 'amp' is the tail of the HTML entity `&amp;`, which the shell reads as an operator followed by a command.
+   448 |    echo one &amp echo two
+       |              ^~~
+note: Write the character the entity names.
+285:3: warning: The value of 'swallowed' is the command name 'printf', and the command never runs.
+   285 |    swallowed=printf 'x\n'
+       |    ^~~~~~~~~~~~~~~~
+note: Write `swallowed=$(printf)` to store its output, or quote the name.
+312:3: warning: The value of 'pager' is the command name 'cat', and the command never runs.
+   312 |    pager=cat
+       |    ^~~~~~~~~
+note: Write `pager=$(cat)` to store its output, or quote the name.
+442:3: warning: The value of 'runner' is the command name 'printf', and the command never runs.
+   442 |    runner=printf
+       |    ^~~~~~~~~~~~~
+note: Write `runner=$(printf)` to store its output, or quote the name.
+Encountered 338 warnings.
 done
 done
 done

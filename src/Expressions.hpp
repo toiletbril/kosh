@@ -58,6 +58,15 @@ struct function_call_record
   bool is_inside_function_body{false};
 };
 
+/* One assignment whose value is a bare command name. The value points into a
+   composed string that dies with the command, so both fields are owned. */
+struct command_name_assignment_record
+{
+  String name;
+  String value;
+  SourceLocation location;
+};
+
 /* Whether the name reads a positional parameter, so $1 through $9, $@, $*, or
    $#. A name carrying a modifier such as ${1:-default} supplies its own value
    and is left out. */
@@ -123,6 +132,13 @@ public:
   StringMap<SourceLocation> assigned_names_so_far{heap_allocator()};
 
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
+
+  /* An assignment holding a bare command name is only wrong when nothing runs
+     that name, and the run may follow the assignment, so the finding waits for
+     the end of the walk. */
+  ArrayList<command_name_assignment_record> command_name_assignments{
+      heap_allocator()};
+  HashSet command_position_names{heap_allocator()};
 
   /* Every function the script defines and every call of one, gathered during
      the walk and swept once it ends. */

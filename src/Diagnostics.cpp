@@ -131,6 +131,10 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Use `disable`, `enable`, `shell`, `source`, `source-path`, or "
       "`external-sources`",
       None, Annoying, Policy),
+    D(1109, "html-entity", "an HTML entity is not shell syntax",
+      "The command '{0}' is the tail of the HTML entity `&{0};`, which the "
+      "shell reads as an operator followed by a command",
+      "Write the character the entity names", None, Strict, Policy),
     D(1110, "unicode-quote", "a Unicode quote does not quote anything",
       "The Unicode quote '{0}' is ordinary text, so it opens no quoted string",
       "Delete it and retype an ASCII quote", None, Strict, Policy),
@@ -1674,6 +1678,7 @@ constexpr static_string_entry<analysis_command_info>
           BRACKET_GROUPS | COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("[[", DoubleBracket, BRACKET_GROUPS),
         C("alias", Alias, COMMAND_GROUP_RUNTIME_DEFINER),
+        C("amp", Unknown, COMMAND_GROUP_HTML_ENTITY_TAIL),
         C("arch", Arch, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("basename", Basename, NEUTRAL_READER_GROUPS),
         C("break", Break, NO_COMMAND_GROUP),
@@ -1700,6 +1705,7 @@ constexpr static_string_entry<analysis_command_info>
         C("find", Find, NO_COMMAND_GROUP),
         C("getopts", Getopts, COMMAND_GROUP_VARIABLE_TARGET),
         C("grep", Grep, COMMAND_GROUP_PATTERN_MATCHER),
+        C("gt", Unknown, COMMAND_GROUP_HTML_ENTITY_TAIL),
         C("hostname", Hostname, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("id", Id, COMMAND_GROUP_ENVIRONMENT_NEUTRAL),
         C("kill", Kill, COMMAND_GROUP_NON_STDIN_READER),
@@ -1707,6 +1713,7 @@ constexpr static_string_entry<analysis_command_info>
         C("ln", Ln, COMMAND_GROUP_NON_STDIN_READER),
         C("local", Local, DECLARATION_GROUPS),
         C("ls", Ls, COMMAND_GROUP_NON_STDIN_READER),
+        C("lt", Unknown, COMMAND_GROUP_HTML_ENTITY_TAIL),
         C("mapfile", Mapfile, COMMAND_GROUP_VARIABLE_TARGET),
         C("mkdir", Mkdir, COMMAND_GROUP_NON_STDIN_READER),
         C("mv", Mv, COMMAND_GROUP_NON_STDIN_READER),
@@ -5077,10 +5084,11 @@ fn check_assignment_value_shape(AnalysisContext &actx,
   }
 
   if (!input.is_append && input.shape.has_bare_literal_value &&
-      COMMAND_NAME_VALUES.contains(value))
+      COMMAND_NAME_VALUES.contains(value) &&
+      actx.should_report(diagnostic_id::sc2209))
   {
-    actx.report_diagnostic(diagnostic_id::sc2209, input.location,
-                           {input.name, value});
+    actx.command_name_assignments.push(command_name_assignment_record{
+        String{input.name}, String{value}, input.location});
   }
 
   let const first_bracket = input.name.find_character('[');
@@ -6461,6 +6469,16 @@ pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool
   if (name.starts_with("KOSH_")) return true;
 
   return SHELL_MAINTAINED_VARIABLES.contains(name);
+}
+
+fn check_command_name_assignments(AnalysisContext &actx) throws -> void
+{
+  for (let const &assignment : actx.command_name_assignments) {
+    if (actx.command_position_names.contains(assignment.name.view())) continue;
+
+    actx.report_diagnostic(diagnostic_id::sc2209, assignment.location,
+                           {assignment.name.view(), assignment.value.view()});
+  }
 }
 
 fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void

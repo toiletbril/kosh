@@ -437,3 +437,13 @@ text'
   # -e "middle" \
   -e x file
 }
+
+command_name_assignment_diagnostics() {
+  runner=printf
+  linker=ln
+  $linker -s target link
+}
+
+html_entity_diagnostics() {
+  echo one &amp echo two
+}

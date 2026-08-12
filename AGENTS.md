@@ -343,6 +343,18 @@ and-or command. A numeric code suppresses every catalog variant under that
 code. An exact slug suppresses one numbered or native analysis variant. Parser
 errors and runtime diagnostics are not suppressed by these comments.
 
+Six catalog codes are excluded by decision. SC1015 and SC1016 were retired
+upstream and split into SC1110 and SC1111, which are implemented, so reporting
+them would name the same bytes twice. SC1117 fires on a backslash before any
+byte that carries no meaning inside double quotes, which an ordinary regular
+expression payload triggers constantly. SC1119 through SC1122 describe the text
+that trails a here-document token and its terminator, and `walk_heredoc_body`
+discards that text, so a second scan of every here-document would be needed.
+SC2034 reports an assigned name that no read consumes, and reads appear in
+roughly twenty-five syntactic forms, so the read set cannot be gathered without
+a new walk of the source. SC2278 and SC2280 describe ksh behavior, and Koshka
+has no ksh mood, so an assignment to `$0` resolves to SC2277 or SC2279 instead.
+
 src/Toiletline.cpp connects the editor and evaluator. The vendored editor lives
 in src/toiletline/toiletline.h. The completion bridge retains its result until
 the editor consumes returned pointers. Plain appends update the stored byte

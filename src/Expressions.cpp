@@ -699,6 +699,7 @@ fn analyze_ast(const Expression *root, StringView source,
 
   root->analyze(actx, true);
 
+  expressions::check_command_name_assignments(actx);
   expressions::check_unassigned_variable_reads(actx);
   expressions::check_function_argument_dataflow(actx);
 
@@ -1557,6 +1558,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2084, arg_location);
     }
 
+    /* The command word is one expansion, so whatever the name holds is meant to
+       run and an assignment of a bare command name to it was deliberate. */
+    if (!is_operand && word != nullptr && word->segments.count() == 1 &&
+        word->segments[0].kind == WordSegment::Kind::VariableReference &&
+        actx.command_name_assignments.count() != 0)
+    {
+      actx.command_position_names.add(word->segments[0].text.view());
+    }
+
     if (has_quote_sandwich) {
       actx.report_diagnostic(diagnostic_id::sc2140, arg_location,
                              {quote_sandwich_word});
@@ -1760,6 +1770,18 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   check_test_operand_lints(actx, lint_input);
   check_prefix_assignment_reads(actx, lint_input);
 
+  /* No search path holds a program named after an entity, so the finding needs
+     no resolution scan and survives an unknown path. */
+  let const command_is_html_entity_tail =
+      name.has_value() && !command_is_shadowed &&
+      command_info.is_in_group(COMMAND_GROUP_HTML_ENTITY_TAIL) &&
+      !actx.tested_command_names.contains(*name);
+
+  if (command_is_html_entity_tail) {
+    actx.report_diagnostic(diagnostic_id::sc1109, m_args[0]->source_location(),
+                           {*name});
+  }
+
   let const resolution_diagnostic =
       actx.has_seen_runtime_definer
           ? diagnostic_id::unresolved_command_uncertain
@@ -1768,7 +1790,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
      its only diagnostic cannot reach the output. */
   let const should_check_command_resolution =
       name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed && actx.should_report(resolution_diagnostic);
+      !command_is_shadowed && !command_is_html_entity_tail &&
+      actx.should_report(resolution_diagnostic);
 
   let unavailable = Maybe<utils::unavailable_path_source_component>{};
   let command_was_resolved = false;
@@ -1787,6 +1810,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       diagnostic_location = unavailable->location;
       reported_name = unavailable->reported_prefix.view();
     }
+
     let local_names = ArrayList<String>{heap_allocator()};
     actx.defined_functions.for_each(
         [&](StringView n) throws { local_names.push(String{n}); });

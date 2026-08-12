@@ -44,6 +44,7 @@ enum class diagnostic_id : u16
   sc1104,
   sc1106,
   sc1107,
+  sc1109,
   sc1110,
   sc1111,
   sc1112,
@@ -522,6 +523,7 @@ constexpr u32 COMMAND_GROUP_VARIABLE_TARGET = 1u << 5;
 constexpr u32 COMMAND_GROUP_NON_STDIN_READER = 1u << 6;
 constexpr u32 COMMAND_GROUP_ENVIRONMENT_NEUTRAL = 1u << 7;
 constexpr u32 COMMAND_GROUP_PATTERN_MATCHER = 1u << 8;
+constexpr u32 COMMAND_GROUP_HTML_ENTITY_TAIL = 1u << 9;
 
 struct analysis_command_info
 {

@@ -276,6 +276,11 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
    script that reads it without assigning it is correct. */
 pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool;
 
+/* The assignments holding a bare command name that no command word ever
+   expanded. A run of the name may follow the assignment, so the decision waits
+   for the end of the walk. */
+fn check_command_name_assignments(AnalysisContext &actx) throws -> void;
+
 /* The names left in reads_before_assignment once the walk is done. A name still
    listed there was read at the top level and no later assignment claimed it. */
 fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void;
