@@ -299,8 +299,9 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       }
     }
 
-    if (element.is_bare_unquoted &&
-        (operand.view() == ">=" || operand.view() == "<="))
+    let const token_kind = element.word->kind();
+    if (token_kind == Token::Kind::GreaterEquals ||
+        token_kind == Token::Kind::LessEquals)
     {
       actx.report_diagnostic(diagnostic_id::sc2122,
                              element.word->source_location(), {operand.view()});

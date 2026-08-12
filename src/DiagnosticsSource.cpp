@@ -1190,6 +1190,16 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
 
     if (resembled.name.is_empty()) resembled = misspelled;
 
+    if (resembled.name.is_empty() && actx.eval_context != nullptr) {
+      let const suggestion =
+          actx.eval_context->suggest_similar_variable_name(read.name);
+      if (suggestion.has_value() &&
+          actx.eval_context->is_exported(suggestion->view()))
+      {
+        continue;
+      }
+    }
+
     if (resembled.name.is_empty()) {
       actx.report_diagnostic(diagnostic_id::sc2154, read.location, {read.name});
     } else {

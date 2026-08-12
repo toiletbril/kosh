@@ -15,5 +15,5 @@ done
 # The recognition holds in the sh mood the same as the default mood.
 "$BIN" --mood sh -c 'printf "sh_green=[%s]\n" "${KOSH_ANSI_GREEN-MISSING}"'
 # An unknown name is unset, so the strict report fires under nounset.
-"$BIN" -c 'set -u; echo "${KOSH_ANSI_NOPE}"'
+"$BIN" --no-diagnostics -c 'set -u; echo "${KOSH_ANSI_NOPE}"'
 echo "rc=$?"
