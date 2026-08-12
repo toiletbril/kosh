@@ -335,9 +335,7 @@ fn SimpleCommand::can_evaluate_in_process_substitution(
   if (let const function_body = cxt.find_function(*command_name);
       function_body != nullptr)
   {
-    if (active_functions.contains(*command_name)) return true;
-
-    active_functions.add(*command_name);
+    if (!active_functions.add(*command_name)) return true;
     defer { active_functions.remove(*command_name); };
     return function_body->can_evaluate_in_process_substitution(
         cxt, active_functions);

@@ -155,7 +155,7 @@ flatten fn Lexer::peek_expression_token() throws -> Token *
   return t;
 }
 
-flatten fn Lexer::peek_shell_token() throws -> Token *
+fn Lexer::peek_shell_token() throws -> Token *
 {
   skip_whitespace();
   if (m_peek_cache != nullptr && m_peek_cache_is_shell &&
@@ -601,11 +601,9 @@ hot fn Lexer::lex_number() throws -> Token *
   while (lexer::is_number(chop_character(length)))
     length++;
 
-  let digits = String{heap_allocator()};
-  digits.append(m_source.view().substring_of_length(m_cursor_position, length));
-
-  Token *const num =
-      m_arena->create<tokens::Number>(here(m_cursor_position, length), digits);
+  Token *const num = m_arena->create<tokens::Number>(
+      here(m_cursor_position, length),
+      m_source.view().substring_of_length(m_cursor_position, length));
   ASSERT(num != nullptr);
 
   m_cached_offset = length;

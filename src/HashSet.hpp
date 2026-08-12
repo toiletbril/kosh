@@ -16,7 +16,12 @@ public:
 
   pure fn allocator() const wontthrow -> Allocator { return m_map.allocator(); }
 
-  hot fn add(StringView key) throws -> void { m_map.set(key, Nothing{}); }
+  hot fn add(StringView key) throws -> bool
+  {
+    let const previous_count = m_map.count();
+    m_map.set(key, Nothing{});
+    return m_map.count() != previous_count;
+  }
 
   cold fn remove(StringView key) throws -> void { m_map.erase(key); }
 

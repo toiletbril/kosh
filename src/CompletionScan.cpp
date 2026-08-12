@@ -220,8 +220,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
 
   let seen = HashSet{heap_allocator()};
   let const do_push_unique = [&](StringView host) throws {
-    if (host.is_empty() || seen.contains(host)) return;
-    seen.add(host);
+    if (host.is_empty() || !seen.add(host)) return;
     hosts.push(String{host});
   };
 
@@ -302,14 +301,15 @@ template <typename Collector>
 static fn cached_targets_for(const Path &source_file, Collector collect) throws
     -> const ArrayList<String> *
 {
-  let const mtime = source_file.modification_time();
+  let const absolute_source_file = source_file.to_absolute();
+  let const mtime = absolute_source_file.modification_time();
   if (!mtime.has_value()) return nullptr;
-  let const key = source_file.text().view();
+  let const key = absolute_source_file.text().view();
   if (const cached_target_list *cached = BUILD_TARGET_CACHE.find(key);
       cached != nullptr && cached->mtime == *mtime)
     return &cached->targets;
-  BUILD_TARGET_CACHE.set(key, cached_target_list{*mtime, collect()});
-  return &BUILD_TARGET_CACHE.find(key)->targets;
+  return &BUILD_TARGET_CACHE.set(key, cached_target_list{*mtime, collect()})
+              ->targets;
 }
 
 fn complete_from_process_arguments(StringView line, StringView token,
@@ -336,10 +336,9 @@ fn complete_from_process_arguments(StringView line, StringView token,
   for (const os::process_entry &process : processes) {
     if (is_by_name) {
       let const name = process.name.view();
-      if (name.is_empty() || !name.starts_with(token) || seen.contains(name)) {
+      if (name.is_empty() || !name.starts_with(token) || !seen.add(name)) {
         continue;
       }
-      seen.add(name);
       candidates.push(String{completion_allocator(), name});
     } else {
       let pid_text = String::from(process.pid, completion_allocator());
@@ -434,9 +433,8 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       let seen = HashSet{heap_allocator()};
       for (const String &name : intrinsic_targets) {
         if (make_target_is_artifact(name.view(), make_directory) ||
-            seen.contains(name.view()))
+            !seen.add(name.view()))
           continue;
-        seen.add(name.view());
         filtered.push(name.clone());
       }
       return filtered;
@@ -729,8 +727,7 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     let seen = HashSet{heap_allocator()};
     let const do_add_name = [&](StringView name) throws {
       if (!name.starts_with(token)) return;
-      if (seen.contains(name)) return;
-      seen.add(name);
+      if (!seen.add(name)) return;
       candidates.push(String{name});
     };
 

@@ -443,7 +443,7 @@ constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
 };
 constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 
-hot flatten fn EvalContext::process_args(
+hot fn EvalContext::process_args(
     const ArrayList<const Token *> &args, argument_lifetime lifetime,
     argument_context context,
     ArrayList<SourceLocation> *expanded_locations) throws -> ArrayList<String>

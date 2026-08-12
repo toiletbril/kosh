@@ -3394,9 +3394,10 @@ pure fn bounded_osa_distance(StringView a, StringView b,
      row width is rejected before the rows are reserved. */
   if (b_length + 1 > OSA_ROW_WIDTH) return max_distance + 1;
 
-  usize previous_previous[OSA_ROW_WIDTH];
-  usize previous[OSA_ROW_WIDTH];
-  usize current[OSA_ROW_WIDTH];
+  usize rows[3][OSA_ROW_WIDTH];
+  let previous_previous = rows[0];
+  let previous = rows[1];
+  let current = rows[2];
 
   for (usize j = 0; j <= b_length; j++)
     previous[j] = j;
@@ -3417,10 +3418,10 @@ pure fn bounded_osa_distance(StringView a, StringView b,
       if (value < row_best) row_best = value;
     }
     if (row_best > max_distance) return max_distance + 1;
-    for (usize j = 0; j <= b_length; j++) {
-      previous_previous[j] = previous[j];
-      previous[j] = current[j];
-    }
+    let old_previous_previous = previous_previous;
+    previous_previous = previous;
+    previous = current;
+    current = old_previous_previous;
   }
   return previous[b_length];
 }

@@ -634,6 +634,7 @@ static fn compute_longest_common_prefix(const ArrayList<String> &candidates,
   let const first = candidates[0].view();
   usize prefix_length = first.length;
   for (usize i = 1; i < candidates.count(); i++) {
+    if (prefix_length == 0) break;
     let const candidate = candidates[i].view();
     prefix_length = common_prefix_length(first, candidate, prefix_length,
                                          should_ignore_ascii_case);
@@ -1313,8 +1314,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
 
   let const do_add_name = [&](StringView name) throws -> void {
     if (!name.starts_with(prefix)) return;
-    if (seen.contains(name)) return;
-    seen.add(name);
+    if (!seen.add(name)) return;
 
     let candidate = String{completion_allocator()};
     candidate += has_brace ? "${" : "$";
@@ -1606,8 +1606,8 @@ static fn keep_hinted_extension(ArrayList<String> candidates,
   return kept;
 }
 
-flatten fn complete(StringView line, usize cursor, EvalContext &context,
-                    const Path &base_directory, completion_mode mode) throws
+fn complete(StringView line, usize cursor, EvalContext &context,
+            const Path &base_directory, completion_mode mode) throws
     -> completion_result
 {
   let const for_listing = mode == completion_mode::Listing;

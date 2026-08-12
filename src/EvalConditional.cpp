@@ -492,8 +492,7 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
     fail_conditional(reason.view(),
                      "The pattern must be a valid extended regular expression");
   }
-  m_regex_cache.set(key.view(), CompiledRegex{compiled});
-  return m_regex_cache.find(key.view())->get();
+  return m_regex_cache.set(key.view(), CompiledRegex{compiled})->get();
 }
 
 fn EvalContext::evaluate_conditional(

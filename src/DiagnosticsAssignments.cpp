@@ -685,8 +685,7 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
       let const value_names_a_command =
           !COMMAND_VALUED_VARIABLES.contains(name) &&
           get_analysis_command_info(assigned).id != command_name_id::Unknown &&
-          get_analysis_command_info(input.command_literal).id ==
-              command_name_id::Unknown;
+          input.command_id() == command_name_id::Unknown;
       if (input.command_literal[0] == '-' || value_names_a_command) {
         actx.report_diagnostic(diagnostic_id::sc2037,
                                input.local_vars[0].location,

@@ -91,9 +91,9 @@ public:
 
   pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
 
-  hot fn set(StringView key, Value value) throws -> void
+  hot fn set(StringView key, Value value) throws -> Value *
   {
-    set_value(key, steal(value));
+    return set_value(key, steal(value));
   }
 
   hot fn get_or_create(StringView key, Value default_value) throws -> Value &
@@ -108,7 +108,7 @@ public:
      buffer, so a tight reassignment loop pays no per-turn allocation. The value
      must not view the existing slot's own buffer, since clear then append would
      read bytes the clear already truncated. */
-  hot fn set(StringView key, StringView value) throws -> void
+  hot fn set(StringView key, StringView value) throws -> Value *
   {
     let const hash = hash_bytes(key);
     let const result = prepare_insertion(key, hash);
@@ -122,12 +122,12 @@ public:
       if (!buffer_is_wasteful) {
         existing->clear();
         existing->append(value);
-        return;
+        return existing;
       }
       *existing = String{m_allocator, value};
-      return;
+      return existing;
     }
-    place(result.insertion, key, hash, String{m_allocator, value});
+    return place(result.insertion, key, hash, String{m_allocator, value});
   }
 
   hot fn erase(StringView key) throws -> void

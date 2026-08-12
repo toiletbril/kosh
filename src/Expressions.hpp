@@ -195,15 +195,13 @@ public:
 
   fn add_defined_function(StringView name) throws -> void
   {
-    if (defined_functions.contains(name)) return;
-    defined_functions.add(name);
+    if (!defined_functions.add(name)) return;
     defined_function_insertions.push(String{name});
   }
 
   fn add_known_alias(StringView name) throws -> void
   {
-    if (known_aliases.contains(name)) return;
-    known_aliases.add(name);
+    if (!known_aliases.add(name)) return;
     known_alias_insertions.push(String{name});
   }
 

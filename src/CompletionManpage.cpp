@@ -123,8 +123,7 @@ static fn manpage_section1_directories(ProgramResolver &resolver) throws
   let seen_roots = HashSet{heap_allocator()};
 
   let const do_push_man1_of_root = [&](StringView root) {
-    if (seen_roots.contains(root)) return;
-    seen_roots.add(root);
+    if (!seen_roots.add(root)) return;
     let directory = Path{root};
     directory.push_component("man1");
     directories.push(steal(directory));
@@ -550,8 +549,7 @@ static fn parse_manpage_option_entries(StringView text) throws
         has_letter = !(flag[k] >= '0' && flag[k] <= '9');
         if (has_letter) break;
       }
-    if (flag.length >= 2 && has_letter && !seen.contains(flag)) {
-      seen.add(flag);
+    if (flag.length >= 2 && has_letter && seen.add(flag)) {
       let const description = descriptions.find(flag);
       entries.push(help_entry{String{flag}, description != nullptr
                                                 ? String{description->view()}
@@ -595,8 +593,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     LOG(Debug,
         "skipping the man fork for '%.*s' because man is absent or untrusted",
         static_cast<int>(page_name.length), page_name.data);
-    MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
-    return *MANPAGE_OPTION_CACHE.find(page_name);
+    return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
   }
   unused(context);
   let argv = ArrayList<String>{heap_allocator()};
@@ -605,8 +602,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   if (Maybe<String> page = capture_completion_program_output(argv);
       page.has_value())
     parsed_options = parse_manpage_option_entries(page->view());
-  MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
-  return *MANPAGE_OPTION_CACHE.find(page_name);
+  return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
 }
 
 /* Runs only on an explicit tab and a dash token, so the ghost never forks man.
@@ -769,8 +765,7 @@ static fn parse_help_option_entries(StringView text) throws
           raw.substring_of_length(gap, raw.length - gap).trim_blanks();
 
     for (let const &flag : extract_dash_flags(option_part))
-      if (!seen.contains(flag.view())) {
-        seen.add(flag.view());
+      if (seen.add(flag.view())) {
         entries.push(help_entry{String{flag.view()}, String{description}});
       }
   }
@@ -1009,9 +1004,7 @@ static fn parse_help_subcommands(StringView text, StringView command) throws
       alias_start = alias_end + 1;
 
       if (!is_plausible_subcommand_name(alias)) continue;
-      if (seen.contains(alias)) continue;
-
-      seen.add(alias);
+      if (!seen.add(alias)) continue;
       subcommands.push(help_entry{String{alias}, String{description}});
       saw_entry_in_section = true;
     }

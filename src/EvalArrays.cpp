@@ -817,8 +817,7 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
   let names = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
   let const do_consider = [&](StringView candidate) throws {
-    if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
-      seen.add(candidate);
+    if (candidate.starts_with(prefix) && seen.add(candidate)) {
       names.push_managed(candidate);
     }
   };

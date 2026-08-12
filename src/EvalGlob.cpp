@@ -65,7 +65,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
   /* A missing or unreadable parent directory yields no match, so the caller
      applies the failglob policy. */
-  let entries = Path::read_directory(parent_dir);
+  let entries = Path::read_directory_typed(parent_dir);
   if (!entries.has_value()) {
     LOG(Debug,
         "the parent directory is unreadable, the glob '%.*s' yields no match",
@@ -93,12 +93,15 @@ fn EvalContext::expand_path_once(const glob_field &field,
      them has them fed back in unless globskipdots keeps them out. */
   let const pattern_leads_with_dot = glob[0] == '.';
   if (pattern_leads_with_dot && !is_shopt_enabled("globskipdots")) {
-    entries->push(String{"."});
-    entries->push(String{".."});
+    entries->push(
+        Path::directory_child{String{"."}, Path::entry_kind::Directory});
+    entries->push(
+        Path::directory_child{String{".."}, Path::entry_kind::Directory});
   }
 
   let const dotglob_is_on = is_shopt_enabled("dotglob");
   let const nocaseglob_is_on = is_shopt_enabled("nocaseglob");
+  let const is_extglob_enabled = extglob_enabled();
 
   let lowered_glob = String{scratch};
   if (nocaseglob_is_on) {
@@ -108,14 +111,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
   }
   let const match_glob = nocaseglob_is_on ? lowered_glob.view() : glob;
 
-  for (let const &entry_name : *entries) {
-    let const filename = entry_name.view();
-
-    if (!should_expand_files) {
-      let full_path = parent_dir;
-      full_path.push_component(filename);
-      if (!full_path.is_directory()) continue;
-    }
+  for (let const &entry : *entries) {
+    let const filename = entry.name.view();
 
     /* A leading-dot-less pattern skips a dotfile unless dotglob is on. */
     if (filename == "." || filename == "..") {
@@ -126,17 +123,27 @@ fn EvalContext::expand_path_once(const glob_field &field,
       continue;
     }
 
-    if (name_matches_glob(match_glob, filename, field.glob_active, stem_start,
-                          extglob_enabled(), nocaseglob_is_on, scratch))
-    {
-      add_expansion();
+    if (!should_expand_files && (entry.kind == Path::entry_kind::Regular ||
+                                 entry.kind == Path::entry_kind::Other))
+      continue;
 
-      /* A real filename is literal, so the result field never globs again. */
-      let result_field = glob_field{scratch};
-      result_field.text.append(typed_prefix);
-      result_field.text.append(filename);
-      expanded.push(steal(result_field));
+    if (!name_matches_glob(match_glob, filename, field.glob_active, stem_start,
+                           is_extglob_enabled, nocaseglob_is_on, scratch))
+      continue;
+
+    if (!should_expand_files && entry.kind != Path::entry_kind::Directory) {
+      let full_path = parent_dir;
+      full_path.push_component(filename);
+      if (!full_path.is_directory()) continue;
     }
+
+    add_expansion();
+
+    /* A real filename is literal, so the result field never globs again. */
+    let result_field = glob_field{scratch};
+    result_field.text.append(typed_prefix);
+    result_field.text.append(filename);
+    expanded.push(steal(result_field));
   }
 
   return expanded;
