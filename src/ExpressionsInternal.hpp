@@ -141,6 +141,7 @@ struct assignment_lint_input
   StringView raw_assignment;
   SourceLocation location;
   bool is_append;
+  bool is_command_prefix;
   assignment_value_shape shape;
 };
 

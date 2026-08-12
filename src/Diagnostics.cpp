@@ -5072,8 +5072,13 @@ fn check_assignment_value_shape(AnalysisContext &actx,
     actx.report_diagnostic(id, input.location, {input.name});
   }
 
-  if (!input.is_append && assignment_value_is_own_name(input.name, value))
+  /* A prefix repeating the value the name already holds exports it into the
+     environment of the command, which an ordinary assignment does not do. */
+  if (!input.is_append && !input.is_command_prefix &&
+      assignment_value_is_own_name(input.name, value))
+  {
     actx.report_diagnostic(diagnostic_id::sc2269, input.location, {input.name});
+  }
 
   /* A separator written as two text bytes never becomes the control byte,
      shellcheck SC2141. */
@@ -5083,7 +5088,13 @@ fn check_assignment_value_shape(AnalysisContext &actx,
     actx.report_diagnostic(diagnostic_id::sc2141, input.location, {input.name});
   }
 
-  if (!input.is_append && input.shape.has_bare_literal_value &&
+  /* A prefix naming the program another tool is meant to start, such as
+     `PAGER=cat cmd`, hands the name to that tool and is deliberate. */
+  let const is_deliberate_command_prefix =
+      input.is_command_prefix && COMMAND_VALUED_VARIABLES.contains(input.name);
+
+  if (!input.is_append && !is_deliberate_command_prefix &&
+      input.shape.has_bare_literal_value &&
       COMMAND_NAME_VALUES.contains(value) &&
       actx.should_report(diagnostic_id::sc2209))
   {

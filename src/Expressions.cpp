@@ -1131,17 +1131,26 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   optimizer::optimize_node(this, actx);
 
-  /* A PATH=... prefix leaves the runtime search path unknown to the prepass, so
-     the not-found check for the prefixed command and everything after it stays
-     quiet. */
+  let const is_command_prefix = !m_args.is_empty();
+  let const leading_command_word =
+      is_command_prefix ? m_args[0]->raw_view() : Maybe<StringView>{};
+
+  /* A prefix reaches only the environment of the command it leads, and a prefix
+     on a POSIX special builtin persists after the command in the default
+     mood. */
+  let const prefix_outlives_command =
+      !is_command_prefix || !leading_command_word.has_value() ||
+      is_special_builtin_name(*leading_command_word);
+
   for (let const &var : m_local_vars) {
+    /* A PATH=... prefix leaves the runtime search path unknown to the prepass,
+       so the not-found check for the prefixed command and everything after it
+       stays quiet. */
     if (var.name.view() == "PATH")
       actx.should_silence_unresolved_commands = true;
 
-    /* A prefix on an ordinary command does not outlive it, and a prefix with no
-       command word does. Both are recorded, because the dataflow sweep reports
-       a name that no assignment ever claims. */
-    actx.note_variable_assignment(var.name.view(), var.location);
+    if (prefix_outlives_command)
+      actx.note_variable_assignment(var.name.view(), var.location);
 
     if (actx.shebang_is_posix_sh && var.is_append) {
       actx.report_diagnostic(diagnostic_id::sc3024, var.location,
@@ -1150,9 +1159,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
     let const shape = scan_assignment_value(actx, var.value, var.location);
     check_assignment_value_shape(
-        actx, assignment_lint_input{var.name.view(),
-                                    analysis_source_text(actx, var.location),
-                                    var.location, var.is_append, shape});
+        actx, assignment_lint_input{
+                  var.name.view(), analysis_source_text(actx, var.location),
+                  var.location, var.is_append, is_command_prefix, shape});
   }
 
   for (let const &assignment : m_array_args) {
@@ -1871,6 +1880,18 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
             static_cast<const tokens::WordToken *>(m_args[i])->word();
         for (let const &segment : word.segments) {
           if (segment.kind != WordSegment::Kind::VariableReference) continue;
+
+          /* A read of a name this command also assigns as a prefix is reported
+             by the prefix check, which names that shape exactly. */
+          let is_read_of_own_prefix = false;
+          for (let const &var : m_local_vars) {
+            if (var.name.view() != segment.text.view()) continue;
+
+            is_read_of_own_prefix = true;
+            break;
+          }
+
+          if (is_read_of_own_prefix) continue;
 
           actx.note_variable_read(segment.text.view(),
                                   m_args[i]->source_location(),

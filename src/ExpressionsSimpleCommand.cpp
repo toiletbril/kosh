@@ -106,7 +106,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   check_assignment_value_shape(
       actx, assignment_lint_input{m_assignment->key().view(),
                                   raw_assignment.view(), source_location(),
-                                  m_assignment->is_append(), shape});
+                                  m_assignment->is_append(), false, shape});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
