@@ -249,6 +249,11 @@ header, or platform macro.
 `get_processor_counts` wrapper supplies the affinity-limited and configured
 logical processor counts used by koshkit nproc.
 
+Every wrapper that rebinds a standard descriptor bumps the counter reported by
+`get_descriptor_epoch`. The terminal answers behind `stdout_wants_color` and
+`stderr_wants_color` are cached against that counter, and a rebinding refreshes
+them. Diagnostic rendering asks once per message and pays no isatty call.
+
 Fork-backed evaluator launches pass through os wrappers. POSIX evaluates the
 inherited syntax tree in the child. Windows selects an in-process fallback or
 starts a fresh shell from recorded source. When Windows cannot fork a piped

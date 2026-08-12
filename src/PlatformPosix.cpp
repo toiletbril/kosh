@@ -144,6 +144,7 @@ fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
   const os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
   dup2(target, STDOUT_FILENO);
+  note_descriptor_rebound();
 
   if (const int flags = fcntl(target, F_GETFD); flags != -1)
     fcntl(target, F_SETFD, flags | FD_CLOEXEC);
@@ -154,6 +155,7 @@ fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 fn restore_stdout(os::descriptor saved) wontthrow -> void
 {
   dup2(saved, STDOUT_FILENO);
+  note_descriptor_rebound();
   close(saved);
 }
 
@@ -172,6 +174,8 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   result.saved = backup;
 
   result.is_dup2_ok = dup2(target, shell_fd) != -1;
+  note_descriptor_rebound();
+
   return result;
 }
 
@@ -183,6 +187,8 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
   } else {
     close(saved.shell_fd);
   }
+
+  note_descriptor_rebound();
 }
 
 fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
@@ -203,7 +209,9 @@ fn reopen_terminal_as_stdin() wontthrow -> bool
   if (tty_fd == -1) return false;
   LOG(Info, "reopening the controlling terminal onto fd 0");
   const bool was_replaced = dup2(tty_fd, STDIN_FILENO) != -1;
+  note_descriptor_rebound();
   close(tty_fd);
+
   return was_replaced && isatty(STDIN_FILENO) == 1;
 }
 
@@ -220,12 +228,19 @@ fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 {
   if (target == shell_fd) return true;
-  return dup2(target, shell_fd) != -1;
+
+  let const was_replaced = dup2(target, shell_fd) != -1;
+  note_descriptor_rebound();
+
+  return was_replaced;
 }
 
 fn close_shell_fd(i32 shell_fd) wontthrow -> bool
 {
-  return close(shell_fd) != -1;
+  let const was_closed = close(shell_fd) != -1;
+  note_descriptor_rebound();
+
+  return was_closed;
 }
 
 fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32

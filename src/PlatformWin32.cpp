@@ -213,12 +213,15 @@ fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
   os::descriptor saved = GetStdHandle(STD_OUTPUT_HANDLE);
   SetStdHandle(STD_OUTPUT_HANDLE, target);
+  note_descriptor_rebound();
+
   return saved;
 }
 
 fn restore_stdout(os::descriptor saved) wontthrow -> void
 {
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
+  note_descriptor_rebound();
 }
 
 /* Windows addresses only the three standard streams. */
@@ -269,6 +272,8 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   }
   result.replacement = duplicate;
   result.is_dup2_ok = true;
+  note_descriptor_rebound();
+
   return result;
 }
 
@@ -279,6 +284,9 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
   if (SetStdHandle(*slot, saved.was_open ? saved.saved
                                          : INVALID_HANDLE_VALUE) == FALSE)
     return;
+
+  note_descriptor_rebound();
+
   if (saved.is_dup2_ok && saved.replacement != nullptr &&
       saved.replacement != INVALID_HANDLE_VALUE)
   {
@@ -610,7 +618,11 @@ fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return false;
   if (target == nullptr || target == INVALID_HANDLE_VALUE) return false;
-  return SetStdHandle(*slot, target) != FALSE;
+
+  let const was_replaced = SetStdHandle(*slot, target) != FALSE;
+  note_descriptor_rebound();
+
+  return was_replaced;
 }
 
 fn close_shell_fd(i32 shell_fd) wontthrow -> bool
@@ -620,6 +632,9 @@ fn close_shell_fd(i32 shell_fd) wontthrow -> bool
   const os::descriptor handle = GetStdHandle(*slot);
   if (handle == nullptr || handle == INVALID_HANDLE_VALUE) return false;
   if (SetStdHandle(*slot, INVALID_HANDLE_VALUE) == FALSE) return false;
+
+  note_descriptor_rebound();
+
   return CloseHandle(handle) != FALSE;
 }
 

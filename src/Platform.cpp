@@ -23,6 +23,12 @@
 namespace koshka {
 namespace os {
 
+static u64 DESCRIPTOR_EPOCH = 0;
+
+pure fn get_descriptor_epoch() wontthrow -> u64 { return DESCRIPTOR_EPOCH; }
+
+fn note_descriptor_rebound() wontthrow -> void { DESCRIPTOR_EPOCH++; }
+
 fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
     -> Maybe<String>
 {

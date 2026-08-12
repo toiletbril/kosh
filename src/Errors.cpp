@@ -183,7 +183,7 @@ cold static fn get_context_pointing_to(
 
   u32 terminal_columns = 0;
   u32 terminal_rows = 0;
-  if (display_cells > 24 && os::is_fd_a_tty(KOSH_STDERR) &&
+  if (display_cells > 24 && colors::stderr_is_a_terminal() &&
       os::terminal_size(terminal_columns, terminal_rows, KOSH_STDERR) &&
       terminal_columns > gutter_width + 24 &&
       display_cells > terminal_columns - gutter_width)

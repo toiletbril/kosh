@@ -539,6 +539,11 @@ private:
   descriptor m_descriptor{KOSH_INVALID_FD};
 };
 
+/* Every rebinding of a standard descriptor bumps this counter. A cached answer
+   about a standard stream is refreshed when the value changes. */
+pure fn get_descriptor_epoch() wontthrow -> u64;
+fn note_descriptor_rebound() wontthrow -> void;
+
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor;
 fn restore_stdout(os::descriptor saved) wontthrow -> void;
 

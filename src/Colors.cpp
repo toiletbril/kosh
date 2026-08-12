@@ -93,14 +93,42 @@ static fn color_is_suppressed_by_environment() throws -> bool
   return false;
 }
 
+/* isatty is a syscall and diagnostic rendering asks once per message. The
+   answer is kept until a redirection rebinds a standard descriptor. */
+struct cached_terminal_answer
+{
+  u64 epoch{static_cast<u64>(-1)};
+  bool is_a_terminal{false};
+
+  template <typename Probe>
+  fn get(Probe probe) wontthrow -> bool
+  {
+    let const current_epoch = os::get_descriptor_epoch();
+    if (epoch != current_epoch) {
+      epoch = current_epoch;
+      is_a_terminal = probe();
+    }
+
+    return is_a_terminal;
+  }
+};
+
+static cached_terminal_answer STDOUT_TERMINAL_ANSWER{};
+static cached_terminal_answer STDERR_TERMINAL_ANSWER{};
+
 fn stdout_wants_color() throws -> bool
 {
-  return terminal_wants_color(os::is_stdout_a_tty());
+  return terminal_wants_color(STDOUT_TERMINAL_ANSWER.get(os::is_stdout_a_tty));
 }
 
 fn stderr_wants_color() throws -> bool
 {
-  return terminal_wants_color(os::is_stderr_a_tty());
+  return terminal_wants_color(stderr_is_a_terminal());
+}
+
+fn stderr_is_a_terminal() wontthrow -> bool
+{
+  return STDERR_TERMINAL_ANSWER.get(os::is_stderr_a_tty);
 }
 
 fn terminal_wants_color(bool output_is_terminal) throws -> bool

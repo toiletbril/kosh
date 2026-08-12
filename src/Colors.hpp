@@ -37,11 +37,13 @@ inline const StringView BOLD_RED_CURLY_YELLOW_UNDERLINE =
     "\x1b[1;91;4:3;58:5:3m";
 } /* namespace ansi */
 
-/* Whether color may be written to a stream, decided fresh so a redirected
-   stream never gains escapes. Color is on only when the stream is a terminal,
-   NO_COLOR is unset or empty, and TERM is not dumb. */
+/* Whether color may be written to a stream. Color is on only when the stream is
+   a terminal, NO_COLOR is unset or empty, and TERM is not dumb. The terminal
+   answer is cached until a redirection rebinds the descriptor. A redirected
+   stream never gains escapes. */
 fn stdout_wants_color() throws -> bool;
 fn stderr_wants_color() throws -> bool;
+fn stderr_is_a_terminal() wontthrow -> bool;
 fn terminal_wants_color(bool output_is_terminal) throws -> bool;
 fn terminal_supports_styled_underlines() throws -> bool;
 
