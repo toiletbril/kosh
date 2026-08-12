@@ -99,15 +99,13 @@ fn Parser::close_analysis_scope(usize scope_mark) throws
   return harvested;
 }
 
-hot pure static fn kind_in(Token::Kind kind,
-                           std::initializer_list<Token::Kind> set) wontthrow
-    -> bool
+template <typename... Kinds>
+consteval fn token_kind_mask(Kinds... kinds) -> u64
 {
-  for (let k : set) {
-    if (k == kind) return true;
-  }
-  return false;
+  return ((u64{1} << static_cast<u8>(kinds)) | ... | u64{0});
 }
+
+static_assert(static_cast<u8>(Token::Kind::Function) < 64);
 
 /* A brace is a reserved word only when a token is exactly '{' or '}' as a
    single unquoted segment, so a quoted or escaped brace is rejected. */
@@ -129,14 +127,13 @@ hot pure static fn is_unquoted_word(const Token *token,
 
 /* RightBracket in the terminator set stands for a standalone '}' word, the
    close of a brace group. */
-hot pure static fn
-is_list_terminator(const Token *token,
-                   std::initializer_list<Token::Kind> terminators) wontthrow
-    -> bool
+hot pure static fn is_list_terminator(const Token *token,
+                                      u64 terminator_mask) wontthrow -> bool
 {
   ASSERT(token != nullptr);
-  return kind_in(token->kind(), terminators) ||
-         (kind_in(Token::Kind::RightBracket, terminators) &&
+  return (terminator_mask & (u64{1} << static_cast<u8>(token->kind()))) != 0 ||
+         ((terminator_mask &
+           (u64{1} << static_cast<u8>(Token::Kind::RightBracket))) != 0 &&
           is_unquoted_word(token, "}"));
 }
 
@@ -237,7 +234,7 @@ hot pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
 
 flatten fn Parser::construct_ast() throws -> Expression *
 {
-  return parse_command_list({});
+  return parse_command_list(0);
 }
 
 fn Parser::construct_next_top_level_ast() throws -> Expression *
@@ -250,7 +247,7 @@ fn Parser::construct_next_top_level_ast() throws -> Expression *
   m_should_stop_after_top_level_unit = true;
   defer { m_should_stop_after_top_level_unit = false; };
 
-  return parse_command_list({});
+  return parse_command_list(0);
 }
 
 pure fn Parser::is_at_end() const wontthrow -> bool
@@ -322,7 +319,7 @@ cold fn Parser::construct_ast(ArrayList<String> &errors,
     if (token->kind() == Token::Kind::EndOfFile) break;
 
     try {
-      Expression *piece = parse_command_list({});
+      Expression *piece = parse_command_list(0);
       ASSERT(piece != nullptr);
       if (first_piece == nullptr) first_piece = piece;
     } catch (const ErrorWithLocationAndDetails &e) {
@@ -357,8 +354,7 @@ fn Parser::reject_empty_loop_body(const Expression *body) throws -> void
       "The body between 'do' and 'done' is empty, a command is required"};
 }
 
-hot fn Parser::parse_command_list(
-    std::initializer_list<Token::Kind> terminators) throws -> Expression *
+hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
 {
   /* Every nested compound command recurses through this list. A source nested
      past the limit throws here instead of overflowing the native stack. */
@@ -477,7 +473,7 @@ hot fn Parser::parse_command_list(
     ASSERT(token != nullptr);
 
     /* A terminator keyword is left for the caller to consume. */
-    if (is_list_terminator(token, terminators)) {
+    if (is_list_terminator(token, terminator_mask)) {
       do_finish_shellcheck_suppression(token->source_location().position);
       if (lhs != nullptr) {
         do_finish_pending(lhs, token);
@@ -1280,7 +1276,8 @@ hot fn Parser::parse_if() throws -> Command *
 
   loop
   {
-    Expression *condition = parse_command_list({Token::Kind::Then});
+    Expression *condition =
+        parse_command_list(token_kind_mask(Token::Kind::Then));
     Token *then_token = m_lexer.next_shell_token();
     ASSERT(then_token != nullptr);
     if (then_token->kind() != Token::Kind::Then) {
@@ -1292,7 +1289,7 @@ hot fn Parser::parse_if() throws -> Command *
     }
 
     Expression *body = parse_command_list(
-        {Token::Kind::Elif, Token::Kind::Else, Token::Kind::Fi});
+        token_kind_mask(Token::Kind::Elif, Token::Kind::Else, Token::Kind::Fi));
     branches.push(if_branch{condition, body});
 
     Token *after = m_lexer.next_shell_token();
@@ -1300,7 +1297,7 @@ hot fn Parser::parse_if() throws -> Command *
     if (after->kind() == Token::Kind::Elif) {
       continue;
     } else if (after->kind() == Token::Kind::Else) {
-      otherwise = parse_command_list({Token::Kind::Fi});
+      otherwise = parse_command_list(token_kind_mask(Token::Kind::Fi));
       Token *fi_token = m_lexer.next_shell_token();
       ASSERT(fi_token != nullptr);
       if (fi_token->kind() != Token::Kind::Fi) {
@@ -1328,7 +1325,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   LOG(Debug, "parsing a %s loop at byte %zu", is_until ? "until" : "while",
       location.position);
 
-  Expression *condition = parse_command_list({Token::Kind::Do});
+  Expression *condition = parse_command_list(token_kind_mask(Token::Kind::Do));
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
@@ -1339,7 +1336,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
                                       do_token->source_location(), detail};
   }
 
-  Expression *body = parse_command_list({Token::Kind::Done});
+  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
   reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
@@ -1537,7 +1534,7 @@ hot fn Parser::parse_for() throws -> Command *
                                       do_token->source_location(), detail};
   }
 
-  Expression *body = parse_command_list({Token::Kind::Done});
+  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
   reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
@@ -1593,7 +1590,7 @@ hot fn Parser::parse_select() throws -> Command *
                                       "expected 'do'"};
   }
 
-  Expression *body = parse_command_list({Token::Kind::Done});
+  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
   reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
@@ -1722,9 +1719,9 @@ hot fn Parser::parse_case() throws -> Command *
                               "Expected '|' or ')' in a case pattern"};
     }
 
-    Expression *body = parse_command_list(
-        {Token::Kind::DoubleSemicolon, Token::Kind::SemicolonAmpersand,
-         Token::Kind::DoubleSemicolonAmpersand, Token::Kind::Esac});
+    Expression *body = parse_command_list(token_kind_mask(
+        Token::Kind::DoubleSemicolon, Token::Kind::SemicolonAmpersand,
+        Token::Kind::DoubleSemicolonAmpersand, Token::Kind::Esac));
 
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != nullptr);
@@ -1763,7 +1760,8 @@ hot fn Parser::parse_brace_group() throws -> Command *
   LOG(Debug, "parsing a brace group at byte %zu",
       open->source_location().position);
 
-  Expression *body = parse_command_list({Token::Kind::RightBracket});
+  Expression *body =
+      parse_command_list(token_kind_mask(Token::Kind::RightBracket));
 
   Token *close = m_lexer.next_shell_token();
   ASSERT(close != nullptr);
@@ -1814,7 +1812,8 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
       open->source_location().position);
 
   let const scope_mark = open_analysis_scope();
-  Expression *body = parse_command_list({Token::Kind::RightParen});
+  Expression *body =
+      parse_command_list(token_kind_mask(Token::Kind::RightParen));
 
   Token *close = m_lexer.next_shell_token();
   ASSERT(close != nullptr);
@@ -1947,7 +1946,7 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
                                       "expected 'do'"};
   }
 
-  Expression *body = parse_command_list({Token::Kind::Done});
+  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
   reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);

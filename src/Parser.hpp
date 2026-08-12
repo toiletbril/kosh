@@ -131,8 +131,7 @@ private:
   mustuse fn attach_trailing_redirections(Command *compound) throws
       -> Command *;
 
-  mustuse fn parse_command_list(
-      std::initializer_list<Token::Kind> terminators) throws -> Expression *;
+  mustuse fn parse_command_list(u64 terminator_mask) throws -> Expression *;
 
   /* A do-group body cannot be empty, the way dash and bash both reject a loop
      with nothing between 'do' and 'done'. The caret points at the terminator
