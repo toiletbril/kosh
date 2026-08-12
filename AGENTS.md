@@ -334,15 +334,17 @@ location when the mapping exists. An analysis message that carries a ShellCheck
 code closes with that code in parentheses after the sentence period. A closing
 parenthesis ends a sentence, so no second period is appended.
 
-Diagnostics.cpp owns each analysis diagnostic's code, slug, summary, message,
-suggestion, related detail, tier, and delivery. It also owns the command name
-dispatch table and the command-keyed check bodies. SimpleCommand::analyze
-gathers the borrowed arguments, redirections, prefix assignments, command
-literal, and dispatch record into one command_lint_input and hands that bundle
-to the check entry points, so a new check adds no traversal. Expressions.cpp
-keeps the walk and the reporting funnel. Expression analysis reports a
-diagnostic ID with source locations and dynamic values. The default mood rejects
-strict and lenient findings and reports annoying findings as warnings.
+DiagnosticsCatalog.cpp owns each analysis diagnostic's code, slug, summary,
+message, suggestion, related detail, tier, and delivery.
+DiagnosticsDispatch.cpp owns the command name dispatch table. The remaining
+Diagnostics-prefixed sources own the grouped check bodies and their shared
+internal helpers. SimpleCommand::analyze gathers the borrowed arguments,
+redirections, prefix assignments, command literal, and dispatch record into one
+command_lint_input and hands that bundle to the check entry points, so a new
+check adds no traversal. Expressions.cpp keeps the walk and the reporting
+funnel. Expression analysis reports a diagnostic ID with source locations and
+dynamic values. The default mood rejects strict and lenient findings and
+reports annoying findings as warnings.
 Compatibility moods expose the tiers as warnings through `-W`, `-WW`, and
 `-WWW`. Related-location notes use cyan carets, and every secondary detail
 begins with a lowercase byte.
