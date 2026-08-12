@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 unset KOSH_FLAGS
 export KOSH_FLAGS=--no-diagnostics
 d=$(mktemp -d)

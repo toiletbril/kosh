@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 unset KOSH_FLAGS
 # A warning from a sourced file prints the chain that reached it, the same
 # trace frames an error shows, while a warning in the typed line stays a

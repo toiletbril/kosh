@@ -205,6 +205,7 @@ PATH="$dir/query-directory${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" -c '
 '
 
 analysis_log="$dir/analysis.log"
+# shellcheck disable=SC2209
 analysis_command=uname
 analysis_path="$TEST_SYSTEM_PATH${TEST_PATH_SEPARATOR}$TEST_UNAME_DIRECTORY"
 if [ "${OS-}" = Windows_NT ]; then

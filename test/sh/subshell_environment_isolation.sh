@@ -30,6 +30,7 @@ ls /dev/null >/dev/null 2>&1 && echo "external_still_resolves"
 
 # A set -u read of an unset name aborts the subshell with status 2 the way
 # dash reports it, and the parent goes on.
+# shellcheck disable=SC2154
 (set -u; echo "$not_set_here"; echo not_reached) 2>/dev/null
 echo "status=$?"
 echo survived

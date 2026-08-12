@@ -75,3 +75,30 @@ echo '== a disable directive silences the sweep:'
 "$BIN" -n -WWW -c '# shellcheck disable=SC2154
 echo "$suppressed_name"' 2>&1
 echo "rc=$?"
+
+echo '== an assign form parameter expansion assigns its target:'
+"$BIN" -n -WWW -c 'echo "${assigned_target:=written}"
+echo "$assigned_target"' 2>&1
+echo "rc=$?"
+
+echo '== a default form parameter expansion assigns nothing:'
+"$BIN" -n -WWW -c 'echo "${default_target:-written}"
+echo "$default_target"' 2>&1
+
+echo '== a prefix on an ordinary command does not outlive it:'
+"$BIN" -n -WWW -c 'temporary_name=1 true
+echo "$temporary_name"' 2>&1
+
+echo '== a prefix on a special builtin outlives it:'
+"$BIN" -n -WWW -c 'persistent_name=1 export other_name=2
+echo "$persistent_name"' 2>&1
+echo "rc=$?"
+
+echo '== a prefix repeating its own value is not a self assignment:'
+"$BIN" -n -WWW -c 'kept_name=1
+kept_name="$kept_name" env true' 2>&1
+echo "rc=$?"
+
+echo '== a command valued prefix keeps its command name:'
+"$BIN" -n -WWW -c 'PAGER=cat true' 2>&1
+echo "rc=$?"

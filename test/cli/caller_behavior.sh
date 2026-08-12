@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 unset KOSH_FLAGS
 # caller returns 1 at the top level and prints the frame line and source inside
 # a function. A non-numeric operand is a located error pointing at the operand.

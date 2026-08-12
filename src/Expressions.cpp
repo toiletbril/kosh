@@ -383,13 +383,36 @@ fn AnalysisContext::note_variable_assignment(StringView name,
   }
 }
 
+/* The name an assign form ${name=value} or ${name:=value} writes back, or an
+   empty view for every other expansion. */
+pure fn assign_form_target_name(StringView expansion_text) wontthrow
+    -> StringView
+{
+  let const name = expressions::operand_target_name(expansion_text);
+  if (!optimizer::is_plain_variable_name(name)) return StringView{};
+
+  let remainder = expansion_text.substring(name.length);
+  if (!remainder.is_empty() && remainder[0] == ':')
+    remainder = remainder.substring(1);
+
+  if (remainder.is_empty() || remainder[0] != '=') return StringView{};
+
+  return name;
+}
+
 fn AnalysisContext::note_variable_read(StringView name, SourceLocation location,
                                        bool is_top_level_unconditional) throws
     -> void
 {
   if (!is_top_level_unconditional) return;
   if (has_seen_runtime_definer) return;
-  if (!optimizer::is_plain_variable_name(name)) return;
+
+  if (!optimizer::is_plain_variable_name(name)) {
+    let const assigned = assign_form_target_name(name);
+    if (!assigned.is_empty()) note_variable_assignment(assigned, location);
+
+    return;
+  }
 
   if (assigned_names_so_far.find(name) != nullptr) return;
   if (function_local_names.find(name) != nullptr) return;

@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 # export -f serializes a shell function into the environment under the bash
 # BASH_FUNC_name%% convention so a child bash inherits it. kosh does not import
 # BASH_FUNC itself, so an inherited entry stays inert and cannot inject code.

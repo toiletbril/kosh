@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 # The koshkit builtin prefix always works. In the default mood a bare coreutil
 # name falls back to the koshkit utility when PATH has no binary of that name,
 # while the sh mood reports a command not found. The --enable-koshkit flag and

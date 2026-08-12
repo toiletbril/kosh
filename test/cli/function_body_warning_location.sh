@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 unset KOSH_FLAGS
 # A warning from a function body called after its defining source is gone
 # renders against the function's stored definition copy, with the defining

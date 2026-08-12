@@ -82,3 +82,21 @@ rc=1
        |  ^~~~~~~~~~~~~~~~~~~ the assignment that gives 'greeting_text' a value runs here.
 == a disable directive silences the sweep:
 rc=0
+== an assign form parameter expansion assigns its target:
+rc=0
+== a default form parameter expansion assigns nothing:
+2:6: warning: The variable 'default_target' is read before any assignment gives it a value.
+     2 |  echo "$default_target"
+       |       ^~~~~~~~~~~~~~~~~
+note: Assign 'default_target' before it is read, or export it from the environment.
+== a prefix on an ordinary command does not outlive it:
+2:6: warning: The variable 'temporary_name' is read before any assignment gives it a value.
+     2 |  echo "$temporary_name"
+       |       ^~~~~~~~~~~~~~~~~
+note: Assign 'temporary_name' before it is read, or export it from the environment.
+== a prefix on a special builtin outlives it:
+rc=0
+== a prefix repeating its own value is not a self assignment:
+rc=0
+== a command valued prefix keeps its command name:
+rc=0

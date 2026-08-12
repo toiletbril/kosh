@@ -1,3 +1,4 @@
+# shellcheck disable=SC2154
 unset KOSH_FLAGS
 # The analysis prepass cannot know the runtime search path, so a command that
 # only resolves after a PATH assignment earlier in the script must not be

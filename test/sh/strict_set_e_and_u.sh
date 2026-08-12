@@ -29,5 +29,6 @@ set +e
 # nounset prints nothing for the bad reference and the script stops there.
 set -u
 echo before_unset
+# shellcheck disable=SC2154
 echo "$never_assigned_name"
 echo never_reached

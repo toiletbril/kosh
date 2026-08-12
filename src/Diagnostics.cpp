@@ -4854,6 +4854,28 @@ constexpr PackedStringKey COMMAND_VALUED_VARIABLE_KEYS[] = {
 constexpr StaticStringSet COMMAND_VALUED_VARIABLES{
     COMMAND_VALUED_VARIABLE_KEYS};
 
+/* A prefix such as `BIN="$BIN"` hands the outer value to the command, so a
+   reference to the name among the operands reads those same bytes. */
+pure fn prefix_value_is_own_name(const prefix_assignment &var) wontthrow -> bool
+{
+  /* A quoted value carries an empty text segment for the quote itself, which
+     contributes no bytes to the value. */
+  let has_matching_reference = false;
+  for (let const &segment : var.value.segments) {
+    if (segment.kind == WordSegment::Kind::VariableReference) {
+      if (has_matching_reference) return false;
+      if (segment.text.view() != var.name.view()) return false;
+
+      has_matching_reference = true;
+      continue;
+    }
+
+    if (!segment.text.is_empty()) return false;
+  }
+
+  return has_matching_reference;
+}
+
 } /* namespace */
 
 /* A prefix assignment does not affect the expansion on the same command, so a
@@ -4898,10 +4920,10 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
       const StringView referenced{segment.text.data(), segment.text.count()};
       bool does_name_a_prefix = false;
       for (let const &var : input.local_vars) {
-        if (var.name.view() == referenced) {
-          does_name_a_prefix = true;
-          break;
-        }
+        if (var.name.view() != referenced) continue;
+
+        does_name_a_prefix = !prefix_value_is_own_name(var);
+        break;
       }
       if (does_name_a_prefix) {
         actx.report_diagnostic(diagnostic_id::assignment_prefix_read,
