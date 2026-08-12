@@ -759,10 +759,12 @@ cold fn make_synopsis(StringView program_name, const SynopsisList &lines) throws
   return s;
 }
 
-cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
+cold fn wrap_text(StringView text, usize indent, usize width,
+                  Maybe<usize> continuation_indent) throws -> String
 {
   let out = String{heap_allocator()};
-  const usize text_width = width > indent ? width - indent : 1;
+  let line_indent = indent;
+  let text_width = width > line_indent ? width - line_indent : 1;
   usize line_used = 0;
   usize word_start = 0;
   bool is_line_started = false;
@@ -774,10 +776,12 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
       if (is_line_started && line_used + 1 + word_length > text_width) {
         out += '\n';
         is_line_started = false;
+        line_indent = continuation_indent.value_or(indent);
+        text_width = width > line_indent ? width - line_indent : 1;
         line_used = 0;
       }
       if (!is_line_started) {
-        for (usize j = 0; j < indent; j++)
+        for (usize j = 0; j < line_indent; j++)
           out += ' ';
         is_line_started = true;
       } else {

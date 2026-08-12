@@ -259,6 +259,42 @@ pure static fn resolve_session_mood(mimic_mood invocation_mood) wontthrow
   return invocation_mood;
 }
 
+static fn
+append_listed_diagnostic(String &listing,
+                         const diagnostic_definition &definition) throws -> void
+{
+  let row = String{heap_allocator()};
+  if (definition.shellcheck_code.has_value()) {
+    char code_text[32];
+    row += "SC";
+    row += utils::int_to_text_into(*definition.shellcheck_code, code_text,
+                                   sizeof(code_text));
+    row += ": ";
+  }
+  row += definition.slug;
+  row += " (";
+  row += get_diagnostic_tier_name(definition.tier);
+  row += "): ";
+
+  let const summary = StringView{definition.summary};
+  usize capital_position = 0;
+  while (capital_position < summary.length &&
+         (summary[capital_position] < 'a' || summary[capital_position] > 'z'))
+  {
+    capital_position++;
+  }
+  row += summary.substring_of_length(0, capital_position);
+  if (capital_position < summary.length) {
+    row += static_cast<char>(summary[capital_position] - 'a' + 'A');
+    capital_position++;
+  }
+  row += summary.substring_of_length(capital_position,
+                                     summary.length - capital_position);
+  listing +=
+      wrap_text(row.view(), HELP_INDENT, HELP_WRAP_WIDTH, HELP_INDENT + 2);
+  listing += '\n';
+}
+
 static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
@@ -290,19 +326,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
       let const &definition = DIAGNOSTIC_DEFINITIONS[index];
       if (!definition.shellcheck_code.has_value()) continue;
 
-      char code_text[32];
-      l += "  ";
-      l += "SC";
-      l += utils::int_to_text_into(*definition.shellcheck_code, code_text,
-                                   sizeof(code_text));
-      l += "  ";
-      l += get_diagnostic_tier_name(definition.tier);
-      l += "  ";
-      l += definition.slug;
-      l += '\n';
-      l += wrap_text(StringView{definition.summary}, HELP_INDENT + 4,
-                     HELP_WRAP_WIDTH);
-      l += '\n';
+      append_listed_diagnostic(l, definition);
     }
 
     l += "\nNATIVE ANALYSIS DIAGNOSTICS\n";
@@ -310,14 +334,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
       let const &definition = DIAGNOSTIC_DEFINITIONS[index];
       if (definition.shellcheck_code.has_value()) continue;
 
-      l += "  ";
-      l += definition.slug;
-      l += "  ";
-      l += get_diagnostic_tier_name(definition.tier);
-      l += '\n';
-      l += wrap_text(StringView{definition.summary}, HELP_INDENT + 4,
-                     HELP_WRAP_WIDTH);
-      l += '\n';
+      append_listed_diagnostic(l, definition);
     }
     print(l);
     return EXIT_SUCCESS;

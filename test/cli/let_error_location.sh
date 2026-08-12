@@ -17,10 +17,10 @@ fi
 "$BIN" --list-diagnostics | grep -c arith-assign
 catalog=$("$BIN" --list-diagnostics)
 echo "SC2024-variants=$(printf '%s\n' "$catalog" |
-  grep -c '^  SC2024  strict  sudo-')"
+  grep -c '^  SC2024: sudo-.* (strict):')"
 echo "SC2184-variants=$(printf '%s\n' "$catalog" |
-  grep -c '^  SC2184  strict  unquoted-unset-index$')"
+  grep -c '^  SC2184: unquoted-unset-index (strict):')"
 echo "exported-cdpath=$(printf '%s\n' "$catalog" |
-  grep -c '^  exported-cdpath  strict$')"
+  grep -c '^  exported-cdpath (strict):')"
 echo "catalog-nounset=$(printf '%s\n' "$catalog" |
-  grep -c '^  nounset  ')"
+  grep -c '^  nounset (')"
