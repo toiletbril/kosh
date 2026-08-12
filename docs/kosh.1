@@ -310,8 +310,9 @@ The syntax tree is printed before each command runs.
 .B \-\-optimizer\-diagnostics
 The analysis prepass decisions are traced. Every folded and eliminated node is
 reported as an analysis diagnostic, and the closing line is a count of the
-eliminated statements. A compatibility mood reports them only under
-.BR \-W .
+eliminated statements. The rows are lenient, and a compatibility mood reports
+them only under
+.BR \-WW .
 .TP
 .BR \-E ", " \-\-show\-exit\-code
 The exit status is printed after each command.

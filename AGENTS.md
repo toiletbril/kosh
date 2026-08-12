@@ -347,7 +347,8 @@ begins with a lowercase byte.
 
 The catalog holds 310 numbered rows across 306 ShellCheck codes and 18 native
 analysis rows. Seven of the native rows belong to the optimizer and are reported
-only under `--optimizer-diagnostics`. Its closing line is a blue count of the
+only under `--optimizer-diagnostics`. Those seven rows are lenient. Its closing
+line is a blue count of the
 eliminated statements. A `static_assert` couples the row order to the `diagnostic_id`
 enum order, so both stay ascending by code with the native rows last. A message
 authors its own shell syntax in backquotes, and a name, path, value, or number
