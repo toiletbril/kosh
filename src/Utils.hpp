@@ -172,6 +172,87 @@ fn parse_integer_in_base(StringView text, int_base base,
 fn parse_integer_in_base_u64(StringView text, int_base base) throws
     -> ErrorOr<u64>;
 
+/* The optimal-string-alignment distance, the edit distance that also counts an
+   adjacent transposition as one edit. The result saturates at max_distance + 1
+   once the rows can no longer reach the bound. */
+pure fn bounded_osa_distance(StringView a, StringView b,
+                             usize max_distance) wontthrow -> usize;
+
+/* The edit budget a name of this length is allowed, which is one for a name too
+   short to survive two edits. */
+pure fn suggestion_distance_budget(usize name_length) wontthrow -> usize;
+
+/* The closest candidate to a name, kept as candidates are offered one at a
+   time. A candidate that is an anagram of the name wins a tie, since a
+   transposed pair is the likelier typo. */
+class NameSuggestion
+{
+public:
+  explicit NameSuggestion(StringView name)
+      : m_name(name), m_max_distance(suggestion_distance_budget(name.length)),
+        m_best_distance(m_max_distance + 1)
+  {}
+
+  /* Whether an edit distance reads as a correction of a name of this length. A
+     correction keeps at least one byte of the name it corrects, so a distance
+     that covers the whole name names something else. */
+  static pure fn is_correction(usize distance, usize name_length) wontthrow
+      -> bool
+  {
+    return distance <= suggestion_distance_budget(name_length) &&
+           distance < name_length;
+  }
+
+  fn consider(StringView candidate) throws -> void
+  {
+    if (candidate.is_empty() || candidate == m_name) return;
+
+    const usize distance =
+        bounded_osa_distance(m_name, candidate, m_max_distance);
+    if (distance > m_best_distance) return;
+    if (!is_correction(distance, m_name.length)) return;
+
+    const bool is_candidate_anagram = is_anagram(m_name, candidate);
+    if (distance < m_best_distance ||
+        (is_candidate_anagram && !m_best_is_anagram))
+    {
+      m_best_distance = distance;
+      m_best_is_anagram = is_candidate_anagram;
+      m_best = String{candidate};
+    }
+  }
+
+  fn take_suggestion() throws -> Maybe<String>
+  {
+    if (m_best_distance > m_max_distance) return None;
+
+    return steal(m_best);
+  }
+
+private:
+  static fn is_anagram(StringView a, StringView b) wontthrow -> bool
+  {
+    if (a.length != b.length) return false;
+
+    i32 counts[256] = {0};
+    for (usize i = 0; i < a.length; i++) {
+      counts[static_cast<u8>(a[i])]++;
+      counts[static_cast<u8>(b[i])]--;
+    }
+
+    for (let const count : counts)
+      if (count != 0) return false;
+
+    return true;
+  }
+
+  StringView m_name;
+  usize m_max_distance;
+  usize m_best_distance;
+  bool m_best_is_anagram{false};
+  String m_best{heap_allocator()};
+};
+
 fn suggest_command(StringView name, const ArrayList<String> &local_names,
                    const ProgramResolver *resolver = nullptr) throws
     -> Maybe<String>;

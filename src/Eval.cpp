@@ -520,8 +520,17 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   /* bash does not nounset on the operand of [[ -v name ]]. */
   if (is_warning_suppressed(suppressible_warning::UnsetReference)) return;
 
-  let const empty_expansion_note =
+  let empty_expansion_note =
       "Replace it with ${" + String{name} + "-} if empty expansion is desired";
+
+  if (Maybe<String> resembled = suggest_similar_variable_name(name);
+      resembled.has_value())
+  {
+    empty_expansion_note = "The variable '" + *resembled +
+                           "' is set, correct the spelling, or replace this "
+                           "with ${" +
+                           String{name} + "-} if empty expansion is desired";
+  }
 
   let const should_demote = strict_diagnostics_are_warnings();
   if (error_unset() && (m_runtime.error_unset_explicit || !should_demote) &&
@@ -1783,6 +1792,33 @@ pure fn EvalContext::getopts_last_optind() const wontthrow -> i64
 fn EvalContext::set_getopts_last_optind(i64 optind) wontthrow -> void
 {
   m_getopts_last_optind = optind;
+}
+
+fn EvalContext::suggest_similar_variable_name(StringView name) const throws
+    -> Maybe<String>
+{
+  if (name.is_empty()) return None;
+
+  let suggestion = utils::NameSuggestion{name};
+  m_shell_variables.for_each(
+      [&suggestion](StringView candidate, const String &)
+          throws -> void { suggestion.consider(candidate); });
+  m_indexed_arrays.for_each(
+      [&suggestion](StringView candidate, const ArrayList<String> &)
+          throws -> void { suggestion.consider(candidate); });
+  m_associative_names.for_each(
+      [&suggestion](StringView candidate)
+          throws -> void { suggestion.consider(candidate); });
+  m_exported_names.for_each([&suggestion](StringView candidate) throws -> void {
+    suggestion.consider(candidate);
+  });
+
+  let dynamic_names = ArrayList<StringView>{heap_allocator()};
+  append_dynamic_variable_names(dynamic_names);
+  for (let const dynamic_name : dynamic_names)
+    suggestion.consider(dynamic_name);
+
+  return suggestion.take_suggestion();
 }
 
 fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>

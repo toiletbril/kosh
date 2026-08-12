@@ -681,6 +681,12 @@ public:
   fn append_dynamic_variable_names(ArrayList<StringView> &out) const throws
       -> void;
 
+  /* The closest name the shell currently holds, or None when nothing is close
+     enough. The walk covers every name the shell knows and runs only on the
+     unset diagnostic path. */
+  fn suggest_similar_variable_name(StringView name) const throws
+      -> Maybe<String>;
+
   hot fn lookup_shell_variable(StringView name) const wontthrow
       -> const String *
   {

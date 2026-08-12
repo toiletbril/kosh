@@ -40,6 +40,50 @@ struct active_getopts_call
   SourceLocation location;
 };
 
+/* One function this script defines. The name points into the syntax tree, which
+   outlives the analysis. */
+struct function_definition_record
+{
+  StringView name;
+  SourceLocation location;
+  bool does_read_positionals{false};
+};
+
+/* One call of a name this script defines as a function. */
+struct function_call_record
+{
+  StringView name;
+  SourceLocation location;
+  bool has_arguments{false};
+  bool is_inside_function_body{false};
+};
+
+/* Whether the name reads a positional parameter, so $1 through $9, $@, $*, or
+   $#. A name carrying a modifier such as ${1:-default} supplies its own value
+   and is left out. */
+inline pure fn reference_names_positional(StringView name) wontthrow -> bool
+{
+  if (name.is_empty()) return false;
+
+  switch (name[0]) {
+  case '@':
+  case '*':
+  case '#': return name.length == 1;
+
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9': return name.is_all_decimal_digits();
+
+  default: return false;
+  }
+}
+
 class AnalysisContext
 {
 public:
@@ -67,16 +111,26 @@ public:
      cannot leave a loop that only surrounds the call. */
   usize loop_body_depth{0};
 
-  /* Saved and cleared on entry to a function body and restored on exit. */
-  HashSet function_local_names{heap_allocator()};
+  /* Saved and cleared on entry to a function body and restored on exit. Each
+     name carries the assignment that recorded it, read by the diagnostic that
+     names a near miss. */
+  StringMap<SourceLocation> function_local_names{heap_allocator()};
 
   /* An assignment inside a function to one of these updates an existing global
      rather than leaking a new binding, so the no-local warning stays quiet. */
-  HashSet global_assigned_names{heap_allocator()};
+  StringMap<SourceLocation> global_assigned_names{heap_allocator()};
 
-  HashSet assigned_names_so_far{heap_allocator()};
+  StringMap<SourceLocation> assigned_names_so_far{heap_allocator()};
 
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
+
+  /* Every function the script defines and every call of one, gathered during
+     the walk and swept once it ends. */
+  ArrayList<function_definition_record> function_definitions{heap_allocator()};
+  ArrayList<function_call_record> function_calls{heap_allocator()};
+
+  static constexpr usize NO_ACTIVE_FUNCTION_DEFINITION = ~usize{0};
+  usize active_function_definition{NO_ACTIVE_FUNCTION_DEFINITION};
 
   bool is_direct_pipeline_stage{false};
   bool is_inside_loop_condition{false};
@@ -185,7 +239,29 @@ public:
      check that costs more than a comparison asks first, and the reporting
      funnel asks before it formats anything. */
   pure fn should_report(diagnostic_id id) const wontthrow -> bool;
-  fn note_variable_assignment(StringView name) throws -> void;
+  fn note_variable_assignment(StringView name, SourceLocation location) throws
+      -> void;
+
+  /* A positional read inside a function body means the body uses the arguments
+     its caller passes. */
+  fn mark_positional_reference() wontthrow -> void
+  {
+    if (active_function_definition == NO_ACTIVE_FUNCTION_DEFINITION) return;
+
+    function_definitions[active_function_definition].does_read_positionals =
+        true;
+  }
+
+  /* The sentinel check comes first, since the walk spends most of its time
+     outside every function body. */
+  fn note_positional_reference(StringView name) wontthrow -> void
+  {
+    if (active_function_definition == NO_ACTIVE_FUNCTION_DEFINITION) return;
+    if (!reference_names_positional(name)) return;
+
+    mark_positional_reference();
+  }
+
   fn note_variable_read(StringView name, SourceLocation location,
                         bool is_top_level_unconditional) throws -> void;
   fn trace_optimizer_line(StringView message) const throws -> void;

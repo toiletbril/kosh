@@ -7,12 +7,47 @@ note: Assign 'undefined_name' before it is read, or export it from the environme
 2:6: warning: The variable 'myvalue' is never assigned, and 'my_value' is.
      2 |  echo "$myvalue"
        |       ^~~~~~~~~~
+1:1: details:
+     1 |  my_value=1
+       |  ^~~~~~~~~~ the assignment that gives 'my_value' a value runs here.
 note: Correct the spelling or assign 'myvalue'.
 == case and underscore folding both count as a resemblance:
 2:6: warning: The variable 'OUTPUTFILE' is never assigned, and 'output_file' is.
      2 |  echo "$OUTPUTFILE"
        |       ^~~~~~~~~~~~~
+1:1: details:
+     1 |  output_file=out
+       |  ^~~~~~~~~~~~~~~ the assignment that gives 'output_file' a value runs here.
 note: Correct the spelling or assign 'OUTPUTFILE'.
+== a transposed pair still names the assigned variable:
+2:6: warning: The variable 'outupt_length' is never assigned, and 'output_length' is.
+     2 |  echo "$outupt_length"
+       |       ^~~~~~~~~~~~~~~~
+1:1: details:
+     1 |  output_length=1
+       |  ^~~~~~~~~~~~~~~ the assignment that gives 'output_length' a value runs here.
+note: Correct the spelling or assign 'outupt_length'.
+== a dropped byte still names the assigned variable:
+2:6: warning: The variable 'destinaton_path' is never assigned, and 'destination_path' is.
+     2 |  echo "$destinaton_path"
+       |       ^~~~~~~~~~~~~~~~~~
+1:1: details:
+     1 |  destination_path=1
+       |  ^~~~~~~~~~~~~~~~~~ the assignment that gives 'destination_path' a value runs here.
+note: Correct the spelling or assign 'destinaton_path'.
+== two edits on a long name still resolve:
+2:6: warning: The variable 'configuratoin_rot' is never assigned, and 'configuration_root' is.
+     2 |  echo "$configuratoin_rot"
+       |       ^~~~~~~~~~~~~~~~~~~~
+1:1: details:
+     1 |  configuration_root=1
+       |  ^~~~~~~~~~~~~~~~~~~~ the assignment that gives 'configuration_root' a value runs here.
+note: Correct the spelling or assign 'configuratoin_rot'.
+== a name too far from every assigned name stays unresolved:
+2:6: warning: The variable 'temporary_buffer' is read before any assignment gives it a value.
+     2 |  echo "$temporary_buffer"
+       |       ^~~~~~~~~~~~~~~~~~~
+note: Assign 'temporary_buffer' before it is read, or export it from the environment.
 == an assignment before the read stays quiet:
 rc=0
 == a prefix assignment counts as an assignment:
@@ -38,5 +73,12 @@ rc=0
        |       ^~~~~~~~~~~~~~~~
 note: Assign 'rejected_name' before it is read, or export it from the environment.
 rc=1
+== a read before a later assignment names that assignment:
+1:6: warning: The variable 'greeting_text' is read before it is assigned.
+     1 |  echo "$greeting_text"
+       |       ^~~~~~~~~~~~~~~~
+2:1: details:
+     2 |  greeting_text=hello
+       |  ^~~~~~~~~~~~~~~~~~~ the assignment that gives 'greeting_text' a value runs here.
 == a disable directive silences the sweep:
 rc=0

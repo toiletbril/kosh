@@ -1,0 +1,51 @@
+== an unset name near a set name names it:
+1:23: warning: The variable 'output_fil' is never assigned, and 'output_file' is.
+     1 |  output_file=out; echo "$output_fil"
+       |                        ^~~~~~~~~~~~~
+1:1: details:
+     1 |  output_file=out; echo "$output_fil"
+       |  ^~~~~~~~~~~~~~~ the assignment that gives 'output_file' a value runs here.
+note: Correct the spelling or assign 'output_fil'.
+1:24: warning: The variable 'output_fil' is not set, it expands to empty.
+     1 |  output_file=out; echo "$output_fil"
+       |                         ^~~~~~~~~~~
+note: The variable 'output_file' is set, correct the spelling, or replace this with ${output_fil-} if empty expansion is desired.
+
+== a transposed pair names the set name:
+1:29: warning: The variable 'destinaton_path' is never assigned, and 'destination_path' is.
+     1 |  destination_path=/tmp; echo "$destinaton_path"
+       |                              ^~~~~~~~~~~~~~~~~~
+1:1: details:
+     1 |  destination_path=/tmp; echo "$destinaton_path"
+       |  ^~~~~~~~~~~~~~~~~~~~~ the assignment that gives 'destination_path' a value runs here.
+note: Correct the spelling or assign 'destinaton_path'.
+1:30: warning: The variable 'destinaton_path' is not set, it expands to empty.
+     1 |  destination_path=/tmp; echo "$destinaton_path"
+       |                               ^~~~~~~~~~~~~~~~
+note: The variable 'destination_path' is set, correct the spelling, or replace this with ${destinaton_path-} if empty expansion is desired.
+
+== a name far from every set name keeps the plain note:
+1:29: warning: The variable 'zzzzzzzzzzzzzz' is read before any assignment gives it a value.
+     1 |  destination_path=/tmp; echo "$zzzzzzzzzzzzzz"
+       |                              ^~~~~~~~~~~~~~~~~
+note: Assign 'zzzzzzzzzzzzzz' before it is read, or export it from the environment.
+1:30: warning: The variable 'zzzzzzzzzzzzzz' is not set, it expands to empty.
+     1 |  destination_path=/tmp; echo "$zzzzzzzzzzzzzz"
+       |                               ^~~~~~~~~~~~~~~
+note: Replace it with ${zzzzzzzzzzzzzz-} if empty expansion is desired.
+
+== nounset names the set name in its fatal note:
+1:39: error: The variable 'configuration_rot' is never assigned, and 'configuration_root' is.
+     1 |  set -u; configuration_root=/etc; echo "$configuration_rot"
+       |                                        ^~~~~~~~~~~~~~~~~~~~
+1:9: details:
+     1 |  set -u; configuration_root=/etc; echo "$configuration_rot"
+       |          ^~~~~~~~~~~~~~~~~~~~~~~ the assignment that gives 'configuration_root' a value runs here.
+note: Correct the spelling or assign 'configuration_rot'.
+rc=1
+== an exported name is a candidate:
+1:7: warning: The variable 'KOSH_TEST_EXPORTE' is not set, it expands to empty.
+     1 |  echo "$KOSH_TEST_EXPORTE"
+       |        ^~~~~~~~~~~~~~~~~~
+note: The variable 'KOSH_TEST_EXPORTED' is set, correct the spelling, or replace this with ${KOSH_TEST_EXPORTE-} if empty expansion is desired.
+

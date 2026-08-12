@@ -13,6 +13,22 @@ echo '== case and underscore folding both count as a resemblance:'
 "$BIN" -n -WWW -c 'output_file=out
 echo "$OUTPUTFILE"' 2>&1
 
+echo '== a transposed pair still names the assigned variable:'
+"$BIN" -n -WWW -c 'output_length=1
+echo "$outupt_length"' 2>&1
+
+echo '== a dropped byte still names the assigned variable:'
+"$BIN" -n -WWW -c 'destination_path=1
+echo "$destinaton_path"' 2>&1
+
+echo '== two edits on a long name still resolve:'
+"$BIN" -n -WWW -c 'configuration_root=1
+echo "$configuratoin_rot"' 2>&1
+
+echo '== a name too far from every assigned name stays unresolved:'
+"$BIN" -n -WWW -c 'destination_path=1
+echo "$temporary_buffer"' 2>&1
+
 echo '== an assignment before the read stays quiet:'
 "$BIN" -n -WWW -c 'name=1
 echo "$name"' 2>&1
@@ -50,6 +66,10 @@ echo "rc=$?"
 echo '== the default mood rejects an unassigned read:'
 "$BIN" -n -c 'echo "$rejected_name"' 2>&1
 echo "rc=$?"
+
+echo '== a read before a later assignment names that assignment:'
+"$BIN" -n -WWW -c 'echo "$greeting_text"
+greeting_text=hello' 2>&1
 
 echo '== a disable directive silences the sweep:'
 "$BIN" -n -WWW -c '# shellcheck disable=SC2154

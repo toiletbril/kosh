@@ -759,33 +759,33 @@ note: Run the command on its own instead.
     18 |    echo "`<file`"
        |          ^~~~~~~
 note: Use $(cat file) under a sh shebang.
-19:11: warning: The indirect expansion of !indirect is a bash extension absent from POSIX sh.
+19:9: warning: The indirect expansion of !indirect is a bash extension absent from POSIX sh.
     19 |    echo "${!indirect}"
-       |            ^~~~~~~~~
+       |          ^~~~~~~~~~~~
 note: Use eval or a case dispatch under a sh shebang.
-20:11: warning: The array reference array[0] is a bash extension absent from POSIX sh.
+20:9: warning: The array reference array[0] is a bash extension absent from POSIX sh.
     20 |    echo "${array[0]}"
-       |            ^~~~~~~~
+       |          ^~~~~~~~~~~
 note: Use the positional parameters under a sh shebang.
-21:11: warning: The array key expansion of !array[@] is a bash extension absent from POSIX sh.
+21:9: warning: The array key expansion of !array[@] is a bash extension absent from POSIX sh.
     21 |    echo "${!array[@]}"
-       |            ^~~~~~~~~
+       |          ^~~~~~~~~~~~
 note: Use the positional parameters under a sh shebang.
-22:11: warning: The name prefix expansion of !prefix* is a bash extension absent from POSIX sh.
+22:9: warning: The name prefix expansion of !prefix* is a bash extension absent from POSIX sh.
     22 |    echo "${!prefix*}"
-       |            ^~~~~~~~
+       |          ^~~~~~~~~~~
 note: List the names explicitly under a sh shebang.
-23:11: warning: The substring expansion of text:1:2 is a bash extension absent from POSIX sh.
+23:9: warning: The substring expansion of text:1:2 is a bash extension absent from POSIX sh.
     23 |    echo "${text:1:2}"
-       |            ^~~~~~~~
+       |          ^~~~~~~~~~~
 note: Use expr or cut under a sh shebang.
-24:11: warning: The string replacement in text/from/to is a bash extension absent from POSIX sh.
+24:9: warning: The string replacement in text/from/to is a bash extension absent from POSIX sh.
     24 |    echo "${text/from/to}"
-       |            ^~~~~~~~~~~~
+       |          ^~~~~~~~~~~~~~~
 note: Use sed or a case dispatch under a sh shebang.
-25:10: warning: RANDOM is a bash variable that POSIX sh leaves undefined.
+25:9: warning: RANDOM is a bash variable that POSIX sh leaves undefined.
     25 |    echo "$RANDOM"
-       |           ^~~~~~
+       |          ^~~~~~~
 note: Compute the value another way under a sh shebang.
 30:15: warning: The &> redirection is a bash extension absent from POSIX sh.
     30 |    echo both &>out.log

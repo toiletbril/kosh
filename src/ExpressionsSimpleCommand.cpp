@@ -70,22 +70,6 @@ static fn word_is_safe_for_in_process_substitution(const Word &word) wontthrow
   return true;
 }
 
-/* A brace expansion needs a comma between the braces, so a lone brace stays
-   data. A question mark is common inside a plain URL, so only the star counts
-   as a glob here. */
-static pure fn segment_holds_literal_pattern(StringView text) wontthrow -> bool
-{
-  if (text.find_character('*').has_value()) return true;
-
-  let const open = text.find_character('{');
-  if (!open.has_value()) return false;
-
-  let const comma = text.substring(*open).find_character(',');
-  if (!comma.has_value()) return false;
-
-  return text.substring(*open + *comma).find_character('}').has_value();
-}
-
 AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
     : Command(location), m_assignment(a)
 {}
@@ -114,56 +98,15 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                            {m_assignment->key().view()});
   }
 
-  let has_unquoted_pattern = false;
-  let has_only_literal_segments = true;
-  let has_quoted_literal_value = false;
-  let has_bare_literal_value = true;
-  for (let const &segment : m_assignment->value_word().segments) {
-    if (segment.kind != WordSegment::Kind::UnquotedText)
-      has_bare_literal_value = false;
-
-    if (actx.shebang_is_posix_sh)
-      check_posix_word_portability(actx, segment, source_location());
-
-    switch (segment.kind) {
-    case WordSegment::Kind::LiteralText:
-    case WordSegment::Kind::DoubleQuotedText:
-      if (segment.text.view().find_character('"').has_value())
-        has_quoted_literal_value = true;
-      break;
-
-    case WordSegment::Kind::UnquotedText: break;
-
-    default: has_only_literal_segments = false; break;
-    }
-
-    if (segment.kind == WordSegment::Kind::UnquotedText &&
-        segment_holds_literal_pattern(segment.text.view()))
-    {
-      has_unquoted_pattern = true;
-    }
-
-    if (segment.kind == WordSegment::Kind::VariableReference &&
-        segment.text.view() == "@")
-    {
-      actx.report_diagnostic(diagnostic_id::sc2124, source_location());
-      break;
-    }
-    if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
-        segment.text.view().find_character('$').has_value())
-    {
-      actx.report_diagnostic(diagnostic_id::sc2004, source_location());
-    }
-  }
+  let const shape = scan_assignment_value(actx, m_assignment->value_word(),
+                                          source_location());
 
   let const raw_assignment = m_assignment->raw_string();
 
   check_assignment_value_shape(
-      actx,
-      assignment_lint_input{m_assignment->key().view(), raw_assignment.view(),
-                            source_location(), m_assignment->is_append(),
-                            has_unquoted_pattern, has_only_literal_segments,
-                            has_quoted_literal_value, has_bare_literal_value});
+      actx, assignment_lint_input{m_assignment->key().view(),
+                                  raw_assignment.view(), source_location(),
+                                  m_assignment->is_append(), shape});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
@@ -216,7 +159,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::external_array_subscript,
                                source_location());
     }
-    actx.note_variable_assignment(base);
+    actx.note_variable_assignment(base, source_location());
     actx.array_valued_names.add(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
@@ -226,11 +169,11 @@ fn AssignCommand::analyze(AnalysisContext &actx,
     return;
   }
 
-  actx.note_variable_assignment(name.view());
+  actx.note_variable_assignment(name.view(), source_location());
 
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
-      !actx.function_local_names.contains(name.view()) &&
-      !actx.global_assigned_names.contains(name.view()) &&
+      actx.function_local_names.find(name.view()) == nullptr &&
+      actx.global_assigned_names.find(name.view()) == nullptr &&
       !(actx.eval_context != nullptr &&
         actx.eval_context->get_variable_value(name.view()).has_value()))
   {
@@ -241,7 +184,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   if (actx.function_scope_depth == 0 && is_unconditional &&
       !actx.has_seen_runtime_definer)
   {
-    actx.global_assigned_names.add(name.view());
+    actx.global_assigned_names.set(name.view(), source_location());
   }
 
   /* A conditional or nested assignment may not run, a runtime definer may have

@@ -1347,6 +1347,11 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       }
 
       case WordSegment::Kind::VariableReference:
+        actx.note_positional_reference(segment.text.view());
+        word_is_literal = false;
+        if (!segment.is_in_double_quotes) has_unquoted_expansion = true;
+        break;
+
       case WordSegment::Kind::ArithmeticExpansion:
         word_is_literal = false;
         if (!segment.is_in_double_quotes) has_unquoted_expansion = true;

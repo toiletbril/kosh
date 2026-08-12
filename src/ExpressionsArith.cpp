@@ -194,12 +194,6 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
 {
   unused(is_unconditional);
 
-  let conditional_location = source_location();
-  if (source_end_position() > conditional_location.position) {
-    conditional_location.length =
-        source_end_position() - conditional_location.position;
-  }
-
   using Kind = conditional_element::Kind;
   for (usize i = 0; i < m_elements.count(); i++) {
     let const &element = m_elements[i];
@@ -214,8 +208,13 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       if (i > 0 && i + 1 < m_elements.count() &&
           conditional_word_is_literal(m_elements[i - 1].word) &&
           conditional_word_is_literal(m_elements[i + 1].word))
-        actx.report_diagnostic(diagnostic_id::sc2050, conditional_location,
-                               {op});
+      {
+        actx.report_diagnostic(
+            diagnostic_id::sc2050,
+            location_spanning(m_elements[i - 1].word->source_location(),
+                              m_elements[i + 1].word->source_location()),
+            {op});
+      }
       continue;
     }
 
@@ -303,6 +302,7 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       let const &operand_word =
           static_cast<const tokens::WordToken *>(element.word)->word();
       let const shape = classify_test_operand(operand_word);
+      if (shape.has_positional_reference) actx.mark_positional_reference();
 
       if (shape.has_array_spread || shape.has_brace_expansion ||
           shape.has_unquoted_glob)
@@ -399,8 +399,12 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
          conditional_word_has_glob(right));
     if (!is_pattern_operator && conditional_word_is_literal(left) &&
         conditional_word_is_literal(right))
-      actx.report_diagnostic(diagnostic_id::sc2050, conditional_location,
-                             {operand.view()});
+    {
+      actx.report_diagnostic(
+          diagnostic_id::sc2050,
+          location_spanning(left->source_location(), right->source_location()),
+          {operand.view()});
+    }
 
     /* The right side of an equality comparison is a glob pattern, so an
        unquoted variable there matches instead of comparing, shellcheck
@@ -1048,13 +1052,18 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
   let saved_locals = steal(actx.function_local_names);
-  actx.function_local_names = HashSet{heap_allocator()};
+  actx.function_local_names = StringMap<SourceLocation>{heap_allocator()};
   actx.apply_scope_definitions(m_analysis_scope_definitions);
   let const saved_loop_body_depth = actx.loop_body_depth;
   actx.loop_body_depth = 0;
+  let const saved_active_function = actx.active_function_definition;
+  actx.active_function_definition = actx.function_definitions.count();
+  actx.function_definitions.push(
+      function_definition_record{m_name.view(), source_location()});
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
   actx.function_scope_depth--;
+  actx.active_function_definition = saved_active_function;
   actx.loop_body_depth = saved_loop_body_depth;
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);

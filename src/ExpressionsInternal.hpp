@@ -40,6 +40,16 @@ pure fn analysis_source_text(const AnalysisContext &actx,
 pure fn analysis_source_span(const AnalysisContext &actx,
                              const Expression &expression) wontthrow
     -> StringView;
+
+/* The segment span widened over the leading sigil and the braces around it. */
+pure fn expansion_location_with_sigil(const AnalysisContext &actx,
+                                      SourceLocation location) wontthrow
+    -> SourceLocation;
+
+/* One span reaching from the start of the first location to the end of the
+   last. An empty location contributes nothing. */
+pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow
+    -> SourceLocation;
 pure fn view_contains(StringView view, StringView needle) wontthrow -> bool;
 pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
                                         StringView expression) wontthrow
@@ -54,6 +64,7 @@ struct test_operand_shape
   bool has_brace_expansion{false};
   bool has_unquoted_glob{false};
   bool has_unquoted_expansion{false};
+  bool has_positional_reference{false};
 };
 
 cold fn classify_test_operand(const Word &word) wontthrow -> test_operand_shape;
@@ -106,18 +117,31 @@ struct command_lint_input
   }
 };
 
+/* What one assignment value expands to, gathered in one walk of its
+   segments. */
+struct assignment_value_shape
+{
+  bool has_unquoted_pattern{false};
+  bool has_only_literal_segments{true};
+  bool has_quoted_literal_value{false};
+  bool has_bare_literal_value{true};
+};
+
+/* The walk shared by a standalone assignment and a command prefix assignment.
+   It gathers the shape and reports the findings one segment decides. */
+fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
+                         SourceLocation location) throws
+    -> assignment_value_shape;
+
 /* The borrowed inputs one assignment's value checks read. The segment walk in
-   AssignCommand::analyze computes the pattern bit and the raw view once. */
+   scan_assignment_value computes the shape and the raw view once. */
 struct assignment_lint_input
 {
   StringView name;
   StringView raw_assignment;
   SourceLocation location;
   bool is_append;
-  bool has_unquoted_pattern;
-  bool has_only_literal_segments;
-  bool has_quoted_literal_value;
-  bool has_bare_literal_value;
+  assignment_value_shape shape;
 };
 
 fn check_assignment_value_shape(AnalysisContext &actx,
@@ -255,6 +279,10 @@ pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool;
 /* The names left in reads_before_assignment once the walk is done. A name still
    listed there was read at the top level and no later assignment claimed it. */
 fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void;
+
+/* The function definitions and calls the walk gathered. A call and a definition
+   only agree once both are known, so the comparison waits for the end. */
+fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void;
 
 } /* namespace expressions */
 

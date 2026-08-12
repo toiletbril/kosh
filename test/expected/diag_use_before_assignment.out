@@ -23,6 +23,9 @@
 2:6: warning: The variable 'count' is read before it is assigned.
      2 |  echo "$count"
        |       ^~~~~~~~
+3:1: details:
+     3 |  count=5
+       |  ^~~~~~~ the assignment that gives 'count' a value runs here.
 2:7: warning: The variable 'count' is not set, it expands to empty.
      2 |  echo "$count"
        |        ^~~~~~

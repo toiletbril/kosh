@@ -54,13 +54,13 @@ note: Quote the expansion to keep one argument.
      4 |  : $foo ${bar}
        |         ^~~~~~
 note: Quote the expansion to keep one argument.
-6:3: warning: An unquoted variable can split into words and expand globs.
+6:6: warning: An unquoted variable can split into words and expand globs.
      6 |  : pre$foo "lead${bar}tail"
-       |    ^~~~~~~
+       |       ^~~~
 note: Quote the expansion to keep one argument.
-7:3: warning: An unquoted variable can split into words and expand globs.
+7:4: warning: An unquoted variable can split into words and expand globs.
      7 |  : a${b}c$d
-       |    ^~~~~~~~
+       |     ^~~~
 note: Quote the expansion to keep one argument.
 Encountered 4 warnings.
 4:3: warning: The variable 'foo' is not set, it expands to empty.

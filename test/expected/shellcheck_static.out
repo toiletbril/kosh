@@ -4685,6 +4685,10 @@ note: Use $* for one joined string or a separate "$@" word.
     21 |    [ -z lit ] && echo a
        |         ^~~
 note: Test a variable or drop the check.
+22:5: warning: The '-eq' comparison has literal operands on both sides.
+    22 |    [ count -eq notanumber ] && echo b
+       |      ^~~~~~~~~~~~~~~~~~~~
+note: Remove the constant condition or compare runtime data.
 22:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
     22 |    [ count -eq notanumber ] && echo b
        |      ^~~~~
@@ -4766,10 +4770,18 @@ note: Declare it with local to keep it inside the function.
     58 |  [ ! 1 -eq 2 ]
        |    ^
 note: Drop the ! and use -ne.
+58:5: warning: The '-eq' comparison has literal operands on both sides.
+    58 |  [ ! 1 -eq 2 ]
+       |      ^~~~~~~
+note: Remove the constant condition or compare runtime data.
 59:3: warning: A negated = is just !=.
     59 |  [ ! a = b ]
        |    ^
 note: Drop the ! and use !=.
+59:5: warning: The '=' comparison has literal operands on both sides.
+    59 |  [ ! a = b ]
+       |      ^~~~~
+note: Remove the constant condition or compare runtime data.
 59:7: warning: The literals 'a' and 'b' differ, so the comparison never succeeds.
     59 |  [ ! a = b ]
        |        ^
@@ -4901,13 +4913,13 @@ note: Move the assignment outside the pipeline or avoid the pipeline subshell.
     99 |    [[ 10 > 7 ]]
        |    ^~
 note: Use an arithmetic command or a numeric -lt or -gt operator.
-99:3: warning: The '>' comparison has literal operands on both sides.
+99:6: warning: The '>' comparison has literal operands on both sides.
     99 |    [[ 10 > 7 ]]
-       |    ^~~~~~~~~~~~
+       |       ^~~~~~
 note: Remove the constant condition or compare runtime data.
-100:3: warning: The '<' comparison has literal operands on both sides.
+100:6: warning: The '<' comparison has literal operands on both sides.
    100 |    [[ left < right ]]
-       |    ^~~~~~~~~~~~~~~~~~
+       |       ^~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
 101:15: warning: A quoted regular expression is matched literally.
    101 |    [[ value =~ 'v.*' ]]
@@ -4929,9 +4941,9 @@ note: Test a variable or drop the check.
    105 |    echo {1..$limit}
        |         ^~~~~~~~~~~
 note: Use an arithmetic loop for a variable limit.
-105:8: warning: An unquoted variable can split into words and expand globs.
+105:12: warning: An unquoted variable can split into words and expand globs.
    105 |    echo {1..$limit}
-       |         ^~~~~~~~~~~
+       |             ^~~~~~
 note: Quote the expansion to keep one argument.
 106:6: warning: Brackets around a tr range add literal bracket bytes.
    106 |    tr [A-Z] [a-z]
@@ -5042,7 +5054,7 @@ note: Group each side with escaped parentheses.
 note: Write ${10} to select positional parameter 10.
 133:8: warning: An unquoted variable can split into words and expand globs.
    133 |    echo $10
-       |         ^~~
+       |         ^~
 note: Quote the expansion to keep one argument.
 134:3: warning: A command substitution in command position executes its output.
    134 |    $(printf command)
@@ -5162,6 +5174,10 @@ note: Evaluate the numbers with `$((...))` before the comparison.
    160 |    recursive_wrapper == value
        |                      ^~
 note: Write `[ x = y ]` to compare the values.
+161:5: warning: The '-gt' comparison has literal operands on both sides.
+   161 |    [ -5 -gt 3 ]
+       |      ^~~~~~~~
+note: Remove the constant condition or compare runtime data.
 164:16: warning: A test with -a or -o is obsolescent.
    164 |    [ -e "$left" -a -e "$right" ]
        |                 ^~
@@ -5198,6 +5214,10 @@ note: Write it with `-n`, or drop the brackets to check the exit status.
    175 |    [ "$left" ]
        |      ^~~~~~~
 note: Write it with -n to read clearer.
+177:5: warning: The '=' comparison has literal operands on both sides.
+   177 |    [ a = b ]
+       |      ^~~~~
+note: Remove the constant condition or compare runtime data.
 177:7: warning: The literals 'a' and 'b' differ, so the comparison never succeeds.
    177 |    [ a = b ]
        |        ^
@@ -5226,9 +5246,9 @@ note: Give the operator its operand before the comparison.
    182 |    [[ -z == foo ]]
        |          ^~
 note: Test a variable or drop the check.
-182:3: warning: The '==' comparison has literal operands on both sides.
+182:6: warning: The '==' comparison has literal operands on both sides.
    182 |    [[ -z == foo ]]
-       |    ^~~~~~~~~~~~~~~
+       |       ^~~~~~~~~
 note: Remove the constant condition or compare runtime data.
 186:3: warning: A `[ ]` test does not take `&&`, the bracket closes before it.
    186 |    [ "$left" = a && "$right" = b ]
@@ -5366,17 +5386,17 @@ note: Loop over the elements, or write `*` in place of `@`.
    210 |    [[ {a,b} = one ]]
        |       ^~~~~
 note: Loop over the expanded words.
-210:3: warning: The '=' comparison has literal operands on both sides.
+210:6: warning: The '=' comparison has literal operands on both sides.
    210 |    [[ {a,b} = one ]]
-       |    ^~~~~~~~~~~~~~~~~
+       |       ^~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
 211:6: warning: A `[[ ]]` expression matches a glob only to the right of `=` or `!=`, so '*.txt' stays literal.
    211 |    [[ *.txt = one ]]
        |       ^~~~~
 note: Loop over the matches.
-211:3: warning: The '=' comparison has literal operands on both sides.
+211:6: warning: The '=' comparison has literal operands on both sides.
    211 |    [[ *.txt = one ]]
-       |    ^~~~~~~~~~~~~~~~~
+       |       ^~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
 212:16: warning: The right side of `=` inside `[[ ]]` is matched as a glob, not compared.
    212 |    [[ "$left" = $right ]]
@@ -5618,6 +5638,10 @@ note: Write `piped=$(...)` around the complete pipeline.
    284 |    first=one second=two | wc -l
        |    ^~~~~~~~~
 note: Write `first=$(...)` around the complete pipeline.
+285:3: warning: The value of 'swallowed' is the command name 'printf', and the command never runs.
+   285 |    swallowed=printf 'x\n'
+       |    ^~~~~~~~~~~~~~~~
+note: Write `swallowed=$(printf)` to store its output, or quote the name.
 285:3: warning: The value of 'swallowed' is read as a name, and 'x\n' becomes the command.
    285 |    swallowed=printf 'x\n'
        |    ^~~~~~~~~~~~~~~~
@@ -5901,7 +5925,7 @@ note: Write `\$` inside the quotes and keep the string in one piece.
    438 |    -e x file
        |    ^~
 note: Place the option after its command.
-Encountered 328 warnings.
+Encountered 334 warnings.
 done
 done
 done

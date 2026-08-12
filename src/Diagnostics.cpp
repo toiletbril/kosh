@@ -5,6 +5,7 @@
 #include "PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
 #include "Tokens.hpp"
+#include "Utils.hpp"
 
 namespace koshka {
 
@@ -621,6 +622,20 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "not "
       "every `su` accepts",
       "Write `su -c` instead, or use `sudo`", None, Lenient, Policy),
+    D(2119, "function-call-without-arguments",
+      "a call passes no arguments to a function that reads them",
+      "The function '{0}' reads the arguments it is called with, and this call "
+      "passes none",
+      "Pass the values '{0}' expects, or write `\"$@\"` to forward the script "
+      "arguments",
+      "the body reads its arguments here", Strict, Policy),
+    D(2120, "function-arguments-never-passed",
+      "a function reads arguments that no call passes",
+      "The function '{0}' reads the arguments it is called with, and no call "
+      "passes any",
+      "Pass the arguments at the call, or read a named variable in place of "
+      "`$1`",
+      None, Strict, Policy),
     D(2121, "set-as-assignment", "set does not assign a variable",
       "The `set` builtin changes the shell options and the positional "
       "parameters, so '{0}' is not assigned",
@@ -710,7 +725,8 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
     D(2153, "misspelled-variable-name",
       "a read name resembles an assigned name",
       "The variable '{0}' is never assigned, and '{1}' is",
-      "Correct the spelling or assign '{0}'", None, Strict, Policy),
+      "Correct the spelling or assign '{0}'",
+      "the assignment that gives '{1}' a value runs here", Strict, Policy),
     D(2154, "unassigned-variable-read",
       "a name is read that the script never assigns",
       "The variable '{0}' is read before any assignment gives it a value",
@@ -968,6 +984,12 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The input redirect feeds '{0}', which never reads stdin, so the data is "
       "discarded",
       None, None, Annoying, Policy),
+    D(2218, "function-called-before-definition",
+      "a call runs before the function is defined",
+      "The function '{0}' is called here, and the definition that gives it a "
+      "body runs later in the file",
+      "Move the definition of '{0}' above this call",
+      "the definition runs after the call", Strict, Policy),
     D(2219, "let-arithmetic-command",
       "an arithmetic command states the intent that let hides",
       "The `let` builtin evaluates its argument as arithmetic",
@@ -1408,8 +1430,8 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "Command '{0}' was not found", "Did you mean '{1}'?", None, Lenient,
       Warning),
     D(0, "use-before-assign", "a variable is read before a later assignment",
-      "The variable '{0}' is read before it is assigned", None, None, Lenient,
-      Policy),
+      "The variable '{0}' is read before it is assigned", None,
+      "the assignment that gives '{0}' a value runs here", Lenient, Policy),
 };
 
 #undef D
@@ -2476,8 +2498,9 @@ fn check_posix_parameter_expansion(AnalysisContext &actx,
   if (text.is_empty()) return;
 
   let const do_get_location = [&]() -> SourceLocation {
-    return segment.get_source_location(fallback_location.filename)
-        .value_or(fallback_location);
+    return expansion_location_with_sigil(
+        actx, segment.get_source_location(fallback_location.filename)
+                  .value_or(fallback_location));
   };
 
   if (text[0] == '!') {
@@ -2694,7 +2717,45 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
       has_pending_division = false;
 
       let const target = arithmetic_assignment_target(expression, position);
-      if (!target.is_empty()) actx.note_variable_assignment(target);
+      if (!target.is_empty()) actx.note_variable_assignment(target, location);
+      break;
+    }
+
+    /* An arithmetic expression is never quoted, so a $ here introduces a real
+       expansion and a positional name behind it is a positional read. */
+    case '$': {
+      has_pending_division = false;
+
+      usize name_start = position + 1;
+      let const is_braced =
+          name_start < expression.length && expression[name_start] == '{';
+      if (is_braced) name_start++;
+
+      usize name_end = name_start;
+      while (name_end < expression.length &&
+             lexer::is_variable_name(expression[name_end]))
+        name_end++;
+
+      if (name_end == name_start && name_end < expression.length) {
+        switch (expression[name_end]) {
+        case '@':
+        case '*':
+        case '#': name_end++; break;
+
+        default: break;
+        }
+      }
+
+      position = name_end - 1;
+
+      if (is_braced &&
+          (name_end >= expression.length || expression[name_end] != '}'))
+      {
+        break;
+      }
+
+      actx.note_positional_reference(
+          expression.substring_of_length(name_start, name_end - name_start));
       break;
     }
 
@@ -2775,8 +2836,9 @@ fn check_posix_word_portability(AnalysisContext &actx,
 {
   let const text = segment.text.view();
   let const do_get_location = [&]() -> SourceLocation {
-    return segment.get_source_location(fallback_location.filename)
-        .value_or(fallback_location);
+    return expansion_location_with_sigil(
+        actx, segment.get_source_location(fallback_location.filename)
+                  .value_or(fallback_location));
   };
 
   switch (segment.kind) {
@@ -3632,8 +3694,12 @@ fn check_command_name_lints(AnalysisContext &actx,
         if (segment.kind == WordSegment::Kind::VariableReference &&
             segment.is_split_eligible())
         {
-          actx.report_diagnostic(diagnostic_id::sc2086_test,
-                                 args[i]->source_location());
+          let const operand_location = args[i]->source_location();
+          actx.report_diagnostic(
+              diagnostic_id::sc2086_test,
+              expansion_location_with_sigil(
+                  actx, segment.get_source_location(operand_location.filename)
+                            .value_or(operand_location)));
           break;
         }
       }
@@ -4510,12 +4576,46 @@ fn check_test_operand_lints(AnalysisContext &actx,
                              {view});
     }
 
+    /* Both sides of a comparison are written out, so the answer is fixed,
+       shellcheck SC2050. The file comparisons read the filesystem and are left
+       alone. */
+    if (i >= 2 && i + 1 < operand_end && is_test_binary_operator_word(view) &&
+        !is_test_file_comparison_word(view) &&
+        !is_test_binary_operator_word(previous_literal.view()) &&
+        args[i - 1]->kind() == Token::Kind::Word &&
+        args[i + 1]->kind() == Token::Kind::Word)
+    {
+      let const &left =
+          static_cast<const tokens::WordToken *>(args[i - 1])->word();
+      let const &right =
+          static_cast<const tokens::WordToken *>(args[i + 1])->word();
+      if (word_is_fully_literal(left) && word_is_fully_literal(right)) {
+        /* A bracket test receives its operands already expanded, so a glob or a
+           brace list on either side is not the text that is compared. */
+        let const left_shape = classify_test_operand(left);
+        let const right_shape = classify_test_operand(right);
+        let const is_expanded_before_test =
+            left_shape.has_unquoted_glob || right_shape.has_unquoted_glob ||
+            left_shape.has_brace_expansion || right_shape.has_brace_expansion;
+
+        if (!is_expanded_before_test) {
+          actx.report_diagnostic(
+              diagnostic_id::sc2050,
+              location_spanning(args[i - 1]->source_location(),
+                                args[i + 1]->source_location()),
+              {view});
+        }
+      }
+    }
+
     /* The bracket test takes one word per operand, so an operand that expands
        to several words leaves the test with a stray argument. The shape is read
        once from the segments the word already holds. */
     if (i < operand_end) {
       let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
       let const shape = classify_test_operand(word);
+      if (shape.has_positional_reference) actx.mark_positional_reference();
+
       let const written =
           analysis_source_text(actx, args[i]->source_location());
       let const previous = previous_literal.view();
@@ -4872,6 +4972,70 @@ pure fn value_has_written_escape(StringView value) wontthrow -> bool
 
 } /* namespace */
 
+/* A brace expansion needs a comma between the braces, so a lone brace stays
+   data. A question mark is common inside a plain URL, so only the star counts
+   as a glob here. */
+static pure fn segment_holds_literal_pattern(StringView text) wontthrow -> bool
+{
+  if (text.find_character('*').has_value()) return true;
+
+  let const open = text.find_character('{');
+  if (!open.has_value()) return false;
+
+  let const comma = text.substring(*open).find_character(',');
+  if (!comma.has_value()) return false;
+
+  return text.substring(*open + *comma).find_character('}').has_value();
+}
+
+fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
+                         SourceLocation location) throws
+    -> assignment_value_shape
+{
+  assignment_value_shape shape{};
+
+  for (let const &segment : value_word.segments) {
+    if (segment.kind != WordSegment::Kind::UnquotedText)
+      shape.has_bare_literal_value = false;
+
+    if (actx.shebang_is_posix_sh)
+      check_posix_word_portability(actx, segment, location);
+
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::DoubleQuotedText:
+      if (segment.text.view().find_character('"').has_value())
+        shape.has_quoted_literal_value = true;
+      break;
+
+    case WordSegment::Kind::UnquotedText: break;
+
+    default: shape.has_only_literal_segments = false; break;
+    }
+
+    if (segment.kind == WordSegment::Kind::UnquotedText &&
+        segment_holds_literal_pattern(segment.text.view()))
+    {
+      shape.has_unquoted_pattern = true;
+    }
+
+    if (segment.kind == WordSegment::Kind::VariableReference &&
+        segment.text.view() == "@")
+    {
+      actx.report_diagnostic(diagnostic_id::sc2124, location);
+      break;
+    }
+
+    if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
+        segment.text.view().find_character('$').has_value())
+    {
+      actx.report_diagnostic(diagnostic_id::sc2004, location);
+    }
+  }
+
+  return shape;
+}
+
 fn check_assignment_value_shape(AnalysisContext &actx,
                                 const assignment_lint_input &input) throws
     -> void
@@ -4881,14 +5045,14 @@ fn check_assignment_value_shape(AnalysisContext &actx,
 
   let const value = input.raw_assignment.substring(*equals + 1);
 
-  if (input.has_unquoted_pattern) {
+  if (input.shape.has_unquoted_pattern) {
     actx.report_diagnostic(diagnostic_id::sc2125, input.location, {input.name});
   }
 
   /* PATH without a separator and without its own value replaces the search
      path, shellcheck SC2123. An expanded value may already hold a path list. */
   if (input.name == "PATH" && !input.is_append && !value.is_empty() &&
-      input.has_only_literal_segments &&
+      input.shape.has_only_literal_segments &&
       !value.find_character(':').has_value() &&
       !view_contains(value, StringView{"PATH"}))
   {
@@ -4906,13 +5070,13 @@ fn check_assignment_value_shape(AnalysisContext &actx,
 
   /* A separator written as two text bytes never becomes the control byte,
      shellcheck SC2141. */
-  if (input.name == "IFS" && input.has_only_literal_segments &&
+  if (input.name == "IFS" && input.shape.has_only_literal_segments &&
       value_has_written_escape(value))
   {
     actx.report_diagnostic(diagnostic_id::sc2141, input.location, {input.name});
   }
 
-  if (!input.is_append && input.has_bare_literal_value &&
+  if (!input.is_append && input.shape.has_bare_literal_value &&
       COMMAND_NAME_VALUES.contains(value))
   {
     actx.report_diagnostic(diagnostic_id::sc2209, input.location,
@@ -4920,8 +5084,8 @@ fn check_assignment_value_shape(AnalysisContext &actx,
   }
 
   let const first_bracket = input.name.find_character('[');
-  if (input.has_quoted_literal_value && input.has_only_literal_segments &&
-      !first_bracket.has_value())
+  if (input.shape.has_quoted_literal_value &&
+      input.shape.has_only_literal_segments && !first_bracket.has_value())
   {
     actx.quoted_literal_assignments.set(input.name, input.location);
   }
@@ -6240,6 +6404,14 @@ struct unassigned_read
   SourceLocation location;
 };
 
+/* The assigned name a read comes closest to, with the assignment that recorded
+   it. */
+struct resembling_assignment
+{
+  StringView name;
+  SourceLocation location;
+};
+
 pure fn fold_name_byte(char byte) wontthrow -> char
 {
   return byte >= 'a' && byte <= 'z' ? static_cast<char>(byte - ('a' - 'A'))
@@ -6272,6 +6444,16 @@ pure fn names_resemble_each_other(StringView left, StringView right) wontthrow
   return at_left == left.length && at_right == right.length;
 }
 
+/* The same edit distance the command name suggestion spends, so a mistyped
+   variable and a mistyped command are judged by one rule. */
+pure fn names_are_near_misspellings(StringView left, StringView right) wontthrow
+    -> bool
+{
+  let const budget = utils::suggestion_distance_budget(right.length);
+  return utils::NameSuggestion::is_correction(
+      utils::bounded_osa_distance(left, right, budget), right.length);
+}
+
 } /* namespace */
 
 pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool
@@ -6300,25 +6482,131 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
   });
 
   for (let const &read : reads) {
-    StringView resembled{};
-    let const do_match = [&read, &resembled](StringView assigned)
-                             throws -> void {
-      if (!resembled.is_empty()) return;
+    resembling_assignment resembled{};
+    resembling_assignment misspelled{};
+    let const do_match = [&read, &resembled, &misspelled](
+                             StringView assigned,
+                             const SourceLocation &location) throws -> void {
+      if (!resembled.name.is_empty()) return;
       if (assigned == read.name) return;
-      if (names_resemble_each_other(assigned, read.name)) resembled = assigned;
+
+      if (names_resemble_each_other(assigned, read.name)) {
+        resembled = resembling_assignment{assigned, location};
+        return;
+      }
+
+      if (misspelled.name.is_empty() &&
+          names_are_near_misspellings(assigned, read.name))
+      {
+        misspelled = resembling_assignment{assigned, location};
+      }
     };
 
     actx.assigned_names_so_far.for_each(do_match);
     actx.global_assigned_names.for_each(do_match);
     actx.function_local_names.for_each(do_match);
 
-    if (resembled.is_empty()) {
+    if (resembled.name.is_empty()) resembled = misspelled;
+
+    if (resembled.name.is_empty()) {
       actx.report_diagnostic(diagnostic_id::sc2154, read.location, {read.name});
     } else {
       actx.report_diagnostic(diagnostic_id::sc2153, read.location,
-                             {read.name, resembled});
+                             {read.name, resembled.name}, resembled.location);
     }
   }
+}
+
+namespace {
+
+/* Whether an earlier record already carries the name, so a redefinition is
+   judged by the first body the file gives the name. */
+pure fn definition_is_redefinition(
+    const ArrayList<function_definition_record> &definitions,
+    usize index) wontthrow -> bool
+{
+  for (usize earlier = 0; earlier < index; earlier++) {
+    if (definitions[earlier].name == definitions[index].name) return true;
+  }
+
+  return false;
+}
+
+fn check_function_argument_use(AnalysisContext &actx, usize index) throws
+    -> void
+{
+  let const &definition = actx.function_definitions[index];
+
+  let has_call_with_arguments = false;
+  let has_call_without_arguments = false;
+  for (let const &call : actx.function_calls) {
+    if (call.name != definition.name) continue;
+
+    if (call.has_arguments) {
+      has_call_with_arguments = true;
+      break;
+    }
+
+    has_call_without_arguments = true;
+  }
+
+  /* A definition no call reaches may belong to a sourced library, where the
+     caller lives outside this file. */
+  if (has_call_with_arguments || !has_call_without_arguments) return;
+
+  actx.report_diagnostic(diagnostic_id::sc2120, definition.location,
+                         {definition.name});
+
+  for (let const &call : actx.function_calls) {
+    if (call.name != definition.name) continue;
+
+    actx.report_diagnostic(diagnostic_id::sc2119, call.location,
+                           {definition.name}, definition.location);
+  }
+}
+
+fn check_call_before_definition(AnalysisContext &actx) throws -> void
+{
+  for (let const &call : actx.function_calls) {
+    if (call.is_inside_function_body) continue;
+
+    for (let const &definition : actx.function_definitions) {
+      if (definition.name != call.name) continue;
+
+      if (call.location.position < definition.location.position) {
+        actx.report_diagnostic(diagnostic_id::sc2218, call.location,
+                               {call.name}, definition.location);
+      }
+
+      break;
+    }
+  }
+}
+
+} /* namespace */
+
+fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
+{
+  if (actx.function_definitions.is_empty()) return;
+
+  if (actx.should_report(diagnostic_id::sc2119) ||
+      actx.should_report(diagnostic_id::sc2120))
+  {
+    for (usize index = 0; index < actx.function_definitions.count(); index++) {
+      if (!actx.function_definitions[index].does_read_positionals) continue;
+      if (definition_is_redefinition(actx.function_definitions, index))
+        continue;
+
+      check_function_argument_use(actx, index);
+    }
+  }
+
+  /* An interactive chunk runs against a live shell whose functions the file
+     never defines, so the order the file states is not the order that runs. */
+  if (actx.should_silence_unresolved_commands) return;
+  if (!actx.should_report(diagnostic_id::sc2218)) return;
+
+  check_call_before_definition(actx);
 }
 
 } /* namespace expressions */

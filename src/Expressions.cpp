@@ -366,16 +366,19 @@ pure fn AnalysisContext::is_diagnostic_suppressed(
   return false;
 }
 
-fn AnalysisContext::note_variable_assignment(StringView name) throws -> void
+fn AnalysisContext::note_variable_assignment(StringView name,
+                                             SourceLocation location) throws
+    -> void
 {
   if (name.is_empty()) return;
 
-  assigned_names_so_far.add(name);
+  assigned_names_so_far.set(name, location);
 
   if (const SourceLocation *read_location = reads_before_assignment.find(name);
       read_location != nullptr)
   {
-    report_diagnostic(diagnostic_id::use_before_assign, *read_location, {name});
+    report_diagnostic(diagnostic_id::use_before_assign, *read_location, {name},
+                      location);
     reads_before_assignment.erase(name);
   }
 }
@@ -388,9 +391,9 @@ fn AnalysisContext::note_variable_read(StringView name, SourceLocation location,
   if (has_seen_runtime_definer) return;
   if (!optimizer::is_plain_variable_name(name)) return;
 
-  if (assigned_names_so_far.contains(name)) return;
-  if (function_local_names.contains(name)) return;
-  if (global_assigned_names.contains(name)) return;
+  if (assigned_names_so_far.find(name) != nullptr) return;
+  if (function_local_names.find(name) != nullptr) return;
+  if (global_assigned_names.find(name) != nullptr) return;
   if (reads_before_assignment.find(name) != nullptr) return;
   if (expressions::is_shell_maintained_variable(name)) return;
 
@@ -697,6 +700,7 @@ fn analyze_ast(const Expression *root, StringView source,
   root->analyze(actx, true);
 
   expressions::check_unassigned_variable_reads(actx);
+  expressions::check_function_argument_dataflow(actx);
 
   actx.flush_warnings();
 
@@ -733,6 +737,55 @@ pure fn analysis_source_text(const AnalysisContext &actx,
       location.length > actx.source.length - location.position)
     return {};
   return actx.source.substring_of_length(location.position, location.length);
+}
+
+/* A word segment spans the name and its modifiers, and the sigil and the braces
+   around it belong to the expansion a reader sees. */
+pure fn expansion_location_with_sigil(const AnalysisContext &actx,
+                                      SourceLocation location) wontthrow
+    -> SourceLocation
+{
+  if (location.length == 0) return location;
+  if (location.position > actx.source.length ||
+      location.length > actx.source.length - location.position)
+  {
+    return location;
+  }
+
+  usize start = location.position;
+  usize length = location.length;
+
+  if (start >= 2 && actx.source[start - 1] == '{' &&
+      actx.source[start - 2] == '$')
+  {
+    start -= 2;
+    length += 2;
+
+    if (start + length < actx.source.length &&
+        actx.source[start + length] == '}')
+    {
+      length++;
+    }
+  } else if (start >= 1 && actx.source[start - 1] == '$') {
+    start--;
+    length++;
+  } else {
+    return location;
+  }
+
+  return SourceLocation{start, length, location.filename};
+}
+
+pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow
+    -> SourceLocation
+{
+  if (first.length == 0) return last;
+  if (last.length == 0) return first;
+  if (last.position < first.position) return first;
+
+  return SourceLocation{first.position,
+                        last.position + last.length - first.position,
+                        first.filename};
 }
 
 pure fn analysis_source_span(const AnalysisContext &actx,
@@ -972,6 +1025,8 @@ cold fn classify_test_operand(const Word &word) wontthrow -> test_operand_shape
       {
         shape.has_array_spread = true;
       }
+      if (reference_names_positional(name))
+        shape.has_positional_reference = true;
       break;
     }
 
@@ -1085,16 +1140,22 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     /* A prefix on an ordinary command does not outlive it, and a prefix with no
        command word does. Both are recorded, because the dataflow sweep reports
        a name that no assignment ever claims. */
-    actx.note_variable_assignment(var.name.view());
+    actx.note_variable_assignment(var.name.view(), var.location);
 
     if (actx.shebang_is_posix_sh && var.is_append) {
       actx.report_diagnostic(diagnostic_id::sc3024, var.location,
                              {var.name.view()});
     }
+
+    let const shape = scan_assignment_value(actx, var.value, var.location);
+    check_assignment_value_shape(
+        actx, assignment_lint_input{var.name.view(),
+                                    analysis_source_text(actx, var.location),
+                                    var.location, var.is_append, shape});
   }
 
   for (let const &assignment : m_array_args) {
-    actx.note_variable_assignment(assignment.name.view());
+    actx.note_variable_assignment(assignment.name.view(), assignment.location);
     actx.array_valued_names.add(assignment.name.view());
     actx.constant_variables.erase(assignment.name.view());
 
@@ -1222,9 +1283,20 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   let const command_literal = borrowed_command_literal.has_value()
                                   ? *borrowed_command_literal
                                   : command_literal_storage.view();
-  let const command_is_shadowed =
-      actx.defined_functions.contains(command_literal) ||
-      actx.known_aliases.contains(command_literal);
+  let const command_is_defined_function =
+      actx.defined_functions.contains(command_literal);
+  let const command_is_shadowed = command_is_defined_function ||
+                                  actx.known_aliases.contains(command_literal);
+
+  /* A literal command word borrows from the syntax tree, which outlives the
+     sweep. A word the analysis had to build lives in a local and is left out.
+   */
+  if (command_is_defined_function && borrowed_command_literal.has_value()) {
+    actx.function_calls.push(function_call_record{
+        command_literal, m_args[0]->source_location(), m_args.count() > 1,
+        actx.function_scope_depth != 0});
+  }
+
   let const command_info = get_analysis_command_info(command_literal);
   let const command_id = command_info.id;
   let const command_is_assignment_builtin =
@@ -1348,6 +1420,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     StringView bare_array_name{};
     StringView quoted_value_name{};
     const SourceLocation *quoted_value_assignment = nullptr;
+    SourceLocation split_eligible_location = arg_location;
 
     if (word != nullptr) {
       for (let const &segment : word->segments) {
@@ -1414,6 +1487,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         case WordSegment::Kind::VariableReference: {
           quote_sandwich_state = 0;
           let const referenced = segment.text.view();
+          actx.note_positional_reference(referenced);
           if (!is_operand) break;
 
           /* An unquoted default assignment is split and globbed before it is
@@ -1450,6 +1524,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               !is_split_exempt_variable_name(referenced))
           {
             has_split_eligible_variable = true;
+            split_eligible_location = expansion_location_with_sigil(
+                actx, segment.get_source_location(arg_location.filename)
+                          .value_or(arg_location));
           }
           if (should_check_array_reads && bare_array_name.is_empty() &&
               actx.array_valued_names.contains(referenced))
@@ -1557,7 +1634,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           !(command_is_assignment_builtin &&
             word->get_assignment_split().has_value()))
       {
-        actx.report_diagnostic(diagnostic_id::sc2086_expansion, arg_location);
+        actx.report_diagnostic(diagnostic_id::sc2086_expansion,
+                               split_eligible_location);
       }
 
       if (should_check_dash_glob && !has_end_of_options) {
@@ -1618,7 +1696,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                  .to_literal_string()
                            : m_args[i]->raw_string();
       let const target_name = operand_target_name(word.view());
-      if (!target_name.is_empty()) actx.function_local_names.add(target_name);
+      if (!target_name.is_empty()) {
+        actx.function_local_names.set(target_name,
+                                      m_args[i]->source_location());
+      }
     }
   }
 
@@ -1755,7 +1836,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                    ->word()
                                    .to_literal_string()
                              : m_args[i]->raw_string();
-        actx.note_variable_assignment(operand_target_name(word.view()));
+        actx.note_variable_assignment(operand_target_name(word.view()),
+                                      m_args[i]->source_location());
       }
     } else if (!command_info.is_in_group(COMMAND_GROUP_VARIABLE_PROBE)) {
       for (usize i = 1; i < m_args.count(); i++) {

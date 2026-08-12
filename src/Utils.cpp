@@ -3356,8 +3356,8 @@ constexpr usize OSA_ROW_WIDTH = 256;
    rather than two. Bounded by max_distance, returning max_distance + 1 once the
    best possible result on the current row already exceeds it, so a far-off
    candidate costs little. */
-static pure fn bounded_osa_distance(StringView a, StringView b,
-                                    usize max_distance) wontthrow -> usize
+pure fn bounded_osa_distance(StringView a, StringView b,
+                             usize max_distance) wontthrow -> usize
 {
   const usize a_length = a.length;
   const usize b_length = b.length;
@@ -3401,56 +3401,10 @@ static pure fn bounded_osa_distance(StringView a, StringView b,
   return previous[b_length];
 }
 
-class NameSuggestion
+pure fn suggestion_distance_budget(usize name_length) wontthrow -> usize
 {
-public:
-  explicit NameSuggestion(StringView name)
-      : m_name(name), m_max_distance(name.length <= 3 ? 1 : 2),
-        m_best_distance(m_max_distance + 1)
-  {}
-
-  fn consider(StringView candidate) throws -> void
-  {
-    if (candidate.is_empty() || candidate == m_name) return;
-    const usize distance =
-        bounded_osa_distance(m_name, candidate, m_max_distance);
-    if (distance > m_best_distance) return;
-    const bool is_candidate_anagram = is_anagram(m_name, candidate);
-    if (distance < m_best_distance ||
-        (is_candidate_anagram && !m_best_is_anagram))
-    {
-      m_best_distance = distance;
-      m_best_is_anagram = is_candidate_anagram;
-      m_best = String{candidate};
-    }
-  }
-
-  fn take_suggestion() throws -> Maybe<String>
-  {
-    if (m_best_distance > m_max_distance) return None;
-    return steal(m_best);
-  }
-
-private:
-  static fn is_anagram(StringView a, StringView b) wontthrow -> bool
-  {
-    if (a.length != b.length) return false;
-    i32 counts[256] = {0};
-    for (usize i = 0; i < a.length; i++) {
-      counts[static_cast<u8>(a[i])]++;
-      counts[static_cast<u8>(b[i])]--;
-    }
-    for (let const count : counts)
-      if (count != 0) return false;
-    return true;
-  }
-
-  StringView m_name;
-  usize m_max_distance;
-  usize m_best_distance;
-  bool m_best_is_anagram{false};
-  String m_best{heap_allocator()};
-};
+  return name_length <= 3 ? 1 : 2;
+}
 
 fn suggest_command(StringView name, const ArrayList<String> &local_names,
                    const ProgramResolver *resolver) throws -> Maybe<String>
