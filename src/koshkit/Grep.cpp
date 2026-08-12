@@ -55,12 +55,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   }
   defer { os::free_regex(compiled); };
 
-  ArrayList<StringView> sources{cxt.scratch_allocator()};
-  if (operands.count() == 1)
-    sources.push(StringView{"-"});
-  else
-    for (usize i = 1; i < operands.count(); i++)
-      sources.push(operands[i].view());
+  let const sources =
+      source_list_from_operands(operands, cxt.scratch_allocator(), 1);
 
   let const should_print_names = sources.count() > 1;
   let output = String{cxt.scratch_allocator()};

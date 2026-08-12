@@ -23,6 +23,10 @@ word_only() {
   echo "${text:1:2}"
   echo "${text/from/to}"
   echo "$RANDOM"
+  echo "$BASH_ARGV0"
+  echo "$BASH_EXECUTION_STRING"
+  echo "$BASH_MONOSECONDS"
+  echo "$PPID"
   echo "${text:-default}"
   echo "${#text}"
 }

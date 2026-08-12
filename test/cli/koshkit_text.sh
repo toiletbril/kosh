@@ -28,6 +28,11 @@ echo "--- grep -v apple ---"
 "$BIN" -c 'koshkit grep -v apple fruit.txt'
 echo "--- grep -i APPLE ---"
 "$BIN" -c 'koshkit grep -i APPLE fruit.txt'
+echo "--- grep stdin ---"
+printf 'pear\nplum\n' | "$BIN" -c 'koshkit grep plum'
+printf 'pear\n' > pear.txt
+echo "--- grep multiple files ---"
+"$BIN" -c 'koshkit grep pear fruit.txt pear.txt'
 echo "--- tr to lower ---"
 "$BIN" -c 'printf "AbC\n" | koshkit tr A-Z a-z'
 echo "--- tr -d digits ---"

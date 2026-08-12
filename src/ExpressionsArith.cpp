@@ -101,7 +101,7 @@ conditional_operator_view(const conditional_element &element) wontthrow
   default: return None;
   }
 
-  if (element.word == nullptr) return None;
+  if (!element.is_bare_unquoted || element.word == nullptr) return None;
 
   let const view = element.word->raw_view();
   if (!view.has_value() || !is_conditional_binary_operator(*view)) {
@@ -122,12 +122,7 @@ cold static fn conditional_inequality_left_operand(
   if (operator_index == 0 || operator_index + 1 >= elements.count())
     return None;
 
-  let const &op = elements[operator_index];
-  if (op.kind != Kind::Operand || op.word == nullptr) {
-    return None;
-  }
-
-  let const op_view = op.word->raw_view();
+  let const op_view = conditional_operator_view(elements[operator_index]);
   if (!op_view.has_value() || *op_view != StringView{"!="}) {
     return None;
   }
@@ -198,9 +193,7 @@ conditional_element_ends_operand(const conditional_element &element) wontthrow
     return false;
   }
 
-  let const view = element.word->raw_view();
-
-  return !view.has_value() || !is_conditional_binary_operator(*view);
+  return !conditional_operator_view(element).has_value();
 }
 
 fn ConditionalCommand::analyze(AnalysisContext &actx,
@@ -252,7 +245,8 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
 
     /* A unary operator followed by a binary operator lost its operand,
        shellcheck SC1019. */
-    if (is_test_unary_operator_word(operand.view()) &&
+    if (element.is_bare_unquoted &&
+        is_test_unary_operator_word(operand.view()) &&
         i + 1 < m_elements.count())
     {
       let const next_operator = conditional_operator_view(m_elements[i + 1]);
@@ -305,7 +299,9 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       }
     }
 
-    if (operand.view() == ">=" || operand.view() == "<=") {
+    if (element.is_bare_unquoted &&
+        (operand.view() == ">=" || operand.view() == "<="))
+    {
       actx.report_diagnostic(diagnostic_id::sc2122,
                              element.word->source_location(), {operand.view()});
     }
@@ -355,20 +351,14 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
 
     let is_binary_operand = false;
     if (i > 0) {
-      let const &previous = m_elements[i - 1];
       is_binary_operand =
-          previous.kind == Kind::Less || previous.kind == Kind::Greater ||
-          (previous.kind == Kind::Operand && previous.word != nullptr &&
-           is_conditional_binary_operator(previous.word->raw_string().view()));
+          conditional_operator_view(m_elements[i - 1]).has_value();
     }
     if (!is_binary_operand && i + 1 < m_elements.count()) {
-      let const &next = m_elements[i + 1];
       is_binary_operand =
-          next.kind == Kind::Less || next.kind == Kind::Greater ||
-          (next.kind == Kind::Operand && next.word != nullptr &&
-           is_conditional_binary_operator(next.word->raw_string().view()));
+          conditional_operator_view(m_elements[i + 1]).has_value();
     }
-    if (!is_binary_operand && !is_conditional_binary_operator(operand.view()) &&
+    if (!is_binary_operand && !conditional_operator_view(element).has_value() &&
         element.word->kind() == Token::Kind::Word)
     {
       let const &word =
@@ -382,19 +372,22 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
           break;
         }
     }
-    if ((operand.view() == "-n" || operand.view() == "-z") &&
+    if (element.is_bare_unquoted &&
+        (operand.view() == "-n" || operand.view() == "-z") &&
         i + 1 < m_elements.count() &&
         conditional_word_is_literal(m_elements[i + 1].word))
       actx.report_diagnostic(diagnostic_id::sc2157_string,
                              m_elements[i + 1].word->source_location());
 
-    if (CONDITIONAL_PATH_TESTS.contains(operand.view()) &&
+    if (element.is_bare_unquoted &&
+        CONDITIONAL_PATH_TESTS.contains(operand.view()) &&
         i + 1 < m_elements.count() &&
         conditional_word_has_glob(m_elements[i + 1].word))
       actx.report_diagnostic(diagnostic_id::sc2144,
                              m_elements[i + 1].word->source_location());
 
-    if (!is_conditional_binary_operator(operand.view()) || i == 0 ||
+    if (!element.is_bare_unquoted ||
+        !is_conditional_binary_operator(operand.view()) || i == 0 ||
         i + 1 >= m_elements.count())
       continue;
 

@@ -262,16 +262,17 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
 }
 
 fn source_list_from_operands(const ArrayList<String> &operands,
-                             Allocator allocator) throws
+                             Allocator allocator,
+                             usize first_operand_index) throws
     -> ArrayList<StringView>
 {
   let sources = ArrayList<StringView>{allocator};
-  if (operands.is_empty()) {
+  if (first_operand_index >= operands.count()) {
     sources.push(StringView{"-"});
   } else {
-    sources.reserve(operands.count());
-    for (let const &operand : operands)
-      sources.push(operand.view());
+    sources.reserve(operands.count() - first_operand_index);
+    for (usize i = first_operand_index; i < operands.count(); i++)
+      sources.push(operands[i].view());
   }
   return sources;
 }

@@ -723,14 +723,9 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 {
   const String dir_string{dir};
   let const handle = ::opendir(dir_string.c_str());
-  if (handle == nullptr) {
-    LOG(Debug, "could not open the directory '%s'", dir_string.c_str());
-    return None;
-  }
+  if (handle == nullptr) return None;
 
   let names = ArrayList<String>{heap_allocator()};
-  /* readdir returns NULL for both EOF and error, so errno is cleared first and
-     a changed errno means a real error. */
   loop
   {
     errno = 0;
@@ -744,9 +739,7 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
     }
 
     let const name = StringView{entry->d_name};
-    if (name == StringView{"."} || name == StringView{".."}) {
-      continue;
-    }
+    if (name == StringView{"."} || name == StringView{".."}) continue;
     names.push(String{name});
   }
 
@@ -2572,12 +2565,9 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
   }
 }
 
-fn stat_path(StringView path, file_status &status) wontthrow -> bool
+static fn fill_file_status(const struct stat &info,
+                           file_status &status) wontthrow -> void
 {
-  const String path_string{path};
-  struct stat info{};
-  /* lstat does not follow the symlink, so ls shows the l type without -L. */
-  if (::lstat(path_string.c_str(), &info) != 0) return false;
   status.device_id = static_cast<u64>(info.st_dev);
   status.file_id = static_cast<u64>(info.st_ino);
   status.has_file_identity = true;
@@ -2591,6 +2581,15 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.change_time = static_cast<i64>(info.st_ctime);
   status.change_nanoseconds = static_cast<u32>(info.st_ctim.tv_nsec);
   status.blocks = static_cast<u64>(info.st_blocks);
+}
+
+fn stat_path(StringView path, file_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  /* lstat does not follow the symlink, so ls shows the l type without -L. */
+  if (::lstat(path_string.c_str(), &info) != 0) return false;
+  fill_file_status(info, status);
   return true;
 }
 
@@ -2599,19 +2598,7 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
   const String path_string{path};
   struct stat info{};
   if (::stat(path_string.c_str(), &info) != 0) return false;
-  status.device_id = static_cast<u64>(info.st_dev);
-  status.file_id = static_cast<u64>(info.st_ino);
-  status.has_file_identity = true;
-  status.mode = static_cast<u32>(info.st_mode);
-  status.link_count = static_cast<u64>(info.st_nlink);
-  status.owner_id = static_cast<u32>(info.st_uid);
-  status.group_id = static_cast<u32>(info.st_gid);
-  status.size = static_cast<u64>(info.st_size);
-  status.modification_time = static_cast<i64>(info.st_mtime);
-  status.modification_nanoseconds = static_cast<u32>(info.st_mtim.tv_nsec);
-  status.change_time = static_cast<i64>(info.st_ctime);
-  status.change_nanoseconds = static_cast<u32>(info.st_ctim.tv_nsec);
-  status.blocks = static_cast<u64>(info.st_blocks);
+  fill_file_status(info, status);
   return true;
 }
 

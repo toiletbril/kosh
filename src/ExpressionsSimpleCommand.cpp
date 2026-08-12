@@ -19,37 +19,24 @@ namespace koshka {
 
 namespace expressions {
 
-static pure fn is_process_dynamic_name(StringView text,
-                                       usize position) wontthrow -> bool
+static pure fn is_process_dynamic_name(StringView text, usize position,
+                                       bool is_bash_dynamic) wontthrow -> bool
 {
-  static const StringView PROCESS_DYNAMIC_NAMES[] = {
-      "BASHPID",
-      "PPID",
-      "RANDOM",
-      "SRANDOM",
-  };
-  for (let const name : PROCESS_DYNAMIC_NAMES) {
-    if (position + name.length > text.length ||
-        text.substring_of_length(position, name.length) != name)
-    {
-      continue;
-    }
+  if (!is_bash_dynamic) return false;
+  if (position > 0 && lexer::is_variable_name(text[position - 1])) return false;
 
-    let const end_position = position + name.length;
-    const bool has_name_before =
-        position > 0 && lexer::is_variable_name(text[position - 1]);
-    let const has_name_after = end_position < text.length &&
-                               lexer::is_variable_name(text[end_position]);
-    if (!has_name_before && !has_name_after) {
-      return true;
-    }
-  }
+  usize end_position = position;
+  while (end_position < text.length &&
+         lexer::is_variable_name(text[end_position]))
+    end_position++;
 
-  return false;
+  return is_process_dynamic_variable_name(
+      text.substring_of_length(position, end_position - position));
 }
 
-static fn word_is_safe_for_in_process_substitution(const Word &word) wontthrow
-    -> bool
+static fn
+word_is_safe_for_in_process_substitution(const Word &word,
+                                         bool is_bash_dynamic) wontthrow -> bool
 {
   for (let const &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::ProcessSubstitution ||
@@ -62,12 +49,14 @@ static fn word_is_safe_for_in_process_substitution(const Word &word) wontthrow
       if (!segment.text.is_empty() && segment.text[0] == '!') {
         return false;
       }
-      if (is_process_dynamic_name(segment.text.view(), 0)) return false;
+      if (is_process_dynamic_name(segment.text.view(), 0, is_bash_dynamic))
+        return false;
     }
 
     if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
       for (usize position = 0; position < segment.text.count(); position++)
-        if (is_process_dynamic_name(segment.text.view(), position))
+        if (is_process_dynamic_name(segment.text.view(), position,
+                                    is_bash_dynamic))
           return false;
   }
 
@@ -291,10 +280,10 @@ cold fn AssignCommand::to_string() const throws -> String
 fn AssignCommand::can_evaluate_in_process_substitution(
     const EvalContext &cxt, HashSet &active_functions) const throws -> bool
 {
-  unused(cxt);
   unused(active_functions);
   return !is_async() && !is_timed() &&
-         word_is_safe_for_in_process_substitution(m_assignment->value_word());
+         word_is_safe_for_in_process_substitution(
+             m_assignment->value_word(), cxt.bash_dynamic_variables_enabled());
 }
 
 SimpleCommand::SimpleCommand(SourceLocation location,
@@ -326,7 +315,9 @@ fn SimpleCommand::can_evaluate_in_process_substitution(
   for (let const argument : m_args) {
     if (argument->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(argument)->word();
-    if (!word_is_safe_for_in_process_substitution(word)) return false;
+    if (!word_is_safe_for_in_process_substitution(
+            word, cxt.bash_dynamic_variables_enabled()))
+      return false;
   }
 
   let const command_name = static_command_name(m_args[0]);

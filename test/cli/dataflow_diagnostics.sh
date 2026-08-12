@@ -44,8 +44,11 @@ echo '== the shell maintains these names itself:'
 echo "rc=$?"
 
 echo '== a KOSH_ name is maintained by the shell:'
-"$BIN" -n -WWW -c 'echo "$KOSH_GIT_BRANCH $KOSH_ANSI_RED"' 2>&1
+"$BIN" -n -WWW -c 'echo "$KOSH $KOSH_FLAGS $KOSH_GIT_BRANCH $KOSH_ANSI_RED"' 2>&1
 echo "rc=$?"
+
+echo '== misspelled KOSH and ANSI names are unresolved:'
+"$BIN" -n -WWW -c 'echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"' 2>&1
 
 echo '== an arithmetic assignment assigns its target:'
 "$BIN" -n -WWW -c 'echo $((y = 7)); echo "$y"' 2>&1

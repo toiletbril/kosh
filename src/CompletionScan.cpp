@@ -740,6 +740,11 @@ fn complete_from_builtin_flags(StringView line, StringView token,
 
       for (let const &name : os::environment_names())
         do_add_name(name.view());
+
+      let dynamic_names = ArrayList<StringView>{heap_allocator()};
+      context.append_dynamic_variable_names(dynamic_names);
+      for (let const name : dynamic_names)
+        do_add_name(name);
     }
 
     if (!candidates.is_empty()) return candidates;

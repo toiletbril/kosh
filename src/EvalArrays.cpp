@@ -821,12 +821,14 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
       names.push_managed(candidate);
     }
   };
-  m_shell_variables.for_each([&](StringView variable_name, const String &v) {
-    unused(v);
-    do_consider(variable_name);
-  });
+  let const stored_names = variable_names();
+  stored_names.for_each(do_consider);
   for (const String &environment_name : os::environment_names())
     do_consider(environment_name.view());
+  let dynamic_names = ArrayList<StringView>{heap_allocator()};
+  append_dynamic_variable_names(dynamic_names);
+  for (let const dynamic_name : dynamic_names)
+    do_consider(dynamic_name);
   names.sort();
   return names;
 }

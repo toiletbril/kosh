@@ -22,10 +22,6 @@ public:
   struct VTable
   {
     opaque *(*alloc)(opaque *context, usize length, usize alignment);
-    /* Grow or shrink in place. Returns false when the block cannot change size
-       without moving, so the caller allocates and copies. */
-    bool (*resize)(opaque *context, opaque *pointer, usize old_length,
-                   usize new_length, usize alignment);
     void (*free)(opaque *context, opaque *pointer, usize length,
                  usize alignment);
   };
@@ -37,11 +33,6 @@ public:
       -> opaque *
   {
     return vtable->alloc(context, length, alignment);
-  }
-  fn raw_resize(opaque *pointer, usize old_length, usize new_length,
-                usize alignment) const wontthrow -> bool
-  {
-    return vtable->resize(context, pointer, old_length, new_length, alignment);
   }
   flatten fn raw_free(opaque *pointer, usize length,
                       usize alignment) const wontthrow -> void
@@ -78,16 +69,6 @@ hot inline fn bump_alloc(opaque *context, usize length, usize alignment) throws
   return bump_arena_allocate(static_cast<BumpArena *>(context), length,
                              alignment);
 }
-inline fn bump_resize(opaque *context, opaque *pointer, usize old_length,
-                      usize new_length, usize alignment) wontthrow -> bool
-{
-  unused(context);
-  unused(pointer);
-  unused(old_length);
-  unused(new_length);
-  unused(alignment);
-  return false;
-}
 inline fn bump_free(opaque *context, opaque *pointer, usize length,
                     usize alignment) wontthrow -> void
 {
@@ -97,8 +78,7 @@ inline fn bump_free(opaque *context, opaque *pointer, usize length,
   unused(alignment);
 }
 
-inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
-                                               bump_free};
+inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_free};
 
 /* A size-classed cache over the C allocator. musl returns a freed page group to
    the kernel at once, so a tight allocate then free of the same size churns
@@ -203,16 +183,6 @@ hot inline fn heap_alloc(opaque *context, usize length,
   }
   return heap_pool_instance().take(length);
 }
-inline fn heap_resize(opaque *context, opaque *pointer, usize old_length,
-                      usize new_length, usize alignment) wontthrow -> bool
-{
-  unused(context);
-  unused(pointer);
-  unused(old_length);
-  unused(new_length);
-  unused(alignment);
-  return false;
-}
 hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
                         usize alignment) wontthrow -> void
 {
@@ -226,8 +196,7 @@ hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
   heap_pool_instance().give(pointer, length);
 }
 
-inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_resize,
-                                               heap_free};
+inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_free};
 
 inline fn fake_alloc(opaque *context, usize length, usize alignment) wontthrow
     -> opaque *
@@ -238,16 +207,6 @@ inline fn fake_alloc(opaque *context, usize length, usize alignment) wontthrow
   ASSERT(false, "a fake_allocator container tried to allocate");
   return nullptr;
 }
-inline fn fake_resize(opaque *context, opaque *pointer, usize old_length,
-                      usize new_length, usize alignment) wontthrow -> bool
-{
-  unused(context);
-  unused(pointer);
-  unused(old_length);
-  unused(new_length);
-  unused(alignment);
-  return false;
-}
 inline fn fake_free(opaque *context, opaque *pointer, usize length,
                     usize alignment) wontthrow -> void
 {
@@ -257,8 +216,7 @@ inline fn fake_free(opaque *context, opaque *pointer, usize length,
   unused(alignment);
 }
 
-inline constexpr Allocator::VTable FAKE_VTABLE{fake_alloc, fake_resize,
-                                               fake_free};
+inline constexpr Allocator::VTable FAKE_VTABLE{fake_alloc, fake_free};
 
 } // namespace allocators
 

@@ -1,5 +1,8 @@
 == unset completes a variable name:
 completion_probe_var
+== unset completes a dynamic ANSI variable name:
+KOSH_ANSI_RED
+KOSH_ANSI_RESET
 == unset -f completes a function name:
 completion_probe_fn
 == plain unset does not offer a function name:

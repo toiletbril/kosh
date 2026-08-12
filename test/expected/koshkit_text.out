@@ -34,6 +34,10 @@ cherry
 --- grep -i APPLE ---
 apple
 apple
+--- grep stdin ---
+plum
+--- grep multiple files ---
+pear.txt:pear
 --- tr to lower ---
 abc
 --- tr -d digits ---

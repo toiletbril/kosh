@@ -1379,11 +1379,13 @@ fn environment_names() -> ArrayList<String>
   defer { FreeEnvironmentStringsA(block); };
   for (char *entry = block; *entry != '\0';) {
     StringView pair{entry};
+    if (pair[0] == '=') {
+      entry += pair.length + 1;
+      continue;
+    }
     let const equals = pair.find_character('=');
-    /* Drive entries such as =C: keep their leading '=' as part of the name. */
-    let const split = (equals.has_value() && *equals > 0)
-                          ? pair.substring_of_length(0, *equals)
-                          : pair;
+    let const split =
+        equals.has_value() ? pair.substring_of_length(0, *equals) : pair;
     names.push(String{split});
     entry += pair.length + 1;
   }

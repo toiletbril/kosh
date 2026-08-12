@@ -715,42 +715,87 @@ enum class dynamic_var : u8
   FUNCNAME,
 };
 
-constexpr static_string_entry<dynamic_var> ALWAYS_DYNAMIC_ENTRIES[] = {
-    {SSK("IFS"),             dynamic_var::IFS            },
-    {SSK("LINENO"),          dynamic_var::LINENO         },
-    {SSK("KOSH_GIT_BRANCH"), dynamic_var::KOSH_GIT_BRANCH},
-    {SSK("KOSH_GIT_AHEAD"),  dynamic_var::KOSH_GIT_AHEAD },
-    {SSK("KOSH_GIT_BEHIND"), dynamic_var::KOSH_GIT_BEHIND},
-    {SSK("KOSH_IDENTITY"),   dynamic_var::KOSH_IDENTITY  },
+struct dynamic_variable_info
+{
+  StringView name;
+  dynamic_var kind;
+  bool is_process_sensitive;
+  bool is_bash_only_diagnostic;
+};
+
+#define DYNAMIC_VARIABLE(name, kind, process_sensitive, bash_only)             \
+  {                                                                            \
+    SSK(name),                                                                 \
+    {                                                                          \
+      StringView{name, sizeof(name) - 1}, dynamic_var::kind,                   \
+          process_sensitive, bash_only                                         \
+    }                                                                          \
+  }
+
+constexpr static_string_entry<dynamic_variable_info> ALWAYS_DYNAMIC_ENTRIES[] =
+    {
+        DYNAMIC_VARIABLE("IFS", IFS, false, false),
+        DYNAMIC_VARIABLE("LINENO", LINENO, false, false),
+        DYNAMIC_VARIABLE("KOSH_GIT_BRANCH", KOSH_GIT_BRANCH, false, false),
+        DYNAMIC_VARIABLE("KOSH_GIT_AHEAD", KOSH_GIT_AHEAD, false, false),
+        DYNAMIC_VARIABLE("KOSH_GIT_BEHIND", KOSH_GIT_BEHIND, false, false),
+        DYNAMIC_VARIABLE("KOSH_IDENTITY", KOSH_IDENTITY, false, false),
 };
 constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
 
-constexpr static_string_entry<dynamic_var> BASH_DYNAMIC_ENTRIES[] = {
-    {SSK("BASH_COMMAND"),          dynamic_var::BASH_COMMAND         },
-    {SSK("BASH_EXECUTION_STRING"), dynamic_var::BASH_EXECUTION_STRING},
-    {SSK("BASH_LINENO"),           dynamic_var::BASH_LINENO          },
-    {SSK("BASH_MONOSECONDS"),      dynamic_var::BASH_MONOSECONDS     },
-    {SSK("BASH_SOURCE"),           dynamic_var::BASH_SOURCE          },
-    {SSK("BASH_SUBSHELL"),         dynamic_var::BASH_SUBSHELL        },
-    {SSK("BASH_ARGV0"),            dynamic_var::BASH_ARGV0           },
-    {SSK("BASHPID"),               dynamic_var::BASHPID              },
-    {SSK("EPOCHREALTIME"),         dynamic_var::EPOCHREALTIME        },
-    {SSK("EPOCHSECONDS"),          dynamic_var::EPOCHSECONDS         },
-    {SSK("EUID"),                  dynamic_var::EUID                 },
-    {SSK("FUNCNAME"),              dynamic_var::FUNCNAME             },
-    {SSK("GROUPS"),                dynamic_var::GROUPS               },
-    {SSK("HOSTNAME"),              dynamic_var::HOSTNAME             },
-    {SSK("HOSTTYPE"),              dynamic_var::HOSTTYPE             },
-    {SSK("MACHTYPE"),              dynamic_var::MACHTYPE             },
-    {SSK("OSTYPE"),                dynamic_var::OSTYPE               },
-    {SSK("PPID"),                  dynamic_var::PPID                 },
-    {SSK("RANDOM"),                dynamic_var::RANDOM               },
-    {SSK("SECONDS"),               dynamic_var::SECONDS              },
-    {SSK("SHELLOPTS"),             dynamic_var::SHELLOPTS            },
-    {SSK("SRANDOM"),               dynamic_var::SRANDOM              },
-    {SSK("UID"),                   dynamic_var::UID                  },
+constexpr static_string_entry<dynamic_variable_info> BASH_DYNAMIC_ENTRIES[] = {
+    DYNAMIC_VARIABLE("BASH_COMMAND", BASH_COMMAND, false, true),
+    DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false,
+                     true),
+    DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false, true),
+    DYNAMIC_VARIABLE("BASH_MONOSECONDS", BASH_MONOSECONDS, false, true),
+    DYNAMIC_VARIABLE("BASH_SOURCE", BASH_SOURCE, false, true),
+    DYNAMIC_VARIABLE("BASH_SUBSHELL", BASH_SUBSHELL, false, true),
+    DYNAMIC_VARIABLE("BASH_ARGV0", BASH_ARGV0, false, true),
+    DYNAMIC_VARIABLE("BASHPID", BASHPID, true, true),
+    DYNAMIC_VARIABLE("EPOCHREALTIME", EPOCHREALTIME, false, true),
+    DYNAMIC_VARIABLE("EPOCHSECONDS", EPOCHSECONDS, false, true),
+    DYNAMIC_VARIABLE("EUID", EUID, false, true),
+    DYNAMIC_VARIABLE("FUNCNAME", FUNCNAME, false, true),
+    DYNAMIC_VARIABLE("GROUPS", GROUPS, false, true),
+    DYNAMIC_VARIABLE("HOSTNAME", HOSTNAME, false, true),
+    DYNAMIC_VARIABLE("HOSTTYPE", HOSTTYPE, false, true),
+    DYNAMIC_VARIABLE("MACHTYPE", MACHTYPE, false, true),
+    DYNAMIC_VARIABLE("OSTYPE", OSTYPE, false, true),
+    DYNAMIC_VARIABLE("PPID", PPID, true, true),
+    DYNAMIC_VARIABLE("RANDOM", RANDOM, true, true),
+    DYNAMIC_VARIABLE("SECONDS", SECONDS, false, true),
+    DYNAMIC_VARIABLE("SHELLOPTS", SHELLOPTS, false, true),
+    DYNAMIC_VARIABLE("SRANDOM", SRANDOM, true, true),
+    DYNAMIC_VARIABLE("UID", UID, false, true),
 };
 constexpr StaticStringMap BASH_DYNAMIC{BASH_DYNAMIC_ENTRIES};
+
+#undef DYNAMIC_VARIABLE
+
+pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
+{
+  if (ALWAYS_DYNAMIC.find(name).has_value() ||
+      BASH_DYNAMIC.find(name).has_value())
+    return true;
+
+  for (let const &color : KOSH_ANSI_COLORS)
+    if (StringView{color.name} == name) return true;
+
+  return false;
+}
+
+pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool
+{
+  let const info = BASH_DYNAMIC.find(name);
+  return info.has_value() && info->is_bash_only_diagnostic;
+}
+
+pure fn is_process_dynamic_variable_name(StringView name) wontthrow -> bool
+{
+  let const info = BASH_DYNAMIC.find(name);
+  return info.has_value() && info->is_process_sensitive;
+}
 
 constexpr pure fn is_dynamic_first_byte(char c) wontthrow -> bool
 {
@@ -871,8 +916,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      round-trip. A name whose first byte holds no dynamic variable falls
      straight through to the environment. */
   if (is_dynamic_first_byte(first_byte)) {
-    if (let const tag = ALWAYS_DYNAMIC.find(name); tag.has_value()) {
-      switch (*tag) {
+    if (let const info = ALWAYS_DYNAMIC.find(name); info.has_value()) {
+      switch (info->kind) {
       case dynamic_var::IFS:
         return String{heap_allocator(), m_field_separators.view()};
       case dynamic_var::LINENO:
@@ -894,7 +939,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           m_git_counts_command_index = m_command_evaluation_index;
         }
 
-        switch (*tag) {
+        switch (info->kind) {
         case dynamic_var::KOSH_GIT_AHEAD:
           return m_git_ahead_count > 0
                      ? String::from(m_git_ahead_count, heap_allocator())
@@ -919,8 +964,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
 
     if (bash_dynamic_variables_enabled()) {
-      if (let const tag = BASH_DYNAMIC.find(name); tag.has_value()) {
-        switch (*tag) {
+      if (let const info = BASH_DYNAMIC.find(name); info.has_value()) {
+        switch (info->kind) {
         case dynamic_var::RANDOM:
           if (!m_random_seeded) {
             std::srand(static_cast<unsigned>(m_shell_start_time) ^
@@ -1030,45 +1075,16 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 fn EvalContext::append_dynamic_variable_names(
     ArrayList<StringView> &out) const throws -> void
 {
-  out.push(StringView{"IFS"});
-  out.push(StringView{"LINENO"});
-  out.push(StringView{"KOSH_GIT_AHEAD"});
-  out.push(StringView{"KOSH_GIT_BEHIND"});
-  out.push(StringView{"KOSH_GIT_BRANCH"});
-  out.push(StringView{"KOSH_IDENTITY"});
+  for (let const &entry : ALWAYS_DYNAMIC.entries)
+    out.push(entry.value.name);
 
   for (let const &color : KOSH_ANSI_COLORS)
     out.push(StringView{color.name});
 
   if (!bash_dynamic_variables_enabled()) return;
 
-  static constexpr const char *BASH_DYNAMIC_NAMES[] = {
-      "RANDOM",
-      "SECONDS",
-      "SHELLOPTS",
-      "EPOCHSECONDS",
-      "EPOCHREALTIME",
-      "BASHPID",
-      "PPID",
-      "UID",
-      "EUID",
-      "HOSTNAME",
-      "BASH_MONOSECONDS",
-      "BASH_ARGV0",
-      "BASH_EXECUTION_STRING",
-      "GROUPS",
-      "HOSTTYPE",
-      "MACHTYPE",
-      "SRANDOM",
-      "OSTYPE",
-      "BASH_SUBSHELL",
-      "FUNCNAME",
-      "BASH_SOURCE",
-      "BASH_LINENO",
-      "BASH_COMMAND",
-  };
-  for (let const name : BASH_DYNAMIC_NAMES)
-    out.push(StringView{name});
+  for (let const &entry : BASH_DYNAMIC.entries)
+    out.push(entry.value.name);
 }
 
 pure fn EvalContext::positional_params() const wontthrow

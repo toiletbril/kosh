@@ -596,8 +596,7 @@ pure fn is_find_leading_option(StringView word) wontthrow -> bool
 }
 
 /* The names the shell or the environment gives a value without the script
-   assigning one, so a read of them is not an unassigned read. Every KOSH_ name
-   is covered by its prefix and is left out here. */
+   assigning one, so a read of them is not an unassigned read. */
 constexpr PackedStringKey SHELL_MAINTAINED_VARIABLE_KEYS[] = {
     SSK("BASH"),
     SSK("BASHOPTS"),
@@ -689,7 +688,23 @@ constexpr StaticStringSet SHELL_MAINTAINED_VARIABLES{
 
 pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool
 {
-  if (name.starts_with("KOSH_")) return true;
+  if (is_runtime_dynamic_variable_name(name)) return true;
+
+  static constexpr PackedStringKey KOSH_KEYS[] = {
+      SSK("KOSH"),
+      SSK("KOSH_BUILD_MODE"),
+      SSK("KOSH_CALC_HISTORY"),
+      SSK("KOSH_COMMIT"),
+      SSK("KOSH_DIRECTORY_HISTORY"),
+      SSK("KOSH_FAREWELL"),
+      SSK("KOSH_FLAGS"),
+      SSK("KOSH_HISTORY"),
+      SSK("KOSH_OS"),
+      SSK("KOSH_VERSION"),
+      SSK("KOSH_WELCOME"),
+  };
+  static constexpr StaticStringSet KOSH_VARIABLES{KOSH_KEYS};
+  if (KOSH_VARIABLES.contains(name)) return true;
 
   return SHELL_MAINTAINED_VARIABLES.contains(name);
 }
@@ -816,7 +831,9 @@ fn check_posix_parameter_expansion(AnalysisContext &actx,
   if (position == name_start) return;
 
   let const name = text.substring_of_length(name_start, position - name_start);
-  if (BASH_ONLY_VARIABLES.contains(name)) {
+  if (BASH_ONLY_VARIABLES.contains(name) ||
+      is_bash_only_dynamic_variable_name(name))
+  {
     actx.report_diagnostic(diagnostic_id::sc3028, do_get_location(), {name});
     return;
   }

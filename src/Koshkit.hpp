@@ -298,7 +298,8 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
 /* The operand list becomes a source list, a single "-" stdin source when no
    operand is given, otherwise each operand as a view. */
 fn source_list_from_operands(const ArrayList<String> &operands,
-                             Allocator allocator) throws
+                             Allocator allocator,
+                             usize first_operand_index = 0) throws
     -> ArrayList<StringView>;
 
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void;

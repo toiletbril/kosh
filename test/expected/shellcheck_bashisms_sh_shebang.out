@@ -44,6 +44,14 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$RANDOM"]
           [CompoundListCondition, None]
+            [SimpleCommand "echo" "$BASH_ARGV0"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$BASH_EXECUTION_STRING"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$BASH_MONOSECONDS"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$PPID"]
+          [CompoundListCondition, None]
             [SimpleCommand "echo" "$text:-default"]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$#text"]
@@ -307,6 +315,30 @@
 ]
 [Word
   Variable "RANDOM"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "BASH_ARGV0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "BASH_EXECUTION_STRING"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "BASH_MONOSECONDS"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "PPID"
 ]
 [Word
   Unquoted "echo"
@@ -908,157 +940,173 @@ note: Use `sed` or a `case` dispatch under a `sh` shebang.
     25 |    echo "$RANDOM"
        |          ^~~~~~~
 note: Compute the value another way under a `sh` shebang.
-30:15: warning: The `&>` redirection is a bash extension absent from POSIX sh. (SC3020)
-    30 |    echo both &>out.log
+26:9: warning: 'BASH_ARGV0' is a bash variable that POSIX sh leaves undefined. (SC3028)
+    26 |    echo "$BASH_ARGV0"
+       |          ^~~~~~~~~~~
+note: Compute the value another way under a `sh` shebang.
+27:9: warning: 'BASH_EXECUTION_STRING' is a bash variable that POSIX sh leaves undefined. (SC3028)
+    27 |    echo "$BASH_EXECUTION_STRING"
+       |          ^~~~~~~~~~~~~~~~~~~~~~
+note: Compute the value another way under a `sh` shebang.
+28:9: warning: 'BASH_MONOSECONDS' is a bash variable that POSIX sh leaves undefined. (SC3028)
+    28 |    echo "$BASH_MONOSECONDS"
+       |          ^~~~~~~~~~~~~~~~~
+note: Compute the value another way under a `sh` shebang.
+29:9: warning: 'PPID' is a bash variable that POSIX sh leaves undefined. (SC3028)
+    29 |    echo "$PPID"
+       |          ^~~~~
+note: Compute the value another way under a `sh` shebang.
+34:15: warning: The `&>` redirection is a bash extension absent from POSIX sh. (SC3020)
+    34 |    echo both &>out.log
        |                ^~~~~~~
 note: Write the file redirect and `2>&1` separately under a `sh` shebang.
-31:18: warning: The `&>` redirection is a bash extension absent from POSIX sh. (SC3020)
-    31 |    echo append &>>out.log
+35:18: warning: The `&>` redirection is a bash extension absent from POSIX sh. (SC3020)
+    35 |    echo append &>>out.log
        |                   ^~~~~~~
 note: Write the file redirect and `2>&1` separately under a `sh` shebang.
-32:14: warning: The `>&` redirection to 'outfile' is a bash extension absent from POSIX sh. (SC3021)
-    32 |    echo dup >&outfile
+36:14: warning: The `>&` redirection to 'outfile' is a bash extension absent from POSIX sh. (SC3021)
+    36 |    echo dup >&outfile
        |               ^~~~~~~
 note: Write the file redirect and `2>&1` separately under a `sh` shebang.
-33:8: warning: The named file descriptor '{logfd}' is a bash extension absent from POSIX sh. (SC3022)
-    33 |    exec {logfd}>trace.log
+37:8: warning: The named file descriptor '{logfd}' is a bash extension absent from POSIX sh. (SC3022)
+    37 |    exec {logfd}>trace.log
        |         ^~~~~~~
 note: Name a fixed descriptor number under a `sh` shebang.
-34:16: warning: The file descriptor '12' is outside the range POSIX sh defines. (SC3023)
-    34 |    echo high 12>high.log
+38:16: warning: The file descriptor '12' is outside the range POSIX sh defines. (SC3023)
+    38 |    echo high 12>high.log
        |                 ^~~~~~~~
 note: Use a descriptor from 0 to 9 under a `sh` shebang.
-35:13: warning: The path '/dev/tcp/example.com/80' is a bash network device that POSIX sh leaves undefined. (SC3025)
-    35 |    echo net >/dev/tcp/example.com/80
+39:13: warning: The path '/dev/tcp/example.com/80' is a bash network device that POSIX sh leaves undefined. (SC3025)
+    39 |    echo net >/dev/tcp/example.com/80
        |              ^~~~~~~~~~~~~~~~~~~~~~~
 note: Open the connection with a network client under a `sh` shebang.
-36:14: warning: The redirection target 'prefix*.log' is a glob that POSIX sh leaves undefined. (SC3031)
-    36 |    echo glob >prefix*.log
+40:14: warning: The redirection target 'prefix*.log' is a glob that POSIX sh leaves undefined. (SC3031)
+    40 |    echo glob >prefix*.log
        |               ^~~~~~~~~~~
 note: Name the file explicitly under a `sh` shebang.
-40:3: warning: The standalone `((...))` command is a bash extension absent from POSIX sh. (SC3006)
-    40 |    ((counter + 1))
+44:3: warning: The standalone `((...))` command is a bash extension absent from POSIX sh. (SC3006)
+    44 |    ((counter + 1))
        |    ^~~~~~~~~~~~~~~
 note: Use the `: $((...))` form under a `sh` shebang.
-41:8: warning: The `++` operator in arithmetic is undefined in POSIX sh. (SC3018)
-    41 |    : $((counter++))
+45:8: warning: The `++` operator in arithmetic is undefined in POSIX sh. (SC3018)
+    45 |    : $((counter++))
        |         ^~~~~~~~~
 note: Write the assignment out under a `sh` shebang.
-42:8: warning: The `--` operator in arithmetic is undefined in POSIX sh. (SC3018)
-    42 |    : $((counter--))
+46:8: warning: The `--` operator in arithmetic is undefined in POSIX sh. (SC3018)
+    46 |    : $((counter--))
        |         ^~~~~~~~~
 note: Write the assignment out under a `sh` shebang.
-43:8: warning: The `**` operator in arithmetic is undefined in POSIX sh. (SC3019)
-    43 |    : $((base ** exponent))
+47:8: warning: The `**` operator in arithmetic is undefined in POSIX sh. (SC3019)
+    47 |    : $((base ** exponent))
        |         ^~~~~~~~~~~~~~~~
 note: Multiply the value out under a `sh` shebang.
-44:11: warning: The `<` comparison in `test` is undefined in POSIX sh. (SC3012)
-    44 |    [ alpha \< beta ]
+48:11: warning: The `<` comparison in `test` is undefined in POSIX sh. (SC3012)
+    48 |    [ alpha \< beta ]
        |            ^~
 note: Compare with `expr` or a `case` statement under a `sh` shebang.
-45:11: warning: The `>` comparison in `test` is undefined in POSIX sh. (SC3012)
-    45 |    [ alpha \> beta ]
+49:11: warning: The `>` comparison in `test` is undefined in POSIX sh. (SC3012)
+    49 |    [ alpha \> beta ]
        |            ^~
 note: Compare with `expr` or a `case` statement under a `sh` shebang.
-46:11: warning: The `-nt` operator in `test` is undefined in POSIX sh. (SC3013)
-    46 |    [ first -nt second ]
+50:11: warning: The `-nt` operator in `test` is undefined in POSIX sh. (SC3013)
+    50 |    [ first -nt second ]
        |            ^~~
 note: Compare the timestamps with `find` or `ls` under a `sh` shebang.
-47:11: warning: The `-ef` operator in `test` is undefined in POSIX sh. (SC3013)
-    47 |    [ first -ef second ]
+51:11: warning: The `-ef` operator in `test` is undefined in POSIX sh. (SC3013)
+    51 |    [ first -ef second ]
        |            ^~~
 note: Compare the timestamps with `find` or `ls` under a `sh` shebang.
-48:5: warning: The unary `-a` in `test` is undefined in POSIX sh. (SC3017)
-    48 |    [ -a present ]
+52:5: warning: The unary `-a` in `test` is undefined in POSIX sh. (SC3017)
+    52 |    [ -a present ]
        |      ^~
 note: Use `-e` instead.
-49:11: warning: The literals 'alpha' and 'beta' differ, so the comparison never succeeds. (SC2193)
-    49 |    [ alpha = beta ]
+53:11: warning: The literals 'alpha' and 'beta' differ, so the comparison never succeeds. (SC2193)
+    53 |    [ alpha = beta ]
        |            ^
 note: Compare a variable, or correct the operand spelling.
-54:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2177)
-    54 |    time { printf 'grouped\n'; }
+58:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2177)
+    58 |    time { printf 'grouped\n'; }
        |    ^~~~
 note: Run the compound command through `sh -c` and time that.
-55:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2177)
-    55 |    time ( printf 'subshell\n' )
+59:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2177)
+    59 |    time ( printf 'subshell\n' )
        |    ^~~~
 note: Run the compound command through `sh -c` and time that.
-53:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2176)
-    53 |    time printf 'timed\n' | wc -l
+57:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2176)
+    57 |    time printf 'timed\n' | wc -l
        |    ^~~~
 note: Time one stage, or run the pipeline through `bash -c` and time that.
-61:3: warning: Commands after `exec` do not run when `exec` succeeds. (SC2093)
-    61 |    exec -c env
+65:3: warning: Commands after `exec` do not run when `exec` succeeds. (SC2093)
+    65 |    exec -c env
        |    ^~~~
-62:3: details:
-    62 |    let value=1
+66:3: details:
+    66 |    let value=1
        |    ^~~~~~~~~~~ this is the first command skipped after `exec`.
 note: Remove the `exec`, or remove the unreachable commands.
-59:3: warning: The `+=` assignment to 'LIST' is a bash extension absent from POSIX sh. (SC3024)
-    59 |    LIST+=extra
+63:3: warning: The `+=` assignment to 'LIST' is a bash extension absent from POSIX sh. (SC3024)
+    63 |    LIST+=extra
        |    ^~~~~~~~~~~
 note: Write `NAME="$NAME"value` under a `sh` shebang.
-60:3: warning: The `+=` assignment to 'PREFIX' is a bash extension absent from POSIX sh. (SC3024)
-    60 |    PREFIX+=extra env
+64:3: warning: The `+=` assignment to 'PREFIX' is a bash extension absent from POSIX sh. (SC3024)
+    64 |    PREFIX+=extra env
        |    ^~~~~~~~~~~~~
 note: Write `NAME="$NAME"value` under a `sh` shebang.
-61:8: warning: The `exec` `-c` flag is a bash extension absent from POSIX sh. (SC3038)
-    61 |    exec -c env
+65:8: warning: The `exec` `-c` flag is a bash extension absent from POSIX sh. (SC3038)
+    65 |    exec -c env
        |         ^~
 note: Drop the flag under a `sh` shebang.
-62:3: warning: The `let` builtin is a bash extension absent from POSIX sh. (SC3039)
-    62 |    let value=1
+66:3: warning: The `let` builtin is a bash extension absent from POSIX sh. (SC3039)
+    66 |    let value=1
        |    ^~~
 note: Use the `: $((...))` form under a `sh` shebang.
-63:18: warning: The `ERR` condition is a bash extension absent from POSIX sh. (SC3047)
-    63 |    trap 'cleanup' ERR
+67:18: warning: The `ERR` condition is a bash extension absent from POSIX sh. (SC3047)
+    67 |    trap 'cleanup' ERR
        |                   ^~~
 note: Check the status after each command under a `sh` shebang.
-64:18: warning: The `SIG` prefix on 'SIGINT' is undefined in POSIX sh. (SC3048)
-    64 |    trap 'cleanup' SIGINT
+68:18: warning: The `SIG` prefix on 'SIGINT' is undefined in POSIX sh. (SC3048)
+    68 |    trap 'cleanup' SIGINT
        |                   ^~~~~~
 note: Name the signal without the `SIG` prefix under a `sh` shebang.
-65:18: warning: The signal name 'int' is undefined in POSIX sh because it is not uppercase. (SC3049)
-    65 |    trap 'cleanup' int
+69:18: warning: The signal name 'int' is undefined in POSIX sh because it is not uppercase. (SC3049)
+    69 |    trap 'cleanup' int
        |                   ^~~
 note: Name the signal in uppercase under a `sh` shebang.
-68:10: warning: The `printf` `%q` directive is a bash extension absent from POSIX sh. (SC3050)
-    68 |    printf '%q\n' "$value"
+72:10: warning: The `printf` `%q` directive is a bash extension absent from POSIX sh. (SC3050)
+    72 |    printf '%q\n' "$value"
        |           ^~~~~~
 note: Quote the value another way under a `sh` shebang.
-70:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it. (SC2240)
-    70 |    . library.sh extra
+74:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it. (SC2240)
+    74 |    . library.sh extra
        |                 ^~~~~
 note: Set the values as variables before the file is read.
-74:3: warning: The `$0` parameter cannot be assigned in POSIX sh, so '$0=zero' runs as a command. (SC2279)
-    74 |    $0=zero
+78:3: warning: The `$0` parameter cannot be assigned in POSIX sh, so '$0=zero' runs as a command. (SC2279)
+    78 |    $0=zero
        |    ^~~~~~~
 note: Assign the program name to a named variable.
-77:3: warning: 'mapfile' is a bash array builtin absent from POSIX sh. (SC3030)
-    77 |    mapfile -t lines < roster
+81:3: warning: 'mapfile' is a bash array builtin absent from POSIX sh. (SC3030)
+    81 |    mapfile -t lines < roster
        |    ^~~~~~~
 note: Read the input with a `while read` loop, or switch the shebang to bash.
-78:3: warning: 'readarray' is a bash array builtin absent from POSIX sh. (SC3030)
-    78 |    readarray -t rows < roster
+82:3: warning: 'readarray' is a bash array builtin absent from POSIX sh. (SC3030)
+    82 |    readarray -t rows < roster
        |    ^~~~~~~~~
 note: Read the input with a `while read` loop, or switch the shebang to bash.
-79:10: warning: The `printf -v` form is a bash extension, the POSIX `printf` has no `-v`. (SC3045)
-    79 |    printf -v buffer '%s' text
+83:10: warning: The `printf -v` form is a bash extension, the POSIX `printf` has no `-v`. (SC3045)
+    83 |    printf -v buffer '%s' text
        |           ^~
 note: Capture the output with a command substitution under a `sh` shebang.
-80:3: warning: The `local` builtin is not in POSIX sh, the value stays global. (SC3043)
-    80 |    local scoped=value
+84:3: warning: The `local` builtin is not in POSIX sh, the value stays global. (SC3043)
+    84 |    local scoped=value
        |    ^~~~~
 note: Rework the function, or switch the shebang to bash.
-83:23: warning: The `&>` redirection is a bash extension absent from POSIX sh. (SC3020)
-    83 |    { echo grouped; } &>both.log
+87:23: warning: The `&>` redirection is a bash extension absent from POSIX sh. (SC3020)
+    87 |    { echo grouped; } &>both.log
        |                        ^~~~~~~~
 note: Write the file redirect and `2>&1` separately under a `sh` shebang.
-84:22: warning: The redirection target 'prefix*.log' is a glob that POSIX sh leaves undefined. (SC3031)
-    84 |    { echo globbed; } >prefix*.log
+88:22: warning: The redirection target 'prefix*.log' is a glob that POSIX sh leaves undefined. (SC3031)
+    88 |    { echo globbed; } >prefix*.log
        |                       ^~~~~~~~~~~
 note: Name the file explicitly under a `sh` shebang.
-Encountered 57 warnings.
+Encountered 61 warnings.
 done
 [Code 0]

@@ -56,6 +56,20 @@ rc=0
 rc=0
 == a KOSH_ name is maintained by the shell:
 rc=0
+== misspelled KOSH and ANSI names are unresolved:
+1:6: warning: The variable 'KOSH_ANSI_REDD' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
+       |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Assign 'KOSH_ANSI_REDD' before it is read, or export it from the environment.
+1:6: warning: The variable 'KOSH_VERSOIN' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
+       |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Assign 'KOSH_VERSOIN' before it is read, or export it from the environment.
+1:6: warning: The variable 'KOSH_GIT_BRNACH' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
+       |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: Assign 'KOSH_GIT_BRNACH' before it is read, or export it from the environment.
+Encountered 3 warnings.
 == an arithmetic assignment assigns its target:
 rc=0
 == a compound arithmetic assignment assigns its target:

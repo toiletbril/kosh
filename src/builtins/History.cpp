@@ -93,9 +93,9 @@ static fn append_file_into_history(EvalContext &cxt, const Path &source) throws
   let payload = String{cxt.scratch_allocator(), source_text->view()};
   if (payload[payload.count() - 1] != '\n') payload += '\n';
 
-  let const written = os::write_fd(fd, payload.data(), payload.count());
+  let const was_written = os::write_all(fd, payload.data(), payload.count());
   os::close_fd(fd);
-  return written.has_value() && written.value() == payload.count();
+  return was_written;
 }
 
 static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
@@ -117,10 +117,8 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
   let const fd = opened.value();
 
   bool was_written = true;
-  if (!contents.is_empty()) {
-    let const written = os::write_fd(fd, contents.data(), contents.count());
-    was_written = written.has_value() && written.value() == contents.count();
-  }
+  if (!contents.is_empty())
+    was_written = os::write_all(fd, contents.data(), contents.count());
 
   os::close_fd(fd);
   return was_written;
