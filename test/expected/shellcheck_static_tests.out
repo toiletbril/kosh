@@ -1,0 +1,2086 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "recursive_wrapper"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "recursive_wrapper" "$@"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "test_operator_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "let" "counter -lt limit"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" ">=" "$right" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "-foo" "$right" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-foo" "$right" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "-gt" "1.5" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "-gt" "count+1" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "recursive_wrapper" "==" "value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-5" "-gt" "3" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "--help" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-verbose" "=" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-e" "$left" "-a" "-e" "$right" "]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "constant_test_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "false" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "0" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "true" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "1" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "literal" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$(ls)" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "a" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "!=" "a" "-o" "$left" "!=" "b" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "!=" "a" "]"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "[" "$left" "!=" "b" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+  [CompoundListCondition, None]
+    [FunctionDefinition "test_grouping_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "=" "a"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "$right" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "=" "a"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "$right" "=" "b" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "trailing" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$left" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "written"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "-f" "$left"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "found"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "[" "-f" "$left" "]"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "found"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [ConditionalCommand]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "found"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "test_operand_expansion_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$@" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$values[@]" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "{a,b}" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "*.txt" "=" "one" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-d" "*.txt" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-v" "arr[i]" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "$value" "]"]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+          [CompoundListCondition, None]
+            [ConditionalCommand]
+  [CompoundListCondition, None]
+    [FunctionDefinition "file_command_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "xargs" "rm"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "wc" "-l"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "-name" "*.txt"]
+          [CompoundListCondition, None]
+            [SimpleCommand "mv" "file.txt"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cp" "-r" "dir"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ln" "-s" "target"]
+          [CompoundListCondition, None]
+            [SimpleCommand "xargs" "-i" "echo" "replaced"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "text_utility_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "echo" "$value"]
+              [SimpleCommand "wc" "-c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sed" "s/old/new/" "file"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "true"]
+              [SimpleCommand "ls"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-exec" "echo" "$(basename x)" ";"]
+          [CompoundListCondition, None]
+            [SimpleCommand "tr" "a-z" "A-Z"]
+          [CompoundListCondition, None]
+            [SimpleCommand "tr" "hello" "world"]
+          [CompoundListCondition, None]
+            [SimpleCommand "grep" "file*" "list"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "line\n"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "$(grep needle file)" "]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "plain\n" "one" "two"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "helper_function"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "helper"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "privilege_and_builtin_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "remote" "echo $value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "-p" "22" "remote" "echo $value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "ssh" "remote" "echo literal"]
+          [CompoundListCondition, None]
+            [SimpleCommand "su" "operator" "helper_function"]
+          [CompoundListCondition, None]
+            [SimpleCommand "su" "-" "-c" "helper_function"]
+          [CompoundListCondition, None]
+            [SimpleCommand "su" "operator" "whoami"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-exec" "helper_function" "{}" ";"]
+          [CompoundListCondition, None]
+            [SimpleCommand "find" "." "-execdir" "helper_function" "{}" ";"]
+          [CompoundListCondition, None]
+            [Pipeline]
+              [SimpleCommand "ls"]
+              [SimpleCommand "xargs" "helper_function"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cd" "/tmp"]
+          [CompoundListCondition, None]
+            [SimpleCommand "cd" "-"]
+          [CompoundListCondition, None]
+            [SimpleCommand "break"]
+          [CompoundListCondition, None]
+            [SimpleCommand "set" "assigned=value"]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "one" "two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "exit" "one" "two"]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "$(echo 5)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "export" "$exported_name"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sudo" "cd" "/tmp"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sudo" "export" "FOO=1"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "trap_condition_diagnostics"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "9"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "15"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "KILL"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "SIGSTOP"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "helper_function" "INT"]
+          [CompoundListCondition, None]
+            [SimpleCommand "trap" "-" "EXIT"]
+[Word
+  Unquoted "recursive_wrapper"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "recursive_wrapper"
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "test_operator_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "let"
+]
+[Word
+  DoubleQuoted "counter -lt limit"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Literal ">"
+  Unquoted "="
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-foo"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-foo"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "1.5"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "notanumber"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "count+1"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "recursive_wrapper"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "value"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-5"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "--help"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-verbose"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "constant_test_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "literal"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  CommandSubstitution "ls"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "test_grouping_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "trailing"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Literal "("
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ")"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "written"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "test_operand_expansion_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "values[@]"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "{a,b}"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "arr[i]"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "{a,b}"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Variable "right"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "left"
+]
+[Word
+  Unquoted "=~"
+]
+[Word
+  Unquoted "*.txt"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "file_command_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "-name"
+]
+[Word
+  Literal "*.txt"
+]
+[Word
+  Unquoted "mv"
+]
+[Word
+  Unquoted "file.txt"
+]
+[Word
+  Unquoted "cp"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "dir"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "target"
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "-i"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "replaced"
+]
+[Word
+  Unquoted "list"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "text_utility_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Literal "s/old/new/"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-exec"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "basename x"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "a-z"
+]
+[Word
+  Unquoted "A-Z"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Literal "hello"
+]
+[Word
+  Literal "world"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "file*"
+]
+[Word
+  Unquoted "list"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "line\n"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  CommandSubstitution "grep needle file"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "plain\n"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "helper"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "privilege_and_builtin_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "remote"
+]
+[Word
+  DoubleQuoted "echo "
+  Variable "value"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "22"
+]
+[Word
+  Unquoted "remote"
+]
+[Word
+  DoubleQuoted "echo "
+  Variable "value"
+]
+[Word
+  Unquoted "ssh"
+]
+[Word
+  Unquoted "remote"
+]
+[Word
+  Literal "echo literal"
+]
+[Word
+  Unquoted "su"
+]
+[Word
+  Unquoted "operator"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "su"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "su"
+]
+[Word
+  Unquoted "operator"
+]
+[Word
+  Unquoted "whoami"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-exec"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "{}"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "find"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "-execdir"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "{}"
+]
+[Word
+  Literal ";"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "xargs"
+]
+[Word
+  Unquoted "helper_function"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "assigned=value"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  CommandSubstitution "echo 5"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Variable "exported_name"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "sudo"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "FOO=1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "trap_condition_diagnostics"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "9"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "15"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "KILL"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "SIGSTOP"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "helper_function"
+]
+[Word
+  Unquoted "INT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "}"
+]
+4:23: warning: The 'recursive_wrapper' function calls itself recursively. (SC2264)
+     4 |  recursive_wrapper() { recursive_wrapper "$@"; }
+       |                        ^~~~~~~~~~~~~~~~~
+4:1: details:
+     4 |  recursive_wrapper() { recursive_wrapper "$@"; }
+       |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
+note: Use `command` before the wrapped command name.
+7:7: warning: The `-lt` operator belongs to `test`, arithmetic reads it as a subtraction. (SC1106)
+     7 |    let "counter -lt limit"
+       |        ^~~~~~~~~~~~~~~~~~~
+note: Use the symbolic form such as `<` or `>` inside arithmetic.
+7:3: warning: The `let` builtin evaluates its argument as arithmetic. (SC2219)
+     7 |    let "counter -lt limit"
+       |    ^~~
+note: Write `(( ... ))` for the arithmetic.
+8:14: warning: The `>=` operator does not exist in `test`. (SC2122)
+     8 |    [[ "$left" >= "$right" ]]
+       |               ^~
+note: Negate the opposite comparison, as in `! a < b`.
+9:13: warning: The `>=` operator does not exist in `test`. (SC2122)
+     9 |    [ "$left" \>= "$right" ]
+       |              ^~~
+note: Negate the opposite comparison, as in `! a < b`.
+10:13: warning: The `-foo` operator is not a known test operator. (SC2057)
+    10 |    [ "$left" -foo "$right" ]
+       |              ^~~~
+note: Check the operator spelling or quote the operand.
+11:5: warning: The `-foo` operator is not a known test operator. (SC2058)
+    11 |    [ -foo "$right" ]
+       |      ^~~~
+note: Check the operator spelling or quote the operand.
+12:17: warning: The `-gt` operator compares integers, '1.5' carries a fraction. (SC2072)
+    12 |    [ "$left" -gt 1.5 ]
+       |                  ^~~
+note: Compare the decimals with `bc` or `awk`.
+13:18: warning: The `-eq` operator compares integers, 'notanumber' is not an integer. (SC2130)
+    13 |    [[ "$left" -eq notanumber ]]
+       |                   ^~~~~~~~~~
+note: Use `=` to compare the text.
+14:17: warning: Test brackets compare 'count+1' as text, the arithmetic is not evaluated. (SC2255)
+    14 |    [ "$left" -gt count+1 ]
+       |                  ^~~~~~~
+note: Evaluate the numbers with `$((...))` before the comparison.
+15:21: warning: The `==` comparison runs 'recursive_wrapper' as a command. (SC2284)
+    15 |    recursive_wrapper == value
+       |                      ^~
+note: Write `[ x = y ]` to compare the values.
+16:5: warning: The `-gt` comparison has literal operands on both sides. (SC2050)
+    16 |    [ -5 -gt 3 ]
+       |      ^~~~~~~~
+note: Remove the constant condition or compare runtime data.
+19:16: warning: A `test` with `-a` or `-o` is obsolescent. (SC2166)
+    19 |    [ -e "$left" -a -e "$right" ]
+       |                 ^~
+note: Join two tests with `&&` or `||`.
+23:3: warning: A test with no operand always fails. (SC2212)
+    23 |    [ ]
+       |    ^
+note: Write `false` for a failing condition.
+24:5: warning: `[ false ]` tests the nonempty word `false`, so it succeeds. (SC2158)
+    24 |    [ false ]
+       |      ^~~~~
+note: Drop the brackets and write `false`.
+25:5: warning: `[ 0 ]` tests the nonempty word `0`, so it succeeds. (SC2159)
+    25 |    [ 0 ]
+       |      ^
+note: Write `false` for a failing condition.
+26:5: warning: `[ true ]` tests the nonempty word `true`, the brackets add nothing. (SC2160)
+    26 |    [ true ]
+       |      ^~~~
+note: Drop the brackets and write `true`.
+27:5: warning: `[ 1 ]` tests the nonempty word `1`, the brackets add nothing. (SC2161)
+    27 |    [ 1 ]
+       |      ^
+note: Write `true` for a succeeding condition.
+28:5: warning: The 'literal' operand is a literal, so the test never changes. (SC2078)
+    28 |    [ literal ]
+       |      ^~~~~~~
+note: Add the `$` when a variable was meant.
+29:5: warning: A one-operand test on command output only checks that something was printed. (SC2243)
+    29 |    [ "$(ls)" ]
+       |      ^~~~~~~
+note: Write it with `-n`, or drop the brackets to check the exit status.
+30:5: warning: A one-operand test is the nonempty-string test. (SC2244)
+    30 |    [ "$left" ]
+       |      ^~~~~~~
+note: Write it with `-n` to read clearer.
+32:5: warning: The `=` comparison has literal operands on both sides. (SC2050)
+    32 |    [ a = b ]
+       |      ^~~~~
+note: Remove the constant condition or compare runtime data.
+32:7: warning: The literals 'a' and 'b' differ, so the comparison never succeeds. (SC2193)
+    32 |    [ a = b ]
+       |        ^
+note: Compare a variable, or correct the operand spelling.
+34:18: warning: The '$left' operand fails only one of the two `!=` tests, so the `-o` is always true. (SC2056)
+    34 |    [ "$left" != a -o "$left" != b ]
+       |                   ^~
+note: Join the two inequalities with `-a`.
+34:18: warning: A `test` with `-a` or `-o` is obsolescent. (SC2166)
+    34 |    [ "$left" != a -o "$left" != b ]
+       |                   ^~
+note: Join two tests with `&&` or `||`.
+35:20: warning: The '$left' operand fails only one of the two `!=` tests, so the `||` is always true. (SC2055)
+    35 |    [[ $left != a || $left != b ]]
+       |                     ^~~~~
+note: Join the two inequalities with `&&`.
+36:25: warning: The '$left' operand fails only one of the two `!=` tests, so the `||` is always true. (SC2252)
+    36 |    [ "$left" != a ] || [ "$left" != b ]
+       |                          ^~~~~~~
+note: Join the two tests with `&&`.
+37:6: warning: The `-z` operator expects an operand, `==` is another operator. (SC1019)
+    37 |    [[ -z == foo ]]
+       |       ^~
+note: Give the operator its operand before the comparison.
+37:9: warning: The operand is literal, so this string test is constant. (SC2157)
+    37 |    [[ -z == foo ]]
+       |          ^~
+note: Test a variable or drop the check.
+37:6: warning: The `==` comparison has literal operands on both sides. (SC2050)
+    37 |    [[ -z == foo ]]
+       |       ^~~~~~~~~
+note: Remove the constant condition or compare runtime data.
+41:3: warning: A `[ ]` test does not take `&&`, the bracket closes before it. (SC2107)
+    41 |    [ "$left" = a && "$right" = b ]
+       |    ^
+note: Write `[ a ] && [ b ]`.
+41:33: warning: The trailing `]` has no opening `[`. (SC2171)
+    41 |    [ "$left" = a && "$right" = b ]
+       |                                  ^
+note: Add the opening `[`, or quote the bracket when it is data.
+41:29: warning: An assignment cannot contain spaces around equals. (SC2283)
+    41 |    [ "$left" = a && "$right" = b ]
+       |                              ^
+note: Write `NAME=value` without spaces.
+42:3: warning: A `[ ]` test does not take `||`, the bracket closes before it. (SC2109)
+    42 |    [ "$left" = a || "$right" = b ]
+       |    ^
+note: Write `[ a ] || [ b ]`.
+42:33: warning: The trailing `]` has no opening `[`. (SC2171)
+    42 |    [ "$left" = a || "$right" = b ]
+       |                                  ^
+note: Add the opening `[`, or quote the bracket when it is data.
+42:29: warning: An assignment cannot contain spaces around equals. (SC2283)
+    42 |    [ "$left" = a || "$right" = b ]
+       |                              ^
+note: Write `NAME=value` without spaces.
+43:17: warning: The trailing `]` has no opening `[`. (SC2171)
+    43 |    echo trailing ]
+       |                  ^
+note: Add the opening `[`, or quote the bracket when it is data.
+44:18: warning: A `[[ ]]` expression joins its parts with `&&`. (SC2108)
+    44 |    [[ "$left" = a -a "$right" = b ]]
+       |                   ^~
+note: Write `&&` in place of `-a`.
+45:18: warning: A `[[ ]]` expression joins its parts with `||`. (SC2110)
+    45 |    [[ "$left" = a -o "$right" = b ]]
+       |                   ^~
+note: Write `||` in place of `-o`.
+46:6: warning: A `[[ ]]` expression takes `(` and `)` without a backslash. (SC1029)
+    46 |    [[ \( "$left" = a \) ]]
+       |       ^~
+note: Remove the backslash before the parenthesis.
+46:21: warning: A `[[ ]]` expression takes `(` and `)` without a backslash. (SC1029)
+    46 |    [[ \( "$left" = a \) ]]
+       |                      ^~
+note: Remove the backslash before the parenthesis.
+47:6: warning: A brace does not group a `[[ ]]` expression. (SC1026)
+    47 |    [[ { "$left" = a } ]]
+       |       ^
+note: Group the expression with `( )`.
+47:20: warning: A brace does not group a `[[ ]]` expression. (SC1026)
+    47 |    [[ { "$left" = a } ]]
+       |                     ^
+note: Group the expression with `( )`.
+48:15: warning: The `>` is a file redirection, not a comparison. (SC2065)
+    48 |    [ "$left" > "$right" ]
+       |                ^~~~~~~~
+note: Escape it as `\>`, or use the `[[ ]]` form.
+48:5: warning: A one-operand test is the nonempty-string test. (SC2244)
+    48 |    [ "$left" > "$right" ]
+       |      ^~~~~~~
+note: Write it with `-n` to read clearer.
+49:15: warning: The `<` reads a file into the test, it does not compare. (SC2073)
+    49 |    [ "$left" < "$right" ]
+       |                ^~~~~~~~
+note: Escape it as `\<`, or use the `[[ ]]` form.
+49:5: warning: A one-operand test is the nonempty-string test. (SC2244)
+    49 |    [ "$left" < "$right" ]
+       |      ^~~~~~~
+note: Write it with `-n` to read clearer.
+50:18: warning: The redirect writes to the file named '2', it does not name a descriptor. (SC2210)
+    50 |    echo written > 2
+       |                   ^
+note: Write `>&2` to reach the descriptor, or compare the numbers in a test.
+51:6: warning: A `( )` subshell runs its contents, it does not test them. (SC2205)
+    51 |    if ( -f "$left" ); then echo found; fi
+       |       ^
+note: Write the condition as `[ ... ]`.
+51:8: warning: An option-shaped word in command position is not a command. (SC2215)
+    51 |    if ( -f "$left" ); then echo found; fi
+       |         ^~
+note: Place the option after its command.
+52:6: warning: The `( )` around the test starts a subshell and changes nothing else. (SC2234)
+    52 |    if ( [ -f "$left" ] ); then echo found; fi
+       |       ^
+note: Remove the parentheses.
+53:6: warning: The `( )` around the condition starts a subshell and changes nothing else. (SC2233)
+    53 |    if ( [[ -f "$left" ]] ); then echo found; fi
+       |       ^
+note: Remove the parentheses.
+57:5: warning: The `[ ]` test takes one word per operand, '"$@"' expands to every element. (SC2198)
+    57 |    [ "$@" = one ]
+       |      ^~~~
+note: Loop over the elements, or join them with `*`.
+58:5: warning: The `[ ]` test takes one word per operand, '"${values[@]}"' expands to every element. (SC2198)
+    58 |    [ "${values[@]}" = one ]
+       |      ^~~~~~~~~~~~~~
+note: Loop over the elements, or join them with `*`.
+59:5: warning: The `[ ]` test takes one word per operand, '{a,b}' expands to several. (SC2200)
+    59 |    [ {a,b} = one ]
+       |      ^~~~~
+note: Loop over the expanded words.
+59:11: warning: The literals '{a,b}' and 'one' differ, so the comparison never succeeds. (SC2193)
+    59 |    [ {a,b} = one ]
+       |            ^
+note: Compare a variable, or correct the operand spelling.
+60:5: warning: The `[ ]` test takes one word per operand, '*.txt' expands to every match. (SC2202)
+    60 |    [ *.txt = one ]
+       |      ^~~~~
+note: Loop over the matches.
+60:11: warning: The literals '*.txt' and 'one' differ, so the comparison never succeeds. (SC2193)
+    60 |    [ *.txt = one ]
+       |            ^
+note: Compare a variable, or correct the operand spelling.
+61:8: warning: The `-d` test runs against the first path '*.txt' expands to. (SC2245)
+    61 |    [ -d *.txt ]
+       |         ^~~~~
+note: Loop over the matches to test each one.
+62:8: warning: The `-v` operand 'arr[i]' carries glob characters, so the shell expands it before the test runs. (SC2208)
+    62 |    [ -v arr[i] ]
+       |         ^~~~~~
+note: Quote the name, or use the `[[ ]]` form.
+63:8: warning: A test reads an unquoted variable. (SC2086)
+    63 |    [ -n $value ]
+       |         ^~~~~~
+note: Quote it to avoid an empty or split argument.
+63:8: warning: The `-n` operand is unquoted, so an empty value leaves `-n` with no operand. (SC2070)
+    63 |    [ -n $value ]
+       |         ^~~~~~
+note: Quote the operand, or use the `[[ ]]` form.
+64:6: warning: A `[[ ]]` expression concatenates '"$@"' into one word. (SC2199)
+    64 |    [[ "$@" = one ]]
+       |       ^~~~
+note: Loop over the elements, or write `*` in place of `@`.
+65:6: warning: A `[[ ]]` expression leaves '{a,b}' unexpanded. (SC2201)
+    65 |    [[ {a,b} = one ]]
+       |       ^~~~~
+note: Loop over the expanded words.
+65:6: warning: The `=` comparison has literal operands on both sides. (SC2050)
+    65 |    [[ {a,b} = one ]]
+       |       ^~~~~~~~~~~
+note: Remove the constant condition or compare runtime data.
+66:6: warning: A `[[ ]]` expression matches a glob only to the right of `=` or `!=`, so '*.txt' stays literal. (SC2203)
+    66 |    [[ *.txt = one ]]
+       |       ^~~~~
+note: Loop over the matches.
+66:6: warning: The `=` comparison has literal operands on both sides. (SC2050)
+    66 |    [[ *.txt = one ]]
+       |       ^~~~~~~~~~~
+note: Remove the constant condition or compare runtime data.
+67:16: warning: The right side of `=` inside `[[ ]]` is matched as a glob, not compared. (SC2053)
+    67 |    [[ "$left" = $right ]]
+       |                 ^~~~~~
+note: Quote '$right' so the comparison stays literal.
+68:17: warning: The right side of `!=` inside `[[ ]]` is matched as a glob, not compared. (SC2053)
+    68 |    [[ "$left" != $right ]]
+       |                  ^~~~~~
+note: Quote '$right' so the comparison stays literal.
+69:17: warning: The `=~` operator takes a regular expression, '*.txt' reads as a glob. (SC2049)
+    69 |    [[ "$left" =~ *.txt ]]
+       |                  ^~~~~
+note: Compare with `=` for a glob, or write the pattern as a regex.
+73:8: warning: The `ls` listing splits a name with a space or a newline before `xargs` reads it. (SC2011)
+    73 |    ls | xargs rm
+       |         ^~~~~
+note: Use `find -print0` with `xargs -0`, or `find -exec`.
+74:3: warning: The `ls` listing mangles a name with a space or a newline when it is read as data. (SC2012)
+    74 |    ls | wc -l
+       |    ^~
+note: Use `find`, or match the names with a glob.
+75:3: warning: Some `find` implementations have no default path, so this search walks nothing. (SC2185)
+    75 |    find -name '*.txt'
+       |    ^~~~
+note: Write `.` as the path before the expression.
+76:6: warning: The `mv` command is given 'file.txt' alone, so no destination is named. (SC2224)
+    76 |    mv file.txt
+       |       ^~~~~~~~
+note: Add the destination path.
+77:9: warning: The `cp` command is given 'dir' alone, so no destination is named. (SC2225)
+    77 |    cp -r dir
+       |          ^~~
+note: Add the destination path.
+78:9: warning: The `ln` command is given 'target' alone, so no link name is named. (SC2226)
+    78 |    ln -s target
+       |          ^~~~~~
+note: Add the link name, or write `.` explicitly.
+79:3: warning: The `xargs -i` flag is deprecated. (SC2267)
+    79 |    xargs -i echo replaced < list
+       |    ^~~~~
+note: Use `-I` with an explicit replacement string.
+83:3: warning: The `echo` output is counted by `wc`, where the shell knows the length on its own. (SC2000)
+    83 |    echo "$value" | wc -c
+       |    ^~~~
+note: Use `${#variable}` instead.
+84:7: warning: The `sed` script 's/old/new/' replaces plain text, which the shell does without a fork. (SC2001)
+    84 |    sed 's/old/new/' file
+       |        ^~~~~~~~~~~~
+note: Use `${variable//search/replace}` instead.
+85:10: warning: The pipe feeds 'ls', which never reads stdin, so the upstream output is discarded. (SC2216)
+    85 |    true | ls
+       |           ^~
+86:21: warning: The substitution in the `find` action expands before `find` runs, not once for each file. (SC2014)
+    86 |    find . -exec echo $(basename x) \;
+       |                      ^~~~~~~~~~~~~
+note: Move the substitution into `-exec sh -c` so it runs for each file.
+86:21: warning: An unquoted command substitution splits its output. (SC2046)
+    86 |    find . -exec echo $(basename x) \;
+       |                      ^~~~~~~~~~~~~
+note: Quote it to keep one argument.
+87:6: warning: The `a-z` range in `tr` leaves an accented letter untranslated. (SC2018)
+    87 |    tr a-z A-Z
+       |       ^~~
+note: Use `[:lower:]` instead.
+87:10: warning: The `A-Z` range in `tr` leaves an accented letter untranslated. (SC2019)
+    87 |    tr a-z A-Z
+       |           ^~~
+note: Use `[:upper:]` instead.
+88:6: warning: The `tr` set 'hello' repeats a letter, and `tr` translates one character at a time. (SC2020)
+    88 |    tr 'hello' 'world'
+       |       ^~~~~~~
+note: Use `sed` to replace a word.
+89:8: warning: In the regular expression 'file*' the star repeats the preceding character, where a glob would match any text. (SC2022)
+    89 |    grep 'file*' list
+       |         ^~~~~~~
+note: Write `.*` for any text, or match the names with a glob.
+90:8: warning: The `echo` operand holds `\n`, which `echo` prints as written. (SC2028)
+    90 |    echo 'line\n'
+       |         ^~~~~~~~
+note: Use `printf` instead.
+91:8: warning: The complete `grep` output is collected to learn whether one line matched. (SC2143)
+    91 |    [ -n "$(grep needle file)" ]
+       |         ^~~~~~~~~~~~~~~~~~~~~
+note: Use `grep -q` and test its exit status.
+92:10: warning: The `printf` format consumes no argument, so the remaining operands are ignored. (SC2182)
+    92 |    printf 'plain\n' one two
+       |           ^~~~~~~~~
+note: Add a format directive, or remove the extra operands.
+107:3: warning: This `cd` is unchecked, so later commands can run in the wrong directory. (SC2164)
+   107 |    cd /tmp
+       |    ^~
+note: Stop or return when `cd` fails.
+108:3: warning: This `cd` is unchecked, so later commands can run in the wrong directory. (SC2164)
+   108 |    cd -
+       |    ^~
+note: Stop or return when `cd` fails.
+107:3: warning: A later `cd -` undoes this directory change, and a subshell restores the directory on its own. (SC2103)
+   107 |    cd /tmp
+       |    ^~
+108:3: details:
+   108 |    cd -
+       |    ^~ the working directory is restored here.
+note: Run the commands inside `( )` instead.
+98:14: warning: The expansion in this `ssh` operand runs on the client, not on the remote host. (SC2029)
+    98 |    ssh remote "echo $value"
+       |               ^~~~~~~~~~~~~
+note: Quote the operand in single quotes so the remote shell expands it.
+99:20: warning: The expansion in this `ssh` operand runs on the client, not on the remote host. (SC2029)
+    99 |    ssh -p 22 remote "echo $value"
+       |                     ^~~~~~~~~~~~~
+note: Quote the operand in single quotes so the remote shell expands it.
+101:15: warning: The `su` command starts a new shell, where the function 'helper_function' is not defined. (SC2032)
+   101 |    su operator helper_function
+       |                ^~~~~~~~~~~~~~~
+note: Move the body into its own script, or pass it with `sh -c`.
+102:11: warning: The `su` command starts a new shell, where the function 'helper_function' is not defined. (SC2032)
+   102 |    su - -c helper_function
+       |            ^~~~~~~~~~~~~~~
+note: Move the body into its own script, or pass it with `sh -c`.
+103:15: warning: The operand 'whoami' is handed to `su` as a command without `-c`, and not every `su` accepts that. (SC2117)
+   103 |    su operator whoami
+       |                ^~~~~~
+note: Write `su -c` instead, or use `sudo`.
+104:16: warning: The function 'helper_function' is handed to an external command, which never sees a shell function. (SC2033)
+   104 |    find . -exec helper_function {} \;
+       |                 ^~~~~~~~~~~~~~~
+note: Wrap the call in `sh -c`, or move the body into its own script.
+105:19: warning: The function 'helper_function' is handed to an external command, which never sees a shell function. (SC2033)
+   105 |    find . -execdir helper_function {} \;
+       |                    ^~~~~~~~~~~~~~~
+note: Wrap the call in `sh -c`, or move the body into its own script.
+106:14: warning: The function 'helper_function' is handed to an external command, which never sees a shell function. (SC2033)
+   106 |    ls | xargs helper_function
+       |               ^~~~~~~~~~~~~~~
+note: Wrap the call in `sh -c`, or move the body into its own script.
+106:8: warning: The `ls` listing splits a name with a space or a newline before `xargs` reads it. (SC2011)
+   106 |    ls | xargs helper_function
+       |         ^~~~~
+note: Use `find -print0` with `xargs -0`, or `find -exec`.
+109:3: warning: The `break` command stands in a function outside any loop, where there is nothing to leave. (SC2104)
+   109 |    break
+       |    ^~~~~
+note: Use `return` instead.
+110:7: warning: The `set` builtin changes the shell options and the positional parameters, so 'assigned' is not assigned. (SC2121)
+   110 |    set assigned=value
+       |        ^~~~~~~~~~~~~~
+note: Write `assigned=value` on its own.
+111:14: warning: The `return` builtin takes one number from 0 to 255, so the operands after the first are ignored. (SC2151)
+   111 |    return one two
+       |               ^~~
+note: Write the other data to standard output.
+111:10: warning: The code 'one' is not a number from 0 to 255, `return` either rejects it or wraps it modulo 256. (SC2242)
+   111 |    return one two
+       |           ^~~
+112:12: warning: The `exit` builtin takes one number from 0 to 255, so the operands after the first are ignored. (SC2241)
+   112 |    exit one two
+       |             ^~~
+note: Write the other data to standard output.
+112:8: warning: The code 'one' is not a number from 0 to 255, `exit` either rejects it or wraps it modulo 256. (SC2242)
+   112 |    exit one two
+       |         ^~~
+113:10: warning: An unquoted command substitution splits its output. (SC2046)
+   113 |    return $(echo 5)
+       |           ^~~~~~~~~
+note: Quote it to keep one argument.
+113:10: warning: A command substitution wraps a useless `echo`. (SC2116)
+   113 |    return $(echo 5)
+       |           ^~~~~~~~~
+note: The text can be used directly without the subshell.
+113:10: warning: The `return` operand is command output, and a status is one number from 0 to 255. (SC2152)
+   113 |    return $(echo 5)
+       |           ^~~~~~~~~
+note: Print the value and return a status separately.
+114:10: warning: The `export` operand expands 'exported_name', so the exported name is the value of 'exported_name'. (SC2163)
+   114 |    export $exported_name
+       |           ^~~~~~~~~~~~~~
+note: Drop the dollar sign to export 'exported_name' itself.
+115:8: warning: The `sudo` command starts an external program, so the builtin 'cd' is not found. (SC2232)
+   115 |    sudo cd /tmp
+       |         ^~
+note: Wrap the builtin in `sudo sh -c` instead.
+116:8: warning: The `sudo` command starts an external program, so the builtin 'export' is not found. (SC2232)
+   116 |    sudo export FOO=1
+       |         ^~~~~~
+note: Wrap the builtin in `sudo sh -c` instead.
+120:26: warning: The trap condition '9' is a signal number, and the numbering is not the same on every system. (SC2172)
+   120 |    trap 'helper_function' 9
+       |                           ^
+note: Name the signal, such as `INT` or `TERM`.
+120:26: warning: The signal '9' cannot be trapped, so this handler never runs. (SC2173)
+   120 |    trap 'helper_function' 9
+       |                           ^
+note: Remove the condition, since the kernel delivers this signal unconditionally.
+121:26: warning: The trap condition '15' is a signal number, and the numbering is not the same on every system. (SC2172)
+   121 |    trap 'helper_function' 15
+       |                           ^~
+note: Name the signal, such as `INT` or `TERM`.
+122:26: warning: The signal 'KILL' cannot be trapped, so this handler never runs. (SC2173)
+   122 |    trap 'helper_function' KILL
+       |                           ^~~~
+note: Remove the condition, since the kernel delivers this signal unconditionally.
+123:26: warning: The signal 'SIGSTOP' cannot be trapped, so this handler never runs. (SC2173)
+   123 |    trap 'helper_function' SIGSTOP
+       |                           ^~~~~~~
+note: Remove the condition, since the kernel delivers this signal unconditionally.
+Encountered 118 warnings.
+[Code 0]

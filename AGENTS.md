@@ -67,10 +67,10 @@ against one shared reference result. The dashdiff, bashdiff, and mimicrydiff
 targets select that runner. The harness carries alternate goldens for
 documented macOS differences.
 
-The native runner suppresses annoying diagnostics outside
-`shellcheck_static`. That canonical test owns the complete annoying diagnostic
-catalog. A test for another parser or evaluator contract uses strict input and
-does not duplicate diagnostic output.
+The native runner suppresses annoying diagnostics outside the
+`shellcheck_static_*` family. Those canonical tests own the complete annoying
+diagnostic catalog. A test for another parser or evaluator contract uses strict
+input and does not duplicate diagnostic output.
 
 `shellcheck_bashisms_sh_shebang` owns the portability catalog, because those
 rows are reported only under an `sh` or `dash` shebang. Two findings need their

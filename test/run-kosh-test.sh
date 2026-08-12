@@ -9,7 +9,7 @@ fi
 for TEST_NAME in "$@"; do
   [ -f "kosh/$TEST_NAME.kosh" ] || continue
   case $TEST_NAME in
-  shellcheck_static) TEST_BIN_FLAGS="$BIN_FLAGS -WWW" ;;
+  shellcheck_static_*) TEST_BIN_FLAGS="$BIN_FLAGS -WWW" ;;
   *) TEST_BIN_FLAGS="$BIN_FLAGS -WWW --no-annoying-diagnostics" ;;
   esac
   if [ "$REFILL_MODE" = yes ]; then

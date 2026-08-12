@@ -1,0 +1,86 @@
+#!/bin/env kosh
+# shellcheck disable=unresolved-command
+
+directive_scope() {
+  # shellcheck disable=SC2086
+  echo $suppressed
+  echo $reported
+}
+
+directive_placement_diagnostics() {
+  # shellcheck foobar=baz
+  echo one
+  # shellcheck disable=SC2153 not a misspelling
+  echo two
+  echo three # shellcheck disable=SC2034
+  if false; then
+    echo four
+  # shellcheck disable=SC2086
+  elif false; then
+    echo five
+  fi
+  case "$1" in
+  first) : ;;
+  # shellcheck disable=SC2086
+  *) : ;;
+  esac
+}
+
+source_byte_diagnostics() {
+  echo “curly”
+  echo ‘curly’
+  ls –l
+  echo "inside ” quotes"
+  echo 'inside ’ quotes'
+}
+source_byte_diagnostics() {
+  echo spaced word
+  echo 'carriagereturn'
+}
+
+escape_style_diagnostics() {
+  echo Yay \o/
+  spacing=foo\tbar
+  echo 'no way it\'
+  quoted='long \
+text'
+  echo "The apples are $""1 each"
+  echo "$"
+  \ls -l
+  sed \
+  # -e "middle" \
+  -e x file
+}
+
+command_name_assignment_diagnostics() {
+  runner=printf
+  linker=ln
+  $linker -s target link
+}
+
+html_entity_diagnostics() {
+  echo one &amp echo two
+}
+
+# The rm operands stay behind --dry-run so an accidental call destroys nothing.
+destructive_command_diagnostics() {
+  sudo cat *.log
+  rm --dry-run -rf /usr
+  rm --dry-run -rf "$staging/"
+  mkdir -pm 0700 parent/child
+}
+
+stdin_and_subscript_diagnostics() {
+  echo hello < input.txt
+  typeset scoped=value
+  read -r chosen
+  slots[chosen]=x
+  echo value | tally=1
+}
+
+compound_redirection_diagnostics() {
+  { echo grouped; } 2>&1 > grouped.log
+  { echo claimed; } > claim.log > claim.log
+  while true; do echo looped; done < same.txt > same.txt
+  if true; then echo branched; fi > "file$((index++))"
+}

@@ -1,0 +1,117 @@
+#!/bin/env kosh
+
+assignment_value_diagnostics() {
+  local counter=0
+  counter=$counter+1
+  counter=counter+1
+  PATH=/opt/local/bin
+  pattern=*.txt
+  braces=file{a,b}.txt
+}
+
+assignment_pipeline_diagnostics() {
+  piped=value | wc -l
+  first=one second=two | wc -l
+  swallowed=printf 'x\n'
+}
+
+array_name_diagnostics() {
+  entries=(one two)
+  echo "$entries"
+  entries=scalar
+  entries+=tail
+  grid[1][2]=corner
+  spread=($loose)
+  declare -a declared
+  declared=flat
+  mapfile -t filled < /etc/hosts
+  echo "$filled"
+}
+
+quoted_value_diagnostics() {
+  options='-t "one two"'
+  wc $options
+}
+
+command_word_shape_diagnostics() {
+  echo "one"two"three"
+  : ${SANDWICH:=fallback}
+  same=1
+  same=$same
+  IFS="\t"
+  pager=cat
+  $1=first
+  $0=zero
+  prefix$suffix=1
+  odd.name==value
+  ===
+  ===trail
+  =lead
+  "$quoted"=42
+  9lives=cat
+  spaced += tail
+}
+
+redirection_semantics_diagnostics() {
+  > report.txt
+  < file.txt | grep foo
+  cat file > tr
+  gzcat a | grep x < today.log
+  env > environment.txt | grep ANDROID
+  grep foo < in1 < in2 > out1 > out2
+  ssh host <<BARE
+echo "$HOSTNAME"
+BARE
+  ssh host <<"QUOTED"
+echo "$HOSTNAME"
+QUOTED
+}
+
+arithmetic_diagnostics() {
+  echo $((a / b * c))
+  echo $((a * b / c))
+  echo $((1.5 + 2))
+  echo $((010 + 1))
+  echo $((0x1F + 1))
+  $((count + 1))
+  (( total / parts * scale ))
+}
+
+loop_word_diagnostics() {
+  for one_word in single; do echo "$one_word"; done
+  for entry in ${directory}/*.txt; do echo "$entry"; done
+  while true; do
+    echo hi | grep -q bye | break
+  done
+}
+
+case_shape_diagnostics() {
+  case constant in
+  constant) : ;;
+  *) : ;;
+  esac
+  case "$prefix suffix" in
+  nomatch) : ;;
+  *) : ;;
+  esac
+  case "$value" in
+  $expanded) : ;;
+  *) : ;;
+  esac
+  while getopts "ab:" chosen_option; do
+    case $chosen_option in
+    a) : ;;
+    z) : ;;
+    esac
+  done
+}
+
+compound_list_diagnostics() {
+  ( echo first || echo second ) && echo third
+  ! false
+  echo after
+}
+
+false && break
+false && continue
+:

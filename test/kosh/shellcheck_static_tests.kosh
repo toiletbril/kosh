@@ -1,0 +1,126 @@
+#!/bin/env kosh
+# shellcheck disable=unresolved-command
+
+recursive_wrapper() { recursive_wrapper "$@"; }
+
+test_operator_diagnostics() {
+  let "counter -lt limit"
+  [[ "$left" >= "$right" ]]
+  [ "$left" \>= "$right" ]
+  [ "$left" -foo "$right" ]
+  [ -foo "$right" ]
+  [ "$left" -gt 1.5 ]
+  [[ "$left" -eq notanumber ]]
+  [ "$left" -gt count+1 ]
+  recursive_wrapper == value
+  [ -5 -gt 3 ]
+  [ --help ]
+  [ -verbose = "$left" ]
+  [ -e "$left" -a -e "$right" ]
+}
+
+constant_test_diagnostics() {
+  [ ]
+  [ false ]
+  [ 0 ]
+  [ true ]
+  [ 1 ]
+  [ literal ]
+  [ "$(ls)" ]
+  [ "$left" ]
+  [ -n ]
+  [ a = b ]
+  [ "$left" = b ]
+  [ "$left" != a -o "$left" != b ]
+  [[ $left != a || $left != b ]]
+  [ "$left" != a ] || [ "$left" != b ]
+  [[ -z == foo ]]
+}
+
+test_grouping_diagnostics() {
+  [ "$left" = a && "$right" = b ]
+  [ "$left" = a || "$right" = b ]
+  echo trailing ]
+  [[ "$left" = a -a "$right" = b ]]
+  [[ "$left" = a -o "$right" = b ]]
+  [[ \( "$left" = a \) ]]
+  [[ { "$left" = a } ]]
+  [ "$left" > "$right" ]
+  [ "$left" < "$right" ]
+  echo written > 2
+  if ( -f "$left" ); then echo found; fi
+  if ( [ -f "$left" ] ); then echo found; fi
+  if ( [[ -f "$left" ]] ); then echo found; fi
+}
+
+test_operand_expansion_diagnostics() {
+  [ "$@" = one ]
+  [ "${values[@]}" = one ]
+  [ {a,b} = one ]
+  [ *.txt = one ]
+  [ -d *.txt ]
+  [ -v arr[i] ]
+  [ -n $value ]
+  [[ "$@" = one ]]
+  [[ {a,b} = one ]]
+  [[ *.txt = one ]]
+  [[ "$left" = $right ]]
+  [[ "$left" != $right ]]
+  [[ "$left" =~ *.txt ]]
+}
+
+file_command_diagnostics() {
+  ls | xargs rm
+  ls | wc -l
+  find -name '*.txt'
+  mv file.txt
+  cp -r dir
+  ln -s target
+  xargs -i echo replaced < list
+}
+
+text_utility_diagnostics() {
+  echo "$value" | wc -c
+  sed 's/old/new/' file
+  true | ls
+  find . -exec echo $(basename x) \;
+  tr a-z A-Z
+  tr 'hello' 'world'
+  grep 'file*' list
+  echo 'line\n'
+  [ -n "$(grep needle file)" ]
+  printf 'plain\n' one two
+}
+
+helper_function() { echo helper; }
+
+privilege_and_builtin_diagnostics() {
+  ssh remote "echo $value"
+  ssh -p 22 remote "echo $value"
+  ssh remote 'echo literal'
+  su operator helper_function
+  su - -c helper_function
+  su operator whoami
+  find . -exec helper_function {} \;
+  find . -execdir helper_function {} \;
+  ls | xargs helper_function
+  cd /tmp
+  cd -
+  break
+  set assigned=value
+  return one two
+  exit one two
+  return $(echo 5)
+  export $exported_name
+  sudo cd /tmp
+  sudo export FOO=1
+}
+
+trap_condition_diagnostics() {
+  trap 'helper_function' 9
+  trap 'helper_function' 15
+  trap 'helper_function' KILL
+  trap 'helper_function' SIGSTOP
+  trap 'helper_function' INT
+  trap - EXIT
+}
