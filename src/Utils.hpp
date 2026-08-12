@@ -90,6 +90,9 @@ fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool;
 
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void;
 
+fn set_foreground_program_title(const ArrayList<String> &arguments,
+                                EvalContext &cxt) throws -> void;
+
 fn execute_context(ExecContext &&ec, EvalContext &cxt,
                    execution_mode mode) throws -> i32;
 

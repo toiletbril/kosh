@@ -1121,7 +1121,9 @@ selects vi mode. The command
 .B set \-o emacs
 restores emacs mode.
 .PP
-The shell does not set the terminal window title.
+The interactive terminal title shows the current user and directory. While a
+foreground program runs, the title shows its command line. Output from
+PROMPT_COMMAND or PS1 can replace the idle title.
 .PP
 Ghost text uses prefix matches from completion and history. Tab also offers
 smart-case and subsequence matches. An empty command position includes

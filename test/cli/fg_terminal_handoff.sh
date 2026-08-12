@@ -1,6 +1,7 @@
 unset KOSH_FLAGS
 
 d=$(mktemp -d)
+d=$(cd "$d" && pwd -P)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
 
 probe="$d/stopped.bash"
@@ -11,7 +12,8 @@ printf '%s\n' '#!/bin/bash' \
     'echo "FG_READ:$value"' > "$probe"
 chmod +x "$probe"
 
-printf 'printf ready > "%s"\n' "$d/ready" > "$d/rc"
+printf 'printf ready > "%s"\nPROMPT_COMMAND='\''cd "%s"; printf "\\033]0;HOOK\\007"'\''\n' \
+    "$d/ready" "$d" > "$d/rc"
 
 wait_for_transcript()
 {
@@ -37,7 +39,8 @@ send_input()
     wait_for_transcript 'HANDOFF_STEP_1' || return 1
     printf 'stty tostop; echo HANDOFF_STEP_2\n'
     wait_for_transcript 'HANDOFF_STEP_2' || return 1
-    printf '%s\n' "$probe"
+    printf '%s\n' "( /usr/bin/true \$'safe\\001\\302\\200\\303\\251' ) > redirected"
+    printf "%s 'argument with spaces'\n" "$probe"
     wait_for_transcript 'Stopped' || return 1
     printf 'fg\n'
     wait_for_transcript 'FG_READY' || return 1
@@ -64,12 +67,38 @@ if grep -q 'fg will give the terminal.*before it resumes job' "$d/log"; then
     ordering=passed
 fi
 
-title_output=absent
-if grep -aF ']0;' "$d/typescript" >/dev/null 2>&1; then
-    title_output=present
+title_output=failed
+escape=$(printf '\033')
+bell=$(printf '\007')
+if [ -n "${LOGNAME+x}" ]; then
+    expected_user=$LOGNAME
+elif [ -n "${USER+x}" ]; then
+    expected_user=$USER
+else
+    expected_user=$(id -un)
+fi
+safe_argument=$(printf 'safe\303\251')
+idle_title="${escape}]0;${expected_user} @ ${d}${bell}"
+probe_title="${escape}]0;${probe} 'argument with spaces'${bell}"
+sanitized_title="${escape}]0;/usr/bin/true ${safe_argument}${bell}"
+hook_title="${escape}]0;HOOK${bell}"
+probe_title_count=$(grep -aoF "$probe_title" "$d/typescript" 2>/dev/null |
+    wc -l | tr -d ' ')
+last_probe_position=$(grep -aboF "$probe_title" "$d/typescript" 2>/dev/null |
+    tail -n 1 | cut -d: -f1)
+last_idle_position=$(grep -aboF "$idle_title" "$d/typescript" 2>/dev/null |
+    tail -n 1 | cut -d: -f1)
+last_hook_position=$(grep -aboF "$hook_title" "$d/typescript" 2>/dev/null |
+    tail -n 1 | cut -d: -f1)
+if grep -aF "$sanitized_title" "$d/typescript" >/dev/null 2>&1 &&
+    [ "$probe_title_count" -ge 2 ] && [ -n "$last_probe_position" ] &&
+    [ -n "$last_idle_position" ] && [ -n "$last_hook_position" ] &&
+    [ "$last_idle_position" -gt "$last_probe_position" ] &&
+    [ "$last_hook_position" -gt "$last_idle_position" ]; then
+    title_output=passed
 fi
 
 case "$ordering:$title_output:$output" in
-    passed:absent:*FG_READ:terminal-value*) echo passed ;;
+    passed:passed:*FG_READ:terminal-value*) echo passed ;;
     *) grep 'fg ' "$d/log"; printf '%s\n' "$output"; echo failed ;;
 esac

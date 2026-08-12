@@ -572,6 +572,115 @@ fn history_rewrite_event(usize number, StringView expected,
 
 static fn strip_ansi_color(StringView text) throws -> String;
 
+fn set_title(StringView title) -> void
+{
+  let const output = os::is_stdout_a_tty()   ? KOSH_STDOUT
+                     : os::is_stderr_a_tty() ? KOSH_STDERR
+                                             : KOSH_INVALID_FD;
+  if (output == KOSH_INVALID_FD) return;
+
+  static constexpr usize MAX_TITLE_LENGTH = 4096;
+  let sequence = String{koshka::heap_allocator()};
+  sequence.reserve(title.count() < MAX_TITLE_LENGTH ? title.count() + 5
+                                                    : MAX_TITLE_LENGTH + 5);
+  sequence += "\x1b]0;";
+  bool was_space_appended = false;
+  for (usize position = 0;
+       position < title.count() && sequence.count() < MAX_TITLE_LENGTH + 4;)
+  {
+    let const byte = title[position];
+    let const unsigned_byte = static_cast<unsigned char>(byte);
+    if (byte == '\t' || byte == '\n' || byte == '\r') {
+      if (!was_space_appended) sequence.push(' ');
+      was_space_appended = true;
+      position++;
+      continue;
+    }
+    if (byte == '\x1b' && position + 1 < title.count() &&
+        title[position + 1] == '[')
+    {
+      usize end_position = position + 2;
+      while (end_position < title.count() &&
+             (title[end_position] < '@' || title[end_position] > '~'))
+      {
+        end_position++;
+      }
+      if (end_position < title.count() && title[end_position] == 'm') {
+        position = end_position + 1;
+        continue;
+      }
+    }
+    if (unsigned_byte < 0x20 || unsigned_byte == 0x7f) {
+      position++;
+      continue;
+    }
+    if (unsigned_byte < 0x80) {
+      sequence.push(byte);
+      was_space_appended = byte == ' ';
+      position++;
+      continue;
+    }
+
+    usize codepoint_length = 0;
+    u32 codepoint = 0;
+    if (unsigned_byte >= 0xc2 && unsigned_byte <= 0xdf) {
+      codepoint_length = 2;
+      codepoint = unsigned_byte & 0x1f;
+    } else if (unsigned_byte >= 0xe0 && unsigned_byte <= 0xef) {
+      codepoint_length = 3;
+      codepoint = unsigned_byte & 0x0f;
+    } else if (unsigned_byte >= 0xf0 && unsigned_byte <= 0xf4) {
+      codepoint_length = 4;
+      codepoint = unsigned_byte & 0x07;
+    }
+    if (codepoint_length == 0 || position + codepoint_length > title.count()) {
+      position++;
+      continue;
+    }
+    bool is_valid = true;
+    for (usize continuation = 1; continuation < codepoint_length;
+         continuation++)
+    {
+      let const continuation_byte =
+          static_cast<unsigned char>(title[position + continuation]);
+      if ((continuation_byte & 0xc0) != 0x80) {
+        is_valid = false;
+        break;
+      }
+      codepoint = (codepoint << 6) | (continuation_byte & 0x3f);
+    }
+    let const minimum_codepoint = codepoint_length == 2   ? 0x80u
+                                  : codepoint_length == 3 ? 0x800u
+                                                          : 0x10000u;
+    if (!is_valid || codepoint < minimum_codepoint || codepoint > 0x10ffffu ||
+        (codepoint >= 0xd800u && codepoint <= 0xdfffu) ||
+        (codepoint >= 0x80u && codepoint <= 0x9fu) ||
+        sequence.count() + codepoint_length > MAX_TITLE_LENGTH + 4)
+    {
+      position++;
+      continue;
+    }
+    sequence.append(title.substring_of_length(position, codepoint_length));
+    was_space_appended = false;
+    position += codepoint_length;
+  }
+
+  sequence.push('\a');
+  unused(os::write_all(output, sequence.data(), sequence.count()));
+}
+
+fn set_idle_title() -> void
+{
+  static const String user = os::get_current_user().value_or("???");
+  let const directory = Path::current_directory().text();
+  let title = String{koshka::heap_allocator()};
+  title.reserve(user.count() + directory.count() + 3);
+  title += user;
+  title += " @ ";
+  title += directory;
+  set_title(title.view());
+}
+
 fn enable_completion(koshka::EvalContext &context) -> void
 {
   COMPLETION_CONTEXT = &context;
@@ -1495,6 +1604,10 @@ fn initialize() -> void
 }
 
 fn exit() -> void {}
+
+fn set_title(StringView title) -> void { unused(title); }
+
+fn set_idle_title() -> void {}
 
 fn get_input(const String &prompt) -> input_result
 {

@@ -83,6 +83,9 @@ void initialize();
 
 void exit();
 
+void set_title(StringView title);
+void set_idle_title();
+
 struct input_result
 {
   i32 code;

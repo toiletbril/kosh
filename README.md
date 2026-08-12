@@ -4,12 +4,8 @@
 
 0.1.0 has been released! See the [Release Blog Post](https://fennec.support/scribbles/shell-release).
 
-**The project was renamed in 0.1.1.** The `shit` binary is now `kosh`, the
-`shitbox` utilities are now `koshkit`, the startup files are `~/.koshrc` and
-`/etc/koshrc`, the history files carry the `.kosh_` prefix, and the environment
-and shell variables carry the `KOSH_` prefix. The repository now lives at
-`github.com/toiletbril/kosh`. The old names are not accepted, so a configuration
-written for 0.1.0 has to be renamed by hand.
+**The project was renamed in 0.1.1.** The `shit` is now `kosh`, `shitbox` is
+`koshkit`, and every prefix is changed to `kosh`.
 
 ---
 

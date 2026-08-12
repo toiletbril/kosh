@@ -602,6 +602,8 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   let const saved_exit_status = context.last_exit_status();
   let const saved_command_duration_nanos =
       context.last_command_duration_nanos();
+  context.set_prompt_command_running(true);
+  defer { context.set_prompt_command_running(false); };
 
   if (PROMPT_COMMAND_CACHED_AST != nullptr &&
       PROMPT_COMMAND_CACHED_TEXT.view() == command->view())
@@ -1641,6 +1643,7 @@ fn main(int argc, char **argv) -> int
 
         /* The PROMPT_COMMAND hook runs before the template is expanded, so a
            framework that assigns PS1 inside it is in place by then. */
+        toiletline::set_idle_title();
         run_prompt_command(context, ast_arena);
 
         if (!did_seed_interactive_path_map && !is_rescue_mode &&

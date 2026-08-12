@@ -503,6 +503,25 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
   return result;
 }
 
+fn set_foreground_program_title(const ArrayList<String> &arguments,
+                                EvalContext &cxt) throws -> void
+{
+  if (arguments.is_empty()) return;
+
+  if (!cxt.shell_is_interactive() || !cxt.startup_finished() ||
+      cxt.is_completion_function_running() || cxt.is_prompt_command_running())
+  {
+    return;
+  }
+
+  let command = String{cxt.scratch_allocator()};
+  for (usize index = 0; index < arguments.count(); index++) {
+    if (index > 0) command.push(' ');
+    append_shell_quoted_arg(command, arguments[index]);
+  }
+  toiletline::set_title(command.view());
+}
+
 fn execute_context(ExecContext &&ec, EvalContext &cxt,
                    execution_mode mode) throws -> i32
 {
@@ -526,7 +545,11 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
       LOG(Debug, "execute_context mimicking the shell for '%s'",
           ec.program().c_str());
       if (cxt.shell_is_interactive() && os::shell_has_controlling_terminal()) {
-        let const command = String{ec.program().view()};
+        let command = String{heap_allocator()};
+        for (usize index = 0; index < ec.args().count(); index++) {
+          if (index > 0) command.push(' ');
+          append_shell_quoted_arg(command, ec.args()[index]);
+        }
 
         /* The child blocks on this pipe until the parent hands off the
            terminal, so it never touches the terminal before the handoff. */
@@ -640,7 +663,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   if (is_async || is_foreground_job) {
     for (usize i = 0; i < ec.args().count(); i++) {
       if (i > 0) command += ' ';
-      command += ec.args()[i].view();
+      append_shell_quoted_arg(command, ec.args()[i]);
     }
     if (is_async) command += " &";
   }
@@ -732,6 +755,21 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 {
   let const is_async = mode == execution_mode::Background;
   ASSERT(ecs.count() > 1);
+
+  if (!is_async && cxt.shell_is_interactive() && cxt.startup_finished() &&
+      !cxt.is_completion_function_running() && !cxt.is_prompt_command_running())
+  {
+    let command = String{cxt.scratch_allocator()};
+    for (usize stage = 0; stage < ecs.count(); stage++) {
+      if (stage > 0) command += " | ";
+      for (usize argument = 0; argument < ecs[stage].args().count(); argument++)
+      {
+        if (argument > 0) command.push(' ');
+        append_shell_quoted_arg(command, ecs[stage].args()[argument]);
+      }
+    }
+    toiletline::set_title(command.view());
+  }
 
   LOG(Debug, "running a pipeline of %zu stages%s", ecs.count(),
       is_async ? " in the background" : "");

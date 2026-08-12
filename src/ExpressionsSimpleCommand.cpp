@@ -820,6 +820,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 
+  if (!is_async() && !cxt.is_in_pipeline_stage())
+    utils::set_foreground_program_title(program_args, cxt);
+
   if (!program_args.is_empty())
     cxt.guard_restricted_path(program_args[0].view(),
                               program_arg_locations.is_empty()

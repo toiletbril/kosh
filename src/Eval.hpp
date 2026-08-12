@@ -1439,6 +1439,14 @@ public:
   {
     return m_is_completion_function_running;
   }
+  fn set_prompt_command_running(bool running) wontthrow -> void
+  {
+    m_is_prompt_command_running = running;
+  }
+  pure fn is_prompt_command_running() const wontthrow -> bool
+  {
+    return m_is_prompt_command_running;
+  }
 
   /* Whether a builtin is running as a stage of a multi-stage pipeline. exec
      reads it so exec in a pipeline stage spawns a child rather than replacing
@@ -1894,6 +1902,7 @@ protected:
   bool m_running_traps{false};
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};
+  bool m_is_prompt_command_running{false};
   bool m_is_in_pipeline_stage{false};
 
   fn install_trap_dispositions() throws -> void;

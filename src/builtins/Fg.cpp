@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Toiletline.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -54,7 +55,14 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return done_status;
   }
 
-  ec.print_to_stdout(job->command + "\n");
+  let command = job->command.view();
+  if (command.count() >= 2 &&
+      command.substring_of_length(command.count() - 2, 2) == " &")
+  {
+    command = command.substring_of_length(0, command.count() - 2);
+  }
+  ec.print_to_stdout(command + "\n");
+  if (cxt.shell_is_interactive()) toiletline::set_title(command);
 
   let const should_reclaim =
       cxt.shell_is_interactive() && os::shell_has_controlling_terminal();

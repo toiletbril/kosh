@@ -304,6 +304,9 @@ src/Toiletline.cpp connects the editor and evaluator. The vendored editor lives
 in src/toiletline/toiletline.h. The completion bridge retains its result until
 the editor consumes returned pointers.
 
+The interactive terminal title shows the current user and directory while idle
+and the foreground program command line while it runs.
+
 ### Diagnostics and source locations
 
 src/Errors.cpp renders located carets and trailing notes. Diagnostic identifiers
