@@ -1,6 +1,6 @@
 #!/bin/env kosh
 type echo
-type -a cd
+PATH= type -a cd
 type nope
 
 alias ll='ls -l'

@@ -40,6 +40,9 @@
   Unquoted "echo"
 ]
 [Word
+  Unquoted "PATH="
+]
+[Word
   Unquoted "type"
 ]
 [Word
@@ -147,7 +150,6 @@
 ]
 echo is a shell builtin
 cd is a shell builtin
-cd is /usr/bin/cd
 4:1: error: Builtin `type`: The command 'nope' was not found.
      4 |  type nope
        |  ^~~~~~~~~
