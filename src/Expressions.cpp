@@ -1310,7 +1310,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                   : command_literal_storage.view();
   let const command_is_defined_function =
       actx.defined_functions.contains(command_literal);
-  let const command_is_shadowed = command_is_defined_function ||
+  let const is_command_shadowed = command_is_defined_function ||
                                   actx.known_aliases.contains(command_literal);
 
   /* A literal command word borrows from the syntax tree, which outlives the
@@ -1328,9 +1328,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN);
   let const lint_input = command_lint_input{
       m_args,          m_redirections, m_local_vars,       source_location(),
-      command_literal, command_info,   command_is_shadowed};
+      command_literal, command_info,   is_command_shadowed};
 
-  if (!command_is_shadowed && actx.is_inside_loop_condition &&
+  if (!is_command_shadowed && actx.is_inside_loop_condition &&
       command_id == command_name_id::Read)
   {
     actx.has_input_reading_loop_condition = true;
@@ -1338,7 +1338,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   append_presence_tested_command_names(actx, actx.tested_command_names, true);
 
-  if (!command_is_shadowed && actx.is_inside_read_loop &&
+  if (!is_command_shadowed && actx.is_inside_read_loop &&
       command_id == command_name_id::Ssh)
   {
     actx.report_diagnostic(diagnostic_id::sc2095, m_args[0]->source_location());
@@ -1352,10 +1352,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   let const should_scan_for_malformed_glob =
       actx.should_report(diagnostic_id::malformed_glob);
   let const should_check_unquoted_expansion =
-      !command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
+      !is_command_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
       !command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET);
   let const should_check_dash_glob =
-      !command_is_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
+      !is_command_shadowed && !command_info.is_in_group(COMMAND_GROUP_TEST) &&
       command_id != command_name_id::Echo &&
       command_id != command_name_id::Printf;
   let const should_check_array_reads = actx.array_valued_names.count() != 0;
@@ -1619,7 +1619,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (is_quoted_home)
         actx.report_diagnostic(diagnostic_id::sc2088, arg_location);
 
-      if (!command_is_shadowed && command_id == command_name_id::Echo &&
+      if (!is_command_shadowed && command_id == command_name_id::Echo &&
           source_text.length >= 4 && source_text[0] == '\'' &&
           source_text[1] == '$' && source_text[source_text.length - 1] == '\'')
       {
@@ -1797,7 +1797,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* No search path holds a program named after an entity, so the finding needs
      no resolution scan and survives an unknown path. */
   let const command_is_html_entity_tail =
-      name.has_value() && !command_is_shadowed &&
+      name.has_value() && !is_command_shadowed &&
       command_info.is_in_group(COMMAND_GROUP_HTML_ENTITY_TAIL) &&
       !actx.tested_command_names.contains(*name);
 
@@ -1814,7 +1814,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
      its only diagnostic cannot reach the output. */
   let const should_check_command_resolution =
       name.has_value() && !actx.should_silence_unresolved_commands &&
-      !command_is_shadowed && !command_is_html_entity_tail &&
+      !is_command_shadowed && !command_is_html_entity_tail &&
       actx.should_report(resolution_diagnostic);
 
   let unavailable = Maybe<utils::unavailable_path_source_component>{};
@@ -1876,7 +1876,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   let const is_top_level_unconditional =
       actx.function_scope_depth == 0 && is_unconditional;
-  if (is_top_level_unconditional && !command_is_shadowed) {
+  if (is_top_level_unconditional && !is_command_shadowed) {
     if (command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET)) {
       for (usize i = 1; i < m_args.count(); i++) {
         let const word = m_args[i]->kind() == Token::Kind::Word

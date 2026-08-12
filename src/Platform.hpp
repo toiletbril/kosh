@@ -898,7 +898,7 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
 /* Script fallback returns KOSH_INVALID_PROCESS when it is allowed and the file
    has no executable format. */
 fn execute_program(
-    ExecContext &&ec,
+    ExecContext &ec,
     script_fallback_policy fallback = script_fallback_policy::Reject,
     process_group_mode process_group = process_group_mode::Inherit,
     StringView source = {}, terminal_handoff handoff = terminal_handoff::Keep,

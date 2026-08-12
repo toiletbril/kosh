@@ -67,8 +67,8 @@ public:
   mutable usize cached_substitution_generation{0};
 
   mutable ArrayList<arith_token> cached_arith_tokens{heap_allocator()};
-  mutable bool arith_tokenized{false};
-  mutable bool arith_simple{false};
+  mutable bool is_arith_tokenized{false};
+  mutable bool is_arith_simple{false};
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;

@@ -99,7 +99,7 @@ struct command_lint_input
   SourceLocation command_source_location;
   StringView command_literal;
   analysis_command_info command_info;
-  bool command_is_shadowed;
+  bool is_command_shadowed;
 
   pure fn command_id() const wontthrow -> command_name_id
   {

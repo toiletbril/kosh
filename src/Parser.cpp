@@ -693,8 +693,9 @@ fn Parser::build_file_or_dup_redirection(
          spelling, cmd >&/dev/null, decided after the expansion. An explicit
          descriptor as in 2>&word keeps the strict error. */
       redir.target = from;
-      redir.can_dup_be_filename = op_kind == Token::Kind::Greater &&
-                                  !fd_was_explicit && !m_lexer.is_posix_mode();
+      redir.is_dup_filename_allowed = op_kind == Token::Kind::Greater &&
+                                      !fd_was_explicit &&
+                                      !m_lexer.is_posix_mode();
       out.push(redir);
       return;
     }

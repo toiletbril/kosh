@@ -315,7 +315,7 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void
 {
-  if (input.command_is_shadowed) return;
+  if (input.is_command_shadowed) return;
 
   let const &args = input.args;
 
@@ -660,7 +660,7 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
                                   const command_lint_input &input) throws
     -> void
 {
-  if (input.command_is_shadowed) return;
+  if (input.is_command_shadowed) return;
 
   let const &args = input.args;
 

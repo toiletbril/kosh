@@ -472,7 +472,7 @@ struct eval_state_snapshot
   ProgramResolver program_resolver;
   u8 init_moods_sourcing;
   u8 initialized_moods;
-  bool mood_set_explicitly;
+  bool was_mood_set_explicitly;
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
@@ -1028,7 +1028,7 @@ public:
      seed, so the -W downgrade leaves it fatal. */
   fn set_error_unset_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.error_unset_explicit = enabled;
+    m_runtime.was_error_unset_set_explicitly = enabled;
   }
   /* Mark a warning suppressed or not for the span of a construct. */
   fn set_warning_suppressed(suppressible_warning which, bool enabled) wontthrow
@@ -1098,7 +1098,7 @@ public:
      than a mood seed, so a later mood switch leaves it in place. */
   fn set_pipefail_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.pipefail_explicit = enabled;
+    m_runtime.was_pipefail_set_explicitly = enabled;
   }
 
   fn set_no_clobber(bool enabled) wontthrow -> void;
@@ -1117,7 +1117,7 @@ public:
      a mood seed, so the -W downgrade leaves it fatal. */
   fn set_failglob_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.failglob_explicit = enabled;
+    m_runtime.was_failglob_set_explicitly = enabled;
   }
   /* True while a test or [ command expands its arguments, so an unmatched glob
      there stays a silent literal and the probe answers false rather than
@@ -1225,10 +1225,10 @@ public:
   fn apply_strictness_for_mood() wontthrow -> void
   {
     let const strict = m_runtime.mood == mimic_mood::Default;
-    if (!m_runtime.error_unset_explicit)
+    if (!m_runtime.was_error_unset_set_explicitly)
       set_error_unset(strict && !is_completion_function_running());
-    if (!m_runtime.pipefail_explicit) set_pipefail(strict);
-    if (!m_runtime.failglob_explicit)
+    if (!m_runtime.was_pipefail_set_explicitly) set_pipefail(strict);
+    if (!m_runtime.was_failglob_set_explicitly)
       set_failglob(strict && !is_completion_function_running());
   }
 
@@ -1239,10 +1239,10 @@ public:
     let const previous = RuntimeState::capture(*this);
     m_runtime.mood = defining_runtime.mood;
     set_warning_level(defining_runtime.warning_level);
-    m_runtime.are_diagnostics_disabled =
-        defining_runtime.are_diagnostics_disabled;
-    m_runtime.are_annoying_diagnostics_enabled =
-        defining_runtime.are_annoying_diagnostics_enabled;
+    m_runtime.is_diagnostics_disabled =
+        defining_runtime.is_diagnostics_disabled;
+    m_runtime.is_annoying_diagnostics_enabled =
+        defining_runtime.is_annoying_diagnostics_enabled;
     apply_strictness_for_mood();
     return function_runtime_state{previous,
                                   RuntimeState::capture(*this),
@@ -1252,7 +1252,7 @@ public:
                                   m_warning_mutation_revision,
                                   m_diagnostics_mutation_revision,
                                   m_annoying_diagnostics_mutation_revision,
-                                  m_mood_set_explicitly};
+                                  m_was_mood_set_explicitly};
   }
 
   fn leave_definition_state(
@@ -1268,7 +1268,7 @@ public:
       m_diagnostics_mutation_revision = state.diagnostics_mutation_revision;
       m_annoying_diagnostics_mutation_revision =
           state.annoying_diagnostics_mutation_revision;
-      m_mood_set_explicitly = state.was_mood_set_explicitly;
+      m_was_mood_set_explicitly = state.was_mood_set_explicitly;
       return;
     }
 
@@ -1295,23 +1295,26 @@ public:
     m_runtime.shell_options = merged_options;
     if (m_shell_option_mutations.touched_since(
             shell_option_id::Nounset, state.shell_option_mutation_revision))
-      m_runtime.error_unset_explicit = finished.error_unset_explicit;
+      m_runtime.was_error_unset_set_explicitly =
+          finished.was_error_unset_set_explicitly;
     if (m_shell_option_mutations.touched_since(
             shell_option_id::Pipefail, state.shell_option_mutation_revision))
-      m_runtime.pipefail_explicit = finished.pipefail_explicit;
+      m_runtime.was_pipefail_set_explicitly =
+          finished.was_pipefail_set_explicitly;
     if (m_shell_option_mutations.touched_since(
             shell_option_id::Failglob, state.shell_option_mutation_revision))
-      m_runtime.failglob_explicit = finished.failglob_explicit;
+      m_runtime.was_failglob_set_explicitly =
+          finished.was_failglob_set_explicitly;
     if (state.mood_mutation_revision != m_mood_mutation_revision)
       m_runtime.mood = finished.mood;
     if (state.warning_mutation_revision != m_warning_mutation_revision)
       m_runtime.warning_level = finished.warning_level;
     if (state.diagnostics_mutation_revision != m_diagnostics_mutation_revision)
-      m_runtime.are_diagnostics_disabled = finished.are_diagnostics_disabled;
+      m_runtime.is_diagnostics_disabled = finished.is_diagnostics_disabled;
     if (state.annoying_diagnostics_mutation_revision !=
         m_annoying_diagnostics_mutation_revision)
-      m_runtime.are_annoying_diagnostics_enabled =
-          finished.are_annoying_diagnostics_enabled;
+      m_runtime.is_annoying_diagnostics_enabled =
+          finished.is_annoying_diagnostics_enabled;
   }
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
@@ -1335,12 +1338,12 @@ public:
      main leaves a mood the rc selected in place. */
   fn note_explicit_mood() wontthrow -> void
   {
-    m_mood_set_explicitly = true;
+    m_was_mood_set_explicitly = true;
     m_mood_mutation_revision++;
   }
-  pure fn mood_set_explicitly() const wontthrow -> bool
+  pure fn was_mood_set_explicitly() const wontthrow -> bool
   {
-    return m_mood_set_explicitly;
+    return m_was_mood_set_explicitly;
   }
 
   /* The moods whose startup files have finished sourcing this session, so set
@@ -1677,19 +1680,19 @@ public:
      analysis gate at runtime. */
   fn set_diagnostics_disabled(bool disabled) wontthrow -> void
   {
-    m_runtime.are_diagnostics_disabled = disabled;
+    m_runtime.is_diagnostics_disabled = disabled;
   }
   pure fn diagnostics_disabled() const wontthrow -> bool
   {
-    return m_runtime.are_diagnostics_disabled;
+    return m_runtime.is_diagnostics_disabled;
   }
   fn set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void
   {
-    m_runtime.are_annoying_diagnostics_enabled = enabled;
+    m_runtime.is_annoying_diagnostics_enabled = enabled;
   }
   pure fn annoying_diagnostics_enabled() const wontthrow -> bool
   {
-    return m_runtime.are_annoying_diagnostics_enabled;
+    return m_runtime.is_annoying_diagnostics_enabled;
   }
 
   /* The startup facts set -o reports read-only, mirrored from the invocation
@@ -1866,7 +1869,7 @@ protected:
   ProgramResolver m_program_resolver{};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
-  bool m_mood_set_explicitly{false};
+  bool m_was_mood_set_explicitly{false};
   u64 m_mood_mutation_revision{0};
   u64 m_warning_mutation_revision{0};
   u64 m_diagnostics_mutation_revision{0};
@@ -2047,11 +2050,11 @@ public:
   /* 2>&1 routes the standard error to wherever the standard output goes, and
      1>&2 the reverse. Applied after the file descriptors are placed. When both
      are present the source order decides the result, since each dup reads the
-     current target of its source descriptor, so dup_out_to_err_came_last
+     current target of its source descriptor, so was_output_to_error_last
      records which one the source wrote last. */
-  bool dup_err_to_out{false};
-  bool dup_out_to_err{false};
-  bool dup_out_to_err_came_last{false};
+  bool should_duplicate_error_to_output{false};
+  bool should_duplicate_output_to_error{false};
+  bool was_output_to_error_last{false};
 
   /* exec -c hands the program an empty environment. The flag rides the context
      to the spawn site, where the envp becomes a single null instead of environ.
@@ -2096,17 +2099,17 @@ public:
   fn apply_dup_routing(ApplyErrToOut apply_err_to_out,
                        ApplyOutToErr apply_out_to_err) const -> void
   {
-    if (dup_err_to_out && dup_out_to_err) {
-      if (dup_out_to_err_came_last) {
+    if (should_duplicate_error_to_output && should_duplicate_output_to_error) {
+      if (was_output_to_error_last) {
         apply_err_to_out();
         apply_out_to_err();
       } else {
         apply_out_to_err();
         apply_err_to_out();
       }
-    } else if (dup_err_to_out) {
+    } else if (should_duplicate_error_to_output) {
       apply_err_to_out();
-    } else if (dup_out_to_err) {
+    } else if (should_duplicate_output_to_error) {
       apply_out_to_err();
     }
   }

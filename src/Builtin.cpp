@@ -121,7 +121,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
      flag, so the placement runs whenever either a descriptor or a cross-route
      is present. Otherwise `cd /bad 2>&1` would leave the builtin's stderr on
      the terminal instead of following the standard output. */
-  const bool has_dup_routing = ec.dup_err_to_out || ec.dup_out_to_err;
+  let const has_dup_routing = ec.should_duplicate_error_to_output ||
+                              ec.should_duplicate_output_to_error;
 
   let saved_descriptors = ArrayList<os::saved_descriptor>{heap_allocator()};
   if (has_pipe_descriptors || has_dup_routing) {

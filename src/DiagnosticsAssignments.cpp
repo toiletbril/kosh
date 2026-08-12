@@ -47,7 +47,7 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
 
   let const view = *target_text;
   if (redirection.kind == Redirection::Kind::DuplicateOutput &&
-      redirection.can_dup_be_filename)
+      redirection.is_dup_filename_allowed)
   {
     actx.report_diagnostic(diagnostic_id::sc3021, do_get_location(), {view});
   }
@@ -97,7 +97,7 @@ fn check_redirection_lints(AnalysisContext &actx,
   String read_target{heap_allocator()};
   const Token *read_token = nullptr;
   let const is_test_command =
-      input.is_in_group(COMMAND_GROUP_TEST) && !input.command_is_shadowed;
+      input.is_in_group(COMMAND_GROUP_TEST) && !input.is_command_shadowed;
   /* Descriptors 0 through 9 are the ones a script writes, and the location of
      the first claim is kept so the second claim can point back at it. */
   SourceLocation claimed_fd_locations[10]{};
@@ -141,7 +141,7 @@ fn check_redirection_lints(AnalysisContext &actx,
     if (redirection.kind == Redirection::Kind::Heredoc &&
         redirection.should_expand_heredoc &&
         input.command_id() == command_name_id::Ssh &&
-        !input.command_is_shadowed)
+        !input.is_command_shadowed)
     {
       actx.report_diagnostic(diagnostic_id::sc2087,
                              redirection.target != nullptr
@@ -258,7 +258,7 @@ fn check_redirection_lints(AnalysisContext &actx,
     }
   }
 
-  if (input.redirections.is_empty() || input.command_is_shadowed) {
+  if (input.redirections.is_empty() || input.is_command_shadowed) {
     return;
   }
   if (!input.is_in_group(COMMAND_GROUP_NON_STDIN_READER)) return;
@@ -278,7 +278,7 @@ fn check_redirection_lints(AnalysisContext &actx,
 fn check_test_operand_lints(AnalysisContext &actx,
                             const command_lint_input &input) throws -> void
 {
-  if (!input.is_in_group(COMMAND_GROUP_TEST) || input.command_is_shadowed)
+  if (!input.is_in_group(COMMAND_GROUP_TEST) || input.is_command_shadowed)
     return;
 
   let const &args = input.args;

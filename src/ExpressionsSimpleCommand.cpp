@@ -406,7 +406,7 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
 
   let const parsed_descriptor = field.view().to<i64>();
   if (parsed_descriptor.is_error() || parsed_descriptor.value() < 0) {
-    if (redir.can_dup_be_filename)
+    if (redir.is_dup_filename_allowed)
       return resolved_duplication{-1, steal(field)};
     throw ErrorWithLocation{redir.target->source_location(),
                             "'" + field + "' is not a valid descriptor"};
@@ -633,8 +633,8 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       break;
     case redirection_outcome::BothStreams:
       assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, 1, r.opened_fd);
-      ec.dup_err_to_out = true;
-      ec.dup_out_to_err_came_last = false;
+      ec.should_duplicate_error_to_output = true;
+      ec.was_output_to_error_last = false;
       break;
     case redirection_outcome::OpenedFile:
       assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, r.target_fd,
@@ -645,11 +645,11 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
          three slots and is left to the compound path. */
       if (r.dup_from_fd == r.target_fd) {
       } else if (r.target_fd == 2 && r.dup_from_fd == 1) {
-        ec.dup_err_to_out = true;
-        ec.dup_out_to_err_came_last = false;
+        ec.should_duplicate_error_to_output = true;
+        ec.was_output_to_error_last = false;
       } else if (r.target_fd == 1 && r.dup_from_fd == 2) {
-        ec.dup_out_to_err = true;
-        ec.dup_out_to_err_came_last = true;
+        ec.should_duplicate_output_to_error = true;
+        ec.was_output_to_error_last = true;
       }
       break;
     }
@@ -846,7 +846,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (let const &redir : m_redirections) {
       if (redir.fd_allocation_name_token == nullptr)
         cxt.snapshot_subshell_descriptor(redir.fd);
-      if (redir.can_dup_be_filename) cxt.snapshot_subshell_descriptor(2);
+      if (redir.is_dup_filename_allowed) cxt.snapshot_subshell_descriptor(2);
     }
   }
 
@@ -1316,9 +1316,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         (definition_info->defining_runtime.mood != cxt.mood() ||
          definition_info->defining_runtime.warning_level !=
              cxt.warning_level() ||
-         definition_info->defining_runtime.are_diagnostics_disabled !=
+         definition_info->defining_runtime.is_diagnostics_disabled !=
              cxt.diagnostics_disabled() ||
-         definition_info->defining_runtime.are_annoying_diagnostics_enabled !=
+         definition_info->defining_runtime.is_annoying_diagnostics_enabled !=
              cxt.annoying_diagnostics_enabled());
     Maybe<function_runtime_state> saved_runtime_state = None;
     if (needs_state_swap) {

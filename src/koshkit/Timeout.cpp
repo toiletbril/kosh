@@ -310,7 +310,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   };
 
   os::process child = os::execute_program(
-      steal(command), os::script_fallback_policy::Allow, process_group_mode,
+      command, os::script_fallback_policy::Allow, process_group_mode,
       source != nullptr ? source->view() : StringView{},
       has_controlling_terminal ? os::terminal_handoff::BeforeStart
                                : os::terminal_handoff::Keep);
@@ -337,7 +337,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         ResolvedCommand::from_program(Path{shell_path->view()}),
         steal(fallback_args), steal(fallback_locations));
     child = os::execute_program(
-        steal(fallback), os::script_fallback_policy::Reject, process_group_mode,
+        fallback, os::script_fallback_policy::Reject, process_group_mode,
         source != nullptr ? source->view() : StringView{},
         has_controlling_terminal ? os::terminal_handoff::BeforeStart
                                  : os::terminal_handoff::Keep);

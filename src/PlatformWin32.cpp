@@ -1495,7 +1495,7 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
          utils::ascii_to_lower(suffix[3]) == 't';
 }
 
-fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
+fn execute_program(ExecContext &ec, script_fallback_policy fallback,
                    process_group_mode process_group, StringView,
                    terminal_handoff handoff, i64 process_group_id) -> process
 {
@@ -1594,7 +1594,8 @@ fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
   inherited_handle_state error_inheritance{};
   let const has_command_redirection =
       ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value() ||
-      ec.dup_err_to_out || ec.dup_out_to_err;
+      ec.should_duplicate_error_to_output ||
+      ec.should_duplicate_output_to_error;
   let const should_use_standard_handles =
       has_command_redirection || !is_fd_a_tty(startup_info.hStdInput) ||
       !is_fd_a_tty(startup_info.hStdOutput) ||
@@ -1957,7 +1958,7 @@ fn replace_process(ExecContext &&ec) -> void
      shell exits with its status. */
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
-  process child = execute_program(steal(ec), script_fallback_policy::Allow);
+  process child = execute_program(ec, script_fallback_policy::Allow);
   if (child == KOSH_INVALID_PROCESS) {
     redirect_self(ec);
     ec.close_fds();

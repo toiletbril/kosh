@@ -128,7 +128,7 @@ fn check_command_name_lints(AnalysisContext &actx,
     }
   }
 
-  if (input.command_is_shadowed) return;
+  if (input.is_command_shadowed) return;
 
   let const is_posix = actx.is_posix_sh_shebang;
 
@@ -420,7 +420,7 @@ fn check_command_name_lints(AnalysisContext &actx,
 fn check_command_value_lints(AnalysisContext &actx,
                              const command_lint_input &input) throws -> void
 {
-  if (input.command_is_shadowed) return;
+  if (input.is_command_shadowed) return;
 
   let const &args = input.args;
 

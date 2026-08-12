@@ -648,7 +648,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   let const source = cxt.current_source();
   unused(cxt.materialize_kosh_identity());
   os::process p =
-      os::execute_program(steal(ec),
+      os::execute_program(ec,
                           is_async ? os::script_fallback_policy::Reject
                                    : os::script_fallback_policy::Allow,
                           is_async ? os::process_group_mode::NewBackground
@@ -809,7 +809,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           !is_async ? os::process_group_mode::Inherit
                     : os::background_process_group_mode(process_group_id);
       let const child = os::execute_program(
-          steal(ec), os::script_fallback_policy::Reject, process_group,
+          ec, os::script_fallback_policy::Reject, process_group,
           source != nullptr ? source->view() : StringView{},
           os::terminal_handoff::Keep, process_group_id);
       if (is_async && process_group_id == 0) {
@@ -1643,11 +1643,11 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
   let const slash = name.find_character('/');
   let const user = slash.has_value() ? name.substring_of_length(1, *slash - 1)
                                      : name.substring(1);
-  Maybe<Path> home =
+  let home =
       user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
   if (!home.has_value()) return None;
 
-  let expanded = *home;
+  let expanded = home.take();
   if (slash.has_value()) expanded.push_component(name.substring(*slash + 1));
   return String{expanded.text().view()};
 }

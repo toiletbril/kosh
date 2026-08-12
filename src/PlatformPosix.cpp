@@ -1002,7 +1002,7 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
   return child_pid;
 }
 
-hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
+hot fn execute_program(ExecContext &ec, script_fallback_policy fallback,
                        process_group_mode process_group, StringView source,
                        terminal_handoff handoff, i64 process_group_id) throws
     -> process

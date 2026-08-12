@@ -366,18 +366,21 @@ struct conditional_evaluator
           let const left = operand_value(elements[pos - 3]);
           if (op == "==" || op == "=" || op == "!=") {
             let active = Bitset{cxt.scratch_allocator()};
-            const String pattern =
+            let const pattern =
                 operand_pattern_masked(elements[pos - 1], active);
             let const is_case_insensitive = cxt.is_shopt_enabled("nocasematch");
-            const String match_pattern =
-                is_case_insensitive
-                    ? ascii_lower_copy(cxt.scratch_allocator(), pattern.view())
-                    : pattern;
-            const String match_value =
-                is_case_insensitive
-                    ? ascii_lower_copy(cxt.scratch_allocator(), left.view())
-                    : left;
-            const bool is_matched =
+            if (!is_case_insensitive) {
+              let const is_matched =
+                  utils::glob_matches(pattern.view(), left.view(), active, 0,
+                                      cxt.extglob_enabled());
+              return op == "!=" ? !is_matched : is_matched;
+            }
+
+            let const match_pattern =
+                ascii_lower_copy(cxt.scratch_allocator(), pattern.view());
+            let const match_value =
+                ascii_lower_copy(cxt.scratch_allocator(), left.view());
+            let const is_matched =
                 utils::glob_matches(match_pattern.view(), match_value.view(),
                                     active, 0, cxt.extglob_enabled());
             return op == "!=" ? !is_matched : is_matched;

@@ -204,9 +204,11 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.in_fd) command.in_fd = ec.in_fd.take();
   if (ec.out_fd) command.out_fd = ec.out_fd.take();
   if (ec.err_fd) command.err_fd = ec.err_fd.take();
-  command.dup_err_to_out = ec.dup_err_to_out;
-  command.dup_out_to_err = ec.dup_out_to_err;
-  command.dup_out_to_err_came_last = ec.dup_out_to_err_came_last;
+  command.should_duplicate_error_to_output =
+      ec.should_duplicate_error_to_output;
+  command.should_duplicate_output_to_error =
+      ec.should_duplicate_output_to_error;
+  command.was_output_to_error_last = ec.was_output_to_error_last;
   command.should_use_empty_environment = should_use_empty_environment;
   command.should_use_fallback_argv0 = has_custom_argv0;
 

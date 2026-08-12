@@ -1145,8 +1145,8 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
   let const source_location =
       segment.get_source_location(m_current_location.filename);
   return evaluate_arithmetic_cached_clause(
-      segment.text.view(), segment.cached_arith_tokens, segment.arith_tokenized,
-      segment.arith_simple,
+      segment.text.view(), segment.cached_arith_tokens,
+      segment.is_arith_tokenized, segment.is_arith_simple,
       source_location.has_value() ? &*source_location : nullptr);
 }
 

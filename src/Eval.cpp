@@ -533,7 +533,8 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   }
 
   let const should_demote = strict_diagnostics_are_warnings();
-  if (error_unset() && (m_runtime.error_unset_explicit || !should_demote) &&
+  if (error_unset() &&
+      (m_runtime.was_error_unset_set_explicitly || !should_demote) &&
       !is_warning_suppressed(suppressible_warning::UnsetTestOperand))
   {
     let const message = "Unable to expand '" + String{name} +
@@ -1896,7 +1897,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_program_resolver,
                              m_init_moods_sourcing,
                              m_initialized_moods,
-                             m_mood_set_explicitly,
+                             m_was_mood_set_explicitly,
                              m_mood_mutation_revision,
                              m_warning_mutation_revision,
                              m_diagnostics_mutation_revision,
@@ -1925,7 +1926,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_program_resolver = steal(snapshot.program_resolver);
   m_init_moods_sourcing = snapshot.init_moods_sourcing;
   m_initialized_moods = snapshot.initialized_moods;
-  m_mood_set_explicitly = snapshot.mood_set_explicitly;
+  m_was_mood_set_explicitly = snapshot.was_mood_set_explicitly;
   m_mood_mutation_revision = snapshot.mood_mutation_revision;
   m_warning_mutation_revision = snapshot.warning_mutation_revision;
   m_diagnostics_mutation_revision = snapshot.diagnostics_mutation_revision;

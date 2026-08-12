@@ -520,7 +520,7 @@ public:
   /* True for a bare >&word outside POSIX mode, where a word that expands to
      neither a number nor a dash is the csh both-streams spelling bash reads
      as >word 2>&1, resolved after the expansion the way bash decides it. */
-  bool can_dup_be_filename;
+  bool is_dup_filename_allowed;
   bool is_both_streams_spelling;
   const Token *fd_allocation_name_token;
 

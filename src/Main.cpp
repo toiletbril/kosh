@@ -1483,7 +1483,7 @@ fn main(int argc, char **argv) -> int
   /* The session mood takes over and seeds its strictness once the config has
      loaded, unless the rc picked one with set --mood, which wins the way a
      command-line --mood would. */
-  if (!context.mood_set_explicitly()) context.set_mood(session_mood);
+  if (!context.was_mood_set_explicitly()) context.set_mood(session_mood);
   context.apply_strictness_for_mood();
 
   /* The rc files retained a heap copy of their text and tree until the next
