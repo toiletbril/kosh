@@ -5,7 +5,7 @@ if [ "${OS-}" = Windows_NT ]; then
     expected=$(printf '%s\n%s' "$path_value" survived)
     [ "$output" = "$expected" ] || exit 1
 
-    [ "$("$BIN" -c 'printf "%s" C:\new')" = 'C:new' ] || exit 1
+    [ "$("$BIN" --no-annoying-diagnostics -c 'printf "%s" C:\new')" = 'C:new' ] || exit 1
     [ "$("$BIN" -c "printf '%s' 'C:\new'")" = 'C:\new' ] || exit 1
     [ "$("$BIN" -c 'printf "%s" C:\\new')" = 'C:\new' ] || exit 1
     if "$BIN" --debug-highlight-at '' </dev/null >/dev/null 2>&1; then
