@@ -23,7 +23,6 @@ public:
   cold ArrayList(const ArrayList &other) : m_allocator(other.m_allocator)
   {
     reserve(other.m_length);
-#pragma clang loop unroll_count(4)
     for (usize i = 0; i < other.m_length; i++)
       new (&m_data[i]) T(other.m_data[i]);
     m_length = other.m_length;

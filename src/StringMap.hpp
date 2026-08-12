@@ -274,7 +274,6 @@ private:
     let const old_capacity = m_capacity;
 
     m_slots = m_allocator.alloc_array<slot>(new_capacity);
-#pragma clang loop unroll_count(4)
     for (usize i = 0; i < new_capacity; i++)
       new (&m_slots[i]) slot{};
     m_capacity = new_capacity;
@@ -282,7 +281,6 @@ private:
     m_tombstones = 0;
     let const mask = m_capacity - 1;
 
-#pragma clang loop unroll_count(4)
     for (usize i = 0; i < old_capacity; i++) {
       if (old_slots[i].state == slot::Occupied) {
         let index = static_cast<usize>(old_slots[i].hash) & mask;

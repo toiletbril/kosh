@@ -48,19 +48,18 @@ static fn decimal_digit_count(u64 value) wontthrow -> usize
   return digit_count;
 }
 
-static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
-                        bool should_show_words, bool should_show_bytes,
-                        StringView name, usize field_width,
-                        Allocator allocator) throws -> String
+static fn append_counts(String &line, u64 lines, u64 words, u64 bytes,
+                        bool should_show_lines, bool should_show_words,
+                        bool should_show_bytes, StringView name,
+                        usize field_width) throws -> void
 {
-  String line{allocator};
   bool has_field = false;
 
-  let const do_emit_field = [&line, &has_field, allocator,
-                             field_width](u64 value) throws -> void {
+  let const do_emit_field = [&line, &has_field, field_width](u64 value)
+                                throws -> void {
     if (has_field) line += ' ';
 
-    let const digits = String::from(value, allocator);
+    let const digits = String::from(value, line.allocator());
     for (usize i = digits.count(); i < field_width; i++)
       line += ' ';
 
@@ -78,7 +77,6 @@ static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
   }
 
   line += '\n';
-  return line;
 }
 
 Wc::Wc() = default;
@@ -150,14 +148,18 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
       if (*read_size == 0) break;
       bytes += *read_size;
 
-      for (usize i = 0; i < *read_size; i++) {
-        let const c = buffer[i];
-        if (c == '\n') lines++;
-        if (is_blank(c)) {
-          is_in_word = false;
-        } else if (!is_in_word) {
-          is_in_word = true;
-          words++;
+      if (should_show_lines || should_show_words) {
+        for (usize i = 0; i < *read_size; i++) {
+          let const c = buffer[i];
+          if (should_show_lines && c == '\n') lines++;
+          if (should_show_words) {
+            if (is_blank(c)) {
+              is_in_word = false;
+            } else if (!is_in_word) {
+              is_in_word = true;
+              words++;
+            }
+          }
         }
       }
     }
@@ -186,16 +188,14 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
 
   let output = String{cxt.scratch_allocator()};
   for (const wc_row &row : rows)
-    output +=
-        format_counts(row.line_count, row.word_count, row.byte_count,
-                      should_show_lines, should_show_words, should_show_bytes,
-                      row.name, field_width, cxt.scratch_allocator());
+    append_counts(output, row.line_count, row.word_count, row.byte_count,
+                  should_show_lines, should_show_words, should_show_bytes,
+                  row.name, field_width);
 
   if (sources.count() > 1)
-    output +=
-        format_counts(total_lines, total_words, total_bytes, should_show_lines,
-                      should_show_words, should_show_bytes, StringView{"total"},
-                      field_width, cxt.scratch_allocator());
+    append_counts(output, total_lines, total_words, total_bytes,
+                  should_show_lines, should_show_words, should_show_bytes,
+                  StringView{"total"}, field_width);
 
   ec.print_to_stdout(output);
   return status;

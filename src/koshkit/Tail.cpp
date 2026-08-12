@@ -124,13 +124,28 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const lines = split_keep_newlines(content->view());
+    let const text = content->view();
     let const wanted_count = static_cast<usize>(count);
-    let const start = origin == count_origin::FromStart
-                          ? (count > 0 ? static_cast<usize>(count - 1) : 0)
-                          : sub_sat(lines.count(), wanted_count);
-    for (usize i = start; i < lines.count(); i++)
-      output += lines[i];
+    usize start = 0;
+    if (origin == count_origin::FromStart) {
+      usize remaining_newline_count = count > 0 ? wanted_count - 1 : 0;
+      while (start < text.length && remaining_newline_count > 0) {
+        if (text[start] == '\n') remaining_newline_count--;
+        start++;
+      }
+      if (remaining_newline_count > 0) start = text.length;
+    } else if (wanted_count == 0) {
+      start = text.length;
+    } else {
+      start = text.length;
+      usize remaining_newline_count = wanted_count;
+      if (start > 0 && text[start - 1] == '\n') start--;
+      while (start > 0) {
+        if (text[start - 1] == '\n' && --remaining_newline_count == 0) break;
+        start--;
+      }
+    }
+    output += text.substring(start);
   }
 
   ec.print_to_stdout(output);
