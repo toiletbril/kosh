@@ -78,7 +78,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
   /* An empty glob mask reads as all-false, so the first active run
      materializes it and back-fills false for the bytes already appended. */
-  let do_append_run = [&](StringView text, bool glob_active) {
+  let const do_append_run = [&](StringView text, bool glob_active) {
     let const text_count_before = current.text.count();
     current.text.append(text);
 
@@ -93,14 +93,14 @@ hot fn EvalContext::expand_word(const Word &word) throws
     has_current = true;
   };
 
-  let do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
+  let const do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
 
   /* IFS whitespace folds and a non-whitespace IFS byte delimits one field each.
      A run of k delimiters ends the field and emits k minus one empty fields. */
-  let do_append_split_run = [&](StringView text, bool glob_active) {
+  let const do_append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
     while (i < text.length) {
-      const char byte = text.data[i];
+      let const byte = text.data[i];
       if (!is_field_separator(byte)) {
         usize start = i;
 #pragma clang loop unroll_count(4)
@@ -110,11 +110,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
         continue;
       }
 
-      const bool was_field_started = has_current;
+      let const was_field_started = has_current;
       usize delimiter_count = 0;
 #pragma clang loop unroll_count(4)
       while (i < text.length && is_field_separator(text.data[i])) {
-        const char separator = text.data[i];
+        let const separator = text.data[i];
         if (separator != ' ' && separator != '\t' && separator != '\n') {
           delimiter_count++;
         }
@@ -130,8 +130,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
     }
   };
 
-  let do_emit_elements = [&](const ArrayList<String> &values, bool quoted,
-                             bool star) throws {
+  let const do_emit_elements = [&](const ArrayList<String> &values, bool quoted,
+                                   bool star) throws {
     if (quoted && star) {
       let const ifs = m_field_separators.view();
       let joined = String{scratch_allocator()};
@@ -264,11 +264,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const treat_as_unset =
             positional_test_has_colon ? positional_is_null : param_count == 0;
 
-        let do_emit_positional = [&]() throws {
+        let const do_emit_positional = [&]() throws {
           do_emit_elements(m_positional_params, segment.is_in_double_quotes,
                            is_star);
         };
-        let do_emit_word = [&]() throws {
+        let const do_emit_word = [&]() throws {
           if (let const array_word = parse_modifier_array_word(word);
               array_word.has_value())
           {
@@ -328,15 +328,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const is_star = segment_text[0] == '*';
         let const slice = segment_text.substring(2);
         let const param_count = m_positional_params.count();
-        const i64 total = static_cast<i64>(param_count) + 1;
-        let do_positional_at = [&](i64 index) wontthrow -> StringView {
+        let const total = static_cast<i64>(param_count) + 1;
+        let const do_positional_at = [&](i64 index) wontthrow -> StringView {
           return index == 0 ? m_shell_name.view()
                             : m_positional_params[static_cast<usize>(index - 1)]
                                   .view();
         };
 
-        const usize sep = find_substring_length_separator(slice);
-        const StringView offset_text = slice.substring_of_length(0, sep);
+        let const sep = find_substring_length_separator(slice);
+        let const offset_text = slice.substring_of_length(0, sep);
         let offset_location = SourceLocation{};
         const i64 offset =
             offset_text.is_empty()
@@ -349,7 +349,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         if (start > total) start = total;
         i64 end = total;
         if (sep < slice.length) {
-          const StringView length_text = slice.substring(sep + 1);
+          let const length_text = slice.substring(sep + 1);
           let length_location = SourceLocation{};
           i64 length =
               length_text.is_empty()
@@ -408,7 +408,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let modifier_location = SourceLocation{};
         let const *modifier_location_pointer =
             do_source_location_for(modifier, modifier_location);
-        let do_transform = [&](StringView value) -> String {
+        let const do_transform = [&](StringView value) -> String {
           if (positional_at_op != '\0')
             return apply_parameter_transform_to_value(value, positional_at_op,
                                                       StringView{});
@@ -442,9 +442,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
         while (name_end < segment_text.length &&
                lexer::is_variable_name(segment_text[name_end]))
           name_end++;
-        const char after_array_colon = name_end + 4 < segment_text.length
-                                           ? segment_text[name_end + 4]
-                                           : '\0';
+        let const after_array_colon = name_end + 4 < segment_text.length
+                                          ? segment_text[name_end + 4]
+                                          : '\0';
         if (name_end + 4 <= segment_text.length &&
             segment_text[name_end] == '[' &&
             (segment_text[name_end + 1] == '@' ||
@@ -457,10 +457,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const is_star = segment_text[name_end + 1] == '*';
           let const slice = segment_text.substring(name_end + 4);
           let const elements = collect_array_elements(array_name);
-          const i64 total = static_cast<i64>(elements.count());
+          let const total = static_cast<i64>(elements.count());
 
-          const usize sep = find_substring_length_separator(slice);
-          const StringView offset_text = slice.substring_of_length(0, sep);
+          let const sep = find_substring_length_separator(slice);
+          let const offset_text = slice.substring_of_length(0, sep);
           let offset_location = SourceLocation{};
           const i64 offset =
               offset_text.is_empty()
@@ -473,7 +473,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
           if (start > total) start = total;
           i64 end = total;
           if (sep < slice.length) {
-            const StringView length_text = slice.substring(sep + 1);
+            let const length_text = slice.substring(sep + 1);
             let length_location = SourceLocation{};
             i64 length =
                 length_text.is_empty()
@@ -514,9 +514,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
           }
           break;
         }
-        const char field_modifier_op = name_end + 3 < segment_text.length
-                                           ? segment_text[name_end + 3]
-                                           : '\0';
+        let const field_modifier_op = name_end + 3 < segment_text.length
+                                          ? segment_text[name_end + 3]
+                                          : '\0';
         const char at_transform_op =
             field_modifier_op == '@' && name_end + 4 < segment_text.length
                 ? segment_text[name_end + 4]
@@ -542,7 +542,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
               do_source_location_for(modifier, modifier_location);
           let const is_star = segment_text[name_end + 1] == '*';
           let const elements = collect_array_elements(array_name);
-          let do_transform = [&](StringView element_value) -> String {
+          let const do_transform = [&](StringView element_value) -> String {
             if (is_mapped_at_op)
               return apply_parameter_transform_to_value(
                   element_value, at_transform_op, array_name);
@@ -817,7 +817,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
 
   let result = String{scratch_allocator()};
 
-  let do_emit_run = [&](StringView bytes, bool is_active) {
+  let const do_emit_run = [&](StringView bytes, bool is_active) {
     result.append(bytes);
     for (usize k = 0; k < bytes.length; k++)
       active_out.push(is_active);
@@ -873,11 +873,11 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
                                           bool allow_expansion) throws
     -> ArrayList<String>
 {
-  let do_split_plain = [&]() throws -> ArrayList<String> {
+  let const do_split_plain = [&]() throws -> ArrayList<String> {
     let words = ArrayList<String>{heap_allocator()};
     usize start = 0;
     for (usize i = 0; i <= wordlist.length; i++) {
-      const char character = i < wordlist.length ? wordlist[i] : ' ';
+      let const character = i < wordlist.length ? wordlist[i] : ' ';
       if (character == ' ' || character == '\t' || character == '\n') {
         if (i > start)
           words.push(String{wordlist.substring_of_length(start, i - start)});
@@ -891,7 +891,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
 
   let has_expandable_byte = false;
   for (usize i = 0; i < wordlist.length && !has_expandable_byte; i++) {
-    const char character = wordlist[i];
+    let const character = wordlist[i];
     has_expandable_byte = character == '$' || character == '`' ||
                           character == '"' || character == '\'' ||
                           character == '\\' || character == '~' ||
@@ -902,14 +902,14 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   /* The list expands wrapped in an array literal, so a top-level structural
      byte that closes the literal early and runs the tail as a command is a
      break-out. Such a list degrades to the plain split. */
-  let do_array_literal_is_safe = [&]() wontthrow -> bool {
+  let const do_array_literal_is_safe = [&]() wontthrow -> bool {
     char quote = 0;
     usize paren_depth = 0;
     usize brace_depth = 0;
     let is_in_backtick = false;
     let is_at_word_start = true;
     for (usize i = 0; i < wordlist.length; i++) {
-      const char character = wordlist[i];
+      let const character = wordlist[i];
       if (quote != 0) {
         if (character == quote) quote = 0;
         is_at_word_start = false;
@@ -950,7 +950,9 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
         {
           return false;
         }
-        if (character == '#' && is_at_word_start) return false;
+        if (character == '#' && is_at_word_start) {
+          return false;
+        }
       }
       is_at_word_start = character == ' ' || character == '\t';
     }

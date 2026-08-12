@@ -267,11 +267,15 @@ consteval fn set_option_descriptors_are_valid() wontthrow -> bool
     if (left_option.name.length > PackedStringKey::BYTE_CAPACITY) return false;
     if (!left_option.alias.is_empty() &&
         left_option.alias.length > PackedStringKey::BYTE_CAPACITY)
+    {
       return false;
+    }
     for (usize right = left + 1; right < countof(SET_OPTIONS); right++)
       if (left_option.letter != '\0' &&
           left_option.letter == SET_OPTIONS[right].letter)
+      {
         return false;
+      }
   }
   let const names = make_set_option_name_table();
   for (usize left = 0; left < countof(names.entries); left++)
@@ -353,11 +357,15 @@ consteval fn shellopts_positions_are_valid() wontthrow -> bool
     if (left_position > INTERACTIVE_COMMENTS_POSITION) return false;
     if (left_position != INTERACTIVE_COMMENTS_POSITION &&
         !SET_OPTIONS[left_position].is_in_shellopts)
+    {
       return false;
+    }
     if (left > 0 && !option_text_is_before(
                         shellopts_name(SHELLOPTS_POSITIONS.positions[left - 1]),
                         shellopts_name(left_position)))
+    {
       return false;
+    }
     for (usize right = left + 1; right < countof(SHELLOPTS_POSITIONS.positions);
          right++)
       if (left_position == SHELLOPTS_POSITIONS.positions[right]) return false;
@@ -453,8 +461,10 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
   case set_option_behavior::Stored:
     if (option.id == shell_option_id::Privileged && !enable &&
         os::is_running_setuid() && !os::drop_elevated_identity())
+    {
       throw Error{"Unable to drop elevated ids: " +
                   os::last_system_error_message()};
+    }
     cxt.note_shell_option_mutation(option.id);
     cxt.set_shell_option_state(option.id, enable);
     break;
@@ -491,7 +501,9 @@ fn list_options(const EvalContext &cxt) throws -> String
 {
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
-    if (!option.is_listed || !option_is_available(cxt, option)) continue;
+    if (!option.is_listed || !option_is_available(cxt, option)) {
+      continue;
+    }
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
     out += option.name;
     out += '\n';
@@ -504,7 +516,9 @@ fn list_options_columnar(const EvalContext &cxt) throws -> String
   const usize name_field_width = 15;
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
-    if (!option.is_listed || !option_is_available(cxt, option)) continue;
+    if (!option.is_listed || !option_is_available(cxt, option)) {
+      continue;
+    }
     out += option.name;
     for (usize pad = option.name.length; pad < name_field_width; pad++)
       out.push(' ');
@@ -543,7 +557,9 @@ fn format_option_table(const EvalContext *cxt,
   const usize name_field_width = include_alias_spellings ? 30 : 18;
   let out = String{heap_allocator()};
   for (let const &option : SET_OPTIONS) {
-    if (cxt != nullptr && !option_is_available(*cxt, option)) continue;
+    if (cxt != nullptr && !option_is_available(*cxt, option)) {
+      continue;
+    }
     out += "  ";
     if (option.letter != '\0') {
       out.push('-');
@@ -668,7 +684,9 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String
         letters.push('W');
       continue;
     }
-    if (option.letter == '\0' || !option_is_on(cxt, option)) continue;
+    if (option.letter == '\0' || !option_is_on(cxt, option)) {
+      continue;
+    }
     letters.push(option.letter);
   }
   if (cxt.has_execution_string()) letters.push('c');
@@ -679,7 +697,9 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool
 {
   const set_option_descriptor *option = find_option_by_name(name);
-  if (option == nullptr || !option_is_available(cxt, *option)) return false;
+  if (option == nullptr || !option_is_available(cxt, *option)) {
+    return false;
+  }
   apply_or_reject_option(cxt, *option, enable);
   return true;
 }
@@ -713,7 +733,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_rebind = false;
 
   usize i = 1;
-  let do_read_option_value =
+  let const do_read_option_value =
       [&](const String &option_arg) -> Maybe<StringView> {
     if (let const eq = option_arg.view().find_character('='); eq.has_value())
       return option_arg.view().substring(*eq + 1);
@@ -780,7 +800,9 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let moods = ArrayList<mimic_mood>{cxt.scratch_allocator()};
       usize name_start = 0;
       for (usize j = 0; j <= value->length; j++) {
-        if (j != value->length && (*value)[j] != ',') continue;
+        if (j != value->length && (*value)[j] != ',') {
+          continue;
+        }
         let const name = value->substring_of_length(name_start, j - name_start);
         name_start = j + 1;
         if (name.is_empty()) continue;
@@ -835,9 +857,10 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           break;
         }
         if (letter == 'r') {
-          if (!enable && cxt.restricted_enforcement_active())
+          if (!enable && cxt.restricted_enforcement_active()) {
             throw make_error_for_arg(ec, i,
                                      "Restricted mode cannot be disabled");
+          }
           if (enable) cxt.activate_restricted_mode();
           continue;
         }

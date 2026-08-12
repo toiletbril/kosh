@@ -64,7 +64,7 @@ pure fn EvalContext::resolve_render_source(
   if (copy == nullptr || copy->count() <= info->header_length) {
     return resolved_source;
   }
-  const usize body_length = copy->count() - info->header_length;
+  let const body_length = copy->count() - info->header_length;
   if (location.position < info->body_start_position ||
       location.position >= info->body_start_position + body_length)
   {
@@ -154,12 +154,14 @@ fn EvalContext::run_named_trap(StringView condition) throws -> void
 {
   if (m_running_traps) return;
   const String *action = m_traps.find(condition);
-  if (action == nullptr || action->count() == 0) return;
+  if (action == nullptr || action->count() == 0) {
+    return;
+  }
 
   m_running_traps = true;
   defer { m_running_traps = false; };
 
-  const i32 saved_exit_status = m_last_exit_status;
+  let const saved_exit_status = m_last_exit_status;
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap");
   m_last_exit_status = saved_exit_status;
@@ -218,7 +220,7 @@ fn EvalContext::run_pending_traps() throws -> void
      drains again rather than dropping the arrival. */
   os::SIGNAL_PENDING = 0;
 
-  const i32 saved_exit_status = m_last_exit_status;
+  let const saved_exit_status = m_last_exit_status;
 
   for (i32 number = os::take_pending_signal(); number != 0;
        number = os::take_pending_signal())

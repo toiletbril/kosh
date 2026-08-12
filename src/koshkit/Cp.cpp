@@ -82,7 +82,7 @@ static fn source_permission_bits(const Path &source_path,
                                  StringView source) throws -> Maybe<u32>
 {
   os::file_status status{};
-  StringView stat_target = source;
+  let stat_target = source;
 
   Maybe<Path> resolved;
   if (source_path.is_symbolic_link()) {
@@ -149,7 +149,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       };
     }
 
-    let const destination_existed = Path{destination}.is_directory();
+    let const did_destination_exist = Path{destination}.is_directory();
     os::make_directory(destination, 0700);
     Maybe<ArrayList<String>> names = Path::read_directory(source_path);
     if (!names.has_value())
@@ -167,7 +167,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
                 is_recursive, is_verbose, allocator);
     }
 
-    if (source_mode.has_value() && !destination_existed) {
+    if (source_mode.has_value() && !did_destination_exist) {
       os::set_file_mode(destination,
                         *source_mode & ~os::get_file_creation_mask());
     }
@@ -179,10 +179,10 @@ static fn copy_path(const ExecContext &ec, StringView source,
      truncate its target. */
   if (Path{destination}.is_symbolic_link()) os::remove_file(destination);
 
-  let const destination_existed = Path{destination}.exists();
+  let const did_destination_exist = Path{destination}.exists();
   copy_file(ec, source, destination, is_verbose, allocator);
 
-  if (source_mode.has_value() && !destination_existed) {
+  if (source_mode.has_value() && !did_destination_exist) {
     os::set_file_mode(destination,
                       *source_mode & ~os::get_file_creation_mask());
   }
@@ -208,9 +208,9 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_CP_RECURSIVE_R.is_enabled() || FLAG_CP_RECURSIVE_UPPER.is_enabled();
   let const is_verbose = FLAG_CP_VERBOSE.is_enabled();
   let const destination = operands[operands.count() - 1].view();
-  let const destination_is_directory = Path{destination}.is_directory();
+  let const is_destination_directory = Path{destination}.is_directory();
 
-  if (operands.count() > 2 && !destination_is_directory) {
+  if (operands.count() > 2 && !is_destination_directory) {
     throw Error{
         "cp: the destination '" + String{cxt.scratch_allocator(), destination}
           +
@@ -220,7 +220,7 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
-    if (destination_is_directory) {
+    if (is_destination_directory) {
       /* The Path is held in a named local so the basename view does not dangle
          into a destroyed temporary. */
       let const source_path = Path{source};

@@ -69,7 +69,9 @@ static fn decode_escaped_char(StringView set, usize position) wontthrow
     usize digit_count = 0;
     while (digit_count < 3 && position + 1 + digit_count < set.length) {
       let const digit = set[position + 1 + digit_count];
-      if (digit < '0' || digit > '7') break;
+      if (digit < '0' || digit > '7') {
+        break;
+      }
       value = value * 8 + (digit - '0');
       digit_count++;
     }
@@ -92,8 +94,9 @@ static fn expand_posix_class(StringView set, usize position,
   while (scan + 1 < set.length && !(set[scan] == ':' && set[scan + 1] == ']'))
     scan++;
 
-  if (scan + 1 >= set.length || set[scan] != ':' || set[scan + 1] != ']')
+  if (scan + 1 >= set.length || set[scan] != ':' || set[scan + 1] != ']') {
     return 0;
+  }
 
   let const name_start = position + 2;
   let const class_name = set.substring_of_length(name_start, scan - name_start);

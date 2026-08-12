@@ -386,7 +386,9 @@ pure fn assign_form_target_name(StringView expansion_text) wontthrow
   if (!remainder.is_empty() && remainder[0] == ':')
     remainder = remainder.substring(1);
 
-  if (remainder.is_empty() || remainder[0] != '=') return StringView{};
+  if (remainder.is_empty() || remainder[0] != '=') {
+    return StringView{};
+  }
 
   return name;
 }
@@ -436,7 +438,9 @@ fn window_function_body_error(EvalContext &cxt,
     -> Maybe<StringView>
 {
   let const resolved = cxt.resolve_render_source(error.location());
-  if (!resolved.is_windowed || resolved.text == nullptr) return None;
+  if (!resolved.is_windowed || resolved.text == nullptr) {
+    return None;
+  }
 
   let rebased = error.location();
   rebased.position = resolved.to_render_position(rebased.position);
@@ -648,7 +652,9 @@ pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool
 
       case bracket_scan_state::AfterOpen:
         state = bracket_scan_state::InsideClass;
-        if (byte == '!' || byte == '^') break;
+        if (byte == '!' || byte == '^') {
+          break;
+        }
         if (byte == ']') state = bracket_scan_state::Outside;
         break;
 
@@ -674,7 +680,7 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<shellcheck_directive_span> &directive_spans,
                const ArrayList<heredoc_terminator_miss> &heredoc_misses,
                bool is_named_script_file,
-               bool report_optimizer_diagnostics) throws -> bool
+               bool should_report_optimizer_diagnostics) throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -685,7 +691,8 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.shellcheck_suppressions = &shellcheck_suppressions;
   actx.should_silence_unresolved_commands = silence_unresolved_commands;
   actx.eval_context = eval_context;
-  actx.should_report_optimizer_diagnostics = report_optimizer_diagnostics;
+  actx.should_report_optimizer_diagnostics =
+      should_report_optimizer_diagnostics;
 
   if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
@@ -700,7 +707,7 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_heredoc_terminators(actx, source, heredoc_misses);
 
   LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
-      actx.shebang_is_posix_sh ? "armed" : "off");
+      actx.is_posix_sh_shebang ? "armed" : "off");
 
   /* A function or alias defined by an earlier command resolves, so the already
      registered names seed the top-level scope. */
@@ -829,7 +836,7 @@ hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
 
-  const i64 condition = m_condition->evaluate(cxt);
+  let const condition = m_condition->evaluate(cxt);
   if (cxt.has_pending_control_flow()) return condition;
 
   LOG(Debug, "the if condition yielded %lld, running the %s branch",
@@ -996,7 +1003,9 @@ cold static fn view_has_brace_expansion(StringView text) wontthrow -> bool
     case '}': return false;
     case ',': return true;
     case '.':
-      if (position + 1 < text.length && text[position + 1] == '.') return true;
+      if (position + 1 < text.length && text[position + 1] == '.') {
+        return true;
+      }
       break;
     default: break;
     }
@@ -1048,12 +1057,16 @@ cold fn bare_glob_can_start_with_dash(const Word &word) wontthrow -> bool
   if (!word_is_bare_glob(word)) return false;
   let const text = word.segments[0].text.view();
   if (text.is_empty()) return false;
-  if (text[0] == '*' || text[0] == '?') return true;
+  if (text[0] == '*' || text[0] == '?') {
+    return true;
+  }
   if (text[0] != '[') return false;
 
   let const close = text.find_character(']');
   if (!close.has_value()) return false;
-  if (*close > 1 && (text[1] == '!' || text[1] == '^')) return true;
+  if (*close > 1 && (text[1] == '!' || text[1] == '^')) {
+    return true;
+  }
   for (usize position = 1; position < *close; position++)
     if (text[position] == '-' &&
         (position == 1 || position + 1 == *close || text[position - 1] == '\\'))
@@ -1063,7 +1076,9 @@ cold fn bare_glob_can_start_with_dash(const Word &word) wontthrow -> bool
 
 cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
 {
-  if (needle.length == 0 || needle.length > view.length) return false;
+  if (needle.length == 0 || needle.length > view.length) {
+    return false;
+  }
 
   let const last_start = view.length - needle.length;
   for (usize start = 0; start <= last_start; start++) {
@@ -1104,14 +1119,18 @@ cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
 {
   for (usize i = 1; i < args.count(); i++) {
     let const raw = args[i]->raw_string();
-    if (raw.view() == "-" || raw.view() == "/dev/stdin") return true;
+    if (raw.view() == "-" || raw.view() == "/dev/stdin") {
+      return true;
+    }
   }
   return false;
 }
 
 fn operand_target_name(StringView text) wontthrow -> StringView
 {
-  if (text.is_empty() || text[0] == '-') return StringView{};
+  if (text.is_empty() || text[0] == '-') {
+    return StringView{};
+  }
   usize end = 0;
   while (end < text.length && lexer::is_variable_name(text[end]))
     end++;
@@ -1146,7 +1165,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (prefix_outlives_command)
       actx.note_variable_assignment(var.name.view(), var.location);
 
-    if (actx.shebang_is_posix_sh && var.is_append) {
+    if (actx.is_posix_sh_shebang && var.is_append) {
       actx.report_diagnostic(diagnostic_id::sc3024, var.location,
                              {var.name.view()});
     }
@@ -1255,7 +1274,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           }
         }
       }
-      if (!has_single_wrapping_pair || parenthesis_depth != 0) continue;
+      if (!has_single_wrapping_pair || parenthesis_depth != 0) {
+        continue;
+      }
 
       let expression = actx.source.substring_of_length(
           expression_start_position,
@@ -1312,7 +1333,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!command_is_shadowed && actx.is_inside_loop_condition &&
       command_id == command_name_id::Read)
   {
-    actx.loop_condition_reads_input = true;
+    actx.has_input_reading_loop_condition = true;
   }
 
   append_presence_tested_command_names(actx, actx.tested_command_names, true);
@@ -1428,7 +1449,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
     if (word != nullptr) {
       for (let const &segment : word->segments) {
-        if (actx.shebang_is_posix_sh)
+        if (actx.is_posix_sh_shebang)
           check_posix_word_portability(actx, segment, arg_location);
 
         if (should_scan_for_malformed_glob && !has_bracket_byte &&
@@ -1591,10 +1612,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2051, arg_location);
 
     if (word != nullptr && is_operand) {
-      const bool is_quoted_home = source_text == "\"~\"" ||
-                                  source_text == "'~'" ||
-                                  source_text.starts_with(StringView{"\"~/"}) ||
-                                  source_text.starts_with(StringView{"'~/"});
+      let const is_quoted_home = source_text == "\"~\"" ||
+                                 source_text == "'~'" ||
+                                 source_text.starts_with(StringView{"\"~/"}) ||
+                                 source_text.starts_with(StringView{"'~/"});
       if (is_quoted_home)
         actx.report_diagnostic(diagnostic_id::sc2088, arg_location);
 
@@ -1900,7 +1921,9 @@ fn SimpleCommand::append_presence_tested_command_names(
     const AnalysisContext &actx, HashSet &names,
     bool status_is_success) const throws -> void
 {
-  if (status_is_success == is_negated() || m_args.is_empty()) return;
+  if (status_is_success == is_negated() || m_args.is_empty()) {
+    return;
+  }
 
   let const name = static_command_name(m_args[0]);
   if (!name.has_value()) return;
@@ -1912,7 +1935,9 @@ fn SimpleCommand::append_presence_tested_command_names(
 
   let const is_command_test = *name == "command";
   let const is_type_or_hash = *name == "type" || *name == "hash";
-  if (!is_command_test && !is_type_or_hash) return;
+  if (!is_command_test && !is_type_or_hash) {
+    return;
+  }
 
   bool has_presence_flag = is_type_or_hash;
   for (usize i = 1; i < m_args.count(); i++) {
@@ -1934,7 +1959,9 @@ cold fn SimpleCommand::try_static_condition_verdict(
      constant, so the fold declines it. The guards read this node's private
      members. */
   if (!m_redirections.is_empty()) return koshka::None;
-  if (is_async() || is_negated()) return koshka::None;
+  if (is_async() || is_negated()) {
+    return koshka::None;
+  }
   if (m_local_vars.count() > 0) return koshka::None;
 
   return optimizer::simple_command_static_verdict(m_args, actx);
@@ -1961,7 +1988,7 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 {
   /* POSIX sh reads time as a utility, so it receives the first stage alone and
      the report covers nothing else, shellcheck SC2176. */
-  if (actx.shebang_is_posix_sh && is_timed())
+  if (actx.is_posix_sh_shebang && is_timed())
     actx.report_diagnostic(diagnostic_id::sc2176, time_location());
 
   /* A multi-stage pipeline runs each stage in a forked child, so a stage
@@ -1971,7 +1998,7 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       is_unconditional && m_commands.count() == 1;
   for (let const command : m_commands) {
     ASSERT(command != nullptr);
-    const bool was_direct_pipeline_stage = actx.is_direct_pipeline_stage;
+    let const was_direct_pipeline_stage = actx.is_direct_pipeline_stage;
     actx.is_direct_pipeline_stage =
         m_commands.count() > 1 && (command->as_simple_command() != nullptr ||
                                    command->as_assign_command() != nullptr);
@@ -2028,8 +2055,12 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   for (usize i = 0; i + 1 < m_commands.count(); i++) {
     const SimpleCommand *stage = m_commands[i]->as_simple_command();
     const SimpleCommand *next = m_commands[i + 1]->as_simple_command();
-    if (stage == nullptr || next == nullptr) continue;
-    if (stage->args().is_empty() || next->args().is_empty()) continue;
+    if (stage == nullptr || next == nullptr) {
+      continue;
+    }
+    if (stage->args().is_empty() || next->args().is_empty()) {
+      continue;
+    }
 
     /* One descriptor cannot hold both a pipe and a file, and the redirection
        wins, shellcheck SC2259 and SC2260. Each stage is visited once as the
@@ -2050,7 +2081,9 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
     let const stage_name = static_command_name(stage->args()[0]);
     let const next_name = static_command_name(next->args()[0]);
-    if (!stage_name.has_value() || !next_name.has_value()) continue;
+    if (!stage_name.has_value() || !next_name.has_value()) {
+      continue;
+    }
     let const next_is_user = actx.defined_functions.contains(*next_name) ||
                              actx.known_aliases.contains(*next_name);
     let const stage_is_user = actx.defined_functions.contains(*stage_name) ||
@@ -2103,7 +2136,9 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
           has_null_flag = true;
       for (usize a = 1; a < next->args().count() && !has_null_flag; a++) {
         let const raw = next->args()[a]->raw_string();
-        if (raw.view() == "-0" || raw.view() == "--null") has_null_flag = true;
+        if (raw.view() == "-0" || raw.view() == "--null") {
+          has_null_flag = true;
+        }
       }
 
       if (!has_null_flag)
@@ -2161,14 +2196,18 @@ fn Pipeline::append_presence_tested_command_names(
     const AnalysisContext &actx, HashSet &names,
     bool status_is_success) const throws -> void
 {
-  if (m_commands.count() != 1 || m_commands[0] == nullptr) return;
+  if (m_commands.count() != 1 || m_commands[0] == nullptr) {
+    return;
+  }
   m_commands[0]->append_presence_tested_command_names(
       actx, names, status_is_success != is_negated());
 }
 
 fn Pipeline::as_simple_command() const wontthrow -> const SimpleCommand *
 {
-  if (m_commands.count() != 1 || m_commands[0] == nullptr) return nullptr;
+  if (m_commands.count() != 1 || m_commands[0] == nullptr) {
+    return nullptr;
+  }
   return m_commands[0]->as_simple_command();
 }
 
@@ -2188,10 +2227,14 @@ node_unclosed_test_bracket(const CompoundListCondition *node) wontthrow
   if (args.is_empty()) return nullptr;
 
   let const name = args[0]->raw_view();
-  if (!name.has_value() || *name != StringView{"["}) return nullptr;
+  if (!name.has_value() || *name != StringView{"["}) {
+    return nullptr;
+  }
 
   let const closer = args.back()->raw_view();
-  if (closer.has_value() && *closer == StringView{"]"}) return nullptr;
+  if (closer.has_value() && *closer == StringView{"]"}) {
+    return nullptr;
+  }
 
   return args[0];
 }
@@ -2239,13 +2282,19 @@ node_inequality_left_operand(const CompoundListCondition *node) wontthrow
   if (args.count() != 5) return nullptr;
 
   let const name = args[0]->raw_view();
-  if (!name.has_value() || *name != StringView{"["}) return nullptr;
+  if (!name.has_value() || *name != StringView{"["}) {
+    return nullptr;
+  }
 
   let const closer = args[4]->raw_view();
-  if (!closer.has_value() || *closer != StringView{"]"}) return nullptr;
+  if (!closer.has_value() || *closer != StringView{"]"}) {
+    return nullptr;
+  }
 
   let const op = args[2]->raw_view();
-  if (!op.has_value() || *op != StringView{"!="}) return nullptr;
+  if (!op.has_value() || *op != StringView{"!="}) {
+    return nullptr;
+  }
 
   return args[1];
 }
@@ -2261,7 +2310,7 @@ fn CompoundList::analyze(AnalysisContext &actx,
 
     /* POSIX sh reads time as a utility, so it receives the compound keyword as
        an operand and the report covers nothing, shellcheck SC2177. */
-    if (actx.shebang_is_posix_sh && command != nullptr && command->is_timed() &&
+    if (actx.is_posix_sh_shebang && command != nullptr && command->is_timed() &&
         command->is_compound_command())
     {
       actx.report_diagnostic(diagnostic_id::sc2177, command->time_location());
@@ -2460,7 +2509,9 @@ fn CompoundList::append_presence_tested_command_names(
     const AnalysisContext &actx, HashSet &names,
     bool status_is_success) const throws -> void
 {
-  if (m_nodes.count() != 1 || m_nodes[0] == nullptr) return;
+  if (m_nodes.count() != 1 || m_nodes[0] == nullptr) {
+    return;
+  }
   m_nodes[0]->append_presence_tested_command_names(actx, names,
                                                    status_is_success);
 }

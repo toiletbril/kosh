@@ -130,7 +130,7 @@ fn check_command_name_lints(AnalysisContext &actx,
 
   if (input.command_is_shadowed) return;
 
-  let const is_posix = actx.shebang_is_posix_sh;
+  let const is_posix = actx.is_posix_sh_shebang;
 
   switch (input.command_id()) {
   case command_name_id::Read:
@@ -215,7 +215,9 @@ fn check_command_name_lints(AnalysisContext &actx,
         default: continue;
         }
       }
-      if (view.length >= 2 && view[0] == '-') continue;
+      if (view.length >= 2 && view[0] == '-') {
+        continue;
+      }
       if (!operand_target_name(view).is_empty()) filled_name_index = i;
     }
 
@@ -395,16 +397,16 @@ fn check_command_name_lints(AnalysisContext &actx,
     if (format_index != 0 && args[format_index]->kind() == Token::Kind::Word) {
       let const &format =
           static_cast<const tokens::WordToken *>(args[format_index])->word();
-      bool format_has_expansion = false;
+      bool has_format_expansion = false;
       for (let const &segment : format.segments) {
         if (segment.kind == WordSegment::Kind::VariableReference ||
             segment.kind == WordSegment::Kind::CommandSubstitution)
         {
-          format_has_expansion = true;
+          has_format_expansion = true;
           break;
         }
       }
-      if (format_has_expansion)
+      if (has_format_expansion)
         actx.report_diagnostic(diagnostic_id::sc2059,
                                args[format_index]->source_location());
     }
@@ -629,7 +631,9 @@ fn check_command_value_lints(AnalysisContext &actx,
                               ->word()
                               .to_literal_string();
       let const view = literal.view();
-      if (!view.is_empty() && view[0] == '-') continue;
+      if (!view.is_empty() && view[0] == '-') {
+        continue;
+      }
 
       if (actx.defined_functions.contains(view)) {
         actx.report_diagnostic(diagnostic_id::sc2033,

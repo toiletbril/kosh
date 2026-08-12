@@ -145,10 +145,14 @@ cold fn test_inequality_left_operand(const ArrayList<const Token *> &args,
                                      usize operand_end) wontthrow
     -> Maybe<StringView>
 {
-  if (operator_index == 0 || operator_index + 1 >= operand_end) return None;
+  if (operator_index == 0 || operator_index + 1 >= operand_end) {
+    return None;
+  }
 
   let const op = args[operator_index]->raw_view();
-  if (!op.has_value() || *op != StringView{"!="}) return None;
+  if (!op.has_value() || *op != StringView{"!="}) {
+    return None;
+  }
 
   return args[operator_index - 1]->raw_view();
 }
@@ -157,7 +161,9 @@ cold fn test_inequality_left_operand(const ArrayList<const Token *> &args,
    number such as -5 out of the unknown-operator lints. */
 cold fn view_looks_like_test_operator(StringView view) wontthrow -> bool
 {
-  if (view.length < 2 || view[0] != '-') return false;
+  if (view.length < 2 || view[0] != '-') {
+    return false;
+  }
 
   let const byte = view[1];
 
@@ -181,7 +187,9 @@ cold fn view_has_decimal_fraction(StringView view) wontthrow -> bool
 
   if (position == integer_start) return false;
 
-  if (position >= view.length || view[position] != '.') return false;
+  if (position >= view.length || view[position] != '.') {
+    return false;
+  }
 
   position++;
 
@@ -289,10 +297,14 @@ cold fn view_is_glob_shaped_pattern(StringView view) wontthrow -> bool
    replaces the text without a fork. */
 cold fn view_is_plain_substitution_script(StringView view) wontthrow -> bool
 {
-  if (view.length < 4 || view[0] != 's') return false;
+  if (view.length < 4 || view[0] != 's') {
+    return false;
+  }
 
   let const delimiter = view[1];
-  if (lexer::is_variable_name(delimiter) || delimiter == '\\') return false;
+  if (lexer::is_variable_name(delimiter) || delimiter == '\\') {
+    return false;
+  }
 
   usize field_count = 1;
   for (usize position = 2; position < view.length; position++) {
@@ -359,7 +371,9 @@ cold fn find_echo_escape_sequence(StringView view) wontthrow -> StringView
    written the way the author intends. */
 cold fn view_settles_echo_escapes(StringView view) wontthrow -> bool
 {
-  if (view.length < 2 || view[0] != '-') return false;
+  if (view.length < 2 || view[0] != '-') {
+    return false;
+  }
 
   bool has_escape_letter = false;
   for (usize position = 1; position < view.length; position++) {
@@ -436,7 +450,9 @@ cold fn printf_consumed_argument_count(StringView format,
 {
   usize count = 0;
   for (usize i = 0; i < format.length; i++) {
-    if (format[i] != '%' || i + 1 >= format.length) continue;
+    if (format[i] != '%' || i + 1 >= format.length) {
+      continue;
+    }
     i++;
     if (format[i] == '%') continue;
 
@@ -469,7 +485,9 @@ cold fn printf_consumed_argument_count(StringView format,
         i++;
       if (i + 1 < format.length) i++;
     }
-    if (i < format.length && format[i] == 'q') has_quote_conversion = true;
+    if (i < format.length && format[i] == 'q') {
+      has_quote_conversion = true;
+    }
 
     count++;
   }
@@ -850,7 +868,9 @@ pure fn arithmetic_assignment_target(StringView expression,
 
   case '<':
   case '>':
-    if (at < 2 || expression[at - 2] != expression[at - 1]) return {};
+    if (at < 2 || expression[at - 2] != expression[at - 1]) {
+      return {};
+    }
     at -= 2;
     break;
 

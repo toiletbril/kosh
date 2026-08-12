@@ -224,7 +224,9 @@ fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
   if (m_jobs.is_empty()) return koshka::None;
 
   StringView body = spec;
-  if (!body.is_empty() && body[0] == '%') body = body.substring(1);
+  if (!body.is_empty() && body[0] == '%') {
+    body = body.substring(1);
+  }
 
   if (body.is_empty() || body == "+" || body == "%") {
     return m_jobs.count() - 1;

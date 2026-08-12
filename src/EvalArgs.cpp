@@ -45,14 +45,14 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   if (text[0] == '-' || text[0] == '+') {
     i++;
   }
-  const usize digit_start = i;
+  let const digit_start = i;
   if (!text.substring(digit_start).is_all_decimal_digits()) return None;
 
   u64 magnitude = 0;
   let const maximum_magnitude = text[0] == '-' ? static_cast<u64>(INT64_MAX) + 1
                                                : static_cast<u64>(INT64_MAX);
   for (usize j = digit_start; j < text.length; j++) {
-    const u64 digit = static_cast<u64>(text[j] - '0');
+    let const digit = static_cast<u64>(text[j] - '0');
     if (magnitude > (maximum_magnitude - digit) / 10) return None;
     magnitude = magnitude * 10 + digit;
   }
@@ -62,7 +62,7 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   else
     value = text[0] == '-' ? -static_cast<i64>(magnitude)
                            : static_cast<i64>(magnitude);
-  const usize digit_width = text.length - digit_start;
+  let const digit_width = text.length - digit_start;
   let const leading_zero = digit_width > 1 && text[digit_start] == '0';
   return sequence_integer{value, text.length, leading_zero};
 }
@@ -90,7 +90,9 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
     -> Maybe<ArrayList<String>>
 {
   let const parts = split_sequence_parts(content, alloc);
-  if (parts.count() != 2 && parts.count() != 3) return None;
+  if (parts.count() != 2 && parts.count() != 3) {
+    return None;
+  }
 
   i64 step = 1;
   if (parts.count() == 3) {
@@ -105,15 +107,17 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
   let const start_int = parse_sequence_integer(parts[0]);
   let const end_int = parse_sequence_integer(parts[1]);
   if (start_int.has_value() && end_int.has_value()) {
-    const i64 from = start_int->value;
-    const i64 to = end_int->value;
-    const i128 increment = from <= to ? static_cast<i128>(magnitude)
-                                      : -static_cast<i128>(magnitude);
-    const bool pad = start_int->has_leading_zero || end_int->has_leading_zero;
-    const usize width = pad ? (start_int->field_width > end_int->field_width
-                                   ? start_int->field_width
-                                   : end_int->field_width)
-                            : 0;
+    let const from = start_int->value;
+    let const to = end_int->value;
+    let const increment = from <= to ? static_cast<i128>(magnitude)
+                                     : -static_cast<i128>(magnitude);
+    const bool should_pad =
+        start_int->has_leading_zero || end_int->has_leading_zero;
+    let const width = should_pad
+                          ? (start_int->field_width > end_int->field_width
+                                 ? start_int->field_width
+                                 : end_int->field_width)
+                          : 0;
     let elements = ArrayList<String>{alloc};
     let const distance = from <= to
                              ? static_cast<u128>(static_cast<i128>(to) - from)
@@ -125,14 +129,14 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
          current += increment)
     {
       String number = String::from(static_cast<i64>(current), heap_allocator());
-      if (pad) {
-        const bool negative = !number.is_empty() && number.view()[0] == '-';
-        const StringView digits = number.view().substring(negative ? 1 : 0);
-        const usize sign_length = negative ? 1 : 0;
-        const usize digit_width = width > sign_length ? width - sign_length : 0;
+      if (should_pad) {
+        const bool is_negative = !number.is_empty() && number.view()[0] == '-';
+        let const digits = number.view().substring(is_negative ? 1 : 0);
+        const usize sign_length = is_negative ? 1 : 0;
+        let const digit_width = width > sign_length ? width - sign_length : 0;
         if (digits.length < digit_width) {
           let padded = String{alloc};
-          if (negative) padded.push('-');
+          if (is_negative) padded.push('-');
           for (usize z = digits.length; z < digit_width; z++)
             padded.push('0');
           padded.append(digits);
@@ -145,14 +149,15 @@ fn parse_brace_sequence(StringView content, Allocator alloc) throws
   }
 
   if (parts[0].length == 1 && parts[1].length == 1) {
-    const char from = parts[0][0];
-    const char to = parts[1][0];
-    const bool from_alpha =
+    let const from = parts[0][0];
+    let const to = parts[1][0];
+    const bool is_from_alpha =
         (from >= 'a' && from <= 'z') || (from >= 'A' && from <= 'Z');
-    const bool to_alpha = (to >= 'a' && to <= 'z') || (to >= 'A' && to <= 'Z');
-    if (from_alpha && to_alpha) {
-      const i128 increment = from <= to ? static_cast<i128>(magnitude)
-                                        : -static_cast<i128>(magnitude);
+    const bool is_to_alpha =
+        (to >= 'a' && to <= 'z') || (to >= 'A' && to <= 'Z');
+    if (is_from_alpha && is_to_alpha) {
+      let const increment = from <= to ? static_cast<i128>(magnitude)
+                                       : -static_cast<i128>(magnitude);
       let elements = ArrayList<String>{alloc};
       for (i128 c = from; increment > 0 ? c <= to : c >= to; c += increment) {
         let element = String{alloc};
@@ -171,7 +176,7 @@ fn brace_group_alternatives(StringView content, Allocator alloc) throws
   usize depth = 0;
   let comma_positions = ArrayList<usize>{alloc};
   for (usize i = 0; i < content.length; i++) {
-    const char c = content[i];
+    let const c = content[i];
     if (c == '{') {
       depth++;
     } else if (c == '}') {
@@ -211,7 +216,7 @@ fn find_brace_group(StringView text, Allocator alloc) throws
     if (text[open] != '{') continue;
     usize depth = 0;
     for (usize j = open; j < text.length; j++) {
-      const char c = text[j];
+      let const c = text[j];
       if (c == '{') {
         depth++;
       } else if (c == '}') {
@@ -296,7 +301,7 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
     let out = Word{};
     let run = String{alloc};
     for (usize i = 0; i < produced.count(); i++) {
-      const char c = produced[i];
+      let const c = produced[i];
       if (c == BRACE_OPAQUE_MARKER && i + 1 < produced.count() &&
           produced[i + 1] == BRACE_OPAQUE_MARKER)
       {
@@ -781,7 +786,9 @@ hot flatten fn EvalContext::process_args(
         xtrace_fd_value.has_value())
     {
       let const parsed = xtrace_fd_value->view().to<i64>();
-      if (!parsed.is_error() && parsed.value() >= 0) xtrace_fd = parsed.value();
+      if (!parsed.is_error() && parsed.value() >= 0) {
+        xtrace_fd = parsed.value();
+      }
     }
 
     if (xtrace_fd.has_value())

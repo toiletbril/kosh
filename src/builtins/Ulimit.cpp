@@ -105,7 +105,7 @@ fn selected_resource(bool &is_pipe_pseudo_out) throws -> resource_entry
 fn render_limit(const os::resource_limit &limit, u64 divisor,
                 Allocator allocator) throws -> String
 {
-  const u64 value = FLAG_HARD.is_enabled() ? limit.hard : limit.soft;
+  let const value = FLAG_HARD.is_enabled() ? limit.hard : limit.soft;
   if (value == os::RESOURCE_UNLIMITED) return String{allocator, "unlimited"};
   return String::from(value / divisor, allocator);
 }
@@ -187,8 +187,12 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* Naming neither -H nor -S, or both together, sets both, the way dash does.
    */
-  if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) limit.hard = value;
-  if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.soft = value;
+  if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) {
+    limit.hard = value;
+  }
+  if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) {
+    limit.soft = value;
+  }
 
   if (!os::set_resource_limit(resource.kind, limit))
     throw Error{"Unable to set the resource limit because " +

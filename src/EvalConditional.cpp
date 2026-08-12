@@ -148,7 +148,7 @@ struct conditional_evaluator
        metacharacter there is backslash-escaped to match itself. */
     let escaped_pattern = String{cxt.scratch_allocator()};
     for (usize i = 0; i < pattern.length; i++) {
-      const bool is_literal = i < active.count() && !active[i];
+      let const is_literal = i < active.count() && !active[i];
       if (is_literal && is_regex_metacharacter(pattern[i])) {
         escaped_pattern += '\\';
       }
@@ -159,8 +159,8 @@ struct conditional_evaluator
         cxt.cached_compiled_regex(escaped_pattern.view());
     let spans = ArrayList<os::regex_span>{cxt.scratch_allocator()};
     let error_message = String{cxt.scratch_allocator()};
-    const os::regex_match_result result = os::execute_regex(
-        *compiled, value, spans, error_message, cxt.scratch_allocator());
+    let const result = os::execute_regex(*compiled, value, spans, error_message,
+                                         cxt.scratch_allocator());
     LOG(All, "the =~ regex %s the value",
         result == os::regex_match_result::Matched ? "matched"
                                                   : "did not match");
@@ -200,8 +200,8 @@ struct conditional_evaluator
       if (let const bracket = operand.find_character('[');
           bracket.has_value() && operand[operand.length - 1] == ']')
       {
-        const StringView name = operand.substring_of_length(0, *bracket);
-        const StringView subscript = operand.substring_of_length(
+        let const name = operand.substring_of_length(0, *bracket);
+        let const subscript = operand.substring_of_length(
             *bracket + 1, operand.length - *bracket - 2);
         return cxt.array_element_is_set(name, subscript);
       }
@@ -265,8 +265,8 @@ struct conditional_evaluator
       }
       return 0;
     };
-    const i64 left_number = do_to_number(left);
-    const i64 right_number = do_to_number(right);
+    let const left_number = do_to_number(left);
+    let const right_number = do_to_number(right);
     if (op == "-eq") return left_number == right_number;
     if (op == "-ne") return left_number != right_number;
     if (op == "-lt") return left_number < right_number;
@@ -285,7 +285,7 @@ struct conditional_evaluator
     if (first.kind != Kind::Operand)
       fail_conditional("An operator appears where an operand is expected");
 
-    const String first_literal = operand_literal(first);
+    let const first_literal = operand_literal(first);
 
     if (is_unary_op(first_literal.view())) {
       if (pos + 1 >= elements.count() || kind_at(pos + 1) != Kind::Operand) {
@@ -313,25 +313,25 @@ struct conditional_evaluator
         cxt.set_warning_suppressed(suppressible_warning::UnsetTestOperand,
                                    saved_suppress_test_operand);
       };
-      const String operand = operand_value(elements[pos - 1]);
+      let const operand = operand_value(elements[pos - 1]);
       return eval_unary(first_literal.view(), operand.view());
     }
 
     if (pos + 1 < elements.count()) {
-      const Kind next = kind_at(pos + 1);
+      let const next = kind_at(pos + 1);
       if (next == Kind::Less || next == Kind::Greater) {
         if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand) {
           fail_conditional("An operand is missing after a comparison");
         }
         pos += 3;
         if (is_skipping) return false;
-        const String left = operand_value(elements[pos - 3]);
-        const String right = operand_value(elements[pos - 1]);
-        const int order = os::collate_compare(left, right);
+        let const left = operand_value(elements[pos - 3]);
+        let const right = operand_value(elements[pos - 1]);
+        let const order = os::collate_compare(left, right);
         return next == Kind::Less ? order < 0 : order > 0;
       }
       if (next == Kind::Operand) {
-        const String op = operand_literal(elements[pos + 1]);
+        let const op = operand_literal(elements[pos + 1]);
         if (is_binary_word_op(op.view())) {
           if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
           {
@@ -355,7 +355,7 @@ struct conditional_evaluator
                                        saved_suppress_test_operand);
           };
 
-          const String left = operand_value(elements[pos - 3]);
+          let const left = operand_value(elements[pos - 3]);
           if (op == "==" || op == "=" || op == "!=") {
             let active = Bitset{cxt.scratch_allocator()};
             const String pattern =
@@ -391,7 +391,7 @@ struct conditional_evaluator
               throw;
             }
           }
-          const String right = operand_value(elements[pos - 1]);
+          let const right = operand_value(elements[pos - 1]);
           return eval_binary(left.view(), op.view(), right.view());
         }
       }
@@ -399,7 +399,7 @@ struct conditional_evaluator
 
     pos++;
     if (is_skipping) return false;
-    const String value = operand_value(elements[pos - 1]);
+    let const value = operand_value(elements[pos - 1]);
     return !value.is_empty();
   }
 
@@ -411,7 +411,7 @@ struct conditional_evaluator
     }
     if (!at_end() && kind_at(pos) == Kind::OpenParen) {
       pos++;
-      const bool is_inner_true = eval_or();
+      let const is_inner_true = eval_or();
       if (at_end() || kind_at(pos) != Kind::CloseParen) {
         throw Error{"Expected ')'"};
       }
@@ -426,11 +426,11 @@ struct conditional_evaluator
     let and_result = eval_term();
     while (!at_end() && kind_at(pos) == Kind::And) {
       pos++;
-      const bool was_skipping = is_skipping;
+      let const was_skipping = is_skipping;
       is_skipping = is_skipping || !and_result;
-      const bool rhs = eval_term();
+      let const is_right_hand_side_true = eval_term();
       is_skipping = was_skipping;
-      and_result = and_result && rhs;
+      and_result = and_result && is_right_hand_side_true;
     }
     return and_result;
   }
@@ -440,11 +440,11 @@ struct conditional_evaluator
     let or_result = eval_and();
     while (!at_end() && kind_at(pos) == Kind::Or) {
       pos++;
-      const bool was_skipping = is_skipping;
+      let const was_skipping = is_skipping;
       is_skipping = is_skipping || or_result;
-      const bool rhs = eval_and();
+      let const is_right_hand_side_true = eval_and();
       is_skipping = was_skipping;
-      or_result = or_result || rhs;
+      or_result = or_result || is_right_hand_side_true;
     }
     return or_result;
   }
@@ -505,7 +505,7 @@ fn EvalContext::evaluate_conditional(
       elements.count());
 
   let evaluator = conditional_evaluator{*this, elements};
-  const bool is_conditional_true = evaluator.eval_or();
+  let const is_conditional_true = evaluator.eval_or();
   if (!evaluator.at_end()) {
     fail_conditional(
         "The token '" + evaluator.unexpected_token() +

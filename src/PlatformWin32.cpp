@@ -128,8 +128,9 @@ fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow -> i32
         DWORD event_count = 0;
         if (GetNumberOfConsoleInputEvents(fd, &event_count) == FALSE) return -1;
         if (event_count == 0) {
-          if (has_timeout && monotonic_nanos() - started_at >= timeout)
+          if (has_timeout && monotonic_nanos() - started_at >= timeout) {
             return 0;
+          }
           Sleep(1);
           continue;
         }
@@ -439,8 +440,9 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
       initial_length =
           GetCurrentDirectoryA(countof(initial_path), initial_path);
     }
-    if (initial_length == 0 || initial_length >= countof(initial_path))
+    if (initial_length == 0 || initial_length >= countof(initial_path)) {
       return koshka::None;
+    }
     resolved = Path{
         StringView{initial_path, static_cast<usize>(initial_length)}
     };
@@ -972,8 +974,9 @@ pure fn path_root_length(StringView path) wontthrow -> usize
       position++;
     while (position < path.length && !is_directory_separator(path[position]))
       position++;
-    if (position < path.length && is_directory_separator(path[position]))
+    if (position < path.length && is_directory_separator(path[position])) {
       position++;
+    }
     return position;
   }
   if (path.length >= 2 && is_directory_separator(path[0]) &&
@@ -986,8 +989,9 @@ pure fn path_root_length(StringView path) wontthrow -> usize
       position++;
     while (position < path.length && !is_directory_separator(path[position]))
       position++;
-    if (position < path.length && is_directory_separator(path[position]))
+    if (position < path.length && is_directory_separator(path[position])) {
       position++;
+    }
     return position;
   }
   if (path.length >= 3 && path[1] == ':' && is_directory_separator(path[2])) {
@@ -1353,8 +1357,9 @@ fn signal_internal_diagnostic() wontthrow -> void
   char marker_path[MAX_PATH];
   let const marker_path_length = GetEnvironmentVariableA(
       "KOSH_INTERNAL_DIAGNOSTIC_MARKER", marker_path, countof(marker_path));
-  if (marker_path_length == 0 || marker_path_length >= countof(marker_path))
+  if (marker_path_length == 0 || marker_path_length >= countof(marker_path)) {
     return;
+  }
 
   let const marker =
       CreateFileA(marker_path, FILE_APPEND_DATA,
@@ -1710,8 +1715,9 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
 
   char temp_dir[MAX_PATH];
   let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
-  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH)
+  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH) {
     return koshka::None;
+  }
   char temp_path[MAX_PATH];
   if (GetTempFileNameA(temp_dir, "kos", 0, temp_path) == 0) return koshka::None;
   bool should_delete_temp_path = true;
@@ -2105,8 +2111,9 @@ fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
     if (lock != INVALID_HANDLE_VALUE) return lock;
 
     let const error = GetLastError();
-    if (error != ERROR_SHARING_VIOLATION && error != ERROR_LOCK_VIOLATION)
+    if (error != ERROR_SHARING_VIOLATION && error != ERROR_LOCK_VIOLATION) {
       return None;
+    }
     Sleep(10);
   }
 }
@@ -2120,8 +2127,9 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 {
   char temp_dir[MAX_PATH];
   let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
-  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH)
+  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH) {
     return koshka::None;
+  }
 
   char temp_path[MAX_PATH];
   if (GetTempFileNameA(temp_dir, "kos", 0, temp_path) == 0) return koshka::None;
@@ -2949,8 +2957,9 @@ fn current_executable_path() wontthrow -> Maybe<String>
   char module_path[MAX_PATH];
   let const module_path_length =
       GetModuleFileNameA(nullptr, module_path, MAX_PATH);
-  if (module_path_length == 0 || module_path_length == MAX_PATH)
+  if (module_path_length == 0 || module_path_length == MAX_PATH) {
     return koshka::None;
+  }
 
   return String{
       StringView{module_path, module_path_length}
@@ -3084,9 +3093,9 @@ fn format_mode_string(u32 mode) throws -> String
 {
   /* Windows stat exposes only the owner bits, mirrored across all three
    * triplets. */
-  const bool is_readable = (mode & 0000400u) != 0;
-  const bool is_writable = (mode & 0000200u) != 0;
-  const bool is_executable = (mode & 0000100u) != 0;
+  let const is_readable = (mode & 0000400u) != 0;
+  let const is_writable = (mode & 0000200u) != 0;
+  let const is_executable = (mode & 0000100u) != 0;
 
   String result{heap_allocator()};
   result.push(file_type_letter(mode));

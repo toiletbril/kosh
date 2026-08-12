@@ -114,9 +114,9 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
   let const destination = operands[operands.count() - 1].view();
-  let const destination_is_directory = Path{destination}.is_directory();
+  let const is_destination_directory = Path{destination}.is_directory();
 
-  if (operands.count() > 2 && !destination_is_directory) {
+  if (operands.count() > 2 && !is_destination_directory) {
     throw Error{
         "mv: the destination '" + String{cxt.scratch_allocator(), destination}
           +
@@ -129,7 +129,7 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
     let target = String{cxt.scratch_allocator(), destination};
-    if (destination_is_directory)
+    if (is_destination_directory)
       target = PathBuilder{destination}
                    .append(Path{source}.filename())
                    .build()

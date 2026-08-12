@@ -204,8 +204,9 @@ private:
       {
         return {index, index};
       }
-      if (candidate.state == slot::Tombstone && first_tombstone == NO_INDEX)
+      if (candidate.state == slot::Tombstone && first_tombstone == NO_INDEX) {
         first_tombstone = index;
+      }
       index = (index + 1) & mask;
     }
 

@@ -35,12 +35,14 @@ static pure fn is_process_dynamic_name(StringView text,
       continue;
     }
 
-    const usize end_position = position + name.length;
+    let const end_position = position + name.length;
     const bool has_name_before =
         position > 0 && lexer::is_variable_name(text[position - 1]);
-    const bool has_name_after = end_position < text.length &&
-                                lexer::is_variable_name(text[end_position]);
-    if (!has_name_before && !has_name_after) return true;
+    let const has_name_after = end_position < text.length &&
+                               lexer::is_variable_name(text[end_position]);
+    if (!has_name_before && !has_name_after) {
+      return true;
+    }
   }
 
   return false;
@@ -57,7 +59,9 @@ static fn word_is_safe_for_in_process_substitution(const Word &word) wontthrow
     }
 
     if (segment.kind == WordSegment::Kind::VariableReference) {
-      if (!segment.text.is_empty() && segment.text[0] == '!') return false;
+      if (!segment.text.is_empty() && segment.text[0] == '!') {
+        return false;
+      }
       if (is_process_dynamic_name(segment.text.view(), 0)) return false;
     }
 
@@ -93,7 +97,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 {
   ASSERT(m_assignment != nullptr);
 
-  if (actx.shebang_is_posix_sh && m_assignment->is_append()) {
+  if (actx.is_posix_sh_shebang && m_assignment->is_append()) {
     actx.report_diagnostic(diagnostic_id::sc3024, source_location(),
                            {m_assignment->key().view()});
   }
@@ -236,12 +240,12 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
-    const StringView key_view = m_assignment->key().view();
+    let const key_view = m_assignment->key().view();
     if (let const bracket = key_view.find_character('[');
         bracket.has_value() && key_view[key_view.length - 1] == ']')
     {
-      const StringView array_name = key_view.substring_of_length(0, *bracket);
-      const StringView subscript = key_view.substring_of_length(
+      let const array_name = key_view.substring_of_length(0, *bracket);
+      let const subscript = key_view.substring_of_length(
           *bracket + 1, key_view.length - *bracket - 2);
       cxt.assign_array_element(array_name, subscript, value.view(),
                                m_assignment->is_append());
@@ -301,8 +305,8 @@ SimpleCommand::SimpleCommand(SourceLocation location,
   /* The location spans from the first word to the end of the last, so a caret
      covers the whole command and not only the command word. */
   if (!m_args.is_empty()) {
-    const SourceLocation first = m_args[0]->source_location();
-    const SourceLocation last = m_args.back()->source_location();
+    let const first = m_args[0]->source_location();
+    let const last = m_args.back()->source_location();
     m_location.position = first.position;
     m_location.length = last.position + last.length - first.position;
   }
@@ -614,7 +618,7 @@ fn allocate_redirection_descriptor(const Redirection &redir,
                                           "' does not name an open descriptor"};
   }
 
-  const i32 allocated_fd = os::allocate_free_shell_fd(10);
+  let const allocated_fd = os::allocate_free_shell_fd(10);
   if (allocated_fd < 0) {
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
     throw ErrorWithLocation{location, "Could not allocate a file descriptor"};
@@ -714,7 +718,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args,
     let const body_location =
         !arg_locations.is_empty() ? arg_locations[0] : SourceLocation{};
     for (usize i = 0; i < body_value.count(); i++) {
-      const char c = body_value[i];
+      let const c = body_value[i];
       if (c == ' ' || c == '\t') {
         if (!current.is_empty()) {
           rebuilt.push(String{
@@ -756,9 +760,13 @@ static fn command_word_is_glob(const Word &word) wontthrow -> bool
     if (segment.kind != WordSegment::Kind::UnquotedText) continue;
     for (usize i = 0; i < segment.text.count(); i++) {
       let const c = segment.text[i];
-      if (c == '*' || c == '?') return true;
+      if (c == '*' || c == '?') {
+        return true;
+      }
       if (c == '[') has_open_bracket = true;
-      if (c == ']' && has_open_bracket) return true;
+      if (c == ']' && has_open_bracket) {
+        return true;
+      }
     }
   }
   return false;
@@ -840,9 +848,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           ? cxt.find_function(program_args[0])
           : nullptr;
 
-  const bool is_bare_exec = program_args.count() == 1 &&
-                            program_args[0] == "exec" &&
-                            command_word_function == nullptr;
+  let const is_bare_exec = program_args.count() == 1 &&
+                           program_args[0] == "exec" &&
+                           command_word_function == nullptr;
 
   if (is_bare_exec) {
     for (let const &redir : m_redirections) {
@@ -855,7 +863,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A POSIX special builtin not shadowed by a function exits the shell on a
      redirection error and keeps a prefix assignment, so it is computed once and
      read on both paths. */
-  const bool command_is_special_builtin =
+  const bool is_command_special_builtin =
       !program_args.is_empty() && command_word_function == nullptr &&
       is_special_builtin_name(program_args[0].view());
 
@@ -896,7 +904,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
       switch (r.kind) {
       case redirection_outcome::Heredoc: {
-        const os::descriptor body_fd = r.opened_fd;
+        let const body_fd = r.opened_fd;
         /* Inside an in-process subshell the move is backed up first, so it
            stays contained the way a fork would contain it. */
         if (is_bare_exec) {
@@ -919,9 +927,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         /* The temp file already lands on fd N when mkstemp handed back that
            number, so the collision is handled directly and the restore closes
            fd N, which was free before mkstemp claimed it. */
-        const bool body_is_target_fd =
+        const bool is_body_target_fd =
             os::descriptor_is_shell_fd(body_fd, redir.fd);
-        if (body_is_target_fd) {
+        if (is_body_target_fd) {
           dup_saved_descriptors.push(
               os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
           break;
@@ -935,13 +943,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       case redirection_outcome::BothStreams: {
         /* The filename lands on the standard output and the standard error
            follows it, the pair bash builds for csh >&file. */
-        const os::descriptor file_fd = r.opened_fd;
+        let const file_fd = r.opened_fd;
         koshka::flush();
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(1);
           cxt.snapshot_subshell_descriptor(2);
-          const bool did_replace_out = os::replace_descriptor(1, file_fd);
-          const bool did_replace_err = os::replace_descriptor(2, file_fd);
+          let const did_replace_out = os::replace_descriptor(1, file_fd);
+          let const did_replace_err = os::replace_descriptor(2, file_fd);
           os::close_fd(file_fd);
           if (!did_replace_out || !did_replace_err) {
             did_redirection_open_fail = true;
@@ -966,7 +974,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
 
       case redirection_outcome::Duplicate: {
-        const i32 from_fd = r.dup_from_fd;
+        let const from_fd = r.dup_from_fd;
 
         /* Inside an in-process subshell the move is backed up and contained at
            the subshell's end. The flush keeps buffered output on the original
@@ -983,9 +991,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           if (!os::replace_descriptor(redir.fd,
                                       os::descriptor_for_shell_fd(from_fd)))
           {
-            const SourceLocation location =
-                redir.target != nullptr ? redir.target->source_location()
-                                        : source_location();
+            let const location = redir.target != nullptr
+                                     ? redir.target->source_location()
+                                     : source_location();
             did_redirection_open_fail = true;
             throw ErrorWithLocation{location,
                                     String::from(from_fd, heap_allocator()) +
@@ -1010,13 +1018,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           break;
         }
 
-        const os::saved_descriptor saved = os::save_and_replace_descriptor(
+        let const saved = os::save_and_replace_descriptor(
             redir.fd, os::descriptor_for_shell_fd(from_fd));
         dup_saved_descriptors.push(saved);
         if (!saved.is_dup2_ok) {
-          const SourceLocation location = redir.target != nullptr
-                                              ? redir.target->source_location()
-                                              : source_location();
+          let const location = redir.target != nullptr
+                                   ? redir.target->source_location()
+                                   : source_location();
           did_redirection_open_fail = true;
           throw ErrorWithLocation{location,
                                   String::from(from_fd, heap_allocator()) +
@@ -1026,14 +1034,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
 
       case redirection_outcome::OpenedFile: {
-        const os::descriptor file_fd = r.opened_fd;
+        let const file_fd = r.opened_fd;
         /* The dup2 onto fd N replaces whatever fd N held, so a second exec onto
            the same number closes the earlier file rather than leaking it. The
            flush keeps buffered output on the original descriptor. */
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(redir.fd);
           koshka::flush();
-          const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
+          let const was_replaced = os::replace_descriptor(redir.fd, file_fd);
           if (!os::descriptor_is_shell_fd(file_fd, redir.fd))
             os::close_fd(file_fd);
           if (!was_replaced) {
@@ -1051,9 +1059,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (redir.fd == 1 || redir.fd == 2) {
           koshka::flush();
         }
-        const bool file_is_target_fd =
+        const bool is_file_target_fd =
             os::descriptor_is_shell_fd(file_fd, redir.fd);
-        if (file_is_target_fd) {
+        if (is_file_target_fd) {
           /* open returned fd N itself, so the collision is recorded for restore
              without a close. */
           dup_saved_descriptors.push(
@@ -1074,7 +1082,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* A special builtin's redirection error exits a non-interactive shell, so
        it is not recovered. The defers above put the partial redirections
        back. */
-    if (command_is_special_builtin) throw;
+    if (is_command_special_builtin) throw;
     const String *source = cxt.current_source();
     show_message(redirection_error.to_string(
         source != nullptr ? source->view() : StringView{}, &cxt));
@@ -1088,7 +1096,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The append form reads the current value from the shell store first so a
      non-exported shell variable still contributes. An integer name evaluates
      the join to its decimal here. */
-  let do_apply_append = [&](StringView name, String &value_ref) throws {
+  let const do_apply_append = [&](StringView name, String &value_ref) throws {
     let appended = String{cxt.scratch_allocator()};
     if (let const existing = cxt.get_variable_value(name))
       appended.append(existing->view());
@@ -1109,7 +1117,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      assignments, which persist in the current shell. */
   if (program_args.is_empty()) {
     for (let const &var : m_local_vars) {
-      const StringView name = var.name.view();
+      let const name = var.name.view();
       let value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) do_apply_append(name, value);
       cxt.set_shell_variable(name, value);
@@ -1132,8 +1140,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     /* A value that ran a command substitution leaves the status of the last
        one. A line with no substitution resets to 0. */
-    let do_token_ran_substitution = [&](const Token *token) {
-      if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+    let const do_token_ran_substitution = [&](const Token *token) {
+      if (token == nullptr || token->kind() != Token::Kind::Word) {
+        return false;
+      }
       return static_cast<const tokens::WordToken *>(token)
           ->word()
           .runs_substitution();
@@ -1164,13 +1174,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A prefix IFS=... drives the shell's own word splitting for this command
      through the live separator cache. The effective separators are saved before
      the first such prefix and restored on exit. */
-  bool ifs_was_assigned = false;
+  bool was_ifs_assigned = false;
   String saved_ifs_separators{cxt.scratch_allocator()};
   Maybe<ProgramResolver> saved_program_resolver{};
   /* The assignments apply left to right, each committed before the next is
      expanded, so a later value reads an earlier same-line one. */
   for (let const &var : m_local_vars) {
-    const StringView name = var.name.view();
+    let const name = var.name.view();
     if (cxt.is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
     const bool is_read_field_separator =
@@ -1191,7 +1201,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* A special builtin keeps the assignment outside the bash mood, so it
        commits to the store. The bash mood drops it after the command, so it
        falls to the temporary path instead. */
-    if (command_is_special_builtin && !cxt.is_bash_compatible()) {
+    if (is_command_special_builtin && !cxt.is_bash_compatible()) {
       cxt.set_shell_variable(name, expanded_value);
       if (cxt.export_all()) {
         cxt.record_environment_change(name);
@@ -1217,8 +1227,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The value before the first IFS prefix is saved once, so a name repeated
        on the line still reverts to where it began. */
     if (name == "IFS") {
-      if (!ifs_was_assigned) {
-        ifs_was_assigned = true;
+      if (!was_ifs_assigned) {
+        was_ifs_assigned = true;
         saved_ifs_separators =
             cxt.get_variable_value("IFS").value_or(String{" \t\n"});
       }
@@ -1241,7 +1251,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     if (saved_program_resolver.has_value())
       cxt.get_program_resolver() = steal(*saved_program_resolver);
-    if (ifs_was_assigned) cxt.set_field_separators(saved_ifs_separators.view());
+    if (was_ifs_assigned) cxt.set_field_separators(saved_ifs_separators.view());
   };
 
   ASSERT(!program_args.is_empty());
@@ -1366,7 +1376,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        inside this function and is consumed here. An exit stays pending for the
        shell. */
     if (cxt.has_pending_control_flow()) {
-      const control_flow::Kind kind = cxt.pending_control_flow().kind;
+      let const kind = cxt.pending_control_flow().kind;
       if (kind == control_flow::Kind::Return) {
         function_ret = cxt.pending_control_flow().value;
         cxt.clear_control_flow();
@@ -1408,7 +1418,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (redirect_in_fd) ec.in_fd = redirect_in_fd;
   was_redirect_in_fd_handed_off = true;
 
-  const i64 ret = utils::execute_context(
+  let const ret = utils::execute_context(
       steal(ec), cxt,
       is_async() ? execution_mode::Background : execution_mode::Foreground);
   cxt.set_last_argument(last_argument.view());
@@ -1454,7 +1464,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            value. */
         cxt.declare_associative_array(assignment.name);
         for (let const &element : values) {
-          const StringView text = element.view();
+          let const text = element.view();
           if (!text.is_empty() && text[0] == '[') {
             if (let const close = text.find_character(']');
                 close.has_value() && *close + 1 < text.length &&

@@ -39,7 +39,9 @@ cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
 
 cold static fn conditional_word_is_literal(const Token *token) wontthrow -> bool
 {
-  if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+  if (token == nullptr || token->kind() != Token::Kind::Word) {
+    return false;
+  }
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
   for (let const &segment : word.segments)
     if (segment.kind != WordSegment::Kind::LiteralText &&
@@ -51,7 +53,9 @@ cold static fn conditional_word_is_literal(const Token *token) wontthrow -> bool
 
 cold static fn conditional_word_has_glob(const Token *token) wontthrow -> bool
 {
-  if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+  if (token == nullptr || token->kind() != Token::Kind::Word) {
+    return false;
+  }
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
   for (let const &segment : word.segments)
     if (segment.has_live_glob_chars() && segment.has_glob_metacharacter())
@@ -100,7 +104,9 @@ conditional_operator_view(const conditional_element &element) wontthrow
   if (element.word == nullptr) return None;
 
   let const view = element.word->raw_view();
-  if (!view.has_value() || !is_conditional_binary_operator(*view)) return None;
+  if (!view.has_value() || !is_conditional_binary_operator(*view)) {
+    return None;
+  }
 
   return view;
 }
@@ -117,13 +123,19 @@ cold static fn conditional_inequality_left_operand(
     return None;
 
   let const &op = elements[operator_index];
-  if (op.kind != Kind::Operand || op.word == nullptr) return None;
+  if (op.kind != Kind::Operand || op.word == nullptr) {
+    return None;
+  }
 
   let const op_view = op.word->raw_view();
-  if (!op_view.has_value() || *op_view != StringView{"!="}) return None;
+  if (!op_view.has_value() || *op_view != StringView{"!="}) {
+    return None;
+  }
 
   let const &left = elements[operator_index - 1];
-  if (left.kind != Kind::Operand || left.word == nullptr) return None;
+  if (left.kind != Kind::Operand || left.word == nullptr) {
+    return None;
+  }
 
   return left.word->raw_view();
 }
@@ -182,7 +194,9 @@ conditional_element_ends_operand(const conditional_element &element) wontthrow
 {
   using Kind = conditional_element::Kind;
   if (element.kind == Kind::CloseParen) return true;
-  if (element.kind != Kind::Operand || element.word == nullptr) return false;
+  if (element.kind != Kind::Operand || element.word == nullptr) {
+    return false;
+  }
 
   let const view = element.word->raw_view();
 
@@ -230,7 +244,9 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       }
     }
 
-    if (element.kind != Kind::Operand || element.word == nullptr) continue;
+    if (element.kind != Kind::Operand || element.word == nullptr) {
+      continue;
+    }
 
     let const operand = element.word->raw_string();
 
@@ -535,7 +551,7 @@ fn ArithmeticCommand::analyze(AnalysisContext &actx,
   check_arithmetic_expression_lints(actx, m_expression.view(),
                                     source_location());
 
-  if (actx.shebang_is_posix_sh) {
+  if (actx.is_posix_sh_shebang) {
     actx.report_diagnostic(diagnostic_id::sc3006, source_location());
     check_posix_arithmetic_operators(actx, m_expression.view(),
                                      source_location());
@@ -703,7 +719,7 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
 
     check_arithmetic_expression_lints(actx, clause, source_location());
 
-    if (actx.shebang_is_posix_sh)
+    if (actx.is_posix_sh_shebang)
       check_posix_arithmetic_operators(actx, clause, source_location());
   }
 
@@ -814,7 +830,7 @@ static fn evaluate_subshell_in_process(const Expression *body,
   /* Exit and return end only the subshell. A break or continue is scoped to a
      loop inside it and is consumed here. */
   if (cxt.has_pending_control_flow()) {
-    const control_flow::Kind kind = cxt.pending_control_flow().kind;
+    let const kind = cxt.pending_control_flow().kind;
     if (kind == control_flow::Kind::Exit || kind == control_flow::Kind::Return)
     {
       ret = cxt.pending_control_flow().value;
@@ -853,7 +869,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     SET_AND_RETURN_EXIT_STATUS(cxt, status);
   }
 
-  const os::process child = *forked_child;
+  let const child = *forked_child;
   if (os::process_id_of(child) == 0) {
     i32 status = 1;
     try {
@@ -1056,14 +1072,14 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.apply_scope_definitions(m_analysis_scope_definitions);
   let const saved_loop_body_depth = actx.loop_body_depth;
   actx.loop_body_depth = 0;
-  let const saved_active_function = actx.active_function_definition;
-  actx.active_function_definition = actx.function_definitions.count();
+  let const saved_active_function = actx.active_function_definition_index;
+  actx.active_function_definition_index = actx.function_definitions.count();
   actx.function_definitions.push(
       function_definition_record{m_name.view(), source_location()});
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
   actx.function_scope_depth--;
-  actx.active_function_definition = saved_active_function;
+  actx.active_function_definition_index = saved_active_function;
   actx.loop_body_depth = saved_loop_body_depth;
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
@@ -1188,14 +1204,14 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         break;
       }
 
-      const os::descriptor source = os::descriptor_for_shell_fd(r.dup_from_fd);
+      let const source = os::descriptor_for_shell_fd(r.dup_from_fd);
       const os::saved_descriptor saved =
           os::save_and_replace_descriptor(r.target_fd, source);
       saved_descriptors.push(saved);
       if (!saved.is_dup2_ok) {
-        const SourceLocation location = redir.target != nullptr
-                                            ? redir.target->source_location()
-                                            : source_location();
+        let const location = redir.target != nullptr
+                                 ? redir.target->source_location()
+                                 : source_location();
         throw ErrorWithLocation{location,
                                 String::from(r.dup_from_fd, heap_allocator()) +
                                     ": Bad file descriptor"};
@@ -1205,7 +1221,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
-  const i64 result = m_child->evaluate(cxt);
+  let const result = m_child->evaluate(cxt);
   return result;
 }
 

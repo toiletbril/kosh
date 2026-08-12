@@ -35,8 +35,8 @@ struct decoded_shell_word
   usize leading_variable_expansion_end{0};
   char quote_character{0};
   char last_quote_character{0};
-  bool leading_tilde_is_active{false};
-  bool leading_variable_is_active{false};
+  bool is_leading_tilde_active{false};
+  bool is_leading_variable_active{false};
   bool has_shell_syntax{false};
 
   explicit decoded_shell_word(Allocator allocator)

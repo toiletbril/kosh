@@ -44,13 +44,16 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_COMMAND_DEFAULT_PATH.is_enabled() &&
       cxt.restricted_enforcement_active())
+  {
     throw ErrorWithLocation{ec.source_location(),
                             "command -p is forbidden in a restricted shell"};
+  }
 
   if (args.count() < 2) return 0;
-  if (!FLAG_SHOW.is_enabled() && !FLAG_SHOW_VERBOSE.is_enabled())
+  if (!FLAG_SHOW.is_enabled() && !FLAG_SHOW_VERBOSE.is_enabled()) {
     cxt.guard_restricted_path(args[1].view(), ec.arg_location_at(1),
                               restricted_path_use::Command);
+  }
 
   let default_resolver = ProgramResolver{String{"/usr/bin:/bin"}};
   let &resolver = FLAG_COMMAND_DEFAULT_PATH.is_enabled()

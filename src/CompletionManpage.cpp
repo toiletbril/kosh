@@ -122,18 +122,18 @@ static fn manpage_section1_directories(ProgramResolver &resolver) throws
   let directories = ArrayList<Path>{heap_allocator()};
   let seen_roots = HashSet{heap_allocator()};
 
-  let do_push_man1_of_root = [&](StringView root) {
+  let const do_push_man1_of_root = [&](StringView root) {
     if (seen_roots.contains(root)) return;
     seen_roots.add(root);
     let directory = Path{root};
     directory.push_component("man1");
     directories.push(steal(directory));
   };
-  let do_push_default_roots = [&]() {
+  let const do_push_default_roots = [&]() {
     do_push_man1_of_root("/usr/local/share/man");
     do_push_man1_of_root("/usr/share/man");
   };
-  let do_push_command_roots = [&]() {
+  let const do_push_command_roots = [&]() {
     let const view = manpath_command_output(resolver);
     usize segment_start = 0;
     for (usize i = 0; i <= view.length; i++) {
@@ -209,8 +209,9 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
       break;
     }
   }
-  if (name.length > 2 && name.substring(name.length - 2) == ".1")
+  if (name.length > 2 && name.substring(name.length - 2) == ".1") {
     return name.substring_of_length(0, name.length - 2);
+  }
   return None;
 }
 
@@ -301,11 +302,11 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
   return synopsis;
 }
 
-/* may_read is false on the ghost path, which trusts a cached verdict rather
-   than scan a page on a keystroke. */
+/* is_read_allowed is false on the ghost path, which trusts a cached verdict
+   rather than scan a page on a keystroke. */
 static fn man_subcommand_page_is_valid(StringView command,
                                        StringView subcommand,
-                                       bool may_read) throws -> bool
+                                       bool is_read_allowed) throws -> bool
 {
   let page_name = String{command};
   page_name.push('-');
@@ -313,7 +314,7 @@ static fn man_subcommand_page_is_valid(StringView command,
   if (let const cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view());
       cached != nullptr)
     return *cached;
-  if (!may_read) return false;
+  if (!is_read_allowed) return false;
 
   let const file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
   if (file_path == nullptr) {
@@ -478,7 +479,7 @@ static fn parse_manpage_option_entries(StringView text) throws
   usize pending_indent = 0;
   let pending_description = String{heap_allocator()};
 
-  let do_finalize_pending = [&]() throws -> void {
+  let const do_finalize_pending = [&]() throws -> void {
     if (pending_flags.is_empty()) return;
     let const desc = pending_description.view().trim_blanks();
     for (let const &flag : pending_flags)
@@ -832,7 +833,7 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
 {
   if (trimmed.is_empty()) return false;
-  let const ends_with_ignoring_case = [&](StringView suffix) {
+  let const do_ends_with_ignoring_case = [&](StringView suffix) {
     if (trimmed.length < suffix.length) return false;
     let const offset = trimmed.length - suffix.length;
     for (usize i = 0; i < suffix.length; i++) {
@@ -845,26 +846,26 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
     return true;
   };
   if (trimmed[trimmed.length - 1] == ':') {
-    if (ends_with_ignoring_case(StringView{"commands:"}) ||
-        ends_with_ignoring_case(StringView{"subcommands:"}) ||
-        ends_with_ignoring_case(StringView{"commands are:"}) ||
-        ends_with_ignoring_case(StringView{"example usage:"}))
+    if (do_ends_with_ignoring_case(StringView{"commands:"}) ||
+        do_ends_with_ignoring_case(StringView{"subcommands:"}) ||
+        do_ends_with_ignoring_case(StringView{"commands are:"}) ||
+        do_ends_with_ignoring_case(StringView{"example usage:"}))
       return true;
     /* git opens with "These are common Git commands used in various
        situations:", a colon-terminated line that names commands without
        matching a fixed suffix. */
-    let const contains_word_ignoring_case = [&](StringView needle) {
+    let const do_contains_word_ignoring_case = [&](StringView needle) {
       if (needle.length > trimmed.length) return false;
-      let const is_alpha = [](char c) {
+      let const do_is_alpha = [](char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
       };
       for (usize i = 0; i + needle.length <= trimmed.length; i++) {
-        if (i > 0 && is_alpha(trimmed[i - 1])) continue;
+        if (i > 0 && do_is_alpha(trimmed[i - 1])) continue;
         if (i + needle.length < trimmed.length &&
-            is_alpha(trimmed[i + needle.length]))
+            do_is_alpha(trimmed[i + needle.length]))
           continue;
         let const candidate = trimmed.substring_of_length(i, needle.length);
-        let const eq = [&]() {
+        let const is_equal = [&]() {
           for (usize j = 0; j < needle.length; j++) {
             let a = candidate[j];
             let b = needle[j];
@@ -874,24 +875,24 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
           }
           return true;
         }();
-        if (eq) return true;
+        if (is_equal) return true;
       }
       return false;
     };
-    return contains_word_ignoring_case(StringView{"commands"});
+    return do_contains_word_ignoring_case(StringView{"commands"});
   }
 
-  let const is_all_uppercase = [&]() {
+  let const do_is_all_uppercase = [&]() {
     for (usize i = 0; i < trimmed.length; i++)
       if (trimmed[i] >= 'a' && trimmed[i] <= 'z') return false;
     return true;
   };
-  let const equals_ignoring_case = [&](StringView word) {
-    return trimmed.length == word.length && ends_with_ignoring_case(word);
+  let const do_equal_ignoring_case = [&](StringView word) {
+    return trimmed.length == word.length && do_ends_with_ignoring_case(word);
   };
-  return is_all_uppercase() &&
-         (equals_ignoring_case(StringView{"commands"}) ||
-          equals_ignoring_case(StringView{"subcommands"}));
+  return do_is_all_uppercase() &&
+         (do_equal_ignoring_case(StringView{"commands"}) ||
+          do_equal_ignoring_case(StringView{"subcommands"}));
 }
 
 /* git groups its subcommands under left-margin headers like "start a working
@@ -903,13 +904,14 @@ static fn line_is_subcommand_group_header(StringView trimmed) wontthrow -> bool
   if (trimmed.is_empty()) return false;
   if (line_opens_subcommand_section(trimmed)) return true;
   if (trimmed[trimmed.length - 1] == ')') return true;
-  let const contains = [&](StringView needle) {
+  let const do_contains = [&](StringView needle) {
     if (needle.length > trimmed.length) return false;
     for (usize i = 0; i + needle.length <= trimmed.length; i++)
       if (trimmed.substring_of_length(i, needle.length) == needle) return true;
     return false;
   };
-  return contains(StringView{"(see also"}) || contains(StringView{"see also:"});
+  return do_contains(StringView{"(see also"}) ||
+         do_contains(StringView{"see also:"});
 }
 
 /* cargo and other tools with subcommands but no manpage list them under a

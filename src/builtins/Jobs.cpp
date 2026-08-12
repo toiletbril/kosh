@@ -132,7 +132,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     out.append(state_color(job.state, should_color));
-    StringView state = StringView{state_word(job.state)};
+    let state = StringView{state_word(job.state)};
     out.append(state);
     for (usize pad = state.length; pad < 7; pad++)
       out.push(' ');

@@ -50,7 +50,9 @@ static fn make_one(StringView path, u32 mode, mode_application application,
     return true;
   }
 
-  if (should_ignore_existing && Path{path}.is_directory()) return true;
+  if (should_ignore_existing && Path{path}.is_directory()) {
+    return true;
+  }
   return false;
 }
 
@@ -79,13 +81,14 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
     /* parse_integer_in_base accepts a sign and saturates on overflow without an
        error, so a sign-prefixed or oversized operand parses cleanly. The range
        check rejects it rather than truncating to an over-permissive mode. */
-    if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777)
+    if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777) {
       throw ErrorWithDetails{
           "mkdir: invalid mode '" +
               String{cxt.scratch_allocator(), FLAG_MKDIR_MODE.value()}
               + "'",
           "A mode is an octal number such as 0755"
       };
+    }
 
     named_mode = static_cast<u32>(parsed.value());
   }
@@ -113,7 +116,9 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
       }
 
       for (usize i = 1; i <= text.length; i++) {
-        if (i < text.length && text[i] != '/') continue;
+        if (i < text.length && text[i] != '/') {
+          continue;
+        }
         let const prefix = text.substring_of_length(0, i);
         if (prefix.is_empty()) continue;
         let const is_named_directory = (i == text.length);

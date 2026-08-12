@@ -35,7 +35,7 @@ static fn report_exec_resolution_error(ExecContext &ec, EvalContext &cxt,
                                        StringView message,
                                        i32 command_status) throws -> i32
 {
-  let error = ErrorWithLocation{location, message};
+  let error = ErrorWithLocation{steal(location), message};
   error.set_command_status(command_status);
   const String *source = cxt.current_source();
   show_message(
@@ -57,7 +57,9 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") {
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   let should_be_login_shell = false;
   let should_use_empty_environment = false;
@@ -67,13 +69,15 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (!cxt.is_posix_mode()) {
     while (command_index < args.count()) {
-      const StringView arg = args[command_index].view();
+      let const arg = args[command_index].view();
       if (arg == "--") {
         command_index++;
         break;
       }
 
-      if (arg.length < 2 || arg[0] != '-') break;
+      if (arg.length < 2 || arg[0] != '-') {
+        break;
+      }
 
       let did_consume_value_word = false;
       for (usize k = 1; k < arg.length; k++) {
@@ -248,7 +252,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.in_fd.reset();
   command.out_fd.reset();
   command.err_fd.reset();
-  const i32 status =
+  let const status =
       cxt.run_program_fallback(command, cxt.mood(), script_isolation::Shared);
   utils::quit(status, utils::farewell_policy::Silent);
 }

@@ -84,7 +84,7 @@ struct makefile
 
   fn find_variable(StringView name) const throws -> const String *
   {
-    if (let const *index = variable_index.find(name))
+    if (let const *index = variable_index.find(name); index != nullptr)
       return &variables[*index].value;
     return nullptr;
   }
@@ -407,7 +407,7 @@ static fn is_target_variable_assignment(StringView after_colon) wontthrow
 static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
                            StringView operator_and_value) throws -> void
 {
-  StringView value = operator_and_value.substring(1);
+  let value = operator_and_value.substring(1);
   char operator_character = ' ';
   if (!name_part.is_empty()) {
     let const last = name_part[name_part.length - 1];
@@ -579,7 +579,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
   for (const String &logical :
        join_continuations(source, cxt.scratch_allocator()))
   {
-    StringView line = logical.view();
+    let line = logical.view();
 
     /* A recipe line is kept verbatim and expanded only at build time. */
     if (!line.is_empty() && line[0] == '\t') {
@@ -654,7 +654,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source) throws -> makefile
        parses as usual. undefine, unexport, define, and a bare export are not
        modelled, so they are skipped rather than read as a malformed rule. An
        export that prefixes an assignment keeps the assignment. */
-    StringView statement = trimmed;
+    let statement = trimmed;
     if (directive == "override")
       statement = trim(statement.substring(directive.length));
 
@@ -900,7 +900,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   }
 
   for (const String &recipe : *recipe_lines) {
-    StringView body = recipe.view();
+    let body = recipe.view();
     bool is_silent = false;
     bool should_ignore_errors = false;
     /* A leading @ or - applies in either order. */
@@ -1024,7 +1024,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
                            "Create a `Makefile` or pass `-f <file>`"};
   }
 
-  Maybe<String> source = Path{makefile_path.view()}.read_entire_file();
+  let source = Path{makefile_path.view()}.read_entire_file();
   if (!source.has_value())
     throw ErrorWithDetails{"Unable to read the makefile '" + makefile_path +
                                "': " + os::last_system_error_message(),

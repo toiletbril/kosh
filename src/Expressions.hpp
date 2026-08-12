@@ -46,7 +46,7 @@ struct function_definition_record
 {
   StringView name;
   SourceLocation location;
-  bool does_read_positionals{false};
+  bool has_positional_reads{false};
 };
 
 /* One call of a name this script defines as a function. */
@@ -146,12 +146,12 @@ public:
   ArrayList<function_call_record> function_calls{heap_allocator()};
 
   static constexpr usize NO_ACTIVE_FUNCTION_DEFINITION = ~usize{0};
-  usize active_function_definition{NO_ACTIVE_FUNCTION_DEFINITION};
+  usize active_function_definition_index{NO_ACTIVE_FUNCTION_DEFINITION};
 
   bool is_direct_pipeline_stage{false};
   bool is_inside_loop_condition{false};
   bool is_command_status_observed{false};
-  bool loop_condition_reads_input{false};
+  bool has_input_reading_loop_condition{false};
   bool is_inside_read_loop{false};
   HashSet pipeline_lost_names{heap_allocator()};
   HashSet external_input_names{heap_allocator()};
@@ -175,7 +175,7 @@ public:
 
   /* The SC3xxx bashism lints fire only behind this gate, since a kosh or bash
      shebang means the bash extension on purpose. */
-  bool shebang_is_posix_sh{false};
+  bool is_posix_sh_shebang{false};
 
   /* An interactive -W chunk runs the moment the analysis ends and the runtime
      resolution reports the same missing command, so the analysis copy would
@@ -257,17 +257,19 @@ public:
      its caller passes. */
   fn mark_positional_reference() wontthrow -> void
   {
-    if (active_function_definition == NO_ACTIVE_FUNCTION_DEFINITION) return;
+    if (active_function_definition_index == NO_ACTIVE_FUNCTION_DEFINITION)
+      return;
 
-    function_definitions[active_function_definition].does_read_positionals =
-        true;
+    function_definitions[active_function_definition_index]
+        .has_positional_reads = true;
   }
 
   /* The sentinel check comes first, since the walk spends most of its time
      outside every function body. */
   fn note_positional_reference(StringView name) wontthrow -> void
   {
-    if (active_function_definition == NO_ACTIVE_FUNCTION_DEFINITION) return;
+    if (active_function_definition_index == NO_ACTIVE_FUNCTION_DEFINITION)
+      return;
     if (!reference_names_positional(name)) return;
 
     mark_positional_reference();
@@ -298,7 +300,7 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<shellcheck_directive_span> &directive_spans,
                const ArrayList<heredoc_terminator_miss> &heredoc_misses,
                bool is_named_script_file,
-               bool report_optimizer_diagnostics = false) throws -> bool;
+               bool should_report_optimizer_diagnostics = false) throws -> bool;
 
 class Expression
 {

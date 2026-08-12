@@ -42,7 +42,7 @@ fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
 {
   let is_nonzero = false;
   try {
-    String result = cxt.evaluate_arithmetic_wide(expression, is_nonzero);
+    let result = cxt.evaluate_arithmetic_wide(expression, is_nonzero);
     result += '\n';
     ec.print_to_stdout(result);
     return 0;
@@ -62,7 +62,9 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
   usize i = 0;
   while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
     i++;
-  if (i >= line.length || !lexer::is_variable_name_start(line[i])) return false;
+  if (i >= line.length || !lexer::is_variable_name_start(line[i])) {
+    return false;
+  }
 
   let const name_start = i;
   while (i < line.length && lexer::is_variable_name(line[i]))
@@ -73,8 +75,12 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
     i++;
 
   /* A single = assigns, while == is a comparison the evaluator handles. */
-  if (i >= line.length || line[i] != '=') return false;
-  if (i + 1 < line.length && line[i + 1] == '=') return false;
+  if (i >= line.length || line[i] != '=') {
+    return false;
+  }
+  if (i + 1 < line.length && line[i + 1] == '=') {
+    return false;
+  }
 
   let const value =
       line.substring_of_length(i + 1, line.length - (i + 1)).trim_blanks();
@@ -93,11 +99,11 @@ fn try_define(EvalContext &cxt, StringView line) throws -> bool
   return true;
 }
 
-fn run_repl(const ExecContext &ec, EvalContext &cxt, bool force_pipe) throws
-    -> i32
+fn run_repl(const ExecContext &ec, EvalContext &cxt,
+            bool should_force_pipe) throws -> i32
 {
   let const input_fd = ec.in_fd.value_or(KOSH_STDIN);
-  let const is_terminal = !force_pipe && os::is_fd_a_tty(input_fd);
+  let const is_terminal = !should_force_pipe && os::is_fd_a_tty(input_fd);
 
   /* When the host shell ran calc off a -c command, it never entered the
      interactive loop, so toiletline was never initialized. Bring it up here so
@@ -248,7 +254,9 @@ fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
       !should_pipe &&
       (FLAG_CALC_INTERACTIVE.is_enabled() ||
        (!has_expression && os::is_stdin_a_tty() && os::is_stdout_a_tty()));
-  if (should_pipe || is_interactive) return run_repl(ec, cxt, should_pipe);
+  if (should_pipe || is_interactive) {
+    return run_repl(ec, cxt, should_pipe);
+  }
 
   if (!has_expression) {
     throw ErrorWithDetails{

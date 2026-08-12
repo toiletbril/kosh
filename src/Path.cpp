@@ -171,8 +171,9 @@ cold fn Path::first_unavailable_component() const throws
 
     let const component =
         m_text.substring_of_length(component_start, position - component_start);
-    if (component == StringView{"."} || component == StringView{".."})
+    if (component == StringView{"."} || component == StringView{".."}) {
       has_dot_component = true;
+    }
 
     let const prefix = Path{m_text.substring_of_length(0, position)};
     let is_available = false;
@@ -400,7 +401,7 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
   }
 
   /* A name written with a trailing dot gets no suffix added. */
-  const bool ends_with_dot =
+  let const ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
   let status = os::file_status{};
   let was_resolved = os::stat_path_following(candidate.text().view(), status);

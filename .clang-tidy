@@ -26,7 +26,6 @@ Checks: |
   -modernize-use-nodiscard,
   -bugprone-easily-swappable-parameters,
   -bugprone-reserved-identifier,
-  -bugprone-throwing-static-initialization,
   -misc-non-private-member-variables-in-classes,
   -misc-use-internal-linkage,
   -readability-use-concise-preprocessor-directives,

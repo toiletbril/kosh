@@ -189,8 +189,8 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   i32 status = 0;
-  let do_reject_unknown = [&](StringView name, SourceLocation location)
-                              throws -> bool {
+  let const do_reject_unknown =
+      [&](StringView name, const SourceLocation &location) throws -> bool {
     if (is_known_shopt_option(name)) return false;
     status = 1;
     if (!is_quiet)
@@ -206,7 +206,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (names.is_empty()) {
       if (!is_quiet) {
         for (let const &name : shell_option_names(false)) {
-          Maybe<bool> on = query_shell_option(cxt, name);
+          let on = query_shell_option(cxt, name);
           if (!on.has_value()) continue;
 
           if (should_enable && !*on) {
@@ -223,7 +223,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     for (usize n = 0; n < names.count(); n++) {
       let const &name = names[n];
-      let const location = name_locations[n];
+      let const &location = name_locations[n];
       if (should_enable || should_disable) {
         if (!apply_shell_option(cxt, name, should_enable)) {
           if (is_quiet)
@@ -268,7 +268,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     for (usize n = 0; n < names.count(); n++) {
       let const &name = names[n];
-      let const location = name_locations[n];
+      let const &location = name_locations[n];
       if (do_reject_unknown(name, location)) continue;
       if (name == "restricted_shell") continue;
       LOG(Info, "shopt setting '%.*s' to %s", static_cast<int>(name.length),
@@ -291,7 +291,7 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   for (usize n = 0; n < names.count(); n++) {
     let const &name = names[n];
-    let const location = name_locations[n];
+    let const &location = name_locations[n];
     if (do_reject_unknown(name, location)) continue;
     let const is_on = cxt.is_shopt_enabled(name);
     if (!is_on) status = 1;

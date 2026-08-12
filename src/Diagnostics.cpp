@@ -195,7 +195,9 @@ fn collect_shellcheck_selectors(
     {
       position++;
     }
-    if (position >= comment.length || comment[position] == '#') break;
+    if (position >= comment.length || comment[position] == '#') {
+      break;
+    }
     if (!comment.substring(position).starts_with(StringView{"disable="})) {
       while (position < comment.length && comment[position] != ' ' &&
              comment[position] != '\t' && comment[position] != '#')
@@ -229,7 +231,9 @@ fn collect_shellcheck_selectors(
         source,
         comment.substring_of_length(value_start, position - value_start),
         selectors);
-    if (quote != '\0' && position < comment.length) position++;
+    if (quote != '\0' && position < comment.length) {
+      position++;
+    }
   }
 }
 

@@ -152,7 +152,9 @@ hot pure fn first_active_glob(StringView text, const Bitset &mask,
   /* An absent tail mask entry counts as inert, so an empty mask names a fully
      quoted or literal word with no glob. */
   for (usize i = 0; i < text.length; i++) {
-    if (i >= mask.count() || !mask[i]) continue;
+    if (i >= mask.count() || !mask[i]) {
+      continue;
+    }
 
     let const ch = text.data[i];
     if (extglob && i + 1 < text.length && lexer::is_extglob_operator(ch) &&
@@ -189,7 +191,9 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
   LOG(All,
       "collecting globstar paths under the relative path '%.*s', depth %zu",
       static_cast<int>(relative.length), relative.data, depth);
-  if (directories_only && include_base) out.push(String{allocator, relative});
+  if (directories_only && include_base) {
+    out.push(String{allocator, relative});
+  }
   if (depth >= GLOBSTAR_MAX_DEPTH) return;
 
   let const entries = Path::read_directory_typed(dir);
@@ -204,19 +208,19 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     let child_dir = dir;
     child_dir.push_component(name);
 
-    bool is_dir = false;
-    bool is_link = false;
+    bool is_directory = false;
+    bool is_symbolic_link = false;
     switch (entry.kind) {
-    case Path::entry_kind::Directory: is_dir = true; break;
+    case Path::entry_kind::Directory: is_directory = true; break;
     case Path::entry_kind::Symlink:
-      is_link = true;
-      is_dir = child_dir.is_directory();
+      is_symbolic_link = true;
+      is_directory = child_dir.is_directory();
       break;
     case Path::entry_kind::Regular:
     case Path::entry_kind::Other: break;
     case Path::entry_kind::Unknown:
-      is_link = child_dir.is_symbolic_link();
-      is_dir = child_dir.is_directory();
+      is_symbolic_link = child_dir.is_symbolic_link();
+      is_directory = child_dir.is_directory();
       break;
     }
 
@@ -228,12 +232,12 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     }
     child_relative.append(name);
 
-    if (!directories_only || is_dir) {
+    if (!directories_only || is_directory) {
       out.push(String{allocator, child_relative.view()});
     }
     /* A directory symlink is a match but is not descended into, so a self or
        parent symlink does not spin the walk to the depth cap. */
-    if (is_dir && !is_link) {
+    if (is_directory && !is_symbolic_link) {
       collect_globstar_paths(child_dir, child_relative.view(), directories_only,
                              should_match_dotfiles, false, depth + 1, allocator,
                              out);
@@ -394,7 +398,9 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment, bool word_continues,
   if (!leading_segment.is_tilde_candidate()) return;
 
   let &text = leading_segment.text;
-  if (text.is_empty() || text[0] != '~') return;
+  if (text.is_empty() || text[0] != '~') {
+    return;
+  }
 
   usize name_end = 1;
   while (name_end < text.length() && text[name_end] != '/' &&
@@ -405,7 +411,9 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment, bool word_continues,
   /* A tilde prefix that runs to the segment's end while the word continues in a
      later segment carries a quoted character, so bash leaves the whole word
      literal. */
-  if (name_end == text.length() && word_continues) return;
+  if (name_end == text.length() && word_continues) {
+    return;
+  }
 
   let const directory = resolve_tilde_prefix(name);
   if (name.is_empty() && !directory.has_value()) {

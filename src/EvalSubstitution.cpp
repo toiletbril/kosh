@@ -71,7 +71,9 @@ fn drain_command_substitution_pipe(opaque *raw_context) wontthrow -> void
 
     let const bytes_read = os::read_fd(
         drain->read_fd, drain->data + drain->length, DRAIN_CHUNK_LENGTH);
-    if (!bytes_read.has_value() || *bytes_read == 0) break;
+    if (!bytes_read.has_value() || *bytes_read == 0) {
+      break;
+    }
     drain->length += static_cast<usize>(*bytes_read);
   }
 }
@@ -83,7 +85,9 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   while (i < source.length &&
          (source[i] == ' ' || source[i] == '\t' || source[i] == '\n'))
     i++;
-  if (i >= source.length || source[i] != '<') return None;
+  if (i >= source.length || source[i] != '<') {
+    return None;
+  }
   i++;
 
   if (AST_ARENA == nullptr) return None;
@@ -92,7 +96,9 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   let lexer = Lexer{String{source.substring_of_length(i, source.length - i)},
                     *AST_ARENA, false, None, mood()};
   Token *name = lexer.next_shell_token();
-  if (name == nullptr || name->kind() != Token::Kind::Word) return None;
+  if (name == nullptr || name->kind() != Token::Kind::Word) {
+    return None;
+  }
   /* Anything after the single filename means this is not the bare read form. */
   Token *after = lexer.next_shell_token();
   if (after != nullptr && after->kind() != Token::Kind::EndOfFile &&
@@ -178,7 +184,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   ASSERT(!text.is_empty());
 
   /* The first byte is the direction marker the lexer wrote. */
-  const char direction = text[0];
+  let const direction = text[0];
   let const command_writes_the_pipe = direction == '<';
   LOG(Debug, "setting up a process substitution where the command %s the pipe",
       command_writes_the_pipe ? "writes" : "reads");
@@ -214,7 +220,9 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
     } catch (const ErrorBase &error) {
       let const location =
           segment.get_source_location(m_current_location.filename);
-      if (!location.has_value() || current_source() == nullptr) throw;
+      if (!location.has_value() || current_source() == nullptr) {
+        throw;
+      }
 
       try {
         relocate_error(error, *location);
@@ -362,7 +370,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
                         ? FUNCTION_ARENA
                         : AST_ARENA;
   ASSERT(cache_arena != nullptr);
-  const usize generation = cache_arena->reset_generation();
+  let const generation = cache_arena->reset_generation();
   let const did_push_source_frame = push_substitution_source_frame(
       segment, StringView{"command substitution"});
   defer
@@ -449,22 +457,22 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
   Maybe<eval_state_snapshot> in_process_snapshot;
   let active_functions = HashSet{scratch_allocator()};
-  bool can_evaluate_in_process =
+  bool should_evaluate_in_process =
       !shell_is_interactive() && get_substitution_depth() <= 16 &&
       traps().count() == 0 &&
       ast->can_evaluate_in_process_substitution(*this, active_functions);
-  if (can_evaluate_in_process) {
+  if (should_evaluate_in_process) {
     try {
       in_process_snapshot = snapshot_state();
     } catch (const Error &) {
-      can_evaluate_in_process = false;
+      should_evaluate_in_process = false;
     }
   }
-  if (!can_evaluate_in_process && !os::can_fork_evaluator()) {
+  if (!should_evaluate_in_process && !os::can_fork_evaluator()) {
     in_process_snapshot = snapshot_state();
-    can_evaluate_in_process = true;
+    should_evaluate_in_process = true;
   }
-  if (!can_evaluate_in_process) {
+  if (!should_evaluate_in_process) {
     LOG(Debug, "running the captured substitution in a child process");
     unused(materialize_kosh_identity());
     let const pipe = os::make_pipe();
@@ -491,7 +499,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       was_pipe_handed_off = true;
       in_process_snapshot = snapshot_state();
     } else {
-      const os::process child = *forked_child;
+      let const child = *forked_child;
       was_pipe_handed_off = true;
       if (child == 0) {
         os::close_fd(pipe->in);
@@ -657,7 +665,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
                         ? FUNCTION_ARENA
                         : AST_ARENA;
   ASSERT(cache_arena != nullptr);
-  const usize generation = cache_arena->reset_generation();
+  let const generation = cache_arena->reset_generation();
   let const did_push_source_frame = push_substitution_source_frame(
       segment, StringView{"function substitution"});
   defer

@@ -111,7 +111,7 @@ fn check_redirection_lints(AnalysisContext &actx,
       continue;
     }
 
-    let const is_posix = actx.shebang_is_posix_sh;
+    let const is_posix = actx.is_posix_sh_shebang;
     if (is_posix) {
       check_posix_redirection_portability(actx, redirection,
                                           input.command_location());
@@ -258,7 +258,9 @@ fn check_redirection_lints(AnalysisContext &actx,
     }
   }
 
-  if (input.redirections.is_empty() || input.command_is_shadowed) return;
+  if (input.redirections.is_empty() || input.command_is_shadowed) {
+    return;
+  }
   if (!input.is_in_group(COMMAND_GROUP_NON_STDIN_READER)) return;
   if (args_have_stdin_operand(input.args)) return;
 
@@ -280,16 +282,16 @@ fn check_test_operand_lints(AnalysisContext &actx,
     return;
 
   let const &args = input.args;
-  let const is_posix = actx.shebang_is_posix_sh;
+  let const is_posix = actx.is_posix_sh_shebang;
 
   /* The operand range excludes the closing bracket, so the operator loop and
      the operand loop share one bound. */
   usize operand_end = args.count();
-  bool bracket_form_is_closed = true;
+  bool is_bracket_form_closed = true;
   if (input.command_id() == command_name_id::SingleBracket ||
       input.command_id() == command_name_id::DoubleBracket)
   {
-    bracket_form_is_closed =
+    is_bracket_form_closed =
         args.count() >= 2 &&
         args[args.count() - 1]->kind() == Token::Kind::Word &&
         static_cast<const tokens::WordToken *>(args[args.count() - 1])
@@ -297,7 +299,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
                 .to_literal_string()
                 .view() ==
             (input.command_id() == command_name_id::SingleBracket ? "]" : "]]");
-    if (bracket_form_is_closed) operand_end = args.count() - 1;
+    if (is_bracket_form_closed) operand_end = args.count() - 1;
   }
 
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
@@ -497,7 +499,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
   }
 
   /* A test with no operand always fails, shellcheck SC2212. */
-  if (bracket_form_is_closed && operand_end == 1)
+  if (is_bracket_form_closed && operand_end == 1)
     actx.report_diagnostic(diagnostic_id::sc2212, input.command_location());
 
   /* A single-operand test with no operator is the nonempty-string test. A
@@ -505,7 +507,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
      SC2161, another literal is the constant condition SC2078, command output is
      SC2243, and a variable is SC2244. A flag-shaped operand is left alone so
      [ -n ] is not told to use -n. */
-  if (bracket_form_is_closed && operand_end == 2 &&
+  if (is_bracket_form_closed && operand_end == 2 &&
       args[1]->kind() == Token::Kind::Word)
   {
     let const &word = static_cast<const tokens::WordToken *>(args[1])->word();
@@ -699,14 +701,14 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
     for (let const &segment : word.segments) {
       if (segment.kind != WordSegment::Kind::VariableReference) continue;
       const StringView referenced{segment.text.data(), segment.text.count()};
-      bool does_name_a_prefix = false;
+      bool has_name_prefix = false;
       for (let const &var : input.local_vars) {
         if (var.name.view() != referenced) continue;
 
-        does_name_a_prefix = !prefix_value_is_own_name(var);
+        has_name_prefix = !prefix_value_is_own_name(var);
         break;
       }
-      if (does_name_a_prefix) {
+      if (has_name_prefix) {
         actx.report_diagnostic(diagnostic_id::assignment_prefix_read,
                                args[i]->source_location(),
                                {segment.text.view()});
@@ -724,7 +726,9 @@ pure fn value_is_self_arithmetic(StringView name, StringView value) wontthrow
     -> bool
 {
   usize position = 0;
-  if (position < value.length && value[position] == '$') position++;
+  if (position < value.length && value[position] == '$') {
+    position++;
+  }
 
   if (position + name.length > value.length) return false;
   if (value.substring_of_length(position, name.length) != name) return false;
@@ -755,7 +759,9 @@ pure fn assignment_value_is_own_name(StringView name,
   if (inner.length >= 2 && inner[0] == '"' && inner[inner.length - 1] == '"')
     inner = inner.substring_of_length(1, inner.length - 2);
 
-  if (inner.length < 2 || inner[0] != '$') return false;
+  if (inner.length < 2 || inner[0] != '$') {
+    return false;
+  }
 
   if (inner.length >= 4 && inner[1] == '{' && inner[inner.length - 1] == '}')
     return inner.substring_of_length(2, inner.length - 3) == name;
@@ -808,7 +814,7 @@ fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
     if (segment.kind != WordSegment::Kind::UnquotedText)
       shape.has_bare_literal_value = false;
 
-    if (actx.shebang_is_posix_sh)
+    if (actx.is_posix_sh_shebang)
       check_posix_word_portability(actx, segment, location);
 
     switch (segment.kind) {
@@ -941,7 +947,9 @@ namespace {
 
 pure fn option_letter_index(char letter) wontthrow -> u32
 {
-  if (letter >= 'a' && letter <= 'z') return static_cast<u32>(letter - 'a');
+  if (letter >= 'a' && letter <= 'z') {
+    return static_cast<u32>(letter - 'a');
+  }
   if (letter >= 'A' && letter <= 'Z')
     return static_cast<u32>(letter - 'A') + 26;
 

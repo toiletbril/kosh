@@ -249,7 +249,9 @@ fn check_posix_word_portability(AnalysisContext &actx,
            (text[position] == ' ' || text[position] == '\t'))
       position++;
 
-    if (position >= text.length || text[position] != '<') break;
+    if (position >= text.length || text[position] != '<') {
+      break;
+    }
 
     let const location = do_get_location();
     let const source_text = analysis_source_text(actx, location);
@@ -278,7 +280,9 @@ fn check_posix_word_portability(AnalysisContext &actx,
     let has_caret_bracket = false;
     for (usize position = 0; position + 1 < text.length; position++) {
       let const following = text[position + 1];
-      if (following != '(' && following != '^') continue;
+      if (following != '(' && following != '^') {
+        continue;
+      }
 
       if (following == '(') {
         has_extended_glob |= lexer::is_extglob_operator(text[position]);
@@ -286,10 +290,14 @@ fn check_posix_word_portability(AnalysisContext &actx,
         has_caret_bracket |= text[position] == '[';
       }
 
-      if (has_extended_glob && has_caret_bracket) break;
+      if (has_extended_glob && has_caret_bracket) {
+        break;
+      }
     }
 
-    if (!has_extended_glob && !has_caret_bracket) break;
+    if (!has_extended_glob && !has_caret_bracket) {
+      break;
+    }
 
     let const location = do_get_location();
     if (has_extended_glob)
@@ -496,7 +504,7 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
   switch (command_literal[0]) {
   case '$': {
     if (command_literal[1] == '0' && equals_position == 2) {
-      let const id = actx.shebang_is_posix_sh ? diagnostic_id::sc2279
+      let const id = actx.is_posix_sh_shebang ? diagnostic_id::sc2279
                                               : diagnostic_id::sc2277;
       actx.report_diagnostic(id, location, {command_literal});
 
@@ -776,7 +784,9 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
         break;
       }
       if (!view.is_empty() && view[0] == '-') {
-        if (view == "-c" || view == "--command") is_command_value_next = true;
+        if (view == "-c" || view == "--command") {
+          is_command_value_next = true;
+        }
         continue;
       }
       if (!has_seen_user) {
@@ -899,7 +909,7 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
       check_arithmetic_expression_lints(actx, expression.view(),
                                         args[i]->source_location());
 
-      if (actx.shebang_is_posix_sh) {
+      if (actx.is_posix_sh_shebang) {
         check_posix_arithmetic_operators(actx, expression.view(),
                                          args[i]->source_location());
       }
@@ -936,7 +946,7 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
                                  args[format_index]->source_location());
         }
 
-        if (has_quote_conversion && actx.shebang_is_posix_sh) {
+        if (has_quote_conversion && actx.is_posix_sh_shebang) {
           actx.report_diagnostic(diagnostic_id::sc3050,
                                  args[format_index]->source_location());
         }
@@ -965,7 +975,9 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
 
       let const literal = word.to_literal_string();
       let const view = literal.view();
-      if (view.is_empty() || view[0] == '-') continue;
+      if (view.is_empty() || view[0] == '-') {
+        continue;
+      }
 
       has_seen_command_word = true;
 

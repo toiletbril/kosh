@@ -33,7 +33,6 @@ Diagnostics:
       readability-magic-numbers,
       bugprone-easily-swappable-parameters,
       bugprone-reserved-identifier,
-      bugprone-throwing-static-initialization,
       misc-non-private-member-variables-in-classes,
       readability-use-concise-preprocessor-directives,
       modernize-use-designated-initializers,

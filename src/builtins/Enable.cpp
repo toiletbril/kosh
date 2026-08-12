@@ -38,9 +38,11 @@ fn Enable::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (cxt.restricted_enforcement_active() &&
       (FLAG_LOAD_FILE.is_set() || FLAG_DELETE_FILE.is_enabled()))
+  {
     throw ErrorWithLocation{
         ec.source_location(),
         "Loading or deleting builtins is forbidden in a restricted shell"};
+  }
 
   if (FLAG_ALL.is_enabled()) {
     let out = String{cxt.scratch_allocator()};

@@ -39,7 +39,9 @@ static fn parse_tail_count(StringView spec, count_origin &origin_out,
   }
 
   let const parsed = digits.to<i64>();
-  if (parsed.is_error() || parsed.value() < 0) return false;
+  if (parsed.is_error() || parsed.value() < 0) {
+    return false;
+  }
 
   count_out = parsed.value();
   return true;

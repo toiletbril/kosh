@@ -95,8 +95,8 @@ struct shell_lexical_frame
   shell_lexical_frame_kind kind;
   char parent_quote;
   usize case_depth{0};
-  bool saw_case_keyword{false};
-  bool case_pattern_expected{false};
+  bool has_seen_case_keyword{false};
+  bool is_case_pattern_expected{false};
   bool is_command_position{true};
 };
 

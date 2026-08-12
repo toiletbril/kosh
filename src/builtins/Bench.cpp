@@ -95,20 +95,20 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
   double minimum = accessor(samples[0]);
   double maximum = accessor(samples[0]);
   for (usize i = 0; i < samples.count(); i++) {
-    const double value = accessor(samples[i]);
+    let const value = accessor(samples[i]);
     sum += value;
     if (value < minimum) minimum = value;
     if (value > maximum) maximum = value;
   }
 
-  const double count = static_cast<double>(samples.count());
+  let const count = static_cast<double>(samples.count());
   stats.mean = sum / count;
   stats.min = minimum;
   stats.max = maximum;
 
   double variance_sum = 0;
   for (usize i = 0; i < samples.count(); i++) {
-    const double delta = accessor(samples[i]) - stats.mean;
+    let const delta = accessor(samples[i]) - stats.mean;
     variance_sum += delta * delta;
   }
   stats.std_dev =
@@ -121,7 +121,7 @@ cold fn format_metric(double value, metric_unit unit,
                       Allocator allocator) throws -> String
 {
   double scaled = value;
-  const char *suffix = "";
+  const char *suffix;
 
   switch (unit) {
   case metric_unit::Nanoseconds:
@@ -166,6 +166,7 @@ cold fn format_metric(double value, metric_unit unit,
       suffix = "";
     }
     break;
+  default: unreachable();
   }
 
   char buffer[64];
@@ -252,14 +253,14 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
     return;
   }
 
-  const double ratio = other.mean / first.mean;
+  let const ratio = other.mean / first.mean;
 
   /* The relative uncertainty is the sum in quadrature of the two coefficients
      of variation, scaled onto the ratio, so a noisy pair reports a wider
      band. */
-  const double first_cv = first.std_dev / first.mean;
-  const double other_cv = other.std_dev / other.mean;
-  const double ratio_uncertainty =
+  let const first_cv = first.std_dev / first.mean;
+  let const other_cv = other.std_dev / other.mean;
+  let const ratio_uncertainty =
       ratio * std::sqrt(first_cv * first_cv + other_cv * other_cv);
 
   char buffer[128];
@@ -351,8 +352,8 @@ fn sample_command(StringView shell_binary, StringView command,
   }
 
   let samples = ArrayList<bench_sample>{allocator};
-  const u64 duration_nanos = duration_millis * 1000000ULL;
-  const u64 start_nanos = os::monotonic_nanos();
+  let const duration_nanos = duration_millis * 1000000ULL;
+  let const start_nanos = os::monotonic_nanos();
   u64 last_progress_nanos = 0;
   bool has_perf = true;
   bool is_perf_system_wide = false;
@@ -363,8 +364,10 @@ fn sample_command(StringView shell_binary, StringView command,
       break;
     }
 
-    const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
-    if (run_limit.has_value() && i >= *run_limit) break;
+    let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
+    if (run_limit.has_value() && i >= *run_limit) {
+      break;
+    }
     if (!run_limit.has_value() && i >= MIN_SAMPLES &&
         elapsed_nanos >= duration_nanos)
     {
@@ -552,11 +555,12 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_bench_runs.is_set())
     run_limit = parse_count_flag(FLAG_bench_runs, StringView{"runs"});
 
-  if (run_limit.has_value() && (*run_limit == 0 || *run_limit > MAX_SAMPLES))
+  if (run_limit.has_value() && (*run_limit == 0 || *run_limit > MAX_SAMPLES)) {
     throw ErrorWithLocation{
         FLAG_bench_runs.value_location(),
         "--runs expects a number from 1 through " +
             String::from(MAX_SAMPLES, cxt.scratch_allocator())};
+  }
 
   u64 duration_millis = DEFAULT_DURATION_MILLIS;
   if (FLAG_bench_duration.is_set())
@@ -578,9 +582,10 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (let const detected = os::current_executable_path())
       shell_binary = String{cxt.scratch_allocator(), detected->view()};
   }
-  if (should_use_shell && shell_binary.is_empty())
+  if (should_use_shell && shell_binary.is_empty()) {
     throw Error{
         StringView{"bench cannot find the kosh binary to run a sample"}};
+  }
 
   LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));

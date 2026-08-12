@@ -156,11 +156,11 @@ static fn resolve_timeout_program(StringView program_name,
 }
 
 static fn checked_timeout_program(StringView program_name,
-                                  SourceLocation program_location,
+                                  const SourceLocation &program_location,
                                   EvalContext &cxt) throws -> Maybe<Path>
 {
   let const typed_program_path = Path{program_name};
-  let const program_path = resolve_timeout_program(program_name, cxt);
+  let program_path = resolve_timeout_program(program_name, cxt);
   if (!program_path.has_value()) return None;
 
   if (typed_program_path.has_trailing_separator() &&
@@ -371,7 +371,6 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     if (!has_child_exited &&
         os::poll_process(child, status) == os::process_state::Exited)
     {
-      has_child_exited = true;
       return status;
     }
     signal_supervised_process(child, process_group, has_child_exited, 9);
@@ -402,7 +401,6 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
       if (!has_child_exited &&
           os::poll_process(child, status) == os::process_state::Exited)
       {
-        has_child_exited = true;
         return timeout_expiration_status(status, timeout_signal);
       }
       return 125;

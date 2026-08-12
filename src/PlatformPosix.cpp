@@ -83,7 +83,7 @@ hot fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
 hot fn wait_for_fd_readable(os::descriptor fd, i64 timeout_nanos) wontthrow
     -> i32
 {
-  const bool has_deadline = timeout_nanos > 0;
+  let const has_deadline = timeout_nanos > 0;
   let const start_nanos = monotonic_nanos();
   let const duration_nanos = static_cast<u64>(timeout_nanos);
   const u64 deadline_nanos = !has_deadline
@@ -208,7 +208,7 @@ fn reopen_terminal_as_stdin() wontthrow -> bool
   const int tty_fd = open("/dev/tty", O_RDWR);
   if (tty_fd == -1) return false;
   LOG(Info, "reopening the controlling terminal onto fd 0");
-  const bool was_replaced = dup2(tty_fd, STDIN_FILENO) != -1;
+  let const was_replaced = dup2(tty_fd, STDIN_FILENO) != -1;
   note_descriptor_rebound();
   close(tty_fd);
 
@@ -1053,8 +1053,9 @@ hot fn execute_program(ExecContext &&ec, script_fallback_policy fallback,
       char start_byte = 0;
       let const start_read = os::read_fd(start_pipe->in, &start_byte, 1);
       os::close_fd(start_pipe->in);
-      if (!start_read.has_value() || *start_read == 0)
+      if (!start_read.has_value() || *start_read == 0) {
         os::exit_process_immediately(1);
+      }
 
       try {
         os::replace_process(steal(ec));
@@ -1228,9 +1229,9 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
      the user, or one of the user's own groups. A group-writable Homebrew
      install directory is owned by the user's own group, so it is trusted,
      while a world-writable directory stays untrusted. */
-  const bool owner_is_trusted =
+  let const is_owner_trusted =
       directory_stat.st_uid == 0 || directory_stat.st_uid == geteuid();
-  if (!owner_is_trusted) {
+  if (!is_owner_trusted) {
     LOG(Debug,
         "trust check failed because '%s' is owned by uid %d, not root "
         "or the current user",
@@ -2346,15 +2347,15 @@ fn spawn_measured_child(const ArrayList<String> &argv, measured_output output,
       if (null_fd != -1) {
         dup2(null_fd, STDOUT_FILENO);
         dup2(null_fd, STDERR_FILENO);
-        if (null_fd != STDOUT_FILENO && null_fd != STDERR_FILENO)
+        if (null_fd != STDOUT_FILENO && null_fd != STDERR_FILENO) {
           close(null_fd);
+        }
       }
     }
 
-    const bool is_ready = transfer_barrier_byte(ready_descriptors[1], true);
+    let const is_ready = transfer_barrier_byte(ready_descriptors[1], true);
     close(ready_descriptors[1]);
-    const bool should_start =
-        transfer_barrier_byte(start_descriptors[0], false);
+    let const should_start = transfer_barrier_byte(start_descriptors[0], false);
     close(start_descriptors[0]);
     if (!is_ready || !should_start) _exit(127);
 
@@ -2364,7 +2365,7 @@ fn spawn_measured_child(const ArrayList<String> &argv, measured_output output,
 
   close(ready_descriptors[1]);
   close(start_descriptors[0]);
-  const bool is_ready = transfer_barrier_byte(ready_descriptors[0], false);
+  let const is_ready = transfer_barrier_byte(ready_descriptors[0], false);
   close(ready_descriptors[0]);
   if (!is_ready) {
     close(start_descriptors[1]);
@@ -2432,7 +2433,7 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
   if (!has_perf) perf_session.cancel();
 
   const u64 start_nanos = monotonic_nanos();
-  const bool did_release = transfer_barrier_byte(child.start_descriptor, true);
+  let const did_release = transfer_barrier_byte(child.start_descriptor, true);
   close(child.start_descriptor);
   if (!did_release) {
     kill(child.pid, SIGKILL);

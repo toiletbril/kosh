@@ -93,7 +93,7 @@ fn EvalContext::end_command() wontthrow -> void
   m_commands_evaluated++;
 
   if (AST_ARENA != nullptr) {
-    const usize used = AST_ARENA->bytes_used();
+    let const used = AST_ARENA->bytes_used();
     if (used > m_peak_ast_arena_bytes) m_peak_ast_arena_bytes = used;
   }
 
@@ -467,7 +467,7 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   /* The byte after the name must end it so $FOO does not match $FOOBAR. */
   usize i = scan_start;
   while (i < source.length) {
-    const char byte = source[i];
+    let const byte = source[i];
     if (byte == '\n' && (i == 0 || source[i - 1] != '\\')) {
       break;
     }
@@ -476,7 +476,7 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
       continue;
     }
     usize name_start = i + 1;
-    const bool is_braced = source[name_start] == '{';
+    let const is_braced = source[name_start] == '{';
     if (is_braced) name_start++;
     if (name_start + name.length <= source.length &&
         source.substring_of_length(name_start, name.length) == name &&
@@ -499,7 +499,7 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
      first name-delimited spelling. */
   usize k = scan_start;
   while (k + name.length <= source.length) {
-    const char byte = source[k];
+    let const byte = source[k];
     if (byte == '\n' && (k == 0 || source[k - 1] != '\\')) {
       break;
     }
@@ -776,9 +776,13 @@ constexpr pure fn is_dynamic_first_byte(char c) wontthrow -> bool
 pure fn EvalContext::variable_requires_dynamic_lookup(
     StringView name) const wontthrow -> bool
 {
-  if (name.is_empty() || !is_dynamic_first_byte(name[0])) return false;
+  if (name.is_empty() || !is_dynamic_first_byte(name[0])) {
+    return false;
+  }
   if (ALWAYS_DYNAMIC.find(name).has_value()) return true;
-  if (name[0] == 'K' && name.starts_with("KOSH_ANSI_")) return true;
+  if (name[0] == 'K' && name.starts_with("KOSH_ANSI_")) {
+    return true;
+  }
 
   return bash_dynamic_variables_enabled() &&
          BASH_DYNAMIC.find(name).has_value();
@@ -787,7 +791,7 @@ pure fn EvalContext::variable_requires_dynamic_lookup(
 hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
-  const char first_byte = name.is_empty() ? '\0' : name[0];
+  let const first_byte = name.is_empty() ? '\0' : name[0];
 
   if (name.count() == 1) {
     switch (first_byte) {
@@ -942,7 +946,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(static_cast<i64>(std::time(nullptr)),
                               heap_allocator());
         case dynamic_var::EPOCHREALTIME: {
-          const u64 microseconds = os::realtime_microseconds();
+          let const microseconds = os::realtime_microseconds();
           char fraction[8];
           std::snprintf(
               fraction, sizeof(fraction), "%06llu",
@@ -1457,7 +1461,9 @@ fn EvalContext::print_source_backtrace(
 
   for (usize i = m_source_frames.count(); i > 0; i--) {
     let &frame = m_source_frames[i - 1];
-    if (!do_frame_render(frame) || frame.was_printed) continue;
+    if (!do_frame_render(frame) || frame.was_printed) {
+      continue;
+    }
 
     let is_repeated_frame = false;
     for (usize other_index = m_source_frames.count(); other_index > i;
@@ -1968,14 +1974,14 @@ fn EvalContext::set_last_exit_status(i32 status) wontthrow -> void
   m_last_exit_status = status;
 }
 
-fn EvalContext::set_last_command_duration_ns(u64 nanos) wontthrow -> void
+fn EvalContext::set_last_command_duration_nanos(u64 nanos) wontthrow -> void
 {
-  m_last_command_duration_ns = nanos;
+  m_last_command_duration_nanos = nanos;
 }
 
-pure fn EvalContext::last_command_duration_ns() const wontthrow -> u64
+pure fn EvalContext::last_command_duration_nanos() const wontthrow -> u64
 {
-  return m_last_command_duration_ns;
+  return m_last_command_duration_nanos;
 }
 
 pure fn EvalContext::last_exit_status() const wontthrow -> i32
@@ -1993,7 +1999,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
       (body[body.length - 2] == '@' || body[body.length - 2] == '*') &&
       body[body.length - 3] == '[' && lexer::is_variable_name_start(body[0]))
   {
-    const StringView array_name = body.substring_of_length(0, body.length - 3);
+    let const array_name = body.substring_of_length(0, body.length - 3);
     let const subscripts = collect_array_subscripts(array_name);
     let out = String{scratch_allocator()};
     for (usize i = 0; i < subscripts.count(); i++) {
@@ -2003,12 +2009,12 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
     return out;
   }
 
-  const char last = body[body.length - 1];
+  let const last = body[body.length - 1];
   if (last == '*' || last == '@') {
     /* The quoted "${!prefix@}" per-name field form is produced in the
        field-expansion path, this string return cannot carry field boundaries.
      */
-    const StringView prefix = body.substring_of_length(0, body.length - 1);
+    let const prefix = body.substring_of_length(0, body.length - 1);
     let const names = matching_prefix_names(prefix);
     let out = String{scratch_allocator()};
     for (usize i = 0; i < names.count(); i++) {
@@ -2018,7 +2024,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
     return out;
   }
 
-  const Maybe<String> target = get_variable_value(body);
+  let const target = get_variable_value(body);
   if (!target.has_value()) {
     if (error_unset())
       throw_script_fatal("Unable to expand '" + body +
@@ -2224,7 +2230,7 @@ pure fn ExecContext::builtin_kind() const wontthrow -> const Builtin::Kind &
 fn ExecContext::print_to_stdout(StringView s) const throws -> void
 {
   if (!os::write_all(out_fd.value_or(KOSH_STDOUT), s.data, s.length)) {
-    const i32 saved_errno = errno;
+    let const saved_errno = errno;
     if (saved_errno == EPIPE) throw BrokenPipeExit{};
     throw Error{"Unable to write to stdout: " +
                 os::last_system_error_message()};
@@ -2234,7 +2240,7 @@ fn ExecContext::print_to_stdout(StringView s) const throws -> void
 fn ExecContext::print_to_stderr(StringView s) const throws -> void
 {
   if (!os::write_all(err_fd.value_or(KOSH_STDERR), s.data, s.length)) {
-    const i32 saved_errno = errno;
+    let const saved_errno = errno;
     if (saved_errno == EPIPE) throw BrokenPipeExit{};
     throw Error{"Unable to write to stderr: " +
                 os::last_system_error_message()};

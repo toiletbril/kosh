@@ -71,7 +71,9 @@ static fn read_frecency_store(Allocator allocator) throws
   let const text = content->view();
   usize line_start = 0;
   for (usize i = 0; i <= text.length; i++) {
-    if (i != text.length && text[i] != '\n') continue;
+    if (i != text.length && text[i] != '\n') {
+      continue;
+    }
     let const line = text.substring_of_length(line_start, i - line_start);
     line_start = i + 1;
     if (line.is_empty()) continue;
@@ -88,7 +90,9 @@ static fn read_frecency_store(Allocator allocator) throws
     let const time_field = after_path.substring(*second_tab + 1);
     let const rank = rank_field.to<i64>();
     let const last = time_field.to<i64>();
-    if (rank.is_error() || last.is_error()) continue;
+    if (rank.is_error() || last.is_error()) {
+      continue;
+    }
     entries.push(frecency_entry{
         String{allocator, path_field},
         rank.value(), last.value()
@@ -123,7 +127,9 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries,
   while (total_written < out.count()) {
     let const written = os::write_fd(*fd, out.c_str() + total_written,
                                      out.count() - total_written);
-    if (!written || *written == 0) break;
+    if (!written || *written == 0) {
+      break;
+    }
     total_written += *written;
   }
   os::close_fd(*fd);
@@ -194,8 +200,9 @@ pure fn Z::kind() const wontthrow -> Builtin::Kind { return Kind::Z; }
 
 fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+  if (ec.args().count() > 1 && ec.args()[1] == "--help") {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   let query = String{cxt.scratch_allocator()};
   for (usize i = 1; i < ec.args().count(); i++) {
@@ -213,7 +220,9 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (let const &entry : entries) {
     if (!query.is_empty() &&
         !contains_ignore_case(entry.path.view(), query.view()))
+    {
       continue;
+    }
     if (!Path{entry.path.view()}.to_absolute().normalized().is_directory())
       continue;
     let const score = static_cast<double>(entry.rank) *

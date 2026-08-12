@@ -40,9 +40,8 @@ fn Unset::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     } else if (let const bracket = name.view().find_character('[');
                bracket.has_value() && name.view()[name.count() - 1] == ']')
     {
-      const StringView array_name =
-          name.view().substring_of_length(0, *bracket);
-      const StringView subscript = name.view().substring_of_length(
+      let const array_name = name.view().substring_of_length(0, *bracket);
+      let const subscript = name.view().substring_of_length(
           *bracket + 1, name.count() - *bracket - 2);
       try {
         cxt.unset_array_element(array_name, subscript);

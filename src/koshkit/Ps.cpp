@@ -37,8 +37,8 @@ static fn owner_name_for_uid(u32 uid, ArrayList<uid_name_cache_entry> &cache,
     if (entry.uid == uid) return entry.name.clone();
 
   let const looked_up = os::uid_to_username(uid);
-  String name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                      : String::from(uid, allocator);
+  let name = looked_up.has_value() ? String{allocator, looked_up->view()}
+                                   : String::from(uid, allocator);
   cache.push(uid_name_cache_entry{uid, name.clone()});
   return name;
 }
@@ -75,7 +75,7 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   usize rss_width = 3;
 
   for (const os::process_entry &process : processes) {
-    String owner = owner_name_for_uid(process.owner_id, uid_cache, allocator);
+    let owner = owner_name_for_uid(process.owner_id, uid_cache, allocator);
     if (owner.count() > user_width) user_width = owner.count();
     let const pid_text = String::from(process.pid, allocator);
     if (pid_text.count() > pid_width) pid_width = pid_text.count();

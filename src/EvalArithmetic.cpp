@@ -73,7 +73,9 @@ pure fn detect_radix_prefix(StringView body) wontthrow -> radix_prefix
     return {16, 2};
   if (body.length >= 2 && body[0] == '0' && (body[1] == 'b' || body[1] == 'B'))
     return {2, 2};
-  if (body.length >= 1 && body[0] == '0') return {8, 0};
+  if (body.length >= 1 && body[0] == '0') {
+    return {8, 0};
+  }
   return {10, 0};
 }
 
@@ -106,7 +108,9 @@ pure alwaysinline fn try_parse_single_integer_literal(StringView text) wontthrow
   i += detected.prefix_length;
   let const digits = text.substring(i);
   let const digit_count = count_leading_digits(digits, detected.radix);
-  if (digit_count == 0 || i + digit_count != text.length) return None;
+  if (digit_count == 0 || i + digit_count != text.length) {
+    return None;
+  }
 
   let const magnitude = fold_leading_digits(digits, detected.radix);
   return static_cast<i64>(is_negative ? -magnitude : magnitude);
@@ -148,13 +152,17 @@ pure fn arithmetic_power(i64 base, i64 exponent) wontthrow -> i64
    x86, so the two's-complement wrap of INT64_MIN and 0 is returned directly. */
 pure fn arithmetic_divide(i64 lhs, i64 rhs) wontthrow -> i64
 {
-  if (lhs == INT64_MIN && rhs == -1) return INT64_MIN;
+  if (lhs == INT64_MIN && rhs == -1) {
+    return INT64_MIN;
+  }
   return lhs / rhs;
 }
 
 pure fn arithmetic_modulo(i64 lhs, i64 rhs) wontthrow -> i64
 {
-  if (lhs == INT64_MIN && rhs == -1) return 0;
+  if (lhs == INT64_MIN && rhs == -1) {
+    return 0;
+  }
   return lhs % rhs;
 }
 
@@ -346,7 +354,9 @@ public:
    */
   fn read_optional_subscript() throws -> Maybe<StringView>
   {
-    if (pos >= source.length || source[pos] != '[') return None;
+    if (pos >= source.length || source[pos] != '[') {
+      return None;
+    }
     pos++;
     let const inner_start = pos;
     usize depth = 1;
@@ -740,9 +750,15 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
                              "Use `base#digits` with a base from 2 to 64"};
     }
     let const do_digit_value = [base](char c) -> i64 {
-      if (c >= '0' && c <= '9') return c - '0';
-      if (c >= 'a' && c <= 'z') return c - 'a' + 10;
-      if (c >= 'A' && c <= 'Z') return base <= 36 ? c - 'A' + 10 : c - 'A' + 36;
+      if (c >= '0' && c <= '9') {
+        return c - '0';
+      }
+      if (c >= 'a' && c <= 'z') {
+        return c - 'a' + 10;
+      }
+      if (c >= 'A' && c <= 'Z') {
+        return base <= 36 ? c - 'A' + 10 : c - 'A' + 36;
+      }
       if (c == '@') return 62;
       if (c == '_') return 63;
       return -1;
@@ -1214,14 +1230,18 @@ static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
 static pure fn wide_divide(wide_int lhs, wide_int rhs) wontthrow -> wide_int
 {
   constexpr wide_int WIDE_MINIMUM = static_cast<wide_int>(wide_uint{1} << 127u);
-  if (lhs == WIDE_MINIMUM && rhs == -1) return WIDE_MINIMUM;
+  if (lhs == WIDE_MINIMUM && rhs == -1) {
+    return WIDE_MINIMUM;
+  }
   return lhs / rhs;
 }
 
 static pure fn wide_modulo(wide_int lhs, wide_int rhs) wontthrow -> wide_int
 {
   constexpr wide_int WIDE_MINIMUM = static_cast<wide_int>(wide_uint{1} << 127u);
-  if (lhs == WIDE_MINIMUM && rhs == -1) return 0;
+  if (lhs == WIDE_MINIMUM && rhs == -1) {
+    return 0;
+  }
   return lhs % rhs;
 }
 

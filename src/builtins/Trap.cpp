@@ -63,10 +63,13 @@ fn is_valid_trap_condition(StringView condition) throws -> bool
   return os::signal_number_from_name(condition).has_value();
 }
 
-fn format_listed_condition(StringView condition, bool with_sig_prefix,
+fn format_listed_condition(StringView condition,
+                           bool should_include_signal_prefix,
                            Allocator allocator) throws -> String
 {
-  if (with_sig_prefix && os::signal_number_from_name(condition).has_value()) {
+  if (should_include_signal_prefix &&
+      os::signal_number_from_name(condition).has_value())
+  {
     let prefixed = String{allocator, "SIG"};
     prefixed += condition;
     return prefixed;
@@ -81,7 +84,9 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") {
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   if (!cxt.is_posix_mode() && args.count() == 2 &&
       (args[1] == "-l" || args[1] == "--list"))
@@ -93,7 +98,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const is_print_form =
       !cxt.is_posix_mode() && args.count() >= 2 && args[1] == "-p";
   if (args.count() == 1 || is_print_form) {
-    let const with_sig_prefix = cxt.is_bash_compatible();
+    let const should_include_signal_prefix = cxt.is_bash_compatible();
     let const has_filter = is_print_form && args.count() > 2;
 
     let out = String{cxt.scratch_allocator()};
@@ -113,7 +118,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       out += "trap -- '";
       out += action;
       out += "' ";
-      out += format_listed_condition(condition, with_sig_prefix,
+      out += format_listed_condition(condition, should_include_signal_prefix,
                                      cxt.scratch_allocator());
       out += '\n';
     });

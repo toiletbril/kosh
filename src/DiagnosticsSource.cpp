@@ -120,7 +120,9 @@ pure fn source_holds_scanned_byte(StringView source) wontthrow -> bool
 
   for (; at < source.length; at++) {
     let const byte = static_cast<u8>(source[at]);
-    if (byte >= 0x80 || byte == '\r' || byte == '\\') return true;
+    if (byte >= 0x80 || byte == '\r' || byte == '\\') {
+      return true;
+    }
   }
 
   return false;
@@ -301,7 +303,9 @@ pure fn byte_ends_here_document_delimiter(char byte) wontthrow -> bool
 pure fn skip_here_document(StringView source, usize at) wontthrow -> usize
 {
   usize cursor = at + 2;
-  if (cursor < source.length && source[cursor] == '-') cursor++;
+  if (cursor < source.length && source[cursor] == '-') {
+    cursor++;
+  }
 
   while (cursor < source.length &&
          (source[cursor] == ' ' || source[cursor] == '\t'))
@@ -797,7 +801,7 @@ fn check_shebang(AnalysisContext &actx, StringView source,
   }
 
   if (shell_name == StringView{"dash"} || shell_name == StringView{"sh"})
-    actx.shebang_is_posix_sh = true;
+    actx.is_posix_sh_shebang = true;
 }
 
 namespace {
@@ -1106,7 +1110,9 @@ pure fn names_resemble_each_other(StringView left, StringView right) wontthrow
     while (at_right < right.length && right[at_right] == '_')
       at_right++;
 
-    if (at_left == left.length || at_right == right.length) break;
+    if (at_left == left.length || at_right == right.length) {
+      break;
+    }
     if (fold_name_byte(left[at_left]) != fold_name_byte(right[at_right]))
       return false;
 
@@ -1228,7 +1234,9 @@ fn check_function_argument_use(AnalysisContext &actx, usize index) throws
 
   /* A definition no call reaches may belong to a sourced library, where the
      caller lives outside this file. */
-  if (has_call_with_arguments || !has_call_without_arguments) return;
+  if (has_call_with_arguments || !has_call_without_arguments) {
+    return;
+  }
 
   actx.report_diagnostic(diagnostic_id::sc2120, definition.location,
                          {definition.name});
@@ -1269,7 +1277,7 @@ fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
       actx.should_report(diagnostic_id::sc2120))
   {
     for (usize index = 0; index < actx.function_definitions.count(); index++) {
-      if (!actx.function_definitions[index].does_read_positionals) continue;
+      if (!actx.function_definitions[index].has_positional_reads) continue;
       if (definition_is_redefinition(actx.function_definitions, index))
         continue;
 

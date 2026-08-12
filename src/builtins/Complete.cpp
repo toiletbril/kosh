@@ -104,7 +104,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         /* Each embedded quote is written as the '\'' escape so a list carrying
            an apostrophe replays as valid shell. */
         line += "-W '";
-        const StringView list = spec.word_list.view();
+        let const list = spec.word_list.view();
         for (usize i = 0; i < list.length; i++) {
           if (list[i] == '\'')
             line += "'\\''";

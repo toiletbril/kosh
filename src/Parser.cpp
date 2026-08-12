@@ -63,10 +63,14 @@ fn Parser::record_analysis_scope_definition(StringView name,
 fn Parser::record_analysis_alias_definitions(
     const ArrayList<const Token *> &args) throws -> void
 {
-  if (!m_should_collect_analysis_scopes || args.is_empty()) return;
+  if (!m_should_collect_analysis_scopes || args.is_empty()) {
+    return;
+  }
 
   let const command_view = args[0]->raw_view();
-  if (!command_view.has_value() || *command_view != "alias") return;
+  if (!command_view.has_value() || *command_view != "alias") {
+    return;
+  }
 
   for (usize i = 1; i < args.count(); i++) {
     let const text = args[i]->raw_string();
@@ -143,7 +147,7 @@ cold pure static fn find_standalone_keyword(StringView source,
                                             StringView keyword) wontthrow
     -> Maybe<SourceLocation>
 {
-  let do_is_boundary = [](char c) {
+  let const do_is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
            c == '&' || c == '|';
   };
@@ -154,9 +158,9 @@ cold pure static fn find_standalone_keyword(StringView source,
 
   for (usize pos = 0; pos + keyword.length <= source.length; pos++) {
     if (source.substring_of_length(pos, keyword.length) != keyword) continue;
-    const let end_position = pos + keyword.length;
-    const let left_ok = pos == 0 || do_is_boundary(source[pos - 1]);
-    const let right_ok =
+    let const end_position = pos + keyword.length;
+    let const left_ok = pos == 0 || do_is_boundary(source[pos - 1]);
+    let const right_ok =
         end_position == source.length || do_is_boundary(source[end_position]);
     if (left_ok && right_ok) {
       return SourceLocation{pos, keyword.length};
@@ -193,12 +197,12 @@ cold static fn unexpected_command_token_message(const Token *token) throws
   case Token::Kind::Else:
   case Token::Kind::Elif:
   case Token::Kind::Fi: {
-    const let ast = token->to_ast_string();
+    let const ast = token->to_ast_string();
     return "'" + ast.view() + "' has no matching 'if'";
   }
   case Token::Kind::Do:
   case Token::Kind::Done: {
-    const let ast = token->to_ast_string();
+    let const ast = token->to_ast_string();
     return "'" + ast.view() + "' has no matching 'while', 'until', or 'for'";
   }
   case Token::Kind::Esac: return "'esac' has no matching 'case'";
@@ -208,7 +212,7 @@ cold static fn unexpected_command_token_message(const Token *token) throws
   case Token::Kind::RightBracket: return "'}' has no matching '{'";
   case Token::Kind::Pipe: return "'|' has no command before it to pipe from";
   default: {
-    const let ast = token->to_ast_string();
+    let const ast = token->to_ast_string();
     return "Expected a command, found '" + ast.view() + "'";
   }
   }
@@ -287,8 +291,8 @@ cold fn Parser::recover_to_next_statement() throws -> void
 
     if (token->kind() == Token::Kind::EndOfFile) return;
 
-    const bool is_boundary = token->kind() == Token::Kind::Newline ||
-                             token->kind() == Token::Kind::Semicolon;
+    let const is_boundary = token->kind() == Token::Kind::Newline ||
+                            token->kind() == Token::Kind::Semicolon;
 
     if (is_boundary && has_consumed_token) {
       m_lexer.advance_past_last_peek();
@@ -382,14 +386,14 @@ hot fn Parser::parse_command_list(
   SourceLocation time_location{};
   Maybe<usize> active_shellcheck_suppression{};
 
-  let do_finish_shellcheck_suppression = [&](usize end_position) {
+  let const do_finish_shellcheck_suppression = [&](usize end_position) {
     if (!active_shellcheck_suppression.has_value()) return;
     m_shellcheck_suppressions[*active_shellcheck_suppression].end_position =
         end_position;
     active_shellcheck_suppression = None;
   };
 
-  let do_finish_pending = [&](Command *pending, const Token *at) throws {
+  let const do_finish_pending = [&](Command *pending, const Token *at) throws {
     if (should_negate_pending) {
       pending->set_negated();
       should_negate_pending = false;
@@ -495,7 +499,7 @@ hot fn Parser::parse_command_list(
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (lhs == nullptr) {
-        const let ast = token->to_ast_string();
+        let const ast = token->to_ast_string();
         String msg = "Expected a command ";
         msg += compound_list->is_empty() ? "before" : "after";
         msg += " operator, found '";
@@ -593,9 +597,9 @@ hot fn Parser::parse_command_list(
         const bool has_another_pipe =
             last_pipe_token->kind() == Token::Kind::Pipe ||
             last_pipe_token->kind() == Token::Kind::PipeAmpersand;
-        const bool does_this_pipe_stderr =
+        const bool should_pipe_standard_error =
             last_pipe_token->kind() == Token::Kind::PipeAmpersand;
-        pipeline->append_command(has_another_pipe && does_this_pipe_stderr
+        pipeline->append_command(has_another_pipe && should_pipe_standard_error
                                      ? wrap_with_stderr_to_stdout(rhs)
                                      : rhs);
         if (has_another_pipe) {
@@ -678,7 +682,7 @@ fn Parser::build_file_or_dup_redirection(
       /* A wholly-digit word names the descriptor at parse time, anything else
          such as $4 or ${fd} resolves when the redirection runs. */
       if (literal.view().is_all_decimal_digits()) {
-        const let parsed_descriptor = literal.to<i64>();
+        let const parsed_descriptor = literal.to<i64>();
         if (parsed_descriptor.is_error()) {
           throw ErrorWithLocation{from->source_location(),
                                   parsed_descriptor.error().message()};
@@ -704,8 +708,8 @@ fn Parser::build_file_or_dup_redirection(
     ASSERT(after != nullptr);
     /* The second character must touch the operator, so a real pipe in cmd >file
        | next stays separate from >| and <>. */
-    const bool is_adjacent = after->source_location().position ==
-                             op_location.position + op_location.length;
+    let const is_adjacent = after->source_location().position ==
+                            op_location.position + op_location.length;
 
     /* >| truncates the target even under noclobber, the explicit override. */
     if (op_kind == Token::Kind::Greater && after->kind() == Token::Kind::Pipe &&
@@ -830,12 +834,12 @@ fn Parser::build_heredoc_redirection(
   const Word &delimiter_word =
       static_cast<tokens::WordToken *>(delimiter_token)->word();
 
-  const let delimiter_literal = delimiter_word.to_literal_string();
+  let const delimiter_literal = delimiter_word.to_literal_string();
   let delimiter = delimiter_literal.view();
   bool should_strip_tabs = false;
   /* <<- strips leading tabs. The dash counts only when unquoted, so <<'-EOF'
      keeps the dash in the delimiter and terminates on -EOF. */
-  const let has_unquoted_leading_dash =
+  let const has_unquoted_leading_dash =
       !delimiter_word.segments.is_empty() &&
       delimiter_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
       !delimiter_word.segments[0].text.is_empty() &&
@@ -879,13 +883,13 @@ mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
   m_lexer.advance_past_last_peek();
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
-  const let nk = next->kind();
+  let const nk = next->kind();
   if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
        nk == Token::Kind::Less || nk == Token::Kind::DoubleLess) &&
       next->source_location().position ==
           word_location.position + word_location.length)
   {
-    const let op_location = next->source_location();
+    let const op_location = next->source_location();
     m_lexer.advance_past_last_peek();
 
     let const allocation_name = word_token->word().fd_allocation_name();
@@ -899,13 +903,13 @@ mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
       return true;
     }
 
-    const let literal = word_token->word().to_literal_string();
-    const let parsed_descriptor = literal.to<i64>();
+    let const literal = word_token->word().to_literal_string();
+    let const parsed_descriptor = literal.to<i64>();
     if (parsed_descriptor.is_error()) {
       throw ErrorWithLocation{word_location,
                               parsed_descriptor.error().message()};
     }
-    const let fd = static_cast<i32>(parsed_descriptor.value());
+    let const fd = static_cast<i32>(parsed_descriptor.value());
     if (nk == Token::Kind::DoubleLess) {
       build_heredoc_redirection(fd, op_location, first_location, out);
     } else {
@@ -931,8 +935,8 @@ mustuse fn Parser::try_parse_trailing_redirection(
   case Token::Kind::Greater:
   case Token::Kind::DoubleGreater:
   case Token::Kind::Less: {
-    const let op_kind = token->kind();
-    const let op_location = token->source_location();
+    let const op_kind = token->kind();
+    let const op_location = token->source_location();
     m_lexer.advance_past_last_peek();
     build_file_or_dup_redirection((op_kind == Token::Kind::Less) ? 0 : 1,
                                   op_kind, op_location, ignored_first_location,
@@ -942,8 +946,8 @@ mustuse fn Parser::try_parse_trailing_redirection(
 
   case Token::Kind::AmpersandGreater:
   case Token::Kind::AmpersandDoubleGreater: {
-    const let op_kind = token->kind();
-    const let op_location = token->source_location();
+    let const op_kind = token->kind();
+    let const op_location = token->source_location();
     m_lexer.advance_past_last_peek();
     build_both_streams_redirection(op_kind ==
                                        Token::Kind::AmpersandDoubleGreater,
@@ -952,14 +956,14 @@ mustuse fn Parser::try_parse_trailing_redirection(
   }
 
   case Token::Kind::DoubleLess: {
-    const let op_location = token->source_location();
+    let const op_location = token->source_location();
     m_lexer.advance_past_last_peek();
     build_heredoc_redirection(0, op_location, ignored_first_location, out);
     return true;
   }
 
   case Token::Kind::TripleLess: {
-    const let op_location = token->source_location();
+    let const op_location = token->source_location();
     m_lexer.advance_past_last_peek();
     build_here_string_redirection(op_location, ignored_first_location, out);
     return true;
@@ -974,7 +978,7 @@ mustuse fn Parser::try_parse_trailing_redirection(
       return false;
     }
 
-    const let word_location = token->source_location();
+    let const word_location = token->source_location();
     if (try_parse_descriptor_prefixed_redirection(word_token, word_location,
                                                   ignored_first_location, out))
     {
@@ -1027,7 +1031,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
 
-  let do_build_command = [&]() -> Command * {
+  let const do_build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
 
     record_analysis_alias_definitions(args_accumulator);
@@ -1040,9 +1044,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
     return c;
   };
 
-  let do_add_redirection = [&](i32 fd, Token::Kind op_kind,
-                               SourceLocation op_location,
-                               bool fd_was_explicit) {
+  let const do_add_redirection = [&](i32 fd, Token::Kind op_kind,
+                                     SourceLocation op_location,
+                                     bool fd_was_explicit) {
     build_file_or_dup_redirection(fd, op_kind, op_location, source_location,
                                   redirections, fd_was_explicit);
   };
@@ -1130,7 +1134,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
         if (word_token->word().is_all_ascii_digits() ||
             word_token->word().fd_allocation_name().has_value())
         {
-          const let word_location = token->source_location();
+          let const word_location = token->source_location();
           if (try_parse_descriptor_prefixed_redirection(
                   word_token, word_location, source_location, redirections))
           {
@@ -1226,8 +1230,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
     case Token::Kind::Greater:
     case Token::Kind::DoubleGreater:
     case Token::Kind::Less: {
-      const let op_kind = token->kind();
-      const let op_location = token->source_location();
+      let const op_kind = token->kind();
+      let const op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       do_add_redirection((op_kind == Token::Kind::Less) ? 0 : 1, op_kind,
                          op_location, /*fd_was_explicit=*/false);
@@ -1235,8 +1239,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
 
     case Token::Kind::AmpersandGreater:
     case Token::Kind::AmpersandDoubleGreater: {
-      const let op_kind = token->kind();
-      const let op_location = token->source_location();
+      let const op_kind = token->kind();
+      let const op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       build_both_streams_redirection(
           op_kind == Token::Kind::AmpersandDoubleGreater, op_location,
@@ -1244,13 +1248,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
     } break;
 
     case Token::Kind::DoubleLess: {
-      const let op_location = token->source_location();
+      let const op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       build_heredoc_redirection(0, op_location, source_location, redirections);
     } break;
 
     case Token::Kind::TripleLess: {
-      const let op_location = token->source_location();
+      let const op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       build_here_string_redirection(op_location, source_location, redirections);
     } break;
@@ -1267,7 +1271,7 @@ hot fn Parser::parse_if() throws -> Command *
   Token *if_token = m_lexer.next_shell_token();
   ASSERT(if_token != nullptr);
   ASSERT(if_token->kind() == Token::Kind::If);
-  const let location = if_token->source_location();
+  let const location = if_token->source_location();
 
   LOG(Debug, "parsing an if clause at byte %zu", location.position);
 
@@ -1280,7 +1284,7 @@ hot fn Parser::parse_if() throws -> Command *
     Token *then_token = m_lexer.next_shell_token();
     ASSERT(then_token != nullptr);
     if (then_token->kind() != Token::Kind::Then) {
-      const let detail = condition->is_dummy()
+      let const detail = condition->is_dummy()
                              ? "Expected a command for the condition"
                              : "Expected 'then' after the condition";
       throw ErrorWithLocationAndDetails{location, "Unterminated if",
@@ -1319,7 +1323,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
   ASSERT(keyword != nullptr);
-  const let location = keyword->source_location();
+  let const location = keyword->source_location();
 
   LOG(Debug, "parsing a %s loop at byte %zu", is_until ? "until" : "while",
       location.position);
@@ -1328,7 +1332,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
-    const let detail = condition->is_dummy()
+    let const detail = condition->is_dummy()
                            ? "Expected a command for the loop condition"
                            : "Expected 'do'";
     throw ErrorWithLocationAndDetails{location, "Unterminated loop",
@@ -1346,7 +1350,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
 
   let loop_node =
       m_lexer.arena().create<WhileLoop>(location, condition, body, is_until);
-  const SourceLocation done_location = done_token->source_location();
+  let const done_location = done_token->source_location();
   loop_node->set_source_end_position(done_location.position +
                                      done_location.length);
   return loop_node;
@@ -1425,7 +1429,7 @@ fn Parser::parse_optional_in_clause_words(
     }
     if (word->kind() != Token::Kind::Word) {
       /* A non-keyword separator or operator ends the list. */
-      const String raw = word->raw_string();
+      let const raw = word->raw_string();
       if (!KEYWORDS.find(raw.view()).has_value()) break;
       m_lexer.advance_past_last_peek();
       words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
@@ -1442,7 +1446,7 @@ hot fn Parser::parse_for() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
   ASSERT(keyword != nullptr);
-  const let location = keyword->source_location();
+  let const location = keyword->source_location();
 
   LOG(Debug, "parsing a for loop at byte %zu", location.position);
 
@@ -1469,7 +1473,7 @@ hot fn Parser::parse_for() throws -> Command *
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
   if (name_token->kind() != Token::Kind::Word) {
-    const String raw = name_token->raw_string();
+    let const raw = name_token->raw_string();
     if (KEYWORDS.find(raw.view()).has_value())
       name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
                                        name_token->source_location());
@@ -1508,10 +1512,10 @@ hot fn Parser::parse_for() throws -> Command *
                                       "Drop the '$' and any quotes"};
   }
 
-  const let variable_name = name_token->raw_string();
+  let const variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{heap_allocator()};
-  const bool has_in_clause = parse_optional_in_clause_words(words);
+  let const has_in_clause = parse_optional_in_clause_words(words);
 
   skip_semicolons_and_newlines();
 
@@ -1539,7 +1543,7 @@ hot fn Parser::parse_for() throws -> Command *
   let loop_node = m_lexer.arena().create<ForLoop>(
       location, name_token->source_location(), variable_name.view(),
       steal(words), has_in_clause, body);
-  const SourceLocation done_location = done_token->source_location();
+  let const done_location = done_token->source_location();
   loop_node->set_source_end_position(done_location.position +
                                      done_location.length);
   return loop_node;
@@ -1552,14 +1556,14 @@ hot fn Parser::parse_select() throws -> Command *
   Token *keyword = m_lexer.next_shell_token();
   ASSERT(keyword != nullptr);
   ASSERT(is_unquoted_word(keyword, "select"));
-  const let location = keyword->source_location();
+  let const location = keyword->source_location();
 
   LOG(Debug, "parsing a select loop at byte %zu", location.position);
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
   if (name_token->kind() != Token::Kind::Word) {
-    const String raw = name_token->raw_string();
+    let const raw = name_token->raw_string();
     if (KEYWORDS.find(raw.view()).has_value())
       name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
                                        name_token->source_location());
@@ -1568,10 +1572,10 @@ hot fn Parser::parse_select() throws -> Command *
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'select'"};
   }
-  const let variable_name = name_token->raw_string();
+  let const variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{heap_allocator()};
-  const bool has_in_clause = parse_optional_in_clause_words(words);
+  let const has_in_clause = parse_optional_in_clause_words(words);
 
   skip_semicolons_and_newlines();
 
@@ -1626,7 +1630,7 @@ hot fn Parser::parse_case() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
   ASSERT(keyword != nullptr);
-  const let location = keyword->source_location();
+  let const location = keyword->source_location();
 
   LOG(Debug, "parsing a case clause at byte %zu", location.position);
 
@@ -1766,7 +1770,7 @@ hot fn Parser::parse_brace_group() throws -> Command *
 
   BraceGroup *group =
       m_lexer.arena().create<BraceGroup>(open->source_location(), body);
-  const SourceLocation close_location = close->source_location();
+  let const close_location = close->source_location();
   group->set_source_end_position(close_location.position +
                                  close_location.length);
   return group;
@@ -1817,7 +1821,7 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   let subshell =
       m_lexer.arena().create<Subshell>(open->source_location(), body);
   subshell->set_analysis_scope_definitions(close_analysis_scope(scope_mark));
-  const SourceLocation close_location = close->source_location();
+  let const close_location = close->source_location();
   subshell->set_source_end_position(close_location.position +
                                     close_location.length);
   return subshell;
@@ -1833,7 +1837,7 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
   ASSERT(second != nullptr);
   ASSERT(second->kind() == Token::Kind::LeftParen);
 
-  const usize body_start_position = second->source_location().position + 1;
+  let const body_start_position = second->source_location().position + 1;
   usize body_end_position = body_start_position;
   usize depth = 0;
   loop
@@ -1879,10 +1883,10 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
   LOG(Debug, "parsing an arithmetic command at byte %zu",
       open->source_location().position);
 
-  const StringView body = capture_double_paren_body(open);
+  let const body = capture_double_paren_body(open);
   /* The location spans the whole (( body )) so a runtime error underlines the
      entire expression. */
-  const SourceLocation open_location = open->source_location();
+  let const open_location = open->source_location();
   const SourceLocation full_location{open_location.position, body.length + 4,
                                      open_location.filename};
   return m_lexer.arena().create<expressions::ArithmeticCommand>(
@@ -1896,7 +1900,7 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
 {
   LOG(Debug, "parsing a c-style for header at byte %zu", location.position);
 
-  const StringView header = capture_double_paren_body(open);
+  let const header = capture_double_paren_body(open);
 
   /* The clause separators are the semicolons at paren depth zero, so a grouped
      subexpression in a clause is skipped. */
@@ -1904,7 +1908,7 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
   usize separator_count = 0;
   usize depth = 0;
   for (usize i = 0; i < header.length; i++) {
-    const char c = header[i];
+    let const c = header[i];
     if (c == '(') {
       depth++;
     } else if (c == ')') {
@@ -2118,8 +2122,8 @@ hot fn Parser::parse_function_definition(const Token *name_token) throws
     -> Command *
 {
   ASSERT(name_token != nullptr);
-  const let location = name_token->source_location();
-  const let name = name_token->raw_string();
+  let const location = name_token->source_location();
+  let const name = name_token->raw_string();
 
   LOG(Debug, "parsing a function definition for '%s'", name.c_str());
 
@@ -2142,8 +2146,8 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a name after the 'function' keyword"};
   }
-  const let location = name_token->source_location();
-  const let name = name_token->raw_string();
+  let const location = name_token->source_location();
+  let const name = name_token->raw_string();
 
   LOG(Debug, "parsing a keyword function definition for '%s'", name.c_str());
 
@@ -2215,7 +2219,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
   switch (t->kind()) {
   case Token::Kind::Number: {
-    const let parsed_number = t->raw_string().to<i64>();
+    let const parsed_number = t->raw_string().to<i64>();
     if (parsed_number.is_error())
       throw ErrorWithLocation{t->source_location(),
                               parsed_number.error().message()};
@@ -2234,7 +2238,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
       after = m_lexer.next_expression_token();
     }
     if (after->kind() != Token::Kind::Then) {
-      const let ast = after->to_ast_string();
+      let const ast = after->to_ast_string();
       throw ErrorWithLocation{after->source_location(),
                               "Expected 'Then' after the condition, found '" +
                                   ast.view() + "'"};
@@ -2290,13 +2294,13 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
   default:
     if (t->flags() & Token::Flag::UnaryOperator) {
-      const let op = static_cast<const tokens::Operator *>(t);
+      let const op = static_cast<const tokens::Operator *>(t);
 
       Expression *rhs = parse_expression(op->unary_precedence());
 
       lhs = op->construct_unary_expression(rhs);
     } else {
-      const let raw = t->raw_string();
+      let const raw = t->raw_string();
       throw ErrorWithLocation{t->source_location(),
                               "Expected a value or an expression, found '" +
                                   raw.view() + "'"};
@@ -2325,7 +2329,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     case Token::Kind::Else:
     case Token::Kind::Fi: {
       if (m_recursion_depth == 0) {
-        const let raw = maybe_op->raw_string();
+        let const raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected '" + raw.view() +
                                     "' without matching If condition"};
@@ -2335,7 +2339,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
     case Token::Kind::Then: {
       if (m_if_condition_depth == 0) {
-        const let raw = maybe_op->raw_string();
+        let const raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected '" + raw.view() +
                                     "' without matching If condition"};
@@ -2347,13 +2351,13 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     }
 
     if (!(maybe_op->flags() & Token::Flag::BinaryOperator)) {
-      const let raw = maybe_op->raw_string();
+      let const raw = maybe_op->raw_string();
       throw ErrorWithLocation{maybe_op->source_location(),
                               "Expected a binary operator, found '" +
                                   raw.view() + "'"};
     }
 
-    const let op = static_cast<const tokens::Operator *>(maybe_op);
+    let const op = static_cast<const tokens::Operator *>(maybe_op);
     if (op->left_precedence() < min_precedence) break;
     m_lexer.advance_past_last_peek();
 

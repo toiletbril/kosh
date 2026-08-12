@@ -256,7 +256,7 @@ struct resolved_redirection
 fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                        SourceLocation fallback_location,
                        bool *open_or_stage_failed = nullptr,
-                       bool allow_fd_memoization = false) throws
+                       bool should_allow_fd_memoization = false) throws
     -> resolved_redirection;
 
 fn allocate_redirection_descriptor(const Redirection &redir,

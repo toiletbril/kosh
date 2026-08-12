@@ -473,7 +473,7 @@ static fn run_script_contents(const String &script_contents,
     /* An interactive -W chunk runs right away and the runtime reports a missing
        command itself, so the analysis copy stays quiet to avoid a doubled
        error. */
-    bool analysis_failed = false;
+    bool did_analysis_fail = false;
 #if !defined NDEBUG
     let const diagnostic_highlight_bytes_before =
         completion::debug_highlight_input_byte_count();
@@ -488,7 +488,7 @@ static fn run_script_contents(const String &script_contents,
       {
         context.set_diagnostic_highlight_cache(previous_highlight_cache);
       };
-      analysis_failed = !analyze_ast(
+      did_analysis_fail = !analyze_ast(
           ast, script_contents, context.function_names(), context.alias_names(),
           &context, context.warning_level(),
           context.warnings_enabled() && context.shell_is_interactive(),
@@ -506,11 +506,11 @@ static fn run_script_contents(const String &script_contents,
         completion::debug_shell_lexical_scan_byte_count() -
             diagnostic_lexical_scan_bytes_before);
 #endif
-    if (!analysis_failed && out_ast != nullptr) {
+    if (!did_analysis_fail && out_ast != nullptr) {
       *out_ast = ast;
     }
 
-    if (analysis_failed) {
+    if (did_analysis_fail) {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
       exit_code = EXIT_SUCCESS;
@@ -524,10 +524,10 @@ static fn run_script_contents(const String &script_contents,
         context.set_current_history_event_number(previous_history_event_number);
       };
       context.set_current_source(&script_contents, "the script");
-      const auto command_start_ns = koshka::os::monotonic_nanos();
+      let const command_start_nanos = koshka::os::monotonic_nanos();
       exit_code = static_cast<int>(ast->evaluate(context));
-      context.set_last_command_duration_ns(koshka::os::monotonic_nanos() -
-                                           command_start_ns);
+      context.set_last_command_duration_nanos(koshka::os::monotonic_nanos() -
+                                              command_start_nanos);
       LOG(Debug, "the chunk finished with exit code %d", exit_code);
       /* A signal trapped during the last command has no following node to
          trigger its action, so the pending traps drain here. */
@@ -599,8 +599,9 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 
   LOG(Info, "running the PROMPT_COMMAND hook, %zu bytes", command->count());
 
-  const i32 saved_exit_status = context.last_exit_status();
-  const u64 saved_command_duration_ns = context.last_command_duration_ns();
+  let const saved_exit_status = context.last_exit_status();
+  let const saved_command_duration_nanos =
+      context.last_command_duration_nanos();
 
   if (PROMPT_COMMAND_CACHED_AST != nullptr &&
       PROMPT_COMMAND_CACHED_TEXT.view() == command->view())
@@ -620,7 +621,7 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   }
 
   context.set_last_exit_status(saved_exit_status);
-  context.set_last_command_duration_ns(saved_command_duration_ns);
+  context.set_last_command_duration_nanos(saved_command_duration_nanos);
 }
 
 enum class startup_file_requirement : u8
@@ -660,7 +661,9 @@ static fn source_file(
 
 static pure fn selected_rcfile() wontthrow -> Maybe<StringView>
 {
-  if (!FLAG_RCFILE.is_set() && !FLAG_INIT_FILE.is_set()) return None;
+  if (!FLAG_RCFILE.is_set() && !FLAG_INIT_FILE.is_set()) {
+    return None;
+  }
   if (!FLAG_RCFILE.is_set() ||
       (FLAG_INIT_FILE.is_set() &&
        FLAG_INIT_FILE.position() > FLAG_RCFILE.position()))
@@ -684,7 +687,9 @@ static fn source_environment_file(StringView variable_name,
                                   BumpArena &ast_arena) throws -> void
 {
   let const value = context.get_variable_value(variable_name);
-  if (!value.has_value() || value->is_empty()) return;
+  if (!value.has_value() || value->is_empty()) {
+    return;
+  }
 
   let expanded = context.expand_modifier_word(value->view(), false);
   if (expanded.is_empty()) return;
@@ -1113,7 +1118,7 @@ fn main(int argc, char **argv) -> int
      exec -l prepends the dash to the whole path, such as -/usr/bin/bash. The
      mark is the first byte of argv[0], not of the basename, so a path whose
      directory component contains a dash is not mistaken for a login shell. */
-  const bool does_name_mark_login =
+  const bool is_login_name =
       !program_path.view().is_empty() && program_path.view()[0] == '-';
 
   /* SHELL and BASH must name a runnable file a child can exec, so the login
@@ -1121,10 +1126,10 @@ fn main(int argc, char **argv) -> int
      spelling below. A bare dash keeps its spelling since it names nothing to
      run. */
   let executable_path = program_path.clone();
-  if (does_name_mark_login && program_path.view().length > 1)
+  if (is_login_name && program_path.view().length > 1)
     executable_path = koshka::String{program_path.view().substring(1)};
 
-  if (does_name_mark_login && !program_basename.is_empty() &&
+  if (is_login_name && !program_basename.is_empty() &&
       program_basename[0] == '-')
   {
     program_basename = program_basename.substring(1);
@@ -1153,7 +1158,7 @@ fn main(int argc, char **argv) -> int
 
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
      convention, the same mark -l sets. */
-  if (FLAG_LOGIN.is_enabled() || does_name_mark_login) {
+  if (FLAG_LOGIN.is_enabled() || is_login_name) {
     is_login_shell = true;
   }
   LOG(Info, "the shell %s a login shell", is_login_shell ? "is" : "is not");
@@ -1212,7 +1217,7 @@ fn main(int argc, char **argv) -> int
   unused(is_privileged);
 
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
-    bool is_tty = koshka::os::is_stdin_a_tty();
+    let const is_tty = koshka::os::is_stdin_a_tty();
 
     let s = koshka::String{koshka::heap_allocator()};
     s += "Both '-s' and '-i' options were specified. Falling back to ";
@@ -1519,7 +1524,7 @@ fn main(int argc, char **argv) -> int
           }
         } else {
           const koshka::String &file_name = file_names[0];
-          const usize operand_offset = koshka::quoted_argv_offset_until(
+          let const operand_offset = koshka::quoted_argv_offset_until(
               parse_argc, parse_argv, file_name.view());
           const koshka::SourceLocation operand_location{
               operand_offset, koshka::shell_quoted_arg_length(file_name.view()),
@@ -1576,13 +1581,13 @@ fn main(int argc, char **argv) -> int
         {
           /* The consumed -c is the Nth -c token, where N is how many
              commands FLAG_COMMAND has handed out so far. */
-          const usize consumed_command_index = FLAG_COMMAND.value_position();
+          let const consumed_command_index = FLAG_COMMAND.value_position();
           usize seen_dash_c_count = 0;
           usize flag_offset = 0;
           for (int a = 0; a < parse_argc; a++) {
-            const usize token_length = std::strlen(parse_argv[a]);
+            let const token_length = std::strlen(parse_argv[a]);
             const koshka::StringView token{parse_argv[a], token_length};
-            const usize quoted_length = koshka::shell_quoted_arg_length(token);
+            let const quoted_length = koshka::shell_quoted_arg_length(token);
             if (token == "-c") {
               seen_dash_c_count++;
               if (seen_dash_c_count == consumed_command_index &&
@@ -1591,7 +1596,7 @@ fn main(int argc, char **argv) -> int
                 const usize argument_length =
                     koshka::shell_quoted_arg_length(koshka::StringView{
                         parse_argv[a + 1], std::strlen(parse_argv[a + 1])});
-                const usize span = quoted_length + 1 + argument_length;
+                let const span = quoted_length + 1 + argument_length;
                 root_frame_call_site =
                     koshka::SourceLocation{flag_offset, span, koshka::None};
                 break;

@@ -32,7 +32,9 @@ static fn cdpath_search_applies(const String &operand) throws -> bool
   {
     return false;
   }
-  if (operand == "." || operand == "..") return false;
+  if (operand == "." || operand == "..") {
+    return false;
+  }
   if (operand.length() >= 2 && operand[0] == '.' &&
       os::is_directory_separator(operand[1]))
   {
@@ -50,8 +52,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+  if (ec.args().count() > 1 && ec.args()[1] == "--help") {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
   if (cxt.restricted_enforcement_active())
     throw ErrorWithLocation{ec.source_location(),
                             "cd is forbidden in a restricted shell"};
@@ -60,13 +63,15 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       !cxt.is_posix_mode() && cxt.shell_option_state(shell_option_id::Physical);
   usize operand_index = 1;
   while (operand_index < ec.args().count()) {
-    const StringView option = ec.args()[operand_index].view();
+    let const option = ec.args()[operand_index].view();
     if (option == "--") {
       operand_index++;
       break;
     }
 
-    if (option.length < 2 || option[0] != '-') break;
+    if (option.length < 2 || option[0] != '-') {
+      break;
+    }
     let is_options = true;
     for (usize k = 1; k < option.length; k++)
       if (option[k] != 'L' && option[k] != 'P') {
@@ -156,17 +161,16 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let was_reached_through_cdpath = false;
   if (!is_to_previous && operand_count > 0 && cdpath_search_applies(arg_path)) {
     if (let const cdpath = cxt.get_variable_value("CDPATH")) {
-      const StringView entries = cdpath->view();
+      let const entries = cdpath->view();
       usize start = 0;
       while (start <= entries.length) {
         usize end = start;
         while (end < entries.length && entries.data[end] != os::PATH_DELIMITER)
           end++;
-        const StringView entry =
-            entries.substring_of_length(start, end - start);
-        Path candidate = entry.is_empty()
-                             ? Path{arg_path}
-                             : Path{entry}.push_component(arg_path.view());
+        let const entry = entries.substring_of_length(start, end - start);
+        let candidate = entry.is_empty()
+                            ? Path{arg_path}
+                            : Path{entry}.push_component(arg_path.view());
         let resolved = candidate;
         let is_candidate_available = true;
         if (is_physical) {

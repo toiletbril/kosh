@@ -39,7 +39,7 @@ pure fn group_mask(char who) wontthrow -> u32
 
 fn mask_to_symbolic(u32 mask, Allocator allocator) throws -> String
 {
-  const u32 allowed = (~mask) & PERMISSION_BITS;
+  let const allowed = (~mask) & PERMISSION_BITS;
   const char groups[] = {'u', 'g', 'o'};
   const u32 shifts[] = {6, 3, 0};
   let out = String{allocator};
@@ -47,7 +47,7 @@ fn mask_to_symbolic(u32 mask, Allocator allocator) throws -> String
     if (g > 0) out.push(',');
     out.push(groups[g]);
     out.push('=');
-    const u32 bits = (allowed >> shifts[g]) & 7u;
+    let const bits = (allowed >> shifts[g]) & 7u;
     if (bits & 4u) out.push('r');
     if (bits & 2u) out.push('w');
     if (bits & 1u) out.push('x');
@@ -72,8 +72,10 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
     if (who == 0) who = PERMISSION_BITS;
 
     if (i >= spec.length) return None;
-    const char op = spec[i];
-    if (op != '+' && op != '-' && op != '=') return None;
+    let const op = spec[i];
+    if (op != '+' && op != '-' && op != '=') {
+      return None;
+    }
     i++;
 
     u32 permission = 0;
@@ -120,8 +122,8 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  const bool should_print_symbolic = FLAG_UMASK_SYMBOLIC.is_enabled();
-  const bool should_print_reusable = FLAG_UMASK_REUSABLE.is_enabled();
+  let const should_print_symbolic = FLAG_UMASK_SYMBOLIC.is_enabled();
+  let const should_print_reusable = FLAG_UMASK_REUSABLE.is_enabled();
 
   if (operands.count() > 2) {
     ErrorWithLocation located{
@@ -133,7 +135,7 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   if (operands.count() < 2) {
-    const u32 mask = os::get_file_creation_mask();
+    let const mask = os::get_file_creation_mask();
     let out = String{cxt.scratch_allocator()};
     if (should_print_reusable)
       out += should_print_symbolic ? "umask -S " : "umask ";

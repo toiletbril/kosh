@@ -34,8 +34,9 @@ static fn shell_word_expansion_end(StringView word,
     return word.length;
   }
 
-  if (word[expansion_start] != '$' || expansion_start + 1 >= word.length)
+  if (word[expansion_start] != '$' || expansion_start + 1 >= word.length) {
     return expansion_start;
+  }
 
   let const next_byte = word[expansion_start + 1];
   if (next_byte == '{') {
@@ -122,7 +123,7 @@ fn decode_shell_word(StringView word, Allocator allocator,
     if (quote_character == 0 && (byte == '\'' || byte == '"')) {
       decoded.has_shell_syntax = true;
       if (is_scanning_tilde_prefix) {
-        decoded.leading_tilde_is_active = false;
+        decoded.is_leading_tilde_active = false;
         is_scanning_tilde_prefix = false;
       }
       is_scanning_leading_variable = false;
@@ -140,7 +141,7 @@ fn decode_shell_word(StringView word, Allocator allocator,
     }
     if (byte == quote_character) {
       if (is_scanning_tilde_prefix) {
-        decoded.leading_tilde_is_active = false;
+        decoded.is_leading_tilde_active = false;
         is_scanning_tilde_prefix = false;
       }
       is_scanning_leading_variable = false;
@@ -160,7 +161,7 @@ fn decode_shell_word(StringView word, Allocator allocator,
       {
         decoded.has_shell_syntax = true;
         if (is_scanning_tilde_prefix) {
-          decoded.leading_tilde_is_active = false;
+          decoded.is_leading_tilde_active = false;
           is_scanning_tilde_prefix = false;
         }
         is_scanning_leading_variable = false;
@@ -181,11 +182,11 @@ fn decode_shell_word(StringView word, Allocator allocator,
       }
     }
     if (decoded.text.is_empty()) {
-      decoded.leading_tilde_is_active = byte == '~' && quote_character == 0;
-      decoded.leading_variable_is_active =
+      decoded.is_leading_tilde_active = byte == '~' && quote_character == 0;
+      decoded.is_leading_variable_active =
           byte == '$' && quote_character != '\'';
-      is_scanning_tilde_prefix = decoded.leading_tilde_is_active;
-      is_scanning_leading_variable = decoded.leading_variable_is_active;
+      is_scanning_tilde_prefix = decoded.is_leading_tilde_active;
+      is_scanning_leading_variable = decoded.is_leading_variable_active;
       if (is_scanning_leading_variable)
         decoded.leading_variable_expansion_end = 1;
     } else if (is_scanning_leading_variable) {
@@ -233,7 +234,7 @@ fn decode_shell_word(StringView word, Allocator allocator,
 
     usize raw_end = raw_start;
     if (raw_start == 0 && byte == '~' && scan_quote == 0 &&
-        decoded.leading_tilde_is_active)
+        decoded.is_leading_tilde_active)
     {
       raw_end = raw_start + 1;
     } else if ((byte == '$' && scan_quote != '\'') ||
@@ -632,8 +633,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
 
   /* An interactive foreground command runs in its own process group and holds
      the terminal, so it dies on its own Ctrl-C. */
-  const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
-                                 os::shell_has_controlling_terminal();
+  let const is_foreground_job = !is_async && cxt.shell_is_interactive() &&
+                                os::shell_has_controlling_terminal();
 
   let command = String{heap_allocator()};
   if (is_async || is_foreground_job) {
@@ -811,8 +812,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           steal(ec), os::script_fallback_policy::Reject, process_group,
           source != nullptr ? source->view() : StringView{},
           os::terminal_handoff::Keep, process_group_id);
-      if (is_async && process_group_id == 0)
+      if (is_async && process_group_id == 0) {
         process_group_id = os::process_id_of(child);
+      }
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
@@ -979,8 +981,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           os::exit_process_immediately(child_status);
         }
 
-        if (is_async && process_group_id == 0)
+        if (is_async && process_group_id == 0) {
           process_group_id = os::process_id_of(child);
+        }
         ec.close_fds();
         children.push(child);
         child_stage.push(stage_index);
@@ -1104,12 +1107,14 @@ static pure fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
                                          bool has_overflowed) wontthrow -> i64
 {
   if (is_negative) {
-    if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1)
+    if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1) {
       return INT64_MIN;
+    }
     return static_cast<i64>(~magnitude + 1u);
   }
-  if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX))
+  if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX)) {
     return INT64_MAX;
+  }
   return static_cast<i64>(magnitude);
 }
 
@@ -1125,7 +1130,7 @@ fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
      same scheme String::from uses, then a leading minus is prepended. A u64
      never needs more than twenty digits, so twenty-one bytes hold any i64. */
   ASSERT(buffer_size >= 21, "the buffer must hold a sign and twenty digits");
-  const bool is_negative = value < 0;
+  let const is_negative = value < 0;
   u64 magnitude =
       is_negative ? ~static_cast<u64>(value) + 1 : static_cast<u64>(value);
   usize offset = buffer_size;
@@ -1287,8 +1292,9 @@ public:
 
   fn ensure_built_for(StringView source) throws -> void
   {
-    if (m_source_data == source.data && m_source_length == source.count())
+    if (m_source_data == source.data && m_source_length == source.count()) {
       return;
+    }
 
     m_source_data = source.data;
     m_source_length = source.count();
@@ -1429,8 +1435,9 @@ fn parse_decimal_i64(StringView text, bool *out_of_range) throws -> ErrorOr<i64>
 fn parse_decimal_u64(StringView text) throws -> ErrorOr<u64>
 {
   let const parsed = TRY(parse_decimal_magnitude(text));
-  if (parsed.is_negative || parsed.has_overflowed)
+  if (parsed.is_negative || parsed.has_overflowed) {
     return Error{"integer value out of range"};
+  }
   return parsed.magnitude;
 }
 
@@ -1470,8 +1477,9 @@ fn parse_decimal_f64(const String &text) throws -> ErrorOr<f64>
   }
 
   let const narrowed_value = static_cast<f64>(parsed_value);
-  if (parsed_value != 0.0L && narrowed_value == 0.0)
+  if (parsed_value != 0.0L && narrowed_value == 0.0) {
     return Error{"number value out of range"};
+  }
 
   return narrowed_value;
 }
@@ -1524,8 +1532,9 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
   }
 
   skip_ascii_whitespace(text, offset);
-  if (!has_digits || offset != text.length)
+  if (!has_digits || offset != text.length) {
     return Error{"'" + text + "' is not a valid timeout"};
+  }
 
   /* A whole-seconds part too large for the signed nanosecond result saturates
      to the maximum rather than overflowing. */
@@ -1544,9 +1553,9 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>
 static pure fn digit_value_in_base(char c, u32 radix) wontthrow -> i32
 {
   u32 value;
-  if (c >= '0' && c <= '9')
+  if (c >= '0' && c <= '9') {
     value = static_cast<u32>(c - '0');
-  else if (c >= 'a' && c <= 'z')
+  } else if (c >= 'a' && c <= 'z')
     value = static_cast<u32>(c - 'a') + 10;
   else if (c >= 'A' && c <= 'Z')
     value = static_cast<u32>(c - 'A') + 10;
@@ -1621,8 +1630,9 @@ fn parse_integer_in_base_u64(StringView text, int_base base) throws
     -> ErrorOr<u64>
 {
   let const parsed = TRY(parse_magnitude_in_base(text, base));
-  if (parsed.is_negative || parsed.has_overflowed)
+  if (parsed.is_negative || parsed.has_overflowed) {
     return Error{"integer value out of range"};
+  }
   return parsed.magnitude;
 }
 
@@ -1651,7 +1661,7 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
     return -1;
   };
 
-  let do_emit_codepoint = [&](u32 cp) throws {
+  let const do_emit_codepoint = [&](u32 cp) throws {
     if (cp < 0x80) {
       out.push(static_cast<char>(cp));
     } else if (cp < 0x800) {
@@ -1671,7 +1681,7 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
 
   usize i = 0;
   while (i < body.length) {
-    const char c = body[i];
+    let const c = body[i];
     i++;
 
     if (c != '\\') {
@@ -1683,7 +1693,7 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
       break;
     }
 
-    const char e = body[i];
+    let const e = body[i];
     i++;
     switch (e) {
     case 'n': out.push('\n'); break;
@@ -1722,14 +1732,14 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
         out.push('c');
         break;
       }
-      const char target = body[i];
+      let const target = body[i];
       i++;
       if (target == '\\' && i < body.length && body[i] == '\\') {
         i++;
       }
-      const char upper = (target >= 'a' && target <= 'z')
-                             ? static_cast<char>(target - 'a' + 'A')
-                             : target;
+      let const upper = (target >= 'a' && target <= 'z')
+                            ? static_cast<char>(target - 'a' + 'A')
+                            : target;
       const u8 control = upper == '?'
                              ? static_cast<u8>(0x7fu)
                              : static_cast<u8>(static_cast<u8>(upper) & 0x1fu);
@@ -1854,7 +1864,7 @@ hot fn extglob_active(const Bitset &mask, usize index) wontthrow -> bool
 fn extglob_opens_group(StringView glob, usize index) wontthrow -> bool
 {
   if (index + 1 >= glob.count()) return false;
-  const char op = glob[index];
+  let const op = glob[index];
   if (op != '?' && op != '*' && op != '+' && op != '@' && op != '!') {
     return false;
   }
@@ -1911,8 +1921,8 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
 {
   if (glob.is_empty()) return str.is_empty();
 
-  const bool active = extglob_active(mask, mask_offset);
-  const char head = glob[0];
+  let const is_active = extglob_active(mask, mask_offset);
+  let const head = glob[0];
 
   /* An extended-glob group such as @(a|b), *(a|b), or !(a) drives the match
      through the alternatives split on the top-level |. */
@@ -1928,9 +1938,9 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
       usize depth = 0;
       usize start = 0;
       for (usize i = 0; i <= content.count(); i++) {
-        const bool boundary =
+        let const is_boundary =
             i == content.count() || (content[i] == '|' && depth == 0);
-        if (boundary) {
+        if (is_boundary) {
           alternatives.push({content.substring_of_length(start, i - start),
                              content_offset + start});
           start = i + 1;
@@ -1969,17 +1979,17 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
         /* A negated group consumes a prefix that none of the alternatives
            match, then the suffix matches the rest. */
         for (usize length = 0; length <= str.count(); length++) {
-          bool any_alternative_matches = false;
+          bool has_matching_alternative = false;
           for (let const &alternative : alternatives) {
             if (extglob_full_match(alternative.pattern,
                                    str.substring_of_length(0, length), mask,
                                    alternative.mask_offset))
             {
-              any_alternative_matches = true;
+              has_matching_alternative = true;
               break;
             }
           }
-          if (!any_alternative_matches &&
+          if (!has_matching_alternative &&
               extglob_full_match(suffix, str.substring(length), mask,
                                  suffix_offset))
           {
@@ -1994,7 +2004,7 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
 
   /* A trailing * matches the rest of the string, so it is taken without trying
      every split. */
-  if (active && head == '*') {
+  if (is_active && head == '*') {
     for (usize eaten = 0; eaten <= str.count(); eaten++) {
       if (extglob_full_match(glob.substring(1), str.substring(eaten), mask,
                              mask_offset + 1))
@@ -2005,12 +2015,12 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
 
   if (str.is_empty()) return false;
 
-  if (active && head == '?') {
+  if (is_active && head == '?') {
     return extglob_full_match(glob.substring(1), str.substring(1), mask,
                               mask_offset + 1);
   }
 
-  if (active && head == '[') {
+  if (is_active && head == '[') {
     /* Reuse the iterative matcher for a single bracket class by matching one
        character, then continue with the rest of the glob and the string. */
     usize span = 1;
@@ -2019,10 +2029,10 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
       span++;
     if (span < glob.count()) {
       span++;
-      const bool class_matched =
+      let const did_class_match =
           glob_matches(glob.substring_of_length(0, span),
                        str.substring_of_length(0, 1), mask, mask_offset);
-      if (!class_matched) return false;
+      if (!did_class_match) return false;
       return extglob_full_match(glob.substring(span), str.substring(1), mask,
                                 mask_offset + span);
     }
@@ -2079,8 +2089,9 @@ pure fn smart_case_prefix_matches(StringView candidate,
                                   StringView prefix) wontthrow -> bool
 {
   if (candidate.starts_with(prefix)) return true;
-  if (token_has_uppercase(prefix) || candidate.length < prefix.length)
+  if (token_has_uppercase(prefix) || candidate.length < prefix.length) {
     return false;
+  }
 
   for (usize position = 0; position < prefix.length; position++)
     if (ascii_to_lower(candidate[position]) != ascii_to_lower(prefix[position]))
@@ -2098,7 +2109,7 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
      keeps the iterative matcher below, unchanged, and pays nothing. */
   if (extglob) {
     for (usize i = 0; i + 1 < glob.count(); i++) {
-      const char c = glob[i];
+      let const c = glob[i];
       if ((c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
           glob[i + 1] == '(')
       {
@@ -2158,33 +2169,34 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
          not the terminator, and a quoted member byte never opens a range, so
          the scan consults the same per-byte mask the rest of the matcher reads.
        */
-      let const is_active = [&](usize index) wontthrow -> bool {
+      let const do_is_active = [&](usize index) wontthrow -> bool {
         return is_glob_char_active(glob_active, mask_offset + index);
       };
-      let const is_close_at = [&](usize index) wontthrow -> bool {
-        return glob[index] == ']' && is_active(index);
+      let const do_is_close_at = [&](usize index) wontthrow -> bool {
+        return glob[index] == ']' && do_is_active(index);
       };
 
       /* The unsigned value of a byte, so a high byte at or above 0x80 compares
          as itself rather than as a negative char in the range and equality
          tests. */
-      let const byte_at = [](StringView view, usize index) wontthrow -> u8 {
-        return static_cast<u8>(view[index]);
-      };
+      let const do_get_byte_at =
+          [](StringView view, usize index)
+              wontthrow -> u8 { return static_cast<u8>(view[index]); };
 
       /* A [:name:] unit inside the bracket is a POSIX character class. The
          index past its closing ":]" comes back when one starts here, so both
          scans treat the unit atomically and its inner ] never closes the
          bracket. */
-      let const class_end_past = [&](usize index) wontthrow -> Maybe<usize> {
+      let const do_get_class_end_past = [&](usize index)
+                                            wontthrow -> Maybe<usize> {
         if (index + 1 >= glob.count() || glob[index] != '[' ||
-            glob[index + 1] != ':' || !is_active(index))
+            glob[index + 1] != ':' || !do_is_active(index))
           return None;
         for (usize scan = index + 2; scan + 1 < glob.count(); scan++) {
           if (glob[scan] == ':' && glob[scan + 1] == ']') return scan + 2;
           /* A ] before any ":]" means the [ was a plain member after all, the
              way [[:a] is a bracket holding [, :, and a. */
-          if (glob[scan] == ']' && is_active(scan)) return None;
+          if (glob[scan] == ']' && do_is_active(scan)) return None;
         }
         return None;
       };
@@ -2195,29 +2207,29 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
       usize close_scan = g + 1;
       if (close_scan < glob.count() &&
           (glob[close_scan] == '!' || glob[close_scan] == '^') &&
-          is_active(close_scan))
+          do_is_active(close_scan))
       {
         close_scan++;
       }
-      if (close_scan < glob.count() && is_close_at(close_scan)) {
+      if (close_scan < glob.count() && do_is_close_at(close_scan)) {
         close_scan++;
       }
       bool has_closing_bracket = false;
       while (close_scan < glob.count()) {
-        if (Maybe<usize> past_class = class_end_past(close_scan);
+        if (Maybe<usize> past_class = do_get_class_end_past(close_scan);
             past_class.has_value())
         {
           close_scan = *past_class;
           continue;
         }
-        if (is_close_at(close_scan)) {
+        if (do_is_close_at(close_scan)) {
           has_closing_bracket = true;
           break;
         }
         close_scan++;
       }
       if (!has_closing_bracket) {
-        if (byte_at(glob, g) != byte_at(str, s)) goto retry_star;
+        if (do_get_byte_at(glob, g) != do_get_byte_at(str, s)) goto retry_star;
         g++;
         s++;
         break;
@@ -2229,7 +2241,7 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
       /* POSIX sh negates a class with a leading '!'. The '^' form is kept as a
          common extension. The negation applies only to an active byte, so a
          quoted ! or ^ at the front is a literal member. */
-      if ((glob[g] == '!' || glob[g] == '^') && is_active(g)) {
+      if ((glob[g] == '!' || glob[g] == '^') && do_is_active(g)) {
         g++;
         should_negate = true;
 
@@ -2240,32 +2252,35 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
          member. A range is consumed as one atom, so its first endpoint does not
          also match by itself and a later hyphen remains a literal member. */
       bool is_first_member = true;
-      while (g < glob.count() && (is_first_member || !is_close_at(g))) {
-        if (Maybe<usize> past_class = class_end_past(g); past_class.has_value())
+      while (g < glob.count() && (is_first_member || !do_is_close_at(g))) {
+        if (Maybe<usize> past_class = do_get_class_end_past(g);
+            past_class.has_value())
         {
           let const class_name =
               glob.substring_of_length(g + 2, *past_class - g - 4);
-          is_matched |= byte_is_in_posix_class(class_name, byte_at(str, s));
+          is_matched |=
+              byte_is_in_posix_class(class_name, do_get_byte_at(str, s));
           g = *past_class;
           is_first_member = false;
           continue;
         }
         if (glob[g] != '-' && g + 2 < glob.count() && glob[g + 1] == '-' &&
-            is_active(g + 1) && !is_close_at(g + 2) &&
-            !class_end_past(g + 2).has_value())
+            do_is_active(g + 1) && !do_is_close_at(g + 2) &&
+            !do_get_class_end_past(g + 2).has_value())
         {
-          let const lower = byte_at(glob, g);
-          let const upper = byte_at(glob, g + 2);
-          is_matched |= lower <= byte_at(str, s) && byte_at(str, s) <= upper;
+          let const lower = do_get_byte_at(glob, g);
+          let const upper = do_get_byte_at(glob, g + 2);
+          is_matched |= lower <= do_get_byte_at(str, s) &&
+                        do_get_byte_at(str, s) <= upper;
           g += 3;
         } else {
-          is_matched |= byte_at(glob, g) == byte_at(str, s);
+          is_matched |= do_get_byte_at(glob, g) == do_get_byte_at(str, s);
           g++;
         }
         is_first_member = false;
       }
 
-      if (g >= glob.count() || !is_close_at(g)) {
+      if (g >= glob.count() || !do_is_close_at(g)) {
         GLOB_GROUP_ERR();
       }
       if (should_negate) is_matched = !is_matched;
@@ -2343,8 +2358,9 @@ cold fn print_memory_report() wontthrow -> void
   let const should_goodbye = farewell == farewell_policy::Goodbye;
   LOG(Info, "quitting with code %d", code);
 
-  if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->memory_stats_enabled())
+  if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->memory_stats_enabled()) {
     print_memory_report();
+  }
 
   const u8 actual_code = static_cast<u8>(code);
 
@@ -2816,7 +2832,7 @@ fn ProgramResolver::split_path_dirs(StringView path) throws -> ArrayList<String>
   let current = String{heap_allocator()};
 
   for (usize position = 0; position < path.length; position++) {
-    const char byte = path[position];
+    let const byte = path[position];
     if (byte == os::PATH_DELIMITER) {
       directories.push(current.is_empty() ? String{"."}
                                           : String{current.view()});
@@ -2915,8 +2931,9 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
     for (let const &entry : *entries) {
       let full_path = directory.clone();
       full_path.push_component(entry.name.view());
-      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists())
+      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists()) {
         continue;
+      }
       if (directory_entry_kind(directory, entry) != Path::entry_kind::Regular)
         continue;
 
@@ -3059,8 +3076,9 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
 
       let full_path = directory.clone();
       full_path.push_component(entry.name.view());
-      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists())
+      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists()) {
         continue;
+      }
       if (directory_entry_kind(directory, entry) != Path::entry_kind::Regular)
         continue;
 
@@ -3199,9 +3217,10 @@ fn ProgramResolver::get_status(StringView name, StatusLookup lookup) throws
 
   let normalized_name = String{name};
   unused(os::normalize_program_name(normalized_name));
-  if (!m_command_names_are_valid && !normalized_name.is_empty())
+  if (!m_command_names_are_valid && !normalized_name.is_empty()) {
     prepare_complete_path_cache(normalized_name.substring_of_length(0, 1),
                                 ValidationScope::Prefix);
+  }
 
   let const runnable_position =
       command_name_lower_bound_in(m_command_names, normalized_name.view());
@@ -3224,8 +3243,9 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
                                        Maybe<StringView> path_override) throws
     -> ArrayList<Path>
 {
-  if (!path_override.has_value() && !m_path.has_value())
+  if (!path_override.has_value() && !m_path.has_value()) {
     return ArrayList<Path>{heap_allocator()};
+  }
 
   LOG(Debug, "statting candidates for '%.*s' along PATH%s",
       static_cast<int>(program_name.length), program_name.data,
@@ -3268,12 +3288,14 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
         }
         if (is_match) {
           result.push(try_path);
-          if (cache_policy == CachePolicy::Remember && is_runnable)
+          if (cache_policy == CachePolicy::Remember && is_runnable) {
             cache_resolved_path(key, try_path, suffix.extension, true);
+          }
           return result;
         }
-        if (requirement == Requirement::Execution && !blocked.has_value())
+        if (requirement == Requirement::Execution && !blocked.has_value()) {
           blocked = CachedPath{try_path, suffix.extension};
+        }
       }
     } else {
 #if !defined NDEBUG
@@ -3286,8 +3308,9 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
         if (is_match) result.push(full_path);
       } else if (is_match) {
         result.push(full_path);
-        if (cache_policy == CachePolicy::Remember && is_runnable)
+        if (cache_policy == CachePolicy::Remember && is_runnable) {
           cache_resolved_path(key, full_path, name_info.extension, false);
+        }
         return result;
       } else if (requirement == Requirement::Execution && !blocked.has_value())
         blocked = CachedPath{full_path, name_info.extension};
@@ -3311,8 +3334,9 @@ hot fn ProgramResolver::search(StringView program_name, SearchMode search_mode,
     let result = ArrayList<Path>{heap_allocator()};
     let const candidate = Path{program_name};
     if (!candidate.is_regular_file()) return result;
-    if (requirement != Requirement::Regular && !candidate.is_executable())
+    if (requirement != Requirement::Regular && !candidate.is_executable()) {
       return result;
+    }
     result.push(candidate);
     return result;
   }
@@ -3417,9 +3441,10 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names,
     suggestion.consider(local.view());
   for (let const &builtin : builtin_names())
     suggestion.consider(builtin.view());
-  if (resolver != nullptr && resolver->has_valid_command_names())
+  if (resolver != nullptr && resolver->has_valid_command_names()) {
     resolver->for_each_command_name(
         [&](const String &entry) { suggestion.consider(entry.view()); });
+  }
 
   return suggestion.take_suggestion();
 }
@@ -3698,8 +3723,9 @@ fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
     remainder = remainder.substring(*newline_pos + 1);
   }
 
-  if (remote_name.is_empty() || merge_ref.is_empty())
+  if (remote_name.is_empty() || merge_ref.is_empty()) {
     return String{heap_allocator()};
+  }
 
   let const refs_prefix = StringView{"refs/"};
   let const remotes_prefix = StringView{"refs/remotes/"};
@@ -3815,7 +3841,7 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
   let const count_output =
       os::capture_program_output(count_argv, 5'000'000'000);
 
-  let const parse_count = [](StringView s) -> i32 {
+  let const do_parse_count = [](StringView s) -> i32 {
     while (!s.is_empty() &&
            (s[0] == ' ' || s[0] == '\t' || s[0] == '\n' || s[0] == '\r'))
     {
@@ -3833,10 +3859,10 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
   if (count_output.has_value()) {
     let const separator = count_output->view().find_character('\t');
     if (separator.has_value()) {
-      ahead_count =
-          parse_count(count_output->view().substring_of_length(0, *separator));
+      ahead_count = do_parse_count(
+          count_output->view().substring_of_length(0, *separator));
       behind_count =
-          parse_count(count_output->view().substring(*separator + 1));
+          do_parse_count(count_output->view().substring(*separator + 1));
     }
   }
 

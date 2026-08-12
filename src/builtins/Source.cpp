@@ -25,8 +25,9 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+  if (ec.args().count() > 1 && ec.args()[1] == "--help") {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   if (ec.args().count() < 2) return report_usage_error(ec, cxt, ec.program());
 

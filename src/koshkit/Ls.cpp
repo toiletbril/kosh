@@ -61,8 +61,8 @@ static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache,
   for (const id_name_entry &entry : cache)
     if (entry.id == uid) return entry.name.clone();
   let const looked_up = os::uid_to_username(uid);
-  String name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                      : String::from(uid, allocator);
+  let name = looked_up.has_value() ? String{allocator, looked_up->view()}
+                                   : String::from(uid, allocator);
   cache.push(id_name_entry{uid, name.clone()});
   return name;
 }
@@ -73,8 +73,8 @@ static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache,
   for (const id_name_entry &entry : cache)
     if (entry.id == gid) return entry.name.clone();
   let const looked_up = os::gid_to_groupname(gid);
-  String name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                      : String::from(gid, allocator);
+  let name = looked_up.has_value() ? String{allocator, looked_up->view()}
+                                   : String::from(gid, allocator);
   cache.push(id_name_entry{gid, name.clone()});
   return name;
 }
@@ -161,11 +161,13 @@ static fn render_long_entries(const ArrayList<long_entry> &entries,
 static fn column_width(const ArrayList<usize> &widths, usize column_index,
                        usize rows) wontthrow -> usize
 {
-  const usize count = widths.count();
+  let const count = widths.count();
   usize widest = 0;
   for (usize r = 0; r < rows; r++) {
-    const usize index = column_index * rows + r;
-    if (index < count && widths[index] > widest) widest = widths[index];
+    let const index = column_index * rows + r;
+    if (index < count && widths[index] > widest) {
+      widest = widths[index];
+    }
   }
   return widest;
 }
@@ -174,12 +176,12 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
 static fn render_columns(const ArrayList<StringView> &names, String &output,
                          Allocator allocator) throws -> void
 {
-  const usize count = names.count();
+  let const count = names.count();
   if (count == 0) return;
 
   u32 terminal_columns = 0;
   u32 terminal_rows = 0;
-  const bool is_terminal = os::terminal_size(terminal_columns, terminal_rows);
+  let const is_terminal = os::terminal_size(terminal_columns, terminal_rows);
   if (FLAG_LS_ONE.is_enabled() || !is_terminal) {
     for (const StringView &name : names) {
       output += name;
@@ -195,10 +197,10 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
     widths.push(name.length);
 
   /* A column-major grid puts the entry at column*rows+row. */
-  const usize max_columns = count < terminal_width ? count : terminal_width;
+  let const max_columns = count < terminal_width ? count : terminal_width;
   usize best_columns = 1;
   for (usize columns = max_columns; columns >= 1; columns--) {
-    const usize rows = (count + columns - 1) / columns;
+    let const rows = (count + columns - 1) / columns;
     usize total = 0;
     for (usize c = 0; c < columns; c++) {
       total += column_width(widths, c, rows);
@@ -211,7 +213,7 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
     if (columns == 1) break;
   }
 
-  const usize rows = (count + best_columns - 1) / best_columns;
+  let const rows = (count + best_columns - 1) / best_columns;
   ArrayList<usize> column_widths{allocator};
   column_widths.reserve(best_columns);
   for (usize c = 0; c < best_columns; c++)
@@ -219,10 +221,10 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
 
   for (usize r = 0; r < rows; r++) {
     for (usize c = 0; c < best_columns; c++) {
-      const usize index = c * rows + r;
+      let const index = c * rows + r;
       if (index >= count) continue;
       output += names[index];
-      const bool has_next =
+      let const has_next =
           (c + 1 < best_columns) && ((c + 1) * rows + r < count);
       if (has_next)
         for (usize p = widths[index]; p < column_widths[c] + COLUMN_GAP; p++)

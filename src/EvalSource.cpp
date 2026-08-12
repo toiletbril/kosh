@@ -245,7 +245,9 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
         }
       }
     }
-    if (error && !is_interrupt && !was_error_rendered) do_render_error(error);
+    if (error && !is_interrupt && !was_error_rendered) {
+      do_render_error(error);
+    }
     return is_interrupt;
   };
 

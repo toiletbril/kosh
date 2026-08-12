@@ -76,7 +76,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* Only the last node yields the list's status, so a terminal exec rides into
      that node alone. */
-  const bool was_terminal_exec_allowed = cxt.terminal_exec_allowed();
+  let const was_terminal_exec_allowed = cxt.terminal_exec_allowed();
   cxt.set_terminal_exec_allowed(false);
   defer { cxt.set_terminal_exec_allowed(was_terminal_exec_allowed); };
 
@@ -117,7 +117,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
     }
 
-    const bool is_last_node = index + 1 >= m_nodes.count();
+    let const is_last_node = index + 1 >= m_nodes.count();
     cxt.set_terminal_exec_allowed(was_terminal_exec_allowed && is_last_node);
 
     /* set -e keys off the command that actually produced the status, not one
@@ -130,7 +130,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         !is_end_of_and_or_chain || n->is_negated();
     /* In bash mood an evaluation error fails the command and the list goes on,
        while a script-fatal error still aborts the run. */
-    let do_run_node = [&]() throws -> i64 {
+    let const do_run_node = [&]() throws -> i64 {
       if (should_ignore_errexit) cxt.enter_condition();
       defer
       {
@@ -206,16 +206,16 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* POSIX exempts set -e for a command that is an operand of && or || and not
        the last of the and-or list, and for a command the ! reserved word
        negates. */
-    const bool command_failed_uncaught =
+    const bool was_command_failure_uncaught =
         !cxt.in_condition() && did_execute && !n->is_negated() &&
         is_end_of_and_or_chain && ret != 0 && ret != NOTHING_WAS_EXECUTED;
 
-    if (command_failed_uncaught && !cxt.is_posix_mode()) {
+    if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(static_cast<i32>(ret));
       cxt.run_named_trap(StringView{"ERR", 3});
     }
 
-    if (cxt.error_exit() && command_failed_uncaught) {
+    if (cxt.error_exit() && was_command_failure_uncaught) {
       cxt.set_last_exit_status(static_cast<i32>(ret));
       if (cxt.in_subshell()) {
         cxt.request_exit(ret, source_location());
@@ -306,15 +306,15 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
   let status = m_cmd->evaluate(cxt);
 
   if (m_cmd->is_timed()) {
-    const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
+    let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
     double user_after = 0.0;
     double system_after = 0.0;
     os::children_cpu_seconds(user_after, system_after);
     let const rss_after = os::children_peak_rss_bytes();
     const double real_seconds =
         static_cast<double>(elapsed_nanos) / 1000000000.0;
-    const double user_cpu = user_after - user_before;
-    const double system_cpu = system_after - system_before;
+    let const user_cpu = user_after - user_before;
+    let const system_cpu = system_after - system_before;
     let const peak_rss_bytes = rss_after > rss_before ? rss_after : 0;
 
     /* The -p form prints the posix report and ignores TIMEFORMAT. Otherwise a
@@ -521,7 +521,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       {
         if (!did_register_job) utils::terminate_and_reap_processes(children);
       };
-      const i32 id = cxt.register_pipeline_job(children, last_child, "pipeline",
+      let const id = cxt.register_pipeline_job(children, last_child, "pipeline",
                                                process_group_id);
       did_register_job = true;
       if (cxt.shell_is_interactive())
@@ -697,7 +697,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The status is committed here so $? reads it from the store, since the
      all-simple fast path otherwise returns without recording it. */
-  const i64 ret = utils::execute_contexts_with_pipes(
+  let const ret = utils::execute_contexts_with_pipes(
       steal(ecs), cxt,
       is_async() ? execution_mode::Background : execution_mode::Foreground);
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
@@ -1023,12 +1023,13 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   optimizer::optimize_node(this, actx);
 
   let const was_inside_loop_condition = actx.is_inside_loop_condition;
-  let const prior_loop_condition_reads_input = actx.loop_condition_reads_input;
+  let const prior_loop_condition_reads_input =
+      actx.has_input_reading_loop_condition;
   let saved_tested_command_names = actx.tested_command_names.clone();
   let const was_retaining_tested_command_names =
       actx.should_retain_tested_command_names;
   actx.is_inside_loop_condition = true;
-  actx.loop_condition_reads_input = false;
+  actx.has_input_reading_loop_condition = false;
   actx.should_retain_tested_command_names = true;
   let const was_analyzing_condition = actx.is_analyzing_condition;
   let const saved_getopts = actx.active_getopts;
@@ -1037,9 +1038,10 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   m_condition->analyze(actx, is_unconditional);
   actx.is_analyzing_condition = was_analyzing_condition;
   actx.should_retain_tested_command_names = was_retaining_tested_command_names;
-  let const loop_condition_reads_input = actx.loop_condition_reads_input;
+  let const has_input_reading_loop_condition =
+      actx.has_input_reading_loop_condition;
   actx.is_inside_loop_condition = was_inside_loop_condition;
-  actx.loop_condition_reads_input = prior_loop_condition_reads_input;
+  actx.has_input_reading_loop_condition = prior_loop_condition_reads_input;
 
   if (m_is_until) {
     actx.tested_command_names = saved_tested_command_names.clone();
@@ -1049,7 +1051,7 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
   let const was_silenced = actx.should_silence_unresolved_commands;
   let const was_inside_read_loop = actx.is_inside_read_loop;
-  if (loop_condition_reads_input) actx.is_inside_read_loop = true;
+  if (has_input_reading_loop_condition) actx.is_inside_read_loop = true;
   if (is_folded_to_skip()) actx.should_silence_unresolved_commands = true;
   actx.loop_body_depth++;
   m_body->analyze(actx, false);
@@ -1455,7 +1457,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
-  let do_arm_matches = [&](const case_item &item) throws -> bool {
+  let const do_arm_matches = [&](const case_item &item) throws -> bool {
     for (let const pattern_token : item.patterns) {
       /* A quoted or escaped metacharacter in the pattern is a literal, so the
          expansion carries a parallel mask the matcher reads. A constant literal

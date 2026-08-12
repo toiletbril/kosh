@@ -25,8 +25,9 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+  if (ec.args().count() > 1 && ec.args()[1] == "--help") {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   /* The default mood rejects a return outside a function or a sourced file,
      while the sh mood lets it end the script the way dash does. */

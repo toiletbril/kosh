@@ -157,8 +157,8 @@ fn append_utf8_code_point(String &out, u32 code_point) throws -> void
   out += static_cast<char>(0x80 | (code_point & 0x3F));
 }
 
-fn append_simple_escape(String &out, char e, bool use_bash_escapes) throws
-    -> void
+fn append_simple_escape(String &out, char e,
+                        bool should_use_bash_escapes) throws -> void
 {
   switch (e) {
   case 'n': out += '\n'; break;
@@ -170,7 +170,7 @@ fn append_simple_escape(String &out, char e, bool use_bash_escapes) throws
   case 'v': out += '\v'; break;
   case 'e':
   case 'E':
-    if (use_bash_escapes) {
+    if (should_use_bash_escapes) {
       out += '\x1b';
     } else {
       out += '\\';
@@ -186,7 +186,7 @@ fn append_simple_escape(String &out, char e, bool use_bash_escapes) throws
 }
 
 fn append_escape(String &out, const String &fmt, usize &i,
-                 bool use_bash_escapes) throws -> void
+                 bool should_use_bash_escapes) throws -> void
 {
   ASSERT(i < fmt.length());
 
@@ -239,12 +239,12 @@ fn append_escape(String &out, const String &fmt, usize &i,
     return;
   }
 
-  append_simple_escape(out, e, use_bash_escapes);
+  append_simple_escape(out, e, should_use_bash_escapes);
 }
 
 /* Returns true when a \c was seen so the caller can abort the whole printf. */
 fn append_b_argument(String &out, const String &arg,
-                     bool use_bash_escapes) throws -> bool
+                     bool should_use_bash_escapes) throws -> bool
 {
   for (usize i = 0; i < arg.length(); i++) {
     if (arg[i] != '\\' || i + 1 >= arg.length()) {
@@ -286,7 +286,7 @@ fn append_b_argument(String &out, const String &arg,
       continue;
     }
     i++;
-    append_simple_escape(out, e, use_bash_escapes);
+    append_simple_escape(out, e, should_use_bash_escapes);
   }
   return false;
 }
@@ -303,7 +303,7 @@ fn append_q_argument(String &out, const String &arg) throws -> void
   if (utils::append_ansi_c_quote_if_needed(out, arg.view())) return;
 
   for (usize i = 0; i < arg.count(); i++) {
-    const char c = arg[i];
+    let const c = arg[i];
     if (!is_q_safe_byte(c)) out += '\\';
     out += c;
   }
@@ -337,12 +337,12 @@ fn append_conversion(String &out, const String &spec, char conv,
 
   /* A conversion whose result is wider than the stack buffer is rewritten into
      a heap buffer sized from the length snprintf reports. */
-  let do_append_formatted = [&](const char *format, auto value) throws {
+  let const do_append_formatted = [&](const char *format, auto value) throws {
     const int needed = std::snprintf(buffer, sizeof(buffer), format, value);
     if (needed >= 0 && static_cast<usize>(needed) < sizeof(buffer)) {
       out += buffer;
     } else if (needed > 0) {
-      const usize size = static_cast<usize>(needed) + 1;
+      let const size = static_cast<usize>(needed) + 1;
       char *const heap_buffer = static_cast<char *>(std::malloc(size));
       if (heap_buffer != nullptr) {
         std::snprintf(heap_buffer, size, format, value);
@@ -358,8 +358,8 @@ fn append_conversion(String &out, const String &spec, char conv,
     if (spec == "%") {
       /* A plain %s stops at an embedded NUL the way snprintf on the c_str
          does, so the output matches the reference shell. */
-      const StringView value = arg.view();
-      const usize printed = value.find_character('\0').value_or(value.length);
+      let const value = arg.view();
+      let const printed = value.find_character('\0').value_or(value.length);
       out.append(value.substring_of_length(0, printed));
     } else {
       String with_s = spec.clone();
@@ -409,7 +409,7 @@ fn append_conversion(String &out, const String &spec, char conv,
   case 'G': {
     String with_conv = spec.clone();
     with_conv.push(conv);
-    const double value = std::strtod(arg.c_str(), nullptr);
+    let const value = std::strtod(arg.c_str(), nullptr);
     do_append_formatted(with_conv.c_str(), value);
   } break;
   default:
@@ -458,7 +458,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const operand_base = format_index + 1;
   let const operand_count = args.count() - operand_base;
   let const empty_operand = String{cxt.scratch_allocator()};
-  let do_operand_at = [&](usize index) wontthrow -> const String & {
+  let const do_operand_at = [&](usize index) wontthrow -> const String & {
     return index < operand_count ? args[operand_base + index] : empty_operand;
   };
 
@@ -468,7 +468,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool has_consumed_a_conversion = false;
   bool should_stop = false;
 
-  let do_consume_star = [&](String &spec) throws {
+  let const do_consume_star = [&](String &spec) throws {
     char number_text[24];
     spec.append(utils::int_to_text_into(
         parse_printf_integer(do_operand_at(operand_index)), number_text,
@@ -477,14 +477,14 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     has_consumed_a_conversion = true;
   };
 
-  let const use_bash_escapes = !cxt.is_posix_mode();
+  let const should_use_bash_escapes = !cxt.is_posix_mode();
 
   do {
     has_consumed_a_conversion = false;
     for (usize i = 0; i < fmt.length(); i++) {
       if (fmt[i] == '\\' && i + 1 < fmt.length()) {
         i++;
-        append_escape(out, fmt, i, use_bash_escapes);
+        append_escape(out, fmt, i, should_use_bash_escapes);
         continue;
       }
       if (fmt[i] != '%') {
@@ -562,7 +562,7 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const is_missing_argument = operand_index >= operand_count;
       let const &arg = do_operand_at(operand_index);
       if (conv == 'b') {
-        should_stop = append_b_argument(out, arg, use_bash_escapes);
+        should_stop = append_b_argument(out, arg, should_use_bash_escapes);
         operand_index++;
         has_consumed_a_conversion = true;
         if (should_stop) break;

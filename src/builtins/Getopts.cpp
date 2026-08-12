@@ -29,7 +29,9 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") {
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 

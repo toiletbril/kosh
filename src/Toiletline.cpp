@@ -155,7 +155,7 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
      past this frame is undefined behavior. The body is guarded and any throw is
      swallowed. */
   try {
-    const bool is_explicit_completion = for_listing != 0;
+    let const is_explicit_completion = for_listing != 0;
     if (is_explicit_completion)
       COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion(
           koshka::ProgramResolver::CompletionRefresh::Cached);
@@ -467,12 +467,13 @@ fn history_events(koshka::Allocator allocator)
 
 fn history_append_event(StringView command) -> koshka::Maybe<usize>
 {
-  if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES)
+  if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES) {
     return koshka::None;
+  }
 
   let const path = history_file_path();
   if (!path.has_value()) return koshka::None;
-  if (::itl_g_history_path == NULL) unused(::tl_history_load(path->c_str()));
+  if (::itl_g_history_path == nullptr) unused(::tl_history_load(path->c_str()));
 
   itl_string_t *entry = ::itl_string_alloc();
   defer { ITL_STRING_FREE(entry); };
@@ -951,11 +952,11 @@ static fn prompt_strftime(const char *format) throws -> String
   };
 }
 
-static fn prompt_hostname(bool need_full) throws -> String
+static fn prompt_hostname(bool should_use_full_hostname) throws -> String
 {
   String host = os::get_hostname().value_or(
       os::get_environment_variable("HOSTNAME").value_or("localhost"));
-  if (need_full) return host;
+  if (should_use_full_hostname) return host;
   let const dot = host.view().find_character('.');
   return String{
       host.view().substring_of_length(0, dot.value_or(host.length()))};
@@ -1046,7 +1047,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       break;
     case '?': {
       const i32 status = context.last_exit_status();
-      const bool should_use_color = colors::stdout_wants_color();
+      let const should_use_color = colors::stdout_wants_color();
       if (should_use_color)
         out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
       out += String::from(status, koshka::heap_allocator());
@@ -1054,7 +1055,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     } break;
     case '.': {
       const i32 status = context.last_exit_status();
-      const bool should_use_color = colors::stdout_wants_color();
+      let const should_use_color = colors::stdout_wants_color();
       if (should_use_color && status != 0) out += colors::ansi::BOLD_BRIGHT_RED;
       out += "•";
       if (should_use_color && status != 0) out += colors::ansi::RESET;
@@ -1064,7 +1065,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
                           koshka::heap_allocator());
       break;
     case 'D':
-      out += format_prompt_duration(context.last_command_duration_ns());
+      out += format_prompt_duration(context.last_command_duration_nanos());
       break;
     /* \! and \# are untracked here, so they expand to nothing. */
     case '!': break;
@@ -1100,11 +1101,11 @@ scan_prompt_template_inputs(StringView text,
                             koshka::ArrayList<prompt_cache_input> &names) throws
     -> bool
 {
-  let is_name_byte = [](char c) {
+  let const do_is_name_byte = [](char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
            (c >= '0' && c <= '9') || c == '_';
   };
-  let do_add_name = [&](StringView name) throws {
+  let const do_add_name = [&](StringView name) throws {
     for (let const &known : names)
       if (known.name.view() == name) return;
     let input = prompt_cache_input{};
@@ -1113,11 +1114,11 @@ scan_prompt_template_inputs(StringView text,
   };
 
   for (usize i = 0; i < text.length; i++) {
-    const char byte = text[i];
+    let const byte = text[i];
     if (byte == '`') return false;
     if (byte != '$') continue;
     if (i + 1 >= text.length) continue;
-    const char next = text[i + 1];
+    let const next = text[i + 1];
     if (next == '(') return false;
     if (next == '{') {
       usize j = i + 2;
@@ -1129,19 +1130,20 @@ scan_prompt_template_inputs(StringView text,
       }
       if (j < text.length && (text[j] == '#' || text[j] == '!')) j++;
       usize name_start = j;
-      while (j < text.length && is_name_byte(text[j]))
+      while (j < text.length && do_is_name_byte(text[j]))
         j++;
       if (j == name_start) return false;
       do_add_name(text.substring_of_length(name_start, j - name_start));
       /* An assigning form has an input the cache cannot key. */
       if (j < text.length && text[j] == '=') return false;
-      if (j + 1 < text.length && text[j] == ':' && text[j + 1] == '=')
+      if (j + 1 < text.length && text[j] == ':' && text[j + 1] == '=') {
         return false;
+      }
       i = j - 1;
       continue;
     }
     usize j = i + 1;
-    while (j < text.length && is_name_byte(text[j]))
+    while (j < text.length && do_is_name_byte(text[j]))
       j++;
     if (j > i + 1) {
       do_add_name(text.substring_of_length(i + 1, j - i - 1));
@@ -1158,7 +1160,7 @@ scan_prompt_template_inputs(StringView text,
 fn default_prompt_template() -> String
 {
   let template_string = String{koshka::heap_allocator()};
-  const bool should_use_color = colors::stdout_wants_color();
+  let const should_use_color = colors::stdout_wants_color();
 
   if (should_use_color) {
     template_string += R"(${KOSH_GIT_BRANCH:+)";
@@ -1297,7 +1299,7 @@ fn build_prompt(EvalContext &context) -> String
 
   let scanned_inputs =
       koshka::ArrayList<prompt_cache_input>{koshka::heap_allocator()};
-  const bool is_cacheable =
+  let const is_cacheable =
       scan_prompt_template_inputs(ps1_template.view(), scanned_inputs);
   if (is_cacheable && PROMPT_CACHE_VALID &&
       ps1_template.view() == PROMPT_CACHE_TEMPLATE.view())
@@ -1305,9 +1307,9 @@ fn build_prompt(EvalContext &context) -> String
     bool is_every_input_unchanged = true;
     for (let const &input : PROMPT_CACHE_INPUTS) {
       let current = context.get_variable_value(input.name.view());
-      const bool both_unset = !current.has_value() && !input.value.has_value();
-      const bool both_equal = current.has_value() && input.value.has_value() &&
-                              current->view() == input.value->view();
+      let const both_unset = !current.has_value() && !input.value.has_value();
+      let const both_equal = current.has_value() && input.value.has_value() &&
+                             current->view() == input.value->view();
       if (!both_unset && !both_equal) {
         is_every_input_unchanged = false;
         break;
@@ -1355,8 +1357,9 @@ fn build_prompt(EvalContext &context) -> String
 fn render_ps0(EvalContext &context) -> String
 {
   Maybe<String> ps0 = context.get_variable_value("PS0");
-  if (!ps0.has_value() || ps0->is_empty())
+  if (!ps0.has_value() || ps0->is_empty()) {
     return String{koshka::heap_allocator()};
+  }
 
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps0->view());
@@ -1510,7 +1513,7 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 fn default_prompt_template() -> String
 {
   let template_string = String{};
-  const bool should_use_color = koshka::colors::stdout_wants_color();
+  let const should_use_color = koshka::colors::stdout_wants_color();
 
   if (should_use_color) {
     template_string += "[\\u@\\h${KOSH_GIT_BRANCH:+ (";

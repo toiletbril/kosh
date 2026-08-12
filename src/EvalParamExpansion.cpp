@@ -120,7 +120,7 @@ fn EvalContext::expand_modifier_word_worker(
     if (active_out != nullptr) active_out->push(is_active);
   };
 
-  let do_emit_run = [&](StringView bytes, bool is_active) {
+  let const do_emit_run = [&](StringView bytes, bool is_active) {
     out.append(bytes);
     if (active_out != nullptr) {
       for (usize k = 0; k < bytes.length; k++)
@@ -154,7 +154,7 @@ fn EvalContext::expand_modifier_word_worker(
         continue;
       }
       if (i + 1 < word.length) {
-        const char next = word[i + 1];
+        let const next = word[i + 1];
         if (next == '\n') {
           i++;
           continue;
@@ -242,7 +242,7 @@ fn EvalContext::expand_modifier_word_worker(
       i32 depth = 1;
       char quote = 0;
       while (j < word.length) {
-        const char ch = word[j];
+        let const ch = word[j];
         if (quote != 0) {
           inner += ch;
           if (quote == '"' && ch == '\\' && j + 1 < word.length) {
@@ -270,7 +270,7 @@ fn EvalContext::expand_modifier_word_worker(
           inner += ch;
           j++;
           while (j < word.length) {
-            const char b = word[j];
+            let const b = word[j];
             inner += b;
             j++;
             if (b == '\\' && j < word.length) {
@@ -288,7 +288,7 @@ fn EvalContext::expand_modifier_word_worker(
           usize paren_depth = 1;
           char nested_quote = 0;
           while (j < word.length) {
-            const char p = word[j];
+            let const p = word[j];
             inner += p;
             j++;
             if (nested_quote != 0) {
@@ -366,7 +366,7 @@ fn EvalContext::expand_modifier_word_worker(
       usize depth = 0;
       char quote = 0;
       for (; j < word.length; j++) {
-        const char ch = word[j];
+        let const ch = word[j];
         if (quote != 0) {
           inner += ch;
           if (quote == '"' && ch == '\\' && j + 1 < word.length) {
@@ -410,7 +410,7 @@ fn EvalContext::expand_modifier_word_worker(
       usize depth = 1;
       char quote = 0;
       for (; j < word.length; j++) {
-        const char ch = word[j];
+        let const ch = word[j];
         if (quote != 0) {
           inner += ch;
           if (quote == '"' && ch == '\\' && j + 1 < word.length) {
@@ -531,8 +531,8 @@ hot fn EvalContext::apply_parameter_expansion(
         bracket.has_value() && *bracket > 0 && name[name.length - 1] == ']' &&
         lexer::is_variable_name_start(name[0]))
     {
-      const StringView array_name = name.substring_of_length(0, *bracket);
-      const StringView subscript =
+      let const array_name = name.substring_of_length(0, *bracket);
+      let const subscript =
           name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
       if (subscript == "@" || subscript == "*") {
         return String::from(array_element_count(array_name),
@@ -576,7 +576,7 @@ hot fn EvalContext::apply_parameter_expansion(
       lexer::is_variable_name_start(name[0]))
   {
     if (let const close = rest.find_character(']'); close.has_value()) {
-      const StringView subscript = rest.substring_of_length(1, *close - 1);
+      let const subscript = rest.substring_of_length(1, *close - 1);
       let subscript_location = SourceLocation{};
       let const *subscript_location_pointer =
           do_source_location_for(subscript, subscript_location);
@@ -585,11 +585,11 @@ hot fn EvalContext::apply_parameter_expansion(
                                      subscript_location_pointer);
       /* The / # % ^ , modifiers after the ] modify the one element, a different
          modifier such as :- falls through to the general path. */
-      const StringView modifier = rest.substring(*close + 1);
+      let const modifier = rest.substring(*close + 1);
       let modifier_location = SourceLocation{};
       let const *modifier_location_pointer =
           do_source_location_for(modifier, modifier_location);
-      const char modifier_op = modifier.is_empty() ? '\0' : modifier[0];
+      let const modifier_op = modifier.is_empty() ? '\0' : modifier[0];
       if (subscript != "@" && subscript != "*" &&
           (modifier_op == '/' || modifier_op == '#' || modifier_op == '%' ||
            modifier_op == '^' || modifier_op == ','))
@@ -668,7 +668,7 @@ hot fn EvalContext::apply_parameter_expansion(
   if (op_index >= rest.length) return expand_variable(name);
 
   if (is_colon_form) {
-    const char after_colon = rest[op_index];
+    let const after_colon = rest[op_index];
     if (!is_colon_modifier_operator(after_colon) && name != "@" && name != "*")
     {
       let const substring_body = rest.substring(1);
@@ -763,7 +763,7 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize
   usize paren_depth = 0;
   usize question_depth = 0;
   for (usize i = 0; i < body.length; i++) {
-    const char character = body[i];
+    let const character = body[i];
     if (character == '(') {
       paren_depth++;
     } else if (character == ')') {
@@ -806,7 +806,7 @@ fn EvalContext::apply_substring_to_value(
 {
   LOG(All, "taking the substring '%.*s' of a value of %zu bytes",
       static_cast<int>(body.length), body.data, value.length);
-  const i64 value_length = static_cast<i64>(value.length);
+  let const value_length = static_cast<i64>(value.length);
 
   let const separator = find_substring_length_separator(body);
   let const offset_text = body.substring_of_length(0, separator);
@@ -941,7 +941,7 @@ fn EvalContext::pattern_replace_value(
     remainder = remainder.substring(1);
   }
 
-  const usize separator = find_replacement_separator(remainder);
+  let const separator = find_replacement_separator(remainder);
   let const pattern_word = remainder.substring_of_length(0, separator);
   let pattern_location = SourceLocation{};
   let pattern_active = Bitset{scratch_allocator()};
@@ -1144,9 +1144,9 @@ fn EvalContext::apply_case_modification_to_value(
 {
   LOG(All, "applying the case modification '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.length);
-  const char op = spec[0];
-  const bool should_modify_all = spec.length > 1 && spec[1] == op;
-  const StringView pattern_word = spec.substring(should_modify_all ? 2 : 1);
+  let const op = spec[0];
+  let const should_modify_all = spec.length > 1 && spec[1] == op;
+  let const pattern_word = spec.substring(should_modify_all ? 2 : 1);
 
   let pattern_active = Bitset{scratch_allocator()};
   String pattern{scratch_allocator()};
@@ -1166,7 +1166,7 @@ fn EvalContext::apply_case_modification_to_value(
   out.reserve(value.length);
   for (usize i = 0; i < value.length; i++) {
     char character = value[i];
-    const bool is_affected = should_modify_all || i == 0;
+    let const is_affected = should_modify_all || i == 0;
     if (is_affected &&
         (pattern_matches_any ||
          utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
@@ -1194,15 +1194,15 @@ fn EvalContext::apply_value_modifier(
     const SourceLocation *source_location) throws -> String
 {
   if (modifier.is_empty()) return String{scratch_allocator(), value};
-  const char op = modifier[0];
+  let const op = modifier[0];
   if (op == '/')
     return pattern_replace_value(String{scratch_allocator(), value}, modifier,
                                  source_location);
   if (op == '^' || op == ',')
     return apply_case_modification_to_value(value, modifier, source_location);
   if (op == '#' || op == '%') {
-    const bool is_doubled = modifier.length > 1 && modifier[1] == op;
-    const StringView pattern_word = modifier.substring(is_doubled ? 2 : 1);
+    let const is_doubled = modifier.length > 1 && modifier[1] == op;
+    let const pattern_word = modifier.substring(is_doubled ? 2 : 1);
     let pattern_location = SourceLocation{};
     return trim_value_with_modifier(
         *this, value, pattern_word,

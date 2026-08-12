@@ -95,12 +95,12 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let was_timed_out = false;
   let const start_nanos = os::monotonic_nanos();
   let const duration_nanos = static_cast<u64>(timeout_nanos);
-  const u64 deadline_nanos = timeout_nanos < 0
+  let const deadline_nanos = timeout_nanos < 0
                                  ? 0
                                  : (UINT64_MAX - start_nanos < duration_nanos
                                         ? UINT64_MAX
                                         : start_nanos + duration_nanos);
-  let do_read_byte = [&](char &byte) -> Maybe<usize> {
+  let const do_read_byte = [&](char &byte) -> Maybe<usize> {
     if (deadline_nanos != 0) {
       let const now_nanos = os::monotonic_nanos();
       if (now_nanos >= deadline_nanos) {
@@ -134,7 +134,9 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_READ_QUERY.is_enabled()) {
     char answer = 0;
     let const got = do_read_byte(answer);
-    if (!got.has_value() || *got == 0) return was_timed_out ? 142 : 1;
+    if (!got.has_value() || *got == 0) {
+      return was_timed_out ? 142 : 1;
+    }
     return (answer == 'y' || answer == 'Y') ? 0 : 1;
   }
 
@@ -144,7 +146,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const usize first_operand = 1;
   let const operand_count = has_operands ? names.count() - first_operand : 1;
   const String reply_name = "REPLY";
-  let do_operand_name = [&](usize index) -> const String & {
+  let const do_operand_name = [&](usize index) -> const String & {
     if (!has_operands) return reply_name;
     ASSERT(first_operand + index < names.count());
     return names[first_operand + index];
@@ -180,12 +182,16 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     while (output_count < max_bytes) {
       char byte = 0;
       let const got = do_read_byte(byte);
-      if (!got.has_value() || *got == 0) break;
+      if (!got.has_value() || *got == 0) {
+        break;
+      }
 
       if (should_process_escapes && byte == '\\') {
         char escaped_byte = 0;
         let const got_escaped = do_read_byte(escaped_byte);
-        if (!got_escaped.has_value() || *got_escaped == 0) break;
+        if (!got_escaped.has_value() || *got_escaped == 0) {
+          break;
+        }
 
         if (escaped_byte == '\n') continue;
 
@@ -216,7 +222,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       let accumulated = steal(*read_line);
       if (should_process_escapes) {
-        let do_trailing_backslash_count = [&accumulated]() -> usize {
+        let const do_trailing_backslash_count = [&accumulated]() -> usize {
           usize backslash_count = 0;
           while (backslash_count < accumulated.length() &&
                  accumulated[accumulated.length() - 1 - backslash_count] ==
@@ -259,18 +265,18 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const field_separators =
       String{cxt.scratch_allocator(), cxt.field_separators()};
-  let do_is_separator = [&](usize i) {
+  let const do_is_separator = [&](usize i) {
     return !is_literal_byte[i] &&
            field_separators.find_character(line[i]).has_value();
   };
   /* POSIX folds an IFS whitespace run into a single delimiter, while each IFS
      non-whitespace character delimits one field on its own, so an empty field
      can sit between two non-whitespace delimiters. */
-  let do_is_ifs_whitespace = [&](usize i) {
+  let const do_is_ifs_whitespace = [&](usize i) {
     return (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') &&
            do_is_separator(i);
   };
-  let do_is_ifs_nonwhitespace = [&](usize i) {
+  let const do_is_ifs_nonwhitespace = [&](usize i) {
     return do_is_separator(i) && !do_is_ifs_whitespace(i);
   };
 
@@ -280,7 +286,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     while (cursor < line.length() && do_is_ifs_whitespace(cursor))
       cursor++;
     while (cursor < line.length()) {
-      const usize start = cursor;
+      let const start = cursor;
       while (cursor < line.length() && !do_is_separator(cursor))
         cursor++;
       words.push(String{line.substring_of_length(start, cursor - start)});

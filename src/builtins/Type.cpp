@@ -41,9 +41,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
-  let const want_word = FLAG_TYPE_WORD.is_enabled();
-  let const want_path = FLAG_TYPE_PATH.is_enabled();
-  let const force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
+  let const should_print_word = FLAG_TYPE_WORD.is_enabled();
+  let const should_print_path = FLAG_TYPE_PATH.is_enabled();
+  let const should_force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
 
   let out = String{cxt.scratch_allocator()};
   let missing_names = ArrayList<String>{cxt.scratch_allocator()};
@@ -54,7 +54,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     LOG(Debug, "type classifying '%s' in resolution order", name.c_str());
 
-    if (force_path) {
+    if (should_force_path) {
       let const paths = cxt.get_program_resolver().search(
           name,
           FLAG_TYPE_ALL.is_enabled() ? ProgramResolver::SearchMode::All
@@ -65,7 +65,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                      : ProgramResolver::CachePolicy::ReadOnly);
       if (paths.count() != 0) {
         for (let const &path : paths) {
-          if (want_word)
+          if (should_print_word)
             out += "file";
           else
             out += path.text();
@@ -120,10 +120,10 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       bool has_any = false;
       if (!word.is_empty()) {
         has_any = true;
-        if (want_word) {
+        if (should_print_word) {
           out += word;
           out += "\n";
-        } else if (!want_path) {
+        } else if (!should_print_path) {
           do_describe_resolution(word);
         }
       }
@@ -133,9 +133,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                ProgramResolver::CachePolicy::Bypass))
       {
         has_any = true;
-        if (want_word) {
+        if (should_print_word) {
           out += "file\n";
-        } else if (want_path) {
+        } else if (should_print_path) {
           out += path.text();
           out += "\n";
         } else {
@@ -146,17 +146,19 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
       }
       if (!has_any) {
-        if (!want_word && !want_path) missing_names.push_managed(name);
+        if (!should_print_word && !should_print_path) {
+          missing_names.push_managed(name);
+        }
         did_find_all = false;
       }
       continue;
     }
 
     if (!word.is_empty()) {
-      if (want_word) {
+      if (should_print_word) {
         out += word;
         out += "\n";
-      } else if (!want_path) {
+      } else if (!should_print_path) {
         do_describe_resolution(word);
       }
       continue;
@@ -168,9 +170,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             ProgramResolver::CachePolicy::ReadOnly);
         paths.count() != 0)
     {
-      if (want_word) {
+      if (should_print_word) {
         out += "file\n";
-      } else if (want_path) {
+      } else if (should_print_path) {
         out += paths[0].text();
         out += "\n";
       } else {
@@ -180,7 +182,9 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out += "\n";
       }
     } else {
-      if (!want_word && !want_path) missing_names.push_managed(name);
+      if (!should_print_word && !should_print_path) {
+        missing_names.push_managed(name);
+      }
       did_find_all = false;
     }
   }

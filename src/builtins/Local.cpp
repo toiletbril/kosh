@@ -38,7 +38,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") {
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   if (!cxt.in_function_scope())
     throw ErrorWithDetails{
@@ -51,8 +53,10 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_mark_export = false;
   usize first_name = 1;
   for (; first_name < args.count(); first_name++) {
-    const StringView arg = args[first_name].view();
-    if (arg.length < 1 || arg[0] != '-') break;
+    let const arg = args[first_name].view();
+    if (arg.length < 1 || arg[0] != '-') {
+      break;
+    }
     if (arg == "--") {
       first_name++;
       break;

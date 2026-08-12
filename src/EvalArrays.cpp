@@ -209,7 +209,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
   m_shell_variables.erase(name);
   ASSERT(dense != nullptr);
 
-  const usize dense_count = dense->count();
+  let const dense_count = dense->count();
   if (index < dense_count) {
     (*dense)[index] = String{heap_allocator(), value};
     return;
@@ -261,8 +261,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
   char integer_result[24];
-  let do_integer_element_value = [&](Maybe<String> existing)
-                                     throws -> StringView {
+  let const do_integer_element_value = [&](Maybe<String> existing)
+                                           throws -> StringView {
     let joined = String{scratch_allocator()};
     if (is_append) {
       if (existing.has_value()) joined.append(existing->view());
@@ -276,7 +276,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
   };
 
   if (is_associative_array(name)) {
-    const String key = expand_modifier_word(subscript);
+    let const key = expand_modifier_word(subscript);
     if (is_integer_variable(name)) [[unlikely]] {
       set_associative_element(
           name, key.view(),
@@ -426,8 +426,8 @@ fn EvalContext::unset_array_element(StringView name,
   }
 
   if (ArrayList<String> *array = m_indexed_arrays.find(name)) {
-    const i64 index = evaluate_arithmetic(subscript);
-    const i64 array_count = static_cast<i64>(array->count());
+    let const index = evaluate_arithmetic(subscript);
+    let const array_count = static_cast<i64>(array->count());
     const i64 resolved =
         index < 0 ? index + array_negative_index_base(name) : index;
     if (resolved < 0) return;
@@ -678,7 +678,7 @@ fn EvalContext::apply_array_subscript(
       }
       return out;
     }
-    const String key =
+    let const key =
         expand_modifier_word(subscript, true, true, source_location);
     return String{heap_allocator(), lookup_associative_element(name, key.view())
                                         .value_or(String{scratch_allocator()})
@@ -700,7 +700,9 @@ fn EvalContext::apply_array_subscript(
     }
     let out = String{scratch_allocator()};
     for (usize i = 0; i < array->count(); i++) {
-      if (i > 0 && has_separator) out.push(separator);
+      if (i > 0 && has_separator) {
+        out.push(separator);
+      }
       out.append((*array)[i].view());
     }
     return out;
@@ -714,7 +716,7 @@ fn EvalContext::apply_array_subscript(
       return get_variable_value(name).value_or(String{heap_allocator()});
     return String{scratch_allocator()};
   }
-  const i64 array_count = static_cast<i64>(array->count());
+  let const array_count = static_cast<i64>(array->count());
   if (index < 0) index += array_negative_index_base(name);
   if (index < 0 || index >= array_count) {
     if (index >= 0) {
@@ -785,12 +787,12 @@ fn EvalContext::array_element_is_set(StringView name,
     return array_element_count(name) != 0;
   }
   if (is_associative_array(name)) {
-    const String key = expand_modifier_word(subscript);
+    let const key = expand_modifier_word(subscript);
     return lookup_associative_element(name, key.view()).has_value();
   }
-  const i64 index = evaluate_arithmetic(subscript);
+  let const index = evaluate_arithmetic(subscript);
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
-    const i64 array_count = static_cast<i64>(array->count());
+    let const array_count = static_cast<i64>(array->count());
     /* A negative index counts from the highest set index, so [[ -v a[-1] ]]
        names the element ${a[-1]} reads. */
     const i64 resolved =
@@ -814,7 +816,7 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
       static_cast<int>(prefix.length), prefix.data);
   let names = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
-  let do_consider = [&](StringView candidate) throws {
+  let const do_consider = [&](StringView candidate) throws {
     if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
       seen.add(candidate);
       names.push_managed(candidate);

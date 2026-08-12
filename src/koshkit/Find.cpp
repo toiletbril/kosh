@@ -70,16 +70,16 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
   /* The stat reads the symlink, not its target, and a failed stat yields the
      marker '\0' that matches no -type filter and is not descended. */
   os::file_status status{};
-  const char type_letter = os::stat_path(path.text().view(), status)
-                               ? os::file_type_letter(status.mode)
-                               : '\0';
+  let const type_letter = os::stat_path(path.text().view(), status)
+                              ? os::file_type_letter(status.mode)
+                              : '\0';
 
   if (find_entry_matches(type_letter, path.filename(), depth, options)) {
     output += display;
     output += '\n';
   }
 
-  const bool should_descend =
+  let const should_descend =
       options.max_depth < 0 || static_cast<i64>(depth) < options.max_depth;
   if (!should_descend || type_letter != 'd') {
     return;
@@ -160,7 +160,9 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   usize index = 1;
   while (index < args.count()) {
     let const start_argument = args[index].view();
-    if (!start_argument.is_empty() && start_argument[0] == '-') break;
+    if (!start_argument.is_empty() && start_argument[0] == '-') {
+      break;
+    }
 
     roots.push(start_argument);
     index++;

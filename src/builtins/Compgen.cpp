@@ -142,7 +142,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       if (filter.has_value() &&
           candidate_is_excluded(candidate.view(), *filter, cxt))
+      {
         continue;
+      }
       out.append(candidate.view());
       out.push('\n');
       has_any_matched = true;
@@ -162,7 +164,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (!match.view().starts_with(word)) continue;
       if (filter.has_value() &&
           candidate_is_excluded(match.view(), *filter, cxt))
+      {
         continue;
+      }
       out.append(match.view());
       out.push('\n');
       has_any_matched = true;
@@ -182,7 +186,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (let const &candidate : candidates) {
       if (filter.has_value() &&
           candidate_is_excluded(candidate.view(), *filter, cxt))
+      {
         continue;
+      }
       out.append(candidate.view());
       out.push('\n');
     }
@@ -201,7 +207,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!candidate.view().starts_with(word)) continue;
     if (filter.has_value() &&
         candidate_is_excluded(candidate.view(), *filter, cxt))
+    {
       continue;
+    }
     out.append(candidate.view());
     out.push('\n');
     has_any_matched = true;

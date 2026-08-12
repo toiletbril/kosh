@@ -502,7 +502,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (usize character_position = 0;
          character_position < arguments[1].count(); character_position++)
     {
-      const char character = arguments[1][character_position];
+      let const character = arguments[1][character_position];
       switch (character) {
       case ' ':
       case '\t':
@@ -582,8 +582,9 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const mood_length =
           comma.has_value() ? *comma : spelling.count() - mood_start;
       let const mood = spelling.substring_of_length(mood_start, mood_length);
-      if (mood.is_empty() || !LINK_MOODS.find(mood).has_value())
+      if (mood.is_empty() || !LINK_MOODS.find(mood).has_value()) {
         return report_usage_error(ec, cxt, ec.program());
+      }
       if (!link_moods.is_empty()) link_moods += ',';
       link_moods += mood;
       if (!comma.has_value()) break;

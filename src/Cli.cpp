@@ -342,21 +342,22 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
       operand_locations->push(SourceLocation{});
   };
 
-  Flag *prev_flag{};
-  bool next_arg_is_value = false;
-  bool prev_is_long = false;
+  Flag *previous_flag{};
+  bool should_take_next_argument_as_value = false;
+  bool was_previous_flag_long = false;
   bool should_ignore_rest = false;
 
   for (int i = 0; i < argc; i++) {
     ASSERT(argv[i] != nullptr);
 
-    if (next_arg_is_value) {
+    if (should_take_next_argument_as_value) {
       /* operand_value_flag alone lets a recognized boolean flag after it parse
          as a flag, so `-c -l command` runs command under -l. Every other flag
          takes the next argument verbatim, keeping a dash-led value intact. */
-      bool next_is_known_bool_flag = false;
-      if (prev_flag == operand_value_flag && operand_value_flag != nullptr &&
-          argv[i][0] == '-' && argv[i][1] != '\0')
+      bool is_next_known_boolean_flag = false;
+      if (previous_flag == operand_value_flag &&
+          operand_value_flag != nullptr && argv[i][0] == '-' &&
+          argv[i][1] != '\0')
       {
         let const is_long_token = argv[i][1] == '-';
         let const token_offset = is_long_token ? &argv[i][2] : &argv[i][1];
@@ -368,24 +369,24 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
               (probe_flag->kind() == Flag::Kind::Bool ||
                probe_flag->kind() == Flag::Kind::RepeatedBool))
           {
-            next_is_known_bool_flag = true;
+            is_next_known_boolean_flag = true;
           }
         }
       }
 
-      if (!next_is_known_bool_flag) {
-        next_arg_is_value = false;
+      if (!is_next_known_boolean_flag) {
+        should_take_next_argument_as_value = false;
 
-        ASSERT(prev_flag != nullptr);
+        ASSERT(previous_flag != nullptr);
         LOG(All,
             "attaching the next argument '%s' as the value of the flag '%s'",
-            argv[i], flag_name(prev_flag, prev_is_long).c_str());
-        if (prev_flag->kind() == Flag::Kind::String)
-          static_cast<FlagString *>(prev_flag)->set(argv[i]);
+            argv[i], flag_name(previous_flag, was_previous_flag_long).c_str());
+        if (previous_flag->kind() == Flag::Kind::String)
+          static_cast<FlagString *>(previous_flag)->set(argv[i]);
         else
-          static_cast<FlagManyStrings *>(prev_flag)->append(argv[i]);
-        prev_flag->set_position(++position);
-        prev_flag->set_value_location(argument_location(
+          static_cast<FlagManyStrings *>(previous_flag)->append(argv[i]);
+        previous_flag->set_position(++position);
+        previous_flag->set_value_location(argument_location(
             argv, static_cast<usize>(i), base_position, arg_locations));
 
         continue;
@@ -403,7 +404,7 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
     {
       /* The next operand is the script, after which every argument is a
          positional parameter for the script, the way `sh script -x` does. */
-      const bool is_program_name = args.is_empty();
+      let const is_program_name = args.is_empty();
       LOG(Debug, "taking '%s' as an operand", argv[i]);
       args.push_managed(StringView{argv[i]});
       do_record_operand(static_cast<usize>(i));
@@ -492,9 +493,9 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
           if (*value_offset == '\0') {
             LOG(All, "the flag '%s' expects the next argument as its value",
                 flag_name(flag, is_long).c_str());
-            next_arg_is_value = true;
-            prev_flag = flag;
-            prev_is_long = is_long;
+            should_take_next_argument_as_value = true;
+            previous_flag = flag;
+            was_previous_flag_long = is_long;
             flag->set_value_location(argument_location(
                 argv, static_cast<usize>(i), base_position, arg_locations));
           } else {
@@ -562,19 +563,20 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
           } else {
             error_message += "-";
 
-            const StringView flag_sv = flag_offset;
-            let const equals_position = flag_sv.find_character('=');
+            const StringView flag_view = flag_offset;
+            let const equals_position = flag_view.find_character('=');
 
             if (equals_position.has_value())
-              error_message += flag_sv.substring_of_length(0, *equals_position);
+              error_message +=
+                  flag_view.substring_of_length(0, *equals_position);
             else
-              error_message += flag_sv;
+              error_message += flag_view;
           }
           error_message += "'";
 
           LOG(Debug, "rejecting the unknown flag in '%s'", argv[i]);
 
-          const usize arg_index = static_cast<usize>(i);
+          let const arg_index = static_cast<usize>(i);
           let error = ErrorWithLocationAndDetails{
               argument_location(argv, arg_index, base_position, arg_locations),
               prefixed_message(program_name, error_message),
@@ -586,13 +588,14 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
     }
   }
 
-  if (next_arg_is_value) {
-    ASSERT(prev_flag != nullptr);
+  if (should_take_next_argument_as_value) {
+    ASSERT(previous_flag != nullptr);
     let error = ErrorWithLocation{
-        prev_flag->value_location(),
-        prefixed_message(program_name, "No value provided for '" +
-                                           flag_name(prev_flag, prev_is_long) +
-                                           "' flag")};
+        previous_flag->value_location(),
+        prefixed_message(program_name,
+                         "No value provided for '" +
+                             flag_name(previous_flag, was_previous_flag_long) +
+                             "' flag")};
     error.set_command_status(2);
     throw error;
   }
@@ -770,8 +773,10 @@ cold fn wrap_text(StringView text, usize indent, usize width,
   bool is_line_started = false;
   for (usize i = 0; i <= text.length; i++) {
     let const is_at_end = i == text.length;
-    if (!is_at_end && text[i] != ' ') continue;
-    const usize word_length = i - word_start;
+    if (!is_at_end && text[i] != ' ') {
+      continue;
+    }
+    let const word_length = i - word_start;
     if (word_length > 0) {
       if (is_line_started && line_used + 1 + word_length > text_width) {
         out += '\n';
@@ -849,9 +854,11 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
     usize word_start = 0;
     for (usize i = 0; i <= description.length; i++) {
       let const is_at_end = i == description.length;
-      if (!is_at_end && description[i] != ' ') continue;
+      if (!is_at_end && description[i] != ' ') {
+        continue;
+      }
 
-      const usize word_length = i - word_start;
+      let const word_length = i - word_start;
       if (word_length > 0) {
         if (line_used > 0 && line_used + 1 + word_length > TEXT_WIDTH) {
           s += '\n';
@@ -904,7 +911,9 @@ fn print_error(StringView text) throws -> void
   while (written_count < text.count()) {
     let const written = os::write_fd(KOSH_STDERR, text.data + written_count,
                                      text.count() - written_count);
-    if (!written.has_value() || *written == 0) return;
+    if (!written.has_value() || *written == 0) {
+      return;
+    }
     written_count += *written;
   }
 }

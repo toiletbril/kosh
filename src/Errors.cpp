@@ -81,16 +81,16 @@ cold static fn get_context_pointing_to(
     const utils::source_line_position &line_position, Maybe<StringView> message,
     const diagnostic_color &color, EvalContext *eval_context) throws -> String
 {
-  const usize line_number = line_position.line_number;
+  let const line_number = line_position.line_number;
   LOG(Debug, "assembling the caret context for line %zu", line_number + 1);
 
   static constexpr usize LINE_NUMBER_FIELD_WIDTH = 6;
   static constexpr usize BAR_SEPARATOR_WIDTH = 4;
-  const usize line_number_digit_count = number_string_length(line_number + 1);
+  let const line_number_digit_count = number_string_length(line_number + 1);
   const usize line_number_padding_length =
       sub_sat(LINE_NUMBER_FIELD_WIDTH, line_number_digit_count);
-  const usize gutter_width = line_number_padding_length +
-                             line_number_digit_count + BAR_SEPARATOR_WIDTH;
+  let const gutter_width = line_number_padding_length +
+                           line_number_digit_count + BAR_SEPARATOR_WIDTH;
 
   let msg = String{heap_allocator()};
   for (usize i = 0; i < line_number_padding_length; i++) {
@@ -103,7 +103,7 @@ cold static fn get_context_pointing_to(
       line_position.line_end - line_position.line_start;
   let const context =
       source.substring_of_length(line_position.line_start, line_byte_count);
-  const usize caret_byte_position = byte_position - line_position.line_start;
+  let const caret_byte_position = byte_position - line_position.line_start;
 
   ASSERT(!context.find_character('\n').has_value(),
          "'%s', start: %zu, end: %zu", context.data, line_position.line_start,
@@ -142,7 +142,7 @@ cold static fn get_context_pointing_to(
     return caret_expanded_position;
   };
 
-  const usize caret_limit = line_position.line_end - byte_position;
+  let const caret_limit = line_position.line_end - byte_position;
   const usize caret_byte_count =
       byte_count > caret_limit ? caret_limit : byte_count;
   const usize expanded_caret_byte_position =
@@ -155,8 +155,8 @@ cold static fn get_context_pointing_to(
   let const caret_text = display_line.substring_of_length(
       expanded_caret_byte_position,
       expanded_caret_end_byte_position - expanded_caret_byte_position);
-  const usize caret_column = toiletline::display_width(caret_prefix);
-  const usize caret_width = toiletline::display_width(caret_text);
+  let const caret_column = toiletline::display_width(caret_prefix);
+  let const caret_width = toiletline::display_width(caret_text);
 
   let generated_highlights = ArrayList<highlight_span>{heap_allocator()};
   const ArrayList<highlight_span> *source_highlights = &generated_highlights;
@@ -186,7 +186,7 @@ cold static fn get_context_pointing_to(
     }
     line_highlights = &expanded_highlights;
   }
-  const usize display_cells = toiletline::display_width(display_line);
+  let const display_cells = toiletline::display_width(display_line);
 
   usize window_start = 0;
   usize window_end = display_cells;
@@ -200,10 +200,10 @@ cold static fn get_context_pointing_to(
       terminal_columns > gutter_width + 24 &&
       display_cells > terminal_columns - gutter_width)
   {
-    const usize available_line_width = terminal_columns - gutter_width;
-    const usize caret_display_width = caret_width < 1 ? 1 : caret_width;
-    const usize half_window_width = available_line_width / 2;
-    const usize caret_center = caret_column + caret_display_width / 2;
+    let const available_line_width = terminal_columns - gutter_width;
+    let const caret_display_width = caret_width < 1 ? 1 : caret_width;
+    let const half_window_width = available_line_width / 2;
+    let const caret_center = caret_column + caret_display_width / 2;
     window_start =
         caret_center > half_window_width ? caret_center - half_window_width : 0;
     if (window_start + available_line_width > display_cells)
@@ -217,7 +217,7 @@ cold static fn get_context_pointing_to(
     if (caret_column + caret_display_width > window_end &&
         window_end < display_cells)
     {
-      const usize shift = caret_column + caret_display_width - window_end;
+      let const shift = caret_column + caret_display_width - window_end;
       window_start = window_start + shift > caret_column ? caret_column
                                                          : window_start + shift;
       window_end += shift;
@@ -245,7 +245,7 @@ cold static fn get_context_pointing_to(
 
   const usize caret_pad =
       (has_left_ellipsis ? 3u : 0u) + sub_sat(caret_column, window_start);
-  const usize caret_end = caret_column + caret_width;
+  let const caret_end = caret_column + caret_width;
   const usize visible_caret =
       sub_sat(caret_end < window_end ? caret_end : window_end, caret_column);
 
@@ -364,7 +364,7 @@ fn ErrorWithLocation::to_string(StringView source,
                                 EvalContext *context) const throws -> String
 {
   usize byte_position = m_location.position;
-  const usize byte_count = m_location.length;
+  let const byte_count = m_location.length;
 
   /* The location can name a byte in a source other than the one rendered, so
      the caret would read out of bounds and the message renders unlocated. */
@@ -505,7 +505,7 @@ cold fn DetailsWithLocation::to_string(StringView source,
   if (m_message.is_empty()) return String{heap_allocator()};
 
   usize byte_position = m_location.position;
-  const usize byte_count = m_location.length;
+  let const byte_count = m_location.length;
 
   /* The out-of-source guard renders nothing when the location names another
      source, so the caret never reads past the end. */

@@ -719,8 +719,8 @@ public:
     m_last_argument = String{value};
   }
 
-  fn set_last_command_duration_ns(u64 nanos) wontthrow -> void;
-  pure fn last_command_duration_ns() const wontthrow -> u64;
+  fn set_last_command_duration_nanos(u64 nanos) wontthrow -> void;
+  pure fn last_command_duration_nanos() const wontthrow -> u64;
 
   fn set_last_background_pid(i64 pid) wontthrow -> void;
 
@@ -1757,7 +1757,7 @@ protected:
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
 
-  u64 m_last_command_duration_ns{0};
+  u64 m_last_command_duration_nanos{0};
 
   String m_shell_name{heap_allocator()};
   String m_shell_executable_path{heap_allocator()};

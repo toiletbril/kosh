@@ -104,7 +104,9 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let lines = ArrayList<String>{heap_allocator()};
   loop
   {
-    if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) break;
+    if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) {
+      break;
+    }
 
     bool was_newline_terminated = false;
     let const read =
@@ -125,7 +127,7 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
          element_index++)
     {
       char index_text[24];
-      const StringView subscript =
+      let const subscript =
           utils::int_to_text_into(origin + static_cast<i64>(element_index),
                                   index_text, sizeof(index_text));
       cxt.assign_array_element(array_name, subscript,

@@ -263,7 +263,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
     let rewritten = String{heap_allocator()};
     usize i = 0;
     while (i < expression.length) {
-      const char byte = expression[i];
+      let const byte = expression[i];
       if (!lexer::is_variable_name_start(byte)) {
         rewritten += byte;
         i++;
@@ -382,7 +382,7 @@ pure fn word_segment_has_glob_metacharacter(
     const WordSegment &segment) wontthrow -> bool
 {
   for (usize i = 0; i < segment.text.count(); i++) {
-    const char c = segment.text[i];
+    let const c = segment.text[i];
     if (c == '*' || c == '?' || c == '[') {
       return true;
     }

@@ -28,7 +28,9 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") {
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   /* Checked before the signal parsing so -l is not read as a signal named l. */
   if (args.count() > 1 && (args[1] == "-l" || args[1] == "--list")) {
@@ -83,7 +85,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  let do_resolve_signal = [&ec](StringView spec, usize index) throws -> i32 {
+  let const do_resolve_signal = [&ec](StringView spec, usize index)
+                                    throws -> i32 {
     /* The leading-digit guard rejects a doubled minus such as --9, whose
        stripped spec -9 would otherwise parse as the negative signal -9 and
        reach kill with an invalid number. */

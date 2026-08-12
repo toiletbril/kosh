@@ -113,7 +113,9 @@ public:
     /* == is a bashism for string equality. bash accepts it, so the bash mood
        treats it as =, while the default and POSIX moods reject it the way dash
        does. The analysis stage also warns on it as SC3014. */
-    if (op == "=" || (op == "==" && is_bash_compatible)) return left == right;
+    if (op == "=" || (op == "==" && is_bash_compatible)) {
+      return left == right;
+    }
     if (op == "==") {
       fail("'==' is a bashism, use = for string equality in POSIX mode");
       return false;
@@ -218,9 +220,9 @@ public:
     if (is_open_paren_token(pos)) {
       pos++;
       let const result = parse_expression();
-      if (at_end() || current() != ")")
+      if (at_end() || current() != ")") {
         fail("A ')' is expected");
-      else
+      } else
         pos++;
       return result;
     }

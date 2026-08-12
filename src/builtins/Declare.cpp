@@ -51,7 +51,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") {
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   let should_make_associative = false;
   let should_make_indexed = false;
@@ -262,7 +264,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (should_make_associative && !cxt.is_associative_array(name)) {
         return false;
       }
-      if (should_mark_readonly && !cxt.is_readonly(name)) return false;
+      if (should_mark_readonly && !cxt.is_readonly(name)) {
+        return false;
+      }
       return true;
     };
 

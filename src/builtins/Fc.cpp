@@ -112,7 +112,7 @@ resolve_fc_selection(StringView specification,
 }
 
 static fn report_fc_selection_error(const ExecContext &ec, EvalContext &cxt,
-                                    SourceLocation location,
+                                    const SourceLocation &location,
                                     fc_selection_error error) throws -> i32
 {
   if (error == fc_selection_error::OutOfRange) {
@@ -431,8 +431,9 @@ fn Fc::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       FLAG_FC_REVERSE.is_enabled(), FLAG_FC_EXECUTE.is_enabled(),
       FLAG_FC_EDITOR.is_set() ? Maybe<StringView>{FLAG_FC_EDITOR.value()}
                               : None};
-  if (options.editor.has_value() && *options.editor == "-")
+  if (options.editor.has_value() && *options.editor == "-") {
     options.should_execute = true;
+  }
 
   let const events = toiletline::history_events(cxt.scratch_allocator());
   let const active_index =

@@ -51,10 +51,12 @@ static fn settled_option_value(StringView line, StringView option) throws
   let const words = split_completion_words(line, line.length, cword);
   for (usize i = 1; i < words.count(); i++) {
     let const word = words[i].view();
-    if (word == option && i + 1 < words.count() && i + 1 != cword)
+    if (word == option && i + 1 < words.count() && i + 1 != cword) {
       return String{words[i + 1].view()};
-    if (word.length > option.length && word.starts_with(option))
+    }
+    if (word.length > option.length && word.starts_with(option)) {
       return String{word.substring(option.length)};
+    }
   }
   return None;
 }
@@ -192,8 +194,9 @@ static fn parse_package_json_scripts(StringView text) throws
         if (text[i] == '\\') i++;
         i++;
       }
-      if (expecting_key && depth == 1)
+      if (expecting_key && depth == 1) {
         scripts.push(String{text.substring_of_length(start, i - start)});
+      }
       expecting_key = false;
       i++;
       continue;
@@ -368,8 +371,8 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
   /* The name resolves to a path first, since the helper runs the path directly
      with no PATH search, and a probe that overruns the deadline is killed. */
   let const probe_timeout_nanos = 2'000'000'000ULL;
-  let const capture = [&](const ArrayList<String> &probe_argv)
-                          throws -> String {
+  let const do_capture = [&](const ArrayList<String> &probe_argv)
+                             throws -> String {
     if (probe_argv.is_empty()) return String{heap_allocator()};
     let const resolved = context.get_program_resolver().search(
         probe_argv[0].view(), ProgramResolver::SearchMode::First,
@@ -423,7 +426,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       probe.push(String{"-pRrq"});
       probe.push(String{":"});
       let database_targets =
-          parse_make_database_targets(capture(probe).view(), make_directory);
+          parse_make_database_targets(do_capture(probe).view(), make_directory);
       if (!database_targets.is_empty()) return database_targets;
       let const intrinsic_targets =
           koshkit::collect_makefile_targets(context, makefile_path);
@@ -454,7 +457,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       probe.push(String{directory.view()});
       probe.push(String{"-t"});
       probe.push(String{"targets"});
-      return parse_colon_led_names(capture(probe).view());
+      return parse_colon_led_names(do_capture(probe).view());
     });
     break;
   }
@@ -472,7 +475,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       probe.push(String{"--target"});
       probe.push(String{"help"});
       let names = ArrayList<String>{heap_allocator()};
-      let const help = capture(probe);
+      let const help = do_capture(probe);
       let const text = help.view();
       usize i = 0;
       while (i < text.length) {
@@ -515,7 +518,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
     let probe = ArrayList<String>{heap_allocator()};
     probe.push(String{"tsh"});
     probe.push(String{"ls"});
-    owned_targets = parse_tsh_node_names(capture(probe).view());
+    owned_targets = parse_tsh_node_names(do_capture(probe).view());
     break;
   }
   }
@@ -536,14 +539,16 @@ static fn append_flag_forms(const FlagList &flags, StringView token_filter,
     if (flag->short_name() != '\0') {
       let form = String{"-"};
       form.push(flag->short_name());
-      if (token_filter.is_empty() || form.view().starts_with(token_filter))
+      if (token_filter.is_empty() || form.view().starts_with(token_filter)) {
         out.push(steal(form));
+      }
     }
     if (!flag->long_name().is_empty()) {
       let form = String{"--"};
       form += flag->long_name();
-      if (token_filter.is_empty() || form.view().starts_with(token_filter))
+      if (token_filter.is_empty() || form.view().starts_with(token_filter)) {
         out.push(steal(form));
+      }
     }
   }
 }
@@ -756,9 +761,9 @@ fn complete_from_builtin_flags(StringView line, StringView token,
 }
 
 static pure fn entry_is_unrequested_dash_word(
-    StringView entry, bool token_asks_for_dash) wontthrow -> bool
+    StringView entry, bool should_offer_dash_entries) wontthrow -> bool
 {
-  return !token_asks_for_dash && !entry.is_empty() && entry[0] == '-';
+  return !should_offer_dash_entries && !entry.is_empty() && entry[0] == '-';
 }
 
 /* The description opens after a space, so a value holding a parenthesis such as
@@ -1211,18 +1216,18 @@ fn advance_shell_lexical_state(StringView source, usize end,
         active_construct->phase = highlight_construct_phase::for_do;
         frame.is_command_position = false;
       } else if (frame.is_command_position && do_word_matches("case")) {
-        frame.saw_case_keyword = true;
+        frame.has_seen_case_keyword = true;
         frame.is_command_position = false;
-      } else if (frame.saw_case_keyword && do_word_matches("in")) {
-        frame.saw_case_keyword = false;
+      } else if (frame.has_seen_case_keyword && do_word_matches("in")) {
+        frame.has_seen_case_keyword = false;
         frame.case_depth++;
-        frame.case_pattern_expected = true;
+        frame.is_case_pattern_expected = true;
         frame.is_command_position = false;
       } else if (frame.is_command_position && frame.case_depth > 0 &&
                  do_word_matches("esac"))
       {
         frame.case_depth--;
-        frame.case_pattern_expected = false;
+        frame.is_case_pattern_expected = false;
         frame.is_command_position = false;
       } else if (frame.is_command_position && word_looks_like_assignment(word))
       {
@@ -1233,10 +1238,10 @@ fn advance_shell_lexical_state(StringView source, usize end,
         state.known_function_names.add(word);
         frame.is_command_position = false;
       } else if (frame.is_command_position) {
-        if (let const next_is_command =
+        if (let const is_next_command =
                 advance_shell_keyword_state(word, state.frames.count(), state);
-            next_is_command.has_value())
-          frame.is_command_position = *next_is_command;
+            is_next_command.has_value())
+          frame.is_command_position = *is_next_command;
         else if (!lexer::is_shell_sentinel(c))
           frame.is_command_position = false;
       }
@@ -1248,10 +1253,11 @@ fn advance_shell_lexical_state(StringView source, usize end,
           (source[i + 1] == ';' || source[i + 1] == '&') &&
           frame.case_depth > 0)
       {
-        frame.case_pattern_expected = true;
+        frame.is_case_pattern_expected = true;
       }
-      if (c == '\n' && !state.pending_heredocs.is_empty())
+      if (c == '\n' && !state.pending_heredocs.is_empty()) {
         state.is_in_heredoc = true;
+      }
     }
 
     if (state.frames.is_empty()) {
@@ -1259,9 +1265,10 @@ fn advance_shell_lexical_state(StringView source, usize end,
         frame.group_depth++;
       else if (c == ')' && frame.group_depth > 0)
         frame.group_depth--;
-      else if (c == ')' && frame.case_depth > 0 && frame.case_pattern_expected)
+      else if (c == ')' && frame.case_depth > 0 &&
+               frame.is_case_pattern_expected)
       {
-        frame.case_pattern_expected = false;
+        frame.is_case_pattern_expected = false;
         frame.is_command_position = true;
       }
       i++;
@@ -1293,8 +1300,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
         i++;
         continue;
       }
-      if (frame.case_depth > 0 && frame.case_pattern_expected) {
-        frame.case_pattern_expected = false;
+      if (frame.case_depth > 0 && frame.is_case_pattern_expected) {
+        frame.is_case_pattern_expected = false;
         frame.is_command_position = true;
         i++;
         continue;

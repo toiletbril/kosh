@@ -128,13 +128,13 @@ fn crc32c_update(u32 crc, const void *data, usize length) wontthrow -> u32
   let const bytes = static_cast<const u8 *>(data);
 
 #if defined __x86_64__ && !defined __COSMOPOLITAN__
-  static const bool has_sse42 = []() -> bool {
+  static let const has_sse42 = []() -> bool {
     __builtin_cpu_init();
     return __builtin_cpu_supports("sse4.2");
   }();
   if (has_sse42) return crc32c_update_sse42(crc, bytes, length);
 #elif defined __aarch64__ || defined __arm64__ || defined _M_ARM64
-  static const bool has_crc32c = is_aarch64_crc32c_available();
+  static let const has_crc32c = is_aarch64_crc32c_available();
   if (has_crc32c) return crc32c_update_acle(crc, bytes, length);
 #endif
 

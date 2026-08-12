@@ -48,8 +48,10 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (!cxt.is_posix_mode()) {
     while (start < args.count()) {
-      const StringView arg = args[start].view();
-      if (arg.length < 2 || arg[0] != '-') break;
+      let const arg = args[start].view();
+      if (arg.length < 2 || arg[0] != '-') {
+        break;
+      }
       let is_all_option_letters = true;
       for (usize k = 1; k < arg.length; k++)
         if (arg[k] != 'n' && arg[k] != 'e' && arg[k] != 'E') {
@@ -117,9 +119,15 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         }
 
         let const do_hex_value = [](char digit) -> i32 {
-          if (digit >= '0' && digit <= '9') return digit - '0';
-          if (digit >= 'a' && digit <= 'f') return digit - 'a' + 10;
-          if (digit >= 'A' && digit <= 'F') return digit - 'A' + 10;
+          if (digit >= '0' && digit <= '9') {
+            return digit - '0';
+          }
+          if (digit >= 'a' && digit <= 'f') {
+            return digit - 'a' + 10;
+          }
+          if (digit >= 'A' && digit <= 'F') {
+            return digit - 'A' + 10;
+          }
           return -1;
         };
 
