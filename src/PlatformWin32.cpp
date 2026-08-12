@@ -1948,7 +1948,7 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
 {
   ExitProcess(static_cast<UINT>(status));
-  unreachable();
+  unreachable("ExitProcess returned while exiting immediately");
 }
 
 fn replace_process(ExecContext &&ec) -> void
@@ -1966,7 +1966,7 @@ fn replace_process(ExecContext &&ec) -> void
 
   i32 status = wait_and_monitor_process(child);
   ExitProcess(static_cast<UINT>(status));
-  unreachable();
+  unreachable("ExitProcess returned after process replacement");
 }
 
 fn redirect_self(const ExecContext &ec) -> void

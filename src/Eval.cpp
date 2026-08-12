@@ -948,7 +948,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return m_git_behind_count > 0
                      ? String::from(m_git_behind_count, heap_allocator())
                      : String{heap_allocator()};
-        default: ASSERT(false); return String{heap_allocator()};
+        default:
+          unreachable("the git count variable must be KOSH_GIT_AHEAD or "
+                      "KOSH_GIT_BEHIND");
         }
       }
       case dynamic_var::KOSH_IDENTITY: return materialize_kosh_identity();

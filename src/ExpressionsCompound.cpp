@@ -262,7 +262,7 @@ cold fn CompoundListCondition::to_string() const throws -> String
   case Kind::None: k = "None"; break;
   case Kind::And: k = "&&"; break;
   case Kind::Or: k = "||"; break;
-  default: unreachable();
+  default: unreachable("invalid compound-list condition kind %d", ENUM(kind()));
   }
   return "CompoundListCondition, " + k;
 }

@@ -1293,7 +1293,7 @@ ConstantString::~ConstantString() = default;
 fn ConstantString::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   unused(cxt);
-  unreachable();
+  unreachable("a constant string was evaluated as an arithmetic number");
 }
 
 cold fn ConstantString::to_ast_string(usize layer) const throws -> String

@@ -617,7 +617,8 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
     }
   }
 
-  unreachable();
+  unreachable(
+      "the command-list parser loop terminated without returning or throwing");
 }
 
 static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
@@ -753,7 +754,12 @@ fn Parser::build_file_or_dup_redirection(
   case Token::Kind::DoubleGreater:
     redir.kind = expressions::Redirection::Kind::AppendOutput;
     break;
-  default: redir.kind = expressions::Redirection::Kind::ReadInput; break;
+  case Token::Kind::Less:
+    redir.kind = expressions::Redirection::Kind::ReadInput;
+    break;
+  default:
+    unreachable("the file redirection builder received token kind %d",
+                ENUM(op_kind));
   }
   redir.target = target;
   out.push(redir);
@@ -1259,7 +1265,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     }
   }
 
-  unreachable();
+  unreachable("the simple-command parser loop terminated without returning");
 }
 
 hot fn Parser::parse_if() throws -> Command *

@@ -262,24 +262,8 @@ Source backtraces are suppressed. The primary message, source caret, note, and
 detail location remain visible when available.
 .TP
 .B \-\-list\-diagnostics
-The checks reported by the analysis stage are listed. The shell then exits.
-Each numbered row prints the ShellCheck code, tier, public slug, and wrapped
-summary. Each native row prints its slug, tier, and wrapped summary.
-The checks cover unsafe word splitting and globbing, misleading quoting,
-command-output iteration, test and conditional mistakes, redirection order and
-privilege boundaries, pipeline state loss, unvalidated arithmetic input,
-unreachable control flow, dangerous file operations, POSIX portability, lexical
-source bytes, and whole-script variable and function dataflow.
-The catalog contains 310 numbered rows across 306 ShellCheck codes. It also
-contains 18 native analysis checks. A code that carries more than one row
-reports a distinct finding from each row. The default mood rejects a script when
-a strict or lenient check reports an error.
-The portability rows are reported only when the shebang names
-.B sh
-or
-.BR dash .
-The source is also checked for a UTF-8 byte-order mark before the shebang or
-first command.
+The available analysis checks and their metadata are listed. The shell then
+exits.
 .SS Interactive operation
 .TP
 .BR \-T ", " \-\-no\-completion
@@ -1212,10 +1196,8 @@ mapping exists. A diagnostic may include a source line, caret, detail location,
 and trailing note. The complete source line is highlighted before terminal
 clipping.
 .PP
-An analysis message that carries a ShellCheck code closes with that code in
-parentheses, as in
-.BR "An unquoted variable can split into words and expand globs. (SC2086)" .
-A native analysis message carries no code.
+An analysis diagnostic may include a ShellCheck identifier. A native analysis
+diagnostic carries no identifier.
 .PP
 In the default mood, strict and lenient findings reject the script. Annoying
 findings remain warnings. The annoying tier contains additional safety checks
@@ -1227,9 +1209,7 @@ call that runs before its function is defined all reject the script in the
 default mood. A read name that resembles an assigned name is reported with that
 assignment as a detail location.
 .PP
-An analysis run that reported two or more diagnostics closes with a counted
-summary line. The warning count is yellow and the error count is bold bright
-red.
+Several findings end with warning and error totals.
 .PP
 A comment of the form
 .B # shellcheck disable=SC2086,unquoted-command-substitution
@@ -1254,9 +1234,7 @@ remains live. A backtrace is omitted when only one synthetic command-line root
 exists. A printed frame begins with
 .BR trace: .
 .PP
-Error and warning labels, locations, and messages are bold. Warning labels are
-yellow. Note and trace text is cyan. Error carets are bold bright red. Warning,
-note, and trace carets are yellow. NO_COLOR disables color.
+NO_COLOR disables color.
 .SH ENVIRONMENT
 .TP
 .B KOSH_FLAGS

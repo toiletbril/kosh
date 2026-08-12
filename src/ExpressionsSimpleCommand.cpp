@@ -428,7 +428,8 @@ static fn redirection_open_mode(Redirection::Kind kind,
     return os::file_open_mode::Truncate;
   case Redirection::Kind::AppendOutput: return os::file_open_mode::Append;
   case Redirection::Kind::ReadWrite: return os::file_open_mode::ReadWrite;
-  default: return os::file_open_mode::Read;
+  case Redirection::Kind::ReadInput: return os::file_open_mode::Read;
+  default: unreachable("only a file-opening redirection has an open mode");
   }
 }
 

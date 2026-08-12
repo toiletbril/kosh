@@ -166,7 +166,7 @@ cold fn format_metric(double value, metric_unit unit,
       suffix = "";
     }
     break;
-  default: unreachable();
+  default: unreachable("invalid benchmark metric unit %d", ENUM(unit));
   }
 
   char buffer[64];

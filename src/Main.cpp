@@ -1740,7 +1740,7 @@ fn main(int argc, char **argv) -> int
             script_contents.count());
         toiletline::exit_raw_mode();
       } else {
-        unreachable();
+        unreachable("the input loop has no configured input source");
       }
     } catch (const koshka::Error &e) {
       koshka::show_message(e.to_string());
@@ -1830,5 +1830,5 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  unreachable();
+  unreachable("the main command loop terminated without exiting");
 }

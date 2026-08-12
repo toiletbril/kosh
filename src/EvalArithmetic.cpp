@@ -971,7 +971,10 @@ static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
   case '&': return lhs & rhs;
   case '^': return lhs ^ rhs;
   case '|': return lhs | rhs;
-  default: return rhs;
+  default:
+    unreachable("the cached arithmetic evaluator received invalid binary "
+                "operator '%c'",
+                kind);
   }
 }
 
@@ -1594,7 +1597,10 @@ public:
       case '|': lhs = lhs | rhs; break;
       case 'A': lhs = (lhs != 0 && rhs != 0) ? 1 : 0; break;
       case 'O': lhs = (lhs != 0 || rhs != 0) ? 1 : 0; break;
-      default: unreachable();
+      default:
+        unreachable("the wide arithmetic parser received invalid binary "
+                    "operator '%c'",
+                    op.kind);
       }
     }
   }

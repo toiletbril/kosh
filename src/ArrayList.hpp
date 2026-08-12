@@ -67,9 +67,14 @@ public:
 
   hot mustuse pure fn count() const wontthrow -> usize { return m_length; }
   mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
-  hot mustuse pure fn operator[](usize i) wontthrow->T & { return m_data[i]; }
+  hot mustuse pure fn operator[](usize i) wontthrow->T &
+  {
+    ASSERT(i < m_length, "array index is past the end");
+    return m_data[i];
+  }
   hot mustuse pure fn operator[](usize i) const wontthrow->const T &
   {
+    ASSERT(i < m_length, "array index is past the end");
     return m_data[i];
   }
 

@@ -433,8 +433,7 @@ pure inline fn get_diagnostic_tier_name(diagnostic_tier tier) wontthrow
   case diagnostic_tier::Lenient: return "lenient";
   case diagnostic_tier::Annoying: return "annoying";
   }
-  ASSERT(false);
-  return {};
+  unreachable("invalid diagnostic tier %d", ENUM(tier));
 }
 fn format_diagnostic_template(
     const char *text_template,

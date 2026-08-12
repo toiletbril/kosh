@@ -204,8 +204,7 @@ inline fn fake_alloc(opaque *context, usize length, usize alignment) wontthrow
   unused(context);
   unused(length);
   unused(alignment);
-  ASSERT(false, "a fake_allocator container tried to allocate");
-  return nullptr;
+  unreachable("a container with the fake allocator attempted to allocate");
 }
 inline fn fake_free(opaque *context, opaque *pointer, usize length,
                     usize alignment) wontthrow -> void

@@ -24,6 +24,7 @@ public:
   hot mustuse pure fn is_empty() const wontthrow -> bool { return length == 0; }
   hot mustuse pure fn operator[](usize i) const wontthrow->char
   {
+    ASSERT(i < length, "string-view index is past the end");
     return data[i];
   }
 

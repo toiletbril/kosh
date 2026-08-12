@@ -49,7 +49,7 @@ cold static fn diagnostic_colors_for(error_severity severity) throws
         colors::ansi::CYAN, {}, colors::ansi::CYAN, colors::ansi::CYAN};
   }
 
-  unreachable();
+  unreachable("invalid diagnostic color severity %d", ENUM(severity));
 }
 
 /* An analysis message closes with its catalog code in parentheses, and that
@@ -62,6 +62,37 @@ pure static fn text_ends_a_sentence(StringView text) wontthrow -> bool
 
   return last_byte == '.' || last_byte == '?' || last_byte == '!' ||
          last_byte == ')';
+}
+
+cold static fn append_diagnostic_message(String &out, StringView message,
+                                         const diagnostic_color &color) throws
+    -> void
+{
+  let const reset = color.get_reset();
+  usize digit_start = message.length;
+  if (!reset.is_empty() && message.length > 0 &&
+      message[message.length - 1] == ')')
+  {
+    digit_start = message.length - 1;
+    while (digit_start > 0 && message[digit_start - 1] >= '0' &&
+           message[digit_start - 1] <= '9')
+      digit_start--;
+  }
+
+  let const has_code_suffix =
+      digit_start + 1 < message.length && digit_start >= 4 &&
+      message.substring_of_length(digit_start - 4, 4) == StringView{" (SC"};
+  out += color.message;
+  if (!has_code_suffix) {
+    out += message;
+    return;
+  }
+
+  out += message.substring_of_length(0, digit_start - 4);
+  out += reset;
+  out += colors::ansi::DIM;
+  out += message.substring(digit_start - 4);
+  out += reset;
 }
 
 template <class T>
@@ -318,9 +349,12 @@ cold fn ErrorBase::to_string(StringView source,
   let const color = diagnostic_colors_for(severity);
   let const period = text_ends_a_sentence(message()) ? "" : ".";
 
-  return color.severity + severity_word + color.get_reset() + ": " +
-         color.message + message() + period + color.get_reset() +
-         trailing_details_to_string();
+  let result = color.severity + severity_word + color.get_reset() + ": ";
+  append_diagnostic_message(result, message().view(), color);
+  result += period;
+  result += color.get_reset();
+  result += trailing_details_to_string();
+  return result;
 }
 
 fn Error::to_string() const throws -> String
@@ -415,8 +449,7 @@ fn ErrorWithLocation::to_string(StringView source,
   result += color.get_reset();
   if (!m_message.is_empty()) {
     result += ": ";
-    result += color.message;
-    result += m_message;
+    append_diagnostic_message(result, m_message.view(), color);
 
     if (!text_ends_a_sentence(m_message.view())) result += '.';
 

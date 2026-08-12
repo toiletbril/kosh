@@ -12,8 +12,8 @@ The configuration manual is docs/kosh.5. It owns startup file identity and
 file-format behavior. Startup files contain ordinary shell commands. Shell
 language and runtime loading rules remain in docs/kosh.1.
 
-A new flag, mood, builtin, or renamed option updates AGENTS.md, docs/kosh.1,
-and completions/kosh.bash. A configuration file change also updates docs/kosh.5.
+A new flag, mood, builtin, or renamed option updates docs/kosh.1 and
+completions/kosh.bash. A configuration file change also updates docs/kosh.5.
 An architecture or contributor workflow change updates AGENTS.md.
 
 The project is a C++ and C command shell. Speed is the defining goal. The
@@ -68,26 +68,14 @@ targets select that runner. The harness carries alternate goldens for
 documented macOS differences.
 
 The native runner suppresses annoying diagnostics outside the
-`shellcheck_static_*` family. Those canonical tests own the complete annoying
-diagnostic catalog. A test for another parser or evaluator contract uses strict
-input and does not duplicate diagnostic output.
+`shellcheck_static_*` family. Those canonical tests own the diagnostic catalog.
+A test for another parser or evaluator contract uses strict input and does not
+duplicate diagnostic output.
 
-`shellcheck_bashisms_sh_shebang` owns the portability catalog, because those
-rows are reported only under an `sh` or `dash` shebang. Two findings need their
-own input. `shellcheck_byte_order_mark` carries the three mark bytes, which are
-a whole-file property. `shellcheck_local_outside_function` ends in a fatal
-builtin error, which would replace the trailing exit status of the shared
-golden.
+Runner output files live below `.test-work/results`.
 
-Runner output files live below `.test-work/results`. The portable mktemp shim
-uses host filesystem operations and never starts the tested shell. Its exported
-allocation root is absolute and uses native path syntax on every host.
-
-The benchmark uses `+analysis` for analysis-enabled runs. Compatibility rows
-retain their mood and enable analysis with `-W`.
-The local benchmark uses one measured run by default. CI gives each executable
-seven measured runs. The speed gate compares the slowest reference time with
-the fastest candidate time.
+The speed gate compares the slowest reference time with the fastest candidate
+time.
 
 Every rm test invokes the koshkit rm with `--dry-run`. This rule applies to
 koshkit_rm and every new rm test. Temporary directory cleanup uses the system rm
@@ -273,66 +261,10 @@ per-keystroke highlighter. src/CompletionInternal.hpp declares shared helpers.
 src/CompletionPolicy.hpp owns program policies, help allowlists, extension
 hints, custom completer routing, and transparent prefixes.
 
-Completion isolates the command segment at the cursor. The scanner is quote
-aware, recognizes the innermost command substitution, stops before its closer,
-and skips here-document bodies. The cascade checks process arguments, builtin
-flags, registered specifications, build targets, manual subcommands and options,
-help subcommands and options, then the filesystem.
-
-Smart-case and subsequence matching follow exact-prefix ranking. Ghost
-completion stops after prefix matches. Explicit Tab also considers subsequences.
-Empty ghost completion avoids a PATH scan. Empty explicit completion includes
-PATH programs.
-
-Path completion expands a leading tilde or variable prefix only for directory
-listing. The offered candidate retains the typed prefix. Glob patterns expand
-to their matches. Quote reconstruction preserves raw bytes before a quote and
-appends the suffix inside the same quote. Completion replaces a stale suffix
-after the cursor.
-
-A command runs `--help` at most once per cache key. The program must pass the
-allowlist and trusted-directory gate. The subcommand walk stops at a flag, an
-unknown subcommand, or MAX_SUBCOMMAND_DEPTH of four.
-
-Completion, highlighting, and command lookup share the directory-listing cache.
-The first use in an epoch validates metadata. Later uses in that epoch reuse the
-entry. Each interactive input starts an epoch. Tab and compgen start nested
-explicit validation epochs. A stale command index is rebuilt after
-PROMPT_COMMAND and before the editor accepts a key. Explicit PATH validation
-ends with the Tab callback or compgen invocation that started it.
-
-The runnable-name and regular-file indexes derive from directory listings.
-They never populate the execution hash. Only execution and the hash builtin
-populate that hash. A PATH membership change invalidates both indexes and the
-execution hash. Each directory listing is sorted once by folded name.
-Filesystem completion and partial-path highlighting binary-search the active
-prefix. Symlink target kinds are resolved when a listing is used.
-
-The highlighter probes a complete bare path without enumerating siblings. Warm
-command and history classification performs no filesystem access. Variable
-lookup is limited to names present on the line. Nested command and arithmetic
-substitutions are colored in one pass.
-
-Completion, diagnostics, and koshkit cat share semantic highlight roles and the
-tolerant lexical scanner. Colors.cpp maps roles to terminal styles. Styled
-underline support remains behind a disabled capability gate.
-
-Diagnostic highlighting stores lexical checkpoints at line boundaries near
-4096-byte intervals. Sequential lines build the same checkpoints without
-copying their lexical containers. Checkpoints retain function definitions.
-Random lookup resumes at the nearest checkpoint. A source identity change
-invalidates checkpoints and cached spans.
-
-Analysis warnings are queued with owned messages. Unique source lines are
-highlighted in source order, then diagnostics are rendered in discovery order.
-Fatal diagnostics flush earlier warnings before they are rendered. An analysis
-run that reported two or more diagnostics closes with a counted summary line.
-The warning count is yellow and the error count is bold bright red.
-
-A diagnostic line carries no program name prefix. It begins with its source
-location when the mapping exists. An analysis message that carries a ShellCheck
-code closes with that code in parentheses after the sentence period. A closing
-parenthesis ends a sentence, so no second period is appended.
+Completion, highlighting, diagnostics, and koshkit cat share the tolerant
+scanner and semantic highlight roles. Completion, highlighting, and command
+lookup share directory scans. PATH changes invalidate the derived indexes and
+the execution hash.
 
 DiagnosticsCatalog.cpp owns each analysis diagnostic's code, slug, summary,
 message, suggestion, related detail, tier, and delivery.
@@ -346,24 +278,13 @@ funnel. Expression analysis reports a diagnostic ID with source locations and
 dynamic values. The default mood rejects strict and lenient findings and
 reports annoying findings as warnings.
 Compatibility moods expose the tiers as warnings through `-W`, `-WW`, and
-`-WWW`. Related-location notes use cyan carets, and every secondary detail
-begins with a lowercase byte.
+`-WWW`. A `static_assert` couples catalog order to the `diagnostic_id` enum.
+A message authors shell syntax in backquotes. A dynamic name, path, value, or
+number is single quoted. A summary begins with a lowercase letter, and a
+suggestion begins with an uppercase letter.
 
-The catalog holds 310 numbered rows across 306 ShellCheck codes and 18 native
-analysis rows. Seven of the native rows belong to the optimizer and are reported
-only under `--optimizer-diagnostics`. Those seven rows are lenient. Its closing
-line is a blue count of the
-eliminated statements. A `static_assert` couples the row order to the `diagnostic_id`
-enum order, so both stay ascending by code with the native rows last. A message
-authors its own shell syntax in backquotes, and a name, path, value, or number
-taken from the script through a `{0}` or `{1}` placeholder is single quoted. A
-summary begins with a lowercase letter, and a suggestion begins with an
-uppercase letter.
-
-The portability rows are gated behind `shebang_is_posix_sh`, which is armed when
-the shebang names `sh` or `dash`. The whole-script dataflow rows are reported by
-one sweep at the end of `analyze_ast`, and a misspelled name is matched against
-the assigned names by edit distance.
+The portability rows are gated behind `shebang_is_posix_sh`. Whole-script
+dataflow findings are reported by one sweep at the end of `analyze_ast`.
 
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare koshkit utility
@@ -375,33 +296,13 @@ and-or command. A numeric code suppresses every catalog variant under that
 code. An exact slug suppresses one numbered or native analysis variant. Parser
 errors and runtime diagnostics are not suppressed by these comments.
 
-Six catalog codes are excluded by decision. SC1015 and SC1016 were retired
-upstream and split into SC1110 and SC1111, which are implemented, so reporting
-them would name the same bytes twice. SC1117 fires on a backslash before any
-byte that carries no meaning inside double quotes, which an ordinary regular
-expression payload triggers constantly. SC1119 through SC1122 describe the text
-that trails a here-document token and its terminator, and `walk_heredoc_body`
-discards that text, so a second scan of every here-document would be needed.
-SC2034 reports an assigned name that no read consumes, and reads appear in
-roughly twenty-five syntactic forms, so the read set cannot be gathered without
-a new walk of the source. SC2278 and SC2280 describe ksh behavior, and Koshka
-has no ksh mood, so an assignment to `$0` resolves to SC2277 or SC2279 instead.
+SC1015, SC1016, SC1117, SC1119 through SC1122, SC2034, SC2278, and SC2280 are
+excluded. These codes are retired, too noisy, require unavailable syntax data,
+require another traversal, or apply only to an unsupported shell mood.
 
 src/Toiletline.cpp connects the editor and evaluator. The vendored editor lives
 in src/toiletline/toiletline.h. The completion bridge retains its result until
-the editor consumes returned pointers. Plain appends update the stored byte
-length and serialized line directly. History entries are decoded as bytes.
-Display width is tracked separately.
-
-An edited fc command records complete commands in a transaction. One history
-rewrite replaces the accepted active event after successful evaluation. A
-failed rewrite retains the active event.
-
-Ghost completion and history cache prefixes that produce no suggestion. The
-physical working directory is captured once per input. Reassigning PWD does not
-change the implicit completion base. A directory change preserves the command
-cache when every PATH component is absolute. A relative or empty component
-invalidates it.
+the editor consumes returned pointers.
 
 ### Diagnostics and source locations
 

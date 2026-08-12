@@ -28,8 +28,7 @@ pure inline fn get_error_severity_word(error_severity severity) wontthrow
   case error_severity::Details: return "details";
   case error_severity::Trace: return "trace";
   }
-  ASSERT(false);
-  return {};
+  unreachable("invalid error severity %d", ENUM(severity));
 }
 
 struct SourceLocation
