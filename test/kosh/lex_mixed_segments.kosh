@@ -1,4 +1,6 @@
 #!/bin/env kosh
+# The names below stand in for word segments and are never assigned on purpose.
+# shellcheck disable=SC2154
 : pre"dq"'sq'$x${y}post
 : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
 

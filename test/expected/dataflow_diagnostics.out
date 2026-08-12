@@ -1,0 +1,42 @@
+== a name that is never assigned:
+1:6: warning: The variable 'undefined_name' is read before any assignment gives it a value.
+     1 |  echo "$undefined_name"
+       |       ^~~~~~~~~~~~~~~~~
+note: Assign 'undefined_name' before it is read, or export it from the environment.
+== a name that resembles an assigned name:
+2:6: warning: The variable 'myvalue' is never assigned, and 'my_value' is.
+     2 |  echo "$myvalue"
+       |       ^~~~~~~~~~
+note: Correct the spelling or assign 'myvalue'.
+== case and underscore folding both count as a resemblance:
+2:6: warning: The variable 'OUTPUTFILE' is never assigned, and 'output_file' is.
+     2 |  echo "$OUTPUTFILE"
+       |       ^~~~~~~~~~~~~
+note: Correct the spelling or assign 'OUTPUTFILE'.
+== an assignment before the read stays quiet:
+rc=0
+== a prefix assignment counts as an assignment:
+rc=0
+== the shell maintains these names itself:
+rc=0
+== a KOSH_ name is maintained by the shell:
+rc=0
+== an arithmetic assignment assigns its target:
+rc=0
+== a compound arithmetic assignment assigns its target:
+rc=0
+== an arithmetic comparison assigns nothing:
+1:24: warning: The variable 'q' is read before any assignment gives it a value.
+     1 |  echo $((q <= 1)); echo "$q"
+       |                         ^~~~
+note: Assign 'q' before it is read, or export it from the environment.
+== a C-style for init clause assigns its target:
+rc=0
+== the default mood rejects an unassigned read:
+1:6: error: The variable 'rejected_name' is read before any assignment gives it a value.
+     1 |  echo "$rejected_name"
+       |       ^~~~~~~~~~~~~~~~
+note: Assign 'rejected_name' before it is read, or export it from the environment.
+rc=1
+== a disable directive silences the sweep:
+rc=0

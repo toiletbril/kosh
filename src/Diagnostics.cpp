@@ -707,6 +707,15 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "The `return` operand is command output, and a status is one number from "
       "0 to 255",
       "Print the value and return a status separately", None, Strict, Policy),
+    D(2153, "misspelled-variable-name",
+      "a read name resembles an assigned name",
+      "The variable '{0}' is never assigned, and '{1}' is",
+      "Correct the spelling or assign '{0}'", None, Strict, Policy),
+    D(2154, "unassigned-variable-read",
+      "a name is read that the script never assigns",
+      "The variable '{0}' is read before any assignment gives it a value",
+      "Assign '{0}' before it is read, or export it from the environment", None,
+      Strict, Policy),
     D(2155, "declare-substitution-status",
       "declare and assignment can mask command status",
       "Declaring and assigning from a command substitution in one command "
@@ -2289,6 +2298,98 @@ constexpr PackedStringKey FIND_LEADING_OPTION_KEYS[] = {
     SSK("-d"), SSK("-s"), SSK("-x"), SSK("-X")};
 constexpr StaticStringSet FIND_LEADING_OPTIONS{FIND_LEADING_OPTION_KEYS};
 
+/* The names the shell or the environment gives a value without the script
+   assigning one, so a read of them is not an unassigned read. Every KOSH_ name
+   is covered by its prefix and is left out here. */
+constexpr PackedStringKey SHELL_MAINTAINED_VARIABLE_KEYS[] = {
+    SSK("BASH"),
+    SSK("BASHOPTS"),
+    SSK("BASHPID"),
+    SSK("BASH_ALIASES"),
+    SSK("BASH_ARGC"),
+    SSK("BASH_ARGV"),
+    SSK("BASH_ARGV0"),
+    SSK("BASH_COMMAND"),
+    SSK("BASH_ENV"),
+    SSK("BASH_EXECUTION_STRING"),
+    SSK("BASH_LINENO"),
+    SSK("BASH_MONOSECONDS"),
+    SSK("BASH_REMATCH"),
+    SSK("BASH_SOURCE"),
+    SSK("BASH_SUBSHELL"),
+    SSK("BASH_VERSINFO"),
+    SSK("BASH_VERSION"),
+    SSK("CDPATH"),
+    SSK("COLUMNS"),
+    SSK("COMP_CWORD"),
+    SSK("COMP_LINE"),
+    SSK("COMP_POINT"),
+    SSK("COMP_WORDS"),
+    SSK("DIRSTACK"),
+    SSK("DISPLAY"),
+    SSK("EDITOR"),
+    SSK("ENV"),
+    SSK("EPOCHREALTIME"),
+    SSK("EPOCHSECONDS"),
+    SSK("EUID"),
+    SSK("FCEDIT"),
+    SSK("FUNCNAME"),
+    SSK("GLOBIGNORE"),
+    SSK("GROUPS"),
+    SSK("HISTFILE"),
+    SSK("HISTSIZE"),
+    SSK("HOME"),
+    SSK("HOSTNAME"),
+    SSK("HOSTTYPE"),
+    SSK("IFS"),
+    SSK("LANG"),
+    SSK("LC_ALL"),
+    SSK("LC_COLLATE"),
+    SSK("LC_CTYPE"),
+    SSK("LC_MESSAGES"),
+    SSK("LC_NUMERIC"),
+    SSK("LC_TIME"),
+    SSK("LINENO"),
+    SSK("LINES"),
+    SSK("LOGNAME"),
+    SSK("MACHTYPE"),
+    SSK("MAIL"),
+    SSK("MAILCHECK"),
+    SSK("MAILPATH"),
+    SSK("OLDPWD"),
+    SSK("OPTARG"),
+    SSK("OPTERR"),
+    SSK("OPTIND"),
+    SSK("OSTYPE"),
+    SSK("PAGER"),
+    SSK("PATH"),
+    SSK("PIPESTATUS"),
+    SSK("POSIXLY_CORRECT"),
+    SSK("PPID"),
+    SSK("PROMPT_COMMAND"),
+    SSK("PS1"),
+    SSK("PS2"),
+    SSK("PS3"),
+    SSK("PS4"),
+    SSK("PWD"),
+    SSK("RANDOM"),
+    SSK("REPLY"),
+    SSK("SECONDS"),
+    SSK("SHELL"),
+    SSK("SHELLOPTS"),
+    SSK("SHLVL"),
+    SSK("SRANDOM"),
+    SSK("TERM"),
+    SSK("TIMEFORMAT"),
+    SSK("TMPDIR"),
+    SSK("TZ"),
+    SSK("UID"),
+    SSK("USER"),
+    SSK("VISUAL"),
+};
+constexpr StaticStringSet SHELL_MAINTAINED_VARIABLES{
+    SHELL_MAINTAINED_VARIABLE_KEYS};
+
 constexpr PackedStringKey BASH_ONLY_VARIABLE_KEYS[] = {
     SSK("BASHOPTS"),      SSK("BASHPID"),
     SSK("BASH_ALIASES"),  SSK("BASH_ARGC"),
@@ -2436,6 +2537,56 @@ fn check_posix_parameter_expansion(AnalysisContext &actx,
   }
 }
 
+/* The name an arithmetic assignment writes, read backwards from the '=' the
+   scan stands on. The view is empty when that '=' closes a comparison. */
+pure fn arithmetic_assignment_target(StringView expression,
+                                     usize equals_position) wontthrow
+    -> StringView
+{
+  if (equals_position == 0) return {};
+  if (equals_position + 1 < expression.length &&
+      expression[equals_position + 1] == '=')
+  {
+    return {};
+  }
+
+  usize at = equals_position;
+
+  switch (expression[at - 1]) {
+  case '=':
+  case '!': return {};
+
+  case '<':
+  case '>':
+    if (at < 2 || expression[at - 2] != expression[at - 1]) return {};
+    at -= 2;
+    break;
+
+  case '+':
+  case '-':
+  case '*':
+  case '/':
+  case '%':
+  case '&':
+  case '|':
+  case '^': at--; break;
+
+  default: break;
+  }
+
+  while (at > 0 && lexer::is_whitespace(expression[at - 1]))
+    at--;
+
+  let const end = at;
+  while (at > 0 && lexer::is_variable_name(expression[at - 1]))
+    at--;
+
+  if (at == end) return {};
+  if (!lexer::is_variable_name_start(expression[at])) return {};
+
+  return expression.substring_of_length(at, end - at);
+}
+
 } /* namespace */
 
 fn check_posix_arithmetic_operators(AnalysisContext &actx,
@@ -2535,10 +2686,17 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     case '|':
     case '&':
     case '^':
-    case '=':
     case '<':
     case '>':
     case '%': has_pending_division = false; break;
+
+    case '=': {
+      has_pending_division = false;
+
+      let const target = arithmetic_assignment_target(expression, position);
+      if (!target.is_empty()) actx.note_variable_assignment(target);
+      break;
+    }
 
     default: {
       if (!lexer::is_variable_name(expression[position])) break;
@@ -6070,6 +6228,95 @@ fn check_heredoc_terminators(
                              SourceLocation{miss.position, miss.length},
                              {terminator});
       break;
+    }
+  }
+}
+
+namespace {
+
+struct unassigned_read
+{
+  StringView name;
+  SourceLocation location;
+};
+
+pure fn fold_name_byte(char byte) wontthrow -> char
+{
+  return byte >= 'a' && byte <= 'z' ? static_cast<char>(byte - ('a' - 'A'))
+                                    : byte;
+}
+
+/* Whether two names differ only in letter case and in underscore placement,
+   which is the shape a misspelled reference of an assigned name takes. */
+pure fn names_resemble_each_other(StringView left, StringView right) wontthrow
+    -> bool
+{
+  usize at_left = 0;
+  usize at_right = 0;
+
+  loop
+  {
+    while (at_left < left.length && left[at_left] == '_')
+      at_left++;
+    while (at_right < right.length && right[at_right] == '_')
+      at_right++;
+
+    if (at_left == left.length || at_right == right.length) break;
+    if (fold_name_byte(left[at_left]) != fold_name_byte(right[at_right]))
+      return false;
+
+    at_left++;
+    at_right++;
+  }
+
+  return at_left == left.length && at_right == right.length;
+}
+
+} /* namespace */
+
+pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool
+{
+  if (name.starts_with("KOSH_")) return true;
+
+  return SHELL_MAINTAINED_VARIABLES.contains(name);
+}
+
+fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
+{
+  if (actx.reads_before_assignment.count() == 0) return;
+  if (!actx.should_report(diagnostic_id::sc2154) &&
+      !actx.should_report(diagnostic_id::sc2153))
+  {
+    return;
+  }
+
+  let reads = ArrayList<unassigned_read>{heap_allocator()};
+  actx.reads_before_assignment.for_each(
+      [&reads](StringView name, const SourceLocation &location)
+          throws -> void { reads.push(unassigned_read{name, location}); });
+
+  reads.sort([](const unassigned_read &left, const unassigned_read &right) {
+    return left.location.position < right.location.position;
+  });
+
+  for (let const &read : reads) {
+    StringView resembled{};
+    let const do_match = [&read, &resembled](StringView assigned)
+                             throws -> void {
+      if (!resembled.is_empty()) return;
+      if (assigned == read.name) return;
+      if (names_resemble_each_other(assigned, read.name)) resembled = assigned;
+    };
+
+    actx.assigned_names_so_far.for_each(do_match);
+    actx.global_assigned_names.for_each(do_match);
+    actx.function_local_names.for_each(do_match);
+
+    if (resembled.is_empty()) {
+      actx.report_diagnostic(diagnostic_id::sc2154, read.location, {read.name});
+    } else {
+      actx.report_diagnostic(diagnostic_id::sc2153, read.location,
+                             {read.name, resembled});
     }
   }
 }

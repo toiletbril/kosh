@@ -1,4 +1,6 @@
 #!/bin/env kosh
+# The names below stand in for word segments and are never assigned on purpose.
+# shellcheck disable=SC2154
 : $foo ${bar}
 : "$foo" "${bar}"
 : pre$foo "lead${bar}tail"

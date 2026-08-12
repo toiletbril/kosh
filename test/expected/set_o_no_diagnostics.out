@@ -44,8 +44,8 @@
 [Word
   Unquoted "done"
 ]
-3:13: warning: The variable 'never_a' is not set, it expands to empty.
-     3 |  echo "first=$never_a"
+6:13: warning: The variable 'never_a' is not set, it expands to empty.
+     6 |  echo "first=$never_a"
        |              ^~~~~~~~
 note: Replace it with ${never_a-} if empty expansion is desired.
 first=

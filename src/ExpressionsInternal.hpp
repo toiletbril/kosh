@@ -248,6 +248,14 @@ enum class loop_disposition
 
 fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition;
 
+/* Whether the shell or the environment gives the name a value on its own, so a
+   script that reads it without assigning it is correct. */
+pure fn is_shell_maintained_variable(StringView name) wontthrow -> bool;
+
+/* The names left in reads_before_assignment once the walk is done. A name still
+   listed there was read at the top level and no later assignment claimed it. */
+fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void;
+
 } /* namespace expressions */
 
 } /* namespace koshka */

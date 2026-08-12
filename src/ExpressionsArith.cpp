@@ -694,6 +694,15 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
      runs before the constant table is cleared for the body. */
   optimizer::optimize_node(this, actx);
 
+  for (let const clause : {m_init.view(), m_condition.view(), m_step.view()}) {
+    if (clause.is_empty()) continue;
+
+    check_arithmetic_expression_lints(actx, clause, source_location());
+
+    if (actx.shebang_is_posix_sh)
+      check_posix_arithmetic_operators(actx, clause, source_location());
+  }
+
   actx.constant_variables.clear();
   actx.loop_body_depth++;
   m_body->analyze(actx, false);

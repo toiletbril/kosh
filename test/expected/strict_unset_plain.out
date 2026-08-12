@@ -23,13 +23,13 @@
 [Word
   Unquoted "not-reached"
 ]
-3:6: warning: An unquoted variable can split into words and expand globs.
-     3 |  echo $nope
+5:6: warning: An unquoted variable can split into words and expand globs.
+     5 |  echo $nope
        |       ^~~~~
 note: Quote the expansion to keep one argument.
 before
-3:6: warning: The variable 'nope' is not set, it expands to empty.
-     3 |  echo $nope
+5:6: warning: The variable 'nope' is not set, it expands to empty.
+     5 |  echo $nope
        |       ^~~~~
 note: Replace it with ${nope-} if empty expansion is desired.
 

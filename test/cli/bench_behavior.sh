@@ -56,8 +56,10 @@ counter_row_count=$(printf '%s\n' "$counter_output" | grep -Ec '^  (cpu cycles|i
 case "$counter_row_count" in
     0) ;;
     5)
-        printf '%s\n' "$counter_output" | grep '^  cpu cycles' | grep -q '[1-9]'
-        printf '%s\n' "$counter_output" | grep '^  instructions' | grep -q '[1-9]'
+        cpu_cycle_row=$(printf '%s\n' "$counter_output" | grep '^  cpu cycles')
+        instruction_row=$(printf '%s\n' "$counter_output" | grep '^  instructions')
+        case "$cpu_cycle_row" in *[1-9]*) ;; *) exit 1 ;; esac
+        case "$instruction_row" in *[1-9]*) ;; *) exit 1 ;; esac
         ;;
     *) exit 1 ;;
 esac
@@ -66,8 +68,10 @@ if [ "$(uname -s)" = Linux ] && command -v perf >/dev/null 2>&1 &&
         -- /bin/true >/dev/null 2>&1; then
     test "$counter_row_count" -eq 5
 fi
-printf '%s\n' "$counter_output" |
-    grep -Fq "Benchmark: $BENCH_ECHO counter-run (1 runs)"
+case "$counter_output" in
+    *"Benchmark: $BENCH_ECHO counter-run (1 runs)"*) ;;
+    *) exit 1 ;;
+esac
 echo "counter capability passed"
 echo "== counter fallback keeps one complete sample:"
 if [ "$(uname -s)" = Linux ]; then
@@ -78,8 +82,10 @@ if [ "$(uname -s)" = Linux ]; then
     )
     test "$(printf '%s\n' "$fallback_output" | grep -c '^fallback-run$')" -eq 1
     test "$(printf '%s\n' "$fallback_output" | grep -Ec '^  (cpu cycles|instructions|cache refs|cache misses|branch misses)')" -eq 0
-    printf '%s\n' "$fallback_output" |
-        grep -Fq "Benchmark: $BENCH_ECHO fallback-run (1 runs)"
+    case "$fallback_output" in
+        *"Benchmark: $BENCH_ECHO fallback-run (1 runs)"*) ;;
+        *) exit 1 ;;
+    esac
 fi
 echo "counter fallback passed"
 echo "== a failed later sample clears terminal progress:"
@@ -120,15 +126,19 @@ terminal_hex=$(od -An -tx1 "$d/typescript" | tr -d ' \n')
 if [ "$has_typescript" -eq 1 ]; then
     [ -n "$terminal_hex" ] || exit 1
     [ ! -e "$vanishing_command" ] && [ ! -L "$vanishing_command" ] || exit 1
+    typescript_text=$(tr -d '\r' < "$d/typescript")
     if [ "${OS-}" = Windows_NT ]; then
-        tr -d '\r' < "$d/typescript" |
-            grep -Fq "Unable to run '$vanishing_command --mood bash -c true'" ||
-            exit 1
+        case "$typescript_text" in
+            *"Unable to run '$vanishing_command --mood bash -c true'"*) ;;
+            *) exit 1 ;;
+        esac
     else
-        tr -d '\r' < "$d/typescript" |
-            grep -F "$vanishing_command --mood bash -c true" |
-            grep -Fq 'exited with status 127.' ||
-            exit 1
+        vanishing_row=$(printf '%s\n' "$typescript_text" |
+            grep -F "$vanishing_command --mood bash -c true")
+        case "$vanishing_row" in
+            *'exited with status 127.'*) ;;
+            *) exit 1 ;;
+        esac
     fi
 fi
 if [ "$has_progress_terminal" -eq 1 ]; then

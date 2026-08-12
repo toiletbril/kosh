@@ -1,3 +1,5 @@
 #!/bin/env kosh
+# The runtime nounset error is the contract under test, not the static warning.
+# shellcheck disable=SC2154
 set -u
 echo "$undefined_var"

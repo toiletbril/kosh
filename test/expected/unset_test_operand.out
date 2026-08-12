@@ -222,13 +222,13 @@ exit=0
 == [[ unset -ne 0 ]]:
 exit=1
 == [ unset -ne 0 ] (builtin, integer expected):
-11:5: error: Builtin `[`: Cannot compare with '-ne', '' is not an integer.
-    11 |  ( [ "$UNSET_VAR" -ne 0 ] ) 2>&1; echo "exit=$?"
+13:5: error: Builtin `[`: Cannot compare with '-ne', '' is not an integer.
+    13 |  ( [ "$UNSET_VAR" -ne 0 ] ) 2>&1; echo "exit=$?"
        |      ^~~~~~~~~~~~
 exit=1
 == set -u aborts a bare reference:
-13:17: error: Unable to expand 'UNSET_VAR' because the parameter is not set.
-    13 |  ( set -u; echo "$UNSET_VAR" ) 2>&1
+15:17: error: Unable to expand 'UNSET_VAR' because the parameter is not set.
+    15 |  ( set -u; echo "$UNSET_VAR" ) 2>&1
        |                  ^~~~~~~~~~
 note: Replace it with ${UNSET_VAR-} if empty expansion is desired.
 rc=2

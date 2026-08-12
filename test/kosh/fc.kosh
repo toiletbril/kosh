@@ -1,4 +1,6 @@
 #!/bin/env kosh
+# The edited command assigns edited_value at runtime, which no static walk sees.
+# shellcheck disable=SC2154
 d=$TEST_TEMP_DIRECTORY/fc
 koshkit mkdir -p "$d"
 export KOSH_HISTORY=$d/history

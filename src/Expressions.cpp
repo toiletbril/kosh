@@ -392,6 +392,7 @@ fn AnalysisContext::note_variable_read(StringView name, SourceLocation location,
   if (function_local_names.contains(name)) return;
   if (global_assigned_names.contains(name)) return;
   if (reads_before_assignment.find(name) != nullptr) return;
+  if (expressions::is_shell_maintained_variable(name)) return;
 
   if (eval_context != nullptr &&
       (eval_context->is_exported(name) ||
@@ -694,6 +695,8 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.apply_scope_definitions(scope_definitions);
 
   root->analyze(actx, true);
+
+  expressions::check_unassigned_variable_reads(actx);
 
   actx.flush_warnings();
 
@@ -1078,6 +1081,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   for (let const &var : m_local_vars) {
     if (var.name.view() == "PATH")
       actx.should_silence_unresolved_commands = true;
+
+    /* A prefix on an ordinary command does not outlive it, and a prefix with no
+       command word does. Both are recorded, because the dataflow sweep reports
+       a name that no assignment ever claims. */
+    actx.note_variable_assignment(var.name.view());
 
     if (actx.shebang_is_posix_sh && var.is_append) {
       actx.report_diagnostic(diagnostic_id::sc3024, var.location,

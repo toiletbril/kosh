@@ -1,4 +1,6 @@
 #!/bin/env kosh
+# The operand is unset on purpose, which is the contract under test.
+# shellcheck disable=SC2154
 echo "== [ -z unset ]:"
 [ -z "$UNSET_VAR" ]; echo "exit=$?"
 echo "== [ -n unset ]:"

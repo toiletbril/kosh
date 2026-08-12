@@ -16,13 +16,16 @@ unset KOSH_FLAGS
 # and -L is the short for --init-moods, matching the command-line flags so a
 # config can set either form.
 echo "== bash mood relaxes nounset:"
-"$BIN" -c 'set --mood bash; echo "[${UNSETA}]"; echo ok'
+"$BIN" -c '# shellcheck disable=SC2154
+set --mood bash; echo "[${UNSETA}]"; echo ok'
 echo "== -M short form prints the active mood:"
 "$BIN" -c 'set -M sh; set --mood'
 echo "== default mood is strict:"
-"$BIN" -c 'echo "[${UNSETB}]"' 2>&1 | grep -o "is not set" | head -1
+"$BIN" -c '# shellcheck disable=SC2154
+echo "[${UNSETB}]"' 2>&1 | grep -o "is not set" | head -1
 echo "== switching back to kosh restores strictness:"
-"$BIN" -c 'set --mood bash; set --mood kosh; echo "[${UNSETC}]"' 2>&1 | grep -o "is not set" | head -1
+"$BIN" -c '# shellcheck disable=SC2154
+set --mood bash; set --mood kosh; echo "[${UNSETC}]"' 2>&1 | grep -o "is not set" | head -1
 echo "rc-done"
 
 unset KOSH_FLAGS

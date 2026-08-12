@@ -176,6 +176,8 @@ enum class diagnostic_id : u16
   sc2148,
   sc2151,
   sc2152,
+  sc2153,
+  sc2154,
   sc2155,
   sc2156,
   sc2157_string,
