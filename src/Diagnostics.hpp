@@ -359,7 +359,8 @@ struct diagnostic_definition
   const char *message_template;
   Maybe<const char *> suggestion_template;
   Maybe<const char *> related_template;
-  u16 shellcheck_code;
+  /* None marks a native analysis row that borrows no ShellCheck number. */
+  Maybe<u16> shellcheck_code;
   diagnostic_tier tier;
   diagnostic_delivery delivery;
 };
@@ -438,7 +439,8 @@ pure inline fn get_diagnostic_tier_name(diagnostic_tier tier) wontthrow
 fn format_diagnostic_template(
     const char *text_template,
     std::initializer_list<StringView> arguments = {}) throws -> String;
-fn append_diagnostic_code(String &message, u16 shellcheck_code) throws -> void;
+fn append_diagnostic_code(String &message, Maybe<u16> shellcheck_code) throws
+    -> void;
 fn collect_shellcheck_selectors(
     StringView source, shellcheck_directive_span comment_span,
     ArrayList<shellcheck_selector> &selectors) throws -> void;

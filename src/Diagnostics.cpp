@@ -1425,76 +1425,79 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       "sh",
       "Use `sed` or a `case` dispatch under a `sh` shebang", None, Strict,
       Policy),
-    D(0, "arith-assign", "array syntax was used for arithmetic assignment",
+    D(None, "arith-assign", "array syntax was used for arithmetic assignment",
       "The assignment of '{0}' uses array subscript syntax",
       "Use `let '{0}={1}'` to evaluate and assign it", None, Strict, Policy),
-    D(0, "assignment-prefix-read",
+    D(None, "assignment-prefix-read",
       "an assignment prefix is read before it takes effect",
       "The assignment prefix does not affect this command, '{0}' is read "
       "before it is set",
       None, None, Lenient, Policy),
-    D(0, "exported-cdpath", "an exported `CDPATH` can redirect child scripts",
+    D(None, "exported-cdpath",
+      "an exported `CDPATH` can redirect child scripts",
       "An exported `CDPATH` can redirect `cd` commands in child scripts",
       "Keep `CDPATH` unexported or clear it before running scripts", None,
       Strict, Policy),
-    D(0, "arith-external-input",
+    D(None, "arith-external-input",
       "external input is evaluated as arithmetic code",
       "External input is evaluated as arithmetic code",
       "Validate the value as decimal digits before arithmetic", None, Strict,
       Policy),
-    D(0, "array-subscript-external-input",
+    D(None, "array-subscript-external-input",
       "an external array subscript is evaluated as arithmetic code",
       "An array subscript from external input is evaluated as arithmetic code",
       "Validate the subscript as decimal digits before using it", None, Strict,
       Policy),
-    D(0, "malformed-glob", "a glob contains an unterminated bracket class",
+    D(None, "malformed-glob", "a glob contains an unterminated bracket class",
       "Malformed glob pattern, unterminated `[`", None, None, Strict, Policy),
-    D(0, "no-local", "a function assignment without `local` leaks globally",
+    D(None, "no-local", "a function assignment without `local` leaks globally",
       "This assignment to '{0}' in a function has no `local`, the value leaks "
       "to the global scope",
       "Declare it with `local` to keep it inside the function", None, Annoying,
       Policy),
-    D(0, "optimizer-eliminated-cstyle-for",
+    D(None, "optimizer-eliminated-cstyle-for",
       "a c-style for loop with a zero condition was removed",
       "This c-style `for` loop has a zero condition and never runs its body",
       "Remove the loop or write a condition that can be true", None, Lenient,
       Warning),
-    D(0, "optimizer-eliminated-for",
+    D(None, "optimizer-eliminated-for",
       "a for loop over an empty list was removed",
       "This `for` loop iterates over an empty list and never runs its body",
       "Remove the loop or give it words to iterate over", None, Lenient,
       Warning),
-    D(0, "optimizer-eliminated-if", "an if with no reachable body was removed",
+    D(None, "optimizer-eliminated-if",
+      "an if with no reachable body was removed",
       "Every condition of this `if` is statically false and it has no `else` "
       "body",
       "Remove the `if` or write a condition that can be true", None, Lenient,
       Warning),
-    D(0, "optimizer-folded-arithmetic",
+    D(None, "optimizer-folded-arithmetic",
       "a constant arithmetic expression was folded",
       "The arithmetic expression `{0}` is constant and was folded to '{1}'",
       None, None, Lenient, Warning),
-    D(0, "optimizer-folded-branch", "an if always takes the same branch",
+    D(None, "optimizer-folded-branch", "an if always takes the same branch",
       "Every condition of this `if` is statically decidable and branch '{0}' "
       "always runs",
       None, None, Lenient, Warning),
-    D(0, "optimizer-folded-else", "an if always takes its else body",
+    D(None, "optimizer-folded-else", "an if always takes its else body",
       "Every condition of this `if` is statically false and the `else` body "
       "always runs",
       None, None, Lenient, Warning),
-    D(0, "optimizer-folded-loop", "a loop condition is statically false",
+    D(None, "optimizer-folded-loop", "a loop condition is statically false",
       "This `{0}` loop condition never lets the body run", None, None, Lenient,
       Warning),
-    D(0, "typeset-spelling", "`typeset` is the ksh spelling of `declare`",
+    D(None, "typeset-spelling", "`typeset` is the ksh spelling of `declare`",
       "The `typeset` builtin is the ksh spelling of `declare`",
       "Write `declare` for the clearer bash name", None, Annoying, Policy),
-    D(0, "unresolved-command", "a command cannot be resolved during analysis",
+    D(None, "unresolved-command",
+      "a command cannot be resolved during analysis",
       "Command '{0}' was not found", "Did you mean '{1}'?", None, Lenient,
       Policy),
-    D(0, "unresolved-command-uncertain",
+    D(None, "unresolved-command-uncertain",
       "a command may be defined by unseen runtime code",
       "Command '{0}' was not found", "Did you mean '{1}'?", None, Lenient,
       Warning),
-    D(0, "use-before-assign", "a variable is read before a later assignment",
+    D(None, "use-before-assign", "a variable is read before a later assignment",
       "The variable '{0}' is read before it is assigned", None,
       "the assignment that gives '{0}' a value runs here", Lenient, Policy),
 };
@@ -1547,9 +1550,10 @@ fn format_diagnostic_template(
   return result;
 }
 
-fn append_diagnostic_code(String &message, u16 shellcheck_code) throws -> void
+fn append_diagnostic_code(String &message, Maybe<u16> shellcheck_code) throws
+    -> void
 {
-  if (shellcheck_code == 0) return;
+  if (!shellcheck_code.has_value()) return;
   if (message.is_empty()) return;
 
   if (let const last_byte = message.back();
@@ -1561,7 +1565,7 @@ fn append_diagnostic_code(String &message, u16 shellcheck_code) throws -> void
   char code_text[32];
   message += " (SC";
   message +=
-      utils::int_to_text_into(shellcheck_code, code_text, sizeof(code_text));
+      utils::int_to_text_into(*shellcheck_code, code_text, sizeof(code_text));
   message += ')';
 }
 
@@ -1594,12 +1598,12 @@ pure fn shellcheck_selector_disables(const shellcheck_selector &selector,
                                       selector.slug.length) ==
            StringView{definition.slug};
   case shellcheck_selector_kind::Code:
-    return definition.shellcheck_code != 0 &&
-           definition.shellcheck_code == selector.code_start;
+    return definition.shellcheck_code.has_value() &&
+           *definition.shellcheck_code == selector.code_start;
   case shellcheck_selector_kind::CodeRange:
-    return definition.shellcheck_code != 0 &&
-           definition.shellcheck_code >= selector.code_start &&
-           definition.shellcheck_code < selector.code_end;
+    return definition.shellcheck_code.has_value() &&
+           *definition.shellcheck_code >= selector.code_start &&
+           *definition.shellcheck_code < selector.code_end;
   }
 
   return false;

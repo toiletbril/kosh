@@ -288,12 +288,12 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     let l = String{"SHELLCHECK DIAGNOSTICS\n"};
     for (usize index = 0; index < get_diagnostic_count(); index++) {
       let const &definition = DIAGNOSTIC_DEFINITIONS[index];
-      if (definition.shellcheck_code == 0) continue;
+      if (!definition.shellcheck_code.has_value()) continue;
 
       char code_text[32];
       l += "  ";
       l += "SC";
-      l += utils::int_to_text_into(definition.shellcheck_code, code_text,
+      l += utils::int_to_text_into(*definition.shellcheck_code, code_text,
                                    sizeof(code_text));
       l += "  ";
       l += get_diagnostic_tier_name(definition.tier);
@@ -308,7 +308,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     l += "\nNATIVE ANALYSIS DIAGNOSTICS\n";
     for (usize index = 0; index < get_diagnostic_count(); index++) {
       let const &definition = DIAGNOSTIC_DEFINITIONS[index];
-      if (definition.shellcheck_code != 0) continue;
+      if (definition.shellcheck_code.has_value()) continue;
 
       l += "  ";
       l += definition.slug;
