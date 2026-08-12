@@ -268,10 +268,16 @@ summary. Each native row prints its slug, tier, and wrapped summary.
 The checks cover unsafe word splitting and globbing, misleading quoting,
 command-output iteration, test and conditional mistakes, redirection order and
 privilege boundaries, pipeline state loss, unvalidated arithmetic input,
-unreachable control flow, nonportable syntax, and dangerous file operations.
-The catalog contains about 100 checks derived from ShellCheck and about a dozen
-native analysis checks. The default mood rejects a script when a strict or
-lenient check reports an error.
+unreachable control flow, dangerous file operations, POSIX portability, lexical
+source bytes, and whole-script variable and function dataflow.
+The catalog contains 310 numbered rows across 306 ShellCheck codes. It also
+contains 11 native analysis checks. A code that carries more than one row
+reports a distinct finding from each row. The default mood rejects a script when
+a strict or lenient check reports an error.
+The portability rows are reported only when the shebang names
+.B sh
+or
+.BR dash .
 The source is also checked for a UTF-8 byte-order mark before the shebang or
 first command.
 .SS Interactive operation
@@ -1206,6 +1212,16 @@ clipping.
 In the default mood, strict and lenient findings reject the script. Annoying
 findings remain warnings. The annoying tier contains additional safety checks
 and style findings that can produce excessive reports in existing scripts.
+.PP
+Whole-script dataflow findings are strict, so a read of a name the script never
+assigns, a call that passes no arguments to a function that reads them, and a
+call that runs before its function is defined all reject the script in the
+default mood. A read name that resembles an assigned name is reported with that
+assignment as a detail location.
+.PP
+An analysis run that reported two or more diagnostics closes with a counted
+summary line. The warning count is yellow and the error count is bold bright
+red.
 .PP
 A comment of the form
 .B # shellcheck disable=SC2086,unquoted-command-substitution

@@ -72,6 +72,13 @@ The native runner suppresses annoying diagnostics outside
 catalog. A test for another parser or evaluator contract uses strict input and
 does not duplicate diagnostic output.
 
+`shellcheck_bashisms_sh_shebang` owns the portability catalog, because those
+rows are reported only under an `sh` or `dash` shebang. Two findings need their
+own input. `shellcheck_byte_order_mark` carries the three mark bytes, which are
+a whole-file property. `shellcheck_local_outside_function` ends in a fatal
+builtin error, which would replace the trailing exit status of the shared
+golden.
+
 Runner output files live below `.test-work/results`. The portable mktemp shim
 uses host filesystem operations and never starts the tested shell. Its exported
 allocation root is absolute and uses native path syntax on every host.
@@ -332,6 +339,19 @@ strict and lenient findings and reports annoying findings as warnings.
 Compatibility moods expose the tiers as warnings through `-W`, `-WW`, and
 `-WWW`. Related-location notes use cyan carets, and every secondary detail
 begins with a lowercase byte.
+
+The catalog holds 310 numbered rows across 306 ShellCheck codes and 11 native
+analysis rows. A `static_assert` couples the row order to the `diagnostic_id`
+enum order, so both stay ascending by code with the native rows last. A message
+authors its own shell syntax in backquotes, and a name, path, value, or number
+taken from the script through a `{0}` or `{1}` placeholder is single quoted. A
+summary begins with a lowercase letter, and a suggestion begins with an
+uppercase letter.
+
+The portability rows are gated behind `shebang_is_posix_sh`, which is armed when
+the shebang names `sh` or `dash`. The whole-script dataflow rows are reported by
+one sweep at the end of `analyze_ast`, and a misspelled name is matched against
+the assigned names by edit distance.
 
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare koshkit utility
