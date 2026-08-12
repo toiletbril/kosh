@@ -160,3 +160,8 @@ printf 'notnum\n' | { select x in a b; do echo "reply=$REPLY name=[$x]"; break; 
 printf '1\n2\n3\n' | { select item in one two three; do echo "item: $item"; done; }
 printf '\n3\n' | { select x in p q r; do echo "after empty: $x"; break; done; }
 printf '' | { select x in p q; do :; done; }; echo "eof-status=$?"
+
+eval 'for x "in" a; do :; done'
+echo "quoted-for-in-status=$?"
+eval 'case x "in" x) :;; esac'
+echo "quoted-case-in-status=$?"

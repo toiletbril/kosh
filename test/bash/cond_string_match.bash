@@ -228,3 +228,8 @@ echo {1..99999999999999999999}
 test foo == foo && echo test-eq
 test "$HOME" == "$HOME" && echo var-eq
 [ abc != xyz ] && echo neq-still-works
+
+[[ "!" ]] && echo quoted-not-is-an-operand
+[[ "-n" ]] && echo quoted-unary-is-an-operand
+eval '[[ x "==" x ]]'
+echo "quoted-binary-status=$?"

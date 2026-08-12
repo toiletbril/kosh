@@ -22,6 +22,14 @@ cold [[noreturn]] static fn fail_conditional(StringView reason) throws -> void
   fail_conditional("Unable to evaluate the [[ ]]", reason);
 }
 
+cold [[noreturn]] static fn fail_conditional_syntax(StringView reason) throws
+    -> void
+{
+  ErrorWithDetails error{"Unable to evaluate the [[ ]]", reason};
+  error.set_command_status(2);
+  throw error;
+}
+
 static fn ascii_lower_copy(Allocator allocator, StringView text) throws
     -> String
 {
@@ -287,7 +295,7 @@ struct conditional_evaluator
 
     let const first_literal = operand_literal(first);
 
-    if (is_unary_op(first_literal.view())) {
+    if (first.is_bare_unquoted && is_unary_op(first_literal.view())) {
       if (pos + 1 >= elements.count() || kind_at(pos + 1) != Kind::Operand) {
         fail_conditional("The unary operator '" + first_literal +
                          "' is missing its operand");
@@ -330,7 +338,7 @@ struct conditional_evaluator
         let const order = os::collate_compare(left, right);
         return next == Kind::Less ? order < 0 : order > 0;
       }
-      if (next == Kind::Operand) {
+      if (next == Kind::Operand && elements[pos + 1].is_bare_unquoted) {
         let const op = operand_literal(elements[pos + 1]);
         if (is_binary_word_op(op.view())) {
           if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
@@ -506,7 +514,7 @@ fn EvalContext::evaluate_conditional(
   let evaluator = conditional_evaluator{*this, elements};
   let const is_conditional_true = evaluator.eval_or();
   if (!evaluator.at_end()) {
-    fail_conditional(
+    fail_conditional_syntax(
         "The token '" + evaluator.unexpected_token() +
         "' came after a complete conditional, so it may be an "
         "operator the shell does not support or a missing && or || "

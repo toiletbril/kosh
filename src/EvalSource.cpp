@@ -472,15 +472,15 @@ fn EvalContext::run_source(StringView source, StringView origin,
     show_message(detailed_error.to_string(source, this));
     show_message(detailed_error.details_to_string(source, this));
     print_source_backtrace(detailed_error.location());
-    return 1;
+    return static_cast<i32>(detailed_error.command_status());
   } catch (const ErrorWithLocation &located_error) {
     show_message(located_error.to_string(source, this));
     print_source_backtrace(located_error.location());
-    return 1;
+    return static_cast<i32>(located_error.command_status());
   } catch (const Error &caught_error) {
     show_message(caught_error.to_string());
     print_source_backtrace();
-    return 1;
+    return static_cast<i32>(caught_error.command_status());
   }
 }
 

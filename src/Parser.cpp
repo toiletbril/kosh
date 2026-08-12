@@ -1412,7 +1412,13 @@ fn Parser::parse_optional_in_clause_words(
   /* The word 'in' is not a keyword token. */
   Token *peeked = m_lexer.peek_shell_token();
   ASSERT(peeked != nullptr);
-  if (peeked->kind() != Token::Kind::Word || peeked->raw_string() != "in") {
+  if (!is_unquoted_word(peeked, "in")) {
+    if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
+      ErrorWithLocation error{peeked->source_location(),
+                              "Expected an unquoted 'in'"};
+      error.set_command_status(2);
+      throw error;
+    }
     return false;
   }
 
@@ -1651,11 +1657,11 @@ hot fn Parser::parse_case() throws -> Command *
 
   Token *in_token = m_lexer.next_shell_token();
   ASSERT(in_token != nullptr);
-  if (!(in_token->kind() == Token::Kind::Word &&
-        in_token->raw_string() == "in"))
-  {
-    throw ErrorWithLocation{in_token->source_location(),
-                            "Expected 'in' after the case word"};
+  if (!is_unquoted_word(in_token, "in")) {
+    ErrorWithLocation error{in_token->source_location(),
+                            "Expected an unquoted 'in' after the case word"};
+    error.set_command_status(2);
+    throw error;
   }
 
   let items = ArrayList<case_item>{heap_allocator()};
@@ -2001,15 +2007,16 @@ hot fn Parser::parse_conditional_command() throws -> Command *
     case Token::Kind::Greater: elements.push({Kind::Greater, nullptr}); break;
     case Token::Kind::Newline: continue;
     case Token::Kind::Word: {
-      const String word_literal =
-          static_cast<tokens::WordToken *>(t)->word().to_literal_string();
-      if (word_literal == "!") {
+      let const is_bare_unquoted =
+          static_cast<tokens::WordToken *>(t)->word().plain_literal_kind() ==
+          Word::PlainLiteral::PlainUnquotedOneSegment;
+      if (is_unquoted_word(t, "!")) {
         elements.push({Kind::Not, nullptr});
         break;
       }
-      elements.push({Kind::Operand, t});
+      elements.push({Kind::Operand, t, is_bare_unquoted});
 
-      if (word_literal == "=~") {
+      if (is_unquoted_word(t, "=~")) {
         Token *peek = m_lexer.peek_shell_token();
         if (peek != nullptr && !is_unquoted_word(peek, "]]") &&
             peek->kind() != Token::Kind::EndOfFile &&

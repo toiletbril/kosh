@@ -104,6 +104,7 @@ struct conditional_element
 
   Kind kind;
   const Token *word{nullptr};
+  bool is_bare_unquoted{false};
 };
 
 /* A pending non-local jump the evaluator carries instead of throwing, consumed
