@@ -1750,17 +1750,9 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 
   unlink(path_template.begin());
 
-  usize offset = 0;
-  while (offset < content.count()) {
-    let written = ::write(fd, content.data + offset, content.count() - offset);
-    if (written < 0 && errno == EINTR) {
-      continue;
-    }
-    if (written < 0) {
-      close(fd);
-      return koshka::None;
-    }
-    offset += static_cast<usize>(written);
+  if (!write_all(fd, content.data, content.count())) {
+    close(fd);
+    return koshka::None;
   }
 
   if (lseek(fd, 0, SEEK_SET) < 0) {
@@ -1787,17 +1779,10 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
   const int fd = ::mkstemp(path_template.begin());
   if (fd < 0) return None;
 
-  usize written_size = 0;
-  while (written_size < content.count()) {
-    let const written = ::write(fd, content.data + written_size,
-                                content.count() - written_size);
-    if (written < 0 && errno == EINTR) continue;
-    if (written <= 0) {
-      unused(::close(fd));
-      unused(::unlink(path_template.begin()));
-      return None;
-    }
-    written_size += static_cast<usize>(written);
+  if (!write_all(fd, content.data, content.count())) {
+    unused(::close(fd));
+    unused(::unlink(path_template.begin()));
+    return None;
   }
 
   if (::close(fd) != 0) {

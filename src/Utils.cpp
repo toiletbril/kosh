@@ -931,18 +931,13 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
             [&]() { diagnostic_err = diagnostic_out.value_or(KOSH_STDOUT); },
             [&]() { diagnostic_out = diagnostic_err.value_or(KOSH_STDERR); });
         os::signal_internal_diagnostic();
-        usize written_count = 0;
-        while (written_count < diagnostic.count()) {
-          let const written = os::write_fd(diagnostic_err.value_or(KOSH_STDERR),
-                                           diagnostic.data() + written_count,
-                                           diagnostic.count() - written_count);
-          if (!written.has_value() || *written == 0) {
-            const i32 saved_errno = errno;
-            if (saved_errno == EPIPE) throw BrokenPipeExit{};
-            throw Error{"Unable to write to stderr: " +
-                        os::last_system_error_message()};
-          }
-          written_count += *written;
+        if (!os::write_all(diagnostic_err.value_or(KOSH_STDERR),
+                           diagnostic.data(), diagnostic.count()))
+        {
+          let const saved_errno = errno;
+          if (saved_errno == EPIPE) throw BrokenPipeExit{};
+          throw Error{"Unable to write to stderr: " +
+                      os::last_system_error_message()};
         }
 
         stage_status[stage_index] = *preflight_status;

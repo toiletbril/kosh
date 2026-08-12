@@ -1117,9 +1117,10 @@ cold pure fn substitution_body_is_bare_echo(StringView body) wontthrow -> bool
 cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
     -> bool
 {
+  let storage = String{heap_allocator()};
   for (usize i = 1; i < args.count(); i++) {
-    let const raw = args[i]->raw_string();
-    if (raw.view() == "-" || raw.view() == "/dev/stdin") {
+    let const raw = borrowed_token_text(args[i], storage);
+    if (raw == "-" || raw == "/dev/stdin") {
       return true;
     }
   }
@@ -1769,7 +1770,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       m_args.count() > 1)
   {
     usize wrapped_command_index = 1;
-    if (m_args[wrapped_command_index]->raw_string().view() == "--") {
+    let wrapped_storage = String{heap_allocator()};
+    if (borrowed_token_text(m_args[wrapped_command_index], wrapped_storage) ==
+        "--")
+    {
       wrapped_command_index++;
     }
     if (wrapped_command_index < m_args.count()) {
@@ -2035,7 +2039,9 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       let const &cat_args = first_stage->args();
       if (cat_args.count() == 2) {
         let const name = static_command_name(cat_args[0]);
-        let const raw_operand = cat_args[1]->raw_string();
+        let raw_operand_storage = String{heap_allocator()};
+        let const raw_operand =
+            borrowed_token_text(cat_args[1], raw_operand_storage);
         let const file_is_plain_operand =
             cat_args[1]->kind() == Token::Kind::Word &&
             !raw_operand.is_empty() && raw_operand[0] != '-';
@@ -2118,8 +2124,10 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       if (next_info.id == command_name_id::Wc && !next_is_user &&
           stage->args().count() == 2 && next->args().count() == 2)
       {
-        let const count_flag = next->args()[1]->raw_string();
-        if (count_flag.view() == "-c" || count_flag.view() == "-m") {
+        let count_flag_storage = String{heap_allocator()};
+        let const count_flag =
+            borrowed_token_text(next->args()[1], count_flag_storage);
+        if (count_flag == "-c" || count_flag == "-m") {
           actx.report_diagnostic(diagnostic_id::sc2000,
                                  stage->args()[0]->source_location());
         }
@@ -2131,12 +2139,13 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       if (!next_is_xargs) break;
 
       let has_null_flag = false;
+      let raw_storage = String{heap_allocator()};
       for (usize a = 1; a < stage->args().count() && !has_null_flag; a++)
-        if (stage->args()[a]->raw_string().view() == "-print0")
+        if (borrowed_token_text(stage->args()[a], raw_storage) == "-print0")
           has_null_flag = true;
       for (usize a = 1; a < next->args().count() && !has_null_flag; a++) {
-        let const raw = next->args()[a]->raw_string();
-        if (raw.view() == "-0" || raw.view() == "--null") {
+        let const raw = borrowed_token_text(next->args()[a], raw_storage);
+        if (raw == "-0" || raw == "--null") {
           has_null_flag = true;
         }
       }
@@ -2175,11 +2184,13 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
        SC2126. */
     case command_name_id::Grep:
       if (next_info.id == command_name_id::Wc && !next_is_user &&
-          next->args().count() == 2 &&
-          next->args()[1]->raw_string().view() == "-l")
+          next->args().count() == 2)
       {
-        actx.report_diagnostic(diagnostic_id::sc2126,
-                               stage->args()[0]->source_location());
+        let flag_storage = String{heap_allocator()};
+        if (borrowed_token_text(next->args()[1], flag_storage) == "-l") {
+          actx.report_diagnostic(diagnostic_id::sc2126,
+                                 stage->args()[0]->source_location());
+        }
       }
       break;
 

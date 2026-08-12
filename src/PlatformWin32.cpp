@@ -2145,15 +2145,9 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
     return koshka::None;
   }
 
-  usize written_size = 0;
-  while (written_size < content.count()) {
-    let const write_size = write_fd(handle, content.data + written_size,
-                                    content.count() - written_size);
-    if (!write_size.has_value() || *write_size == 0) {
-      close_fd(handle);
-      return koshka::None;
-    }
-    written_size += *write_size;
+  if (!write_all(handle, content.data, content.count())) {
+    close_fd(handle);
+    return koshka::None;
   }
 
   LARGE_INTEGER beginning{};
@@ -2196,16 +2190,10 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
   }
   if (handle == INVALID_HANDLE_VALUE) return None;
 
-  usize written_size = 0;
-  while (written_size < content.count()) {
-    let const written = write_fd(handle, content.data + written_size,
-                                 content.count() - written_size);
-    if (!written.has_value() || *written == 0) {
-      unused(close_fd(handle));
-      unused(DeleteFileA(temp_path));
-      return None;
-    }
-    written_size += *written;
+  if (!write_all(handle, content.data, content.count())) {
+    unused(close_fd(handle));
+    unused(DeleteFileA(temp_path));
+    return None;
   }
 
   if (!close_fd(handle)) {
