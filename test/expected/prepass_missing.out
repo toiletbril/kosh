@@ -71,12 +71,12 @@ note: Remove the dollar sign from the assignment name.
 4:6: warning: An assignment cannot contain spaces around equals.
      4 |  name = value
        |       ^
-note: Write NAME=value without spaces.
+note: Write `NAME=value` without spaces.
 4:1: warning: Command 'name' was not found.
      4 |  name = value
        |  ^~~~
 note: Did you mean 'time'?
-5:1: warning: Malformed glob pattern, unterminated '['.
+5:1: warning: Malformed glob pattern, unterminated `[`.
      5 |  [grep needle file]
        |  ^~~~~
 5:1: warning: Test brackets and operands require separating spaces.
@@ -86,7 +86,7 @@ note: Add spaces after the opening bracket and before the close.
 5:1: warning: Test brackets do not run the command written inside them.
      5 |  [grep needle file]
        |  ^~~~~
-note: Run the command directly as the if condition.
+note: Run the command directly as the `if` condition.
 6:1: warning: Test brackets and operands require separating spaces.
      6 |  [[left=right]]
        |  ^~~~~~~~~~~~~~
@@ -95,10 +95,10 @@ note: Add spaces after the opening bracket and before the close.
      6 |  [[left=right]]
        |  ^~~~~~~~~~~~~~
 note: Place spaces around the comparison operator.
-7:1: warning: Parentheses start a subshell rather than a file or string test.
+7:1: warning: Parentheses start a subshell, and a subshell performs no file or string test.
      7 |  ( -f file )
        |  ^
-note: Use [[ ... ]] or [ ... ] for the condition.
+note: Use `[[ ... ]]` or `[ ... ]` for the condition.
 7:3: warning: An option-shaped word in command position is not a command.
      7 |  ( -f file )
        |    ^~

@@ -92,7 +92,7 @@
 [Word
   CommandSubstitution "echo $foo"
 ]
-2:1: warning: An echo of a command substitution prints what the command already prints.
+2:1: warning: An `echo` of a command substitution prints what the command already prints.
      2 |  echo `echo hi`
        |  ^~~~
 note: Run the command on its own instead.
@@ -100,11 +100,11 @@ note: Run the command on its own instead.
      2 |  echo `echo hi`
        |       ^~~~~~~~~
 note: Quote it to keep one argument.
-4:1: warning: An echo of a command substitution prints what the command already prints.
+4:1: warning: An `echo` of a command substitution prints what the command already prints.
      4 |  echo "`echo q`"
        |  ^~~~
 note: Run the command on its own instead.
-6:1: warning: An echo of a command substitution prints what the command already prints.
+6:1: warning: An `echo` of a command substitution prints what the command already prints.
      6 |  echo `(echo y) 2>/dev/null`
        |  ^~~~
 note: Run the command on its own instead.
@@ -112,7 +112,7 @@ note: Run the command on its own instead.
      6 |  echo `(echo y) 2>/dev/null`
        |       ^~~~~~~~~~~~~~~~~~~~~~
 note: Quote it to keep one argument.
-7:1: warning: An echo of a command substitution prints what the command already prints.
+7:1: warning: An `echo` of a command substitution prints what the command already prints.
      7 |  echo `echo "a b"`
        |  ^~~~
 note: Run the command on its own instead.
@@ -120,7 +120,7 @@ note: Run the command on its own instead.
      7 |  echo `echo "a b"`
        |       ^~~~~~~~~~~~
 note: Quote it to keep one argument.
-9:10: warning: An echo of a command substitution prints what the command already prints.
+9:10: warning: An `echo` of a command substitution prints what the command already prints.
      9 |  foo=bar; echo `echo \$foo`
        |           ^~~~
 note: Run the command on its own instead.

@@ -4664,11 +4664,11 @@ note: Delete it and retype an ASCII space.
    424 |    echo 'carriagereturn'
        |                  ^
 note: Convert the file to Unix line endings with `tr -d '\r'`.
-428:12: warning: The escape '\o' has no meaning here, so the shell reads it as a plain 'o'.
+428:12: warning: The escape `\o` has no meaning here, so the shell reads it as a plain 'o'.
    428 |    echo Yay \o/
        |             ^~
 note: Quote the backslash, or build the byte with `printf`.
-429:14: warning: The escape '\t' has no meaning here, so the shell reads it as a plain 't'.
+429:14: warning: The escape `\t` has no meaning here, so the shell reads it as a plain 't'.
    429 |    spacing=foo\tbar
        |               ^~
 note: Build the byte with `printf`, or write it inside `$'...'`.
@@ -4704,37 +4704,37 @@ note: Move the directive above the complete command.
    410 |    # shellcheck disable=SC2086
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Move the directive above the `case` command.
-3:8: warning: A bare glob can expand to a filename that begins with '-'.
+3:8: warning: A bare glob can expand to a filename that begins with `-`.
      3 |    grep *.txt file
        |         ^~~~~
-note: Prefix the glob with a directory or place -- before it.
-3:8: warning: The unquoted grep pattern can glob against the local files before grep sees it.
+note: Prefix the glob with a directory or place `--` before it.
+3:8: warning: The unquoted `grep` pattern can glob against the local files before `grep` sees it.
      3 |    grep *.txt file
        |         ^~~~~
 note: Quote the pattern.
-4:8: warning: A grep reads a regular expression, where a leading * has nothing to repeat, this pattern looks like a glob.
+4:8: warning: A `grep` reads a regular expression, and a leading `*` has nothing to repeat, so this pattern looks like a glob.
      4 |    grep '*x' file
        |         ^~~~
-5:12: warning: A for over the cat output iterates IFS-split words rather than lines.
+5:12: warning: A `for` over the `cat` output iterates IFS-split words rather than lines.
      5 |    for f in $(cat list); do echo "$f"; done
        |             ^~~~~~~~~~~
-note: Read the lines with 'while IFS= read -r line' instead.
-6:12: warning: A for over the find output breaks a name with whitespace apart.
+note: Read the lines with `while IFS= read -r line` instead.
+6:12: warning: A `for` over the `find` output breaks a name with whitespace apart.
      6 |    for f in $(find . -name x); do echo "$f"; done
        |             ^~~~~~~~~~~~~~~~~
-note: Use find -exec or a 'while read -r' loop over find -print0.
-7:12: warning: An xargs splits the find output on whitespace and quotes.
+note: Use `find -exec`, or a `while read -r` loop over `find -print0`.
+7:12: warning: An `xargs` splits the `find` output on whitespace and quotes.
      7 |    find . | xargs echo
        |             ^~~~~
-note: Pair find -print0 with xargs -0 or use find -exec.
+note: Pair `find -print0` with `xargs -0`, or use `find -exec`.
 8:10: warning: The pipe feeds `echo`, which never reads stdin, so the upstream output is discarded.
      8 |    true | echo discarded
        |           ^~~~
 note: Remove the pipe, or forward the input with `cat`.
-13:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
+13:18: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal.
     13 |    command 2>&1 > out.log
        |                   ^~~~~~~
-note: Put the file redirect first as in '>file 2>&1'.
+note: Put the file redirect first as in `>file 2>&1`.
 14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
     14 |    sort < data > data
        |                  ^~~~
@@ -4742,112 +4742,112 @@ note: Put the file redirect first as in '>file 2>&1'.
     14 |    sort < data > data
        |           ^~~~ this redirect reads the file that is later truncated.
 note: Write to a temporary and move it over.
-15:8: warning: A command substitution wraps a useless echo.
+15:8: warning: A command substitution wraps a useless `echo`.
     15 |    echo "wrapped $(echo inner)"
        |         ^~~~~~~~~~~~~~~~~~~~~~~
 note: The text can be used directly without the subshell.
-16:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument.
+16:15: warning: `$@` inside a longer word concatenates the surrounding text onto the first and last argument.
     16 |    printf '%s' "a $@ b"
        |                ^~~~~~~~
-note: Use $* for one joined string or a separate "$@" word.
-21:8: warning: The operand is a literal, so this -z test is constant.
+note: Use `$*` for one joined string, or a separate `"$@"` word.
+21:8: warning: The operand is a literal, so this `-z` test is constant.
     21 |    [ -z lit ] && echo a
        |         ^~~
 note: Test a variable or drop the check.
-22:5: warning: The '-eq' comparison has literal operands on both sides.
+22:5: warning: The `-eq` comparison has literal operands on both sides.
     22 |    [ count -eq notanumber ] && echo b
        |      ^~~~~~~~~~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-22:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
+22:5: warning: The numeric comparison `-eq` reads 'count', and that is not a number, so the test errors at run time.
     22 |    [ count -eq notanumber ] && echo b
        |      ^~~~~
-22:15: warning: The numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
+22:15: warning: The numeric comparison `-eq` reads 'notanumber', and that is not a number, so the test errors at run time.
     22 |    [ count -eq notanumber ] && echo b
        |                ^~~~~~~~~~
-23:12: warning: [ and test compare strings byte for byte and never glob-match.
+23:12: warning: `[` and `test` compare strings byte for byte and never glob-match.
     23 |    [ "$x" = "glob*" ] && echo c
        |             ^~~~~~~
-note: Use a case or the [[ ]] form for the pattern.
+note: Use a `case`, or the `[[ ]]` form for the pattern.
 24:8: warning: The complete `grep` output is collected to learn whether one line matched.
     24 |    [ -n "$(ls | grep x)" ] && echo d
        |         ^~~~~~~~~~~~~~~~
 note: Use `grep -q` and test its exit status.
-28:6: warning: The case word 'a' is constant, so the same branch is chosen every time.
+28:6: warning: The `case` word 'a' is constant, so the same branch is chosen every time.
     28 |  case a in a) ;; esac
        |       ^
-note: Add the missing `$`, or drop the case.
-28:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+note: Add the missing `$`, or drop the `case`.
+28:6: warning: This `case` has no default `*)` branch, a value no pattern matches is silently ignored.
     28 |  case a in a) ;; esac
        |       ^
-29:6: warning: The case word 'a' is constant, so the same branch is chosen every time.
+29:6: warning: The `case` word 'a' is constant, so the same branch is chosen every time.
     29 |  case a in *) ;; esac
        |       ^
-note: Add the missing `$`, or drop the case.
-34:3: warning: The egrep command is deprecated.
+note: Add the missing `$`, or drop the `case`.
+34:3: warning: The `egrep` command is deprecated.
     34 |    egrep pattern file
        |    ^~~~~
-note: Use grep -E for the extended regular expression match.
-35:3: warning: The fgrep command is deprecated.
+note: Use `grep -E` for the extended regular expression match.
+35:3: warning: The `fgrep` command is deprecated.
     35 |    fgrep word file
        |    ^~~~~
-note: Use grep -F for the fixed string match.
-36:3: warning: An expr forks for arithmetic the shell does natively.
+note: Use `grep -F` for the fixed string match.
+36:3: warning: An `expr` forks for arithmetic the shell does natively.
     36 |    expr 1 + 2
        |    ^~~~
-note: Use $((...)) for the calculation.
+note: Use `$((...))` for the calculation.
 37:3: warning: The `let` builtin evaluates its argument as arithmetic.
     37 |    let counter=counter+1
        |    ^~~
-note: Write `(( ... ))`, which needs no quoting and reads as arithmetic.
-38:3: warning: An echo of a command substitution prints what the command already prints.
+note: Write `(( ... ))` for the arithmetic.
+38:3: warning: An `echo` of a command substitution prints what the command already prints.
     38 |    echo "$(date)"
        |    ^~~~
 note: Run the command on its own instead.
-39:8: warning: Grepping the ps output races the process table and matches the grep itself.
+39:8: warning: Grepping the `ps` output races the process table and matches the `grep` itself.
     39 |    ps | grep init
        |         ^~~~
-note: Use pgrep to match a process by name.
-40:8: warning: Grepping the ls listing mangles a name with a space or a newline.
+note: Use `pgrep` to match a process by name.
+40:8: warning: Grepping the `ls` listing mangles a name with a space or a newline.
     40 |    ls | grep conf
        |         ^~~~
-note: Match the names with a glob or with find instead.
-41:3: warning: Counting grep output with wc -l runs an extra process.
+note: Match the names with a glob or with `find` instead.
+41:3: warning: Counting `grep` output with `wc -l` runs an extra process.
     41 |    grep needle file | wc -l
        |    ^~~~
-note: Use grep -c to count the matching lines directly.
+note: Use `grep -c` to count the matching lines directly.
 43:5: warning: A test reads an unquoted variable.
     43 |    [ $? -eq 0 ] && echo ok
        |      ^~
 note: Quote it to avoid an empty or split argument.
-43:5: warning: Testing $? checks the exit status indirectly.
+43:5: warning: Testing `$?` checks the exit status indirectly.
     43 |    [ $? -eq 0 ] && echo ok
        |      ^~
-note: Test the command directly with if or && so an intervening command cannot clobber the status.
+note: Test the command directly with `if` or `&&` so an intervening command cannot clobber the status.
 44:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
     44 |    local declared=$(date)
        |          ^~~~~~~~~~~~~~~~
 note: Split the declaration and the assignment so a failure is seen.
-48:7: warning: This assignment to 'x' in a function has no local, so the value leaks to the global scope.
+48:7: warning: This assignment to 'x' in a function has no `local`, the value leaks to the global scope.
     48 |  f() { x=1; }
        |        ^~~
-note: Declare it with local to keep it inside the function.
-50:7: warning: This assignment to 'z' in a function has no local, so the value leaks to the global scope.
+note: Declare it with `local` to keep it inside the function.
+50:7: warning: This assignment to 'z' in a function has no `local`, the value leaks to the global scope.
     50 |  h() { z=4; }
        |        ^~~
-note: Declare it with local to keep it inside the function.
-58:3: warning: A negated -eq is just -ne.
+note: Declare it with `local` to keep it inside the function.
+58:3: warning: A negated `-eq` is just `-ne`.
     58 |  [ ! 1 -eq 2 ]
        |    ^
-note: Drop the ! and use -ne.
-58:5: warning: The '-eq' comparison has literal operands on both sides.
+note: Drop the `!` and use `-ne`.
+58:5: warning: The `-eq` comparison has literal operands on both sides.
     58 |  [ ! 1 -eq 2 ]
        |      ^~~~~~~
 note: Remove the constant condition or compare runtime data.
-59:3: warning: A negated = is just !=.
+59:3: warning: A negated `=` is just `!=`.
     59 |  [ ! a = b ]
        |    ^
-note: Drop the ! and use !=.
-59:5: warning: The '=' comparison has literal operands on both sides.
+note: Drop the `!` and use `!=`.
+59:5: warning: The `=` comparison has literal operands on both sides.
     59 |  [ ! a = b ]
        |      ^~~~~
 note: Remove the constant condition or compare runtime data.
@@ -4855,31 +4855,31 @@ note: Remove the constant condition or compare runtime data.
     59 |  [ ! a = b ]
        |        ^
 note: Compare a variable, or correct the operand spelling.
-62:8: warning: The printf format comes from a variable, the data can inject format directives.
+62:8: warning: The `printf` format comes from a variable, the data can inject format directives.
     62 |  printf "$1"
        |         ^~~~
-note: Use printf '%s' to print it.
-64:11: warning: The printf format comes from a variable, the data can inject format directives.
+note: Use `printf '%s'` to print it.
+64:11: warning: The `printf` format comes from a variable, the data can inject format directives.
     64 |  printf -- "$1"
        |            ^~~~
-note: Use printf '%s' to print it.
-66:1: warning: A read without -r mangles a backslash in the input.
+note: Use `printf '%s'` to print it.
+66:1: warning: A `read` without `-r` mangles a backslash in the input.
     66 |  read x < /dev/null
        |  ^~~~~~
-note: Add -r to read the line literally.
-69:8: warning: A test with -a or -o is obsolescent.
+note: Add `-r` to read the line literally.
+69:8: warning: A `test` with `-a` or `-o` is obsolescent.
     69 |  [ -f a -a -f b ]
        |         ^~
-note: Join two tests with && or || instead.
-70:3: warning: A negated -z is just -n.
+note: Join two tests with `&&` or `||`.
+70:3: warning: A negated `-z` is just `-n`.
     70 |  [ ! -z "$x" ]
        |    ^
-note: Test with -n instead.
-71:3: warning: A negated -n is just -z.
+note: Test with `-n`.
+71:3: warning: A negated `-n` is just `-z`.
     71 |  [ ! -n "$y" ]
        |    ^
-note: Test with -z instead.
-74:1: warning: An echo of a command substitution prints what the command already prints.
+note: Test with `-z`.
+74:1: warning: An `echo` of a command substitution prints what the command already prints.
     74 |  echo $(echo hi)
        |  ^~~~
 note: Run the command on its own instead.
@@ -4887,7 +4887,7 @@ note: Run the command on its own instead.
     74 |  echo $(echo hi)
        |       ^~~~~~~~~~
 note: Quote it to keep one argument.
-74:6: warning: A command substitution wraps a useless echo.
+74:6: warning: A command substitution wraps a useless `echo`.
     74 |  echo $(echo hi)
        |       ^~~~~~~~~~
 note: The text can be used directly without the subshell.
@@ -4895,38 +4895,38 @@ note: The text can be used directly without the subshell.
     75 |  export FOO=$(echo hi)
        |         ^~~~~~~~~~~~~~
 note: Split the declaration and the assignment so a failure is seen.
-76:1: warning: An echo of a command substitution prints what the command already prints.
+76:1: warning: An `echo` of a command substitution prints what the command already prints.
     76 |  echo "$(echo hi)"
        |  ^~~~
 note: Run the command on its own instead.
-76:6: warning: A command substitution wraps a useless echo.
+76:6: warning: A command substitution wraps a useless `echo`.
     76 |  echo "$(echo hi)"
        |       ^~~~~~~~~~~~
 note: The text can be used directly without the subshell.
-78:1: warning: A useless cat.
+78:1: warning: A useless `cat`.
     78 |  cat data/hello-d | cat
        |  ^~~
-note: Give the file to the next command directly instead of piping cat.
+note: Give the file to the next command directly instead of piping `cat`.
 80:1: warning: The `which` program is not standard and is missing on some systems.
     80 |  which sh >/dev/null 2>&1
        |  ^~~~~
 note: Use `command -v` instead.
-94:3: warning: Commands after exec do not run when exec succeeds.
+94:3: warning: Commands after `exec` do not run when `exec` succeeds.
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
 94:23: details:
     94 |    exec echo replaced; echo unreachable
-       |                        ^~~~~~~~~~~~~~~~ this is the first command skipped after exec.
-note: Remove exec or remove the unreachable commands.
-95:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+       |                        ^~~~~~~~~~~~~~~~ this is the first command skipped after `exec`.
+note: Remove the `exec`, or remove the unreachable commands.
+95:3: warning: This `cd` is unchecked, so later commands can run in the wrong directory.
     95 |    cd missing; echo wrong-directory
        |    ^~
-note: Stop or return when cd fails.
-96:17: warning: A && B || C also runs C when B fails.
+note: Stop or return when `cd` fails.
+96:17: warning: `A && B || C` also runs C when B fails.
     96 |    true && false || echo fallback
        |                  ^~
-note: Use an if statement when C is the else branch.
-83:15: warning: A for loop over ls output breaks filenames at whitespace.
+note: Use an `if` statement when C is the else branch.
+83:15: warning: A `for` loop over `ls` output breaks filenames at whitespace.
     83 |    for file in $(ls *.mp3); do echo "$file"; done
        |                ^~~~~~~~~~~
 note: Iterate over a glob or read a delimited filename stream.
@@ -4937,39 +4937,39 @@ note: Leave the glob unquoted so it expands into loop values.
 85:10: warning: An array built from command output splits words and expands globs.
     85 |    files=($(printf '%s\n' one two))
        |           ^~~~~~~~~~~~~~~~~~~~~~~~
-note: Use mapfile or readarray to preserve output records.
-86:16: warning: A bare glob can expand to a filename that begins with '-'.
+note: Use `mapfile` or `readarray` to preserve output records.
+86:16: warning: A bare glob can expand to a filename that begins with `-`.
     86 |    find . -name *.ogg
        |                 ^~~~~
-note: Prefix the glob with a directory or place -- before it.
-86:16: warning: The unquoted find pattern expands before find sees it.
+note: Prefix the glob with a directory or place `--` before it.
+86:16: warning: The unquoted `find` pattern expands before `find` sees it.
     86 |    find . -name *.ogg
        |                 ^~~~~
-note: Quote the pattern so find performs the match.
-87:22: warning: The find result is inserted into shell source and can execute filename text.
+note: Quote the pattern so `find` performs the match.
+87:22: warning: The `find` result is inserted into shell source and can execute filename text.
     87 |    find . -exec sh -c 'echo {}' \;
        |                       ^~~~~~~~~
-note: Pass the result as an argument and reference it as $1.
+note: Pass the result as an argument and reference it as `$1`.
 88:9: warning: An unquoted unset array index can expand as a filename glob.
     88 |    unset values[0]
        |          ^~~~~~~~~
 note: Quote the complete array element name.
-89:8: warning: A read operand is a variable name, not a variable value.
+89:8: warning: A `read` operand is a variable name.
     89 |    read $target
        |         ^~~~~~~
 note: Drop the dollar sign from the variable name.
-89:3: warning: A read without -r mangles a backslash in the input.
+89:3: warning: A `read` without `-r` mangles a backslash in the input.
     89 |    read $target
        |    ^~~~~~~~~~~~
-note: Add -r to read the line literally.
-92:10: warning: The printf format consumes more arguments than the command supplies.
+note: Add `-r` to read the line literally.
+92:10: warning: The `printf` format consumes more arguments than the command supplies.
     92 |    printf '%s %s\n' one
        |           ^~~~~~~~~
-note: Add the missing arguments or remove format directives.
-93:60: warning: The shell opens this redirection before sudo changes privileges.
+note: Add the missing arguments, or remove format directives.
+93:60: warning: The shell opens this redirection before `sudo` changes privileges.
     93 |    command -v sudo >/dev/null 2>&1 && sudo echo protected > output
        |                                                             ^~~~~~
-note: Run a shell under sudo or pipe through sudo tee.
+note: Run a shell under `sudo` or pipe through `sudo tee`.
 97:22: warning: This pipeline read assignment is lost when the stage exits.
     97 |    echo one | read -r pipeline_value
        |                       ^~~~~~~~~~~~~~
@@ -4978,15 +4978,15 @@ note: Feed the loop with a redirection or process substitution.
     98 |    echo "$pipeline_value"
        |         ^~~~~~~~~~~~~~~~~
 note: Move the assignment outside the pipeline or avoid the pipeline subshell.
-99:3: warning: The > operator compares strings lexicographically.
+99:3: warning: The `>` operator compares strings lexicographically.
     99 |    [[ 10 > 7 ]]
        |    ^~
-note: Use an arithmetic command or a numeric -lt or -gt operator.
-99:6: warning: The '>' comparison has literal operands on both sides.
+note: Use an arithmetic command, or a numeric `-lt` or `-gt` operator.
+99:6: warning: The `>` comparison has literal operands on both sides.
     99 |    [[ 10 > 7 ]]
        |       ^~~~~~
 note: Remove the constant condition or compare runtime data.
-100:6: warning: The '<' comparison has literal operands on both sides.
+100:6: warning: The `<` comparison has literal operands on both sides.
    100 |    [[ left < right ]]
        |       ^~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
@@ -5014,26 +5014,26 @@ note: Use an arithmetic loop for a variable limit.
    105 |    echo {1..$limit}
        |             ^~~~~~
 note: Quote the expansion to keep one argument.
-106:6: warning: Brackets around a tr range add literal bracket bytes.
+106:6: warning: Brackets around a `tr` range add literal bracket bytes.
    106 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Use a quoted range without brackets.
-106:12: warning: Brackets around a tr range add literal bracket bytes.
+106:12: warning: Brackets around a `tr` range add literal bracket bytes.
    106 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Use a quoted range without brackets.
-106:6: warning: The unquoted tr range can expand as a filename glob.
+106:6: warning: The unquoted `tr` range can expand as a filename glob.
    106 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Quote the range.
-106:12: warning: The unquoted tr range can expand as a filename glob.
+106:12: warning: The unquoted `tr` range can expand as a filename glob.
    106 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Quote the range.
-107:3: warning: This assignment to 'index' in a function has no local, so the value leaks to the global scope.
+107:3: warning: This assignment to 'index' in a function has no `local`, the value leaks to the global scope.
    107 |    index=0
        |    ^~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 108:21: warning: A redirection expansion can run in a child and lose its mutation.
    108 |    echo redirected > "file$((index++))"
        |                      ^~~~~~~~~~~~~~~~~~
@@ -5045,7 +5045,7 @@ note: Quote the expansion to keep one argument.
 110:8: warning: A quoted tilde stays literal instead of expanding to the home directory.
    110 |    echo "~"
        |         ^~~
-note: Leave the tilde unquoted or use a quoted $HOME expansion.
+note: Leave the tilde unquoted, or use a quoted `$HOME` expansion.
 111:8: warning: Single quotes prevent the expansion written inside them.
    111 |    echo '$value'
        |         ^~~~~~~~
@@ -5054,10 +5054,10 @@ note: Use double quotes if the value should expand.
    113 |    echo $((number + 1))
        |         ^~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
-114:10: warning: An exported CDPATH can redirect cd commands in child scripts.
+114:10: warning: An exported `CDPATH` can redirect `cd` commands in child scripts.
    114 |    export CDPATH=.:~/project
        |           ^~~~~~~~~~~~~~~~~~
-note: Keep CDPATH unexported or clear it before running scripts.
+note: Keep `CDPATH` unexported or clear it before running scripts.
 118:15: warning: Several commands append to the same file separately.
    118 |    echo one >> style.log
        |                ^~~~~~~~~
@@ -5065,14 +5065,14 @@ note: Keep CDPATH unexported or clear it before running scripts.
    120 |    echo three >> style.log
        |                  ^~~~~~~~~ this later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
-121:3: warning: An echo of a command substitution prints what the command already prints.
+121:3: warning: An `echo` of a command substitution prints what the command already prints.
    121 |    echo `date`
        |    ^~~~
 note: Run the command on its own instead.
 121:8: warning: Backticks are harder to nest than command substitutions.
    121 |    echo `date`
        |         ^~~~~~
-note: Use $(...) for command substitution.
+note: Use `$(...)` for command substitution.
 121:8: warning: An unquoted command substitution splits its output.
    121 |    echo `date`
        |         ^~~~~~
@@ -5089,38 +5089,38 @@ note: Validate the value as decimal digits before arithmetic.
    123 |    [ x"$value" = xvalue ]
        |      ^~~~~~~~~
 note: Quote the variable directly.
-124:3: warning: PS1 control escapes need balanced display guards.
+124:3: warning: `PS1` control escapes need balanced display guards.
    124 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
-note: Wrap nonprinting prompt escapes in \[ and \].
-124:3: warning: This assignment to 'PS1' in a function has no local, so the value leaks to the global scope.
+note: Wrap nonprinting prompt escapes in `\[` and `\]`.
+124:3: warning: This assignment to 'PS1' in a function has no `local`, the value leaks to the global scope.
    124 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
-128:10: warning: The find -exec action has no terminating ';' or '+'.
+note: Declare it with `local` to keep it inside the function.
+128:10: warning: The `find -exec` action has no terminating `;` or `+`.
    128 |    find . -exec echo {}
        |           ^~~~~
 note: Terminate the action with an escaped semicolon or plus.
-129:11: warning: The test builtin does not support the =~ regular expression operator.
+129:11: warning: The `test` builtin does not support the `=~` regular expression operator.
    129 |    [ value =~ expression ]
        |            ^~
-note: Use [[ value =~ expression ]].
-130:60: warning: An ssh command in a while-read loop can consume the loop input.
+note: Use `[[ value =~ expression ]]`.
+130:60: warning: An `ssh` command in a while-read loop can consume the loop input.
    130 |    while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
        |                                                             ^~~
-note: Redirect ssh input from /dev/null or pass -n.
+note: Redirect `ssh` input from `/dev/null`, or pass `-n`.
 131:9: warning: An alias body cannot receive positional arguments.
    131 |    alias archive='mv $1 /backup'
        |          ^~~~~~~~~~~~~~~~~~~~~~~
 note: Use a function when the wrapper needs arguments.
-132:24: warning: The find expression uses -o without grouping its actions.
+132:24: warning: The `find` expression uses `-o` without grouping its actions.
    132 |    find . -name '*.bak' -o -name '*~' -delete
        |                         ^~
 note: Group each side with escaped parentheses.
 133:8: warning: A positional parameter above nine needs braces.
    133 |    echo $10
        |         ^~~
-note: Write ${10} to select positional parameter 10.
+note: Write `${10}` to select positional parameter 10.
 133:8: warning: An unquoted variable can split into words and expand globs.
    133 |    echo $10
        |         ^~
@@ -5129,22 +5129,22 @@ note: Quote the expansion to keep one argument.
    134 |    $(printf command)
        |    ^~~~~~~~~~~~~~~~~
 note: Run the command inside the substitution directly.
-135:3: warning: A scalar assignment from $@ loses argument boundaries.
+135:3: warning: A scalar assignment from `$@` loses argument boundaries.
    135 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
-note: Assign one value or use an array.
-135:3: warning: This assignment to 'arguments' in a function has no local, so the value leaks to the global scope.
+note: Assign one value, or use an array.
+135:3: warning: This assignment to 'arguments' in a function has no `local`, the value leaks to the global scope.
    135 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
-136:3: warning: A tilde inside PATH remains literal.
+note: Declare it with `local` to keep it inside the function.
+136:3: warning: A tilde inside `PATH` remains literal.
    136 |    PATH="$PATH:~/bin"
        |    ^~~~~~~~~~~~~~~~~~
-note: Expand HOME before assigning PATH.
-137:8: warning: $[...] is the obsolete arithmetic expansion spelling.
+note: Expand `HOME` before assigning `PATH`.
+137:8: warning: `$[...]` is the obsolete arithmetic expansion spelling.
    137 |    echo $[1+2]
        |         ^~~~~~
-note: Use $((...)) for arithmetic expansion.
+note: Use `$((...))` for arithmetic expansion.
 138:22: warning: The word list holds the one constant word 'one', so the body runs once.
    138 |    for outer_index in one; do
        |                       ^~~
@@ -5167,67 +5167,67 @@ note: Use a distinct variable for the nested loop.
    139 |      for outer_index in two; do echo "$outer_index"; done
        |                         ^~~
 note: Loop over a glob, a variable, or a command substitution.
-141:8: warning: The case word 'value' is constant, so the same branch is chosen every time.
+141:8: warning: The `case` word 'value' is constant, so the same branch is chosen every time.
    141 |    case value in
        |         ^~~~~
-note: Add the missing `$`, or drop the case.
-142:3: warning: The pattern 'same' cannot match the case word 'value', so its branch is dead.
+note: Add the missing `$`, or drop the `case`.
+142:3: warning: The pattern 'same' cannot match the `case` word 'value', so its branch is dead.
    142 |    same) : ;;
        |    ^~~~
-143:3: warning: An earlier case pattern makes this pattern unreachable.
+143:3: warning: An earlier `case` pattern makes this pattern unreachable.
    143 |    same) : ;;
        |    ^~~~
 142:3: details:
    142 |    same) : ;;
        |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
-143:3: warning: The pattern 'same' cannot match the case word 'value', so its branch is dead.
+143:3: warning: The pattern 'same' cannot match the `case` word 'value', so its branch is dead.
    143 |    same) : ;;
        |    ^~~~
-144:3: warning: The pattern ''*'' cannot match the case word 'value', so its branch is dead.
+144:3: warning: The pattern ''*'' cannot match the `case` word 'value', so its branch is dead.
    144 |    '*') : ;;
        |    ^~~
-145:3: warning: The pattern 'literal-after-star' cannot match the case word 'value', so its branch is dead.
+145:3: warning: The pattern 'literal-after-star' cannot match the `case` word 'value', so its branch is dead.
    145 |    literal-after-star) : ;;
        |    ^~~~~~~~~~~~~~~~~~
-147:3: warning: An earlier case pattern shadows this pattern.
+147:3: warning: An earlier `case` pattern shadows this pattern.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
 146:3: details:
    146 |    prefix*) : ;;
        |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
-147:3: warning: The pattern 'prefix-value' cannot match the case word 'value', so its branch is dead.
+147:3: warning: The pattern 'prefix-value' cannot match the `case` word 'value', so its branch is dead.
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
-141:8: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+141:8: warning: This `case` has no default `*)` branch, a value no pattern matches is silently ignored.
    141 |    case value in
        |         ^~~~~
-152:7: warning: The '-lt' operator belongs to test, arithmetic reads it as a subtraction.
+152:7: warning: The `-lt` operator belongs to `test`, arithmetic reads it as a subtraction.
    152 |    let "counter -lt limit"
        |        ^~~~~~~~~~~~~~~~~~~
 note: Use the symbolic form such as `<` or `>` inside arithmetic.
 152:3: warning: The `let` builtin evaluates its argument as arithmetic.
    152 |    let "counter -lt limit"
        |    ^~~
-note: Write `(( ... ))`, which needs no quoting and reads as arithmetic.
-153:14: warning: The '>=' operator does not exist in test.
+note: Write `(( ... ))` for the arithmetic.
+153:14: warning: The `>=` operator does not exist in `test`.
    153 |    [[ "$left" >= "$right" ]]
        |               ^~
 note: Negate the opposite comparison, as in `! a < b`.
-154:13: warning: The '>=' operator does not exist in test.
+154:13: warning: The `>=` operator does not exist in `test`.
    154 |    [ "$left" \>= "$right" ]
        |              ^~~
 note: Negate the opposite comparison, as in `! a < b`.
-155:13: warning: The '-foo' operator is not a known test operator.
+155:13: warning: The `-foo` operator is not a known test operator.
    155 |    [ "$left" -foo "$right" ]
        |              ^~~~
 note: Check the operator spelling or quote the operand.
-156:5: warning: The '-foo' operator is not a known test operator.
+156:5: warning: The `-foo` operator is not a known test operator.
    156 |    [ -foo "$right" ]
        |      ^~~~
 note: Check the operator spelling or quote the operand.
-157:17: warning: The '-gt' operator compares integers, '1.5' carries a fraction.
+157:17: warning: The `-gt` operator compares integers, '1.5' carries a fraction.
    157 |    [ "$left" -gt 1.5 ]
        |                  ^~~
 note: Compare the decimals with `bc` or `awk`.
@@ -5243,14 +5243,14 @@ note: Evaluate the numbers with `$((...))` before the comparison.
    160 |    recursive_wrapper == value
        |                      ^~
 note: Write `[ x = y ]` to compare the values.
-161:5: warning: The '-gt' comparison has literal operands on both sides.
+161:5: warning: The `-gt` comparison has literal operands on both sides.
    161 |    [ -5 -gt 3 ]
        |      ^~~~~~~~
 note: Remove the constant condition or compare runtime data.
-164:16: warning: A test with -a or -o is obsolescent.
+164:16: warning: A `test` with `-a` or `-o` is obsolescent.
    164 |    [ -e "$left" -a -e "$right" ]
        |                 ^~
-note: Join two tests with && or || instead.
+note: Join two tests with `&&` or `||`.
 168:3: warning: A test with no operand always fails.
    168 |    [ ]
        |    ^
@@ -5282,8 +5282,8 @@ note: Write it with `-n`, or drop the brackets to check the exit status.
 175:5: warning: A one-operand test is the nonempty-string test.
    175 |    [ "$left" ]
        |      ^~~~~~~
-note: Write it with -n to read clearer.
-177:5: warning: The '=' comparison has literal operands on both sides.
+note: Write it with `-n` to read clearer.
+177:5: warning: The `=` comparison has literal operands on both sides.
    177 |    [ a = b ]
        |      ^~~~~
 note: Remove the constant condition or compare runtime data.
@@ -5295,10 +5295,10 @@ note: Compare a variable, or correct the operand spelling.
    179 |    [ "$left" != a -o "$left" != b ]
        |                   ^~
 note: Join the two inequalities with `-a`.
-179:18: warning: A test with -a or -o is obsolescent.
+179:18: warning: A `test` with `-a` or `-o` is obsolescent.
    179 |    [ "$left" != a -o "$left" != b ]
        |                   ^~
-note: Join two tests with && or || instead.
+note: Join two tests with `&&` or `||`.
 180:20: warning: The '$left' operand fails only one of the two `!=` tests, so the `||` is always true.
    180 |    [[ $left != a || $left != b ]]
        |                     ^~~~~
@@ -5307,7 +5307,7 @@ note: Join the two inequalities with `&&`.
    181 |    [ "$left" != a ] || [ "$left" != b ]
        |                          ^~~~~~~
 note: Join the two tests with `&&`.
-182:6: warning: The '-z' operator expects an operand, '==' is another operator.
+182:6: warning: The `-z` operator expects an operand, `==` is another operator.
    182 |    [[ -z == foo ]]
        |       ^~
 note: Give the operator its operand before the comparison.
@@ -5315,7 +5315,7 @@ note: Give the operator its operand before the comparison.
    182 |    [[ -z == foo ]]
        |          ^~
 note: Test a variable or drop the check.
-182:6: warning: The '==' comparison has literal operands on both sides.
+182:6: warning: The `==` comparison has literal operands on both sides.
    182 |    [[ -z == foo ]]
        |       ^~~~~~~~~
 note: Remove the constant condition or compare runtime data.
@@ -5330,7 +5330,7 @@ note: Add the opening `[`, or quote the bracket when it is data.
 186:29: warning: An assignment cannot contain spaces around equals.
    186 |    [ "$left" = a && "$right" = b ]
        |                              ^
-note: Write NAME=value without spaces.
+note: Write `NAME=value` without spaces.
 187:3: warning: A `[ ]` test does not take `||`, the bracket closes before it.
    187 |    [ "$left" = a || "$right" = b ]
        |    ^
@@ -5342,7 +5342,7 @@ note: Add the opening `[`, or quote the bracket when it is data.
 187:29: warning: An assignment cannot contain spaces around equals.
    187 |    [ "$left" = a || "$right" = b ]
        |                              ^
-note: Write NAME=value without spaces.
+note: Write `NAME=value` without spaces.
 188:17: warning: The trailing `]` has no opening `[`.
    188 |    echo trailing ]
        |                  ^
@@ -5378,7 +5378,7 @@ note: Escape it as `\>`, or use the `[[ ]]` form.
 193:5: warning: A one-operand test is the nonempty-string test.
    193 |    [ "$left" > "$right" ]
        |      ^~~~~~~
-note: Write it with -n to read clearer.
+note: Write it with `-n` to read clearer.
 194:15: warning: The `<` reads a file into the test, it does not compare.
    194 |    [ "$left" < "$right" ]
        |                ^~~~~~~~
@@ -5386,7 +5386,7 @@ note: Escape it as `\<`, or use the `[[ ]]` form.
 194:5: warning: A one-operand test is the nonempty-string test.
    194 |    [ "$left" < "$right" ]
        |      ^~~~~~~
-note: Write it with -n to read clearer.
+note: Write it with `-n` to read clearer.
 195:18: warning: The redirect writes to the file named '2', it does not name a descriptor.
    195 |    echo written > 2
        |                   ^
@@ -5455,7 +5455,7 @@ note: Loop over the elements, or write `*` in place of `@`.
    210 |    [[ {a,b} = one ]]
        |       ^~~~~
 note: Loop over the expanded words.
-210:6: warning: The '=' comparison has literal operands on both sides.
+210:6: warning: The `=` comparison has literal operands on both sides.
    210 |    [[ {a,b} = one ]]
        |       ^~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
@@ -5463,7 +5463,7 @@ note: Remove the constant condition or compare runtime data.
    211 |    [[ *.txt = one ]]
        |       ^~~~~
 note: Loop over the matches.
-211:6: warning: The '=' comparison has literal operands on both sides.
+211:6: warning: The `=` comparison has literal operands on both sides.
    211 |    [[ *.txt = one ]]
        |       ^~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
@@ -5506,7 +5506,7 @@ note: Add the link name, or write `.` explicitly.
 224:3: warning: The `xargs -i` flag is deprecated.
    224 |    xargs -i echo replaced < list
        |    ^~~~~
-note: Use `-I` with an explicit replacement string instead.
+note: Use `-I` with an explicit replacement string.
 228:3: warning: The `echo` output is counted by `wc`, where the shell knows the length on its own.
    228 |    echo "$value" | wc -c
        |    ^~~~
@@ -5542,7 +5542,7 @@ note: Use `sed` to replace a word.
    234 |    grep 'file*' list
        |         ^~~~~~~
 note: Write `.*` for any text, or match the names with a glob.
-235:8: warning: The `echo` operand holds '\n', which `echo` prints as written.
+235:8: warning: The `echo` operand holds `\n`, which `echo` prints as written.
    235 |    echo 'line\n'
        |         ^~~~~~~~
 note: Use `printf` instead.
@@ -5550,18 +5550,18 @@ note: Use `printf` instead.
    236 |    [ -n "$(grep needle file)" ]
        |         ^~~~~~~~~~~~~~~~~~~~~
 note: Use `grep -q` and test its exit status.
-237:10: warning: The printf format consumes no argument, so the remaining operands are ignored.
+237:10: warning: The `printf` format consumes no argument, so the remaining operands are ignored.
    237 |    printf 'plain\n' one two
        |           ^~~~~~~~~
 note: Add a format directive, or remove the extra operands.
-252:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+252:3: warning: This `cd` is unchecked, so later commands can run in the wrong directory.
    252 |    cd /tmp
        |    ^~
-note: Stop or return when cd fails.
-253:3: warning: This cd is unchecked, so later commands can run in the wrong directory.
+note: Stop or return when `cd` fails.
+253:3: warning: This `cd` is unchecked, so later commands can run in the wrong directory.
    253 |    cd -
        |    ^~
-note: Stop or return when cd fails.
+note: Stop or return when `cd` fails.
 252:3: warning: A later `cd -` undoes this directory change, and a subshell restores the directory on its own.
    252 |    cd /tmp
        |    ^~
@@ -5585,7 +5585,7 @@ note: Move the body into its own script, or pass it with `sh -c`.
    247 |    su - -c helper_function
        |            ^~~~~~~~~~~~~~~
 note: Move the body into its own script, or pass it with `sh -c`.
-248:15: warning: The operand 'whoami' is handed to `su` as a command without `-c`, which not every `su` accepts.
+248:15: warning: The operand 'whoami' is handed to `su` as a command without `-c`, and not every `su` accepts that.
    248 |    su operator whoami
        |                ^~~~~~
 note: Write `su -c` instead, or use `sudo`.
@@ -5617,21 +5617,21 @@ note: Write `assigned=value` on its own.
    256 |    return one two
        |               ^~~
 note: Write the other data to standard output.
-256:10: warning: The code 'one' is not a number from 0 to 255, return either rejects it or wraps it modulo 256.
+256:10: warning: The code 'one' is not a number from 0 to 255, `return` either rejects it or wraps it modulo 256.
    256 |    return one two
        |           ^~~
 257:12: warning: The `exit` builtin takes one number from 0 to 255, so the operands after the first are ignored.
    257 |    exit one two
        |             ^~~
 note: Write the other data to standard output.
-257:8: warning: The code 'one' is not a number from 0 to 255, exit either rejects it or wraps it modulo 256.
+257:8: warning: The code 'one' is not a number from 0 to 255, `exit` either rejects it or wraps it modulo 256.
    257 |    exit one two
        |         ^~~
 258:10: warning: An unquoted command substitution splits its output.
    258 |    return $(echo 5)
        |           ^~~~~~~~~
 note: Quote it to keep one argument.
-258:10: warning: A command substitution wraps a useless echo.
+258:10: warning: A command substitution wraps a useless `echo`.
    258 |    return $(echo 5)
        |           ^~~~~~~~~
 note: The text can be used directly without the subshell.
@@ -5679,7 +5679,7 @@ note: Write `counter=$(( ... ))` to evaluate the arithmetic.
    276 |    counter=counter+1
        |    ^~~~~~~~~~~~~~~~~
 note: Write `counter=$(( ... ))` to evaluate the arithmetic.
-277:3: warning: The PATH variable holds the command search path, and this assignment replaces it with '/opt/local/bin'.
+277:3: warning: The `PATH` variable holds the command search path, and this assignment replaces it with '/opt/local/bin'.
    277 |    PATH=/opt/local/bin
        |    ^~~~~~~~~~~~~~~~~~~
 note: Name the variable something else, or keep `$PATH` in the value.
@@ -5687,18 +5687,18 @@ note: Name the variable something else, or keep `$PATH` in the value.
    278 |    pattern=*.txt
        |    ^~~~~~~~~~~~~
 note: Quote the value when the pattern is data, or use an array.
-278:3: warning: This assignment to 'pattern' in a function has no local, so the value leaks to the global scope.
+278:3: warning: This assignment to 'pattern' in a function has no `local`, the value leaks to the global scope.
    278 |    pattern=*.txt
        |    ^~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 279:3: warning: The value of 'braces' keeps the pattern as text, because an assignment does not expand it.
    279 |    braces=file{a,b}.txt
        |    ^~~~~~~~~~~~~~~~~~~~
 note: Quote the value when the pattern is data, or use an array.
-279:3: warning: This assignment to 'braces' in a function has no local, so the value leaks to the global scope.
+279:3: warning: This assignment to 'braces' in a function has no `local`, the value leaks to the global scope.
    279 |    braces=file{a,b}.txt
        |    ^~~~~~~~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 283:3: warning: The assignment to 'piped' runs as the first stage, so the pipeline output is not assigned.
    283 |    piped=value | wc -l
        |    ^~~~~~~~~~~
@@ -5719,10 +5719,10 @@ note: Write `${entries[@]}` to expand every element.
    291 |    entries=scalar
        |    ^~~~~~~~~~~~~~
 note: Write `entries=( ... )` to keep the array.
-291:3: warning: This assignment to 'entries' in a function has no local, so the value leaks to the global scope.
+291:3: warning: This assignment to 'entries' in a function has no `local`, the value leaks to the global scope.
    291 |    entries=scalar
        |    ^~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 292:3: warning: The name 'entries' holds an array, and a scalar append changes the first element.
    292 |    entries+=tail
        |    ^~~~~~~~~~~~~
@@ -5743,10 +5743,10 @@ note: Write `declared=( ... )` to keep the array.
    298 |    echo "$filled"
        |         ^~~~~~~~~
 note: Write `${filled[@]}` to expand every element.
-302:3: warning: This assignment to 'options' in a function has no local, so the value leaks to the global scope.
+302:3: warning: This assignment to 'options' in a function has no `local`, the value leaks to the global scope.
    302 |    options='-t "one two"'
        |    ^~~~~~~~~~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 302:3: warning: The value of 'options' carries quote bytes, and the expansion keeps them as text.
    302 |    options='-t "one two"'
        |    ^~~~~~~~~~~~~~~~~~~~~~
@@ -5774,26 +5774,26 @@ note: Quote the expansion to keep the default intact.
    308 |    : ${SANDWICH:=fallback}
        |      ^~~~~~~~~~~~~~~~~~~~~
 note: Quote the expansion to keep one argument.
-309:3: warning: This assignment to 'same' in a function has no local, so the value leaks to the global scope.
+309:3: warning: This assignment to 'same' in a function has no `local`, the value leaks to the global scope.
    309 |    same=1
        |    ^~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 310:3: warning: The value assigned to 'same' is the value 'same' already holds.
    310 |    same=$same
        |    ^~~~~~~~~~
 note: Remove the assignment, or name the variable the value comes from.
-310:3: warning: This assignment to 'same' in a function has no local, so the value leaks to the global scope.
+310:3: warning: This assignment to 'same' in a function has no `local`, the value leaks to the global scope.
    310 |    same=$same
        |    ^~~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 311:3: warning: The value of 'IFS' carries a backslash and a letter, not the control byte.
    311 |    IFS="\t"
        |    ^~~~~~~~
 note: Write `$'\t'` to place the control byte.
-312:3: warning: This assignment to 'pager' in a function has no local, so the value leaks to the global scope.
+312:3: warning: This assignment to 'pager' in a function has no `local`, the value leaks to the global scope.
    312 |    pager=cat
        |    ^~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 313:3: warning: A positional parameter cannot be assigned, so '$1=first' runs as a command.
    313 |    $1=first
        |    ^~~~~~~~
@@ -5833,7 +5833,7 @@ note: Rename the variable to start with a letter or an underscore.
 322:10: warning: An append cannot contain spaces around `+=`, so 'spaced' runs as a command.
    322 |    spaced += tail
        |           ^~
-note: Write NAME+=value without spaces, or quote the operator to pass it through.
+note: Write `NAME+=value` without spaces, or quote the operator to pass it through.
 326:5: warning: The redirection is attached to no command, so no data is read or written.
    326 |    > report.txt
        |      ^~~~~~~~~~
@@ -5904,42 +5904,42 @@ note: Quote the expansion and leave the glob characters outside the quotes.
    354 |      echo hi | grep -q bye | break
        |                              ^~~~~
 note: Write `||` in place of the pipe.
-359:8: warning: The case word 'constant' is constant, so the same branch is chosen every time.
+359:8: warning: The `case` word 'constant' is constant, so the same branch is chosen every time.
    359 |    case constant in
        |         ^~~~~~~~
-note: Add the missing `$`, or drop the case.
-364:3: warning: The pattern 'nomatch' cannot match the case word '"$prefix suffix"', so its branch is dead.
+note: Add the missing `$`, or drop the `case`.
+364:3: warning: The pattern 'nomatch' cannot match the `case` word '"$prefix suffix"', so its branch is dead.
    364 |    nomatch) : ;;
        |    ^~~~~~~
-368:3: warning: The expansion in the pattern '$expanded' is matched as a glob, not compared literally.
+368:3: warning: The expansion in the pattern '$expanded' is matched as a glob.
    368 |    $expanded) : ;;
        |    ^~~~~~~~~
 note: Quote the expansion so the pattern matches literally.
-374:5: warning: The optstring does not declare 'z', so getopts never stores that letter.
+374:5: warning: The optstring does not declare 'z', so `getopts` never stores that letter.
    374 |      z) : ;;
        |      ^
 371:17: details:
    371 |    while getopts "ab:" chosen_option; do
        |                  ^~~~~ this optstring omits the option.
 note: Add the letter to the optstring, or remove the branch.
-372:10: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
+372:10: warning: This `case` has no default `*)` branch, a value no pattern matches is silently ignored.
    372 |      case $chosen_option in
        |           ^~~~~~~~~~~~~~
-372:10: warning: The optstring declares 'b', which no branch of this case handles.
+372:10: warning: The optstring declares 'b', and no branch of this `case` handles it.
    372 |      case $chosen_option in
        |           ^~~~~~~~~~~~~~
 371:17: details:
    371 |    while getopts "ab:" chosen_option; do
        |                  ^~~~~ this optstring declares the option.
 note: Add a `b)` branch, or drop the letter from the optstring.
-372:10: warning: getopts stores a question mark for an unknown option, which no branch of this case handles.
+372:10: warning: `getopts` stores a question mark for an unknown option, and no branch of this `case` handles it.
    372 |      case $chosen_option in
        |           ^~~~~~~~~~~~~~
 371:17: details:
    371 |    while getopts "ab:" chosen_option; do
        |                  ^~~~~ this loop reads the options.
 note: Add a `*)` branch that prints the usage and exits.
-380:3: warning: The `( )` group starts a subshell, which costs a process on every run.
+380:3: warning: The `( )` group starts a subshell, and a subshell costs a process on every run.
    380 |    ( echo first || echo second ) && echo third
        |    ^
 note: Write `{ ...; }` to group the commands in the current shell.
@@ -5966,14 +5966,14 @@ note: Use `command` before the wrapped command name.
    393 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-429:3: warning: This assignment to 'spacing' in a function has no local, so the value leaks to the global scope.
+429:3: warning: This assignment to 'spacing' in a function has no `local`, the value leaks to the global scope.
    429 |    spacing=foo\tbar
        |    ^~~~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
-431:3: warning: This assignment to 'quoted' in a function has no local, so the value leaks to the global scope.
+note: Declare it with `local` to keep it inside the function.
+431:3: warning: This assignment to 'quoted' in a function has no `local`, the value leaks to the global scope.
    431 |    quoted='long \
        |    ^~~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 433:8: warning: The double-quoted string is closed right after `$` so the dollar sign stays literal, and the word continues after it.
    433 |    echo "The apples are $""1 each"
        |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5986,14 +5986,14 @@ note: Write `\$` inside the quotes and keep the string in one piece.
    438 |    -e x file
        |    ^~
 note: Place the option after its command.
-442:3: warning: This assignment to 'runner' in a function has no local, so the value leaks to the global scope.
+442:3: warning: This assignment to 'runner' in a function has no `local`, the value leaks to the global scope.
    442 |    runner=printf
        |    ^~~~~~~~~~~~~
-note: Declare it with local to keep it inside the function.
-443:3: warning: This assignment to 'linker' in a function has no local, so the value leaks to the global scope.
+note: Declare it with `local` to keep it inside the function.
+443:3: warning: This assignment to 'linker' in a function has no `local`, the value leaks to the global scope.
    443 |    linker=ln
        |    ^~~~~~~~~
-note: Declare it with local to keep it inside the function.
+note: Declare it with `local` to keep it inside the function.
 448:13: warning: The command 'amp' is the tail of the HTML entity `&amp;`, which the shell reads as an operator followed by a command.
    448 |    echo one &amp echo two
        |              ^~~

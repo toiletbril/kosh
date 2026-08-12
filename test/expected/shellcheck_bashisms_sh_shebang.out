@@ -707,150 +707,150 @@
 [Word
   Unquoted "done"
 ]
-6:8: warning: An echo -e relies on a bash builtin, the POSIX echo prints the flag as text.
+6:8: warning: An `echo -e` relies on a bash builtin, the POSIX `echo` prints the flag as text.
      6 |    echo -e escaped
        |         ^~
-note: Use printf instead under a sh shebang.
-7:8: warning: An echo -n relies on a bash builtin, the POSIX echo prints the flag as text.
+note: Use `printf` instead under a `sh` shebang.
+7:8: warning: An `echo -n` relies on a bash builtin, the POSIX `echo` prints the flag as text.
      7 |    echo -n nonewline
        |         ^~
-note: Use printf instead under a sh shebang.
-8:3: warning: The declare builtin is not in POSIX.
+note: Use `printf` instead under a `sh` shebang.
+8:3: warning: The `declare` builtin is not in POSIX.
      8 |    declare -A assoc
        |    ^~~~~~~
-note: Assign the variable plainly under a sh shebang, or switch the shebang to bash.
-9:3: warning: The typeset builtin is not in POSIX.
+note: Assign the variable plainly under a `sh` shebang, or switch the shebang to bash.
+9:3: warning: The `typeset` builtin is not in POSIX.
      9 |    typeset scoped
        |    ^~~~~~~
-note: Assign the variable plainly under a sh shebang, or switch the shebang to bash.
-10:3: warning: The name source is the bash spelling, the POSIX dot command is '.'.
+note: Assign the variable plainly under a `sh` shebang, or switch the shebang to bash.
+10:3: warning: The name `source` is the bash spelling, the POSIX dot command is `.`.
     10 |    source library.sh
        |    ^~~~~~
-note: Use '.' under a sh shebang.
-13:7: warning: The <(...) process substitution is a bash extension absent from POSIX sh.
+note: Use `.` under a `sh` shebang.
+13:7: warning: The `<(...)` process substitution is a bash extension absent from POSIX sh.
     13 |    cat <(echo substituted)
        |        ^~~~~~~~~~~~~~~~~~~
-note: Use a named pipe or a temporary file under a sh shebang.
-14:8: warning: The extended glob !(excluded) is a bash extension absent from POSIX sh.
+note: Use a named pipe or a temporary file under a `sh` shebang.
+14:8: warning: The extended glob `!(excluded)` is a bash extension absent from POSIX sh.
     14 |    echo !(excluded)
        |         ^~~~~~~~~~~
-note: Use a case statement or a plain glob under a sh shebang.
-15:8: warning: The $'...' quoting form is a bash extension absent from POSIX sh.
+note: Use a `case` statement or a plain glob under a `sh` shebang.
+15:8: warning: The `$'...'` quoting form is a bash extension absent from POSIX sh.
     15 |    echo $'a\tb'
        |         ^~~~~~~
-note: Use printf to produce the escapes under a sh shebang.
-16:8: warning: A ^ opens the bracket expression [^a]tail where POSIX sh negates with !
+note: Use `printf` to produce the escapes under a `sh` shebang.
+16:8: warning: A `^` opens the bracket expression `[^a]tail` where POSIX sh negates with `!`.
     16 |    echo [^a]tail
        |         ^~~~~~~~
-note: Use [! ...] under a sh shebang.
-17:3: warning: An echo of a command substitution prints what the command already prints.
+note: Use `[! ...]` under a `sh` shebang.
+17:3: warning: An `echo` of a command substitution prints what the command already prints.
     17 |    echo "$(<file)"
        |    ^~~~
 note: Run the command on its own instead.
-17:9: warning: The $(<file) form is a bash shorthand absent from POSIX sh.
+17:9: warning: The `$(<file)` form is a bash shorthand absent from POSIX sh.
     17 |    echo "$(<file)"
        |          ^~~~~~~~
-note: Use $(cat file) under a sh shebang.
-18:3: warning: An echo of a command substitution prints what the command already prints.
+note: Use `$(cat file)` under a `sh` shebang.
+18:3: warning: An `echo` of a command substitution prints what the command already prints.
     18 |    echo "`<file`"
        |    ^~~~
 note: Run the command on its own instead.
-18:9: warning: The `<file` form is a bash shorthand absent from POSIX sh.
+18:9: warning: The `` `<file` `` form is a bash shorthand absent from POSIX sh.
     18 |    echo "`<file`"
        |          ^~~~~~~
-note: Use $(cat file) under a sh shebang.
-19:9: warning: The indirect expansion of !indirect is a bash extension absent from POSIX sh.
+note: Use `$(cat file)` under a `sh` shebang.
+19:9: warning: The indirect expansion of `!indirect` is a bash extension absent from POSIX sh.
     19 |    echo "${!indirect}"
        |          ^~~~~~~~~~~~
-note: Use eval or a case dispatch under a sh shebang.
-20:9: warning: The array reference array[0] is a bash extension absent from POSIX sh.
+note: Use `eval` or a `case` dispatch under a `sh` shebang.
+20:9: warning: The array reference `array[0]` is a bash extension absent from POSIX sh.
     20 |    echo "${array[0]}"
        |          ^~~~~~~~~~~
-note: Use the positional parameters under a sh shebang.
-21:9: warning: The array key expansion of !array[@] is a bash extension absent from POSIX sh.
+note: Use the positional parameters under a `sh` shebang.
+21:9: warning: The array key expansion of `!array[@]` is a bash extension absent from POSIX sh.
     21 |    echo "${!array[@]}"
        |          ^~~~~~~~~~~~
-note: Use the positional parameters under a sh shebang.
-22:9: warning: The name prefix expansion of !prefix* is a bash extension absent from POSIX sh.
+note: Use the positional parameters under a `sh` shebang.
+22:9: warning: The name prefix expansion of `!prefix*` is a bash extension absent from POSIX sh.
     22 |    echo "${!prefix*}"
        |          ^~~~~~~~~~~
-note: List the names explicitly under a sh shebang.
-23:9: warning: The substring expansion of text:1:2 is a bash extension absent from POSIX sh.
+note: List the names explicitly under a `sh` shebang.
+23:9: warning: The substring expansion of `text:1:2` is a bash extension absent from POSIX sh.
     23 |    echo "${text:1:2}"
        |          ^~~~~~~~~~~
-note: Use expr or cut under a sh shebang.
-24:9: warning: The string replacement in text/from/to is a bash extension absent from POSIX sh.
+note: Use `expr` or `cut` under a `sh` shebang.
+24:9: warning: The string replacement in `text/from/to` is a bash extension absent from POSIX sh.
     24 |    echo "${text/from/to}"
        |          ^~~~~~~~~~~~~~~
-note: Use sed or a case dispatch under a sh shebang.
-25:9: warning: RANDOM is a bash variable that POSIX sh leaves undefined.
+note: Use `sed` or a `case` dispatch under a `sh` shebang.
+25:9: warning: 'RANDOM' is a bash variable that POSIX sh leaves undefined.
     25 |    echo "$RANDOM"
        |          ^~~~~~~
-note: Compute the value another way under a sh shebang.
-30:15: warning: The &> redirection is a bash extension absent from POSIX sh.
+note: Compute the value another way under a `sh` shebang.
+30:15: warning: The `&>` redirection is a bash extension absent from POSIX sh.
     30 |    echo both &>out.log
        |                ^~~~~~~
-note: Write the file redirect and 2>&1 separately under a sh shebang.
-31:18: warning: The &> redirection is a bash extension absent from POSIX sh.
+note: Write the file redirect and `2>&1` separately under a `sh` shebang.
+31:18: warning: The `&>` redirection is a bash extension absent from POSIX sh.
     31 |    echo append &>>out.log
        |                   ^~~~~~~
-note: Write the file redirect and 2>&1 separately under a sh shebang.
-32:14: warning: The >& redirection to outfile is a bash extension absent from POSIX sh.
+note: Write the file redirect and `2>&1` separately under a `sh` shebang.
+32:14: warning: The `>&` redirection to 'outfile' is a bash extension absent from POSIX sh.
     32 |    echo dup >&outfile
        |               ^~~~~~~
-note: Write the file redirect and 2>&1 separately under a sh shebang.
-33:8: warning: The named file descriptor {logfd} is a bash extension absent from POSIX sh.
+note: Write the file redirect and `2>&1` separately under a `sh` shebang.
+33:8: warning: The named file descriptor '{logfd}' is a bash extension absent from POSIX sh.
     33 |    exec {logfd}>trace.log
        |         ^~~~~~~
-note: Name a fixed descriptor number under a sh shebang.
-34:16: warning: The file descriptor 12 is outside the range POSIX sh defines.
+note: Name a fixed descriptor number under a `sh` shebang.
+34:16: warning: The file descriptor '12' is outside the range POSIX sh defines.
     34 |    echo high 12>high.log
        |                 ^~~~~~~~
-note: Use a descriptor from 0 to 9 under a sh shebang.
-35:13: warning: The path /dev/tcp/example.com/80 is a bash network device that POSIX sh leaves undefined.
+note: Use a descriptor from 0 to 9 under a `sh` shebang.
+35:13: warning: The path '/dev/tcp/example.com/80' is a bash network device that POSIX sh leaves undefined.
     35 |    echo net >/dev/tcp/example.com/80
        |              ^~~~~~~~~~~~~~~~~~~~~~~
-note: Open the connection with a network client under a sh shebang.
-36:14: warning: The redirection target prefix*.log is a glob that POSIX sh leaves undefined.
+note: Open the connection with a network client under a `sh` shebang.
+36:14: warning: The redirection target 'prefix*.log' is a glob that POSIX sh leaves undefined.
     36 |    echo glob >prefix*.log
        |               ^~~~~~~~~~~
-note: Name the file explicitly under a sh shebang.
-40:3: warning: The standalone ((...)) command is a bash extension absent from POSIX sh.
+note: Name the file explicitly under a `sh` shebang.
+40:3: warning: The standalone `((...))` command is a bash extension absent from POSIX sh.
     40 |    ((counter + 1))
        |    ^~~~~~~~~~~~~~~
-note: Use the : $((...)) form under a sh shebang.
-41:8: warning: The ++ operator in arithmetic is undefined in POSIX sh.
+note: Use the `: $((...))` form under a `sh` shebang.
+41:8: warning: The `++` operator in arithmetic is undefined in POSIX sh.
     41 |    : $((counter++))
        |         ^~~~~~~~~
-note: Write the assignment out under a sh shebang.
-42:8: warning: The -- operator in arithmetic is undefined in POSIX sh.
+note: Write the assignment out under a `sh` shebang.
+42:8: warning: The `--` operator in arithmetic is undefined in POSIX sh.
     42 |    : $((counter--))
        |         ^~~~~~~~~
-note: Write the assignment out under a sh shebang.
-43:8: warning: The ** operator in arithmetic is undefined in POSIX sh.
+note: Write the assignment out under a `sh` shebang.
+43:8: warning: The `**` operator in arithmetic is undefined in POSIX sh.
     43 |    : $((base ** exponent))
        |         ^~~~~~~~~~~~~~~~
-note: Multiply the value out under a sh shebang.
-44:11: warning: The < comparison in test is undefined in POSIX sh.
+note: Multiply the value out under a `sh` shebang.
+44:11: warning: The `<` comparison in `test` is undefined in POSIX sh.
     44 |    [ alpha \< beta ]
        |            ^~
-note: Compare with expr or a case statement under a sh shebang.
-45:11: warning: The > comparison in test is undefined in POSIX sh.
+note: Compare with `expr` or a `case` statement under a `sh` shebang.
+45:11: warning: The `>` comparison in `test` is undefined in POSIX sh.
     45 |    [ alpha \> beta ]
        |            ^~
-note: Compare with expr or a case statement under a sh shebang.
-46:11: warning: The -nt operator in test is undefined in POSIX sh.
+note: Compare with `expr` or a `case` statement under a `sh` shebang.
+46:11: warning: The `-nt` operator in `test` is undefined in POSIX sh.
     46 |    [ first -nt second ]
        |            ^~~
-note: Compare the timestamps with find or ls under a sh shebang.
-47:11: warning: The -ef operator in test is undefined in POSIX sh.
+note: Compare the timestamps with `find` or `ls` under a `sh` shebang.
+47:11: warning: The `-ef` operator in `test` is undefined in POSIX sh.
     47 |    [ first -ef second ]
        |            ^~~
-note: Compare the timestamps with find or ls under a sh shebang.
-48:5: warning: The unary -a in test is undefined in POSIX sh.
+note: Compare the timestamps with `find` or `ls` under a `sh` shebang.
+48:5: warning: The unary `-a` in `test` is undefined in POSIX sh.
     48 |    [ -a present ]
        |      ^~
-note: Use -e instead.
+note: Use `-e` instead.
 49:11: warning: The literals 'alpha' and 'beta' differ, so the comparison never succeeds.
     49 |    [ alpha = beta ]
        |            ^
@@ -867,45 +867,45 @@ note: Run the compound command through `sh -c` and time that.
     53 |    time printf 'timed\n' | wc -l
        |    ^~~~
 note: Time one stage, or run the pipeline through `bash -c` and time that.
-61:3: warning: Commands after exec do not run when exec succeeds.
+61:3: warning: Commands after `exec` do not run when `exec` succeeds.
     61 |    exec -c env
        |    ^~~~
 62:3: details:
     62 |    let value=1
-       |    ^~~~~~~~~~~ this is the first command skipped after exec.
-note: Remove exec or remove the unreachable commands.
-59:3: warning: The += assignment to LIST is a bash extension absent from POSIX sh.
+       |    ^~~~~~~~~~~ this is the first command skipped after `exec`.
+note: Remove the `exec`, or remove the unreachable commands.
+59:3: warning: The `+=` assignment to 'LIST' is a bash extension absent from POSIX sh.
     59 |    LIST+=extra
        |    ^~~~~~~~~~~
-note: Write NAME="$NAME"value under a sh shebang.
-60:3: warning: The += assignment to PREFIX is a bash extension absent from POSIX sh.
+note: Write `NAME="$NAME"value` under a `sh` shebang.
+60:3: warning: The `+=` assignment to 'PREFIX' is a bash extension absent from POSIX sh.
     60 |    PREFIX+=extra env
        |    ^~~~~~~~~~~~~
-note: Write NAME="$NAME"value under a sh shebang.
-61:8: warning: The exec -c flag is a bash extension absent from POSIX sh.
+note: Write `NAME="$NAME"value` under a `sh` shebang.
+61:8: warning: The `exec` `-c` flag is a bash extension absent from POSIX sh.
     61 |    exec -c env
        |         ^~
-note: Drop the flag under a sh shebang.
-62:3: warning: The let builtin is a bash extension absent from POSIX sh.
+note: Drop the flag under a `sh` shebang.
+62:3: warning: The `let` builtin is a bash extension absent from POSIX sh.
     62 |    let value=1
        |    ^~~
-note: Use the : $((...)) form under a sh shebang.
-63:18: warning: The ERR condition is a bash extension absent from POSIX sh.
+note: Use the `: $((...))` form under a `sh` shebang.
+63:18: warning: The `ERR` condition is a bash extension absent from POSIX sh.
     63 |    trap 'cleanup' ERR
        |                   ^~~
-note: Check the status after each command under a sh shebang.
-64:18: warning: The SIG prefix on SIGINT is undefined in POSIX sh.
+note: Check the status after each command under a `sh` shebang.
+64:18: warning: The `SIG` prefix on 'SIGINT' is undefined in POSIX sh.
     64 |    trap 'cleanup' SIGINT
        |                   ^~~~~~
-note: Name the signal without the SIG prefix under a sh shebang.
-65:18: warning: The signal name int is undefined in POSIX sh because it is not uppercase.
+note: Name the signal without the `SIG` prefix under a `sh` shebang.
+65:18: warning: The signal name 'int' is undefined in POSIX sh because it is not uppercase.
     65 |    trap 'cleanup' int
        |                   ^~~
-note: Name the signal in uppercase under a sh shebang.
-68:10: warning: The printf %q directive is a bash extension absent from POSIX sh.
+note: Name the signal in uppercase under a `sh` shebang.
+68:10: warning: The `printf` `%q` directive is a bash extension absent from POSIX sh.
     68 |    printf '%q\n' "$value"
        |           ^~~~~~
-note: Quote the value another way under a sh shebang.
+note: Quote the value another way under a `sh` shebang.
 70:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it.
     70 |    . library.sh extra
        |                 ^~~~~

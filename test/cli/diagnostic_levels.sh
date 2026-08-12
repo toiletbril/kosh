@@ -50,12 +50,12 @@ echo "annoying-suppressed=$?"
 runtime_annoying_output=$("$BIN" -W \
   -c 'set +o annoying-diagnostics' -c "$annoying_source" 2>&1)
 echo "annoying-runtime-suppressed=$(printf '%s\n' "$runtime_annoying_output" |
-  grep -c 'This cd is unchecked')"
+  grep -c 'This .cd. is unchecked')"
 runtime_annoying_output=$("$BIN" -W \
   -c 'set +o annoying-diagnostics; set -o annoying-diagnostics' \
   -c "$annoying_source" 2>&1)
 echo "annoying-runtime-restored=$(printf '%s\n' "$runtime_annoying_output" |
-  grep -c 'This cd is unchecked')"
+  grep -c 'This .cd. is unchecked')"
 
 lenient_source='diagnostic_levels_missing_command; echo survived'
 "$BIN" -W -c "$lenient_source" >/dev/null 2>&1
@@ -74,9 +74,9 @@ echo "compat-level-one-lenient=$(printf '%s\n' "$compat_lenient_level_one" |
 echo "compat-level-two-lenient=$(printf '%s\n' "$compat_lenient_level_two" |
   grep -c 'read before it is assigned')"
 echo "compat-level-two-annoying=$(printf '%s\n' "$compat_level_two" |
-  grep -c 'This cd is unchecked')"
+  grep -c 'This .cd. is unchecked')"
 echo "compat-level-three-annoying=$(printf '%s\n' "$compat_level_three" |
-  grep -c 'This cd is unchecked')"
+  grep -c 'This .cd. is unchecked')"
 echo "compat-level-two-obsolete=$(printf '%s\n' "$compat_level_two" |
   grep -c 'obsolete arithmetic expansion')"
 echo "compat-level-three-obsolete=$(printf '%s\n' "$compat_level_three" |
@@ -96,7 +96,7 @@ file_directive_output=$(
 )
 echo "$file_directive_output"
 echo "file-directive-errors=$(printf '%s\n' "$file_directive_output" |
-  grep -c 'This cd is unchecked')"
+  grep -c 'This .cd. is unchecked')"
 
 cat > "$temporary_directory/local-directive.sh" <<'EOF'
 f() {

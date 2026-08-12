@@ -7,7 +7,7 @@
 [Word
   Unquoted "[abc"
 ]
-2:6: warning: Malformed glob pattern, unterminated '['.
+2:6: warning: Malformed glob pattern, unterminated `[`.
      2 |  echo [abc
        |       ^~~~
 [abc

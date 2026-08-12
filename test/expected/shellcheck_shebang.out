@@ -55,7 +55,7 @@ note: Add a shebang such as `#!/bin/sh` on the first line.
 1:3: warning: The shebang names 'bin/sh', which is not an absolute path.
      1 |  #!bin/sh
        |    ^~~~~~
-note: Write an absolute path, or use `#!/usr/bin/env` to search PATH.
+note: Write an absolute path, or use `#!/usr/bin/env` to search `PATH`.
 == directory_interpreter ==
 1:3: warning: The shebang names '/bin/sh/', which ends in a slash and names a directory.
      1 |  #!/bin/sh/

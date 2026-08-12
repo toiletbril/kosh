@@ -380,21 +380,21 @@
   DoubleQuoted "neg="
   Variable "?"
 ]
-4:13: warning: A read without -r mangles a backslash in the input.
+4:13: warning: A `read` without `-r` mangles a backslash in the input.
      4 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |              ^~~~~~
-note: Add -r to read the line literally.
-4:21: warning: A read without -r mangles a backslash in the input.
+note: Add `-r` to read the line literally.
+4:21: warning: A `read` without `-r` mangles a backslash in the input.
      4 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |                      ^~~~~~
-note: Add -r to read the line literally.
+note: Add `-r` to read the line literally.
 9:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
      9 |  echo 4 | false || echo 4;
        |           ^~~~~
-15:28: warning: A read without -r mangles a backslash in the input.
+15:28: warning: A `read` without `-r` mangles a backslash in the input.
     15 |  printf 'a\nb\nc\n' | while read l; do echo "got $l"; done
        |                             ^~~~~~
-note: Add -r to read the line literally.
+note: Add `-r` to read the line literally.
 17:8: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
     17 |  true | false
        |         ^~~~~

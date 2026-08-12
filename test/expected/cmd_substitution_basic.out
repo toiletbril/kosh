@@ -395,11 +395,11 @@
      2 |  echo a $(echo b) c
        |         ^~~~~~~~~
 note: Quote it to keep one argument.
-31:6: warning: An echo of a command substitution prints what the command already prints.
+31:6: warning: An `echo` of a command substitution prints what the command already prints.
     31 |  f(){ echo "$(echo hi)"; }
        |       ^~~~
 note: Run the command on its own instead.
-38:1: warning: An echo of a command substitution prints what the command already prints.
+38:1: warning: An `echo` of a command substitution prints what the command already prints.
     38 |  echo $(echo $(echo deep))
        |  ^~~~
 note: Run the command on its own instead.

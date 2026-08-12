@@ -2,7 +2,7 @@
 1:6: warning: The `let` builtin evaluates its argument as arithmetic.
      1 |  a=0; let a = 2; echo unreached
        |       ^~~
-note: Write `(( ... ))`, which needs no quoting and reads as arithmetic.
+note: Write `(( ... ))` for the arithmetic.
 1:12: error: Builtin `let`: Unexpected character in the arithmetic expression.
      1 |  a=0; let a = 2; echo unreached
        |             ^

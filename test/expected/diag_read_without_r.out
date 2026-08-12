@@ -18,9 +18,9 @@
 [Word
   Unquoted "after"
 ]
-2:1: warning: A read without -r mangles a backslash in the input.
+2:1: warning: A `read` without `-r` mangles a backslash in the input.
      2 |  read x </dev/null
        |  ^~~~~~
-note: Add -r to read the line literally.
+note: Add `-r` to read the line literally.
 after
 [Code 0]
