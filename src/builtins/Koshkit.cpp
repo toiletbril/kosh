@@ -37,8 +37,15 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A bare-name invocation arrives with the utility name already at args[0],
      so it dispatches with the name in place. The resolver sets this up when the
      koshkit option is on. */
-  if (koshkit::find_util(ec.args()[0].view()).has_value())
-    return koshkit::dispatch(ec, cxt, 0);
+  if (let const chosen = koshkit::find_util(ec.args()[0].view());
+      chosen.has_value())
+    return koshkit::dispatch(ec, cxt, 0, chosen);
+
+  if (ec.args().count() >= 2) {
+    if (let const chosen = koshkit::find_util(ec.args()[1].view());
+        chosen.has_value())
+      return koshkit::dispatch(ec, cxt, 1, chosen);
+  }
 
   let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
   for (const String &name : koshkit::util_names())

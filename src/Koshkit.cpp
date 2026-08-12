@@ -88,11 +88,16 @@ fn render_with_prefix(const ErrorWithLocation &error, StringView prefix,
       source, &context);
 }
 
-fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
-    -> i32
+fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index,
+            Maybe<Utility::Kind> chosen) throws -> i32
 {
   ASSERT(name_index < ec.args().count());
   let const name = ec.args()[name_index].view();
+  if (!chosen.has_value()) chosen = find_util(name);
+  if (!chosen.has_value())
+    throw ErrorWithLocation{ec.arg_location_at(name_index),
+                            "koshkit has no utility named '" + String{name} +
+                                "'"};
 
   ArrayList<String> shifted{heap_allocator()};
   shifted.reserve(ec.args().count() - name_index);
@@ -103,24 +108,17 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     shifted_locations.push(ec.arg_location_at(i));
   }
 
-  if (let const chosen = find_util(name); chosen.has_value()) {
-    try {
-      return run_util(*chosen, ec, cxt, shifted, shifted_locations);
-    } catch (const BrokenPipeExit &) {
-      throw;
-    } catch (const ErrorWithLocation &e) {
-      let const invocation_name = ec.is_multicall
-                                      ? String{heap_allocator(), name}
-                                      : String{"koshkit "} + name;
-      rethrow_with_prefix(e, invocation_name);
-    } catch (const Error &error) {
-      relocate_error(error, ec.source_location());
-    }
+  try {
+    return run_util(*chosen, ec, cxt, shifted, shifted_locations);
+  } catch (const BrokenPipeExit &) {
+    throw;
+  } catch (const ErrorWithLocation &e) {
+    let const invocation_name = ec.is_multicall ? String{heap_allocator(), name}
+                                                : String{"koshkit "} + name;
+    rethrow_with_prefix(e, invocation_name);
+  } catch (const Error &error) {
+    relocate_error(error, ec.source_location());
   }
-
-  throw ErrorWithLocation{ec.arg_location_at(name_index),
-                          "koshkit has no utility named '" + String{name} +
-                              "'"};
 }
 
 fn run_as_multicall(StringView util_name, ArrayList<String> operands,

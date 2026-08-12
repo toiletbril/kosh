@@ -138,8 +138,8 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
 
 /* The koshkit builtin passes 1 for `koshkit ls` and 0 for a bare-name
    invocation. */
-fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
-    -> i32;
+fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index,
+            Maybe<Utility::Kind> chosen = {}) throws -> i32;
 
 fn run_as_multicall(StringView util_name, ArrayList<String> operands,
                     EvalContext &cxt) throws -> i32;
