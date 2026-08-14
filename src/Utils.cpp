@@ -412,13 +412,17 @@ fn locate_first_unavailable_path_component(const Path &target,
 
   let const prefix = Path{
       target.text().view().substring_of_length(0, unavailable->component_end)};
+  let const is_final_component =
+      expanded_component_index + 1 >= expanded_components.count();
+
   return unavailable_path_source_component{prefix,
                                            operand_location,
                                            steal(reported_prefix),
                                            steal(typed_prefix),
                                            typed_component_start,
                                            unavailable->is_not_directory,
-                                           has_single_raw_component};
+                                           has_single_raw_component,
+                                           is_final_component};
 }
 
 fn file_content_identity(const Path &path, Allocator allocator) throws

@@ -8,7 +8,7 @@ note: Name a shell such as `sh` or `bash` in the shebang.
      1 |  !#/bin/sh
        |  ^~
 note: Write `#!` at the start of the line.
-swapped.kosh:1:1: warning: Command '!#' was not found.
+swapped.kosh:1:1: warning: The directory '!#' does not exist.
      1 |  !#/bin/sh
        |  ^~
 Encountered 2 warnings.
@@ -17,7 +17,7 @@ Encountered 2 warnings.
      1 |  !/bin/sh
        |  ^
 note: Write `#!` at the start of the line.
-missing_hash.kosh:1:1: warning: Command '!' was not found.
+missing_hash.kosh:1:1: warning: The directory '!' does not exist.
      1 |  !/bin/sh
        |  ^
 Encountered 2 warnings.

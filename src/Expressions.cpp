@@ -2160,26 +2160,35 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (should_check_command_resolution && !command_was_resolved &&
       !actx.tested_command_names.contains(*name))
   {
+    let reported_diagnostic = resolution_diagnostic;
     let diagnostic_location = m_args[0]->source_location();
     let reported_name = *name;
+    let is_missing_directory = false;
     if (unavailable.has_value() &&
         resolution_diagnostic == diagnostic_id::unresolved_command)
     {
       diagnostic_location = unavailable->location;
       reported_name = unavailable->reported_prefix.view();
+      is_missing_directory = !unavailable->is_final_component;
+      if (is_missing_directory)
+        reported_diagnostic = diagnostic_id::unresolved_command_directory;
     }
 
-    let local_names = ArrayList<String>{heap_allocator()};
-    actx.defined_functions.for_each(
-        [&](StringView n) throws { local_names.push(String{n}); });
-    actx.known_aliases.for_each([&](StringView n)
-                                    throws { local_names.push(String{n}); });
-    let const suggestion = utils::suggest_command(*name, local_names);
+    let suggestion = Maybe<String>{};
+    if (!is_missing_directory) {
+      let local_names = ArrayList<String>{heap_allocator()};
+      actx.defined_functions.for_each(
+          [&](StringView n) throws { local_names.push(String{n}); });
+      actx.known_aliases.for_each([&](StringView n)
+                                      throws { local_names.push(String{n}); });
+      suggestion = utils::suggest_command(*name, local_names);
+    }
+
     if (suggestion.has_value()) {
-      actx.report_diagnostic(resolution_diagnostic, diagnostic_location,
+      actx.report_diagnostic(reported_diagnostic, diagnostic_location,
                              {reported_name, suggestion->view()});
     } else {
-      actx.report_diagnostic(resolution_diagnostic, diagnostic_location,
+      actx.report_diagnostic(reported_diagnostic, diagnostic_location,
                              {reported_name});
     }
   }

@@ -62,27 +62,27 @@ note: Check the spelling or create it with `mkdir -p`.
        |                ^~~~~~
 note: Did you mean `logical/nested`?
 == analyzed command path first missing component:
-1:11: error: Command './project/miss' was not found.
+1:11: error: The directory './project/miss' does not exist.
      1 |  ./project/miss/tail
        |            ^~~~
 == runtime command path first missing component:
-1:11: error: Command './project/miss' was not found.
+1:11: error: The directory './project/miss' does not exist.
      1 |  ./project/miss/tail
        |            ^~~~
 == exec command path first missing component:
-1:16: error: Command './project/miss' was not found.
+1:16: error: The directory './project/miss' does not exist.
      1 |  exec ./project/miss/tail
        |                 ^~~~
 == analyzed command path preserves missing dot-dot component:
-1:3: error: Command './missing' was not found.
+1:3: error: The directory './missing' does not exist.
      1 |  ./missing/../other
        |    ^~~~~~~
 == runtime command path preserves missing dot-dot component:
-1:3: error: Command './missing' was not found.
+1:3: error: The directory './missing' does not exist.
      1 |  ./missing/../other
        |    ^~~~~~~
 == exec command path preserves missing dot-dot component:
-1:8: error: Command './missing' was not found.
+1:8: error: The directory './missing' does not exist.
      1 |  exec ./missing/../other
        |         ^~~~~~~
 == cd preserves missing dot-dot component:
@@ -93,15 +93,15 @@ note: Check the spelling or create it with `mkdir -p`.
 == logical cd preserves symlink traversal:
 <tmp>/sibling
 == analyzed trailing separator preserves missing dot-dot component:
-1:3: error: Command './missing' was not found.
+1:3: error: The directory './missing' does not exist.
      1 |  ./missing/../existing/
        |    ^~~~~~~
 == runtime trailing separator preserves missing dot-dot component:
-1:3: error: Command './missing' was not found.
+1:3: error: The directory './missing' does not exist.
      1 |  ./missing/../existing/
        |    ^~~~~~~
 == exec trailing separator preserves missing dot-dot component:
-1:8: error: Command './missing' was not found.
+1:8: error: The directory './missing' does not exist.
      1 |  exec ./missing/../existing/
        |         ^~~~~~~
 == command path preserves symlink traversal:

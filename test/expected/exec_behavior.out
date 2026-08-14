@@ -1,5 +1,5 @@
 == a missing command with a slash exits 127:
-1:7: error: Command '/nonexistent' was not found.
+1:7: error: The directory '/nonexistent' does not exist.
      1 |  exec /nonexistent/cmd
        |        ^~~~~~~~~~~
 rc=127

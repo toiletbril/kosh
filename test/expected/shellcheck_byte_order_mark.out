@@ -19,11 +19,11 @@
      1 |  ﻿#!/bin/env kosh
        |  ^
 note: Save the script as UTF-8 without a byte-order mark.
-1:1: warning: Command '﻿#!' was not found.
+1:1: warning: The directory '﻿#!' does not exist.
      1 |  ﻿#!/bin/env kosh
        |  ^~~
 Encountered 2 warnings.
-1:1: error: Command '﻿#!' was not found.
+1:1: error: The directory '﻿#!' does not exist.
      1 |  ﻿#!/bin/env kosh
        |  ^~~
 marked

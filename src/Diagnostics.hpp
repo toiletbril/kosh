@@ -347,6 +347,7 @@ enum class diagnostic_id : u16
   optimizer_folded_loop,
   typeset_spelling,
   unresolved_command,
+  unresolved_command_directory,
   unresolved_command_uncertain,
   use_before_assign,
   Count,

@@ -115,7 +115,7 @@ else
 fi
 out=$("$BIN" --no-diagnostics -c "$drive_relative_operand" 2>&1)
 printf 'raw traversal missing=%s caret=%s executed=%s\n' \
-    "$(printf '%s\n' "$out" | grep -Fc "Command '${drive_relative_operand%%/../*}'")" \
+    "$(printf '%s\n' "$out" | grep -Fc "The directory '${drive_relative_operand%%/../*}'")" \
     "$(printf '%s\n' "$out" | grep -c '^       |    \^~~~~~~$')" \
     "$(printf '%s\n' "$out" | grep -c 'should-not-run')"
 

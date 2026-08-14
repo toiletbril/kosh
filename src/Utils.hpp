@@ -58,6 +58,7 @@ struct unavailable_path_source_component
   usize typed_component_start;
   bool is_not_directory;
   bool has_single_raw_component;
+  bool is_final_component;
 };
 
 fn locate_first_unavailable_path_component(const Path &target,

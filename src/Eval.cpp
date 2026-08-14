@@ -2296,6 +2296,7 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
   let resolution_location =
       arg_locations.is_empty() ? location : arg_locations[0];
   let resolution_program = program.view();
+  let is_missing_directory = false;
 
   Maybe<Builtin::Kind> resolved_builtin;
   Maybe<Path> resolved_program_path;
@@ -2345,6 +2346,7 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
       if (unavailable_component.has_value()) {
         resolution_location = unavailable_component->location;
         resolution_program = unavailable_component->reported_prefix.view();
+        is_missing_directory = !unavailable_component->is_final_component;
         if (unavailable_component->is_not_directory) {
           throw CommandResolutionErrorWithLocation{
               resolution_location, "This file is not a directory", 126};
@@ -2367,6 +2369,13 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
       kind = ResolvedCommand::from_builtin(Builtin::Kind::Koshkit);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
+      if (is_missing_directory) {
+        let const directory_message = StringView{"The directory '"} +
+                                      resolution_program + "' does not exist";
+        throw CommandResolutionErrorWithLocation{resolution_location,
+                                                 directory_message.view()};
+      }
+
       let const message = "Command '" + resolution_program + "' was not found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()},
