@@ -2039,7 +2039,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  check_command_word_shape(actx, lint_input);
+  let has_explained_resolution_failure =
+      check_command_word_shape(actx, lint_input);
 
   /* An assignment builtin that sets PATH also leaves the runtime search path
      unknown to the prepass. */
@@ -2105,7 +2106,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   check_command_value_lints(actx, lint_input);
   check_redirection_lints(actx, lint_input);
   check_test_operand_lints(actx, lint_input);
-  check_prefix_assignment_reads(actx, lint_input);
+  has_explained_resolution_failure |=
+      check_prefix_assignment_reads(actx, lint_input);
 
   /* No search path holds a program named after an entity, so the finding needs
      no resolution scan and survives an unknown path. */
@@ -2128,6 +2130,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   let const should_check_command_resolution =
       name.has_value() && !actx.should_silence_unresolved_commands &&
       !is_command_shadowed && !command_is_html_entity_tail &&
+      !has_explained_resolution_failure &&
       actx.should_report(resolution_diagnostic);
 
   let unavailable = Maybe<utils::unavailable_path_source_component>{};

@@ -51,7 +51,7 @@ FLAG(EXPORT_ALL, Bool, 'a', "export-all", Posix,
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber", Posix,
      "Refuse to overwrite an existing file through '>'.");
 FLAG(NO_EXEC, Bool, 'n', "no-exec", Posix,
-     "Read and parse commands but do not run them.");
+     "Read and parse, and analyze the script but do not run it.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", Posix,
      "Treat an unset variable as an error.");
 FLAG(LOGIN, Bool, 'l', "login", Posix,
@@ -304,10 +304,10 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     let h = String{heap_allocator()};
     h += "KOSHKA";
     h += "\n";
-    h += wrap_text(
-        "Koshka is a pedantic, Bash-compatible command line interpreter and a "
-        "friendly interactive shell.\n\n",
-        HELP_INDENT, HELP_WRAP_WIDTH);
+    h += wrap_text("Koshka is a pedantic, Bash-compatible command line "
+                   "interpreter, diagnostic tool and a "
+                   "friendly interactive shell.\n\n",
+                   HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
     h += wrap_text("Options are also read from the KOSH_FLAGS environment "

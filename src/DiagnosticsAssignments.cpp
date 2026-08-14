@@ -664,11 +664,12 @@ pure fn prefix_value_is_own_name(const prefix_assignment &var) wontthrow -> bool
 /* A prefix assignment does not affect the expansion on the same command, so a
    reference to one of its names reads the old value. */
 fn check_prefix_assignment_reads(AnalysisContext &actx,
-                                 const command_lint_input &input) throws -> void
+                                 const command_lint_input &input) throws -> bool
 {
-  if (input.local_vars.is_empty()) return;
+  if (input.local_vars.is_empty()) return false;
 
   let const &args = input.args;
+  let has_explained_resolution_failure = false;
 
   /* One prefix assignment whose value names a command leaves the next word as
      the command name, shellcheck SC2037. A variable that holds a command name
@@ -690,6 +691,7 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc2037,
                                input.local_vars[0].location,
                                {name, input.command_literal});
+        has_explained_resolution_failure = true;
       }
     }
   }
@@ -715,6 +717,8 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
       }
     }
   }
+
+  return has_explained_resolution_failure;
 }
 
 namespace {

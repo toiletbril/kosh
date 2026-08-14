@@ -6,6 +6,9 @@ echo "== --posix keeps [[ working:"
 "$BIN" --posix -c '[[ x == x ]] && echo bracket-works'
 echo "== --posix seeds BASH_VERSION:"
 "$BIN" --posix -c 'echo "BASH_VERSION=${BASH_VERSION:-unset}"'
+echo "== --posix seeds BASH_VERSINFO:"
+"$BIN" --posix -c \
+  'printf "BASH_VERSINFO=%s.%s.%s.%s\n" "${BASH_VERSINFO[@]:0:4}"'
 echo "== --posix reports the bash-posix mood:"
 "$BIN" --posix -c 'set --mood'
 echo "== --mood bash-posix keeps [[ working:"

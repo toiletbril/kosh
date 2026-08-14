@@ -499,7 +499,7 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
                                      StringView command_literal,
                                      usize equals_position,
                                      const SourceLocation &location) throws
-    -> void
+    -> bool
 {
   switch (command_literal[0]) {
   case '$': {
@@ -508,20 +508,22 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
                                               : diagnostic_id::sc2277;
       actx.report_diagnostic(id, location, {command_literal});
 
-      return;
+      return true;
     }
 
     if (command_literal[1] >= '0' && command_literal[1] <= '9') {
       actx.report_diagnostic(diagnostic_id::sc2270, location,
                              {command_literal});
 
-      return;
+      return true;
     }
 
-    if (lexer::is_variable_name_start(command_literal[1]))
+    if (lexer::is_variable_name_start(command_literal[1])) {
       actx.report_diagnostic(diagnostic_id::sc2281, location);
+      return true;
+    }
 
-    return;
+    return false;
   }
 
   case '=': {
@@ -537,7 +539,7 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
       actx.report_diagnostic(diagnostic_id::sc2273, location,
                              {command_literal});
 
-      return;
+      return true;
     }
 
     let const id = command_literal.starts_with(StringView{"==="})
@@ -545,7 +547,7 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
                        : diagnostic_id::sc2275;
     actx.report_diagnostic(id, location, {command_literal});
 
-    return;
+    return true;
   }
 
   case '0':
@@ -560,7 +562,7 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
   case '9':
     actx.report_diagnostic(diagnostic_id::sc2282, location, {command_literal});
 
-    return;
+    return true;
 
   default: break;
   }
@@ -570,7 +572,7 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
   {
     actx.report_diagnostic(diagnostic_id::sc2272, location, {command_literal});
 
-    return;
+    return true;
   }
 
   for (usize i = 0; i < equals_position; i += 1) {
@@ -578,18 +580,21 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
 
     actx.report_diagnostic(diagnostic_id::sc2271, location, {command_literal});
 
-    return;
+    return true;
   }
+
+  return false;
 }
 
 /* A name like [ holds a glob metacharacter that static_command_name rejects,
    so the literal text is taken separately for the test recognition. */
 fn check_command_word_shape(AnalysisContext &actx,
-                            const command_lint_input &input) throws -> void
+                            const command_lint_input &input) throws -> bool
 {
   let const &args = input.args;
   let const command_literal = input.command_literal;
   let const location = input.command_location();
+  let has_explained_resolution_failure = false;
 
   if (!command_literal.is_empty() && command_literal[0] == '-')
     actx.report_diagnostic(diagnostic_id::sc2215, location);
@@ -607,9 +612,10 @@ fn check_command_word_shape(AnalysisContext &actx,
     {
       actx.report_diagnostic(diagnostic_id::sc2276, location,
                              {*command_source});
+      has_explained_resolution_failure = true;
     } else {
-      check_equals_bearing_command_name(actx, command_literal, *equals_position,
-                                        location);
+      has_explained_resolution_failure = check_equals_bearing_command_name(
+          actx, command_literal, *equals_position, location);
     }
   }
 
@@ -653,7 +659,10 @@ fn check_command_word_shape(AnalysisContext &actx,
   if (args.count() >= 2 && args[1]->raw_view() == StringView{"+="}) {
     actx.report_diagnostic(diagnostic_id::sc2285, args[1]->source_location(),
                            {command_literal});
+    has_explained_resolution_failure = true;
   }
+
+  return has_explained_resolution_failure;
 }
 
 fn check_operand_lints_after_scan(AnalysisContext &actx,

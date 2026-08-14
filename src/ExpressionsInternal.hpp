@@ -212,7 +212,7 @@ fn check_operand_lints_before_scan(AnalysisContext &actx,
                                    const command_lint_input &input) throws
     -> void;
 fn check_command_word_shape(AnalysisContext &actx,
-                            const command_lint_input &input) throws -> void;
+                            const command_lint_input &input) throws -> bool;
 fn check_operand_lints_after_scan(AnalysisContext &actx,
                                   const command_lint_input &input) throws
     -> void;
@@ -226,7 +226,7 @@ fn check_test_operand_lints(AnalysisContext &actx,
                             const command_lint_input &input) throws -> void;
 fn check_prefix_assignment_reads(AnalysisContext &actx,
                                  const command_lint_input &input) throws
-    -> void;
+    -> bool;
 
 alwaysinline fn set_and_return_exit_status(EvalContext &cxt,
                                            i64 status) wontthrow -> i64
