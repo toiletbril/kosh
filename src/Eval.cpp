@@ -223,7 +223,7 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
 {
   if (is_bash_identity) {
     LOG(Info, "seeding the bash identity variables");
-    set_shell_variable("BASH_VERSION", "5.2.0(1)-kosh");
+    set_shell_variable("BASH_VERSION", "5.3.0(1)-kosh");
     let versinfo = ArrayList<String>{heap_allocator()};
     versinfo.push(String{"5"});
     versinfo.push(String{"2"});
