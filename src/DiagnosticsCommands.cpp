@@ -73,12 +73,13 @@ fn check_trap_condition_operands(AnalysisContext &actx,
         uppercase.view().starts_with(StringView{"SIG"}) && view.length > 3;
     let const bare =
         has_sig_prefix ? uppercase.view().substring(3) : uppercase.view();
-    let const names_a_signal =
-        bare == "EXIT" || os::signal_number_from_name(bare).has_value();
+    let const names_a_signal = bare == "EXIT" ||
+                               signal_name_is_unblockable(bare) ||
+                               os::signal_number_from_name(bare).has_value();
 
     /* The kernel delivers KILL and STOP without consulting the handler table,
        shellcheck SC2173. */
-    if (names_a_signal && signal_name_is_unblockable(bare)) {
+    if (signal_name_is_unblockable(bare)) {
       actx.report_diagnostic(diagnostic_id::sc2173, args[i]->source_location(),
                              {view});
     }
