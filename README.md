@@ -1,22 +1,24 @@
 # koshka-oriented shell
 
-[![Koshka is at least 5 times faster than Bash](https://github.com/toiletbril/kosh/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/kosh/actions/workflows/ci.yml)
+[![Koshka is at least 3 times faster than Bash](https://github.com/toiletbril/kosh/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/kosh/actions/workflows/ci.yml)
 
 0.1.0 has been released! See the [Release Blog Post](https://fennec.support/scribbles/shell-release).
 
-**The project was renamed in 0.1.1.** The `shit` is now `kosh`, `shitbox` is
-`koshkit`, and every prefix is changed to `kosh`.
+**The project was renamed in 0.2.0.** The `shit` is now `kosh`, `shitbox` is
+`koshkit`, and every prefix is changed to `kosh` or `KOSH_`. I got over the
+funny name. Thanks.
 
 ---
 
-**Koshka** is the Russian word for a cat. The binary is `kosh`, which reads as
-Koshka-Oriented SHell.
+**Koshka** is the Russian word for a cat.
 
-Have you ever seen warnings from software that uses Bison as its parsing
-engine? Did you encounter any of the coreutils' error messages? Have you spent a
-day debugging a Bash script? Aren't you tired?
+**Koshka** is an interpreter, interactive shell and diagnostic tool, with
+first tier support for Windows, Linux and macOS, fully compatible with Bash 5.3
+and Dash.
 
-I invite you to notice the interactive prompt, the speed, and the diagnostics:
+Koshka contains ~300 built-in shellcheck diagnostics. It is usually 5x faster
+than bash, or ~100x+ faster than shellcheck, which makes it exceptionally
+friendly to coding agents or Strict environments where Bash is still used.
 
 | Koshka analyzing 20K-line shell script in ~0.05s |
 | :-: | 
@@ -24,18 +26,11 @@ I invite you to notice the interactive prompt, the speed, and the diagnostics:
 
 ## What
 
-**Koshka** is an interpreter, interactive shell and diagnostic tool, with
-first tier support for Windows, Linux and macOS, fully compatible with Bash 5.3
-and Dash. It usually runs at least 5 times faster than Bash and is built to
-have the best UX possible.
+`kosh` is the **koshka**'s binary.
 
-It aims to be a complete, faster and portable Bash-compatible shell replacement
-for systems, runners or development machines that can benefit from it's speed
-and pedantic diagnostics.
-
-The shell is friendly to coding agents. Strict validation and source-located
-error messages provide clear feedback while shell commands are generated or
-repaired.
+**Koshka** aims to be a complete, faster and portable Shellcheck and Bash
+replacement for systems, runners or development machines that can benefit from
+it's speed and pedantic diagnostics.
 
 The shell guarantees first tier support for Linux, macOS and Windows,
 preserving equivalent behavior on either of these systems.
@@ -92,7 +87,7 @@ The interactive mode is inspired by
 [fish](https://github.com/fish-shell/fish-shell). Shell provides syntax
 highlighting, word movement, editing controls, UTF-8 support, display-width
 handling for wide characters, multiline editing, history search, and persistent
-history. Shell does not depend on readline.
+history. `kosh` does not depend on readline, so it's config is not used.
 
 **Koshka** has more than 50 builtins, and each builtin supports `--help`. These
 include Bash and POSIX builtins. The additional builtins include the following
