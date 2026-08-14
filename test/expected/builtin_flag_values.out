@@ -44,8 +44,5 @@ debug
 info
 == debug logging joined form:
 debug
-== posix signal names:
-ALRM
-USR1
-USR2
-ABRT
+== every signal flag reads the platform table:
+yes

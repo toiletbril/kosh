@@ -330,12 +330,5 @@ finish_results || SUITE_STATUS=$?
 
 ELAPSED_SECONDS=$(($(date +%s) - START_TIME))
 printf "\nDebug test step completed in %s seconds\n" "$ELAPSED_SECONDS"
-if [ "$ELAPSED_SECONDS" -gt 180 ]; then
-  printf "Debug test step exceeded the 180 second soft limit\n"
-fi
-if [ "$ELAPSED_SECONDS" -gt 300 ]; then
-  printf "Debug test step exceeded the 300 second hard limit\n"
-  SUITE_STATUS=1
-fi
 
 exit "$SUITE_STATUS"

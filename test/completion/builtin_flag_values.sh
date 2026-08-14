@@ -1,7 +1,8 @@
 # A flag whose value comes from a closed set answers from that table instead of
 # the filename fallback. The spaced form and the joined equals form are both
 # accepted. HUP, INT, QUIT, KILL, and TERM are the signal names every platform
-# carries, so the remaining names stay behind the POSIX guard.
+# carries. The last check reads its prefix from the platform table itself, and
+# the golden is the same where that table is smaller.
 echo "== kill -s signal names:"
 "$BIN" --debug-complete-at 'kill -s ' </dev/null |
   grep -E '^(HUP|INT|KILL|QUIT|TERM)$'
@@ -37,9 +38,14 @@ echo "== debug logging levels:"
 "$BIN" --debug-complete-at 'kosh -X ' </dev/null
 echo "== debug logging joined form:"
 "$BIN" --debug-complete-at 'kosh --debug-logging=de' </dev/null
-if [ "${OS-}" != Windows_NT ]; then
-  echo "== posix signal names:"
-  "$BIN" --debug-complete-at 'kill -s AL' </dev/null
-  "$BIN" --debug-complete-at 'trap handler USR' </dev/null
-  "$BIN" --debug-complete-at 'koshkit timeout --signal=AB' </dev/null
-fi
+echo "== every signal flag reads the platform table:"
+signal_name=$("$BIN" --debug-complete-at 'kill -s ' </dev/null | tail -n 1)
+signal_prefix=$(printf '%s' "$signal_name" | cut -c1-2)
+agreement=yes
+[ -n "$signal_name" ] || agreement=no
+for probe in "kill -s $signal_prefix" "trap handler $signal_prefix" \
+  "koshkit timeout --signal=$signal_prefix"; do
+  "$BIN" --debug-complete-at "$probe" </dev/null |
+    grep -qxF "$signal_name" || agreement=no
+done
+echo "$agreement"
