@@ -70,22 +70,26 @@ if grep -q 'fg will give the terminal.*before it resumes job' "$d/log"; then
 fi
 
 title_output=failed
-escape=$(printf '\033')
 bell=$(printf '\007')
 safe_argument=$(printf 'safe\303\251')
-idle_title="${escape}]0;kosh-title-user @ ${d}${bell}"
-probe_title="${escape}]0;${probe} 'argument with spaces'${bell}"
-sanitized_title="${escape}]0;${BIN} -c : ${safe_argument}${bell}"
-hook_title="${escape}]0;HOOK${bell}"
-probe_title_count=$(LC_ALL=C grep -aoF "$probe_title" "$d/typescript" 2>/dev/null |
-    wc -l | tr -d ' ')
-last_probe_position=$(LC_ALL=C grep -aboF "$probe_title" "$d/typescript" 2>/dev/null |
-    tail -n 1 | cut -d: -f1)
-last_idle_position=$(LC_ALL=C grep -aboF "$idle_title" "$d/typescript" 2>/dev/null |
-    tail -n 1 | cut -d: -f1)
-last_hook_position=$(LC_ALL=C grep -aboF "$hook_title" "$d/typescript" 2>/dev/null |
-    tail -n 1 | cut -d: -f1)
-if LC_ALL=C grep -aF "$sanitized_title" "$d/typescript" >/dev/null 2>&1 &&
+idle_title="]0;kosh-title-user @ ${d}${bell}"
+probe_title="]0;${probe} 'argument with spaces'${bell}"
+sanitized_title="]0;${BIN} -c : ${safe_argument}${bell}"
+hook_title="]0;HOOK${bell}"
+
+LC_ALL=C tr '\033' '\n' < "$d/typescript" > "$d/titles"
+
+last_title_record()
+{
+    LC_ALL=C grep -anF "$1" "$d/titles" 2>/dev/null | tail -n 1 | cut -d: -f1
+}
+
+probe_title_count=$(LC_ALL=C grep -acF "$probe_title" "$d/titles" 2>/dev/null |
+    tr -d ' ')
+last_probe_position=$(last_title_record "$probe_title")
+last_idle_position=$(last_title_record "$idle_title")
+last_hook_position=$(last_title_record "$hook_title")
+if LC_ALL=C grep -aqF "$sanitized_title" "$d/titles" 2>/dev/null &&
     [ "$probe_title_count" -ge 2 ] && [ -n "$last_probe_position" ] &&
     [ -n "$last_idle_position" ] && [ -n "$last_hook_position" ] &&
     [ "$last_idle_position" -gt "$last_probe_position" ] &&

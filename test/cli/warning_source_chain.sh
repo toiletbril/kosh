@@ -7,9 +7,8 @@ unset KOSH_FLAGS
 # source path, is the same length on every platform and the golden stays
 # portable. mktemp yields a longer path on macOS than on Linux.
 mkdir -p "$TEST_TEMP_DIRECTORY"
-test_temp_directory=$(cd "$TEST_TEMP_DIRECTORY" && pwd -P)
-outer=$test_temp_directory/wscouter
-inner=$test_temp_directory/wscinner
+outer=$TEST_TEMP_DIRECTORY/wscouter
+inner=$TEST_TEMP_DIRECTORY/wscinner
 cat > "$outer" <<EOF
 outer=1
 . $inner
@@ -19,14 +18,16 @@ inner=1
 [[ x = "$UNSET_CHAIN_FIRST" ]]
 [[ x = "$UNSET_CHAIN_SECOND" ]]
 EOF
-"$BIN" -WWW -c ". $outer" 2>&1 | sed "s|$outer|OUTER|; s|$inner|INNER|" | ./normalize-trace.sh "$BIN"
+"$BIN" -WWW -c ". $outer" 2>&1 |
+    sed 's|[^ ]*wscouter|OUTER|g; s|[^ ]*wscinner|INNER|g' |
+    ./normalize-trace.sh "$BIN"
 cat > "$inner" <<'EOF'
 echo "$MIMIC_CHAIN_FIRST"
 echo "$MIMIC_CHAIN_SECOND"
 EOF
 chmod +x "$inner"
 "$BIN" --mood bash -WWW -c '"$1"' trace-driver "$inner" 2>&1 |
-    sed "s|$inner|INNER|" | ./normalize-trace.sh "$BIN"
+    sed 's|[^ ]*wscinner|INNER|g' | ./normalize-trace.sh "$BIN"
 "$BIN" -WWW -c '[[ x = "$UNSET_FLAT" ]]' 2>&1 | grep -Ec 'trace:'
-[ -n "$test_temp_directory" ] && rm -f "$outer" "$inner"
+[ -n "$TEST_TEMP_DIRECTORY" ] && rm -f "$outer" "$inner"
 echo "rc=$?"
