@@ -28,5 +28,5 @@ chmod +x "$inner"
 "$BIN" --mood bash -WWW -c '"$1"' trace-driver "$inner" 2>&1 |
     sed "s|$inner|INNER|" | ./normalize-trace.sh "$BIN"
 "$BIN" -WWW -c '[[ x = "$UNSET_FLAT" ]]' 2>&1 | grep -Ec 'trace:'
-rm -f "$outer" "$inner"
+[ -n "$test_temp_directory" ] && rm -f "$outer" "$inner"
 echo "rc=$?"

@@ -307,10 +307,12 @@ public:
     }
   }
 
+  /* The result is true when the message was delivered. A suppressed code must
+     not suppress a later check. */
   fn report_diagnostic(diagnostic_id id, SourceLocation location,
                        std::initializer_list<StringView> arguments = {},
                        Maybe<SourceLocation> related_location = None) throws
-      -> void;
+      -> bool;
   fn flush_warnings() throws -> void;
   fn print_diagnostic_summary() const throws -> void;
   fn print_optimizer_summary() const throws -> void;

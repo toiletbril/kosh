@@ -72,10 +72,6 @@ note: Remove the dollar sign from the assignment name.
      4 |  name = value
        |       ^
 note: Write `NAME=value` without spaces.
-4:1: warning: Command 'name' was not found.
-     4 |  name = value
-       |  ^~~~
-note: Did you mean 'time'?
 5:1: warning: Malformed glob pattern, unterminated `[`.
      5 |  [grep needle file]
        |  ^~~~~
@@ -113,7 +109,7 @@ note: Place the option after its command.
 8:1: warning: Command '-n' was not found.
      8 |  -n
        |  ^~
-Encountered 14 warnings.
+Encountered 13 warnings.
 2:1: error: Command 'nosuchcmd_xyz' was not found.
      2 |  nosuchcmd_xyz
        |  ^~~~~~~~~~~~~

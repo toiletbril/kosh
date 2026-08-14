@@ -1080,18 +1080,14 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   }
 
   /* The body runs later when the function is called, so it is analyzed from an
-     empty constant table with the outer constants restored after. */
+     empty constant table with the outer constants restored after. A called
+     function edits the caller's own shell, and its search path, working
+     directory, and runtime-definer effects outlive the body. */
   let saved_constants = steal(actx.constant_variables);
   actx.constant_variables = StringMap<String>{heap_allocator()};
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
-  let const saved_has_seen_runtime_definer = actx.has_seen_runtime_definer;
-  let const saved_has_unknown_path = actx.has_unknown_path;
-  let const saved_has_unknown_working_directory =
-      actx.has_unknown_working_directory;
-  let const saved_should_silence_unresolved_commands =
-      actx.should_silence_unresolved_commands;
   let saved_inherited_assigned_names = actx.inherited_assigned_names.clone();
   let saved_inherited_global_assigned_names =
       actx.inherited_global_assigned_names.clone();
@@ -1113,11 +1109,6 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.function_scope_depth--;
   actx.active_function_definition_index = saved_active_function;
   actx.loop_body_depth = saved_loop_body_depth;
-  actx.has_unknown_working_directory = saved_has_unknown_working_directory;
-  actx.has_unknown_path = saved_has_unknown_path;
-  actx.has_seen_runtime_definer = saved_has_seen_runtime_definer;
-  actx.should_silence_unresolved_commands =
-      saved_should_silence_unresolved_commands;
   actx.array_valued_names = steal(saved_array_valued_names);
   actx.inherited_global_assigned_names =
       steal(saved_inherited_global_assigned_names);

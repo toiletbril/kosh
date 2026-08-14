@@ -1,6 +1,6 @@
-.TH KOSH 1 "2026-08-04" "kosh" "User Commands"
+.TH KOSH 1 "2026-08-14" "kosh" "User Commands"
 .SH NAME
-Koshka \- a very fast and debuggable POSIX- and Bash-compatible command shell
+kosh \- a very fast and debuggable POSIX- and Bash-compatible command shell
 .SH SYNOPSIS
 .B kosh
 .RI [ options ]
@@ -15,10 +15,16 @@ Koshka \- a very fast and debuggable POSIX- and Bash-compatible command shell
 .B kosh
 .B \-s
 .RI [ argument ...]
+.br
+.B kosh
+.B \-\-lint
+.RI [ \-c
+.IR command ...]
+.RI [ file ...]
 .PP
 .SH DESCRIPTION
 .B kosh
-is the Koshka shell executable. it is an interpreter, interactive shell and a
+is the Koshka shell executable. It is an interpreter, interactive shell and a
 diagnostic tool with full Bash and POSIX shell syntax and Bash-compatible
 extensions.
 .PP
@@ -26,14 +32,14 @@ Koshka contains ~300 built-in shellcheck diagnostics and is 5x faster than
 bash, or ~100x faster than shellcheck.
 .PP
 It aims to be a complete, faster and portable Shellcheck and Bash replacement
-for systems, runners or development machines that can benefit from it's speed
+for systems, runners or development machines that can benefit from its speed
 and pedantic diagnostics.
 .PP
 The shell is friendly to coding agents. Strict validation and source-located
 error messages provide clear feedback while shell commands are generated or
 repaired.
 .PP
-The shell gurantees first tier support for Linux, macOS and Windows,
+The shell guarantees first tier support for Linux, macOS and Windows,
 preserving equivalent behavior on either of these systems.
 .PP
 An interactive shell is started when standard input is a terminal and no
@@ -69,6 +75,10 @@ Without
 .B \-\-lint
 analyzes each command string in occurrence order, followed by every file
 operand. Lint operation is noninteractive and completes every selected input.
+Under
+.BR \-s ,
+standard input is analyzed and a file operand becomes a positional parameter.
+With no command string and no file operand, standard input is analyzed.
 .PP
 When both
 .B \-s
@@ -215,7 +225,11 @@ An unset variable read is an error.
 An existing file is not overwritten by a plain output redirection.
 .TP
 .BR \-n ", " \-\-no\-exec
-Commands are parsed without being run. A runtime
+Commands are parsed and analyzed without being run. The analysis stage runs in
+every mood under this option, and a compatibility mood still reports only the
+tiers selected by
+.BR \-W .
+A runtime
 .B set \-n
 also suppresses later commands in the current command list.
 .TP
@@ -246,7 +260,8 @@ suppression from
 .B \-\-no\-diagnostics
 and
 .B \-\-no\-annoying\-diagnostics
-is overridden.
+is overridden. Every startup file is skipped, and the report is free of the
+aliases, functions, and search path of the invoking session.
 .TP
 .BR \-W ", " \-WW ", " \-WWW
 The analysis stage has strict, lenient, and annoying tiers. In the default
@@ -469,10 +484,10 @@ PATH is not searched. The
 .B bash-posix
 mood does not source BASH_ENV.
 .PP
-Clean, rescue, and unequal-id shells skip every startup file. The privileged
-option suppresses ENV and BASH_ENV processing. Restricted mode is visible while
-startup files run, but its restrictions become active only after startup
-finishes.
+Clean, rescue, lint, and unequal-id shells skip every startup file. The
+privileged option suppresses ENV and BASH_ENV processing. Restricted mode is
+visible while startup files run, but its restrictions become active only after
+startup finishes.
 .PP
 Mood-derived pipefail and failglob settings remain disabled while startup files
 run. An explicit command-line nounset setting remains active. The selected mood

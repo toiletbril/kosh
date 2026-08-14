@@ -514,12 +514,16 @@ fn set_foreground_program_title(const ArrayList<String> &arguments,
     return;
   }
 
-  let command = String{cxt.scratch_allocator()};
+  /* The scratch arena is released once per top-level command, and a title built
+     there would grow it for the whole body of a loop. */
+  static String COMMAND_TITLE{heap_allocator()};
+
+  COMMAND_TITLE.clear();
   for (usize index = 0; index < arguments.count(); index++) {
-    if (index > 0) command.push(' ');
-    append_shell_quoted_arg(command, arguments[index]);
+    if (index > 0) COMMAND_TITLE.push(' ');
+    append_shell_quoted_arg(COMMAND_TITLE, arguments[index]);
   }
-  toiletline::set_title(command.view());
+  toiletline::set_title(COMMAND_TITLE.view());
 }
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt,

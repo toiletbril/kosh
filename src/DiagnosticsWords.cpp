@@ -506,22 +506,17 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
     if (command_literal[1] == '0' && equals_position == 2) {
       let const id = actx.is_posix_sh_shebang ? diagnostic_id::sc2279
                                               : diagnostic_id::sc2277;
-      actx.report_diagnostic(id, location, {command_literal});
 
-      return true;
+      return actx.report_diagnostic(id, location, {command_literal});
     }
 
     if (command_literal[1] >= '0' && command_literal[1] <= '9') {
-      actx.report_diagnostic(diagnostic_id::sc2270, location,
-                             {command_literal});
-
-      return true;
+      return actx.report_diagnostic(diagnostic_id::sc2270, location,
+                                    {command_literal});
     }
 
-    if (lexer::is_variable_name_start(command_literal[1])) {
-      actx.report_diagnostic(diagnostic_id::sc2281, location);
-      return true;
-    }
+    if (lexer::is_variable_name_start(command_literal[1]))
+      return actx.report_diagnostic(diagnostic_id::sc2281, location);
 
     return false;
   }
@@ -536,18 +531,15 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
     }
 
     if (is_all_equals && command_literal.length >= 3) {
-      actx.report_diagnostic(diagnostic_id::sc2273, location,
-                             {command_literal});
-
-      return true;
+      return actx.report_diagnostic(diagnostic_id::sc2273, location,
+                                    {command_literal});
     }
 
     let const id = command_literal.starts_with(StringView{"==="})
                        ? diagnostic_id::sc2274
                        : diagnostic_id::sc2275;
-    actx.report_diagnostic(id, location, {command_literal});
 
-    return true;
+    return actx.report_diagnostic(id, location, {command_literal});
   }
 
   case '0':
@@ -560,9 +552,8 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
   case '7':
   case '8':
   case '9':
-    actx.report_diagnostic(diagnostic_id::sc2282, location, {command_literal});
-
-    return true;
+    return actx.report_diagnostic(diagnostic_id::sc2282, location,
+                                  {command_literal});
 
   default: break;
   }
@@ -570,17 +561,15 @@ fn check_equals_bearing_command_name(AnalysisContext &actx,
   if (equals_position + 1 < command_literal.length &&
       command_literal[equals_position + 1] == '=')
   {
-    actx.report_diagnostic(diagnostic_id::sc2272, location, {command_literal});
-
-    return true;
+    return actx.report_diagnostic(diagnostic_id::sc2272, location,
+                                  {command_literal});
   }
 
   for (usize i = 0; i < equals_position; i += 1) {
     if (command_literal[i] != '$') continue;
 
-    actx.report_diagnostic(diagnostic_id::sc2271, location, {command_literal});
-
-    return true;
+    return actx.report_diagnostic(diagnostic_id::sc2271, location,
+                                  {command_literal});
   }
 
   return false;
@@ -610,9 +599,8 @@ fn check_command_word_shape(AnalysisContext &actx,
     if (command_source.has_value() && !command_source->is_empty() &&
         ((*command_source)[0] == '"' || (*command_source)[0] == '\''))
     {
-      actx.report_diagnostic(diagnostic_id::sc2276, location,
-                             {*command_source});
-      has_explained_resolution_failure = true;
+      has_explained_resolution_failure = actx.report_diagnostic(
+          diagnostic_id::sc2276, location, {*command_source});
     } else {
       has_explained_resolution_failure = check_equals_bearing_command_name(
           actx, command_literal, *equals_position, location);
@@ -648,18 +636,19 @@ fn check_command_word_shape(AnalysisContext &actx,
                            args.back()->source_location());
   }
 
-  if (args.count() >= 2 && args[1]->raw_view() == StringView{"="})
-    actx.report_diagnostic(diagnostic_id::sc2283, args[1]->source_location());
+  if (args.count() >= 2 && args[1]->raw_view() == StringView{"="}) {
+    has_explained_resolution_failure |= actx.report_diagnostic(
+        diagnostic_id::sc2283, args[1]->source_location());
+  }
 
   if (args.count() >= 2 && args[1]->raw_view() == StringView{"=="}) {
-    actx.report_diagnostic(diagnostic_id::sc2284, args[1]->source_location(),
-                           {command_literal});
+    has_explained_resolution_failure |= actx.report_diagnostic(
+        diagnostic_id::sc2284, args[1]->source_location(), {command_literal});
   }
 
   if (args.count() >= 2 && args[1]->raw_view() == StringView{"+="}) {
-    actx.report_diagnostic(diagnostic_id::sc2285, args[1]->source_location(),
-                           {command_literal});
-    has_explained_resolution_failure = true;
+    has_explained_resolution_failure |= actx.report_diagnostic(
+        diagnostic_id::sc2285, args[1]->source_location(), {command_literal});
   }
 
   return has_explained_resolution_failure;
@@ -687,7 +676,7 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
           should_take_array_target = false;
           let const target = operand_target_name(literal.view());
           if (!target.is_empty()) {
-            actx.array_valued_names.add(target);
+            actx.add_array_valued_name(target);
             actx.external_input_names.add(target);
           }
         }

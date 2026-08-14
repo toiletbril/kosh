@@ -118,12 +118,17 @@ static cached_terminal_answer STDERR_TERMINAL_ANSWER{};
 
 fn stdout_wants_color() throws -> bool
 {
-  return terminal_wants_color(STDOUT_TERMINAL_ANSWER.get(os::is_stdout_a_tty));
+  return terminal_wants_color(stdout_is_a_terminal());
 }
 
 fn stderr_wants_color() throws -> bool
 {
   return terminal_wants_color(stderr_is_a_terminal());
+}
+
+fn stdout_is_a_terminal() wontthrow -> bool
+{
+  return STDOUT_TERMINAL_ANSWER.get(os::is_stdout_a_tty);
 }
 
 fn stderr_is_a_terminal() wontthrow -> bool

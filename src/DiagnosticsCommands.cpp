@@ -222,7 +222,7 @@ fn check_command_name_lints(AnalysisContext &actx,
     }
 
     if (filled_name_index == args.count()) {
-      actx.array_valued_names.add(StringView{"MAPFILE"});
+      actx.add_array_valued_name(StringView{"MAPFILE"});
       break;
     }
 
@@ -230,7 +230,7 @@ fn check_command_name_lints(AnalysisContext &actx,
         static_cast<const tokens::WordToken *>(args[filled_name_index])
             ->word()
             .to_literal_string();
-    actx.array_valued_names.add(operand_target_name(filled.view()));
+    actx.add_array_valued_name(operand_target_name(filled.view()));
     break;
   }
 
@@ -435,7 +435,7 @@ fn check_command_value_lints(AnalysisContext &actx,
         let const *assignment =
             static_cast<const tokens::Assignment *>(args[i]);
         if (does_declare_an_array)
-          actx.array_valued_names.add(assignment->key().view());
+          actx.add_array_valued_name(assignment->key().view());
 
         if (has_reported_substitution_value) continue;
 
@@ -475,7 +475,7 @@ fn check_command_value_lints(AnalysisContext &actx,
       if (!does_declare_an_array) continue;
 
       let const target = operand_target_name(view);
-      if (!target.is_empty()) actx.array_valued_names.add(target);
+      if (!target.is_empty()) actx.add_array_valued_name(target);
     }
   }
 

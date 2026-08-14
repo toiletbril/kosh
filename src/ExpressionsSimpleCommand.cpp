@@ -137,9 +137,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 
   /* A PATH assignment leaves the runtime search path unknown to the prepass, so
      a later command's not-found check stays quiet. */
-  if (name.view() == "PATH") {
-    actx.mark_path_unknown(true);
-  }
+  if (name.view() == "PATH") actx.mark_path_unknown(true);
   if (is_source_location_variable(name.view()))
     actx.mark_working_directory_unknown();
 

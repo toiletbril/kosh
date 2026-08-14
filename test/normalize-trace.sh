@@ -7,6 +7,11 @@
 # length, and the caret line that follows the KOSH invocation is dropped,
 # the way warning_source_chain normalizes INNER and OUTER.
 #
+# A trace caret spans the real source operand, so its width also follows the
+# checkout path length. Every caret under a trace line collapses to ^~~~ and
+# the golden stays the same on any checkout. A warning caret is left alone,
+# because it spans the reported word and its width is the finding.
+#
 # Usage: ... | normalize-trace.sh "$BIN"
 BIN=$1
 BIN_FORWARD=$(printf '%s\n' "$BIN" | tr '\\' '/')
@@ -15,4 +20,10 @@ BIN_PATTERN=$(printf '%s\n' "$BIN" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
 BIN_FORWARD_PATTERN=$(printf '%s\n' "$BIN_FORWARD" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
 BIN_BACKWARD_PATTERN=$(printf '%s\n' "$BIN_BACKWARD" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
 sed "s#$BIN_PATTERN#KOSH#g; s#$BIN_FORWARD_PATTERN#KOSH#g; s#$BIN_BACKWARD_PATTERN#KOSH#g; s/^\([0-9][0-9]*\):[0-9][0-9]*: trace:/\1:0: trace:/" \
-  | awk '/KOSH -/{print; skip=1; next} skip{skip=0; next} {print}'
+  | awk '
+/KOSH -/{print; skip=1; after_trace=0; next}
+skip{skip=0; next}
+/: trace:$/{print; after_trace=1; next}
+after_trace==1{print; after_trace=2; next}
+after_trace==2{sub(/\^~*/, "^~~~"); print; after_trace=0; next}
+{print}'

@@ -574,9 +574,9 @@ static fn strip_ansi_color(StringView text) throws -> String;
 
 fn set_title(StringView title) -> void
 {
-  let const output = os::is_stdout_a_tty()   ? KOSH_STDOUT
-                     : os::is_stderr_a_tty() ? KOSH_STDERR
-                                             : KOSH_INVALID_FD;
+  let const output = koshka::colors::stdout_is_a_terminal()   ? KOSH_STDOUT
+                     : koshka::colors::stderr_is_a_terminal() ? KOSH_STDERR
+                                                              : KOSH_INVALID_FD;
   if (output == KOSH_INVALID_FD) return;
 
   static constexpr usize MAX_TITLE_LENGTH = 4096;
@@ -599,7 +599,7 @@ fn set_title(StringView title) -> void
     if (byte == '\x1b' && position + 1 < title.count() &&
         title[position + 1] == '[')
     {
-      usize end_position = position + 2;
+      let end_position = position + 2;
       while (end_position < title.count() &&
              (title[end_position] < '@' || title[end_position] > '~'))
       {
@@ -638,24 +638,25 @@ fn set_title(StringView title) -> void
       continue;
     }
     bool is_valid = true;
-    for (usize continuation = 1; continuation < codepoint_length;
-         continuation++)
+    for (usize continuation_index = 1; continuation_index < codepoint_length;
+         continuation_index++)
     {
       let const continuation_byte =
-          static_cast<unsigned char>(title[position + continuation]);
+          static_cast<unsigned char>(title[position + continuation_index]);
       if ((continuation_byte & 0xc0) != 0x80) {
         is_valid = false;
         break;
       }
       codepoint = (codepoint << 6) | (continuation_byte & 0x3f);
     }
+    if (sequence.count() + codepoint_length > MAX_TITLE_LENGTH + 4) break;
+
     let const minimum_codepoint = codepoint_length == 2   ? 0x80u
                                   : codepoint_length == 3 ? 0x800u
                                                           : 0x10000u;
     if (!is_valid || codepoint < minimum_codepoint || codepoint > 0x10ffffu ||
         (codepoint >= 0xd800u && codepoint <= 0xdfffu) ||
-        (codepoint >= 0x80u && codepoint <= 0x9fu) ||
-        sequence.count() + codepoint_length > MAX_TITLE_LENGTH + 4)
+        (codepoint >= 0x80u && codepoint <= 0x9fu))
     {
       position++;
       continue;
@@ -666,6 +667,20 @@ fn set_title(StringView title) -> void
   }
 
   sequence.push('\a');
+
+  /* A loop body sets the same title on every iteration. A redirection that
+     rebinds a standard descriptor retires the cached one. */
+  static String LAST_TITLE_SEQUENCE{koshka::heap_allocator()};
+  static u64 LAST_TITLE_EPOCH = static_cast<u64>(-1);
+  let const current_epoch = os::get_descriptor_epoch();
+  if (current_epoch == LAST_TITLE_EPOCH &&
+      sequence.view() == LAST_TITLE_SEQUENCE.view())
+  {
+    return;
+  }
+
+  LAST_TITLE_EPOCH = current_epoch;
+  LAST_TITLE_SEQUENCE = sequence;
   unused(os::write_all(output, sequence.data(), sequence.count()));
 }
 

@@ -237,10 +237,10 @@ pure fn AnalysisContext::should_report(diagnostic_id id) const wontthrow -> bool
 fn AnalysisContext::report_diagnostic(
     diagnostic_id id, SourceLocation location,
     std::initializer_list<StringView> arguments,
-    Maybe<SourceLocation> related_location) throws -> void
+    Maybe<SourceLocation> related_location) throws -> bool
 {
-  if (!should_report(id)) return;
-  if (is_diagnostic_suppressed(id, location)) return;
+  if (!should_report(id)) return false;
+  if (is_diagnostic_suppressed(id, location)) return false;
 
   let const &definition = get_diagnostic_definition(id);
   let message =
@@ -269,6 +269,8 @@ fn AnalysisContext::report_diagnostic(
          related_location, related_message.view());
     break;
   }
+
+  return true;
 }
 
 cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
@@ -606,7 +608,15 @@ fn wrapped_command_index(command_name_id wrapper_id,
     -> Maybe<usize>
 {
   if (args.count() < 2) return None;
-  if (wrapper_id == command_name_id::Builtin) return 1;
+
+  if (wrapper_id == command_name_id::Builtin) {
+    let const first = static_command_name(args[1]);
+    if (first.has_value() && *first == "--")
+      return args.count() > 2 ? Maybe<usize>{2} : None;
+
+    return 1;
+  }
+
   if (wrapper_id != command_name_id::Command) return None;
 
   for (usize argument_index = 1; argument_index < args.count();
@@ -679,20 +689,22 @@ fn analyze_followed_source(AnalysisContext &actx,
     return true;
   }
 
-  usize path_index = command_index + 1;
+  let path_index = command_index + 1;
   let const option = static_command_name(args[path_index]);
   if (option.has_value() && *option == "--help") return true;
-  if (option.has_value() && *option == "--") {
-    path_index++;
-  }
+  if (option.has_value() && *option == "--") path_index++;
   if (path_index >= args.count()) return true;
 
-  let const literal_path = static_command_name(args[path_index]);
-  if (!literal_path.has_value()) {
+  /* An unread source may have edited the search path or the working
+     directory. */
+  let const do_give_up_on_source = [&actx]() throws -> bool {
     actx.mark_path_unknown(false);
     actx.mark_working_directory_unknown();
     return false;
-  }
+  };
+
+  let const literal_path = static_command_name(args[path_index]);
+  if (!literal_path.has_value()) return do_give_up_on_source();
 
   bool should_expand_tilde = false;
   if (args[path_index]->kind() == Token::Kind::Word) {
@@ -719,10 +731,11 @@ fn analyze_followed_source(AnalysisContext &actx,
   }
   let resolved_path = actx.eval_context->resolve_source_path(
       *literal_path, should_expand_tilde);
-  if (!resolved_path.has_value()) return true;
+  if (!resolved_path.has_value()) return do_give_up_on_source();
 
   let canonical_path = os::canonical_path(*resolved_path);
-  if (!canonical_path.has_value()) return true;
+  if (!canonical_path.has_value()) return do_give_up_on_source();
+
   if (let const *effects = actx.followed_source_effects_cache->find(
           canonical_path->text().view());
       effects != nullptr)
@@ -731,13 +744,13 @@ fn analyze_followed_source(AnalysisContext &actx,
                                   should_merge_parent_uncertainty);
     return should_merge_parent_state;
   }
-  if (!actx.followed_source_paths->add(canonical_path->text().view())) {
-    return false;
-  }
 
   let contents = canonical_path->read_entire_file();
-  if (!contents.has_value()) return true;
+  if (!contents.has_value()) return do_give_up_on_source();
   contents->normalize_crlf_line_endings();
+
+  if (!actx.followed_source_paths->add(canonical_path->text().view()))
+    return false;
 
   let const arena_mark = AST_ARENA->mark();
   defer { AST_ARENA->release(arena_mark); };
@@ -768,6 +781,11 @@ fn analyze_followed_source(AnalysisContext &actx,
   let const scope_definitions = parser.take_analysis_scope_definitions();
   let const directive_spans = parser.take_shellcheck_directive_spans();
   let const heredoc_misses = parser.take_heredoc_terminator_misses();
+  /* A child that skips its own nested sources records partial effects, wrong
+     for a later visit that carries no uncertainty. */
+  let const was_analyzed_under_uncertainty =
+      actx.has_unknown_path || actx.has_unknown_working_directory;
+
   followed_source_effects effects{};
   let const analyzed = analyze_ast(
       ast, contents->view(), actx.defined_functions, actx.known_aliases,
@@ -779,8 +797,10 @@ fn analyze_followed_source(AnalysisContext &actx,
       actx.followed_source_effects_cache, &actx, nullptr,
       should_merge_parent_state, should_merge_parent_uncertainty, &effects);
   if (!analyzed) actx.has_fatal = true;
-  actx.followed_source_effects_cache->set(canonical_path->text().view(),
-                                          steal(effects));
+  if (!was_analyzed_under_uncertainty) {
+    actx.followed_source_effects_cache->set(canonical_path->text().view(),
+                                            steal(effects));
+  }
 
   return should_merge_parent_state;
 }
@@ -1403,8 +1423,6 @@ fn operand_target_name(StringView text) wontthrow -> StringView
 fn SimpleCommand::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
-  unused(is_unconditional);
-
   optimizer::optimize_node(this, actx);
 
   let const is_command_prefix = !m_args.is_empty();
@@ -2310,40 +2328,52 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   /* A multi-stage pipeline runs each stage in a forked child, so a stage
      assignment must not be recorded as a straight-line constant. A single
      command keeps the caller's unconditional context. */
-  let const stage_is_unconditional =
-      is_unconditional && m_commands.count() == 1;
+  let const has_multiple_stages = m_commands.count() > 1;
+  let const stage_is_unconditional = is_unconditional && !has_multiple_stages;
   for (let const command : m_commands) {
     ASSERT(command != nullptr);
     let const was_direct_pipeline_stage = actx.is_direct_pipeline_stage;
+    actx.is_direct_pipeline_stage =
+        has_multiple_stages && (command->as_simple_command() != nullptr ||
+                                command->as_assign_command() != nullptr);
+
+    if (!has_multiple_stages) {
+      command->analyze(actx, stage_is_unconditional);
+      actx.is_direct_pipeline_stage = was_direct_pipeline_stage;
+      continue;
+    }
+
     let const saved_has_seen_runtime_definer = actx.has_seen_runtime_definer;
     let const saved_has_unknown_path = actx.has_unknown_path;
     let const saved_has_unknown_working_directory =
         actx.has_unknown_working_directory;
     let const saved_should_silence_unresolved_commands =
         actx.should_silence_unresolved_commands;
+    let const defined_function_insertion_count =
+        actx.defined_function_insertions.count();
+    let const known_alias_insertion_count = actx.known_alias_insertions.count();
     let saved_inherited_assigned_names = actx.inherited_assigned_names.clone();
     let saved_inherited_global_assigned_names =
         actx.inherited_global_assigned_names.clone();
     let saved_array_valued_names = actx.array_valued_names.clone();
     let *saved_source_effects = actx.current_source_effects;
-    if (m_commands.count() > 1) actx.current_source_effects = nullptr;
-    actx.is_direct_pipeline_stage =
-        m_commands.count() > 1 && (command->as_simple_command() != nullptr ||
-                                   command->as_assign_command() != nullptr);
+    actx.current_source_effects = nullptr;
+
     command->analyze(actx, stage_is_unconditional);
+
     actx.current_source_effects = saved_source_effects;
     actx.is_direct_pipeline_stage = was_direct_pipeline_stage;
-    if (m_commands.count() > 1) {
-      actx.has_unknown_working_directory = saved_has_unknown_working_directory;
-      actx.has_unknown_path = saved_has_unknown_path;
-      actx.has_seen_runtime_definer = saved_has_seen_runtime_definer;
-      actx.should_silence_unresolved_commands =
-          saved_should_silence_unresolved_commands;
-      actx.array_valued_names = steal(saved_array_valued_names);
-      actx.inherited_global_assigned_names =
-          steal(saved_inherited_global_assigned_names);
-      actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
-    }
+    actx.has_unknown_working_directory = saved_has_unknown_working_directory;
+    actx.has_unknown_path = saved_has_unknown_path;
+    actx.has_seen_runtime_definer = saved_has_seen_runtime_definer;
+    actx.should_silence_unresolved_commands =
+        saved_should_silence_unresolved_commands;
+    actx.array_valued_names = steal(saved_array_valued_names);
+    actx.inherited_global_assigned_names =
+        steal(saved_inherited_global_assigned_names);
+    actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
+    actx.rollback_defined_functions(defined_function_insertion_count);
+    actx.rollback_known_aliases(known_alias_insertion_count);
   }
 
   /* cat feeding a single named file into the next stage runs an extra process,

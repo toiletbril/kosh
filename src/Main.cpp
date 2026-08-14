@@ -51,7 +51,7 @@ FLAG(EXPORT_ALL, Bool, 'a', "export-all", Posix,
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber", Posix,
      "Refuse to overwrite an existing file through '>'.");
 FLAG(NO_EXEC, Bool, 'n', "no-exec", Posix,
-     "Read and parse, and analyze the script but do not run it.");
+     "Parse and analyze the script but do not run it.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", Posix,
      "Treat an unset variable as an error.");
 FLAG(LOGIN, Bool, 'l', "login", Posix,
@@ -1263,6 +1263,12 @@ fn main(int argc, char **argv) -> int
           "with '-s' option. "
           "Falling back to '-s'.");
     }
+    if (FLAG_LINT.is_enabled() && !file_names.is_empty()) {
+      koshka::show_message(
+          "The '-s' option was given along with file operands, "
+          "so '--lint' reads standard input and analyzes no "
+          "named file.");
+    }
     should_read_stdin = true;
   } else if (FLAG_LINT.is_enabled() &&
              (!FLAG_COMMAND.is_empty() || !file_names.is_empty()))
@@ -1270,6 +1276,11 @@ fn main(int argc, char **argv) -> int
     should_execute_commands = !FLAG_COMMAND.is_empty();
     should_read_files = !file_names.is_empty();
   } else if (FLAG_LINT.is_enabled()) {
+    if (koshka::os::is_stdin_a_tty()) {
+      koshka::show_message("No file operand and no '-c' command string reached "
+                           "'--lint', so the script is read from the terminal. "
+                           "End the input with Ctrl-D.");
+    }
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
     if (FLAG_INTERACTIVE.is_enabled()) {
@@ -1313,7 +1324,7 @@ fn main(int argc, char **argv) -> int
       koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
 
   usize first_param_index = 0;
-  if (FLAG_LINT.is_enabled()) {
+  if (FLAG_LINT.is_enabled() && should_read_files) {
     first_param_index = file_names.count();
   } else if ((should_read_files || should_execute_commands) &&
              !file_names.is_empty())
@@ -1375,9 +1386,8 @@ fn main(int argc, char **argv) -> int
   let const specified_warning_level = static_cast<u8>(
       warnings_specified_count > 3 ? 3 : warnings_specified_count);
   let warning_level = specified_warning_level;
-  if (FLAG_LINT.is_enabled()) {
+  if (FLAG_LINT.is_enabled())
     warning_level = session_mood == koshka::mimic_mood::Default ? 0 : 3;
-  }
   context.set_warning_level(warning_level);
   context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
@@ -1489,11 +1499,15 @@ fn main(int argc, char **argv) -> int
   let function_arena = koshka::BumpArena{};
   koshka::FUNCTION_ARENA = &function_arena;
 
-  /* A shell with unequal ids, rescue, and --clean source nothing. */
-  if (has_elevated_identity || is_rescue_mode || FLAG_CLEAN.is_enabled()) {
+  /* A lint report must not follow the aliases, functions, and search path of
+     whoever invoked it. */
+  if (has_elevated_identity || is_rescue_mode || FLAG_CLEAN.is_enabled() ||
+      FLAG_LINT.is_enabled())
+  {
     LOG(Info, "skipping every startup config file in %s mode",
         is_rescue_mode            ? "rescue"
         : FLAG_CLEAN.is_enabled() ? "clean"
+        : FLAG_LINT.is_enabled()  ? "lint"
                                   : "privileged");
   } else {
     /* --no-init-diagnostics turns diagnostics and warnings off while the init
@@ -1601,8 +1615,10 @@ fn main(int argc, char **argv) -> int
             flag_offset += quoted_length + 1;
           }
         }
+        /* A debug driver clears should_read_files while the operands remain
+           listed. */
         if (FLAG_COMMAND.at_end() &&
-            (!FLAG_LINT.is_enabled() || file_names.is_empty()))
+            (!FLAG_LINT.is_enabled() || !should_read_files))
         {
           should_quit = true;
         }
@@ -1630,9 +1646,13 @@ fn main(int argc, char **argv) -> int
           const koshka::Path script_path{file_name.view()};
 
           if (script_path.is_directory()) {
+            let const verb = FLAG_LINT.is_enabled()
+                                 ? koshka::StringView{"analyze"}
+                                 : koshka::StringView{"execute"};
             koshka::show_message(
                 koshka::ErrorWithLocation{
-                    operand_location, "Unable to execute `" + file_name.view() +
+                    operand_location, "Unable to " + verb + " `" +
+                                          file_name.view() +
                                           "` because the file is a directory"}
                     .to_string(context.cli_invocation().view(), &context));
             if (!FLAG_LINT.is_enabled()) {
@@ -1647,6 +1667,7 @@ fn main(int argc, char **argv) -> int
                 script_path.read_entire_file();
             if (!contents) {
               let const looks_like_command =
+                  !FLAG_LINT.is_enabled() &&
                   !file_name.view().find_character('/').has_value();
               let hint = koshka::String{koshka::heap_allocator()};
               if (looks_like_command)
@@ -1715,9 +1736,10 @@ fn main(int argc, char **argv) -> int
 
         context.notify_done_jobs();
 
+        toiletline::set_idle_title();
+
         /* The PROMPT_COMMAND hook runs before the template is expanded, so a
            framework that assigns PS1 inside it is in place by then. */
-        toiletline::set_idle_title();
         run_prompt_command(context, ast_arena);
 
         if (!did_seed_interactive_path_map && !is_rescue_mode &&
