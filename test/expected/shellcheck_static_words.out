@@ -1762,56 +1762,56 @@ note: Prefix the glob with a directory or place `--` before it.
      3 |    grep *.txt file
        |         ^~~~~
 note: Quote the pattern.
-4:8: warning: A `grep` reads a regular expression, and a leading `*` has nothing to repeat, so this pattern looks like a glob. (SC2063)
+4:8: warning: A leading `*` in a regular expression has nothing to repeat. (SC2063)
      4 |    grep '*x' file
        |         ^~~~
-5:12: warning: A `for` over the `cat` output iterates IFS-split words rather than lines. (SC2013)
+5:12: warning: A `for` loop over the `cat` output iterates IFS-split words. (SC2013)
      5 |    for f in $(cat list); do echo "$f"; done
        |             ^~~~~~~~~~~
-note: Read the lines with `while IFS= read -r line` instead.
-6:12: warning: A `for` over the `find` output breaks a name with whitespace apart. (SC2044)
+note: Read the lines with `while IFS= read -r line`.
+6:12: warning: A `for` loop over the `find` output breaks a name at whitespace. (SC2044)
      6 |    for f in $(find . -name x); do echo "$f"; done
        |             ^~~~~~~~~~~~~~~~~
 note: Use `find -exec`, or a `while read -r` loop over `find -print0`.
-7:12: warning: An `xargs` splits the `find` output on whitespace and quotes. (SC2038)
+7:12: warning: The `xargs` command splits the `find` output on whitespace and quotes. (SC2038)
      7 |    find . | xargs echo
        |             ^~~~~
 note: Pair `find -print0` with `xargs -0`, or use `find -exec`.
-8:10: warning: The pipe feeds `echo`, which never reads stdin, so the upstream output is discarded. (SC2008)
+8:10: warning: The `echo` command never reads the upstream output. (SC2008)
      8 |    true | echo discarded
        |           ^~~~
 note: Remove the pipe, or forward the input with `cat`.
-13:18: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal. (SC2069)
+13:18: warning: `2>&1` before the file redirect duplicates the current standard output. (SC2069)
     13 |    command 2>&1 > out.log
        |                   ^~~~~~~
 note: Put the file redirect first as in `>file 2>&1`.
-14:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read. (SC2094)
+14:17: warning: The command reads and truncates 'data' at once. (SC2094)
     14 |    sort < data > data
        |                  ^~~~
 14:10: details:
     14 |    sort < data > data
        |           ^~~~ this redirect reads the file that is later truncated.
-note: Write to a temporary and move it over.
-15:8: warning: A command substitution wraps a useless `echo`. (SC2116)
+note: Write to a temporary file and move it over.
+15:8: warning: The `echo` operand is passed through the substitution unchanged. (SC2116)
     15 |    echo "wrapped $(echo inner)"
        |         ^~~~~~~~~~~~~~~~~~~~~~~
-note: The text can be used directly without the subshell.
+note: Use the text directly without the command substitution.
 16:15: warning: `$@` inside a longer word concatenates the surrounding text onto the first and last argument. (SC2145)
     16 |    printf '%s' "a $@ b"
        |                ^~~~~~~~
 note: Use `$*` for one joined string, or a separate `"$@"` word.
-21:8: warning: The operand is a literal, so this `-z` test is constant. (SC2157)
+21:8: warning: The `-z` test has a literal operand. (SC2157)
     21 |    [ -z lit ] && echo a
        |         ^~~
 note: Test a variable or drop the check.
-22:5: warning: The `-eq` comparison has literal operands on both sides. (SC2050)
+22:5: warning: Both operands of the `-eq` comparison are literal. (SC2050)
     22 |    [ count -eq notanumber ] && echo b
        |      ^~~~~~~~~~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-22:5: warning: The numeric comparison `-eq` reads 'count', and that is not a number, so the test errors at run time. (SC2170)
+22:5: warning: The numeric comparison `-eq` reads 'count', and that is not a number. (SC2170)
     22 |    [ count -eq notanumber ] && echo b
        |      ^~~~~
-22:15: warning: The numeric comparison `-eq` reads 'notanumber', and that is not a number, so the test errors at run time. (SC2170)
+22:15: warning: The numeric comparison `-eq` reads 'notanumber', and that is not a number. (SC2170)
     22 |    [ count -eq notanumber ] && echo b
        |                ^~~~~~~~~~
 23:12: warning: `[` and `test` compare strings byte for byte and never glob-match. (SC2081)
@@ -1822,14 +1822,14 @@ note: Use a `case`, or the `[[ ]]` form for the pattern.
     24 |    [ -n "$(ls | grep x)" ] && echo d
        |         ^~~~~~~~~~~~~~~~
 note: Use `grep -q` and test its exit status.
-28:6: warning: The `case` word 'a' is constant, so the same branch is chosen every time. (SC2194)
+28:6: warning: The `case` word 'a' is constant. (SC2194)
     28 |  case a in a) ;; esac
        |       ^
 note: Add the missing `$`, or drop the `case`.
-28:6: warning: This `case` has no default `*)` branch, a value no pattern matches is silently ignored. (SC2249)
+28:6: warning: This `case` has no default `*)` branch. (SC2249)
     28 |  case a in a) ;; esac
        |       ^
-29:6: warning: The `case` word 'a' is constant, so the same branch is chosen every time. (SC2194)
+29:6: warning: The `case` word 'a' is constant. (SC2194)
     29 |  case a in *) ;; esac
        |       ^
 note: Add the missing `$`, or drop the `case`.
@@ -1841,7 +1841,7 @@ note: Use `grep -E` for the extended regular expression match.
     35 |    fgrep word file
        |    ^~~~~
 note: Use `grep -F` for the fixed string match.
-36:3: warning: An `expr` forks for arithmetic the shell does natively. (SC2003)
+36:3: warning: The `expr` command forks for a calculation the shell performs in place. (SC2003)
     36 |    expr 1 + 2
        |    ^~~~
 note: Use `$((...))` for the calculation.
@@ -1852,95 +1852,95 @@ note: Write `(( ... ))` for the arithmetic.
 38:3: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
     38 |    echo "$(date)"
        |    ^~~~
-note: Run the command on its own instead.
-39:8: warning: Grepping the `ps` output races the process table and matches the `grep` itself. (SC2009)
+note: Run the command on its own.
+39:8: warning: The `grep` matches its own process in the `ps` output. (SC2009)
     39 |    ps | grep init
        |         ^~~~
 note: Use `pgrep` to match a process by name.
 40:8: warning: Grepping the `ls` listing mangles a name with a space or a newline. (SC2010)
     40 |    ls | grep conf
        |         ^~~~
-note: Match the names with a glob or with `find` instead.
-41:3: warning: Counting `grep` output with `wc -l` runs an extra process. (SC2126)
+note: Match the names with a glob or with `find`.
+41:3: warning: The `grep` output is piped into `wc -l` for a count `grep` performs on its own. (SC2126)
     41 |    grep needle file | wc -l
        |    ^~~~
 note: Use `grep -c` to count the matching lines directly.
-43:5: warning: A test reads an unquoted variable. (SC2086)
+43:5: warning: The unquoted test operand vanishes when the value is empty. (SC2086)
     43 |    [ $? -eq 0 ] && echo ok
        |      ^~
 note: Quote it to avoid an empty or split argument.
 43:5: warning: Testing `$?` checks the exit status indirectly. (SC2181)
     43 |    [ $? -eq 0 ] && echo ok
        |      ^~
-note: Test the command directly with `if` or `&&` so an intervening command cannot clobber the status.
+note: Test the command directly with `if` or `&&`.
 44:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status. (SC2155)
     44 |    local declared=$(date)
        |          ^~~~~~~~~~~~~~~~
 note: Split the declaration and the assignment so a failure is seen.
-48:7: warning: This assignment to 'x' in a function has no `local`, the value leaks to the global scope.
+48:7: warning: This assignment to 'x' in a function has no `local`.
     48 |  f() { x=1; }
        |        ^~~
 note: Declare it with `local` to keep it inside the function.
-50:7: warning: This assignment to 'z' in a function has no `local`, the value leaks to the global scope.
+50:7: warning: This assignment to 'z' in a function has no `local`.
     50 |  h() { z=4; }
        |        ^~~
 note: Declare it with `local` to keep it inside the function.
-58:3: warning: A negated `-eq` is just `-ne`. (SC2335)
+58:3: warning: A negated `-eq` is `-ne`. (SC2335)
     58 |  [ ! 1 -eq 2 ]
        |    ^
 note: Drop the `!` and use `-ne`.
-58:5: warning: The `-eq` comparison has literal operands on both sides. (SC2050)
+58:5: warning: Both operands of the `-eq` comparison are literal. (SC2050)
     58 |  [ ! 1 -eq 2 ]
        |      ^~~~~~~
 note: Remove the constant condition or compare runtime data.
-59:3: warning: A negated `=` is just `!=`. (SC2335)
+59:3: warning: A negated `=` is `!=`. (SC2335)
     59 |  [ ! a = b ]
        |    ^
 note: Drop the `!` and use `!=`.
-59:5: warning: The `=` comparison has literal operands on both sides. (SC2050)
+59:5: warning: Both operands of the `=` comparison are literal. (SC2050)
     59 |  [ ! a = b ]
        |      ^~~~~
 note: Remove the constant condition or compare runtime data.
-59:7: warning: The literals 'a' and 'b' differ, so the comparison never succeeds. (SC2193)
+59:7: warning: The literals 'a' and 'b' differ. (SC2193)
     59 |  [ ! a = b ]
        |        ^
 note: Compare a variable, or correct the operand spelling.
-62:8: warning: The `printf` format comes from a variable, the data can inject format directives. (SC2059)
+62:8: warning: The `printf` format comes from a variable. (SC2059)
     62 |  printf "$1"
        |         ^~~~
 note: Use `printf '%s'` to print it.
-64:11: warning: The `printf` format comes from a variable, the data can inject format directives. (SC2059)
+64:11: warning: The `printf` format comes from a variable. (SC2059)
     64 |  printf -- "$1"
        |            ^~~~
 note: Use `printf '%s'` to print it.
-66:1: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
+66:1: warning: A `read` without `-r` treats a backslash in the input as an escape. (SC2162)
     66 |  read x < /dev/null
        |  ^~~~~~
 note: Add `-r` to read the line literally.
-69:8: warning: A `test` with `-a` or `-o` is obsolescent. (SC2166)
+69:8: warning: The `-a` and `-o` operators are marked obsolescent by POSIX. (SC2166)
     69 |  [ -f a -a -f b ]
        |         ^~
 note: Join two tests with `&&` or `||`.
-70:3: warning: A negated `-z` is just `-n`. (SC2236)
+70:3: warning: A negated `-z` is `-n`. (SC2236)
     70 |  [ ! -z "$x" ]
        |    ^
 note: Test with `-n`.
-71:3: warning: A negated `-n` is just `-z`. (SC2237)
+71:3: warning: A negated `-n` is `-z`. (SC2237)
     71 |  [ ! -n "$y" ]
        |    ^
 note: Test with `-z`.
 74:1: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
     74 |  echo $(echo hi)
        |  ^~~~
-note: Run the command on its own instead.
-74:6: warning: An unquoted command substitution splits its output. (SC2046)
+note: Run the command on its own.
+74:6: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
     74 |  echo $(echo hi)
        |       ^~~~~~~~~~
 note: Quote it to keep one argument.
-74:6: warning: A command substitution wraps a useless `echo`. (SC2116)
+74:6: warning: The `echo` operand is passed through the substitution unchanged. (SC2116)
     74 |  echo $(echo hi)
        |       ^~~~~~~~~~
-note: The text can be used directly without the subshell.
+note: Use the text directly without the command substitution.
 75:8: warning: Declaring and assigning from a command substitution in one command masks the command's exit status. (SC2155)
     75 |  export FOO=$(echo hi)
        |         ^~~~~~~~~~~~~~
@@ -1948,31 +1948,31 @@ note: Split the declaration and the assignment so a failure is seen.
 76:1: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
     76 |  echo "$(echo hi)"
        |  ^~~~
-note: Run the command on its own instead.
-76:6: warning: A command substitution wraps a useless `echo`. (SC2116)
+note: Run the command on its own.
+76:6: warning: The `echo` operand is passed through the substitution unchanged. (SC2116)
     76 |  echo "$(echo hi)"
        |       ^~~~~~~~~~~~
-note: The text can be used directly without the subshell.
-78:1: warning: A useless `cat`. (SC2002)
+note: Use the text directly without the command substitution.
+78:1: warning: The `cat` writes its file unchanged into the pipe. (SC2002)
     78 |  cat data/hello-d | cat
        |  ^~~
-note: Give the file to the next command directly instead of piping `cat`.
+note: Give the file to the next command directly.
 80:1: warning: The `which` program is not standard and is missing on some systems. (SC2230)
     80 |  which sh >/dev/null 2>&1
        |  ^~~~~
-note: Use `command -v` instead.
-94:3: warning: Commands after `exec` do not run when `exec` succeeds. (SC2093)
+note: Use `command -v` to look up the name.
+94:3: warning: The `exec` replaces the shell process. (SC2093)
     94 |    exec echo replaced; echo unreachable
        |    ^~~~
 94:23: details:
     94 |    exec echo replaced; echo unreachable
        |                        ^~~~~~~~~~~~~~~~ this is the first command skipped after `exec`.
 note: Remove the `exec`, or remove the unreachable commands.
-95:3: warning: This `cd` is unchecked, so later commands can run in the wrong directory. (SC2164)
+95:3: warning: This `cd` is unchecked. (SC2164)
     95 |    cd missing; echo wrong-directory
        |    ^~
 note: Stop or return when `cd` fails.
-96:17: warning: `A && B || C` also runs C when B fails. (SC2015)
+96:17: warning: The `C` command runs whenever `A` or `B` fails. (SC2015)
     96 |    true && false || echo fallback
        |                  ^~
 note: Use an `if` statement when C is the else branch.
@@ -1992,7 +1992,7 @@ note: Use `mapfile` or `readarray` to preserve output records.
     86 |    find . -name *.ogg
        |                 ^~~~~
 note: Prefix the glob with a directory or place `--` before it.
-86:16: warning: The unquoted `find` pattern expands before `find` sees it. (SC2061)
+86:16: warning: The unquoted `find` pattern is expanded against the working directory before `find` sees it. (SC2061)
     86 |    find . -name *.ogg
        |                 ^~~~~
 note: Quote the pattern so `find` performs the match.
@@ -2004,11 +2004,11 @@ note: Pass the result as an argument and reference it as `$1`.
     88 |    unset values[0]
        |          ^~~~~~~~~
 note: Quote the complete array element name.
-89:8: warning: A `read` operand is a variable name. (SC2229)
+89:8: warning: The `read` operand carries a dollar sign. (SC2229)
     89 |    read $target
        |         ^~~~~~~
 note: Drop the dollar sign from the variable name.
-89:3: warning: A `read` without `-r` mangles a backslash in the input. (SC2162)
+89:3: warning: A `read` without `-r` treats a backslash in the input as an escape. (SC2162)
     89 |    read $target
        |    ^~~~~~~~~~~~
 note: Add `-r` to read the line literally.
@@ -2020,27 +2020,27 @@ note: Add the missing arguments, or remove format directives.
     93 |    command -v sudo >/dev/null 2>&1 && sudo echo protected > output
        |                                                             ^~~~~~
 note: Run a shell under `sudo` or pipe through `sudo tee`.
-97:22: warning: This pipeline read assignment is lost when the stage exits. (SC2030)
+97:22: warning: The `read` runs in the pipeline subshell. (SC2030)
     97 |    echo one | read -r pipeline_value
        |                       ^~~~~~~~~~~~~~
 note: Feed the loop with a redirection or process substitution.
-98:8: warning: This read sees the value from before the pipeline. (SC2031)
+98:8: warning: The variable was modified in the pipeline subshell. (SC2031)
     98 |    echo "$pipeline_value"
        |         ^~~~~~~~~~~~~~~~~
-note: Move the assignment outside the pipeline or avoid the pipeline subshell.
+note: Move the assignment outside the pipeline.
 99:3: warning: The `>` operator compares strings lexicographically. (SC2071)
     99 |    [[ 10 > 7 ]]
        |    ^~
 note: Use an arithmetic command, or a numeric `-lt` or `-gt` operator.
-99:6: warning: The `>` comparison has literal operands on both sides. (SC2050)
+99:6: warning: Both operands of the `>` comparison are literal. (SC2050)
     99 |    [[ 10 > 7 ]]
        |       ^~~~~~
 note: Remove the constant condition or compare runtime data.
-100:6: warning: The `<` comparison has literal operands on both sides. (SC2050)
+100:6: warning: Both operands of the `<` comparison are literal. (SC2050)
    100 |    [[ left < right ]]
        |       ^~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-101:15: warning: A quoted regular expression is matched literally. (SC2076)
+101:15: warning: A quoted regular expression is matched as literal text. (SC2076)
    101 |    [[ value =~ 'v.*' ]]
        |                ^~~~~
 note: Store the expression in a variable or leave it unquoted.
@@ -2048,11 +2048,11 @@ note: Store the expression in a variable or leave it unquoted.
    102 |    [[ -e *.txt ]]
        |          ^~~~~
 note: Expand the glob in a loop and test each path.
-103:6: warning: A conditional operator needs surrounding spaces. (SC2077)
+103:6: warning: A conditional operator without surrounding spaces is read as part of one word. (SC2077)
    103 |    [[ $left=$right ]]
        |       ^~~~~~~~~~~~
 note: Place spaces around the comparison operator.
-104:9: warning: The operand is literal, so this string test is constant. (SC2157)
+104:9: warning: The string test has a literal operand. (SC2157)
    104 |    [[ -n literal ]]
        |          ^~~~~~~
 note: Test a variable or drop the check.
@@ -2064,11 +2064,11 @@ note: Use an arithmetic loop for a variable limit.
    105 |    echo {1..$limit}
        |             ^~~~~~
 note: Quote the expansion to keep one argument.
-106:6: warning: Brackets around a `tr` range add literal bracket bytes. (SC2021)
+106:6: warning: The `[` and `]` are read as members of the `tr` set. (SC2021)
    106 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Use a quoted range without brackets.
-106:12: warning: Brackets around a `tr` range add literal bracket bytes. (SC2021)
+106:12: warning: The `[` and `]` are read as members of the `tr` set. (SC2021)
    106 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Use a quoted range without brackets.
@@ -2080,7 +2080,7 @@ note: Quote the range.
    106 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Quote the range.
-107:3: warning: This assignment to 'index' in a function has no `local`, the value leaks to the global scope.
+107:3: warning: This assignment to 'index' in a function has no `local`.
    107 |    index=0
        |    ^~~~~~~
 note: Declare it with `local` to keep it inside the function.
@@ -2092,7 +2092,7 @@ note: Update the variable before forming the redirect path.
    109 |    echo $value
        |         ^~~~~~
 note: Quote the expansion to keep one argument.
-110:8: warning: A quoted tilde stays literal instead of expanding to the home directory. (SC2088)
+110:8: warning: A quoted tilde stays literal. (SC2088)
    110 |    echo "~"
        |         ^~~
 note: Leave the tilde unquoted, or use a quoted `$HOME` expansion.
@@ -2100,7 +2100,7 @@ note: Leave the tilde unquoted, or use a quoted `$HOME` expansion.
    111 |    echo '$value'
        |         ^~~~~~~~
 note: Use double quotes if the value should expand.
-113:8: warning: External input is evaluated as arithmetic code.
+113:8: warning: A value from external input is evaluated as arithmetic code.
    113 |    echo $((number + 1))
        |         ^~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
@@ -2118,20 +2118,20 @@ note: Apply one append redirection to a grouped command.
 121:3: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
    121 |    echo `date`
        |    ^~~~
-note: Run the command on its own instead.
-121:8: warning: Backticks are harder to nest than command substitutions. (SC2006)
+note: Run the command on its own.
+121:8: warning: A backtick inside a backtick must be escaped with a backslash. (SC2006)
    121 |    echo `date`
        |         ^~~~~~
 note: Use `$(...)` for command substitution.
-121:8: warning: An unquoted command substitution splits its output. (SC2046)
+121:8: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
    121 |    echo `date`
        |         ^~~~~~
 note: Quote it to keep one argument.
-122:8: warning: Arithmetic variables do not need a dollar sign. (SC2004)
+122:8: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
    122 |    echo $(($number + 1))
        |         ^~~~~~~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
-122:8: warning: External input is evaluated as arithmetic code.
+122:8: warning: A value from external input is evaluated as arithmetic code.
    122 |    echo $(($number + 1))
        |         ^~~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
@@ -2139,18 +2139,18 @@ note: Validate the value as decimal digits before arithmetic.
    123 |    [ x"$value" = xvalue ]
        |      ^~~~~~~~~
 note: Quote the variable directly.
-124:3: warning: `PS1` control escapes need balanced display guards. (SC2025)
+124:3: warning: The `PS1` value holds a control escape without a `\[` and `\]` guard pair. (SC2025)
    124 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
 note: Wrap nonprinting prompt escapes in `\[` and `\]`.
-124:3: warning: This assignment to 'PS1' in a function has no `local`, the value leaks to the global scope.
+124:3: warning: This assignment to 'PS1' in a function has no `local`.
    124 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
 128:10: warning: The `find -exec` action has no terminating `;` or `+`. (SC2067)
    128 |    find . -exec echo {}
        |           ^~~~~
-note: Terminate the action with an escaped semicolon or plus.
+note: Terminate the action with `\;` or `+`.
 129:11: warning: The `test` builtin does not support the `=~` regular expression operator. (SC2074)
    129 |    [ value =~ expression ]
        |            ^~
@@ -2159,7 +2159,7 @@ note: Use `[[ value =~ expression ]]`.
    130 |    while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
        |                                                             ^~~
 note: Redirect `ssh` input from `/dev/null`, or pass `-n`.
-131:9: warning: An alias body cannot receive positional arguments. (SC2142)
+131:9: warning: The `$1` in an alias body reads the positional arguments of the surrounding script. (SC2142)
    131 |    alias archive='mv $1 /backup'
        |          ^~~~~~~~~~~~~~~~~~~~~~~
 note: Use a function when the wrapper needs arguments.
@@ -2167,7 +2167,7 @@ note: Use a function when the wrapper needs arguments.
    132 |    find . -name '*.bak' -o -name '*~' -delete
        |                         ^~
 note: Group each side with escaped parentheses.
-133:8: warning: A positional parameter above nine needs braces. (SC1037)
+133:8: warning: `$10` expands positional parameter 1 followed by the digit '0'. (SC1037)
    133 |    echo $10
        |         ^~~
 note: Write `${10}` to select positional parameter 10.
@@ -2175,82 +2175,82 @@ note: Write `${10}` to select positional parameter 10.
    133 |    echo $10
        |         ^~
 note: Quote the expansion to keep one argument.
-134:3: warning: A command substitution in command position executes its output. (SC2091)
+134:3: warning: The substitution output is run as a command. (SC2091)
    134 |    $(printf command)
        |    ^~~~~~~~~~~~~~~~~
 note: Run the command inside the substitution directly.
-135:3: warning: A scalar assignment from `$@` loses argument boundaries. (SC2124)
+135:3: warning: A scalar assignment from `$@` joins every argument into one string. (SC2124)
    135 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
 note: Assign one value, or use an array.
-135:3: warning: This assignment to 'arguments' in a function has no `local`, the value leaks to the global scope.
+135:3: warning: This assignment to 'arguments' in a function has no `local`.
    135 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-136:3: warning: A tilde inside `PATH` remains literal. (SC2147)
+136:3: warning: A tilde inside `PATH` is not expanded. (SC2147)
    136 |    PATH="$PATH:~/bin"
        |    ^~~~~~~~~~~~~~~~~~
 note: Expand `HOME` before assigning `PATH`.
-137:8: warning: `$[...]` is the obsolete arithmetic expansion spelling. (SC2007)
+137:8: warning: The `$[...]` spelling is not defined by POSIX. (SC2007)
    137 |    echo $[1+2]
        |         ^~~~~~
 note: Use `$((...))` for arithmetic expansion.
-138:22: warning: The word list holds the one constant word 'one', so the body runs once. (SC2043)
+138:22: warning: The word list is the one constant word 'one'. (SC2043)
    138 |    for outer_index in one; do
        |                       ^~~
 note: Loop over a glob, a variable, or a command substitution.
-139:9: warning: The nested inner loop reuses the outer loop variable 'outer_index'. (SC2165)
+139:9: warning: The inner loop reuses the outer loop variable 'outer_index'. (SC2165)
    139 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~
 138:7: details:
    138 |    for outer_index in one; do
        |        ^~~~~~~~~~~ the outer loop first binds 'outer_index' here.
 note: Use a distinct variable for the nested loop.
-138:7: warning: The outer loop variable 'outer_index' is overwritten by the nested inner loop. (SC2167)
+138:7: warning: The outer loop variable 'outer_index' is overwritten by the inner loop. (SC2167)
    138 |    for outer_index in one; do
        |        ^~~~~~~~~~~
 139:9: details:
    139 |      for outer_index in two; do echo "$outer_index"; done
-       |          ^~~~~~~~~~~ the nested inner loop binds 'outer_index' again here.
+       |          ^~~~~~~~~~~ the inner loop binds 'outer_index' again here.
 note: Use a distinct variable for the nested loop.
-139:24: warning: The word list holds the one constant word 'two', so the body runs once. (SC2043)
+139:24: warning: The word list is the one constant word 'two'. (SC2043)
    139 |      for outer_index in two; do echo "$outer_index"; done
        |                         ^~~
 note: Loop over a glob, a variable, or a command substitution.
-141:8: warning: The `case` word 'value' is constant, so the same branch is chosen every time. (SC2194)
+141:8: warning: The `case` word 'value' is constant. (SC2194)
    141 |    case value in
        |         ^~~~~
 note: Add the missing `$`, or drop the `case`.
-142:3: warning: The pattern 'same' cannot match the `case` word 'value', so its branch is dead. (SC2195)
+142:3: warning: The pattern 'same' cannot match the `case` word 'value'. (SC2195)
    142 |    same) : ;;
        |    ^~~~
-143:3: warning: An earlier `case` pattern makes this pattern unreachable. (SC2221)
+143:3: warning: An earlier `case` pattern matches everything this pattern matches. (SC2221)
    143 |    same) : ;;
        |    ^~~~
 142:3: details:
    142 |    same) : ;;
        |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
-143:3: warning: The pattern 'same' cannot match the `case` word 'value', so its branch is dead. (SC2195)
+143:3: warning: The pattern 'same' cannot match the `case` word 'value'. (SC2195)
    143 |    same) : ;;
        |    ^~~~
-144:3: warning: The pattern ''*'' cannot match the `case` word 'value', so its branch is dead. (SC2195)
+144:3: warning: The pattern ''*'' cannot match the `case` word 'value'. (SC2195)
    144 |    '*') : ;;
        |    ^~~
-145:3: warning: The pattern 'literal-after-star' cannot match the `case` word 'value', so its branch is dead. (SC2195)
+145:3: warning: The pattern 'literal-after-star' cannot match the `case` word 'value'. (SC2195)
    145 |    literal-after-star) : ;;
        |    ^~~~~~~~~~~~~~~~~~
-147:3: warning: An earlier `case` pattern shadows this pattern. (SC2222)
+147:3: warning: An earlier `case` pattern is broader. (SC2222)
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
 146:3: details:
    146 |    prefix*) : ;;
        |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
-147:3: warning: The pattern 'prefix-value' cannot match the `case` word 'value', so its branch is dead. (SC2195)
+147:3: warning: The pattern 'prefix-value' cannot match the `case` word 'value'. (SC2195)
    147 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
-141:8: warning: This `case` has no default `*)` branch, a value no pattern matches is silently ignored. (SC2249)
+141:8: warning: This `case` has no default `*)` branch. (SC2249)
    141 |    case value in
        |         ^~~~~
 Encountered 122 warnings.

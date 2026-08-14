@@ -20,10 +20,10 @@
 [Word
   Unquoted "after"
 ]
-3:1: warning: Command 'zzqqxxnonexist_command_4242' was not found.
+3:1: warning: The command 'zzqqxxnonexist_command_4242' was not found.
      3 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-3:1: error: Command 'zzqqxxnonexist_command_4242' was not found.
+3:1: error: The command 'zzqqxxnonexist_command_4242' was not found.
      3 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 after

@@ -384,7 +384,7 @@ cold fn Note::get_severity() const wontthrow -> error_severity
   return error_severity::Note;
 }
 
-BrokenPipeExit::BrokenPipeExit() : Error("broken pipe") {}
+BrokenPipeExit::BrokenPipeExit() : Error("Broken pipe") {}
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)

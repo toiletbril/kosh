@@ -263,15 +263,15 @@
      4 |  : pre"dq"'sq'$x${y}post
        |               ^~
 note: Quote the expansion to keep one argument.
-5:3: warning: An unquoted command substitution splits its output. (SC2046)
+5:3: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
      5 |  : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Quote it to keep one argument.
-14:3: warning: An unquoted command substitution splits its output. (SC2046)
+14:3: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
     14 |  : pre$(:)post
        |    ^~~~~~~~~~~
 note: Quote it to keep one argument.
-16:3: warning: An unquoted command substitution splits its output. (SC2046)
+16:3: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
     16 |  : $(:)$(:)
        |    ^~~~~~~~
 note: Quote it to keep one argument.

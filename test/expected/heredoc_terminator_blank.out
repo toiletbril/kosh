@@ -15,7 +15,7 @@
 [Word
   Unquoted "EOF"
 ]
-4:1: warning: A blank follows 'EOF', so the line does not close the here-document and the rest of the file is read as body text. (SC1118)
+4:1: warning: A blank follows 'EOF', and the here-document stays open. (SC1118)
      4 |  EOF 
        |  ^~~
 note: Delete the blanks that follow the terminator.

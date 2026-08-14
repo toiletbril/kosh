@@ -30,7 +30,7 @@
 [Word
   Unquoted "done"
 ]
-2:6: warning: The double-quoted `trap` action expands as the trap is set, before the signal arrives. (SC2064)
+2:6: warning: The double-quoted `trap` action expands as the trap is set. (SC2064)
      2 |  trap ": ${unset_at_set_time-}" EXIT
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~
 note: Single-quote it so it expands as the signal arrives.

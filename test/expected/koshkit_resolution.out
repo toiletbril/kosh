@@ -8,10 +8,10 @@
 3
 rc=0
 === sh mood, empty PATH, not found ===
-1:8: error: Command 'seq' was not found.
+1:8: error: The command 'seq' was not found.
      1 |  PATH=; seq 3
        |         ^~~
-note: Did you mean `set`?
+note: Did you mean 'set'?
 rc=127
 === set -o koshkit turns bare names on ===
 1

@@ -68,7 +68,7 @@ done
 1:1: warning: The arithmetic expression `0` is constant and was folded to '0'.
      1 |  for ((; 0; i++)); do echo a; done; echo done
        |  ^~~
-1:1: warning: This c-style `for` loop has a zero condition and never runs its body.
+1:1: warning: This C-style `for` loop has a zero condition and never runs its body.
      1 |  for ((; 0; i++)); do echo a; done; echo done
        |  ^~~
 note: Remove the loop or write a condition that can be true.

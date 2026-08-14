@@ -1400,7 +1400,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
   if (quote_char.has_value()) [[unlikely]] {
     let expected_quote = String{heap_allocator()};
-    expected_quote += "Expected ";
+    expected_quote += "expected ";
     expected_quote += *quote_char;
     expected_quote += " here";
     throw ErrorWithLocationAndDetails{

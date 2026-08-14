@@ -151,7 +151,8 @@ run_and_capture "$BIN" --mood bash -n parse-root.bash
 parse_count=$(printf '%s\n' "$output" | grep -c 'Unterminated if')
 printf 'noexec-bash-parse=%s rc=%s\n' "$parse_count" "$rc"
 run_and_capture "$BIN" --lint state-root.bash
-inner_count=$(printf '%s\n' "$output" | grep -c "Command 'inner' was not found")
+inner_count=$(printf '%s\n' "$output" |
+  grep -c "The command 'inner' was not found")
 printf 'state-inner=%s rc=%s\n' "$inner_count" "$rc"
 run_and_capture "$BIN" --lint wrapper-root.bash
 source_count=$(printf '%s\n' "$output" |

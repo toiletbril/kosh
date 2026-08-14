@@ -78,13 +78,13 @@
   DoubleQuoted "reenabled="
   Variable "?"
 ]
-2:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded. (SC2216)
+2:9: warning: The 'true' command never reads the upstream output. (SC2216)
      2 |  false | true
        |          ^~~~
-5:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded. (SC2216)
+5:9: warning: The 'true' command never reads the upstream output. (SC2216)
      5 |  false | true
        |          ^~~~
-8:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded. (SC2216)
+8:9: warning: The 'true' command never reads the upstream output. (SC2216)
      8 |  false | true
        |          ^~~~
 Encountered 3 warnings.

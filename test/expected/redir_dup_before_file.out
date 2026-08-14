@@ -46,7 +46,7 @@
 [Word
   Unquoted "zz_dup_before_file"
 ]
-2:61: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal. (SC2069)
+2:61: warning: `2>&1` before the file redirect duplicates the current standard output. (SC2069)
      2 |  sh -c 'echo this-is-stdout; echo this-is-stderr 1>&2' 2>&1 >zz_dup_before_file
        |                                                              ^~~~~~~~~~~~~~~~~~
 note: Put the file redirect first as in `>file 2>&1`.

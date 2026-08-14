@@ -2,9 +2,9 @@
 1:6: warning: The variable 'undefined_name' is read before any assignment gives it a value. (SC2154)
      1 |  echo "$undefined_name"
        |       ^~~~~~~~~~~~~~~~~
-note: Assign 'undefined_name' before it is read, or export it from the environment.
+note: Assign 'undefined_name' before it is read, or set it in the environment.
 == a name that resembles an assigned name:
-2:6: warning: The variable 'myvalue' is never assigned, and 'my_value' is. (SC2153)
+2:6: warning: The variable 'myvalue' is never assigned, and 'my_value' is assigned. (SC2153)
      2 |  echo "$myvalue"
        |       ^~~~~~~~~~
 1:1: details:
@@ -12,7 +12,7 @@ note: Assign 'undefined_name' before it is read, or export it from the environme
        |  ^~~~~~~~~~ the assignment that gives 'my_value' a value runs here.
 note: Correct the spelling or assign 'myvalue'.
 == case and underscore folding both count as a resemblance:
-2:6: warning: The variable 'OUTPUTFILE' is never assigned, and 'output_file' is. (SC2153)
+2:6: warning: The variable 'OUTPUTFILE' is never assigned, and 'output_file' is assigned. (SC2153)
      2 |  echo "$OUTPUTFILE"
        |       ^~~~~~~~~~~~~
 1:1: details:
@@ -20,7 +20,7 @@ note: Correct the spelling or assign 'myvalue'.
        |  ^~~~~~~~~~~~~~~ the assignment that gives 'output_file' a value runs here.
 note: Correct the spelling or assign 'OUTPUTFILE'.
 == a transposed pair still names the assigned variable:
-2:6: warning: The variable 'outupt_length' is never assigned, and 'output_length' is. (SC2153)
+2:6: warning: The variable 'outupt_length' is never assigned, and 'output_length' is assigned. (SC2153)
      2 |  echo "$outupt_length"
        |       ^~~~~~~~~~~~~~~~
 1:1: details:
@@ -28,7 +28,7 @@ note: Correct the spelling or assign 'OUTPUTFILE'.
        |  ^~~~~~~~~~~~~~~ the assignment that gives 'output_length' a value runs here.
 note: Correct the spelling or assign 'outupt_length'.
 == a dropped byte still names the assigned variable:
-2:6: warning: The variable 'destinaton_path' is never assigned, and 'destination_path' is. (SC2153)
+2:6: warning: The variable 'destinaton_path' is never assigned, and 'destination_path' is assigned. (SC2153)
      2 |  echo "$destinaton_path"
        |       ^~~~~~~~~~~~~~~~~~
 1:1: details:
@@ -36,7 +36,7 @@ note: Correct the spelling or assign 'outupt_length'.
        |  ^~~~~~~~~~~~~~~~~~ the assignment that gives 'destination_path' a value runs here.
 note: Correct the spelling or assign 'destinaton_path'.
 == two edits on a long name still resolve:
-2:6: warning: The variable 'configuratoin_rot' is never assigned, and 'configuration_root' is. (SC2153)
+2:6: warning: The variable 'configuratoin_rot' is never assigned, and 'configuration_root' is assigned. (SC2153)
      2 |  echo "$configuratoin_rot"
        |       ^~~~~~~~~~~~~~~~~~~~
 1:1: details:
@@ -47,7 +47,7 @@ note: Correct the spelling or assign 'configuratoin_rot'.
 2:6: warning: The variable 'temporary_buffer' is read before any assignment gives it a value. (SC2154)
      2 |  echo "$temporary_buffer"
        |       ^~~~~~~~~~~~~~~~~~~
-note: Assign 'temporary_buffer' before it is read, or export it from the environment.
+note: Assign 'temporary_buffer' before it is read, or set it in the environment.
 == an assignment before the read stays quiet:
 rc=0
 == a prefix assignment counts as an assignment:
@@ -60,15 +60,15 @@ rc=0
 1:6: warning: The variable 'KOSH_ANSI_REDD' is read before any assignment gives it a value. (SC2154)
      1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Assign 'KOSH_ANSI_REDD' before it is read, or export it from the environment.
+note: Assign 'KOSH_ANSI_REDD' before it is read, or set it in the environment.
 1:6: warning: The variable 'KOSH_VERSOIN' is read before any assignment gives it a value. (SC2154)
      1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Assign 'KOSH_VERSOIN' before it is read, or export it from the environment.
+note: Assign 'KOSH_VERSOIN' before it is read, or set it in the environment.
 1:6: warning: The variable 'KOSH_GIT_BRNACH' is read before any assignment gives it a value. (SC2154)
      1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Assign 'KOSH_GIT_BRNACH' before it is read, or export it from the environment.
+note: Assign 'KOSH_GIT_BRNACH' before it is read, or set it in the environment.
 Encountered 3 warnings.
 == an arithmetic assignment assigns its target:
 rc=0
@@ -78,14 +78,14 @@ rc=0
 1:24: warning: The variable 'q' is read before any assignment gives it a value. (SC2154)
      1 |  echo $((q <= 1)); echo "$q"
        |                         ^~~~
-note: Assign 'q' before it is read, or export it from the environment.
+note: Assign 'q' before it is read, or set it in the environment.
 == a C-style for init clause assigns its target:
 rc=0
 == the default mood rejects an unassigned read:
 1:6: error: The variable 'rejected_name' is read before any assignment gives it a value. (SC2154)
      1 |  echo "$rejected_name"
        |       ^~~~~~~~~~~~~~~~
-note: Assign 'rejected_name' before it is read, or export it from the environment.
+note: Assign 'rejected_name' before it is read, or set it in the environment.
 rc=1
 == a read before a later assignment names that assignment:
 1:6: warning: The variable 'greeting_text' is read before it is assigned.
@@ -102,12 +102,12 @@ rc=0
 2:6: warning: The variable 'default_target' is read before any assignment gives it a value. (SC2154)
      2 |  echo "$default_target"
        |       ^~~~~~~~~~~~~~~~~
-note: Assign 'default_target' before it is read, or export it from the environment.
+note: Assign 'default_target' before it is read, or set it in the environment.
 == a prefix on an ordinary command does not outlive it:
 2:6: warning: The variable 'temporary_name' is read before any assignment gives it a value. (SC2154)
      2 |  echo "$temporary_name"
        |       ^~~~~~~~~~~~~~~~~
-note: Assign 'temporary_name' before it is read, or export it from the environment.
+note: Assign 'temporary_name' before it is read, or set it in the environment.
 == a prefix on a special builtin outlives it:
 rc=0
 == a prefix repeating its own value is not a self assignment:

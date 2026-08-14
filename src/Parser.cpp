@@ -176,12 +176,12 @@ throw_unterminated(SourceLocation opener, StringView what, StringView source,
     found->filename = opener.filename;
     throw ErrorWithLocationAndDetails{
         opener, what, *found,
-        "This '" + keyword +
-            "' was read as an argument, put a ';' or a newline before it"};
+        "this '" + keyword +
+            "' was read as an argument, so put a ';' or a newline before it"};
   }
   fallback.filename = opener.filename;
   throw ErrorWithLocationAndDetails{opener, what, fallback,
-                                    "Expected '" + keyword + "'"};
+                                    "expected '" + keyword + "'"};
 }
 
 cold static fn unexpected_command_token_message(const Token *token) throws
@@ -2253,7 +2253,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     if (after->kind() != Token::Kind::Then) {
       let const ast = after->to_ast_string();
       throw ErrorWithLocation{after->source_location(),
-                              "Expected 'Then' after the condition, found '" +
+                              "Expected 'then' after the condition, found '" +
                                   ast.view() + "'"};
     }
 
@@ -2273,8 +2273,8 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
     if (after->kind() != Token::Kind::Fi) {
       throw ErrorWithLocationAndDetails{
-          t->source_location(), "Unterminated If condition",
-          after->source_location(), "expected 'Fi' here"};
+          t->source_location(), "Unterminated if condition",
+          after->source_location(), "expected 'fi' here"};
     }
 
     m_if_condition_depth--;

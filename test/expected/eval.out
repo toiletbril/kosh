@@ -29,7 +29,7 @@
 [Word
   Variable "cmd"
 ]
-eval:1:1: error: Command 'badcmd_xyzzy' was not found.
+eval:1:1: error: The command 'badcmd_xyzzy' was not found.
      1 |  badcmd_xyzzy
        |  ^~~~~~~~~~~~
 2:1: trace:

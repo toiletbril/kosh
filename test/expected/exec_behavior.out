@@ -4,7 +4,7 @@
        |        ^~~~~~~~~~~
 rc=127
 == a missing command on the PATH exits 127:
-1:6: error: Command 'nonexistent_cmd_xyz' was not found.
+1:6: error: The command 'nonexistent_cmd_xyz' was not found.
      1 |  exec nonexistent_cmd_xyz
        |       ^~~~~~~~~~~~~~~~~~~
 rc=127

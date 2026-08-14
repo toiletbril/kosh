@@ -860,14 +860,14 @@
 [Word
   Unquoted "done"
 ]
-6:8: warning: An `echo -e` relies on a bash builtin, the POSIX `echo` prints the flag as text. (SC3037)
+6:8: warning: An `echo -e` relies on a bash builtin, and the POSIX `echo` prints the flag as text. (SC3037)
      6 |    echo -e escaped
        |         ^~
-note: Use `printf` instead under a `sh` shebang.
-7:8: warning: An `echo -n` relies on a bash builtin, the POSIX `echo` prints the flag as text. (SC3037)
+note: Use `printf` under a `sh` shebang.
+7:8: warning: An `echo -n` relies on a bash builtin, and the POSIX `echo` prints the flag as text. (SC3037)
      7 |    echo -n nonewline
        |         ^~
-note: Use `printf` instead under a `sh` shebang.
+note: Use `printf` under a `sh` shebang.
 8:3: warning: The `declare` builtin is not in POSIX. (SC3044)
      8 |    declare -A assoc
        |    ^~~~~~~
@@ -876,7 +876,7 @@ note: Assign the variable plainly under a `sh` shebang, or switch the shebang to
      9 |    typeset scoped
        |    ^~~~~~~
 note: Assign the variable plainly under a `sh` shebang, or switch the shebang to bash.
-10:3: warning: The name `source` is the bash spelling, the POSIX dot command is `.`. (SC3046)
+10:3: warning: The name `source` is the bash spelling of the POSIX `.` command. (SC3046)
     10 |    source library.sh
        |    ^~~~~~
 note: Use `.` under a `sh` shebang.
@@ -892,14 +892,14 @@ note: Use a `case` statement or a plain glob under a `sh` shebang.
     15 |    echo $'a\tb'
        |         ^~~~~~~
 note: Use `printf` to produce the escapes under a `sh` shebang.
-16:8: warning: A `^` opens the bracket expression `[^a]tail` where POSIX sh negates with `!`. (SC3026)
+16:8: warning: A `^` opens the bracket expression `[^a]tail`, and POSIX sh negates with `!`. (SC3026)
     16 |    echo [^a]tail
        |         ^~~~~~~~
 note: Use `[! ...]` under a `sh` shebang.
 17:3: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
     17 |    echo "$(<file)"
        |    ^~~~
-note: Run the command on its own instead.
+note: Run the command on its own.
 17:9: warning: The `$(<file)` form is a bash shorthand absent from POSIX sh. (SC3034)
     17 |    echo "$(<file)"
        |          ^~~~~~~~
@@ -907,7 +907,7 @@ note: Use `$(cat file)` under a `sh` shebang.
 18:3: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
     18 |    echo "`<file`"
        |    ^~~~
-note: Run the command on its own instead.
+note: Run the command on its own.
 18:9: warning: The `` `<file` `` form is a bash shorthand absent from POSIX sh. (SC3035)
     18 |    echo "`<file`"
        |          ^~~~~~~
@@ -1019,8 +1019,8 @@ note: Compare the timestamps with `find` or `ls` under a `sh` shebang.
 52:5: warning: The unary `-a` in `test` is undefined in POSIX sh. (SC3017)
     52 |    [ -a present ]
        |      ^~
-note: Use `-e` instead.
-53:11: warning: The literals 'alpha' and 'beta' differ, so the comparison never succeeds. (SC2193)
+note: Use `-e` for the file test.
+53:11: warning: The literals 'alpha' and 'beta' differ. (SC2193)
     53 |    [ alpha = beta ]
        |            ^
 note: Compare a variable, or correct the operand spelling.
@@ -1035,8 +1035,8 @@ note: Run the compound command through `sh -c` and time that.
 57:3: warning: The `time` keyword times only a simple command in POSIX sh. (SC2176)
     57 |    time printf 'timed\n' | wc -l
        |    ^~~~
-note: Time one stage, or run the pipeline through `bash -c` and time that.
-65:3: warning: Commands after `exec` do not run when `exec` succeeds. (SC2093)
+note: Time one stage, or run the pipeline through `sh -c` and time that.
+65:3: warning: The `exec` replaces the shell process. (SC2093)
     65 |    exec -c env
        |    ^~~~
 66:3: details:
@@ -1067,7 +1067,7 @@ note: Check the status after each command under a `sh` shebang.
     68 |    trap 'cleanup' SIGINT
        |                   ^~~~~~
 note: Name the signal without the `SIG` prefix under a `sh` shebang.
-69:18: warning: The signal name 'int' is undefined in POSIX sh because it is not uppercase. (SC3049)
+69:18: warning: The signal name 'int' is not uppercase, and POSIX sh leaves it undefined. (SC3049)
     69 |    trap 'cleanup' int
        |                   ^~~
 note: Name the signal in uppercase under a `sh` shebang.
@@ -1075,11 +1075,11 @@ note: Name the signal in uppercase under a `sh` shebang.
     72 |    printf '%q\n' "$value"
        |           ^~~~~~
 note: Quote the value another way under a `sh` shebang.
-74:16: warning: The POSIX `.` command reads a file and takes no argument, so 'extra' never reaches it. (SC2240)
+74:16: warning: The POSIX `.` command takes no argument, and 'extra' never reaches it. (SC2240)
     74 |    . library.sh extra
        |                 ^~~~~
 note: Set the values as variables before the file is read.
-78:3: warning: The `$0` parameter cannot be assigned in POSIX sh, so '$0=zero' runs as a command. (SC2279)
+78:3: warning: The `$0` parameter cannot be assigned in POSIX sh, and '$0=zero' runs as a command. (SC2279)
     78 |    $0=zero
        |    ^~~~~~~
 note: Assign the program name to a named variable.
@@ -1091,11 +1091,11 @@ note: Read the input with a `while read` loop, or switch the shebang to bash.
     82 |    readarray -t rows < roster
        |    ^~~~~~~~~
 note: Read the input with a `while read` loop, or switch the shebang to bash.
-83:10: warning: The `printf -v` form is a bash extension, the POSIX `printf` has no `-v`. (SC3045)
+83:10: warning: The `printf -v` form is a bash extension, and the POSIX `printf` has no `-v`. (SC3045)
     83 |    printf -v buffer '%s' text
        |           ^~
 note: Capture the output with a command substitution under a `sh` shebang.
-84:3: warning: The `local` builtin is not in POSIX sh, the value stays global. (SC3043)
+84:3: warning: The `local` builtin is not in POSIX sh. (SC3043)
     84 |    local scoped=value
        |    ^~~~~
 note: Rework the function, or switch the shebang to bash.

@@ -1,5 +1,5 @@
 == an unset name near a set name names it:
-1:23: warning: The variable 'output_fil' is never assigned, and 'output_file' is. (SC2153)
+1:23: warning: The variable 'output_fil' is never assigned, and 'output_file' is assigned. (SC2153)
      1 |  output_file=out; echo "$output_fil"
        |                        ^~~~~~~~~~~~~
 1:1: details:
@@ -12,7 +12,7 @@ note: Correct the spelling or assign 'output_fil'.
 note: The variable 'output_file' is set, correct the spelling, or replace this with ${output_fil-} if empty expansion is desired.
 
 == a transposed pair names the set name:
-1:29: warning: The variable 'destinaton_path' is never assigned, and 'destination_path' is. (SC2153)
+1:29: warning: The variable 'destinaton_path' is never assigned, and 'destination_path' is assigned. (SC2153)
      1 |  destination_path=/tmp; echo "$destinaton_path"
        |                              ^~~~~~~~~~~~~~~~~~
 1:1: details:
@@ -28,14 +28,14 @@ note: The variable 'destination_path' is set, correct the spelling, or replace t
 1:29: warning: The variable 'zzzzzzzzzzzzzz' is read before any assignment gives it a value. (SC2154)
      1 |  destination_path=/tmp; echo "$zzzzzzzzzzzzzz"
        |                              ^~~~~~~~~~~~~~~~~
-note: Assign 'zzzzzzzzzzzzzz' before it is read, or export it from the environment.
+note: Assign 'zzzzzzzzzzzzzz' before it is read, or set it in the environment.
 1:30: warning: The variable 'zzzzzzzzzzzzzz' is not set, it expands to empty.
      1 |  destination_path=/tmp; echo "$zzzzzzzzzzzzzz"
        |                               ^~~~~~~~~~~~~~~
 note: Replace it with ${zzzzzzzzzzzzzz-} if empty expansion is desired.
 
 == nounset names the set name in its fatal note:
-1:39: error: The variable 'configuration_rot' is never assigned, and 'configuration_root' is. (SC2153)
+1:39: error: The variable 'configuration_rot' is never assigned, and 'configuration_root' is assigned. (SC2153)
      1 |  set -u; configuration_root=/etc; echo "$configuration_rot"
        |                                        ^~~~~~~~~~~~~~~~~~~~
 1:9: details:

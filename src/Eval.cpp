@@ -2376,12 +2376,13 @@ fn ExecContext::make_from(SourceLocation location, StringView source,
                                                  directory_message.view()};
       }
 
-      let const message = "Command '" + resolution_program + "' was not found";
+      let const message =
+          "The command '" + resolution_program + "' was not found";
       if (Maybe<String> suggestion = utils::suggest_command(
               program.view(), ArrayList<String>{heap_allocator()},
               &program_resolver))
       {
-        let const hint = "Did you mean `" + *suggestion + "`?";
+        let const hint = "Did you mean '" + *suggestion + "'?";
         throw CommandResolutionErrorWithLocationAndDetails{
             resolution_location, message.view(), hint.view()};
       }

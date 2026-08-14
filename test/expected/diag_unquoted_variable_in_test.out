@@ -37,7 +37,7 @@
 [Word
   Unquoted "after"
 ]
-3:3: warning: A test reads an unquoted variable. (SC2086)
+3:3: warning: The unquoted test operand vanishes when the value is empty. (SC2086)
      3 |  [ $v = x ] && echo equal
        |    ^~
 note: Quote it to avoid an empty or split argument.

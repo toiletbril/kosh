@@ -1,7 +1,7 @@
 ran
 ran
 ran
-error: Command 'definitely_absent_cmd' was not found.
+error: The command 'definitely_absent_cmd' was not found.
      1 |  FOO=1; definitely_absent_cmd
        |         ^~~~~~~~~~~~~~~~~~~~~
 rc=0

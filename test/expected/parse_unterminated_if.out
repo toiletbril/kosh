@@ -3,4 +3,4 @@
        |  ^~
 2:14: details:
      2 |  if true; then
-       |               ^ Expected 'fi'.
+       |               ^ expected 'fi'.

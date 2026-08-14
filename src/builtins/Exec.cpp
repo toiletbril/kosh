@@ -172,7 +172,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       return report_exec_resolution_error(
           ec, cxt, error_location,
-          StringView{"Command '"} + reported_program + "' was not found", 127);
+          StringView{"The command '"} + reported_program + "' was not found",
+          127);
     }
     if (typed_program_path.has_trailing_separator() &&
         !resolved->is_directory())
@@ -190,7 +191,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (found.count() == 0)
       return report_exec_resolution_error(
           ec, cxt, ec.arg_location_at(command_index),
-          StringView{"Command '"} + command_name + "' was not found", 127);
+          StringView{"The command '"} + command_name + "' was not found", 127);
 
     program_path = found[0];
   }

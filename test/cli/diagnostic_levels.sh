@@ -78,13 +78,13 @@ echo "compat-level-two-annoying=$(printf '%s\n' "$compat_level_two" |
 echo "compat-level-three-annoying=$(printf '%s\n' "$compat_level_three" |
   grep -c 'This .cd. is unchecked')"
 echo "compat-level-two-obsolete=$(printf '%s\n' "$compat_level_two" |
-  grep -c 'obsolete arithmetic expansion')"
+  grep -c 'SC2007')"
 echo "compat-level-three-obsolete=$(printf '%s\n' "$compat_level_three" |
-  grep -c 'obsolete arithmetic expansion')"
+  grep -c 'SC2007')"
 echo "compat-level-two-recursion=$(printf '%s\n' "$compat_level_two" |
-  grep -c 'function calls itself recursively')"
+  grep -c 'SC2264')"
 echo "compat-level-three-recursion=$(printf '%s\n' "$compat_level_three" |
-  grep -c 'function calls itself recursively')"
+  grep -c 'SC2264')"
 
 cat > "$temporary_directory/file-directive.sh" <<'EOF'
 # shellcheck disable=SC2164
@@ -141,7 +141,7 @@ slug_variant_output=$(
 echo "slug-variant-general=$(printf '%s\n' "$slug_variant_output" |
   grep -c 'split into words')"
 echo "slug-variant-test=$(printf '%s\n' "$slug_variant_output" |
-  grep -c 'test reads an unquoted variable')"
+  grep -c 'unquoted test operand')"
 
 cat > "$temporary_directory/native-slug-directive.sh" <<'EOF'
 # shellcheck disable=no-local
@@ -171,9 +171,9 @@ uncertain_slash_output=$(
   "$BIN" -WW -c "builtin eval 'function dynamic/name { :; }'; dynamic/name" 2>&1
 )
 echo "uncertain-slash-full-name=$(printf '%s\n' "$uncertain_slash_output" |
-  grep -c "Command 'dynamic/name' was not found")"
+  grep -c "The command 'dynamic/name' was not found")"
 echo "uncertain-slash-prefix=$(printf '%s\n' "$uncertain_slash_output" |
-  grep -c "Command 'dynamic' was not found")"
+  grep -c "The command 'dynamic' was not found")"
 
 send_runtime_input()
 {

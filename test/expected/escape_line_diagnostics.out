@@ -1,10 +1,10 @@
 == blank after a continuation:
-2:10: warning: A blank follows the backslash, so the backslash escapes that blank and the line does not continue. (SC1101)
+2:10: warning: A blank follows the backslash, and the line does not continue. (SC1101)
      2 |  echo one \ 
        |           ^~
 note: Delete the blanks between the backslash and the line ending.
 == tab after a continuation:
-2:10: warning: A blank follows the backslash, so the backslash escapes that blank and the line does not continue. (SC1101)
+2:10: warning: A blank follows the backslash, and the line does not continue. (SC1101)
      2 |  echo one \    
        |           ^~~~~
 note: Delete the blanks between the backslash and the line ending.

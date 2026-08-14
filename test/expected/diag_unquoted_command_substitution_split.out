@@ -18,7 +18,7 @@
 [Word
   Unquoted "after"
 ]
-2:13: warning: An unquoted command substitution splits its output. (SC2046)
+2:13: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
      2 |  echo before $(echo one two)
        |              ^~~~~~~~~~~~~~~
 note: Quote it to keep one argument.

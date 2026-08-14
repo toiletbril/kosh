@@ -15,7 +15,7 @@
 [Word
   Unquoted "EOF"
 ]
-4:2: warning: The line holding 'EOF' is indented with tabs, so it does not close the here-document and the rest of the file is read as body text. (SC1040)
+4:2: warning: The tab-indented line holding 'EOF' does not close the here-document. (SC1040)
      4 |      EOF
        |      ^~~
 note: Write `<<-` in place of `<<` to strip the leading tabs.

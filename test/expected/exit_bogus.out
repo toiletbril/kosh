@@ -10,11 +10,11 @@
 [Word
   DoubleQuoted "hello world"
 ]
-2:20: warning: The `exit` builtin takes one number from 0 to 255, so the operands after the first are ignored. (SC2241)
+2:20: warning: The `exit` builtin takes one number from 0 to 255. (SC2241)
      2 |  exit "hello world" "hello world"
        |                     ^~~~~~~~~~~~~
 note: Write the other data to standard output.
-2:6: warning: The code 'hello world' is not a number from 0 to 255, `exit` either rejects it or wraps it modulo 256. (SC2242)
+2:6: warning: The code 'hello world' is not a number from 0 to 255, and `exit` either rejects it or wraps it modulo 256. (SC2242)
      2 |  exit "hello world" "hello world"
        |       ^~~~~~~~~~~~~
 Encountered 2 warnings.

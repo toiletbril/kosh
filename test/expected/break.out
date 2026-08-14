@@ -311,15 +311,15 @@
      7 |  for x in 1 2 3; do echo $x; break; done
        |                          ^~
 note: Quote the expansion to keep one argument.
-9:7: warning: The `break` command stands in a function outside any loop, where there is nothing to leave. (SC2104)
+9:7: warning: The `break` command stands in a function outside any loop. (SC2104)
      9 |  f() { break; }
        |        ^~~~~
-note: Use `return` instead.
-13:1: warning: The `break` command stands outside any loop, where there is nothing to leave. (SC2105)
+note: Use `return` to leave the function.
+13:1: warning: The `break` command stands outside any loop. (SC2105)
     13 |  break
        |  ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-15:1: warning: The `continue` command stands outside any loop, where there is nothing to leave. (SC2105)
+15:1: warning: The `continue` command stands outside any loop. (SC2105)
     15 |  continue
        |  ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.

@@ -640,51 +640,51 @@ text"
 [Word
   Unquoted "}"
 ]
-30:8: warning: The Unicode quote 'U+201C' is ordinary text, so it opens no quoted string. (SC1110)
+30:8: warning: The Unicode quote 'U+201C' opens no quoted string. (SC1110)
     30 |    echo “curly”
        |         ^
 note: Delete it and retype an ASCII quote.
-30:14: warning: The Unicode quote 'U+201D' is ordinary text, so it opens no quoted string. (SC1110)
+30:14: warning: The Unicode quote 'U+201D' opens no quoted string. (SC1110)
     30 |    echo “curly”
        |               ^
 note: Delete it and retype an ASCII quote.
-31:8: warning: The Unicode quote 'U+2018' is ordinary text, so it opens no quoted string. (SC1110)
+31:8: warning: The Unicode quote 'U+2018' opens no quoted string. (SC1110)
     31 |    echo ‘curly’
        |         ^
 note: Delete it and retype an ASCII quote.
-31:14: warning: The Unicode quote 'U+2019' is ordinary text, so it opens no quoted string. (SC1110)
+31:14: warning: The Unicode quote 'U+2019' opens no quoted string. (SC1110)
     31 |    echo ‘curly’
        |               ^
 note: Delete it and retype an ASCII quote.
-32:6: warning: The Unicode dash 'U+2013' is not the ASCII minus, so the shell reads it as ordinary text. (SC1100)
+32:6: warning: The Unicode dash 'U+2013' is read by the shell as ordinary text. (SC1100)
     32 |    ls –l
        |       ^
 note: Delete it and retype an ASCII minus.
 33:16: warning: The Unicode quote 'U+201D' inside this double-quoted string is printed as text. (SC1111)
     33 |    echo "inside ” quotes"
        |                 ^
-note: Delete it and retype an ASCII quote, or single-quote the string to keep it literal.
+note: Delete it and retype an ASCII quote, or single-quote the string.
 34:16: warning: The Unicode quote 'U+2019' inside this single-quoted string is printed as text. (SC1112)
     34 |    echo 'inside ’ quotes'
        |                 ^
-note: Delete it and retype an ASCII quote, or double-quote the string to keep it literal.
-37:14: warning: The Unicode space 'U+00A0' does not separate words, the shell reads it as part of one word. (SC1018)
+note: Delete it and retype an ASCII quote, or double-quote the string.
+37:14: warning: The Unicode space 'U+00A0' is read by the shell as part of one word. (SC1018)
     37 |    echo spaced word
        |               ^
 note: Delete it and retype an ASCII space.
-38:17: warning: A carriage return in the script text is read as data, not as a line ending. (SC1017)
+38:17: warning: A carriage return in the script text is read as data. (SC1017)
     38 |    echo 'carriagereturn'
        |                  ^
 note: Convert the file to Unix line endings with `tr -d '\r'`.
-42:12: warning: The escape `\o` has no meaning here, so the shell reads it as a plain 'o'. (SC1001)
+42:12: warning: The escape `\o` is read by the shell as a plain 'o'. (SC1001)
     42 |    echo Yay \o/
        |             ^~
 note: Quote the backslash, or build the byte with `printf`.
-43:14: warning: The escape `\t` has no meaning here, so the shell reads it as a plain 't'. (SC1012)
+43:14: warning: The escape `\t` is read by the shell as a plain 't'. (SC1012)
     43 |    spacing=foo\tbar
        |               ^~
 note: Build the byte with `printf`, or write it inside `$'...'`.
-44:18: warning: A backslash carries no meaning inside single quotes, so this one closes the string and stays in the text. (SC1003)
+44:18: warning: A backslash carries no meaning inside single quotes. (SC1003)
     44 |    echo 'no way it\'
        |                   ^~
 note: Write the quote as `'\''` outside the single-quoted run.
@@ -692,27 +692,27 @@ note: Write the quote as `'\''` outside the single-quoted run.
     45 |    quoted='long \
        |                ^~
 note: Close the quote, break the line, and reopen the quote.
-51:16: warning: The backslash closes a comment, so the command above it ends here. (SC1143)
+51:16: warning: A backslash carries no continuation inside a comment. (SC1143)
     51 |    # -e "middle" \
        |                 ^~
 note: Move the comment above the command, or wrap it in `` `# ...` ``.
-11:16: warning: The directive names 'foobar', which is not a directive key, so the directive is ignored. (SC1107)
+11:16: warning: The directive key 'foobar' is unknown. (SC1107)
     11 |    # shellcheck foobar=baz
        |                 ^~~~~~
 note: Use `disable`, `enable`, `shell`, `source`, `source-path`, or `external-sources`.
-13:31: warning: The directive holds 'not', which is not a `key=value` pair, so the directive is ignored. (SC1125)
+13:31: warning: The directive text 'not' is not a `key=value` pair. (SC1125)
     13 |    # shellcheck disable=SC2153 not a misspelling
        |                                ^~~
 note: Write the directive as `key=value`, such as `disable=SC2034`.
-15:14: warning: The directive follows a command on the same line, so nothing is suppressed. (SC1126)
+15:14: warning: The directive follows a command on the same line. (SC1126)
     15 |    echo three # shellcheck disable=SC2034
        |               ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Move the directive to its own line above the command.
-18:3: warning: The directive sits before 'elif', which continues the command above it, so nothing is suppressed. (SC1123)
+18:3: warning: The word 'elif' continues the command above the directive. (SC1123)
     18 |    # shellcheck disable=SC2086
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Move the directive above the complete command.
-24:3: warning: The directive sits before a case branch, so nothing is suppressed. (SC1124)
+24:3: warning: The directive sits before a case branch. (SC1124)
     24 |    # shellcheck disable=SC2086
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Move the directive above the `case` command.
@@ -720,35 +720,35 @@ note: Move the directive above the `case` command.
      7 |    echo $reported
        |         ^~~~~~~~~
 note: Quote the expansion to keep one argument.
-43:3: warning: This assignment to 'spacing' in a function has no `local`, the value leaks to the global scope.
+43:3: warning: This assignment to 'spacing' in a function has no `local`.
     43 |    spacing=foo\tbar
        |    ^~~~~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-45:3: warning: This assignment to 'quoted' in a function has no `local`, the value leaks to the global scope.
+45:3: warning: This assignment to 'quoted' in a function has no `local`.
     45 |    quoted='long \
        |    ^~~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-47:8: warning: The double-quoted string is closed right after `$` so the dollar sign stays literal, and the word continues after it. (SC1135)
+47:8: warning: The double-quoted string is closed right after `$`, and the word continues after it. (SC1135)
     47 |    echo "The apples are $""1 each"
        |         ^~~~~~~~~~~~~~~~~~~~~~~~~~
-note: Write `\$` inside the quotes and keep the string in one piece.
-48:8: warning: The double-quoted string ends right after `$`, so the shell reads the dollar sign as ordinary text. (SC1000)
+note: Write `\$` inside the quotes.
+48:8: warning: The `$` at the end of the double-quoted string is read as ordinary text. (SC1000)
     48 |    echo "$"
        |         ^~~
-note: Write `\$` inside the quotes and keep the string in one piece.
-52:3: warning: An option-shaped word in command position is not a command. (SC2215)
+note: Write `\$` inside the quotes.
+52:3: warning: An option-shaped word in command position is looked up as a command name. (SC2215)
     52 |    -e x file
        |    ^~
 note: Place the option after its command.
-56:3: warning: This assignment to 'runner' in a function has no `local`, the value leaks to the global scope.
+56:3: warning: This assignment to 'runner' in a function has no `local`.
     56 |    runner=printf
        |    ^~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-57:3: warning: This assignment to 'linker' in a function has no `local`, the value leaks to the global scope.
+57:3: warning: This assignment to 'linker' in a function has no `local`.
     57 |    linker=ln
        |    ^~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-62:13: warning: The command 'amp' is the tail of the HTML entity `&amp;`, which the shell reads as an operator followed by a command. (SC1109)
+62:13: warning: The HTML entity `&amp;` is read as an operator followed by a command. (SC1109)
     62 |    echo one &amp echo two
        |              ^~~
 note: Write the character the entity names.
@@ -763,34 +763,34 @@ note: Run the glob expansion inside a shell under `sudo`.
 68:20: warning: An `rm -r` targets the system directory '/usr'. (SC2114)
     68 |    rm --dry-run -rf /usr
        |                     ^~~~
-note: Double-check the path before running this.
+note: Double-check the path before the command is run.
 69:20: warning: An `rm -r` on `"$staging/"` deletes `/` when the variable is empty. (SC2115)
     69 |    rm --dry-run -rf "$staging/"
        |                     ^~~~~~~~~~~
 note: Write `${staging:?}` so an empty value aborts the command.
-70:3: warning: A `mkdir -pm` applies the mode only to the deepest directory, the created parents keep the umask default. (SC2174)
+70:3: warning: The created parent directories keep the umask default. (SC2174)
     70 |    mkdir -pm 0700 parent/child
        |    ^~~~~
-74:3: warning: The input redirect feeds 'echo', which never reads stdin, so the data is discarded. (SC2217)
+74:3: warning: The 'echo' command never reads the redirected input. (SC2217)
     74 |    echo hello < input.txt
        |    ^~~~
 75:3: warning: The `typeset` builtin is the ksh spelling of `declare`.
     75 |    typeset scoped=value
        |    ^~~~~~~
-note: Write `declare` for the clearer bash name.
+note: Write `declare` for the bash name.
 77:3: warning: An array subscript from external input is evaluated as arithmetic code.
     77 |    slots[chosen]=x
        |    ^~~~~~~~~~~~~~~
 note: Validate the subscript as decimal digits before using it.
-78:16: warning: This pipeline assignment is lost when the stage exits. (SC2030)
+78:16: warning: The assignment runs in the pipeline subshell. (SC2030)
     78 |    echo value | tally=1
        |                 ^~~~~~~
 note: Move the assignment outside the pipeline.
-78:16: warning: This assignment to 'tally' in a function has no `local`, the value leaks to the global scope.
+78:16: warning: This assignment to 'tally' in a function has no `local`.
     78 |    echo value | tally=1
        |                 ^~~~~~~
 note: Declare it with `local` to keep it inside the function.
-82:28: warning: `2>&1` before the file redirect duplicates the terminal, so stderr stays on the terminal. (SC2069)
+82:28: warning: `2>&1` before the file redirect duplicates the current standard output. (SC2069)
     82 |    { echo grouped; } 2>&1 > grouped.log
        |                             ^~~~~~~~~~~
 note: Put the file redirect first as in `>file 2>&1`.
@@ -801,18 +801,18 @@ note: Put the file redirect first as in `>file 2>&1`.
     83 |    { echo claimed; } > claim.log > claim.log
        |                        ^~~~~~~~~ this earlier redirect claims the same descriptor.
 note: Pass the files as operands, or use `tee` for several outputs.
-84:49: warning: The command reads and truncates 'same.txt' at once, the truncation empties the input before it is read. (SC2094)
+84:49: warning: The command reads and truncates 'same.txt' at once. (SC2094)
     84 |    while true; do echo looped; done < same.txt > same.txt
        |                                                  ^~~~~~~~
 84:38: details:
     84 |    while true; do echo looped; done < same.txt > same.txt
        |                                       ^~~~~~~~ this redirect reads the file that is later truncated.
-note: Write to a temporary and move it over.
+note: Write to a temporary file and move it over.
 85:37: warning: A redirection expansion can run in a child and lose its mutation. (SC2257)
     85 |    if true; then echo branched; fi > "file$((index++))"
        |                                      ^~~~~~~~~~~~~~~~~~
 note: Update the variable before forming the redirect path.
-56:3: warning: The value of 'runner' is the command name 'printf', and the command never runs. (SC2209)
+56:3: warning: The value of 'runner' is the command name 'printf'. (SC2209)
     56 |    runner=printf
        |    ^~~~~~~~~~~~~
 note: Write `runner=$(printf)` to store its output, or quote the name.

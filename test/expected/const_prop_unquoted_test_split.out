@@ -375,19 +375,19 @@
 [Word
   Unquoted "fi"
 ]
-10:6: warning: A test reads an unquoted variable. (SC2086)
+10:6: warning: The unquoted test operand vanishes when the value is empty. (SC2086)
     10 |  if [ $k ]; then echo ws_unquoted_yes; else echo ws_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-15:6: warning: A test reads an unquoted variable. (SC2086)
+15:6: warning: The unquoted test operand vanishes when the value is empty. (SC2086)
     15 |  if [ $e ]; then echo empty_unquoted_yes; else echo empty_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-21:6: warning: A test reads an unquoted variable. (SC2086)
+21:6: warning: The unquoted test operand vanishes when the value is empty. (SC2086)
     21 |  if [ $m ]; then echo multi_unquoted_yes; else echo multi_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.
-26:6: warning: A test reads an unquoted variable. (SC2086)
+26:6: warning: The unquoted test operand vanishes when the value is empty. (SC2086)
     26 |  if [ $s ]; then echo single_unquoted_yes; else echo single_unquoted_no; fi
        |       ^~
 note: Quote it to avoid an empty or split argument.

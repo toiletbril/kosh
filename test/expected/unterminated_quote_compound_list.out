@@ -3,4 +3,4 @@
        |            ^~~~~~~~~~~
 2:22: details:
      2 |  echo;hello"helloworld
-       |                       ^ Expected " here.
+       |                       ^ expected " here.
