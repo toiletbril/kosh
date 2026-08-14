@@ -64,12 +64,18 @@ selects that file. The
 option or a terminal on standard input selects the interactive editor when no
 earlier source applies. Standard input is used otherwise.
 .PP
+Without
+.BR \-s ,
+.B \-\-lint
+analyzes each command string in occurrence order, followed by every file
+operand. Lint operation is noninteractive and completes every selected input.
+.PP
 When both
 .B \-s
 and
 .B \-i
-are present, a terminal on standard input selects interactive operation. A
-non-terminal selects standard input. The
+are present outside lint operation, a terminal on standard input selects
+interactive operation. A non-terminal selects standard input. The
 .B \-s
 option takes precedence over command strings and file operands. Command strings
 take precedence over
@@ -232,6 +238,16 @@ The option is accepted without effect for compatibility.
 The option is accepted without effect for compatibility.
 .SS Diagnostics
 .TP
+.B \-\-lint
+The option behaves like
+.B \-n
+with every diagnostic tier enabled at its normal severity. Diagnostic
+suppression from
+.B \-\-no\-diagnostics
+and
+.B \-\-no\-annoying\-diagnostics
+is overridden.
+.TP
 .BR \-W ", " \-WW ", " \-WWW
 The analysis stage has strict, lenient, and annoying tiers. In the default
 mood, strict and lenient diagnostics are errors, while annoying diagnostics are
@@ -364,6 +380,13 @@ positional parameters. For
 .B \-s
 and interactive operation, $0 remains the invocation name and every operand
 becomes a positional parameter.
+.PP
+Without
+.BR \-s ,
+.B \-\-lint
+treats every operand as an input file and no operand becomes a positional
+parameter. Missing, unreadable, and directory inputs are reported before the
+remaining inputs are analyzed.
 .SH MOODS
 The
 .B kosh
@@ -1202,6 +1225,9 @@ mapping exists. A diagnostic may include a source line, caret, detail location,
 and trailing note. The complete source line is highlighted before terminal
 clipping.
 .PP
+The analysis stage follows readable static source operands recursively. Dynamic
+and unavailable operands are skipped.
+.PP
 An analysis diagnostic may include a ShellCheck identifier. A native analysis
 diagnostic carries no identifier.
 .PP
@@ -1214,8 +1240,6 @@ assigns, a call that passes no arguments to a function that reads them, and a
 call that runs before its function is defined all reject the script in the
 default mood. A read name that resembles an assigned name is reported with that
 assignment as a detail location.
-.PP
-Several findings end with warning and error totals.
 .PP
 A comment of the form
 .B # shellcheck disable=SC2086,unquoted-command-substitution
@@ -1401,7 +1425,10 @@ cursor byte offset. COMP_WORDBREAKS contains the bytes that split a word.
 The shell exits with the status of the last command it ran. A command path that
 names a directory, or has a trailing separator whose target is not a directory,
 returns 126. A script file that cannot be opened returns 127. A usage error in a
-non-rescue invocation returns 2. A child terminated by SIGPIPE returns 141.
+non-rescue invocation returns 2. A child terminated by SIGPIPE returns 141. A
+.B \-\-lint
+batch returns 1 when an input cannot be read or parsed, or its analysis reports
+an error. Warning-only findings return 0.
 .SH ERRORS
 An unavailable command or pathname is reported through its first unavailable
 component when that component can be identified. A missing explicit directory

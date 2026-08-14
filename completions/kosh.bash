@@ -33,13 +33,17 @@ _kosh_complete()
       _kosh_compgen -f -- "$current_word"
       return
       ;;
+    -c|--command)
+      COMPREPLY=()
+      return
+      ;;
   esac
 
   local long_flags="--version --short-version --help --interactive --stdin \
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
 --no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
 --restricted --privileged --clean --posix --mood \
---init-moods --mimicry --dumb --list-diagnostics \
+--init-moods --mimicry --dumb --lint --list-diagnostics \
 --no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-koshkit \
 --show-ast \

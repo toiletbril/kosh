@@ -22,10 +22,10 @@
 FLAG_LIST_DECL();
 
 /* clang-format off */
-HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]",
-                   "[-OPTIONS] -c <script1> [-c <script2> ...]",
-                   "[-OPTIONS] -",
-                   "[-OPTIONS]");
+HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file> [argument ...]",
+                   "[-OPTIONS] -c <script1> [-c <script2> ...] [argument ...]",
+                   "[-OPTIONS] --lint [-c <script> ...] [--] [file ...]",
+                   "[-OPTIONS] [-]");
 /* clang-format on */
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
@@ -88,6 +88,9 @@ FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Make the shell extremely dumb. Equivalent to --mood sh -T "
      "--no-diagnostics.");
 
+FLAG(LINT, Bool, '\0', "lint", Kosh,
+     "Analyze shell inputs without running them and enable every diagnostic "
+     "tier at its normal severity.");
 FLAG(WARNINGS, RepeatedBool, 'W', "", Kosh,
      "In the default mood, demote annoying, lenient, then strict diagnostics "
      "as W is repeated. In other moods, enable those tiers in reverse order.");
@@ -389,12 +392,11 @@ static fn report_escaped_control_flow(EvalContext &context,
   context.clear_control_flow();
 }
 
-static fn run_script_contents(const String &script_contents,
-                              EvalContext &context, BumpArena &ast_arena,
-                              Maybe<StringView> filename = None,
-                              Expression *precompiled_ast = nullptr,
-                              Expression **out_ast = nullptr,
-                              Maybe<usize> history_event_number = None) -> int
+static fn run_script_contents(
+    const String &script_contents, EvalContext &context, BumpArena &ast_arena,
+    Maybe<StringView> filename = None, Expression *precompiled_ast = nullptr,
+    Expression **out_ast = nullptr, Maybe<usize> history_event_number = None,
+    analysis_diagnostic_totals *diagnostic_totals = nullptr) -> int
 {
   i32 exit_code = EXIT_FAILURE;
 
@@ -416,14 +418,14 @@ static fn run_script_contents(const String &script_contents,
     let heredoc_terminator_misses =
         ArrayList<heredoc_terminator_miss>{heap_allocator()};
 
-    /* POSIX and bash mode skip the analysis stage, -W forces it on as warnings,
-       and --no-diagnostics always skips it. The live context is read so a mood
-       switch or a runtime set -o no-diagnostics flips it. The verdict is known
-       before parsing, so the parser skips its analysis inputs. */
+    /* The default mood and noexec run analysis. Compatibility moods require
+       enabled warnings. The live context is read so a mood or diagnostic
+       switch changes the next command. */
     let const run_analysis =
         precompiled_ast == nullptr &&
         (FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled() ||
-         ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
+         ((context.no_exec() ||
+           !(context.is_bash_compatible() || context.is_posix_mode()) ||
            context.warnings_enabled()) &&
           !context.diagnostics_disabled()));
 
@@ -481,6 +483,16 @@ static fn run_script_contents(const String &script_contents,
         completion::debug_shell_lexical_scan_byte_count();
 #endif
     if (run_analysis) {
+      let followed_source_paths = HashSet{heap_allocator()};
+      let source_effects_cache =
+          StringMap<followed_source_effects>{heap_allocator()};
+      if (filename.has_value()) {
+        if (let canonical_root = os::canonical_path(Path{*filename});
+            canonical_root.has_value())
+        {
+          followed_source_paths.add(canonical_root->text().view());
+        }
+      }
       let highlight_cache = completion::shell_highlight_cache{};
       let *previous_highlight_cache =
           context.set_diagnostic_highlight_cache(&highlight_cache);
@@ -496,7 +508,8 @@ static fn run_script_contents(const String &script_contents,
           context.annoying_diagnostics_enabled(), shellcheck_suppressions,
           analysis_scope_definitions, shellcheck_directive_spans,
           heredoc_terminator_misses, filename.has_value(),
-          FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled());
+          FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled(), &followed_source_paths,
+          &source_effects_cache, nullptr, diagnostic_totals);
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",
@@ -1219,14 +1232,20 @@ fn main(int argc, char **argv) -> int
   unused(is_privileged);
 
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
-    let const is_tty = koshka::os::is_stdin_a_tty();
+    let const should_use_interactive =
+        !FLAG_LINT.is_enabled() && koshka::os::is_stdin_a_tty();
 
     let s = koshka::String{koshka::heap_allocator()};
     s += "Both '-s' and '-i' options were specified. Falling back to ";
-    s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
+    if (should_use_interactive)
+      s += "'-i'";
+    else if (FLAG_LINT.is_enabled())
+      s += "'-s'.";
+    else
+      s += "'-s' because stdin is not a tty.";
     koshka::show_message(s);
 
-    if (is_tty)
+    if (should_use_interactive)
       FLAG_STDIN.toggle();
     else
       FLAG_INTERACTIVE.toggle();
@@ -1244,6 +1263,13 @@ fn main(int argc, char **argv) -> int
           "with '-s' option. "
           "Falling back to '-s'.");
     }
+    should_read_stdin = true;
+  } else if (FLAG_LINT.is_enabled() &&
+             (!FLAG_COMMAND.is_empty() || !file_names.is_empty()))
+  {
+    should_execute_commands = !FLAG_COMMAND.is_empty();
+    should_read_files = !file_names.is_empty();
+  } else if (FLAG_LINT.is_enabled()) {
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
     if (FLAG_INTERACTIVE.is_enabled()) {
@@ -1287,7 +1313,10 @@ fn main(int argc, char **argv) -> int
       koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
 
   usize first_param_index = 0;
-  if ((should_read_files || should_execute_commands) && !file_names.is_empty())
+  if (FLAG_LINT.is_enabled()) {
+    first_param_index = file_names.count();
+  } else if ((should_read_files || should_execute_commands) &&
+             !file_names.is_empty())
   {
     shell_name = file_names[0].clone();
     first_param_index = 1;
@@ -1323,8 +1352,10 @@ fn main(int argc, char **argv) -> int
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
-  context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled());
+  context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled() &&
+                                   !FLAG_LINT.is_enabled());
   context.set_annoying_diagnostics_enabled(
+      FLAG_LINT.is_enabled() ||
       !FLAG_SUPPRESS_ANNOYING_DIAGNOSTICS.is_enabled());
   context.set_source_traces_enabled(!FLAG_NO_TRACES.is_enabled());
   context.set_shell_option_state(koshka::shell_option_id::Privileged,
@@ -1341,12 +1372,17 @@ fn main(int argc, char **argv) -> int
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
   let const warnings_specified_count = FLAG_WARNINGS.count();
-  context.set_warning_level(static_cast<u8>(
-      warnings_specified_count > 3 ? 3 : warnings_specified_count));
+  let const specified_warning_level = static_cast<u8>(
+      warnings_specified_count > 3 ? 3 : warnings_specified_count);
+  let warning_level = specified_warning_level;
+  if (FLAG_LINT.is_enabled()) {
+    warning_level = session_mood == koshka::mimic_mood::Default ? 0 : 3;
+  }
+  context.set_warning_level(warning_level);
   context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
-  context.set_no_exec(FLAG_NO_EXEC.is_enabled());
+  context.set_no_exec(FLAG_NO_EXEC.is_enabled() || FLAG_LINT.is_enabled());
   context.set_koshkit(FLAG_ENABLE_KOSHKIT.is_enabled());
   context.set_failglob(false);
   /* Mimicry is mirrored onto the context, since the execution path in Utils
@@ -1432,7 +1468,7 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  bool should_quit = FLAG_ONE_COMMAND.is_enabled();
+  bool should_quit = FLAG_ONE_COMMAND.is_enabled() && !FLAG_LINT.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
   koshka::Maybe<usize> history_event_number = koshka::None;
 
@@ -1487,6 +1523,10 @@ fn main(int argc, char **argv) -> int
      command-line --mood would. */
   if (!context.was_mood_set_explicitly()) context.set_mood(session_mood);
   context.apply_strictness_for_mood();
+  if (FLAG_LINT.is_enabled()) {
+    context.set_warning_level(
+        context.mood() == koshka::mimic_mood::Default ? 0 : 3);
+  }
 
   /* The rc files retained a heap copy of their text and tree until the next
      top-level command clears them, dropped now rather than carried through the
@@ -1496,6 +1536,10 @@ fn main(int argc, char **argv) -> int
   /* A plain return must not be used past this point, since toiletline needs its
      own cleanup that utils::quit() runs. */
   bool did_seed_interactive_path_map = false;
+  bool did_lint_input_fail = false;
+  usize next_file_index = 0;
+  koshka::analysis_diagnostic_totals lint_diagnostic_totals{};
+
   loop
   {
     ASSERT(!koshka::os::is_child_process());
@@ -1508,73 +1552,23 @@ fn main(int argc, char **argv) -> int
        body, the -c flag and its argument for a command string, the file name
        for a script file. Stdin and interactive runs leave it empty. */
     koshka::Maybe<koshka::SourceLocation> root_frame_call_site = koshka::None;
+    bool should_analyze_input = true;
 
     try {
-      if (should_read_files || should_read_stdin) {
-        /* -s or a "-" operand reads standard input, otherwise the named file is
-           read through the descriptor layer. */
-        if (should_read_stdin || file_names[0] == "-") {
-          bool is_driver_run = false;
+      if (should_read_stdin) {
+        bool is_driver_run = false;
 #if !defined NDEBUG
-          is_driver_run = FLAG_DEBUG_COMPLETE_AT.is_set() ||
-                          FLAG_DEBUG_HIGHLIGHT_AT.is_set() ||
-                          FLAG_DEBUG_GHOST_AT.is_set();
+        is_driver_run = FLAG_DEBUG_COMPLETE_AT.is_set() ||
+                        FLAG_DEBUG_HIGHLIGHT_AT.is_set() ||
+                        FLAG_DEBUG_GHOST_AT.is_set();
 #endif
-          if (!is_driver_run) {
-            LOG(Info, "reading the whole standard input");
-            script_contents = koshka::utils::read_entire_standard_input();
-          }
-        } else {
-          const koshka::String &file_name = file_names[0];
-          let const operand_offset = koshka::quoted_argv_offset_until(
-              parse_argc, parse_argv, file_name.view());
-          const koshka::SourceLocation operand_location{
-              operand_offset, koshka::shell_quoted_arg_length(file_name.view()),
-              koshka::None};
-          const koshka::Path script_path{file_name.view()};
-
-          if (script_path.is_directory()) {
-            koshka::show_message(
-                koshka::ErrorWithLocation{
-                    operand_location, "Unable to execute `" + file_name.view() +
-                                          "` because the file is a directory"}
-                    .to_string(context.cli_invocation().view(), &context));
-            koshka::utils::quit(126, koshka::utils::farewell_policy::Goodbye);
-          }
-
-          LOG(Info, "reading the script file '%s'", file_name.c_str());
-          koshka::Maybe<koshka::String> contents =
-              script_path.read_entire_file();
-          if (!contents) {
-            let const looks_like_command =
-                !file_name.view().find_character('/').has_value();
-            let hint = koshka::String{koshka::heap_allocator()};
-            if (looks_like_command)
-              hint = "Pass -c to run this as a command string";
-            let const message = "Could not open '" + file_name.view() +
-                                "': " + koshka::os::last_system_error_message();
-            if (hint.is_empty()) {
-              koshka::show_message(
-                  koshka::ErrorWithLocation{operand_location, message}
-                      .to_string(context.cli_invocation().view(), &context));
-            } else {
-              koshka::show_message(
-                  koshka::ErrorWithLocationAndDetails{operand_location, message,
-                                                      hint.view()}
-                      .to_string(context.cli_invocation().view(), &context));
-            }
-            koshka::utils::quit(127, koshka::utils::farewell_policy::Goodbye);
-          }
-          script_contents = steal(*contents);
-          source_filename = file_name.view();
-          /* A script-file run bottoms FUNCNAME out at "main", while -c and
-             stdin runs leave it off. */
-          context.set_script_run(true);
-          root_frame_call_site = operand_location;
+        if (!is_driver_run) {
+          LOG(Info, "reading the whole standard input");
+          script_contents = koshka::utils::read_entire_standard_input();
         }
 
         should_quit = true;
-      } else if (should_execute_commands) {
+      } else if (should_execute_commands && !FLAG_COMMAND.at_end()) {
         koshka::StringView command_view = FLAG_COMMAND.next();
         script_contents = koshka::String{command_view};
         context.set_execution_string(command_view);
@@ -1607,7 +1601,87 @@ fn main(int argc, char **argv) -> int
             flag_offset += quoted_length + 1;
           }
         }
-        if (FLAG_COMMAND.at_end()) should_quit = true;
+        if (FLAG_COMMAND.at_end() &&
+            (!FLAG_LINT.is_enabled() || file_names.is_empty()))
+        {
+          should_quit = true;
+        }
+      } else if (should_read_files) {
+        ASSERT(next_file_index < file_names.count());
+        const koshka::String &file_name = file_names[next_file_index++];
+
+        if (file_name == "-") {
+          bool is_driver_run = false;
+#if !defined NDEBUG
+          is_driver_run = FLAG_DEBUG_COMPLETE_AT.is_set() ||
+                          FLAG_DEBUG_HIGHLIGHT_AT.is_set() ||
+                          FLAG_DEBUG_GHOST_AT.is_set();
+#endif
+          if (!is_driver_run) {
+            LOG(Info, "reading the whole standard input");
+            script_contents = koshka::utils::read_entire_standard_input();
+          }
+        } else {
+          let const operand_offset = koshka::quoted_argv_offset_until(
+              parse_argc, parse_argv, file_name.view());
+          const koshka::SourceLocation operand_location{
+              operand_offset, koshka::shell_quoted_arg_length(file_name.view()),
+              koshka::None};
+          const koshka::Path script_path{file_name.view()};
+
+          if (script_path.is_directory()) {
+            koshka::show_message(
+                koshka::ErrorWithLocation{
+                    operand_location, "Unable to execute `" + file_name.view() +
+                                          "` because the file is a directory"}
+                    .to_string(context.cli_invocation().view(), &context));
+            if (!FLAG_LINT.is_enabled()) {
+              koshka::utils::quit(126, koshka::utils::farewell_policy::Goodbye);
+            }
+            should_analyze_input = false;
+          }
+
+          if (should_analyze_input) {
+            LOG(Info, "reading the script file '%s'", file_name.c_str());
+            koshka::Maybe<koshka::String> contents =
+                script_path.read_entire_file();
+            if (!contents) {
+              let const looks_like_command =
+                  !file_name.view().find_character('/').has_value();
+              let hint = koshka::String{koshka::heap_allocator()};
+              if (looks_like_command)
+                hint = "Pass -c to run this as a command string";
+              let const message =
+                  "Could not open '" + file_name.view() +
+                  "': " + koshka::os::last_system_error_message();
+              if (hint.is_empty()) {
+                koshka::show_message(
+                    koshka::ErrorWithLocation{operand_location, message}
+                        .to_string(context.cli_invocation().view(), &context));
+              } else {
+                koshka::show_message(
+                    koshka::ErrorWithLocationAndDetails{operand_location,
+                                                        message, hint.view()}
+                        .to_string(context.cli_invocation().view(), &context));
+              }
+              if (!FLAG_LINT.is_enabled()) {
+                koshka::utils::quit(127,
+                                    koshka::utils::farewell_policy::Goodbye);
+              }
+              should_analyze_input = false;
+            } else {
+              script_contents = steal(*contents);
+              source_filename = file_name.view();
+              /* A script-file run bottoms FUNCNAME out at "main", while -c and
+                 stdin runs leave it off. */
+              context.set_script_run(true);
+              root_frame_call_site = operand_location;
+            }
+          }
+        }
+
+        should_quit =
+            !FLAG_LINT.is_enabled() || next_file_index == file_names.count();
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
           LOG(Info, "initializing the line editor");
@@ -1798,15 +1872,27 @@ fn main(int argc, char **argv) -> int
       }
     };
 
-    script_contents.normalize_crlf_line_endings();
-    exit_code = run_script_contents(script_contents, context, ast_arena,
-                                    source_filename, nullptr, nullptr,
-                                    history_event_number);
+    if (should_analyze_input) {
+      script_contents.normalize_crlf_line_endings();
+      exit_code = run_script_contents(
+          script_contents, context, ast_arena, source_filename, nullptr,
+          nullptr, history_event_number,
+          FLAG_LINT.is_enabled() ? &lint_diagnostic_totals : nullptr);
+    } else {
+      exit_code = EXIT_FAILURE;
+    }
+    if (FLAG_LINT.is_enabled()) {
+      did_lint_input_fail = did_lint_input_fail || exit_code != EXIT_SUCCESS;
+      if (should_quit && did_lint_input_fail) {
+        exit_code = EXIT_FAILURE;
+      }
+    }
 
     /* A child process reaches here when its exec() failed and printed the error
        itself. */
     if (should_quit || koshka::os::is_child_process() ||
-        (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
+        (!FLAG_LINT.is_enabled() && FLAG_ERROR_EXIT.is_enabled() &&
+         exit_code != 0))
     {
 #if !defined NDEBUG
       /* The completion test driver runs after the staged chunks, so a -c that
@@ -1826,6 +1912,13 @@ fn main(int argc, char **argv) -> int
 #endif
       LOG(Info, "exiting after the final chunk with code %d", exit_code);
       if (!koshka::os::is_child_process()) context.run_exit_trap();
+      if (FLAG_LINT.is_enabled()) {
+        if (context.memory_stats_enabled()) {
+          koshka::utils::print_memory_report();
+          context.set_memory_stats_enabled(false);
+        }
+        koshka::print_analysis_diagnostic_summary(lint_diagnostic_totals);
+      }
       koshka::utils::quit(exit_code,
                           FLAG_ERROR_EXIT.is_enabled()
                               ? koshka::utils::farewell_policy::Goodbye

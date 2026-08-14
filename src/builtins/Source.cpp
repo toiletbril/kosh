@@ -42,20 +42,13 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                             restricted_path_use::Source);
   LOG(Info, "source running file '%s' in the current shell", path.c_str());
 
-  let source_path = Path{path.view()};
-  if (!path.view().find_character('/').has_value()) {
-    let const path_matches = cxt.get_program_resolver().search(
-        path.view(), ProgramResolver::SearchMode::First,
-        ProgramResolver::Requirement::Regular,
-        ProgramResolver::CachePolicy::Bypass);
-    if (!path_matches.is_empty())
-      source_path = path_matches[0].clone();
-    else if (cxt.is_posix_mode())
-      throw ErrorWithLocationAndDetails{
-          ec.arg_location_at(path_index),
-          "Unable to source the file '" + path + "': not found in PATH",
-          "Pass an absolute path or add its directory to PATH"};
-  }
+  let resolved_source_path = cxt.resolve_source_path(path.view());
+  if (!resolved_source_path.has_value())
+    throw ErrorWithLocationAndDetails{
+        ec.arg_location_at(path_index),
+        "Unable to source the file '" + path + "': not found in PATH",
+        "Pass an absolute path or add its directory to PATH"};
+  let source_path = resolved_source_path.take();
 
   let const contents = source_path.read_entire_file();
   if (!contents.has_value())

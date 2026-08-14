@@ -361,6 +361,7 @@ fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
                 usize mask_offset, bool extglob = false) throws -> bool;
 
 fn set_quit_context(const EvalContext *context) wontthrow -> void;
+fn print_memory_report() wontthrow -> void;
 
 enum class farewell_policy : u8
 {

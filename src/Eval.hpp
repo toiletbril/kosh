@@ -1566,6 +1566,9 @@ public:
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None,
                 bool should_record_history = false) throws -> i32;
+  fn resolve_source_path(StringView path,
+                         bool should_expand_tilde = false) throws
+      -> Maybe<Path>;
 
   /* Each throws a located error past the recursion cap. */
   fn enter_source(SourceLocation location) throws -> void;

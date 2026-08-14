@@ -13,7 +13,9 @@
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
+#include "Parser.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
@@ -154,9 +156,10 @@ fn AnalysisContext::flush_warnings() throws -> void
   pending_warnings.clear();
 }
 
-cold fn AnalysisContext::print_diagnostic_summary() const throws -> void
+cold fn print_analysis_diagnostic_summary(
+    const analysis_diagnostic_totals &totals) throws -> void
 {
-  if (reported_warning_count + reported_error_count < 2) return;
+  if (totals.warning_count + totals.error_count < 2) return;
 
   let const wants_color = colors::stderr_wants_color();
   let const warning_color = wants_color ? colors::ansi::YELLOW : StringView{};
@@ -166,27 +169,33 @@ cold fn AnalysisContext::print_diagnostic_summary() const throws -> void
 
   let summary = String{"Encountered "};
 
-  if (reported_warning_count > 0) {
+  if (totals.warning_count > 0) {
     summary.append(warning_color);
-    summary.append(String::from(reported_warning_count, heap_allocator()));
-    summary.append(reported_warning_count == 1 ? " warning" : " warnings");
+    summary.append(String::from(totals.warning_count, heap_allocator()));
+    summary.append(totals.warning_count == 1 ? " warning" : " warnings");
     summary.append(reset);
   }
 
-  if (reported_warning_count > 0 && reported_error_count > 0) {
+  if (totals.warning_count > 0 && totals.error_count > 0) {
     summary.append(" and ");
   }
 
-  if (reported_error_count > 0) {
+  if (totals.error_count > 0) {
     summary.append(error_color);
-    summary.append(String::from(reported_error_count, heap_allocator()));
-    summary.append(reported_error_count == 1 ? " error" : " errors");
+    summary.append(String::from(totals.error_count, heap_allocator()));
+    summary.append(totals.error_count == 1 ? " error" : " errors");
     summary.append(reset);
   }
 
   summary.append(".");
 
   show_message(summary.view());
+}
+
+cold fn AnalysisContext::print_diagnostic_summary() const throws -> void
+{
+  print_analysis_diagnostic_summary(
+      {reported_warning_count, reported_error_count});
 }
 
 cold fn AnalysisContext::print_optimizer_summary() const throws -> void
@@ -364,6 +373,8 @@ fn AnalysisContext::note_variable_assignment(StringView name,
   if (name.is_empty()) return;
 
   assigned_names_so_far.set(name, location);
+  if (current_source_effects != nullptr)
+    current_source_effects->assigned_names.add(name);
 
   if (const SourceLocation *read_location = reads_before_assignment.find(name);
       read_location != nullptr)
@@ -408,6 +419,7 @@ fn AnalysisContext::note_variable_read(StringView name, SourceLocation location,
   }
 
   if (assigned_names_so_far.find(name) != nullptr) return;
+  if (inherited_assigned_names.contains(name)) return;
   if (function_local_names.find(name) != nullptr) return;
   if (global_assigned_names.find(name) != nullptr) return;
   if (reads_before_assignment.find(name) != nullptr) return;
@@ -564,6 +576,19 @@ fn borrowed_token_text(const Token *token, String &storage) throws -> StringView
   return storage.view();
 }
 
+static constexpr PackedStringKey SOURCE_LOCATION_VARIABLE_KEYS[] = {
+    SSK("HOME"),
+    SSK("OLDPWD"),
+    SSK("PWD"),
+};
+static constexpr StaticStringSet SOURCE_LOCATION_VARIABLES{
+    SOURCE_LOCATION_VARIABLE_KEYS};
+
+pure fn is_source_location_variable(StringView name) wontthrow -> bool
+{
+  return SOURCE_LOCATION_VARIABLES.contains(name);
+}
+
 namespace {
 
 fn expanded_command_path(StringView name, Allocator allocator) throws -> String
@@ -574,6 +599,190 @@ fn expanded_command_path(StringView name, Allocator allocator) throws -> String
     return String{allocator, expanded->view()};
   }
   return String{allocator, name};
+}
+
+fn wrapped_command_index(command_name_id wrapper_id,
+                         const ArrayList<const Token *> &args) throws
+    -> Maybe<usize>
+{
+  if (args.count() < 2) return None;
+  if (wrapper_id == command_name_id::Builtin) return 1;
+  if (wrapper_id != command_name_id::Command) return None;
+
+  for (usize argument_index = 1; argument_index < args.count();
+       argument_index++)
+  {
+    let const argument = static_command_name(args[argument_index]);
+    if (!argument.has_value()) {
+      return args[argument_index]->kind() == Token::Kind::Word
+                 ? None
+                 : Maybe<usize>{argument_index};
+    }
+    if (*argument == "--") {
+      argument_index++;
+      return argument_index < args.count() ? Maybe<usize>{argument_index}
+                                           : None;
+    }
+    if (*argument == "-p") continue;
+    if (argument->starts_with("-")) return None;
+    return argument_index;
+  }
+
+  return None;
+}
+
+fn apply_followed_source_effects(AnalysisContext &actx,
+                                 const followed_source_effects &effects,
+                                 bool should_merge_parent_state,
+                                 bool should_merge_parent_uncertainty) throws
+    -> void
+{
+  if (should_merge_parent_state) {
+    effects.defined_functions.for_each(
+        [&actx](StringView name) { actx.add_defined_function(name); });
+    effects.known_aliases.for_each(
+        [&actx](StringView name) { actx.add_known_alias(name); });
+    effects.assigned_names.for_each([&actx](StringView name) {
+      actx.inherited_assigned_names.add(name);
+      if (actx.current_source_effects != nullptr)
+        actx.current_source_effects->assigned_names.add(name);
+    });
+    effects.global_assigned_names.for_each([&actx](StringView name) {
+      actx.inherited_global_assigned_names.add(name);
+      if (actx.current_source_effects != nullptr)
+        actx.current_source_effects->global_assigned_names.add(name);
+    });
+    effects.array_valued_names.for_each(
+        [&actx](StringView name) { actx.add_array_valued_name(name); });
+  }
+
+  if (should_merge_parent_uncertainty) {
+    if (effects.has_seen_runtime_definer) actx.mark_runtime_definer_seen();
+    if (effects.has_unknown_path)
+      actx.mark_path_unknown(effects.should_silence_unresolved_commands);
+    if (effects.has_unknown_working_directory)
+      actx.mark_working_directory_unknown();
+  }
+  actx.has_fatal = actx.has_fatal || effects.has_fatal;
+}
+
+fn analyze_followed_source(AnalysisContext &actx,
+                           const ArrayList<const Token *> &args,
+                           usize command_index, bool should_merge_parent_state,
+                           bool should_merge_parent_uncertainty) throws -> bool
+{
+  if (actx.followed_source_paths == nullptr ||
+      actx.followed_source_effects_cache == nullptr ||
+      actx.eval_context == nullptr || AST_ARENA == nullptr ||
+      command_index + 1 >= args.count())
+  {
+    return true;
+  }
+
+  usize path_index = command_index + 1;
+  let const option = static_command_name(args[path_index]);
+  if (option.has_value() && *option == "--help") return true;
+  if (option.has_value() && *option == "--") {
+    path_index++;
+  }
+  if (path_index >= args.count()) return true;
+
+  let const literal_path = static_command_name(args[path_index]);
+  if (!literal_path.has_value()) {
+    actx.mark_path_unknown(false);
+    actx.mark_working_directory_unknown();
+    return false;
+  }
+
+  bool should_expand_tilde = false;
+  if (args[path_index]->kind() == Token::Kind::Word) {
+    let const &word =
+        static_cast<const tokens::WordToken *>(args[path_index])->word();
+    if (!word.segments.is_empty() &&
+        word.segments.front().is_tilde_candidate() &&
+        !word.segments.front().text.is_empty() &&
+        word.segments.front().text.first_character() == '~')
+    {
+      should_expand_tilde = true;
+    }
+  }
+  if (should_expand_tilde && actx.has_unknown_working_directory) {
+    return false;
+  }
+  let const source_path = Path{*literal_path};
+  if (!should_expand_tilde && !source_path.is_absolute()) {
+    if (os::has_directory_separator(*literal_path)) {
+      if (actx.has_unknown_working_directory) return false;
+    } else if (actx.has_unknown_path || actx.has_unknown_working_directory) {
+      return false;
+    }
+  }
+  let resolved_path = actx.eval_context->resolve_source_path(
+      *literal_path, should_expand_tilde);
+  if (!resolved_path.has_value()) return true;
+
+  let canonical_path = os::canonical_path(*resolved_path);
+  if (!canonical_path.has_value()) return true;
+  if (let const *effects = actx.followed_source_effects_cache->find(
+          canonical_path->text().view());
+      effects != nullptr)
+  {
+    apply_followed_source_effects(actx, *effects, should_merge_parent_state,
+                                  should_merge_parent_uncertainty);
+    return should_merge_parent_state;
+  }
+  if (!actx.followed_source_paths->add(canonical_path->text().view())) {
+    return false;
+  }
+
+  let contents = canonical_path->read_entire_file();
+  if (!contents.has_value()) return true;
+  contents->normalize_crlf_line_endings();
+
+  let const arena_mark = AST_ARENA->mark();
+  defer { AST_ARENA->release(arena_mark); };
+  let *previous_function_arena = FUNCTION_ARENA;
+  FUNCTION_ARENA = nullptr;
+  defer { FUNCTION_ARENA = previous_function_arena; };
+
+  let parser = Parser{
+      Lexer{String{contents->view()}, *AST_ARENA, false,
+            canonical_path->text().view(), actx.eval_context->mood()}
+  };
+  parser.set_should_collect_analysis_scopes(true);
+
+  let parse_errors = ArrayList<String>{heap_allocator()};
+  let const ast = parser.construct_ast(parse_errors, actx.eval_context);
+  if (!parse_errors.is_empty()) {
+    for (let const &error : parse_errors)
+      show_message(error);
+    actx.has_fatal = true;
+    followed_source_effects effects{};
+    effects.has_fatal = true;
+    actx.followed_source_effects_cache->set(canonical_path->text().view(),
+                                            steal(effects));
+    return true;
+  }
+
+  let const shellcheck_suppressions = parser.take_shellcheck_suppressions();
+  let const scope_definitions = parser.take_analysis_scope_definitions();
+  let const directive_spans = parser.take_shellcheck_directive_spans();
+  let const heredoc_misses = parser.take_heredoc_terminator_misses();
+  followed_source_effects effects{};
+  let const analyzed = analyze_ast(
+      ast, contents->view(), actx.defined_functions, actx.known_aliases,
+      actx.eval_context, actx.warning_level,
+      actx.should_silence_unresolved_commands, actx.is_default_mood,
+      actx.should_emit_annoying_diagnostics, shellcheck_suppressions,
+      scope_definitions, directive_spans, heredoc_misses, false,
+      actx.should_report_optimizer_diagnostics, actx.followed_source_paths,
+      actx.followed_source_effects_cache, &actx, nullptr,
+      should_merge_parent_state, should_merge_parent_uncertainty, &effects);
+  if (!analyzed) actx.has_fatal = true;
+  actx.followed_source_effects_cache->set(canonical_path->text().view(),
+                                          steal(effects));
+
+  return should_merge_parent_state;
 }
 
 fn command_resolves(
@@ -680,7 +889,14 @@ fn analyze_ast(const Expression *root, StringView source,
                const ArrayList<shellcheck_directive_span> &directive_spans,
                const ArrayList<heredoc_terminator_miss> &heredoc_misses,
                bool is_named_script_file,
-               bool should_report_optimizer_diagnostics) throws -> bool
+               bool should_report_optimizer_diagnostics,
+               HashSet *followed_source_paths,
+               StringMap<followed_source_effects> *source_effects_cache,
+               AnalysisContext *parent_analysis_context,
+               analysis_diagnostic_totals *deferred_diagnostic_totals,
+               bool should_merge_parent_state,
+               bool should_merge_parent_uncertainty,
+               followed_source_effects *source_effects) throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -693,6 +909,31 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.eval_context = eval_context;
   actx.should_report_optimizer_diagnostics =
       should_report_optimizer_diagnostics;
+  actx.followed_source_paths = followed_source_paths;
+  actx.followed_source_effects_cache = source_effects_cache;
+  if (parent_analysis_context != nullptr) {
+    actx.has_seen_runtime_definer =
+        parent_analysis_context->has_seen_runtime_definer;
+    actx.has_unknown_path = parent_analysis_context->has_unknown_path;
+    actx.has_unknown_working_directory =
+        parent_analysis_context->has_unknown_working_directory;
+    parent_analysis_context->inherited_assigned_names.for_each(
+        [&actx](StringView name) { actx.inherited_assigned_names.add(name); });
+    parent_analysis_context->assigned_names_so_far.for_each(
+        [&actx](StringView name, const SourceLocation &) {
+          actx.inherited_assigned_names.add(name);
+        });
+    parent_analysis_context->inherited_global_assigned_names.for_each(
+        [&actx](StringView name) {
+          actx.inherited_global_assigned_names.add(name);
+        });
+    parent_analysis_context->global_assigned_names.for_each(
+        [&actx](StringView name, const SourceLocation &) {
+          actx.inherited_global_assigned_names.add(name);
+        });
+    parent_analysis_context->array_valued_names.for_each(
+        [&actx](StringView name) { actx.array_valued_names.add(name); });
+  }
 
   if (source.length >= 3 && static_cast<u8>(source[0]) == 0xef &&
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
@@ -700,7 +941,11 @@ fn analyze_ast(const Expression *root, StringView source,
 
   expressions::check_source_bytes(actx, source);
 
-  expressions::check_shebang(actx, source, is_named_script_file);
+  if (parent_analysis_context != nullptr) {
+    actx.is_posix_sh_shebang = parent_analysis_context->is_posix_sh_shebang;
+  } else {
+    expressions::check_shebang(actx, source, is_named_script_file);
+  }
 
   expressions::check_shellcheck_directives(actx, source, directive_spans);
 
@@ -715,6 +960,7 @@ fn analyze_ast(const Expression *root, StringView source,
       [&actx](StringView name) { actx.add_defined_function(name); });
   known_aliases.for_each(
       [&actx](StringView name) { actx.add_known_alias(name); });
+  actx.current_source_effects = source_effects;
   actx.apply_scope_definitions(scope_definitions);
 
   root->analyze(actx, true);
@@ -724,7 +970,23 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_function_argument_dataflow(actx);
 
   actx.flush_warnings();
-  actx.print_diagnostic_summary();
+
+  if (parent_analysis_context != nullptr) {
+    parent_analysis_context->reported_warning_count +=
+        actx.reported_warning_count;
+    parent_analysis_context->reported_error_count += actx.reported_error_count;
+    ASSERT(source_effects != nullptr);
+    source_effects->has_fatal = actx.has_fatal;
+    apply_followed_source_effects(*parent_analysis_context, *source_effects,
+                                  should_merge_parent_state,
+                                  should_merge_parent_uncertainty);
+  } else if (deferred_diagnostic_totals != nullptr) {
+    deferred_diagnostic_totals->warning_count += actx.reported_warning_count;
+    deferred_diagnostic_totals->error_count += actx.reported_error_count;
+  } else {
+    actx.print_diagnostic_summary();
+  }
+
   actx.print_optimizer_summary();
 
   return !actx.has_fatal;
@@ -1160,8 +1422,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     /* A PATH=... prefix leaves the runtime search path unknown to the prepass,
        so the not-found check for the prefixed command and everything after it
        stays quiet. */
-    if (var.name.view() == "PATH")
-      actx.should_silence_unresolved_commands = true;
+    if (var.name.view() == "PATH") actx.mark_path_unknown(true);
+    if (is_source_location_variable(var.name.view()))
+      actx.mark_working_directory_unknown();
 
     if (prefix_outlives_command)
       actx.note_variable_assignment(var.name.view(), var.location);
@@ -1180,7 +1443,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   for (let const &assignment : m_array_args) {
     actx.note_variable_assignment(assignment.name.view(), assignment.location);
-    actx.array_valued_names.add(assignment.name.view());
+    actx.add_array_valued_name(assignment.name.view());
     actx.constant_variables.erase(assignment.name.view());
 
     for (let const element : assignment.elements) {
@@ -1325,11 +1588,49 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   let const command_info = get_analysis_command_info(command_literal);
   let const command_id = command_info.id;
+  if (!is_command_shadowed &&
+      (command_id == command_name_id::Cd || command_literal == "pushd" ||
+       command_literal == "popd"))
+  {
+    actx.mark_working_directory_unknown();
+  }
   let const command_is_assignment_builtin =
       command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN);
   let const lint_input = command_lint_input{
       m_args,          m_redirections, m_local_vars,       source_location(),
       command_literal, command_info,   is_command_shadowed};
+
+  usize source_command_index = m_args.count();
+  if (!is_command_shadowed && (command_id == command_name_id::Dot ||
+                               command_id == command_name_id::Source))
+  {
+    source_command_index = 0;
+  } else if (!is_command_shadowed) {
+    let const wrapped_index = wrapped_command_index(command_id, m_args);
+    if (wrapped_index.has_value()) {
+      let command_storage = String{heap_allocator()};
+      let const wrapped_command =
+          borrowed_token_text(m_args[*wrapped_index], command_storage);
+      let const wrapped_command_id =
+          get_analysis_command_info(wrapped_command).id;
+      if (wrapped_command_id == command_name_id::Dot ||
+          wrapped_command_id == command_name_id::Source)
+      {
+        source_command_index = *wrapped_index;
+      }
+    }
+  }
+
+  bool did_analyze_source = false;
+  if (source_command_index < m_args.count()) {
+    let const should_merge_source_state = is_unconditional;
+    let const should_merge_source_uncertainty =
+        actx.function_scope_depth == 0 && !actx.is_direct_pipeline_stage &&
+        !actx.is_inside_subshell_analysis;
+    did_analyze_source = analyze_followed_source(
+        actx, m_args, source_command_index, should_merge_source_state,
+        should_merge_source_uncertainty);
+  }
 
   if (!is_command_shadowed && actx.is_inside_loop_condition &&
       command_id == command_name_id::Read)
@@ -1493,7 +1794,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
         case WordSegment::Kind::FunctionSubstitution:
           quote_sandwich_state = 0;
-          actx.has_seen_runtime_definer = true;
+          actx.mark_runtime_definer_seen();
           break;
 
         case WordSegment::Kind::DoubleQuotedText:
@@ -1752,8 +2053,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                  ->word()
                                  .to_literal_string()
                            : m_args[i]->raw_string();
-      if (operand_target_name(word.view()) == "PATH")
-        actx.should_silence_unresolved_commands = true;
+      let const target_name = operand_target_name(word.view());
+      if (target_name == "PATH") actx.mark_path_unknown(true);
+      if (is_source_location_variable(target_name))
+        actx.mark_working_directory_unknown();
     }
   }
 
@@ -1762,26 +2065,32 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
      so any later unresolved command must not be a hard failure. */
   let runtime_definer_name = String{command_literal};
+  let runtime_definer_id = command_id;
   bool is_runtime_definer =
       command_info.is_in_group(COMMAND_GROUP_RUNTIME_DEFINER);
 
-  if ((command_id == command_name_id::Builtin ||
-       command_id == command_name_id::Command) &&
-      m_args.count() > 1)
+  if (let const wrapped_index = wrapped_command_index(command_id, m_args);
+      wrapped_index.has_value())
   {
-    usize wrapped_command_index = 1;
-    let wrapped_storage = String{heap_allocator()};
-    if (borrowed_token_text(m_args[wrapped_command_index], wrapped_storage) ==
-        "--")
-    {
-      wrapped_command_index++;
-    }
-    if (wrapped_command_index < m_args.count()) {
-      runtime_definer_name = m_args[wrapped_command_index]->raw_string();
+    if (*wrapped_index < m_args.count()) {
+      runtime_definer_name = m_args[*wrapped_index]->raw_string();
+      let const runtime_definer_info =
+          get_analysis_command_info(runtime_definer_name.view());
+      runtime_definer_id = runtime_definer_info.id;
       is_runtime_definer =
-          get_analysis_command_info(runtime_definer_name.view())
-              .is_in_group(COMMAND_GROUP_RUNTIME_DEFINER);
+          runtime_definer_info.is_in_group(COMMAND_GROUP_RUNTIME_DEFINER);
     }
+  }
+
+  if (did_analyze_source && (runtime_definer_id == command_name_id::Dot ||
+                             runtime_definer_id == command_name_id::Source))
+  {
+    is_runtime_definer = false;
+  }
+
+  if (runtime_definer_id == command_name_id::Eval) {
+    actx.mark_path_unknown(false);
+    actx.mark_working_directory_unknown();
   }
 
   if (is_runtime_definer) {
@@ -1789,7 +2098,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         "'%s' may define commands at run time, later resolution failures "
         "degrade to warnings",
         runtime_definer_name.c_str());
-    actx.has_seen_runtime_definer = true;
+    actx.mark_runtime_definer_seen();
   }
 
   check_command_name_lints(actx, lint_input);
@@ -2003,11 +2312,35 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   for (let const command : m_commands) {
     ASSERT(command != nullptr);
     let const was_direct_pipeline_stage = actx.is_direct_pipeline_stage;
+    let const saved_has_seen_runtime_definer = actx.has_seen_runtime_definer;
+    let const saved_has_unknown_path = actx.has_unknown_path;
+    let const saved_has_unknown_working_directory =
+        actx.has_unknown_working_directory;
+    let const saved_should_silence_unresolved_commands =
+        actx.should_silence_unresolved_commands;
+    let saved_inherited_assigned_names = actx.inherited_assigned_names.clone();
+    let saved_inherited_global_assigned_names =
+        actx.inherited_global_assigned_names.clone();
+    let saved_array_valued_names = actx.array_valued_names.clone();
+    let *saved_source_effects = actx.current_source_effects;
+    if (m_commands.count() > 1) actx.current_source_effects = nullptr;
     actx.is_direct_pipeline_stage =
         m_commands.count() > 1 && (command->as_simple_command() != nullptr ||
                                    command->as_assign_command() != nullptr);
     command->analyze(actx, stage_is_unconditional);
+    actx.current_source_effects = saved_source_effects;
     actx.is_direct_pipeline_stage = was_direct_pipeline_stage;
+    if (m_commands.count() > 1) {
+      actx.has_unknown_working_directory = saved_has_unknown_working_directory;
+      actx.has_unknown_path = saved_has_unknown_path;
+      actx.has_seen_runtime_definer = saved_has_seen_runtime_definer;
+      actx.should_silence_unresolved_commands =
+          saved_should_silence_unresolved_commands;
+      actx.array_valued_names = steal(saved_array_valued_names);
+      actx.inherited_global_assigned_names =
+          steal(saved_inherited_global_assigned_names);
+      actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
+    }
   }
 
   /* cat feeding a single named file into the next stage runs an extra process,

@@ -180,7 +180,7 @@ lenient, and annoying diagnostics. The `-W`, `-WW`, and `-WWW` forms select the
 level. An explicit `set --mood` clears that selection. The
 `annoying-diagnostics` set option controls the annoying tier, and
 `no-diagnostics` skips analysis. The `--no-annoying-diagnostics` flag disables
-the annoying tier at startup.
+the annoying tier at startup. The lint flag overrides both controls.
 
 Restricted behavior uses one shared context state. Variable changes, directory
 changes, slash-bearing command and source operands, output redirections, exec,
@@ -284,7 +284,9 @@ number is single quoted. A summary begins with a lowercase letter, and a
 suggestion begins with an uppercase letter.
 
 The portability rows are gated behind `shebang_is_posix_sh`. Whole-script
-dataflow findings are reported by one sweep at the end of `analyze_ast`.
+dataflow findings are reported by one sweep at the end of `analyze_ast`. Each
+analyzed root follows every readable static source path once and skips dynamic
+or unavailable source operands.
 
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare koshkit utility

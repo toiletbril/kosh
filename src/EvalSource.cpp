@@ -523,6 +523,38 @@ fn EvalContext::run_source(StringView source, StringView origin,
   }
 }
 
+fn EvalContext::resolve_source_path(StringView path,
+                                    bool should_expand_tilde) throws
+    -> Maybe<Path>
+{
+  let expanded_path = String{heap_allocator(), path};
+  if (should_expand_tilde && path.starts_with("~")) {
+    let const slash = path.find_character('/');
+    let const prefix_end = slash.value_or(path.length);
+    let const prefix = path.substring_of_length(1, prefix_end - 1);
+    if (let directory = resolve_tilde_prefix(prefix); directory.has_value()) {
+      expanded_path = directory.take();
+      if (slash.has_value()) {
+        if (expanded_path.is_empty() || expanded_path.back() != '/')
+          expanded_path.push('/');
+        expanded_path.append(path.substring(*slash + 1));
+      }
+      path = expanded_path.view();
+    }
+  }
+  let source_path = Path{path};
+  if (os::has_directory_separator(path)) return source_path;
+
+  let const path_matches =
+      get_program_resolver().search(path, ProgramResolver::SearchMode::First,
+                                    ProgramResolver::Requirement::Regular,
+                                    ProgramResolver::CachePolicy::Bypass);
+  if (!path_matches.is_empty()) return path_matches[0].clone();
+  if (is_posix_mode()) return None;
+
+  return source_path;
+}
+
 fn EvalContext::clear_retained_sources() wontthrow -> void
 {
   LOG(All, "dropping %zu retained sources and %zu retained asts",

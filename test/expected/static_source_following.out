@@ -1,0 +1,11 @@
+lint-order=grandchild,child,summary summaries=1 files=1,1 rc=0
+noexec-grandchild=1 child=1 rc=1
+noexec-bash-parse=1 rc=1
+state-inner=1 rc=1
+wrapper-source=1 dot=1 rc=1
+tilde-literal=1 active=1 stale=0 quoted=1 rc=1
+sourced-shebang-output=0 rc=0
+path-mutation-followed=0 assignment=1 rc=1
+ordinary-grandchild=1 child=1 rc=1
+path-source=1 rc=1
+parse-source=1 rc=1

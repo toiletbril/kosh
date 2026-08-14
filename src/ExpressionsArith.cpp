@@ -643,7 +643,7 @@ fn ArrayAssignCommand::analyze(AnalysisContext &actx,
 
   /* The name is no longer a scalar literal, so the constant table forgets it.
    */
-  actx.array_valued_names.add(m_name.view());
+  actx.add_array_valued_name(m_name.view());
   actx.constant_variables.erase(m_name.view());
 }
 
@@ -956,8 +956,33 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
+  let const saved_has_seen_runtime_definer = actx.has_seen_runtime_definer;
+  let const saved_has_unknown_path = actx.has_unknown_path;
+  let const saved_has_unknown_working_directory =
+      actx.has_unknown_working_directory;
+  let const saved_should_silence_unresolved_commands =
+      actx.should_silence_unresolved_commands;
+  let saved_inherited_assigned_names = actx.inherited_assigned_names.clone();
+  let saved_inherited_global_assigned_names =
+      actx.inherited_global_assigned_names.clone();
+  let saved_array_valued_names = actx.array_valued_names.clone();
+  let *saved_source_effects = actx.current_source_effects;
+  actx.current_source_effects = nullptr;
+  let const was_inside_subshell_analysis = actx.is_inside_subshell_analysis;
+  actx.is_inside_subshell_analysis = true;
   actx.apply_scope_definitions(m_analysis_scope_definitions);
   m_body->analyze(actx, is_unconditional);
+  actx.current_source_effects = saved_source_effects;
+  actx.is_inside_subshell_analysis = was_inside_subshell_analysis;
+  actx.has_unknown_working_directory = saved_has_unknown_working_directory;
+  actx.has_unknown_path = saved_has_unknown_path;
+  actx.has_seen_runtime_definer = saved_has_seen_runtime_definer;
+  actx.should_silence_unresolved_commands =
+      saved_should_silence_unresolved_commands;
+  actx.array_valued_names = steal(saved_array_valued_names);
+  actx.inherited_global_assigned_names =
+      steal(saved_inherited_global_assigned_names);
+  actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
   actx.constant_variables = steal(saved_constants);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
@@ -1061,6 +1086,18 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
+  let const saved_has_seen_runtime_definer = actx.has_seen_runtime_definer;
+  let const saved_has_unknown_path = actx.has_unknown_path;
+  let const saved_has_unknown_working_directory =
+      actx.has_unknown_working_directory;
+  let const saved_should_silence_unresolved_commands =
+      actx.should_silence_unresolved_commands;
+  let saved_inherited_assigned_names = actx.inherited_assigned_names.clone();
+  let saved_inherited_global_assigned_names =
+      actx.inherited_global_assigned_names.clone();
+  let saved_array_valued_names = actx.array_valued_names.clone();
+  let *saved_source_effects = actx.current_source_effects;
+  actx.current_source_effects = nullptr;
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = StringMap<SourceLocation>{heap_allocator()};
   actx.apply_scope_definitions(m_analysis_scope_definitions);
@@ -1072,9 +1109,19 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
       function_definition_record{m_name.view(), source_location()});
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
+  actx.current_source_effects = saved_source_effects;
   actx.function_scope_depth--;
   actx.active_function_definition_index = saved_active_function;
   actx.loop_body_depth = saved_loop_body_depth;
+  actx.has_unknown_working_directory = saved_has_unknown_working_directory;
+  actx.has_unknown_path = saved_has_unknown_path;
+  actx.has_seen_runtime_definer = saved_has_seen_runtime_definer;
+  actx.should_silence_unresolved_commands =
+      saved_should_silence_unresolved_commands;
+  actx.array_valued_names = steal(saved_array_valued_names);
+  actx.inherited_global_assigned_names =
+      steal(saved_inherited_global_assigned_names);
+  actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
   actx.rollback_defined_functions(defined_function_insertion_count);

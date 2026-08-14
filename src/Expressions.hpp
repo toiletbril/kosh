@@ -67,6 +67,26 @@ struct command_name_assignment_record
   SourceLocation location;
 };
 
+struct analysis_diagnostic_totals
+{
+  usize warning_count{0};
+  usize error_count{0};
+};
+
+struct followed_source_effects
+{
+  HashSet defined_functions{heap_allocator()};
+  HashSet known_aliases{heap_allocator()};
+  HashSet assigned_names{heap_allocator()};
+  HashSet global_assigned_names{heap_allocator()};
+  HashSet array_valued_names{heap_allocator()};
+  bool has_seen_runtime_definer{false};
+  bool has_unknown_path{false};
+  bool has_unknown_working_directory{false};
+  bool should_silence_unresolved_commands{false};
+  bool has_fatal{false};
+};
+
 /* Whether the name reads a positional parameter, so $1 through $9, $@, $*, or
    $#. A name carrying a modifier such as ${1:-default} supplies its own value
    and is left out. */
@@ -128,8 +148,10 @@ public:
   /* An assignment inside a function to one of these updates an existing global
      rather than leaking a new binding, so the no-local warning stays quiet. */
   StringMap<SourceLocation> global_assigned_names{heap_allocator()};
+  HashSet inherited_global_assigned_names{heap_allocator()};
 
   StringMap<SourceLocation> assigned_names_so_far{heap_allocator()};
+  HashSet inherited_assigned_names{heap_allocator()};
 
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
 
@@ -181,6 +203,9 @@ public:
      resolution reports the same missing command, so the analysis copy would
      double the report. A script run keeps the check. */
   bool should_silence_unresolved_commands{false};
+  bool has_unknown_path{false};
+  bool has_unknown_working_directory{false};
+  bool is_inside_subshell_analysis{false};
 
   HashSet tested_command_names{heap_allocator()};
   bool should_retain_tested_command_names{false};
@@ -188,6 +213,9 @@ public:
 
   bool should_report_optimizer_diagnostics{false};
   usize optimizer_eliminated_count{0};
+  HashSet *followed_source_paths{nullptr};
+  StringMap<followed_source_effects> *followed_source_effects_cache{nullptr};
+  followed_source_effects *current_source_effects{nullptr};
 
   ArrayList<pending_analysis_warning> pending_warnings{heap_allocator()};
 
@@ -195,14 +223,60 @@ public:
 
   fn add_defined_function(StringView name) throws -> void
   {
+    if (current_source_effects != nullptr)
+      current_source_effects->defined_functions.add(name);
     if (!defined_functions.add(name)) return;
     defined_function_insertions.push(String{name});
   }
 
   fn add_known_alias(StringView name) throws -> void
   {
+    if (current_source_effects != nullptr)
+      current_source_effects->known_aliases.add(name);
     if (!known_aliases.add(name)) return;
     known_alias_insertions.push(String{name});
+  }
+
+  fn add_array_valued_name(StringView name) throws -> void
+  {
+    array_valued_names.add(name);
+    if (current_source_effects != nullptr)
+      current_source_effects->array_valued_names.add(name);
+  }
+
+  fn add_global_assigned_name(StringView name, SourceLocation location) throws
+      -> void
+  {
+    global_assigned_names.set(name, location);
+    if (current_source_effects != nullptr)
+      current_source_effects->global_assigned_names.add(name);
+  }
+
+  fn mark_path_unknown(bool should_silence_commands) wontthrow -> void
+  {
+    has_unknown_path = true;
+    should_silence_unresolved_commands =
+        should_silence_unresolved_commands || should_silence_commands;
+    if (current_source_effects != nullptr) {
+      current_source_effects->has_unknown_path = true;
+      current_source_effects->should_silence_unresolved_commands =
+          current_source_effects->should_silence_unresolved_commands ||
+          should_silence_commands;
+    }
+  }
+
+  fn mark_working_directory_unknown() wontthrow -> void
+  {
+    has_unknown_working_directory = true;
+    if (current_source_effects != nullptr)
+      current_source_effects->has_unknown_working_directory = true;
+  }
+
+  fn mark_runtime_definer_seen() wontthrow -> void
+  {
+    has_seen_runtime_definer = true;
+    if (current_source_effects != nullptr)
+      current_source_effects->has_seen_runtime_definer = true;
   }
 
   fn apply_scope_definitions(
@@ -288,17 +362,28 @@ private:
           StringView related_message) throws -> void;
 };
 
-fn analyze_ast(const Expression *root, StringView source,
-               const HashSet &known_functions, const HashSet &known_aliases,
-               EvalContext *eval_context, u8 warning_level,
-               bool silence_unresolved_commands, bool is_default_mood,
-               bool should_emit_annoying_diagnostics,
-               const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
-               const ArrayList<analysis_scope_definition> &scope_definitions,
-               const ArrayList<shellcheck_directive_span> &directive_spans,
-               const ArrayList<heredoc_terminator_miss> &heredoc_misses,
-               bool is_named_script_file,
-               bool should_report_optimizer_diagnostics = false) throws -> bool;
+fn analyze_ast(
+    const Expression *root, StringView source, const HashSet &known_functions,
+    const HashSet &known_aliases, EvalContext *eval_context, u8 warning_level,
+    bool silence_unresolved_commands, bool is_default_mood,
+    bool should_emit_annoying_diagnostics,
+    const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
+    const ArrayList<analysis_scope_definition> &scope_definitions,
+    const ArrayList<shellcheck_directive_span> &directive_spans,
+    const ArrayList<heredoc_terminator_miss> &heredoc_misses,
+    bool is_named_script_file, bool should_report_optimizer_diagnostics = false,
+    HashSet *followed_source_paths = nullptr,
+    StringMap<followed_source_effects> *source_effects_cache = nullptr,
+    AnalysisContext *parent_analysis_context = nullptr,
+    analysis_diagnostic_totals *deferred_diagnostic_totals = nullptr,
+    bool should_merge_parent_state = true,
+    bool should_merge_parent_uncertainty = true,
+    followed_source_effects *source_effects = nullptr) throws -> bool;
+
+mustuse pure fn is_source_location_variable(StringView name) wontthrow -> bool;
+
+fn print_analysis_diagnostic_summary(
+    const analysis_diagnostic_totals &totals) throws -> void;
 
 class Expression
 {

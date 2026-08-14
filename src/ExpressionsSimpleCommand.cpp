@@ -137,7 +137,11 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 
   /* A PATH assignment leaves the runtime search path unknown to the prepass, so
      a later command's not-found check stays quiet. */
-  if (name.view() == "PATH") actx.should_silence_unresolved_commands = true;
+  if (name.view() == "PATH") {
+    actx.mark_path_unknown(true);
+  }
+  if (is_source_location_variable(name.view()))
+    actx.mark_working_directory_unknown();
 
   /* An element assignment a[i]=v changes what $a reads without recording a
      scalar literal, so the base name before the bracket is forgotten. */
@@ -153,7 +157,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                                source_location());
     }
     actx.note_variable_assignment(base, source_location());
-    actx.array_valued_names.add(base);
+    actx.add_array_valued_name(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
         "assignment",
@@ -167,6 +171,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
       actx.function_local_names.find(name.view()) == nullptr &&
       actx.global_assigned_names.find(name.view()) == nullptr &&
+      !actx.inherited_global_assigned_names.contains(name.view()) &&
       !(actx.eval_context != nullptr &&
         actx.eval_context->get_variable_value(name.view()).has_value()))
   {
@@ -177,7 +182,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   if (actx.function_scope_depth == 0 && is_unconditional &&
       !actx.has_seen_runtime_definer)
   {
-    actx.global_assigned_names.set(name.view(), source_location());
+    actx.add_global_assigned_name(name.view(), source_location());
   }
 
   /* A conditional or nested assignment may not run, a runtime definer may have

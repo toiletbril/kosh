@@ -1,0 +1,11 @@
+batch-order=LINT_COMMAND_ONE,LINT_COMMAND_TWO,LINT_FILE_ONE,LINT_FILE_TWO,SUMMARY summaries=1 rc=1 executed=0
+bash-order=LINT_COMMAND_ONE,LINT_COMMAND_TWO,LINT_FILE_ONE,LINT_FILE_TWO,SUMMARY errors=0 summaries=1 files=1,1 rc=0
+memory-summary-last=yes
+one-command-order=LINT_COMMAND_ONE,LINT_COMMAND_TWO,LINT_FILE_ONE,LINT_FILE_TWO rc=1
+parse-command=1 parse-file=1 errors=2 rc=1
+missing=1 directory=1 continued=1 rc=1
+noexec-first=1 noexec-second=0 rc=0
+noexec-commands=2 noexec-files=0 rc=0
+dash-file=1 second-file=1 rc=1
+stdin=1 rc=1
+stdin-precedence=1 command=0 file=0 rc=1
