@@ -1,5 +1,7 @@
 unset KOSH_FLAGS
 
+BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
+
 d=$(mktemp -d)
 d=$(cd "$d" && pwd -P)
 trap 'test -n "$d" && /bin/rm -rf "$d"' EXIT
@@ -39,7 +41,7 @@ send_input()
     wait_for_transcript 'HANDOFF_STEP_1' || return 1
     printf 'stty tostop; echo HANDOFF_STEP_2\n'
     wait_for_transcript 'HANDOFF_STEP_2' || return 1
-    printf '%s\n' "( /usr/bin/true \$'safe\\001\\302\\200\\303\\251' ) > redirected"
+    printf '%s\n' "( \"$BIN\" -c : \$'safe\\001\\302\\200\\303\\251' ) > redirected"
     printf "%s 'argument with spaces'\n" "$probe"
     wait_for_transcript 'Stopped' || return 1
     printf 'fg\n'
@@ -50,18 +52,18 @@ send_input()
 }
 
 if script -q -c true /dev/null >/dev/null 2>&1; then
-    send_input | script -q -c \
+    send_input | LOGNAME=kosh-title-user USER=kosh-title-user script -q -c \
         "exec \"$BIN\" -i -I -X debug --debug-logging-file \"$d/log\" --mood bash --rcfile \"$d/rc\"" \
         "$d/typescript" >"$d/live" 2>/dev/null
 elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
-    send_input | script -q "$d/typescript" /bin/sh -c \
+    send_input | LOGNAME=kosh-title-user USER=kosh-title-user \
+        script -q "$d/typescript" /bin/sh -c \
         "exec \"$BIN\" -i -I -X debug --debug-logging-file \"$d/log\" --mood bash --rcfile \"$d/rc\"" \
         >"$d/live" 2>/dev/null
 else
     exit 1
 fi
 
-output=$(strings "$d/typescript")
 ordering=failed
 if grep -q 'fg will give the terminal.*before it resumes job' "$d/log"; then
     ordering=passed
@@ -70,27 +72,20 @@ fi
 title_output=failed
 escape=$(printf '\033')
 bell=$(printf '\007')
-if [ -n "${LOGNAME+x}" ]; then
-    expected_user=$LOGNAME
-elif [ -n "${USER+x}" ]; then
-    expected_user=$USER
-else
-    expected_user=$(id -un)
-fi
 safe_argument=$(printf 'safe\303\251')
-idle_title="${escape}]0;${expected_user} @ ${d}${bell}"
+idle_title="${escape}]0;kosh-title-user @ ${d}${bell}"
 probe_title="${escape}]0;${probe} 'argument with spaces'${bell}"
-sanitized_title="${escape}]0;/usr/bin/true ${safe_argument}${bell}"
+sanitized_title="${escape}]0;${BIN} -c : ${safe_argument}${bell}"
 hook_title="${escape}]0;HOOK${bell}"
-probe_title_count=$(grep -aoF "$probe_title" "$d/typescript" 2>/dev/null |
+probe_title_count=$(LC_ALL=C grep -aoF "$probe_title" "$d/typescript" 2>/dev/null |
     wc -l | tr -d ' ')
-last_probe_position=$(grep -aboF "$probe_title" "$d/typescript" 2>/dev/null |
+last_probe_position=$(LC_ALL=C grep -aboF "$probe_title" "$d/typescript" 2>/dev/null |
     tail -n 1 | cut -d: -f1)
-last_idle_position=$(grep -aboF "$idle_title" "$d/typescript" 2>/dev/null |
+last_idle_position=$(LC_ALL=C grep -aboF "$idle_title" "$d/typescript" 2>/dev/null |
     tail -n 1 | cut -d: -f1)
-last_hook_position=$(grep -aboF "$hook_title" "$d/typescript" 2>/dev/null |
+last_hook_position=$(LC_ALL=C grep -aboF "$hook_title" "$d/typescript" 2>/dev/null |
     tail -n 1 | cut -d: -f1)
-if grep -aF "$sanitized_title" "$d/typescript" >/dev/null 2>&1 &&
+if LC_ALL=C grep -aF "$sanitized_title" "$d/typescript" >/dev/null 2>&1 &&
     [ "$probe_title_count" -ge 2 ] && [ -n "$last_probe_position" ] &&
     [ -n "$last_idle_position" ] && [ -n "$last_hook_position" ] &&
     [ "$last_idle_position" -gt "$last_probe_position" ] &&
@@ -98,7 +93,19 @@ if grep -aF "$sanitized_title" "$d/typescript" >/dev/null 2>&1 &&
     title_output=passed
 fi
 
-case "$ordering:$title_output:$output" in
-    passed:passed:*FG_READ:terminal-value*) echo passed ;;
-    *) grep 'fg ' "$d/log"; printf '%s\n' "$output"; echo failed ;;
+case "$ordering:$title_output" in
+    passed:passed)
+        if LC_ALL=C grep -aF 'FG_READ:terminal-value' "$d/typescript" \
+            >/dev/null 2>&1; then
+            echo passed
+            exit 0
+        fi
+        ;;
 esac
+
+printf 'ordering=%s title_output=%s probe_count=%s probe_position=%s idle_position=%s hook_position=%s terminal_read=%s\n' \
+    "$ordering" "$title_output" "$probe_title_count" \
+    "${last_probe_position:-missing}" "${last_idle_position:-missing}" \
+    "${last_hook_position:-missing}" \
+    "$(LC_ALL=C grep -aFc 'FG_READ:terminal-value' "$d/typescript" 2>/dev/null)"
+exit 1
