@@ -22,3 +22,52 @@ bash
 bash-posix
 kosh
 sh
+== set --mood= value:
+bash
+bash-posix
+kosh
+sh
+== set --init-moods= value:
+bash
+bash-posix
+kosh
+sh
+== set -M= value:
+bash
+bash-posix
+kosh
+sh
+== set --mood= prefix:
+bash
+bash-posix
+== kosh --mood value:
+bash
+bash-posix
+kosh
+sh
+== kosh --mood= value:
+bash
+bash-posix
+kosh
+sh
+== kosh -M value:
+bash
+bash-posix
+kosh
+sh
+== kosh --init-moods value:
+bash
+bash-posix
+kosh
+sh
+== kosh -L= prefix:
+kosh
+== assimilate --link-mood value:
+bash
+dash
+kosh
+sh
+== assimilate --link-mood= prefix:
+dash
+== assignment prefix is untouched:
+0

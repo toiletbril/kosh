@@ -128,7 +128,7 @@ numeric_variant_output=$(
 )
 echo "$numeric_variant_output"
 echo "numeric-variant-errors=$(printf '%s\n' "$numeric_variant_output" |
-  grep -c 'unquoted variable')"
+  grep -c 'SC2086')"
 
 cat > "$temporary_directory/slug-variant-directive.sh" <<'EOF'
 # shellcheck disable=unquoted-expansion
@@ -153,19 +153,19 @@ native_slug_output=$(
 )
 echo "$native_slug_output"
 echo "native-slug-warnings=$(printf '%s\n' "$native_slug_output" |
-  grep -c 'has no local')"
+  grep -c 'has no .local.')"
 
 conditional_pattern_output=$(
   "$BIN" -n -c '[[ $arg != *=* ]]; [[ $arg == *=* ]]; [[ $arg == *"="* ]]' 2>&1
 )
 echo "conditional-pattern-errors=$(printf '%s\n' "$conditional_pattern_output" |
-  grep -c 'operator needs surrounding spaces')"
+  grep -c 'without surrounding spaces')"
 
 local_probe_output=$(
   "$BIN" -n -c 'local probe 2>/dev/null && probe_ran=1' 2>&1
 )
 echo "conditional-local-errors=$(printf '%s\n' "$local_probe_output" |
-  grep -c 'local outside a function')"
+  grep -c '.local. outside a function')"
 
 uncertain_slash_output=$(
   "$BIN" -WW -c "builtin eval 'function dynamic/name { :; }'; dynamic/name" 2>&1

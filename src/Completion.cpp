@@ -1794,7 +1794,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
        targets even when a like-named subcommand man page exists. */
     Maybe<ArrayList<String>> from_stage = None;
     if (!is_posix_completion) {
-      from_stage = complete_from_process_arguments(line, stage_token, mode);
+      from_stage =
+          complete_from_process_arguments(line, stage_token, token_start, mode);
       if (!from_stage.has_value())
         from_stage = complete_from_builtin_flags(line, stage_token, token_start,
                                                  context);

@@ -1,0 +1,51 @@
+== kill -s signal names:
+HUP
+INT
+KILL
+QUIT
+TERM
+== kill -s prefix:
+INT
+== kill -n prefix:
+TERM
+== trap special conditions:
+ERR
+EXIT
+== trap condition after the print flag:
+RETURN
+== trap action position is a filename:
+0
+== shopt -o reads the set option names:
+pipefail
+== shopt operand stays a shopt name:
+xpg_echo
+== enable builtin names:
+echo
+== complete -o options:
+bashdefault
+default
+dirnames
+== compgen -o joined form:
+default
+dirnames
+== koshkit find entry types:
+d
+f
+l
+== koshkit timeout signal prefix:
+QUIT
+== koshkit pkill joined signal form:
+TERM
+== koshkit killall signal prefix:
+KILL
+== debug logging levels:
+all
+debug
+info
+== debug logging joined form:
+debug
+== posix signal names:
+ALRM
+USR1
+USR2
+ABRT
