@@ -76,6 +76,12 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
                      frame.parent_source, String{frame.source_path.view()},
                      frame.is_cli_root, frame.is_only_root_source});
     fallback_context.m_source_frames.back().was_printed = frame.was_printed;
+    fallback_context.m_source_frames.back().should_defer_trace =
+        frame.should_defer_trace;
+    fallback_context.m_source_frames.back().has_deferred_trace =
+        frame.has_deferred_trace;
+    fallback_context.m_source_frames.back().deferred_trace_location =
+        frame.deferred_trace_location;
   }
   defer
   {
@@ -84,9 +90,21 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
             ? m_source_frames.count()
             : fallback_context.m_source_frames.count();
     for (usize frame_index = 0; frame_index < shared_frame_count; frame_index++)
+    {
       m_source_frames[frame_index].was_printed =
           m_source_frames[frame_index].was_printed ||
           fallback_context.m_source_frames[frame_index].was_printed;
+      m_source_frames[frame_index].has_deferred_trace =
+          m_source_frames[frame_index].has_deferred_trace ||
+          fallback_context.m_source_frames[frame_index].has_deferred_trace;
+      if (fallback_context.m_source_frames[frame_index]
+              .deferred_trace_location.has_value())
+      {
+        m_source_frames[frame_index].deferred_trace_location =
+            fallback_context.m_source_frames[frame_index]
+                .deferred_trace_location;
+      }
+    }
   };
   return fallback_context.run_mimicked_script(ec, mode, isolation);
 }
@@ -176,7 +194,19 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_source_frames.push(source_frame{String{ec.program().view()},
                                     ec.source_location(), current_source(),
                                     String{script_filename}, false, false});
-  defer { m_source_frames.pop_back(); };
+  m_source_frames.back().should_defer_trace = true;
+  defer
+  {
+    let &frame = m_source_frames.back();
+    if (frame.has_deferred_trace) {
+      try {
+        print_source_backtrace(frame.deferred_trace_location, false);
+      } catch (...) {
+        LOG(Debug, "rendering a deferred source trace failed");
+      }
+    }
+    m_source_frames.pop_back();
+  };
   let parser = Parser{
       Lexer{String{contents->view()}, *AST_ARENA, false, script_filename,
             mood()}
@@ -397,13 +427,22 @@ fn EvalContext::run_source(StringView source, StringView origin,
       false, false
   });
   let const frame_is_sourced_file =
-      filename.has_value() && !filename->is_empty();
+      consume_return && filename.has_value() && !filename->is_empty();
+  m_source_frames.back().should_defer_trace = frame_is_sourced_file;
   if (frame_is_sourced_file) m_sourced_file_frames++;
   if (reject_return) m_rejected_return_source_frames++;
   defer
   {
     if (reject_return) m_rejected_return_source_frames--;
     if (frame_is_sourced_file) m_sourced_file_frames--;
+    let &frame = m_source_frames.back();
+    if (frame.has_deferred_trace) {
+      try {
+        print_source_backtrace(frame.deferred_trace_location, false);
+      } catch (...) {
+        LOG(Debug, "rendering a deferred source trace failed");
+      }
+    }
     m_source_frames.pop_back();
   };
 

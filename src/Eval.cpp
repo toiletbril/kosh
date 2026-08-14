@@ -1437,10 +1437,27 @@ fn EvalContext::pop_root_source_frame() wontthrow -> void
   if (!m_source_frames.is_empty()) m_source_frames.pop_back();
 }
 
-fn EvalContext::print_source_backtrace(
-    Maybe<SourceLocation> error_location) throws -> void
+fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
+                                       bool should_defer_for_source_file) throws
+    -> void
 {
   if (!m_should_print_source_traces) return;
+
+  if (should_defer_for_source_file) {
+    for (usize i = m_source_frames.count(); i > 0; i--) {
+      let &frame = m_source_frames[i - 1];
+      if (!frame.should_defer_trace) continue;
+      if (error_location.has_value() &&
+          (!error_location->filename.has_value() ||
+           *error_location->filename != frame.source_path.view()))
+      {
+        break;
+      }
+      frame.has_deferred_trace = true;
+      frame.deferred_trace_location = error_location;
+      return;
+    }
+  }
 
   let const do_location_match = [](SourceLocation left, SourceLocation right) {
     let const same_file =

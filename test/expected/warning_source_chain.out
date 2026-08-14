@@ -1,14 +1,33 @@
-INNER:2:9: warning: The variable 'UNSET_CHAIN' is not set, it expands to empty.
-     2 |  [[ x = "$UNSET_CHAIN" ]]
-       |          ^~~~~~~~~~~~
-note: Replace it with ${UNSET_CHAIN-} if empty expansion is desired.
+INNER:2:9: warning: The variable 'UNSET_CHAIN_FIRST' is not set, it expands to empty.
+     2 |  [[ x = "$UNSET_CHAIN_FIRST" ]]
+       |          ^~~~~~~~~~~~~~~~~~
+note: Replace it with ${UNSET_CHAIN_FIRST-} if empty expansion is desired.
+INNER:3:9: warning: The variable 'UNSET_CHAIN_SECOND' is not set, it expands to empty.
+     3 |  [[ x = "$UNSET_CHAIN_SECOND" ]]
+       |          ^~~~~~~~~~~~~~~~~~~
+note: Replace it with ${UNSET_CHAIN_SECOND-} if empty expansion is desired.
 OUTER:2:3: trace:
      2 |  . INNER
-       |    ^~~~~~~~~~~~~~~~~~~
+       |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1:0: trace:
      1 |  . OUTER
-       |    ^~~~~~~~~~~~~~~~~~~
+       |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1:0: trace:
      1 |  KOSH -WWW -c '. OUTER'
+INNER:1:7: warning: The variable 'MIMIC_CHAIN_FIRST' is not set, it expands to empty.
+     1 |  echo "$MIMIC_CHAIN_FIRST"
+       |        ^~~~~~~~~~~~~~~~~~
+note: Replace it with ${MIMIC_CHAIN_FIRST-} if empty expansion is desired.
+
+INNER:2:7: warning: The variable 'MIMIC_CHAIN_SECOND' is not set, it expands to empty.
+     2 |  echo "$MIMIC_CHAIN_SECOND"
+       |        ^~~~~~~~~~~~~~~~~~~
+note: Replace it with ${MIMIC_CHAIN_SECOND-} if empty expansion is desired.
+
+1:0: trace:
+     1 |  "$1"
+       |  ^~~~
+1:0: trace:
+     1 |  KOSH --mood bash -WWW -c "$1" trace-driver INNER
 0
 rc=0

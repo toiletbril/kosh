@@ -151,6 +151,9 @@ struct source_frame
   bool is_cli_root;
   bool is_only_root_source;
   bool was_printed{false};
+  bool should_defer_trace{false};
+  bool has_deferred_trace{false};
+  Maybe<SourceLocation> deferred_trace_location;
 };
 
 /* A variable binding saved when a local shadows it. A None previous value means
@@ -977,7 +980,8 @@ public:
   pure fn has_history_transaction() const wontthrow -> bool;
   fn begin_command_evaluation() wontthrow -> void;
   /* A frame at error_location is dropped. */
-  fn print_source_backtrace(Maybe<SourceLocation> error_location = None) throws
+  fn print_source_backtrace(Maybe<SourceLocation> error_location = None,
+                            bool should_defer_for_source_file = true) throws
       -> void;
   fn set_source_traces_enabled(bool enabled) wontthrow -> void
   {
