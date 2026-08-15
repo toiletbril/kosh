@@ -346,7 +346,8 @@ cold fn Parser::construct_ast(
         diagnostic_sink->push(source_diagnostic{
             None, error_severity::Error, location, steal(source_name),
             e.message().clone(), String{e.detail_message()}, related_location,
-            steal(related_source_name), String{e.details_message()}});
+            steal(related_source_name), String{e.details_message()},
+            ArrayList<source_fix>{heap_allocator()}});
       }
       recover_to_next_statement();
     } catch (const ErrorWithLocation &e) {
@@ -361,7 +362,8 @@ cold fn Parser::construct_ast(
         diagnostic_sink->push(source_diagnostic{
             None, error_severity::Error, location, steal(source_name),
             e.message().clone(), String{e.detail_message()}, None,
-            String{heap_allocator()}, String{heap_allocator()}});
+            String{heap_allocator()}, String{heap_allocator()},
+            ArrayList<source_fix>{heap_allocator()}});
       }
       recover_to_next_statement();
     }
@@ -1687,6 +1689,9 @@ hot fn Parser::parse_case() throws -> Command *
       throw ErrorWithLocation{word->source_location(),
                               "Expected a word to match on after 'case'"};
   }
+
+  while (m_lexer.peek_shell_token()->kind() == Token::Kind::Newline)
+    m_lexer.advance_past_last_peek();
 
   Token *in_token = m_lexer.next_shell_token();
   ASSERT(in_token != nullptr);

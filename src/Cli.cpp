@@ -878,9 +878,10 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
   };
 
   static const StringView SECTION_HEADERS[] = {
-      "OPTIONS",        "POSIX OPTIONS",
-      "BASH OPTIONS",   "COMPATIBILITY OPTIONS",
-      "KOSHKA OPTIONS", "DEBUG OPTIONS"};
+      "OPTIONS",           "POSIX OPTIONS",
+      "BASH OPTIONS",      "COMPATIBILITY OPTIONS",
+      "AUXILIARY OPTIONS", "KOSHKA OPTIONS",
+      "DEBUG OPTIONS"};
   for (u8 section = 0; section < countof(SECTION_HEADERS); section++) {
     bool was_header_printed = false;
     for (let const flag : flags) {

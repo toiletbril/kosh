@@ -11,10 +11,30 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 
 namespace koshka::language_server {
 
 namespace {
+
+constexpr static_string_entry<mimic_mood> LANGUAGE_MOOD_ENTRIES[] = {
+    {SSK("bash"),       mimic_mood::Bash     },
+    {SSK("bash-posix"), mimic_mood::BashPosix},
+    {SSK("dash"),       mimic_mood::Posix    },
+    {SSK("kosh"),       mimic_mood::Default  },
+    {SSK("posix"),      mimic_mood::Posix    },
+    {SSK("rbash"),      mimic_mood::Bash     },
+    {SSK("sh"),         mimic_mood::Posix    },
+    {SSK("shit"),       mimic_mood::Default  },
+};
+constexpr StaticStringMap LANGUAGE_MOODS{LANGUAGE_MOOD_ENTRIES};
+
+constexpr PackedStringKey FIX_ALL_KIND_KEYS[] = {
+    SSK("source"),
+    SSK("source.fixAll"),
+    SSK("source.fixAll.kosh"),
+};
+constexpr StaticStringSet FIX_ALL_KINDS{FIX_ALL_KIND_KEYS};
 
 enum class json_kind : u8
 {
@@ -624,7 +644,8 @@ public:
         original_source(source),
         normalized_source(source),
         version(document_version),
-        line_starts(heap_allocator())
+        line_starts(heap_allocator()),
+        diagnostics(heap_allocator())
   {
     normalized_source.normalize_crlf_line_endings();
     rebuild_lines();
@@ -720,6 +741,7 @@ public:
   i64 version;
   Maybe<Path> path;
   ArrayList<usize> line_starts;
+  ArrayList<source_diagnostic> diagnostics;
 
 private:
   fn rebuild_lines() throws -> void
@@ -806,10 +828,7 @@ fn append_protocol_range(String &output, const Document &document, usize start,
 pure fn mood_for(const Document &document) throws -> mimic_mood
 {
   let const id = document.language_id.view();
-  if (id == "bash" || id == "rbash") return mimic_mood::Bash;
-  if (id == "sh" || id == "dash" || id == "posix") return mimic_mood::Posix;
-  if (id == "bash-posix") return mimic_mood::BashPosix;
-  if (id == "kosh" || id == "shit") return mimic_mood::Default;
+  if (let const mood = LANGUAGE_MOODS.find(id); mood.has_value()) return *mood;
   if (let const detected =
           detect_mimic_shell_from_source(document.normalized_source.view());
       detected.has_value())
@@ -854,6 +873,7 @@ private:
   fn hover(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn semantic_tokens(const JsonValue *id, const JsonValue *params) throws
       -> bool;
+  fn code_actions(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn publish_diagnostics(Document &document) throws -> bool;
   fn send_diagnostics(const Document &document,
                       const ArrayList<source_diagnostic> &diagnostics) throws
@@ -865,7 +885,7 @@ private:
   pure fn find_document(StringView uri) wontthrow -> Document *;
   fn append_diagnostic(String &output, const Document &document,
                        const source_diagnostic &diagnostic,
-                       bool &is_first) throws -> void;
+                       usize diagnostic_index, bool &is_first) throws -> void;
   fn select_document_mood(const Document &document) wontthrow -> void;
   fn symbol_at(Document &document, protocol_position position) throws
       -> Maybe<document_symbol>;
@@ -882,6 +902,10 @@ private:
   position_encoding m_encoding{position_encoding::Utf16};
   bool m_is_initialized{false};
   bool m_is_shutdown{false};
+  bool m_supports_document_changes{false};
+  bool m_supports_code_action_literals{false};
+  bool m_supports_diagnostic_data{false};
+  bool m_supports_preferred_actions{false};
 };
 
 pure fn semantic_style(highlight_role role) wontthrow -> std::pair<u32, u32>
@@ -962,6 +986,40 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
         m_workspace_root = path.take();
     }
     let const *capabilities = params->get("capabilities");
+    let const *workspace =
+        capabilities != nullptr ? capabilities->get("workspace") : nullptr;
+    let const *workspace_edit =
+        workspace != nullptr ? workspace->get("workspaceEdit") : nullptr;
+    let const *document_changes = workspace_edit != nullptr
+                                      ? workspace_edit->get("documentChanges")
+                                      : nullptr;
+    m_supports_document_changes =
+        document_changes != nullptr &&
+        document_changes->kind == json_kind::Boolean &&
+        document_changes->boolean;
+    let const *text_document =
+        capabilities != nullptr ? capabilities->get("textDocument") : nullptr;
+    let const *code_action =
+        text_document != nullptr ? text_document->get("codeAction") : nullptr;
+    m_supports_code_action_literals =
+        code_action != nullptr &&
+        code_action->get("codeActionLiteralSupport") != nullptr;
+    let const *preferred_support = code_action != nullptr
+                                       ? code_action->get("isPreferredSupport")
+                                       : nullptr;
+    m_supports_preferred_actions =
+        preferred_support != nullptr &&
+        preferred_support->kind == json_kind::Boolean &&
+        preferred_support->boolean;
+    let const *publish_diagnostics =
+        text_document != nullptr ? text_document->get("publishDiagnostics")
+                                 : nullptr;
+    let const *data_support = publish_diagnostics != nullptr
+                                  ? publish_diagnostics->get("dataSupport")
+                                  : nullptr;
+    m_supports_diagnostic_data = data_support != nullptr &&
+                                 data_support->kind == json_kind::Boolean &&
+                                 data_support->boolean;
     let const *general =
         capabilities != nullptr ? capabilities->get("general") : nullptr;
     let const *encodings =
@@ -980,10 +1038,13 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
       m_encoding == position_encoding::Utf8 ? "utf-8" : "utf-16";
   let result = String{"{\"capabilities\":{\"positionEncoding\":"};
   append_json_string(result, encoding);
+  result.append(",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
+                "\"completionProvider\":{\"resolveProvider\":false},"
+                "\"definitionProvider\":true,\"hoverProvider\":true,");
+  if (m_supports_code_action_literals)
+    result.append("\"codeActionProvider\":{\"codeActionKinds\":[\"quickfix\","
+                  "\"source.fixAll.kosh\"],\"resolveProvider\":false},");
   result.append(
-      ",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
-      "\"completionProvider\":{\"resolveProvider\":false},"
-      "\"definitionProvider\":true,\"hoverProvider\":true,"
       "\"semanticTokensProvider\":{\"legend\":{\"tokenTypes\":["
       "\"comment\",\"operator\",\"string\",\"variable\",\"parameter\","
       "\"keyword\",\"function\",\"regexp\"],\"tokenModifiers\":["
@@ -1055,14 +1116,15 @@ fn Server::close_document(const JsonValue *params) throws -> void
 
 fn Server::append_diagnostic(String &output, const Document &document,
                              const source_diagnostic &diagnostic,
-                             bool &is_first) throws -> void
+                             usize diagnostic_index, bool &is_first) throws
+    -> void
 {
   if (!diagnostic.source_name.is_empty() && document.path.has_value() &&
       diagnostic.source_name != document.path->text())
     return;
-  let const do_append_diagnostic = [&](SourceLocation location, u8 severity,
-                                       StringView message,
-                                       Maybe<diagnostic_id> id) throws -> void {
+  let const do_append_diagnostic =
+      [&](SourceLocation location, u8 severity, StringView message,
+          Maybe<diagnostic_id> id, bool has_fixes) throws -> void {
     if (!is_first) output.push(',');
     is_first = false;
     output.append("{\"range\":");
@@ -1076,6 +1138,14 @@ fn Server::append_diagnostic(String &output, const Document &document,
     }
     output.append(",\"source\":\"kosh\",\"message\":");
     append_json_string(output, message);
+    if (has_fixes && m_supports_diagnostic_data && document.version >= 0) {
+      output.append(",\"data\":{\"kind\":\"kosh.fix\","
+                    "\"documentVersion\":");
+      output.append(String::from(document.version, heap_allocator()).view());
+      output.append(",\"diagnosticIndex\":");
+      output.append(String::from(diagnostic_index, heap_allocator()).view());
+      output.push('}');
+    }
     output.push('}');
   };
 
@@ -1084,18 +1154,20 @@ fn Server::append_diagnostic(String &output, const Document &document,
                                                                         : 3;
   if (!diagnostic.message.is_empty())
     do_append_diagnostic(diagnostic.location, severity,
-                         diagnostic.message.view(), diagnostic.id);
+                         diagnostic.message.view(), diagnostic.id,
+                         !diagnostic.fixes.is_empty());
   if (diagnostic.id.has_value() &&
       (*diagnostic.id == diagnostic_id::unresolved_command ||
        *diagnostic.id == diagnostic_id::unresolved_command_uncertain))
   {
     do_append_diagnostic(
         diagnostic.location, 3,
-        "This command may be defined dynamically or outside this script", None);
+        "This command may be defined dynamically or outside this script", None,
+        false);
   }
   if (!diagnostic.suggestion.is_empty())
     do_append_diagnostic(diagnostic.location, 3, diagnostic.suggestion.view(),
-                         None);
+                         None, false);
   if (diagnostic.related_location.has_value() &&
       !diagnostic.related_message.is_empty() &&
       (diagnostic.related_source_name.is_empty() ||
@@ -1103,7 +1175,7 @@ fn Server::append_diagnostic(String &output, const Document &document,
        diagnostic.related_source_name == document.path->text()))
   {
     do_append_diagnostic(*diagnostic.related_location, 3,
-                         diagnostic.related_message.view(), None);
+                         diagnostic.related_message.view(), None, false);
   }
 }
 
@@ -1145,8 +1217,11 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
                 &diagnostics, this);
   }
 
-  return send_diagnostics(document, diagnostics) &&
-         publish_auxiliary_diagnostics(document, diagnostics);
+  let const did_send = send_diagnostics(document, diagnostics) &&
+                       publish_auxiliary_diagnostics(document, diagnostics);
+  document.diagnostics = steal(diagnostics);
+
+  return did_send;
 }
 
 fn Server::send_diagnostics(
@@ -1163,8 +1238,10 @@ fn Server::send_diagnostics(
   }
   payload.append(",\"diagnostics\":[");
   bool is_first = true;
-  for (let const &diagnostic : diagnostics)
-    append_diagnostic(payload, document, diagnostic, is_first);
+  for (usize diagnostic_index = 0; diagnostic_index < diagnostics.count();
+       diagnostic_index++)
+    append_diagnostic(payload, document, diagnostics[diagnostic_index],
+                      diagnostic_index, is_first);
   payload.append("]}}");
 
   return send_payload(payload.view());
@@ -1185,6 +1262,22 @@ fn Server::publish_auxiliary_diagnostics(
     let const source_path = Path{diagnostic.source_name.view()};
     let const source_uri = file_uri_for_path(source_path);
     if (m_current_auxiliary_uris.find(source_uri).has_value()) continue;
+    bool is_open_source = find_document(source_uri.view()) != nullptr;
+    if (!is_open_source) {
+      let const canonical_source = os::canonical_path(source_path);
+      for (let const &document : m_documents) {
+        if (!canonical_source.has_value() || !document.path.has_value())
+          continue;
+        let const canonical_document = os::canonical_path(*document.path);
+        if (canonical_document.has_value() &&
+            canonical_document->text() == canonical_source->text())
+        {
+          is_open_source = true;
+          break;
+        }
+      }
+    }
+    if (is_open_source) continue;
     let source = read_source(source_path);
     if (!source.has_value()) source = source_path.read_entire_file();
     if (!source.has_value()) continue;
@@ -1257,6 +1350,148 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
     response.append(",\"newText\":");
     append_json_string(response, candidate.view());
     response.append("}}");
+  }
+  response.push(']');
+
+  return send_result(id, response.view());
+}
+
+fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
+    -> bool
+{
+  if (!m_supports_code_action_literals) return send_result(id, "[]");
+  let const *text_document =
+      params != nullptr ? params->get("textDocument") : nullptr;
+  let const uri = string_field(text_document, "uri");
+  if (!uri.has_value()) return send_result(id, "[]");
+  let *document = find_document(*uri);
+  if (document == nullptr) return send_result(id, "[]");
+
+  usize range_start = 0;
+  usize range_end = document->normalized_source.count();
+  if (let const *range = params != nullptr ? params->get("range") : nullptr;
+      range != nullptr)
+  {
+    let const start = document_position(range->get("start"));
+    let const end = document_position(range->get("end"));
+    if (!start.has_value() || !end.has_value()) return send_result(id, "[]");
+    let const start_byte =
+        document->byte_position(start->line, start->character, m_encoding);
+    let const end_byte =
+        document->byte_position(end->line, end->character, m_encoding);
+    if (!start_byte.has_value() || !end_byte.has_value())
+      return send_result(id, "[]");
+    range_start = *start_byte;
+    range_end = *end_byte;
+    if (range_end < range_start) return send_result(id, "[]");
+  }
+
+  bool wants_quick_fixes = true;
+  bool wants_fix_all = true;
+  let const *context = params != nullptr ? params->get("context") : nullptr;
+  let const *only = context != nullptr ? context->get("only") : nullptr;
+  if (only != nullptr && only->kind == json_kind::Array) {
+    wants_quick_fixes = false;
+    wants_fix_all = false;
+    for (let const *kind : only->array) {
+      if (kind->kind != json_kind::String) continue;
+      if (kind->text == "quickfix") wants_quick_fixes = true;
+      if (FIX_ALL_KINDS.contains(kind->text)) wants_fix_all = true;
+    }
+  }
+
+  let response = String{"["};
+  bool is_first_action = true;
+  let const diagnostic_belongs_to_document =
+      [&](const source_diagnostic &diagnostic) wontthrow -> bool {
+    if (diagnostic.source_name.is_empty()) return true;
+    if (document->path.has_value())
+      return diagnostic.source_name == document->path->text();
+    return diagnostic.source_name == document->uri;
+  };
+  let const do_append_edit = [&](String &output, const source_edit &edit)
+                                 throws -> void {
+    output.append("{\"range\":");
+    append_protocol_range(output, *document, edit.start, edit.end, m_encoding);
+    output.append(",\"newText\":");
+    append_json_string(output, edit.replacement.view());
+    output.push('}');
+  };
+  let const do_append_workspace_edit =
+      [&](String &output, const ArrayList<const source_edit *> &edits)
+          throws -> void {
+    output.append("\"edit\":{");
+    if (m_supports_document_changes) {
+      output.append("\"documentChanges\":[{\"textDocument\":{\"uri\":");
+      append_json_string(output, document->uri.view());
+      output.append(",\"version\":");
+      output.append(String::from(document->version, heap_allocator()).view());
+      output.append("},\"edits\":[");
+    } else {
+      output.append("\"changes\":{");
+      append_json_string(output, document->uri.view());
+      output.append(":[");
+    }
+    for (usize edit_index = 0; edit_index < edits.count(); edit_index++) {
+      if (edit_index != 0) output.push(',');
+      do_append_edit(output, *edits[edit_index]);
+    }
+    output.append(m_supports_document_changes ? "]}]}" : "]}}");
+  };
+  let const do_append_action = [&](StringView title, StringView kind,
+                                   const ArrayList<const source_edit *> &edits,
+                                   bool is_preferred) throws -> void {
+    if (!is_first_action) response.push(',');
+    is_first_action = false;
+    response.append("{\"title\":");
+    append_json_string(response, title);
+    response.append(",\"kind\":");
+    append_json_string(response, kind);
+    if (is_preferred && m_supports_preferred_actions)
+      response.append(",\"isPreferred\":true");
+    response.push(',');
+    do_append_workspace_edit(response, edits);
+    response.push('}');
+  };
+
+  if (wants_quick_fixes) {
+    for (let const &diagnostic : document->diagnostics) {
+      if (!diagnostic_belongs_to_document(diagnostic)) continue;
+      let const diagnostic_end =
+          diagnostic.location.position + diagnostic.location.length;
+      if (range_start == range_end) {
+        if (range_start < diagnostic.location.position ||
+            range_start > diagnostic_end)
+          continue;
+      } else if (diagnostic_end <= range_start ||
+                 diagnostic.location.position >= range_end)
+      {
+        continue;
+      }
+      for (let const &fix : diagnostic.fixes) {
+        let edits = ArrayList<const source_edit *>{heap_allocator()};
+        for (let const &edit : fix.edits)
+          edits.push(&edit);
+        do_append_action(fix.title.view(), "quickfix", edits, fix.is_preferred);
+      }
+    }
+  }
+
+  if (wants_fix_all) {
+    let candidates = ArrayList<const source_edit *>{heap_allocator()};
+    for (let const &diagnostic : document->diagnostics) {
+      if (!diagnostic_belongs_to_document(diagnostic)) continue;
+      for (let const &fix : diagnostic.fixes) {
+        if (!fix.is_safe_for_fix_all) continue;
+        for (let const &edit : fix.edits)
+          candidates.push(&edit);
+      }
+    }
+    let const nonconflicting =
+        select_nonconflicting_source_edits(steal(candidates));
+    if (!nonconflicting.is_empty())
+      do_append_action("Fix all safe kosh diagnostics", "source.fixAll.kosh",
+                       nonconflicting, true);
   }
   response.push(']');
 
@@ -1608,6 +1843,7 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
     return validate_all();
   }
   if (*method == "textDocument/completion") return complete(id, params);
+  if (*method == "textDocument/codeAction") return code_actions(id, params);
   if (*method == "textDocument/definition") return definition(id, params);
   if (*method == "textDocument/hover") return hover(id, params);
   if (*method == "textDocument/semanticTokens/full")

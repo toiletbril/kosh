@@ -150,7 +150,8 @@ fn AnalysisContext::flush_warnings() throws -> void
           warning.id, error_severity::Warning, warning.location,
           steal(source_name), warning.message.clone(),
           warning.suggestion.clone(), warning.related_location,
-          steal(related_source_name), warning.related_message.clone()});
+          steal(related_source_name), warning.related_message.clone(),
+          source_fixes_for_diagnostic(warning.id, source, warning.location)});
       continue;
     }
     if (warning.related_location.has_value()) {
@@ -362,7 +363,8 @@ fn AnalysisContext::fail(diagnostic_id id, SourceLocation location,
     diagnostic_sink->push(source_diagnostic{
         id, error_severity::Error, location, steal(source_name),
         String{message}, String{suggestion}, related_location,
-        steal(related_source_name), String{related_message}});
+        steal(related_source_name), String{related_message},
+        source_fixes_for_diagnostic(id, source, location)});
     has_fatal = true;
     return;
   }
@@ -803,9 +805,20 @@ fn analyze_followed_source(AnalysisContext &actx,
   parser.set_should_collect_analysis_scopes(true);
 
   let parse_errors = ArrayList<String>{heap_allocator()};
+  let const child_diagnostic_start =
+      actx.diagnostic_sink != nullptr ? actx.diagnostic_sink->count() : 0;
   let const ast = parser.construct_ast(parse_errors, actx.eval_context,
                                        actx.diagnostic_sink);
   if (!parse_errors.is_empty()) {
+    if (actx.diagnostic_sink != nullptr) {
+      for (usize index = child_diagnostic_start;
+           index < actx.diagnostic_sink->count(); index++)
+      {
+        let &diagnostic = (*actx.diagnostic_sink)[index];
+        if (diagnostic.source_name.is_empty())
+          diagnostic.source_name = canonical_path->text();
+      }
+    }
     if (actx.diagnostic_sink == nullptr)
       for (let const &error : parse_errors)
         show_message(error);
@@ -837,6 +850,15 @@ fn analyze_followed_source(AnalysisContext &actx,
       actx.followed_source_effects_cache, &actx, nullptr,
       should_merge_parent_state, should_merge_parent_uncertainty, &effects,
       actx.diagnostic_sink, actx.source_provider);
+  if (actx.diagnostic_sink != nullptr) {
+    for (usize index = child_diagnostic_start;
+         index < actx.diagnostic_sink->count(); index++)
+    {
+      let &diagnostic = (*actx.diagnostic_sink)[index];
+      if (diagnostic.source_name.is_empty())
+        diagnostic.source_name = canonical_path->text();
+    }
+  }
   if (!analyzed) actx.has_fatal = true;
   if (!was_analyzed_under_uncertainty) {
     actx.followed_source_effects_cache->set(canonical_path->text().view(),

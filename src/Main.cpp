@@ -8,6 +8,7 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
+#include "Formatter.hpp"
 #include "Koshkit.hpp"
 #include "LanguageServer.hpp"
 #include "Lexer.hpp"
@@ -25,8 +26,8 @@ FLAG_LIST_DECL();
 /* clang-format off */
 HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file> [argument ...]",
                    "[-OPTIONS] -c <script1> [-c <script2> ...] [argument ...]",
-                   "[-OPTIONS] --lint [-c <script> ...] [--] [file ...]",
-                   "[-OPTIONS] [-]");
+                   "[-OPTIONS] (--lint [--format] | --format) [--apply] [file ...]",
+                   "[-OPTIONS] --language-server");
 /* clang-format on */
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
@@ -89,10 +90,14 @@ FLAG(DUMB, Bool, '\0', "dumb", Compat,
      "Make the shell extremely dumb. Equivalent to --mood sh -T "
      "--no-diagnostics.");
 
-FLAG(LINT, Bool, '\0', "lint", Kosh,
+FLAG(LINT, Bool, '\0', "lint", Auxiliary,
      "Analyze shell inputs without running them and enable every diagnostic "
      "tier at its normal severity.");
-FLAG(LANGUAGE_SERVER, Bool, '\0', "language-server", Kosh,
+FLAG(FORMAT, Bool, '\0', "format", Auxiliary,
+     "Format shell input without running it. Read one file or standard input.");
+FLAG(APPLY, Bool, '\0', "apply", Auxiliary,
+     "Apply lint fixes or formatted output to named files.");
+FLAG(LANGUAGE_SERVER, Bool, '\0', "language-server", Auxiliary,
      "Run the shell language server over standard input and standard output.");
 FLAG(WARNINGS, RepeatedBool, 'W', "", Kosh,
      "In the default mood, demote annoying, lenient, then strict diagnostics "
@@ -399,7 +404,8 @@ static fn run_script_contents(
     const String &script_contents, EvalContext &context, BumpArena &ast_arena,
     Maybe<StringView> filename = None, Expression *precompiled_ast = nullptr,
     Expression **out_ast = nullptr, Maybe<usize> history_event_number = None,
-    analysis_diagnostic_totals *diagnostic_totals = nullptr) -> int
+    analysis_diagnostic_totals *diagnostic_totals = nullptr,
+    ArrayList<source_diagnostic> *diagnostic_sink = nullptr) -> int
 {
   i32 exit_code = EXIT_FAILURE;
 
@@ -450,8 +456,9 @@ static fn run_script_contents(
       ast = p.construct_ast(parse_errors, &context);
 
       if (!parse_errors.is_empty()) {
-        for (let const &e : parse_errors)
-          show_message(e);
+        if (diagnostic_sink == nullptr)
+          for (let const &e : parse_errors)
+            show_message(e);
         context.set_last_exit_status(EXIT_FAILURE);
         return EXIT_FAILURE;
       }
@@ -512,7 +519,8 @@ static fn run_script_contents(
           analysis_scope_definitions, shellcheck_directive_spans,
           heredoc_terminator_misses, filename.has_value(),
           FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled(), &followed_source_paths,
-          &source_effects_cache, nullptr, diagnostic_totals);
+          &source_effects_cache, nullptr, diagnostic_totals, true, true,
+          nullptr, diagnostic_sink);
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",
@@ -890,7 +898,256 @@ pure fn quoted_argv_offset_until(int argc, const char *const *argv,
   return offset;
 }
 
-} // namespace koshka
+struct apply_file_snapshot
+{
+  Path operand_path;
+  Path target_path;
+  os::file_status status;
+  String contents;
+};
+
+pure fn file_status_matches(const os::file_status &expected,
+                            const os::file_status &actual) wontthrow -> bool
+{
+  if (expected.has_file_identity && actual.has_file_identity &&
+      (expected.device_id != actual.device_id ||
+       expected.file_id != actual.file_id))
+    return false;
+
+  return expected.mode == actual.mode && expected.size == actual.size &&
+         expected.modification_time == actual.modification_time &&
+         expected.modification_nanoseconds == actual.modification_nanoseconds &&
+         expected.change_time == actual.change_time &&
+         expected.change_nanoseconds == actual.change_nanoseconds;
+}
+
+static fn read_apply_file(const Path &operand_path) throws
+    -> Maybe<apply_file_snapshot>
+{
+  let target_path = os::canonical_path(operand_path);
+  if (!target_path.has_value()) {
+    show_message("Unable to resolve '" + operand_path.text() +
+                 "': " + os::last_system_error_message());
+    return None;
+  }
+  let status = os::file_status{};
+  if (!os::stat_path_following(target_path->text().view(), status)) {
+    show_message("Unable to inspect '" + operand_path.text() +
+                 "': " + os::last_system_error_message());
+    return None;
+  }
+  if (os::file_type_letter(status.mode) != '-') {
+    show_message("The '--apply' option requires a regular file: '" +
+                 operand_path.text() + "'.");
+    return None;
+  }
+  let contents = target_path->read_entire_file();
+  let verified_status = os::file_status{};
+  if (!contents.has_value() ||
+      !os::stat_path_following(target_path->text().view(), verified_status) ||
+      !file_status_matches(status, verified_status))
+  {
+    show_message("Refusing to read '" + operand_path.text() +
+                 "' because it changed while being processed.");
+    return None;
+  }
+
+  return apply_file_snapshot{operand_path.clone(), target_path.take(), status,
+                             contents.take()};
+}
+
+static fn replace_file_contents(const apply_file_snapshot &snapshot,
+                                StringView replacement) throws -> bool
+{
+  let replacement_path = os::write_to_named_temp_file(
+      snapshot.target_path.parent(), ".kosh_apply", replacement);
+  if (!replacement_path.has_value()) {
+    show_message("Unable to create a replacement for '" +
+                 snapshot.operand_path.text() +
+                 "': " + os::last_system_error_message());
+    return false;
+  }
+  defer { unused(os::remove_file(replacement_path->text().view())); };
+  if (!os::set_file_mode(replacement_path->text().view(), snapshot.status.mode))
+  {
+    show_message("Unable to preserve the mode of '" +
+                 snapshot.operand_path.text() +
+                 "': " + os::last_system_error_message());
+    return false;
+  }
+
+  let resolved_operand = os::canonical_path(snapshot.operand_path);
+  let current_status = os::file_status{};
+  let const current_contents = snapshot.target_path.read_entire_file();
+  if (!resolved_operand.has_value() ||
+      resolved_operand->text() != snapshot.target_path.text() ||
+      !current_contents.has_value() ||
+      current_contents->view() != snapshot.contents.view() ||
+      !os::stat_path_following(snapshot.target_path.text().view(),
+                               current_status) ||
+      !file_status_matches(snapshot.status, current_status))
+  {
+    show_message("Refusing to replace '" + snapshot.operand_path.text() +
+                 "' because it changed while being processed.");
+    return false;
+  }
+  if (!os::rename_path(replacement_path->text().view(),
+                       snapshot.target_path.text().view()))
+  {
+    show_message("Unable to replace '" + snapshot.operand_path.text() +
+                 "': " + os::last_system_error_message());
+    return false;
+  }
+
+  return true;
+}
+
+static fn run_format_operation(const ArrayList<String> &file_names,
+                               bool should_apply, mimic_mood mood,
+                               BumpArena &ast_arena) throws -> int
+{
+  bool did_fail = false;
+  usize input_count = file_names.count();
+  if (!should_apply && input_count == 0) input_count = 1;
+
+  for (usize input_index = 0; input_index < input_count; input_index++) {
+    Maybe<apply_file_snapshot> snapshot;
+    let source = String{heap_allocator()};
+    if (file_names.is_empty() || file_names[input_index] == "-") {
+      source = utils::read_entire_standard_input();
+    } else if (should_apply) {
+      snapshot = read_apply_file(Path{file_names[input_index].view()});
+      if (!snapshot.has_value()) {
+        did_fail = true;
+        continue;
+      }
+      source = snapshot->contents.clone();
+    } else {
+      let const path = Path{file_names[input_index].view()};
+      let contents = path.read_entire_file();
+      if (!contents.has_value()) {
+        show_message("Could not open '" + path.text() +
+                     "': " + os::last_system_error_message());
+        did_fail = true;
+        continue;
+      }
+      source = contents.take();
+    }
+
+    let errors = ArrayList<String>{heap_allocator()};
+    let formatted = format_shell_source(source.view(), mood, ast_arena, errors);
+    if (!formatted.has_value()) {
+      for (let const &error : errors)
+        show_message(error.view());
+      did_fail = true;
+      continue;
+    }
+    if (should_apply) {
+      ASSERT(snapshot.has_value());
+      if (formatted->view() != source.view() &&
+          !replace_file_contents(*snapshot, formatted->view()))
+        did_fail = true;
+    } else {
+      print(formatted->view());
+    }
+  }
+
+  return did_fail ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+static fn run_lint_apply_operation(const ArrayList<String> &file_names,
+                                   bool should_format, EvalContext &context,
+                                   BumpArena &ast_arena) throws -> int
+{
+  bool did_fail = false;
+  let final_totals = analysis_diagnostic_totals{};
+
+  for (let const &file_name : file_names) {
+    let const path = Path{file_name.view()};
+    let snapshot = read_apply_file(path);
+    if (!snapshot.has_value()) {
+      did_fail = true;
+      continue;
+    }
+    let source = snapshot->contents.clone();
+    source.normalize_crlf_line_endings();
+    let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
+    unused(run_script_contents(source, context, ast_arena, file_name.view(),
+                               nullptr, nullptr, None, nullptr, &diagnostics));
+    let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
+    for (let const &diagnostic : diagnostics) {
+      if (!diagnostic.source_name.is_empty() &&
+          diagnostic.source_name != file_name.view())
+        continue;
+      for (let const &fix : diagnostic.fixes) {
+        let edits = ArrayList<source_edit>{heap_allocator()};
+        for (let const &edit : fix.edits) {
+          edits.push(source_edit{edit.start, edit.end, edit.expected.clone(),
+                                 edit.replacement.clone()});
+        }
+        normalized_fixes.push(source_fix{fix.title.clone(), steal(edits),
+                                         fix.is_preferred,
+                                         fix.is_safe_for_fix_all});
+      }
+    }
+    let fixes = source_fixes_for_original_line_endings(
+        snapshot->contents.view(), normalized_fixes);
+    let fixed = apply_source_fixes(snapshot->contents.view(), fixes);
+    if (!fixed.has_value()) {
+      show_message("Unable to apply non-conflicting fixes to '" + path.text() +
+                   "'.");
+      did_fail = true;
+      continue;
+    }
+    let final_source = fixed.take();
+    if (should_format) {
+      let errors = ArrayList<String>{heap_allocator()};
+      let formatted = format_shell_source(final_source.view(), context.mood(),
+                                          ast_arena, errors);
+      if (!formatted.has_value()) {
+        for (let const &error : errors)
+          show_message(error.view());
+        did_fail = true;
+        continue;
+      }
+      final_source = formatted.take();
+    }
+    let validation_source = final_source.clone();
+    validation_source.normalize_crlf_line_endings();
+    let validation_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
+    unused(run_script_contents(validation_source, context, ast_arena,
+                               file_name.view(), nullptr, nullptr, None,
+                               nullptr, &validation_diagnostics));
+    bool has_parse_error = false;
+    for (let const &diagnostic : validation_diagnostics) {
+      if (diagnostic.id.has_value()) continue;
+      has_parse_error = true;
+      show_message(diagnostic.message.view());
+    }
+    if (has_parse_error) {
+      did_fail = true;
+      continue;
+    }
+    if (final_source.view() != snapshot->contents.view() &&
+        !replace_file_contents(*snapshot, final_source.view()))
+    {
+      did_fail = true;
+      continue;
+    }
+
+    let analyzed_source = final_source.clone();
+    analyzed_source.normalize_crlf_line_endings();
+    let const final_status = run_script_contents(
+        analyzed_source, context, ast_arena, file_name.view(), nullptr, nullptr,
+        None, &final_totals);
+    if (final_status != EXIT_SUCCESS) did_fail = true;
+  }
+  print_analysis_diagnostic_summary(final_totals);
+
+  return did_fail ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+} /* namespace koshka */
 
 fn main(int argc, char **argv) -> int
 {
@@ -958,6 +1215,10 @@ fn main(int argc, char **argv) -> int
           koshka::os::get_environment_variable("KOSH_FLAGS");
       kosh_flags.has_value() && !kosh_flags->is_empty())
   {
+    static constexpr koshka::PackedStringKey IGNORED_KOSH_FLAG_KEYS[] = {
+        SSK("--apply"), SSK("--format"), SSK("--language-server")};
+    static constexpr koshka::StaticStringSet IGNORED_KOSH_FLAGS{
+        IGNORED_KOSH_FLAG_KEYS};
     let const view = kosh_flags->view();
     usize token_start = 0;
     /* A -c in KOSH_FLAGS is dropped with the command word after it, since the
@@ -974,7 +1235,7 @@ fn main(int argc, char **argv) -> int
             should_skip_next_command_word = false;
           } else if (token == "-c") {
             should_skip_next_command_word = true;
-          } else if (token != "--language-server") {
+          } else if (!IGNORED_KOSH_FLAGS.contains(token)) {
             kosh_flags_tokens.push(koshka::String{token});
           }
         }
@@ -1197,12 +1458,53 @@ fn main(int argc, char **argv) -> int
   let const is_language_server = FLAG_LANGUAGE_SERVER.is_enabled();
   if (is_language_server &&
       (FLAG_STDIN.is_enabled() || FLAG_INTERACTIVE.is_enabled() ||
-       FLAG_LINT.is_enabled() || !FLAG_COMMAND.is_empty() ||
+       FLAG_LINT.is_enabled() || FLAG_FORMAT.is_enabled() ||
+       FLAG_APPLY.is_enabled() || !FLAG_COMMAND.is_empty() ||
        !file_names.is_empty()))
   {
     koshka::show_message(
         "The '--language-server' option does not accept '-s', '-i', "
-        "'--lint', '-c', or file operands.");
+        "'--lint', '--format', '--apply', '-c', or file operands.");
+    return 2;
+  }
+  if (FLAG_APPLY.is_enabled() && !FLAG_LINT.is_enabled() &&
+      !FLAG_FORMAT.is_enabled())
+  {
+    koshka::show_message(
+        "The '--apply' option requires '--lint' or '--format'.");
+    return 2;
+  }
+  if (FLAG_LINT.is_enabled() && FLAG_FORMAT.is_enabled() &&
+      !FLAG_APPLY.is_enabled())
+  {
+    koshka::show_message(
+        "The '--lint --format' combination requires '--apply'.");
+    return 2;
+  }
+  if (FLAG_APPLY.is_enabled() &&
+      (FLAG_STDIN.is_enabled() || FLAG_INTERACTIVE.is_enabled() ||
+       !FLAG_COMMAND.is_empty()))
+  {
+    koshka::show_message(
+        "The '--apply' option does not accept '-s', '-i', or '-c'.");
+    return 2;
+  }
+  if (FLAG_APPLY.is_enabled()) {
+    if (file_names.is_empty()) {
+      koshka::show_message("The '--apply' option requires named files.");
+      return 2;
+    }
+    for (let const &file_name : file_names) {
+      if (file_name != "-") continue;
+      koshka::show_message("The '--apply' option does not accept '-'.");
+      return 2;
+    }
+  }
+  if (FLAG_FORMAT.is_enabled() && !FLAG_APPLY.is_enabled() &&
+      file_names.count() > 1)
+  {
+    koshka::show_message(
+        "The '--format' option accepts one file without '--apply'.");
     return 2;
   }
 
@@ -1271,7 +1573,7 @@ fn main(int argc, char **argv) -> int
 
   /* The input source is chosen by flag precedence, -s first, then -c, then a
      file operand, then -i or no arguments. */
-  if (is_language_server) {
+  if (is_language_server || FLAG_FORMAT.is_enabled()) {
     should_read_stdin = false;
   } else if (FLAG_STDIN.is_enabled()) {
     if (!FLAG_COMMAND.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
@@ -1518,11 +1820,17 @@ fn main(int argc, char **argv) -> int
 
   if (is_language_server)
     return koshka::language_server::run(context, ast_arena);
+  if (FLAG_LINT.is_enabled() && FLAG_APPLY.is_enabled())
+    return koshka::run_lint_apply_operation(
+        file_names, FLAG_FORMAT.is_enabled(), context, ast_arena);
+  if (FLAG_FORMAT.is_enabled() && !FLAG_LINT.is_enabled())
+    return koshka::run_format_operation(file_names, FLAG_APPLY.is_enabled(),
+                                        session_mood, ast_arena);
 
   /* A lint report must not follow the aliases, functions, and search path of
      whoever invoked it. */
   if (has_elevated_identity || is_rescue_mode || FLAG_CLEAN.is_enabled() ||
-      FLAG_LINT.is_enabled())
+      FLAG_LINT.is_enabled() || FLAG_FORMAT.is_enabled())
   {
     LOG(Info, "skipping every startup config file in %s mode",
         is_rescue_mode            ? "rescue"

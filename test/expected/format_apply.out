@@ -1,0 +1,92 @@
+help-status=0
+help-auxiliary=yes
+if [ -f "$x" ]
+then
+	echo yes
+else
+	echo no
+fi
+#!/bin/sh
+  # preserve this indentation and text
+if true; then echo x # preserve this inline comment
+cat <<-BODY
+	body $x
+	BODY
+fi
+[ -n "$x" ]
+test ()
+{
+	echo shadow
+}
+test -n "$x"
+command test -n "$x"
+value=$(if [ -n "$1" ]
+	then
+		echo yes
+	else
+		echo no
+	fi)
+idempotent=yes
+printf one two three four five six seven eight nine ten eleven twelve thirteen \
+	fourteen fifteen sixteen
+wrap-idempotent=yes maximum=80
+echo {a,b}
+items=(one two)
+for ((i=0; i<2; i++))
+do
+	echo "$i"
+done
+echo @(a|b)
+printf "%s\n" if test x = x
+printf "%s\n" ! test x = y
+case x
+in
+	test)
+		echo yes
+	;;
+esac
+[ -n "$x" ] # keep
+[ -f x ] 2>/dev/null
+2>/dev/null [ -n x ]
+printf err >&2
+exec 3>&1
+(
+	echo sub
+)
+nested-idempotent=yes
+if cat <<EOF; then
+body
+EOF
+echo done
+fi
+if true
+then
+	echo dash
+fi
+apply-status=0 executable=yes symlink=yes
+for x in a b
+do
+	[ "$x" = a ] &&
+	echo "$x"
+done
+if true
+then
+	echo second
+fi
+hardlink-retained=yes
+clean-crlf-status=0 retained=yes
+fixed-crlf-status=0 retained=yes
+lint-apply-status=0 contents=#!/bin/sh|[ "$1" = y ]|
+combined-status=0
+#!/bin/sh
+if [ -n "$1" ]
+then
+	[ "$1" = y ]
+fi
+parse-status=1 unchanged=yes
+apply-alone-status=2
+multi-stdout-status=2
+lint-format-no-apply-status=2
+apply-conflicts=2,2,2 unchanged=yes
+nonregular-status=1
+environment-options-filtered

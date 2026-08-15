@@ -1,4 +1,4 @@
-.TH KOSH 1 "2026-08-14" "kosh" "User Commands"
+.TH KOSH 1 "2026-08-16" "kosh" "User Commands"
 .SH NAME
 kosh \- a very fast and debuggable POSIX- and Bash-compatible command shell,
 formatter and language\-server
@@ -22,7 +22,24 @@ formatter and language\-server
 .RI [ \-c
 .IR command ...]
 .RI [ file ...]
-.PP
+.br
+.B kosh
+.B \-\-format
+.RI [ file ]
+.br
+.B kosh
+.B \-\-format
+.B \-\-apply
+.I file ...
+.br
+.B kosh
+.B \-\-lint
+.RI [ \-\-format ]
+.B \-\-apply
+.I file ...
+.br
+.B kosh
+.B \-\-language\-server
 .SH DESCRIPTION
 .B kosh
 is the Koshka shell executable. It is an interpreter, interactive shell and a
@@ -60,6 +77,15 @@ Under
 .BR \-s ,
 standard input is analyzed and a file operand becomes a positional parameter.
 With no command string and no file operand, standard input is analyzed.
+.PP
+The
+.B \-\-format
+option reads standard input when no file is named. One named file is formatted
+to standard output. The
+.B \-\-apply
+option writes the result to one or more named files. A lint application writes
+safe diagnostic fixes. A combined lint and format application writes the lint
+fixes first and then formats the result.
 .PP
 When both
 .B \-s
@@ -102,6 +128,12 @@ The
 option is discarded from
 .B KOSH_FLAGS
 and cannot inject a command string.
+The
+.BR \-\-format ,
+.BR \-\-apply ,
+and
+.B \-\-language\-server
+options are also discarded.
 .PP
 A dash-prefixed invocation name whose options cannot be parsed enters rescue
 mode when standard input is a terminal. Rescue mode clears the options and
@@ -131,16 +163,21 @@ The editor starts this mode and associates it with
 .BR *.kosh ,
 and
 .BR *.shit .
-The server supplies diagnostics, completion, and semantic tokens. A client
-language identifier selects the matching mood. A generic identifier uses a
-recognized shebang and otherwise uses the
+The server supplies diagnostics, quick fixes, completion, navigation, command
+information, and semantic tokens. A fix-all action applies every
+non-conflicting safe fix in the open document. A client language identifier
+selects the matching mood. A generic identifier uses a recognized shebang and
+otherwise uses the
 .B kosh
 mood. This option does not accept file operands,
 .BR \-c ,
 .BR \-s ,
 .BR \-i ,
 or
-.BR \-\-lint .
+.BR \-\-lint ,
+.BR \-\-format ,
+or
+.BR \-\-apply .
 It is ignored in
 .BR KOSH_FLAGS .
 .TP
@@ -253,6 +290,37 @@ The option is accepted without effect for compatibility.
 .TP
 .B \-m
 The option is accepted without effect for compatibility.
+.SS Formatting
+.TP
+.B \-\-format
+Shell source is formatted without being run. Structural keywords and compound
+braces are placed on separate lines. Each nested level uses one tab, counted as
+two columns for wrapping. Direct
+.B test
+commands become bracket commands unless an earlier alias or function shadows
+the name. Code is wrapped at 80 columns when a safe token boundary exists.
+Comments are retained. A script containing a here-document retains its source
+layout. Output uses LF line endings and one final newline for a nonempty script.
+With no file or a lone
+.B \-
+operand, source is read from standard input. One named file may be written to
+standard output.
+.TP
+.B \-\-apply
+Named files are updated with safe lint fixes under
+.BR \-\-lint ,
+or with formatted source under
+.BR \-\-format .
+The two modes may be combined. Each changed file is replaced atomically after
+its contents and identity are checked again. File modes and symbolic links are
+retained. Another hard link keeps the prior inode. Standard input,
+.BR \-s ,
+.BR \-i ,
+.BR \-c ,
+and a lone
+.B \-
+operand are rejected. This option is ignored in
+.BR KOSH_FLAGS .
 .SS Diagnostics
 .TP
 .B \-\-lint
@@ -265,6 +333,13 @@ and
 .B \-\-no\-annoying\-diagnostics
 is overridden. Every startup file is skipped, and the report is free of the
 aliases, functions, and search path of the invoking session.
+.PP
+With
+.BR \-\-apply ,
+safe structured fixes are written to each named file. The updated source is
+analyzed again, and only the remaining diagnostics are reported. A warning-only
+result exits successfully. A remaining error or an input or write failure exits
+with status 1.
 .TP
 .BR \-W ", " \-WW ", " \-WWW
 The analysis stage has strict, lenient, and annoying tiers. In the default
@@ -1447,6 +1522,14 @@ non-rescue invocation returns 2. A child terminated by SIGPIPE returns 141. A
 .B \-\-lint
 batch returns 1 when an input cannot be read or parsed, or its analysis reports
 an error. Warning-only findings return 0.
+The
+.B \-\-format
+mode returns 1 when an input cannot be read, parsed, formatted, or replaced.
+The
+.B \-\-apply
+mode also returns 1 when a safe replacement cannot be completed. These modes
+return 0 after every requested input succeeds. An invalid option combination
+returns 2.
 .SH ERRORS
 An unavailable command or pathname is reported through its first unavailable
 component when that component can be identified. A missing explicit directory

@@ -24,7 +24,7 @@
    renders the flag at the top of --help with no section heading. The
    six-argument form names the section the flag renders under. */
 #define T__FLAG_SELECT(_1, _2, _3, _4, _5, _6, name, ...) name
-#define FLAG(...) T__FLAG_SELECT(__VA_ARGS__, T__FLAG6, T__FLAG5)(__VA_ARGS__)
+#define FLAG(...)                                         T__FLAG_SELECT(__VA_ARGS__, T__FLAG6, T__FLAG5)(__VA_ARGS__)
 #define T__FLAG5(var_name, kind, short_name, long_name, description)           \
   T__FLAG6(var_name, kind, short_name, long_name, NoSection, description)
 #define T__FLAG6(var_name, kind, short_name, long_name, section, description)  \
@@ -95,6 +95,7 @@ enum class flag_section : u8
   Posix,
   Bash,
   Compat,
+  Auxiliary,
   Kosh,
   Debug,
 };

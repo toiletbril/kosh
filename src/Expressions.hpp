@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Diagnostics.hpp"
 #include "Eval.hpp"
+#include "Formatter.hpp"
 #include "Tokens.hpp"
 
 namespace koshka {
@@ -33,6 +34,7 @@ struct source_diagnostic
   Maybe<SourceLocation> related_location;
   String related_source_name;
   String related_message;
+  ArrayList<source_fix> fixes;
 };
 
 class AnalysisSourceProvider
