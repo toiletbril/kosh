@@ -12,13 +12,13 @@ funny name. Thanks.
 
 **Koshka** is the Russian word for a cat.
 
-**Koshka** is an interpreter, interactive shell and diagnostic tool, with
-first tier support for Windows, Linux and macOS, fully compatible with Bash 5.3
-and Dash.
+**Koshka** is an interpreter, interactive shell, formatter and a language
+server, with first tier support for Windows, Linux and macOS, fully compatible
+with Bash 5.3 and Dash.
 
 Koshka contains ~300 built-in shellcheck diagnostics. It is usually 5x faster
 than bash, or ~100x+ faster than shellcheck, which makes it exceptionally
-friendly to coding agents or Strict environments where Bash is still used.
+friendly to coding agents or strict environments where Bash is still used.
 
 | Koshka analyzing 20K-line shell script in ~0.05s |
 | :-: | 
@@ -29,11 +29,8 @@ friendly to coding agents or Strict environments where Bash is still used.
 `kosh` is the **koshka**'s binary.
 
 **Koshka** aims to be a complete, faster and portable Shellcheck and Bash
-replacement for systems, runners or development machines that can benefit from
-it's speed and pedantic diagnostics.
-
-The shell guarantees first tier support for Linux, macOS and Windows,
-preserving equivalent behavior on either of these systems.
+replacement. The shell guarantees first tier support for Linux, macOS and
+Windows, preserving equivalent behavior on either of these systems.
 
 The shell is designed to work without absolutely no config whatsoever.
 **Koshka**'s Linux binary is static and it does not use C++'s STL. **Koshka**
@@ -59,6 +56,12 @@ optimization enabled. The other moods are `bash`, `bash-posix`, and `sh`. The
 Before it runs a command, **Koshka** analyzes and optimizes the complete script.
 The catalog includes about 100 checks derived from ShellCheck and about a dozen
 native analysis checks.
+
+`kosh --lint` behaves like shellcheck, but several magnitudes faster.
+
+`kosh --format` formats the code. There's no customization as of now.
+
+`kosh --language-server` launches language server on stdin.
 
 The `--mood` option, or `-M`, selects `kosh`, `bash`, `bash-posix`, or `sh`.
 The default is `kosh`. A binary symlinked as `sh`, `dash`, or `bash` selects

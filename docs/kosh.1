@@ -1,6 +1,7 @@
 .TH KOSH 1 "2026-08-14" "kosh" "User Commands"
 .SH NAME
-kosh \- a very fast and debuggable POSIX- and Bash-compatible command shell
+kosh \- a very fast and debuggable POSIX- and Bash-compatible command shell,
+formatter and language\-server
 .SH SYNOPSIS
 .B kosh
 .RI [ options ]
@@ -31,28 +32,8 @@ extensions.
 Koshka contains ~300 built-in shellcheck diagnostics and is 5x faster than
 bash, or ~100x faster than shellcheck.
 .PP
-It aims to be a complete, faster and portable Shellcheck and Bash replacement
-for systems, runners or development machines that can benefit from its speed
-and pedantic diagnostics.
-.PP
-The shell is friendly to coding agents. Strict validation and source-located
-error messages provide clear feedback while shell commands are generated or
-repaired.
-.PP
 The shell guarantees first tier support for Linux, macOS and Windows,
 preserving equivalent behavior on either of these systems.
-.PP
-An interactive shell is started when standard input is a terminal and no
-.BR \-s ,
-.BR \-c ,
-or script operand is given. A script operand names a file to run. The
-.B \-c
-option supplies a command string. The
-.B \-s
-option reads commands from standard input.
-.PP
-Shell source accepts LF and CRLF line endings. A CRLF pair is read as one
-newline. A single carriage return remains part of the source text.
 .PP
 The grammar is the same on every operating system. An unquoted backslash is an
 escape on Windows. A native Windows path therefore uses a quoted backslash, an
