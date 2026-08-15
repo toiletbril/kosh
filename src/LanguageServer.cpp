@@ -1,8 +1,11 @@
 #include "LanguageServer.hpp"
 
+#include "Builtin.hpp"
 #include "Completion.hpp"
+#include "CompletionPolicy.hpp"
 #include "Diagnostics.hpp"
 #include "Expressions.hpp"
+#include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "MimicMood.hpp"
 #include "Parser.hpp"
@@ -603,6 +606,14 @@ struct protocol_position
   usize character;
 };
 
+struct document_symbol
+{
+  String text;
+  highlight_role role;
+  usize start;
+  usize end;
+};
+
 class Document
 {
 public:
@@ -839,6 +850,8 @@ private:
   fn change_document(const JsonValue *params) throws -> void;
   fn close_document(const JsonValue *params) throws -> void;
   fn complete(const JsonValue *id, const JsonValue *params) throws -> bool;
+  fn definition(const JsonValue *id, const JsonValue *params) throws -> bool;
+  fn hover(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn semantic_tokens(const JsonValue *id, const JsonValue *params) throws
       -> bool;
   fn publish_diagnostics(Document &document) throws -> bool;
@@ -854,6 +867,11 @@ private:
                        const source_diagnostic &diagnostic,
                        bool &is_first) throws -> void;
   fn select_document_mood(const Document &document) wontthrow -> void;
+  fn symbol_at(Document &document, protocol_position position) throws
+      -> Maybe<document_symbol>;
+  fn definition_of(Document &document, const document_symbol &symbol) throws
+      -> Maybe<document_symbol>;
+  fn command_information(StringView command) throws -> Maybe<String>;
 
   EvalContext &m_context;
   BumpArena &m_ast_arena;
@@ -965,6 +983,7 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   result.append(
       ",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
       "\"completionProvider\":{\"resolveProvider\":false},"
+      "\"definitionProvider\":true,\"hoverProvider\":true,"
       "\"semanticTokensProvider\":{\"legend\":{\"tokenTypes\":["
       "\"comment\",\"operator\",\"string\",\"variable\",\"parameter\","
       "\"keyword\",\"function\",\"regexp\"],\"tokenModifiers\":["
@@ -1041,39 +1060,51 @@ fn Server::append_diagnostic(String &output, const Document &document,
   if (!diagnostic.source_name.is_empty() && document.path.has_value() &&
       diagnostic.source_name != document.path->text())
     return;
-  if (!is_first) output.push(',');
-  is_first = false;
-  output.append("{\"range\":");
-  let const end = diagnostic.location.position + diagnostic.location.length;
-  append_protocol_range(output, document, diagnostic.location.position, end,
-                        m_encoding);
-  output.append(",\"severity\":");
-  output.append(diagnostic.severity == error_severity::Error ? "1" : "2");
-  if (diagnostic.id.has_value()) {
-    output.append(",\"code\":");
-    append_json_string(output, get_diagnostic_definition(*diagnostic.id).slug);
+  let const do_append_diagnostic = [&](SourceLocation location, u8 severity,
+                                       StringView message,
+                                       Maybe<diagnostic_id> id) throws -> void {
+    if (!is_first) output.push(',');
+    is_first = false;
+    output.append("{\"range\":");
+    append_protocol_range(output, document, location.position,
+                          location.position + location.length, m_encoding);
+    output.append(",\"severity\":");
+    output.append(String::from(severity, heap_allocator()).view());
+    if (id.has_value()) {
+      output.append(",\"code\":");
+      append_json_string(output, get_diagnostic_definition(*id).slug);
+    }
+    output.append(",\"source\":\"kosh\",\"message\":");
+    append_json_string(output, message);
+    output.push('}');
+  };
+
+  let const severity = diagnostic.severity == error_severity::Error     ? 1
+                       : diagnostic.severity == error_severity::Warning ? 2
+                                                                        : 3;
+  if (!diagnostic.message.is_empty())
+    do_append_diagnostic(diagnostic.location, severity,
+                         diagnostic.message.view(), diagnostic.id);
+  if (diagnostic.id.has_value() &&
+      (*diagnostic.id == diagnostic_id::unresolved_command ||
+       *diagnostic.id == diagnostic_id::unresolved_command_uncertain))
+  {
+    do_append_diagnostic(
+        diagnostic.location, 3,
+        "This command may be defined dynamically or outside this script", None);
   }
-  output.append(",\"source\":\"kosh\",\"message\":");
-  let message = diagnostic.message.clone();
-  if (!diagnostic.suggestion.is_empty()) {
-    message.push('\n');
-    message.append(diagnostic.suggestion.view());
+  if (!diagnostic.suggestion.is_empty())
+    do_append_diagnostic(diagnostic.location, 3, diagnostic.suggestion.view(),
+                         None);
+  if (diagnostic.related_location.has_value() &&
+      !diagnostic.related_message.is_empty() &&
+      (diagnostic.related_source_name.is_empty() ||
+       !document.path.has_value() ||
+       diagnostic.related_source_name == document.path->text()))
+  {
+    do_append_diagnostic(*diagnostic.related_location, 3,
+                         diagnostic.related_message.view(), None);
   }
-  append_json_string(output, message.view());
-  if (diagnostic.related_location.has_value()) {
-    output.append(",\"relatedInformation\":[{\"location\":{\"uri\":");
-    append_json_string(output, document.uri.view());
-    output.append(",\"range\":");
-    append_protocol_range(output, document,
-                          diagnostic.related_location->position,
-                          diagnostic.related_location->position +
-                              diagnostic.related_location->length,
-                          m_encoding);
-    output.append("},\"message\":");
-    append_json_string(output, diagnostic.related_message.view());
-    output.append("}]");
-  }
-  output.push('}');
 }
 
 fn Server::publish_diagnostics(Document &document) throws -> bool
@@ -1232,6 +1263,257 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   return send_result(id, response.view());
 }
 
+fn Server::symbol_at(Document &document, protocol_position position) throws
+    -> Maybe<document_symbol>
+{
+  let const byte_position =
+      document.byte_position(position.line, position.character, m_encoding);
+  if (!byte_position.has_value() ||
+      position.line >= document.line_starts.count())
+    return None;
+  let const line_start = document.line_starts[position.line];
+  let line_end = document.normalized_source.count();
+  if (position.line + 1 < document.line_starts.count())
+    line_end = document.line_starts[position.line + 1] - 1;
+  let cache = completion::shell_highlight_cache{};
+  let const *spans = cache.spans_for(document.normalized_source.view(),
+                                     line_start, line_end, m_context);
+
+  for (let const &span : *spans) {
+    let const start = line_start + span.start;
+    let const end = line_start + span.end;
+    if (*byte_position < start || *byte_position > end) continue;
+
+    return document_symbol{
+        String{
+            document.normalized_source.substring_of_length(start, end - start)},
+        span.role, start, end};
+  }
+
+  return None;
+}
+
+pure fn variable_name_of(StringView text) wontthrow -> StringView
+{
+  usize start = 0;
+  if (!text.is_empty() && text[0] == '$') start++;
+  if (start < text.length && text[start] == '{') start++;
+  let end = start;
+
+  while (end < text.length) {
+    let const byte = text[end];
+    if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+          (byte >= '0' && byte <= '9') || byte == '_'))
+      break;
+    end++;
+  }
+
+  return text.substring_of_length(start, end - start);
+}
+
+fn Server::definition_of(Document &document,
+                         const document_symbol &symbol) throws
+    -> Maybe<document_symbol>
+{
+  let const is_variable = symbol.role == highlight_role::variable ||
+                          symbol.role == highlight_role::unset_variable ||
+                          symbol.role == highlight_role::assignment_name;
+  let const is_function = symbol.role == highlight_role::function_name ||
+                          symbol.role == highlight_role::resolved_command ||
+                          symbol.role == highlight_role::unknown_command;
+  if (!is_variable && !is_function) return None;
+  let const name =
+      is_variable ? variable_name_of(symbol.text.view()) : symbol.text.view();
+  if (name.is_empty()) return None;
+  let cache = completion::shell_highlight_cache{};
+  let result = Maybe<document_symbol>{};
+
+  for (usize line = 0; line < document.line_starts.count(); line++) {
+    let const line_start = document.line_starts[line];
+    let line_end = document.normalized_source.count();
+    if (line + 1 < document.line_starts.count())
+      line_end = document.line_starts[line + 1] - 1;
+    let const *spans = cache.spans_for(document.normalized_source.view(),
+                                       line_start, line_end, m_context);
+
+    for (let const &span : *spans) {
+      let const role_matches =
+          is_variable ? span.role == highlight_role::assignment_name
+                      : span.role == highlight_role::function_name;
+      if (!role_matches) continue;
+      let const start = line_start + span.start;
+      let const end = line_start + span.end;
+      let const candidate =
+          document.normalized_source.substring_of_length(start, end - start);
+      if (candidate != name) continue;
+      if (start > symbol.start) return result;
+
+      result = document_symbol{String{candidate}, span.role, start, end};
+    }
+  }
+
+  return result;
+}
+
+fn Server::definition(const JsonValue *id, const JsonValue *params) throws
+    -> bool
+{
+  let const *text_document =
+      params != nullptr ? params->get("textDocument") : nullptr;
+  let const uri = string_field(text_document, "uri");
+  let const position =
+      document_position(params != nullptr ? params->get("position") : nullptr);
+  if (!uri.has_value() || !position.has_value()) return send_result(id, "null");
+  let *document = find_document(*uri);
+  if (document == nullptr) return send_result(id, "null");
+  select_document_mood(*document);
+  let const symbol = symbol_at(*document, *position);
+  if (!symbol.has_value()) return send_result(id, "null");
+  let const target = definition_of(*document, *symbol);
+  if (!target.has_value()) return send_result(id, "null");
+  let response = String{"{\"uri\":"};
+  append_json_string(response, document->uri.view());
+  response.append(",\"range\":");
+  append_protocol_range(response, *document, target->start, target->end,
+                        m_encoding);
+  response.push('}');
+
+  return send_result(id, response.view());
+}
+
+fn Server::command_information(StringView command) throws -> Maybe<String>
+{
+  static constexpr u64 INFORMATION_TIMEOUT_NANOS = 1'000'000'000;
+  let source = String{heap_allocator()};
+  if (search_builtin(command).has_value()) {
+    source.append("help ");
+    source.append(command);
+  } else if (koshkit::find_util(command).has_value()) {
+    source.append("koshkit ");
+    source.append(command);
+    source.append(" --help");
+  }
+  if (!source.is_empty()) {
+    let argv = ArrayList<String>{heap_allocator()};
+    argv.push(String{m_context.shell_executable_path()});
+    argv.push(String{"--clean"});
+    argv.push(String{"-c"});
+    argv.push(steal(source));
+    let const output =
+        os::capture_program_output(argv, INFORMATION_TIMEOUT_NANOS);
+    if (output.has_value() && !output->is_empty()) return output;
+    return None;
+  }
+
+  let const paths = m_context.get_program_resolver().search(
+      command, ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
+  if (paths.is_empty()) return None;
+  let information = String{heap_allocator()};
+  let const man_paths = m_context.get_program_resolver().search(
+      "man", ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
+  if (!man_paths.is_empty() &&
+      os::directory_is_trusted_for_exec(man_paths[0].parent()))
+  {
+    let locate_argv = ArrayList<String>{heap_allocator()};
+    locate_argv.push(String{man_paths[0].text().view()});
+    locate_argv.push(String{"-w"});
+    locate_argv.push(String{command});
+    let const location =
+        os::capture_program_output(locate_argv, INFORMATION_TIMEOUT_NANOS);
+    if (location.has_value() &&
+        location->view().find_character('/').has_value())
+    {
+      let man_argv = ArrayList<String>{heap_allocator()};
+      man_argv.push(String{man_paths[0].text().view()});
+      man_argv.push(String{command});
+      if (let page =
+              os::capture_program_output(man_argv, INFORMATION_TIMEOUT_NANOS);
+          page.has_value() && !page->is_empty())
+      {
+        for (usize position = 0; position < page->length(); position++) {
+          let const byte = page->view()[position];
+          if (byte == '\b') {
+            if (!information.is_empty()) information.pop_back();
+            continue;
+          }
+          information.push(byte);
+        }
+      }
+    }
+  }
+  if (information.is_empty()) {
+    if (let const help_argument = completion::HELP_ALLOWLIST.find(command);
+        help_argument.has_value() &&
+        os::directory_is_trusted_for_exec(paths[0].parent()))
+    {
+      let help_argv = ArrayList<String>{heap_allocator()};
+      help_argv.push(String{paths[0].text().view()});
+      let argument = StringView{*help_argument};
+      usize argument_start = 0;
+
+      while (argument_start < argument.length) {
+        while (argument_start < argument.length &&
+               argument[argument_start] == ' ')
+          argument_start++;
+        let argument_end = argument_start;
+        while (argument_end < argument.length && argument[argument_end] != ' ')
+          argument_end++;
+        if (argument_end > argument_start)
+          help_argv.push(String{argument.substring_of_length(
+              argument_start, argument_end - argument_start)});
+        argument_start = argument_end;
+      }
+      if (let help =
+              os::capture_program_output(help_argv, INFORMATION_TIMEOUT_NANOS);
+          help.has_value() && !help->is_empty())
+        information = help.take();
+    }
+  }
+  if (!information.is_empty() &&
+      information.view()[information.length() - 1] != '\n')
+    information.push('\n');
+  if (!information.is_empty()) information.push('\n');
+  information.append("Path: ");
+  information.append(paths[0].text().view());
+
+  return information;
+}
+
+fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
+{
+  let const *text_document =
+      params != nullptr ? params->get("textDocument") : nullptr;
+  let const uri = string_field(text_document, "uri");
+  let const position =
+      document_position(params != nullptr ? params->get("position") : nullptr);
+  if (!uri.has_value() || !position.has_value()) return send_result(id, "null");
+  let *document = find_document(*uri);
+  if (document == nullptr) return send_result(id, "null");
+  select_document_mood(*document);
+  let const symbol = symbol_at(*document, *position);
+  if (!symbol.has_value()) return send_result(id, "null");
+  let const is_command = symbol->role == highlight_role::resolved_command ||
+                         symbol->role == highlight_role::partial_command ||
+                         symbol->role == highlight_role::unknown_command;
+  if (!is_command) return send_result(id, "null");
+  if (definition_of(*document, *symbol).has_value())
+    return send_result(id, "null");
+  let const information = command_information(symbol->text.view());
+  if (!information.has_value()) return send_result(id, "null");
+  let response = String{"{\"contents\":{\"kind\":\"plaintext\",\"value\":"};
+  append_json_string(response, information->view());
+  response.append("},\"range\":");
+  append_protocol_range(response, *document, symbol->start, symbol->end,
+                        m_encoding);
+  response.push('}');
+
+  return send_result(id, response.view());
+}
+
 fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
     -> bool
 {
@@ -1326,6 +1608,8 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
     return validate_all();
   }
   if (*method == "textDocument/completion") return complete(id, params);
+  if (*method == "textDocument/definition") return definition(id, params);
+  if (*method == "textDocument/hover") return hover(id, params);
   if (*method == "textDocument/semanticTokens/full")
     return semantic_tokens(id, params);
   if (id != nullptr) return send_error(id, -32601, "Method not found");
