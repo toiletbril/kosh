@@ -303,8 +303,9 @@ cold fn Parser::recover_to_next_statement() throws -> void
 
 /* Parse every top-level command, recovering from a syntax error instead of
    aborting at the first. */
-cold fn Parser::construct_ast(ArrayList<String> &errors,
-                              EvalContext *context) throws -> Expression *
+cold fn Parser::construct_ast(
+    ArrayList<String> &errors, EvalContext *context,
+    ArrayList<source_diagnostic> *diagnostic_sink) throws -> Expression *
 {
   Expression *first_piece = nullptr;
   let last_location = SourceLocation{};
@@ -329,11 +330,39 @@ cold fn Parser::construct_ast(ArrayList<String> &errors,
           e.message().c_str());
       errors.push(e.to_string(m_lexer.source(), context));
       errors.push(e.details_to_string(m_lexer.source(), context));
+      if (diagnostic_sink != nullptr) {
+        let const location = e.location();
+        let source_name = String{heap_allocator()};
+        if (location.filename.has_value())
+          source_name = String{*location.filename};
+        let const details_location = e.details_location();
+        let related_source_name = String{heap_allocator()};
+        if (details_location.filename.has_value())
+          related_source_name = String{*details_location.filename};
+        let const related_location =
+            e.details_message().is_empty()
+                ? Maybe<SourceLocation>{None}
+                : Maybe<SourceLocation>{details_location};
+        diagnostic_sink->push(source_diagnostic{
+            None, error_severity::Error, location, steal(source_name),
+            e.message().clone(), String{e.detail_message()}, related_location,
+            steal(related_source_name), String{e.details_message()}});
+      }
       recover_to_next_statement();
     } catch (const ErrorWithLocation &e) {
       LOG(Debug, "recording a parse error and recovering: %s",
           e.message().c_str());
       errors.push(e.to_string(m_lexer.source(), context));
+      if (diagnostic_sink != nullptr) {
+        let const location = e.location();
+        let source_name = String{heap_allocator()};
+        if (location.filename.has_value())
+          source_name = String{*location.filename};
+        diagnostic_sink->push(source_diagnostic{
+            None, error_severity::Error, location, steal(source_name),
+            e.message().clone(), String{e.detail_message()}, None,
+            String{heap_allocator()}, String{heap_allocator()}});
+      }
       recover_to_next_statement();
     }
   }

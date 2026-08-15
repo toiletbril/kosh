@@ -9,6 +9,7 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Koshkit.hpp"
+#include "LanguageServer.hpp"
 #include "Lexer.hpp"
 #include "PackedStringKey.hpp"
 #include "Parser.hpp"
@@ -91,6 +92,8 @@ FLAG(DUMB, Bool, '\0', "dumb", Compat,
 FLAG(LINT, Bool, '\0', "lint", Kosh,
      "Analyze shell inputs without running them and enable every diagnostic "
      "tier at its normal severity.");
+FLAG(LANGUAGE_SERVER, Bool, '\0', "language-server", Kosh,
+     "Run the shell language server over standard input and standard output.");
 FLAG(WARNINGS, RepeatedBool, 'W', "", Kosh,
      "In the default mood, demote annoying, lenient, then strict diagnostics "
      "as W is repeated. In other moods, enable those tiers in reverse order.");
@@ -971,7 +974,7 @@ fn main(int argc, char **argv) -> int
             should_skip_next_command_word = false;
           } else if (token == "-c") {
             should_skip_next_command_word = true;
-          } else {
+          } else if (token != "--language-server") {
             kosh_flags_tokens.push(koshka::String{token});
           }
         }
@@ -1191,6 +1194,18 @@ fn main(int argc, char **argv) -> int
     return 2;
   }
 
+  let const is_language_server = FLAG_LANGUAGE_SERVER.is_enabled();
+  if (is_language_server &&
+      (FLAG_STDIN.is_enabled() || FLAG_INTERACTIVE.is_enabled() ||
+       FLAG_LINT.is_enabled() || !FLAG_COMMAND.is_empty() ||
+       !file_names.is_empty()))
+  {
+    koshka::show_message(
+        "The '--language-server' option does not accept '-s', '-i', "
+        "'--lint', '-c', or file operands.");
+    return 2;
+  }
+
   let init_moods =
       koshka::ArrayList<koshka::mimic_mood>{koshka::heap_allocator()};
   for (usize i = 0; i < FLAG_INIT_MOODS.count(); i++) {
@@ -1256,7 +1271,9 @@ fn main(int argc, char **argv) -> int
 
   /* The input source is chosen by flag precedence, -s first, then -c, then a
      file operand, then -i or no arguments. */
-  if (FLAG_STDIN.is_enabled()) {
+  if (is_language_server) {
+    should_read_stdin = false;
+  } else if (FLAG_STDIN.is_enabled()) {
     if (!FLAG_COMMAND.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
       koshka::show_message(
           "Incompatible options or arguments were specified along "
@@ -1498,6 +1515,9 @@ fn main(int argc, char **argv) -> int
      arena is never reset during the run. */
   let function_arena = koshka::BumpArena{};
   koshka::FUNCTION_ARENA = &function_arena;
+
+  if (is_language_server)
+    return koshka::language_server::run(context, ast_arena);
 
   /* A lint report must not follow the aliases, functions, and search path of
      whoever invoked it. */

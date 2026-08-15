@@ -14,11 +14,33 @@ struct heredoc_contents;
 
 struct pending_analysis_warning
 {
+  diagnostic_id id;
   SourceLocation location;
   String message;
   String suggestion;
   Maybe<SourceLocation> related_location;
   String related_message;
+};
+
+struct source_diagnostic
+{
+  Maybe<diagnostic_id> id;
+  error_severity severity;
+  SourceLocation location;
+  String source_name;
+  String message;
+  String suggestion;
+  Maybe<SourceLocation> related_location;
+  String related_source_name;
+  String related_message;
+};
+
+class AnalysisSourceProvider
+{
+public:
+  virtual ~AnalysisSourceProvider() = default;
+  virtual fn read_source(const Path &canonical_path) throws
+      -> Maybe<String> = 0;
 };
 
 namespace expressions {
@@ -218,6 +240,8 @@ public:
   followed_source_effects *current_source_effects{nullptr};
 
   ArrayList<pending_analysis_warning> pending_warnings{heap_allocator()};
+  ArrayList<source_diagnostic> *diagnostic_sink{nullptr};
+  AnalysisSourceProvider *source_provider{nullptr};
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
@@ -356,11 +380,13 @@ public:
       -> void;
 
 private:
-  fn warn(SourceLocation location, StringView message, StringView suggestion,
-          diagnostic_tier tier, Maybe<SourceLocation> related_location,
+  fn warn(diagnostic_id id, SourceLocation location, StringView message,
+          StringView suggestion, diagnostic_tier tier,
+          Maybe<SourceLocation> related_location,
           StringView related_message) throws -> void;
-  fn fail(SourceLocation location, StringView message, StringView suggestion,
-          diagnostic_tier tier, Maybe<SourceLocation> related_location,
+  fn fail(diagnostic_id id, SourceLocation location, StringView message,
+          StringView suggestion, diagnostic_tier tier,
+          Maybe<SourceLocation> related_location,
           StringView related_message) throws -> void;
 };
 
@@ -380,7 +406,9 @@ fn analyze_ast(
     analysis_diagnostic_totals *deferred_diagnostic_totals = nullptr,
     bool should_merge_parent_state = true,
     bool should_merge_parent_uncertainty = true,
-    followed_source_effects *source_effects = nullptr) throws -> bool;
+    followed_source_effects *source_effects = nullptr,
+    ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
+    AnalysisSourceProvider *source_provider = nullptr) throws -> bool;
 
 mustuse pure fn is_source_location_variable(StringView name) wontthrow -> bool;
 

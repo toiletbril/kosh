@@ -14,3 +14,8 @@ COMP_WORDS=(kosh --debug)
 COMP_CWORD=1
 _kosh_complete
 printf 'release-debug-flags=%s\n' "${#COMPREPLY[@]}"
+
+COMP_WORDS=(kosh --language)
+COMP_CWORD=1
+_kosh_complete
+printf 'language-server=<%s>\n' "${COMPREPLY[0]}"

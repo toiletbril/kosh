@@ -43,7 +43,7 @@ _kosh_complete()
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
 --no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
 --restricted --privileged --clean --posix --mood \
---init-moods --mimicry --dumb --lint --list-diagnostics \
+--init-moods --mimicry --dumb --lint --language-server --list-diagnostics \
 --no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
 --enable-koshkit \
 --show-ast \

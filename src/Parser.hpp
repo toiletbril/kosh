@@ -20,8 +20,9 @@ public:
   fn construct_next_top_level_ast() throws -> Expression *;
   pure fn is_at_end() const wontthrow -> bool;
 
-  fn construct_ast(ArrayList<String> &errors, EvalContext *context) throws
-      -> Expression *;
+  fn construct_ast(ArrayList<String> &errors, EvalContext *context,
+                   ArrayList<source_diagnostic> *diagnostic_sink =
+                       nullptr) throws -> Expression *;
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   fn take_shellcheck_suppressions() throws -> ArrayList<shellcheck_suppression>;

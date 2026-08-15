@@ -292,6 +292,16 @@ public:
     return m_note.view();
   }
 
+  pure fn details_location() const wontthrow -> SourceLocation
+  {
+    return m_details_location;
+  }
+
+  pure fn details_message() const wontthrow -> StringView
+  {
+    return m_details_message.view();
+  }
+
   fn details_to_string(StringView source,
                        EvalContext *context = nullptr) const throws -> String;
 

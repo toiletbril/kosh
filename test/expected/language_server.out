@@ -1,0 +1,15 @@
+status=0
+initialize=ok
+diagnostics=ok
+completion=ok
+semantic-tokens=ok
+method-error=ok
+auxiliary-uri=ok
+auxiliary-diagnostic=ok
+open-source-precedence=ok
+diagnostic-clears=ok
+environment-filtered
+conflict-status=2
+conflict-message=ok
+utf16-crlf=ok
+exit-without-shutdown-status=1

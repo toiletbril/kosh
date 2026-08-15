@@ -1,3 +1,4 @@
 <a b>
 <a*star>
 release-debug-flags=0
+language-server=<--language-server>

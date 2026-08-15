@@ -122,6 +122,28 @@ Commands are read from standard input.
 .BR \-i ", " \-\-interactive
 Interactive operation is requested.
 .TP
+.B \-\-language\-server
+The language server protocol is run over standard input and standard output.
+The editor starts this mode and associates it with
+.BR *.sh ,
+.BR *.dash ,
+.BR *.bash ,
+.BR *.kosh ,
+and
+.BR *.shit .
+The server supplies diagnostics, completion, and semantic tokens. A client
+language identifier selects the matching mood. A generic identifier uses a
+recognized shebang and otherwise uses the
+.B kosh
+mood. This option does not accept file operands,
+.BR \-c ,
+.BR \-s ,
+.BR \-i ,
+or
+.BR \-\-lint .
+It is ignored in
+.BR KOSH_FLAGS .
+.TP
 .BR \-l ", " \-\-login
 Login operation is requested.
 .TP
