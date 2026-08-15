@@ -1816,7 +1816,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (has_dollar_bracket)
       actx.report_diagnostic(diagnostic_id::sc2007, arg_location);
 
-    bool has_dollar_in_arithmetic = false;
     bool has_external_arithmetic_read = false;
     bool has_unquoted_command_substitution = false;
     bool has_bare_star_reference = false;
@@ -1853,11 +1852,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               actx, segment.text.view(),
               segment.get_source_location(arg_location.filename)
                   .value_or(arg_location));
-          if (!has_dollar_in_arithmetic &&
-              segment.text.view().find_character('$').has_value())
-          {
-            has_dollar_in_arithmetic = true;
-          }
           if (is_operand && !has_external_arithmetic_read &&
               arithmetic_reads_external_input(actx, segment.text.view()))
           {
@@ -1988,9 +1982,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
     if (has_literal_dollar_in_quotes)
       actx.report_diagnostic(diagnostic_id::sc1000, arg_location);
-
-    if (has_dollar_in_arithmetic)
-      actx.report_diagnostic(diagnostic_id::sc2004, arg_location);
 
     if (has_multi_digit_positional)
       actx.report_diagnostic(diagnostic_id::sc1037, arg_location);

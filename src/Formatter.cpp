@@ -81,16 +81,6 @@ pure fn is_format_blank(char byte) wontthrow -> bool
   return byte == ' ' || byte == '\t' || byte == '\r';
 }
 
-pure fn contains_byte_pair(StringView source, char first, char second) wontthrow
-    -> bool
-{
-  for (usize position = 1; position < source.length; position++)
-    if (source[position - 1] == first && source[position] == second)
-      return true;
-
-  return false;
-}
-
 pure fn is_format_operator_start(char byte) wontthrow -> bool
 {
   switch (byte) {
@@ -288,6 +278,34 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
       continue;
     }
     if (byte == '\n') {
+      let deferred_heredoc_keyword = Maybe<format_piece>{};
+      let deferred_heredoc_comment = Maybe<format_piece>{};
+      if (!pending_heredocs.is_empty()) {
+        usize keyword_position = pieces.count();
+        while (keyword_position > 0 &&
+               pieces[keyword_position - 1].kind == format_piece_kind::Comment)
+          keyword_position--;
+
+        if (keyword_position > 1) {
+          let const keyword_index = keyword_position - 1;
+          let &candidate = pieces[keyword_index];
+          let const &separator = pieces[keyword_index - 1];
+          if (candidate.kind == format_piece_kind::Word &&
+              (candidate.text == "then" || candidate.text == "do") &&
+              separator.kind == format_piece_kind::Operator &&
+              separator.text == ";")
+          {
+            deferred_heredoc_keyword = steal(candidate);
+            pieces.remove(keyword_index);
+            if (keyword_index < pieces.count() &&
+                pieces[keyword_index].kind == format_piece_kind::Comment)
+            {
+              deferred_heredoc_comment = steal(pieces[keyword_index]);
+              pieces.remove(keyword_index);
+            }
+          }
+        }
+      }
       pieces.push(format_piece{format_piece_kind::Newline, String{"\n"},
                                position, !line_has_code});
       position++;
@@ -325,6 +343,13 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
         if (!found_terminator) break;
       }
       pending_heredocs.clear();
+      if (deferred_heredoc_keyword.has_value()) {
+        pieces.push(deferred_heredoc_keyword.take());
+        if (deferred_heredoc_comment.has_value())
+          pieces.push(deferred_heredoc_comment.take());
+        pieces.push(format_piece{format_piece_kind::Newline, String{"\n"},
+                                 position, false});
+      }
       line_start = position;
       continue;
     }
@@ -502,9 +527,15 @@ public:
   {
     if (starts_line) {
       finish_line();
-      m_output.append(comment);
-      m_line_has_text = !comment.is_empty();
-      m_column = toiletline::display_width(comment);
+      usize text_position = 0;
+      while (text_position < comment.length &&
+             (comment[text_position] == ' ' || comment[text_position] == '\t'))
+        text_position++;
+      let const text = comment.substring(text_position);
+      start_line();
+      m_output.append(text);
+      m_line_has_text = !text.is_empty();
+      m_column += toiletline::display_width(text);
       return;
     }
     if (m_line_has_text) m_output.push(' ');
@@ -542,8 +573,8 @@ private:
   fn start_line() throws -> void
   {
     if (m_line_has_text) return;
-    for (usize position = 0; position < m_indent; position += 2)
-      m_output.push('\t');
+    for (usize position = 0; position < m_indent; position++)
+      m_output.push(' ');
     m_column = m_indent;
   }
 
@@ -694,6 +725,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   bool should_attach_redirection_operand = false;
   bool command_starts_after_redirection = false;
   usize subshell_depth = 0;
+  usize conditional_depth = 0;
   usize indent = initial_indent;
 
   let const do_close_test = [&]() throws {
@@ -712,6 +744,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   for (usize index = 0; index < pieces.count(); index++) {
     let const &piece = pieces[index];
     let const text = piece.text.view();
+    let const is_followed_by_continuation =
+        index + 1 < pieces.count() &&
+        pieces[index + 1].kind == format_piece_kind::Operator &&
+        (pieces[index + 1].text == "&&" || pieces[index + 1].text == "||" ||
+         pieces[index + 1].text == "|" || pieces[index + 1].text == "|&");
+    let const is_followed_by_inline_comment =
+        index + 1 < pieces.count() &&
+        pieces[index + 1].kind == format_piece_kind::Comment &&
+        !pieces[index + 1].starts_line;
     if (piece.kind == format_piece_kind::Raw) {
       writer.append_raw(text);
       continue;
@@ -740,9 +781,16 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       let formatted_word =
           format_word_substitutions(text, indent, recursion_depth);
       let const rendered_text = formatted_word.view();
+      if (rendered_text == "[[")
+        conditional_depth++;
+      else if (rendered_text == "]]" && conditional_depth > 0)
+        conditional_depth--;
       let const is_case_pattern =
           !case_pattern_states.is_empty() && case_pattern_states.back();
       let const is_case_esac = is_case_pattern && rendered_text == "esac";
+      let const is_case_body_esac = !case_pattern_states.is_empty() &&
+                                    !case_pattern_states.back() &&
+                                    rendered_text == "esac";
       let const is_reserved_position =
           is_command_start && (!is_case_pattern || is_case_esac);
       u8 keyword_flags = 0;
@@ -755,6 +803,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if ((keyword_flags & formatter_keyword_closes) != 0) {
         do_finish_command();
         writer.finish_line();
+        if (is_case_body_esac && indent >= 2) indent -= 2;
         if (indent >= 2) indent -= 2;
         writer.set_indent(indent);
       }
@@ -762,7 +811,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         do_finish_command();
         writer.finish_line();
         writer.append_token(rendered_text);
-        writer.finish_line();
+        if (index + 1 < pieces.count() &&
+            pieces[index + 1].kind == format_piece_kind::Comment &&
+            !pieces[index + 1].starts_line)
+        {
+          index++;
+          writer.append_comment(pieces[index].text.view(), false);
+        }
+        if (!is_followed_by_continuation && !is_followed_by_inline_comment)
+          writer.finish_line();
         if ((keyword_flags & formatter_keyword_indents) != 0 || is_case_in)
           indent += 2;
         writer.set_indent(indent);
@@ -792,7 +849,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         continue;
       }
       let const is_redirection_descriptor =
-          index + 1 < pieces.count() &&
+          conditional_depth == 0 && index + 1 < pieces.count() &&
           pieces[index + 1].kind == format_piece_kind::Operator &&
           is_redirection_operator(pieces[index + 1].text.view()) &&
           piece.source_position + piece.text.count() ==
@@ -813,7 +870,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     if (text == "{") {
       writer.finish_line();
       writer.append_token(text);
-      writer.finish_line();
+      if (!is_followed_by_inline_comment) writer.finish_line();
       indent += 2;
       writer.set_indent(indent);
       do_finish_command();
@@ -821,7 +878,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     }
     if (text == "(" && is_command_start) {
       writer.append_token(text);
-      writer.finish_line();
+      if (!is_followed_by_inline_comment) writer.finish_line();
       indent += 2;
       subshell_depth++;
       writer.set_indent(indent);
@@ -834,7 +891,8 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (indent >= 2) indent -= 2;
       writer.set_indent(indent);
       writer.append_token(text);
-      writer.finish_line();
+      if (!is_followed_by_continuation && !is_followed_by_inline_comment)
+        writer.finish_line();
       continue;
     }
     if (is_case_terminator(text)) {
@@ -843,7 +901,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (indent >= 2) indent -= 2;
       writer.set_indent(indent);
       writer.append_token(text);
-      writer.finish_line();
+      if (!is_followed_by_inline_comment) writer.finish_line();
       if (!case_pattern_states.is_empty()) case_pattern_states.back() = true;
       continue;
     }
@@ -855,17 +913,24 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     }
     if (is_line_operator(text)) {
       do_close_test();
-      if (text != ";") writer.append_token(text);
-      writer.finish_line();
-      do_finish_command();
+      if (text == ";" || text == "&") {
+        if (text == "&") writer.append_token(text);
+        if (!is_followed_by_inline_comment) writer.finish_line();
+        do_finish_command();
+      } else {
+        writer.append_token(text);
+        do_finish_command();
+      }
       continue;
     }
-    if (is_test_command && !has_closed_test && is_redirection_operator(text))
-      do_close_test();
+    let const is_redirection =
+        conditional_depth == 0 && is_redirection_operator(text);
+    if (is_test_command && !has_closed_test && is_redirection) do_close_test();
 
-    if (text == "<<" || text == "<<-") should_attach_heredoc_delimiter = true;
+    if (is_redirection && (text == "<<" || text == "<<-"))
+      should_attach_heredoc_delimiter = true;
 
-    if (is_redirection_operator(text)) {
+    if (is_redirection) {
       command_starts_after_redirection = is_command_start;
       if (index > 0 && pieces[index - 1].kind == format_piece_kind::Word &&
           pieces[index - 1].source_position + pieces[index - 1].text.count() ==
@@ -879,7 +944,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 
     if (text == ")" && is_case_pattern) {
       writer.append_attached(text);
-      writer.finish_line();
+      if (!is_followed_by_inline_comment) writer.finish_line();
       indent += 2;
       writer.set_indent(indent);
       case_pattern_states.back() = false;
@@ -924,13 +989,6 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
   normalized.normalize_crlf_line_endings();
   if (!validate_formatted_source(normalized.view(), mood, arena, errors))
     return None;
-  if (contains_byte_pair(normalized.view(), '<', '<')) {
-    while (!normalized.is_empty() && normalized[normalized.count() - 1] == '\n')
-      normalized.pop_back();
-    if (!normalized.is_empty()) normalized.push('\n');
-    return normalized;
-  }
-
   let const pieces = scan_format_pieces(normalized.view());
   let formatted = render_format_pieces(pieces);
   let formatted_errors = ArrayList<String>{heap_allocator()};
@@ -1080,6 +1138,8 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
   let replacement = String{heap_allocator()};
   let title = String{heap_allocator()};
   bool is_fixable = true;
+  let const written =
+      source.substring_of_length(location.position, location.length);
 
   switch (id) {
   case diagnostic_id::sc1082: title = "Remove the byte-order mark"; break;
@@ -1113,8 +1173,6 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
     title = "Remove whitespace from the shebang";
     break;
   case diagnostic_id::sc1029: {
-    let const written =
-        source.substring_of_length(location.position, location.length);
     if (written.length < 2 || written[0] != '\\') {
       is_fixable = false;
       break;
@@ -1135,15 +1193,44 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
     title = "Replace '==' with '='";
     replacement = "=";
     break;
+  case diagnostic_id::sc2068:
+    if (written != "$@") {
+      is_fixable = false;
+      break;
+    }
+    title = "Quote '$@'";
+    replacement = "\"$@\"";
+    break;
+  case diagnostic_id::sc2071:
+    if (written == ">") {
+      title = "Replace '>' with '-gt'";
+      replacement = "-gt";
+    } else if (written == "<") {
+      title = "Replace '<' with '-lt'";
+      replacement = "-lt";
+    } else {
+      is_fixable = false;
+    }
+    break;
+  case diagnostic_id::sc2086_expansion:
+  case diagnostic_id::sc2086_test:
+    if (written.is_empty()) {
+      is_fixable = false;
+      break;
+    }
+    title = "Quote the expansion";
+    replacement.push('"');
+    replacement.append(written);
+    replacement.push('"');
+    break;
   default: is_fixable = false; break;
   }
   if (!is_fixable) return fixes;
 
   let edits = ArrayList<source_edit>{heap_allocator()};
-  edits.push(source_edit{
-      location.position, location.position + location.length,
-      String{source.substring_of_length(location.position, location.length)},
-      steal(replacement)});
+  let const edit_end = location.position + location.length;
+  edits.push(source_edit{location.position, edit_end, String{written},
+                         steal(replacement)});
   fixes.push(source_fix{steal(title), steal(edits), true, true});
 
   return fixes;

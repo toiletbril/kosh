@@ -211,7 +211,9 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
            conditional_word_is_numeric_literal(m_elements[i - 1].word)) ||
           (i + 1 < m_elements.count() &&
            conditional_word_is_numeric_literal(m_elements[i + 1].word)))
-        actx.report_diagnostic(diagnostic_id::sc2071, source_location(), {op});
+        actx.report_diagnostic(diagnostic_id::sc2071,
+                               element.location.value_or(source_location()),
+                               {op});
       if (i > 0 && i + 1 < m_elements.count() &&
           conditional_word_is_literal(m_elements[i - 1].word) &&
           conditional_word_is_literal(m_elements[i + 1].word))

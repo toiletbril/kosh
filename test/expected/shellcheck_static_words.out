@@ -360,6 +360,12 @@
               [CompoundList]
                 [CompoundListCondition, None]
                   [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "special_parameter_arithmetic"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((1 + $?))"]
 [Word
   Unquoted "lint_only"
 ]
@@ -1754,6 +1760,21 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "special_parameter_arithmetic"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 + $?"
+]
+[Word
+  Unquoted "}"
+]
 3:8: warning: A bare glob can expand to a filename that begins with `-`. (SC2035)
      3 |    grep *.txt file
        |         ^~~~~
@@ -2028,9 +2049,9 @@ note: Feed the loop with a redirection or process substitution.
     98 |    echo "$pipeline_value"
        |         ^~~~~~~~~~~~~~~~~
 note: Move the assignment outside the pipeline.
-99:3: warning: The `>` operator compares strings lexicographically. (SC2071)
+99:9: warning: The `>` operator compares strings lexicographically. (SC2071)
     99 |    [[ 10 > 7 ]]
-       |    ^~
+       |          ^
 note: Use an arithmetic command, or a numeric `-lt` or `-gt` operator.
 99:6: warning: Both operands of the `>` comparison are literal. (SC2050)
     99 |    [[ 10 > 7 ]]
@@ -2127,9 +2148,9 @@ note: Use `$(...)` for command substitution.
    121 |    echo `date`
        |         ^~~~~~
 note: Quote it to keep one argument.
-122:8: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
+122:11: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
    122 |    echo $(($number + 1))
-       |         ^~~~~~~~~~~~~~~~
+       |            ^~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
 122:8: warning: A value from external input is evaluated as arithmetic code.
    122 |    echo $(($number + 1))

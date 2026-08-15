@@ -86,6 +86,10 @@ to standard output. The
 option writes the result to one or more named files. A lint application writes
 safe diagnostic fixes. A combined lint and format application writes the lint
 fixes first and then formats the result.
+.B \-\-lint \-\-format
+without
+.B \-\-apply
+writes the fixed and formatted source to standard output.
 .PP
 When both
 .B \-s
@@ -294,13 +298,15 @@ The option is accepted without effect for compatibility.
 .TP
 .B \-\-format
 Shell source is formatted without being run. Structural keywords and compound
-braces are placed on separate lines. Each nested level uses one tab, counted as
-two columns for wrapping. Direct
+braces are placed on separate lines. Each nested level uses two spaces. Direct
 .B test
 commands become bracket commands unless an earlier alias or function shadows
 the name. Code is wrapped at 80 columns when a safe token boundary exists.
-Comments are retained. A script containing a here-document retains its source
-layout. Output uses LF line endings and one final newline for a nonempty script.
+Standalone comments follow the surrounding code indentation and are not
+wrapped. Inline comments remain inline. Here-document bodies and terminators
+retain their layout. Surrounding shell source is formatted. Output uses LF line
+endings and one final newline for a nonempty script.
+Formatted source uses syntax colors when standard output is a terminal.
 With no file or a lone
 .B \-
 operand, source is read from standard input. One named file may be written to

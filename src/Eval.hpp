@@ -105,6 +105,7 @@ struct conditional_element
   Kind kind;
   const Token *word{nullptr};
   bool is_bare_unquoted{false};
+  Maybe<SourceLocation> location;
 };
 
 pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool;

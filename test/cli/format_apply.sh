@@ -17,8 +17,9 @@ printf 'if test -f "\044x"; then echo yes; else echo no; fi\n' |
 
 cat > "$root/comments.sh" <<'EOF'
 #!/bin/sh
-  # preserve this indentation and text
+  # keep this text without wrapping
 if true; then echo x # preserve this inline comment
+       # this standalone comment stays longer than eighty columns without being wrapped or shortened
 cat <<-BODY
 	body $x
 	BODY
@@ -55,11 +56,18 @@ printf 'echo {a,b}\nitems=(one two)\nfor ((i=0; i<2; i++)); do echo "\044i"; don
   "$BIN" --format
 printf 'printf "%%s\\n" if test x = x\nprintf "%%s\\n" ! test x = y\ncase x in test) echo yes;; esac\ntest -n "\044x" # keep\ntest -f x 2>/dev/null\n2>/dev/null test -n x\nprintf err >&2\nexec 3>&1\n(echo sub)\n' |
   "$BIN" --format
+printf 'if [[ $exits > 0 ]]; then exit 1; fi\n' | "$BIN" --format
 wrapped_again=$(printf '%s\n' "$nested" | "$BIN" --format)
 printf 'nested-idempotent=%s\n' \
   "$([ "$nested" = "$wrapped_again" ] && printf yes)"
 printf 'if cat <<EOF; then\nbody\nEOF\necho done\nfi\n' |
   "$BIN" --format
+printf 'if cat <<EOF; then # keep\nbody\nEOF\necho done\nfi\n' |
+  "$BIN" --format
+printf 'printf then <<EOF\nbody\nEOF\n' | "$BIN" --format
+printf 'if { true; } && { false; } || true; then :; fi || false\ncase x in x) :;; esac | cat\n' |
+  "$BIN" --format
+printf 'case x in\nx) echo arm\nesac\necho top\n' | "$BIN" --format
 printf 'if true; then echo dash; fi\n' | "$BIN" --format -
 
 cat > "$root/first.sh" <<'EOF'
@@ -90,15 +98,20 @@ printf '#!/bin/sh\r\n[ "\0441" = y ]\r\n' > "$root/fixed-crlf.expected"
 printf 'fixed-crlf-status=%s retained=%s\n' "$?" \
   "$(cmp -s "$root/fixed-crlf.sh" "$root/fixed-crlf.expected" && printf yes || printf no)"
 
-printf '\357\273\277#!/bin/sh\n[ "\0441" == y ]\n' > "$root/fix.sh"
+printf '\357\273\277#!/bin/sh\n[ "\0441" == y ]\nprintf "%%s\\n" \0441 \044@\n' > "$root/fix.sh"
 "$BIN" --lint --apply --no-traces "$root/fix.sh" >/dev/null 2>&1
 printf 'lint-apply-status=%s contents=%s\n' "$?" \
   "$(tr '\n' '|' < "$root/fix.sh")"
 
-printf '#!/bin/sh\nif test -n "\0441"; then [ "\0441" == y ]; fi\n' > "$root/both.sh"
+printf '#!/bin/bash\nif test -n "\0441"; then [ "\0441" == y ]; fi\nif [[ \0441 > 0 ]]; then echo positive; fi\n' > "$root/both.sh"
 "$BIN" --lint --format --apply --no-traces "$root/both.sh" >/dev/null 2>&1
 printf 'combined-status=%s\n' "$?"
 cat "$root/both.sh"
+
+printf '#!/bin/bash\n[[ 1 > 0 ]]\n' > "$root/warning.sh"
+"$BIN" --lint --format --apply --no-traces "$root/warning.sh" >/dev/null 2>&1
+printf 'warning-apply-status=%s\n' "$?"
+cat "$root/warning.sh"
 
 printf 'if\n' > "$root/invalid.sh"
 before=$(cat "$root/invalid.sh")
@@ -110,8 +123,10 @@ printf 'parse-status=%s unchanged=%s\n' "$?" \
 printf 'apply-alone-status=%s\n' "$?"
 "$BIN" --format "$root/first.sh" "$root/second.sh" >/dev/null 2>&1
 printf 'multi-stdout-status=%s\n' "$?"
-"$BIN" --lint --format "$root/first.sh" >/dev/null 2>&1
-printf 'lint-format-no-apply-status=%s\n' "$?"
+printf '#!/bin/sh\nif test -n "\0441"; then [ "\0441" == y ]; fi\n' |
+  "$BIN" --lint --format --no-traces > "$root/lint-format.out"
+printf 'lint-format-stdout-status=%s\n' "$?"
+cat "$root/lint-format.out"
 
 printf '#!/bin/sh\n[ "\0441" == y ]\n' > "$root/conflict.sh"
 "$BIN" --lint --apply -s "$root/conflict.sh" >/dev/null 2>&1

@@ -1003,8 +1003,9 @@ static fn replace_file_contents(const apply_file_snapshot &snapshot,
 }
 
 static fn run_format_operation(const ArrayList<String> &file_names,
-                               bool should_apply, mimic_mood mood,
-                               BumpArena &ast_arena) throws -> int
+                               bool should_apply, bool should_apply_lint_fixes,
+                               mimic_mood mood, BumpArena &ast_arena,
+                               EvalContext &context) throws -> int
 {
   bool did_fail = false;
   usize input_count = file_names.count();
@@ -1034,6 +1035,44 @@ static fn run_format_operation(const ArrayList<String> &file_names,
       source = contents.take();
     }
 
+    if (should_apply_lint_fixes) {
+      let normalized_source = source.clone();
+      normalized_source.normalize_crlf_line_endings();
+      let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
+      let const source_name = file_names.is_empty()
+                                  ? Maybe<StringView>{}
+                                  : Maybe<StringView>{file_names[input_index]};
+      unused(run_script_contents(normalized_source, context, ast_arena,
+                                 source_name, nullptr, nullptr, None, nullptr,
+                                 &diagnostics));
+      let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
+
+      for (let const &diagnostic : diagnostics) {
+        if (!diagnostic.source_name.is_empty() &&
+            (!source_name.has_value() ||
+             diagnostic.source_name != *source_name))
+          continue;
+        for (let const &fix : diagnostic.fixes) {
+          let edits = ArrayList<source_edit>{heap_allocator()};
+          for (let const &edit : fix.edits)
+            edits.push(source_edit{edit.start, edit.end, edit.expected.clone(),
+                                   edit.replacement.clone()});
+          normalized_fixes.push(source_fix{fix.title.clone(), steal(edits),
+                                           fix.is_preferred,
+                                           fix.is_safe_for_fix_all});
+        }
+      }
+      let const fixes = source_fixes_for_original_line_endings(
+          source.view(), normalized_fixes);
+      let fixed = apply_source_fixes(source.view(), fixes);
+      if (!fixed.has_value()) {
+        show_message("Unable to apply non-conflicting fixes to the input.");
+        did_fail = true;
+        continue;
+      }
+      source = fixed.take();
+    }
+
     let errors = ArrayList<String>{heap_allocator()};
     let formatted = format_shell_source(source.view(), mood, ast_arena, errors);
     if (!formatted.has_value()) {
@@ -1047,6 +1086,27 @@ static fn run_format_operation(const ArrayList<String> &file_names,
       if (formatted->view() != source.view() &&
           !replace_file_contents(*snapshot, formatted->view()))
         did_fail = true;
+    } else if (colors::stdout_wants_color()) {
+      let highlighted = String{heap_allocator()};
+      let highlight_cache = completion::shell_highlight_cache{};
+      usize line_start = 0;
+
+      while (line_start < formatted->count()) {
+        usize line_end = line_start;
+        while (line_end < formatted->count() && (*formatted)[line_end] != '\n')
+          line_end++;
+        if (line_end < formatted->count()) line_end++;
+
+        let const *spans = highlight_cache.spans_for(
+            formatted->view(), line_start, line_end, context);
+        let const line = formatted->view().substring_of_length(
+            line_start, line_end - line_start);
+        completion::append_highlighted_range(
+            highlighted, line, *spans, 0, line.length,
+            colors::PRINTED_SOURCE_HIGHLIGHT_THEME);
+        line_start = line_end;
+      }
+      print(highlighted);
     } else {
       print(formatted->view());
     }
@@ -1474,13 +1534,6 @@ fn main(int argc, char **argv) -> int
         "The '--apply' option requires '--lint' or '--format'.");
     return 2;
   }
-  if (FLAG_LINT.is_enabled() && FLAG_FORMAT.is_enabled() &&
-      !FLAG_APPLY.is_enabled())
-  {
-    koshka::show_message(
-        "The '--lint --format' combination requires '--apply'.");
-    return 2;
-  }
   if (FLAG_APPLY.is_enabled() &&
       (FLAG_STDIN.is_enabled() || FLAG_INTERACTIVE.is_enabled() ||
        !FLAG_COMMAND.is_empty()))
@@ -1823,9 +1876,10 @@ fn main(int argc, char **argv) -> int
   if (FLAG_LINT.is_enabled() && FLAG_APPLY.is_enabled())
     return koshka::run_lint_apply_operation(
         file_names, FLAG_FORMAT.is_enabled(), context, ast_arena);
-  if (FLAG_FORMAT.is_enabled() && !FLAG_LINT.is_enabled())
+  if (FLAG_FORMAT.is_enabled())
     return koshka::run_format_operation(file_names, FLAG_APPLY.is_enabled(),
-                                        session_mood, ast_arena);
+                                        FLAG_LINT.is_enabled(), session_mood,
+                                        ast_arena, context);
 
   /* A lint report must not follow the aliases, functions, and search path of
      whoever invoked it. */

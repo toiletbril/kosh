@@ -147,3 +147,7 @@ annoying_safety_diagnostics() {
   prefix-value) : ;;
   esac
 }
+
+special_parameter_arithmetic() {
+  echo $((1 + $?))
+}

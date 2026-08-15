@@ -46,6 +46,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
   let has_reported_decimal = false;
   let has_reported_octal = false;
   let has_reported_precision_loss = false;
+  let has_redundant_dollar = false;
   /* A division truncates its result, so a multiplication that follows it in the
      same term multiplies the truncated value, shellcheck SC2017. Any operator
      that ends the term clears the flag. */
@@ -128,6 +129,12 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
           name_start < expression.length && expression[name_start] == '{';
       if (is_braced) name_start++;
 
+      if (name_start < expression.length &&
+          lexer::is_variable_name_start(expression[name_start]))
+      {
+        has_redundant_dollar = true;
+      }
+
       usize name_end = name_start;
       while (name_end < expression.length &&
              lexer::is_variable_name(expression[name_end]))
@@ -192,6 +199,9 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     }
     }
   }
+
+  if (has_redundant_dollar)
+    actx.report_diagnostic(diagnostic_id::sc2004, location);
 }
 
 fn check_numeric_comparison_operand(AnalysisContext &actx,

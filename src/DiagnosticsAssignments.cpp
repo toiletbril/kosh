@@ -844,12 +844,6 @@ fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
       actx.report_diagnostic(diagnostic_id::sc2124, location);
       break;
     }
-
-    if (segment.kind == WordSegment::Kind::ArithmeticExpansion &&
-        segment.text.view().find_character('$').has_value())
-    {
-      actx.report_diagnostic(diagnostic_id::sc2004, location);
-    }
   }
 
   return shape;

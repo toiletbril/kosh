@@ -33,10 +33,6 @@ note: Pass the arguments at the call.
 note: Pass the values 'check' expects, or forward `"$@"`.
 Encountered 2 warnings.
 == a positional read in an arithmetic expression counts:
-2:8: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
-     2 |    echo $((2 * $1))
-       |         ^~~~~~~~~~~
-note: Use the variable name directly inside arithmetic.
 1:1: warning: The function 'double' reads arguments, and no call passes any. (SC2120)
      1 |  double() {
        |  ^~~~~~
@@ -48,7 +44,7 @@ note: Pass the arguments at the call.
      1 |  double() {
        |  ^~~~~~ the body reads its arguments here.
 note: Pass the values 'double' expects, or forward `"$@"`.
-Encountered 3 warnings.
+Encountered 2 warnings.
 == a positional read in a for loop word counts:
 1:1: warning: The function 'walk' reads arguments, and no call passes any. (SC2120)
      1 |  walk() {

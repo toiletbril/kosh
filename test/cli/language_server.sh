@@ -64,6 +64,8 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"textDocument/codeAction\",\"params\":{\"textDocument\":{\"uri\":\"file://$directory/open-source.sh\"},\"range\":{\"start\":{\"line\":1,\"character\":0},\"end\":{\"line\":1,\"character\":10}},\"context\":{\"diagnostics\":[],\"only\":[\"quickfix\"]}}}"
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/utf8-action.sh","languageId":"sh","version":1,"text":"[ \"\ud83d\ude00\" == x ]\n"}}}'
   frame '{"jsonrpc":"2.0","id":26,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/utf8-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":14}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/warning-action.sh","languageId":"bash","version":1,"text":"[[ 1 > 0 ]]\n"}}}'
+  frame '{"jsonrpc":"2.0","id":27,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/warning-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":11}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -90,6 +92,7 @@ check_contains filtered-actions '"id":23,"result":[]'
 check_contains root-child-action '"id":24,"result":[]'
 check_contains open-child-action "\"id\":25,\"result\":[{\"title\":\"Replace '==' with '='\",\"kind\":\"quickfix\",\"isPreferred\":true,\"edit\":{\"changes\":{\"file://$directory/open-source.sh\":[{\"range\":{\"start\":{\"line\":1,\"character\":4},\"end\":{\"line\":1,\"character\":6}},\"newText\":\"=\"}]}}}"
 check_contains utf8-code-action '"id":26,"result":[{"title":"Replace '\''=='\'' with '\''='\''","kind":"quickfix","isPreferred":true,"edit":{"changes":{"file:///tmp/utf8-action.sh":[{"range":{"start":{"line":0,"character":9},"end":{"line":0,"character":11}},"newText":"="}]}}}'
+check_contains warning-code-action '"id":27,"result":[{"title":"Replace '\''>'\'' with '\''-gt'\''","kind":"quickfix","isPreferred":true,"edit":{"changes":{"file:///tmp/warning-action.sh":[{"range":{"start":{"line":0,"character":5},"end":{"line":0,"character":6}},"newText":"-gt"}]}}}'
 check_contains builtin-help '"id":12,"result":{"contents":{"kind":"plaintext","value":"DESCRIPTION\n  The printf builtin'
 check_contains utility-help '"id":13,"result":{"contents":{"kind":"plaintext","value":"DESCRIPTION\n  The ls utility'
 check_contains allowed-help 'allowed command help'

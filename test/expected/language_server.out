@@ -17,6 +17,7 @@ filtered-actions=ok
 root-child-action=ok
 open-child-action=ok
 utf8-code-action=ok
+warning-code-action=ok
 builtin-help=ok
 utility-help=ok
 allowed-help=ok

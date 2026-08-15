@@ -2034,27 +2034,33 @@ hot fn Parser::parse_conditional_command() throws -> Command *
     using Kind = conditional_element::Kind;
     switch (t->kind()) {
     case Token::Kind::DoubleAmpersand:
-      elements.push({Kind::And, nullptr});
+      elements.push({Kind::And, nullptr, false, None});
       break;
-    case Token::Kind::DoublePipe: elements.push({Kind::Or, nullptr}); break;
+    case Token::Kind::DoublePipe:
+      elements.push({Kind::Or, nullptr, false, None});
+      break;
     case Token::Kind::LeftParen:
-      elements.push({Kind::OpenParen, nullptr});
+      elements.push({Kind::OpenParen, nullptr, false, None});
       break;
     case Token::Kind::RightParen:
-      elements.push({Kind::CloseParen, nullptr});
+      elements.push({Kind::CloseParen, nullptr, false, None});
       break;
-    case Token::Kind::Less: elements.push({Kind::Less, nullptr}); break;
-    case Token::Kind::Greater: elements.push({Kind::Greater, nullptr}); break;
+    case Token::Kind::Less:
+      elements.push({Kind::Less, nullptr, false, t->source_location()});
+      break;
+    case Token::Kind::Greater:
+      elements.push({Kind::Greater, nullptr, false, t->source_location()});
+      break;
     case Token::Kind::Newline: continue;
     case Token::Kind::Word: {
       let const is_bare_unquoted =
           static_cast<tokens::WordToken *>(t)->word().plain_literal_kind() ==
           Word::PlainLiteral::PlainUnquotedOneSegment;
       if (is_unquoted_word(t, "!")) {
-        elements.push({Kind::Not, nullptr});
+        elements.push({Kind::Not, nullptr, false, None});
         break;
       }
-      elements.push({Kind::Operand, t, is_bare_unquoted});
+      elements.push({Kind::Operand, t, is_bare_unquoted, None});
 
       if (is_unquoted_word(t, "=~")) {
         Token *peek = m_lexer.peek_shell_token();
@@ -2119,14 +2125,15 @@ hot fn Parser::parse_conditional_command() throws -> Command *
           }
           SourceLocation regex_location = first->source_location();
           regex_location.length = end_position - regex_location.position;
-          elements.push(
-              {Kind::Operand, m_lexer.arena().create<tokens::WordToken>(
-                                  regex_location, steal(regex_word))});
+          elements.push({Kind::Operand,
+                         m_lexer.arena().create<tokens::WordToken>(
+                             regex_location, steal(regex_word)),
+                         false, None});
         }
       }
       break;
     }
-    default: elements.push({Kind::Operand, t}); break;
+    default: elements.push({Kind::Operand, t, false, None}); break;
     }
   }
 
