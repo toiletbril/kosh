@@ -219,6 +219,20 @@ b=(x y z)
 unset 'b[-1]'
 echo "b=${b[@]}"
 
+sparse_append=()
+sparse_append[100]=x
+sparse_append[100]+=y
+echo "sparse-plus=${sparse_append[100]} count=${#sparse_append[@]}"
+sparse_append+=([-1]=z)
+echo "literal-negative=${sparse_append[100]}"
+sparse_append[-1]+=q
+echo "element-negative=${sparse_append[100]}"
+
+declare -ia sparse_integer=()
+sparse_integer[100]=4
+sparse_integer[100]+=3
+echo "integer-sparse-plus=${sparse_integer[100]}"
+
 # unset removes a sparse array element held in the sparse map, not only a dense
 # one, so the index disappears from the key list and the value list shrinks.
 a=([0]=x [5]=y [10]=z)

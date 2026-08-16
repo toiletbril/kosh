@@ -380,7 +380,7 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
   return words;
 }
 
-} // namespace
+} /* namespace */
 
 static pure fn segment_is_literal(const WordSegment &segment) wontthrow -> bool
 {
@@ -800,4 +800,4 @@ hot fn EvalContext::process_args(
   return expanded_args;
 }
 
-} // namespace koshka
+} /* namespace koshka */

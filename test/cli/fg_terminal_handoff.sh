@@ -74,7 +74,7 @@ bell=$(printf '\007')
 safe_argument=$(printf 'safe\303\251')
 idle_title="]0;kosh-title-user @ ${d}${bell}"
 probe_title="]0;${probe} 'argument with spaces'${bell}"
-sanitized_title="]0;${BIN} -c : ${safe_argument}${bell}"
+sanitized_title="]0;${BIN} -c : '${safe_argument}'${bell}"
 hook_title="]0;HOOK${bell}"
 
 LC_ALL=C tr '\033' '\n' < "$d/typescript" > "$d/titles"

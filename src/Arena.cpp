@@ -52,7 +52,12 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
 
   LOG(All, "mapping a new arena block of %zu bytes", size);
 
-  m_blocks.push(block{base, size, 0});
+  try {
+    m_blocks.push(block{base, size, 0});
+  } catch (...) {
+    std::free(base);
+    throw;
+  }
 }
 
 hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
@@ -139,4 +144,4 @@ cold fn BumpArena::reset() wontthrow -> void
   if (!m_blocks.is_empty()) m_blocks.front().used = 0;
 }
 
-} // namespace koshka
+} /* namespace koshka */

@@ -3,7 +3,9 @@ MODE ?= dbg
 TARGET ?= # Linux/Windows_NT/Darwin
 ARCH ?= $(shell uname -m) # TODO: arm64/x86_64
 
-ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp PlatformWin32.cpp
+ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp \
+	PlatformPosixFilesystem.cpp PlatformPosixProcess.cpp PlatformWin32.cpp \
+	PlatformWin32Filesystem.cpp PlatformWin32Process.cpp
 SOURCES := $(filter-out $(ROUTED_SOURCES),$(wildcard *.cpp))
 HEADERS := $(wildcard *.hpp)
 
@@ -434,8 +436,8 @@ uninstall:
 CLANG_TIDY ?= clang-tidy
 
 tidy:
-	echo "	CLANG_TIDY $(SOURCES) $(HEADERS)"
-	$(CLANG_TIDY) $(SOURCES) $(HEADERS) --header-filter="*.hpp"
+	echo "	CLANG_TIDY $(SOURCES)"
+	$(CLANG_TIDY) $(SOURCES) --header-filter='.*[.](cpp|hpp)$$' -- $(CXXFLAGS)
 
 CLANG_FORMAT ?= clang-format
 

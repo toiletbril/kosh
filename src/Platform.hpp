@@ -2,9 +2,9 @@
 
 #include "Common.hpp"
 
-#define POSIX 0b1
-#define WIN32 0b10
-#define COSMO 0b100
+#define KOSH_PLATFORM_POSIX 0b1
+#define KOSH_PLATFORM_WIN32 0b10
+#define KOSH_PLATFORM_COSMO 0b100
 
 /* clang-format off */
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
@@ -54,9 +54,9 @@ extern "C" void __lsan_disable(void);
 #if defined __COSMOPOLITAN__
 #include <libc/dce.h>
 #include <libc/runtime/runtime.h>
-#define KOSH_SUPPORT_VECTOR (COSMO | POSIX)
+#define KOSH_SUPPORT_VECTOR (KOSH_PLATFORM_COSMO | KOSH_PLATFORM_POSIX)
 #else
-#define KOSH_SUPPORT_VECTOR (POSIX)
+#define KOSH_SUPPORT_VECTOR (KOSH_PLATFORM_POSIX)
 #endif
 #elif defined _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -71,7 +71,7 @@ extern "C" void __lsan_disable(void);
 #include <psapi.h>
 #include <sys/stat.h>
 #include <tlhelp32.h>
-#define KOSH_SUPPORT_VECTOR (WIN32)
+#define KOSH_SUPPORT_VECTOR (KOSH_PLATFORM_WIN32)
 #endif
 /* clang-format on */
 
@@ -84,7 +84,7 @@ extern "C" void __lsan_disable(void);
 #define KOSH_BROKEN_PIPE_EXIT_STATUS 141
 #endif
 
-#if KOSH_PLATFORM_IS POSIX
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
 extern char **environ;
 #endif
 
@@ -160,7 +160,7 @@ enum class process_group_mode : u8
 pure constexpr fn background_process_group_mode(i64 process_group_id) wontthrow
     -> process_group_mode
 {
-#if KOSH_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
   unused(process_group_id);
   return process_group_mode::NewBackground;
 #else
@@ -175,7 +175,7 @@ enum class terminal_handoff : u8
   BeforeStart,
 };
 
-#if KOSH_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
 constexpr char PATH_DELIMITER = ';';
 constexpr char DIRECTORY_SEPARATOR = '\\';
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = false;
@@ -192,7 +192,7 @@ using os_args = String;
 #define KOSH_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
 #define KOSH_STDERR GetStdHandle(STD_ERROR_HANDLE)
 
-#elif KOSH_PLATFORM_IS POSIX
+#elif KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
 constexpr char PATH_DELIMITER = ':';
 constexpr char DIRECTORY_SEPARATOR = '/';
 constexpr bool FILESYSTEM_IS_CASE_SENSITIVE = true;
@@ -209,6 +209,28 @@ using os_args = ArrayList<const char *>;
 #define KOSH_STDOUT STDOUT_FILENO
 #define KOSH_STDERR STDERR_FILENO
 #endif
+
+class terminal_echo_guard
+{
+public:
+  terminal_echo_guard(descriptor input, bool should_disable) wontthrow;
+  ~terminal_echo_guard();
+
+  terminal_echo_guard(const terminal_echo_guard &) = delete;
+  fn operator=(const terminal_echo_guard &)->terminal_echo_guard & = delete;
+
+  mustuse fn did_succeed() const wontthrow -> bool;
+
+private:
+  descriptor m_input{KOSH_INVALID_FD};
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
+  DWORD m_original_mode{0};
+#else
+  termios m_original_mode{};
+#endif
+  bool m_should_restore{false};
+  bool m_did_succeed{true};
+};
 
 enum class program_extension : u8
 {
@@ -316,9 +338,9 @@ fn make_pipe() wontthrow -> Maybe<Pipe>;
 
 struct thread
 {
-#if KOSH_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
   HANDLE handle{nullptr};
-#elif KOSH_PLATFORM_IS POSIX
+#elif KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
   pthread_t handle{};
 #endif
 };
@@ -357,7 +379,7 @@ public:
   fn cleanup_from(usize mark) wontthrow -> void;
 
 private:
-#if KOSH_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
   ArrayList<Path> m_paths{heap_allocator()};
 #endif
 };
@@ -493,6 +515,8 @@ fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
+fn descriptor_is_seekable(os::descriptor fd) wontthrow -> bool;
+fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool;
 fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
     -> Maybe<String>;
 
@@ -593,7 +617,7 @@ struct regex_span
    not here. */
 struct compiled_regex
 {
-#if KOSH_PLATFORM_IS POSIX
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
   regex_t re{};
 #else
   String pattern{heap_allocator()};
@@ -616,7 +640,8 @@ enum class regex_match_result : u8
 
 /* False on a platform with no regex engine, so [[ =~ ]] reports it is
    unsupported rather than matching. */
-constexpr bool HAS_REGEX_ENGINE = ((KOSH_SUPPORT_VECTOR) &POSIX) != 0;
+constexpr bool HAS_REGEX_ENGINE =
+    ((KOSH_SUPPORT_VECTOR) &KOSH_PLATFORM_POSIX) != 0;
 
 fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result;
@@ -779,7 +804,7 @@ fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool;
 pure fn is_directory_separator(char c) wontthrow -> bool;
 pure inline fn has_directory_separator(StringView path) wontthrow -> bool
 {
-#if KOSH_PLATFORM_IS WIN32
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
   return path.find_character('/').has_value() ||
          path.find_character('\\').has_value();
 #else

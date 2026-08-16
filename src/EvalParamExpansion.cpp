@@ -89,7 +89,7 @@ trim_value_with_modifier(EvalContext &cxt, StringView value, StringView word,
                        end, longest, cxt.extglob_enabled());
 }
 
-} // namespace
+} /* namespace */
 
 fn EvalContext::expand_modifier_word(
     StringView word, bool remove_quotes, bool strip_escaped_literals,
@@ -551,7 +551,7 @@ hot fn EvalContext::apply_parameter_expansion(
       return String::from(stored->count(), scratch_allocator());
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
-    return String::from(value.value_or(String{scratch_allocator()}).length(),
+    return String::from(value.has_value() ? value->length() : 0,
                         scratch_allocator());
   }
 
@@ -737,17 +737,19 @@ hot fn EvalContext::apply_parameter_expansion(
 
   case '#': {
     let word_location = SourceLocation{};
+    let const current_view =
+        current.has_value() ? current->view() : StringView{};
     return trim_value_with_modifier(
-        *this, current.value_or(String{scratch_allocator()}).view(), word,
-        trim_end::Prefix, is_doubled,
+        *this, current_view, word, trim_end::Prefix, is_doubled,
         do_source_location_for(word, word_location));
   }
 
   case '%': {
     let word_location = SourceLocation{};
+    let const current_view =
+        current.has_value() ? current->view() : StringView{};
     return trim_value_with_modifier(
-        *this, current.value_or(String{scratch_allocator()}).view(), word,
-        trim_end::Suffix, is_doubled,
+        *this, current_view, word, trim_end::Suffix, is_doubled,
         do_source_location_for(word, word_location));
   }
 
@@ -795,9 +797,8 @@ fn EvalContext::apply_substring_expansion(
     const SourceLocation *source_location) throws -> String
 {
   let const current = get_variable_value_checked(name);
-  return apply_substring_to_value(
-      current.value_or(String{scratch_allocator()}).view(), body,
-      source_location);
+  let const current_view = current.has_value() ? current->view() : StringView{};
+  return apply_substring_to_value(current_view, body, source_location);
 }
 
 fn EvalContext::apply_substring_to_value(
@@ -899,8 +900,8 @@ fn EvalContext::apply_pattern_replacement(
     const SourceLocation *source_location) throws -> String
 {
   let const current = get_variable_value_checked(name);
-  return pattern_replace_value(current.value_or(String{scratch_allocator()}),
-                               spec, source_location);
+  let const current_view = current.has_value() ? current->view() : StringView{};
+  return pattern_replace_value(current_view, spec, source_location);
 }
 
 /* & reads as the matched span, \& is a literal &, and a backslash before any
@@ -921,11 +922,11 @@ static fn append_pattern_replacement(String &out, StringView replacement,
 }
 
 fn EvalContext::pattern_replace_value(
-    const String &value, StringView spec,
+    StringView value, StringView spec,
     const SourceLocation *source_location) throws -> String
 {
   LOG(All, "applying the pattern replacement '%.*s' to a value of %zu bytes",
-      static_cast<int>(spec.length), spec.data, value.count());
+      static_cast<int>(spec.length), spec.data, value.length);
   StringView remainder = spec.substring(1);
   bool should_replace_all = false;
   bool is_anchored_at_start = false;
@@ -963,63 +964,63 @@ fn EvalContext::pattern_replace_value(
      returned unchanged. The anchored forms still splice at the start or the
      end. */
   if (pattern.is_empty() && !is_anchored_at_start && !is_anchored_at_end)
-    return value;
+    return String{scratch_allocator(), value};
 
   let out = String{scratch_allocator()};
 
   if (is_anchored_at_start) {
     if (let const matched = longest_pattern_match_at(
-            pattern.view(), pattern_active, value.view(), 0, extglob_enabled()))
+            pattern.view(), pattern_active, value, 0, extglob_enabled()))
     {
       append_pattern_replacement(out, replacement.view(),
-                                 value.view().substring_of_length(0, *matched));
-      out.append(value.view().substring(*matched));
+                                 value.substring_of_length(0, *matched));
+      out.append(value.substring(*matched));
     } else {
-      out.append(value.view());
+      out.append(value);
     }
     return out;
   }
 
   if (is_anchored_at_end) {
-    for (usize start = 0; start <= value.length(); start++) {
-      if (utils::glob_matches(pattern.view(), value.view().substring(start),
+    for (usize start = 0; start <= value.length; start++) {
+      if (utils::glob_matches(pattern.view(), value.substring(start),
                               pattern_active, 0, extglob_enabled()))
       {
-        out.append(value.view().substring_of_length(0, start));
+        out.append(value.substring_of_length(0, start));
         append_pattern_replacement(out, replacement.view(),
-                                   value.view().substring(start));
+                                   value.substring(start));
         return out;
       }
     }
-    out.append(value.view());
+    out.append(value);
     return out;
   }
 
   /* A zero-length match advances one byte so the scan cannot loop. */
   bool has_replaced = false;
   usize i = 0;
-  while (i < value.length()) {
+  while (i < value.length) {
     Maybe<usize> matched;
     if (!has_replaced || should_replace_all) {
-      matched = longest_pattern_match_at(pattern.view(), pattern_active,
-                                         value.view(), i, extglob_enabled());
+      matched = longest_pattern_match_at(pattern.view(), pattern_active, value,
+                                         i, extglob_enabled());
     }
     if (matched.has_value()) {
       append_pattern_replacement(out, replacement.view(),
-                                 value.view().substring_of_length(i, *matched));
+                                 value.substring_of_length(i, *matched));
       has_replaced = true;
       if (*matched == 0) {
-        out.push(value.view()[i]);
+        out.push(value[i]);
         i++;
       } else {
         i += *matched;
       }
       if (!should_replace_all) {
-        out.append(value.view().substring(i));
+        out.append(value.substring(i));
         return out;
       }
     } else {
-      out.push(value.view()[i]);
+      out.push(value[i]);
       i++;
     }
   }
@@ -1133,9 +1134,8 @@ fn EvalContext::apply_case_modification(
     const SourceLocation *source_location) throws -> String
 {
   let const current = get_variable_value_checked(name);
-  return apply_case_modification_to_value(
-      current.value_or(String{scratch_allocator()}).view(), spec,
-      source_location);
+  let const current_view = current.has_value() ? current->view() : StringView{};
+  return apply_case_modification_to_value(current_view, spec, source_location);
 }
 
 fn EvalContext::apply_case_modification_to_value(
@@ -1195,9 +1195,7 @@ fn EvalContext::apply_value_modifier(
 {
   if (modifier.is_empty()) return String{scratch_allocator(), value};
   let const op = modifier[0];
-  if (op == '/')
-    return pattern_replace_value(String{scratch_allocator(), value}, modifier,
-                                 source_location);
+  if (op == '/') return pattern_replace_value(value, modifier, source_location);
   if (op == '^' || op == ',')
     return apply_case_modification_to_value(value, modifier, source_location);
   if (op == '#' || op == '%') {
@@ -1213,4 +1211,4 @@ fn EvalContext::apply_value_modifier(
   return String{scratch_allocator(), value};
 }
 
-} // namespace koshka
+} /* namespace koshka */

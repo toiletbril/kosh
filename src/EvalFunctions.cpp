@@ -347,4 +347,4 @@ fn EvalContext::append_integer_expression(String &joined,
   joined += '0';
 }
 
-} // namespace koshka
+} /* namespace koshka */

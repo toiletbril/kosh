@@ -6,10 +6,15 @@
 #include "Common.hpp"
 #include "Containers.hpp"
 #include "Errors.hpp"
+#include "EvalOperations.hpp"
+#include "EvalSnapshot.hpp"
+#include "EvalTypes.hpp"
+#include "ExecContext.hpp"
 #include "Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "ProgramResolver.hpp"
 #include "ResolvedCommand.hpp"
 #include "RuntimeState.hpp"
 
@@ -18,528 +23,6 @@ namespace koshka {
 namespace completion {
 class shell_highlight_cache;
 } /* namespace completion */
-
-enum class argument_lifetime : u8
-{
-  Persistent,
-  Transient,
-};
-
-enum class argument_context : u8
-{
-  Command,
-  ArrayLiteral,
-};
-
-enum class execution_mode : u8
-{
-  Foreground,
-  Background,
-};
-
-enum class script_isolation : u8
-{
-  Shared,
-  Isolated,
-};
-
-enum class return_handling : u8
-{
-  Propagate,
-  Consume,
-  Reject,
-};
-
-enum class restricted_path_use : u8
-{
-  Command,
-  Source,
-  History,
-  Hash,
-};
-
-/* A candidate argument after variable expansion and field splitting. The
-   parallel mask marks which characters may act as glob metacharacters. */
-struct glob_field
-{
-  explicit glob_field(Allocator allocator)
-      : text(allocator), glob_active(heap_allocator())
-  {}
-
-  String text;
-  Bitset glob_active;
-};
-
-/* The index of the first active glob metacharacter in a field, or None when the
-   field is all literal. The argument expander reads it to push a glob-free
-   field straight through, skipping the directory scan that expand_path would
-   run. */
-hot pure fn first_active_glob(StringView text, const Bitset &mask,
-                              bool extglob) wontthrow -> Maybe<usize>;
-
-inline pure fn is_colon_modifier_operator(char c) wontthrow -> bool
-{
-  return c == '-' || c == '+' || c == '=' || c == '?';
-}
-
-class Token;
-class Word;
-class WordSegment;
-class Expression;
-struct arith_token;
-
-struct conditional_element
-{
-  enum class Kind : u8
-  {
-    Operand,
-    And,
-    Or,
-    Not,
-    OpenParen,
-    CloseParen,
-    Less,
-    Greater,
-  };
-
-  Kind kind;
-  const Token *word{nullptr};
-  bool is_bare_unquoted{false};
-  Maybe<SourceLocation> location;
-};
-
-pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool;
-pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool;
-pure fn is_process_dynamic_variable_name(StringView name) wontthrow -> bool;
-
-/* A pending non-local jump the evaluator carries instead of throwing, consumed
-   at the matching boundary or left pending for an outer node. */
-struct control_flow
-{
-  enum class Kind : u8
-  {
-    Normal,
-    Break,
-    Continue,
-    Return,
-    Exit,
-  };
-
-  Kind kind{Kind::Normal};
-  i64 value{0};
-  SourceLocation location{0, 0};
-  const String *source{nullptr};
-  String origin{heap_allocator()};
-};
-
-struct source_frame
-{
-  source_frame(String origin, SourceLocation call_site,
-               const String *parent_source, String source_path,
-               bool is_cli_root, bool is_only_root_source)
-      : origin(steal(origin)), call_site(call_site),
-        parent_source(parent_source), source_path(steal(source_path)),
-        parent_source_length(parent_source != nullptr ? parent_source->length()
-                                                      : 0),
-        is_cli_root(is_cli_root), is_only_root_source(is_only_root_source)
-  {}
-
-  String origin;
-  SourceLocation call_site;
-  const String *parent_source;
-  String source_path;
-  usize parent_source_length;
-  bool is_cli_root;
-  bool is_only_root_source;
-  bool was_printed{false};
-  bool should_defer_trace{false};
-  bool has_deferred_trace{false};
-  Maybe<SourceLocation> deferred_trace_location;
-};
-
-/* A variable binding saved when a local shadows it. A None previous value means
-   the name was unset, so leaving the scope restores the unset state. */
-struct local_binding
-{
-  String name;
-  Maybe<String> previous_value;
-  Maybe<ArrayList<String>> previous_indexed_array;
-  bool previous_was_associative{false};
-  ArrayList<String> previous_associative_keys{heap_allocator()};
-  ArrayList<String> previous_associative_values{heap_allocator()};
-  ArrayList<usize> previous_sparse_indices{heap_allocator()};
-  ArrayList<String> previous_sparse_values{heap_allocator()};
-  bool previous_was_integer{false};
-  /* The read-only mark, so a local -r marks only this scope and the caller's
-     later reassignment is not rejected. */
-  bool previous_was_readonly{false};
-  bool previous_was_exported{false};
-};
-
-struct job
-{
-  enum class State : u8
-  {
-    Running,
-    Stopped,
-    Done,
-  };
-
-  i32 id;
-  os::process pid;
-  ArrayList<os::process> earlier_pipeline_processes{heap_allocator()};
-  String command{heap_allocator()};
-  State state{State::Running};
-  i32 last_status{0};
-  i32 stopped_status{0};
-  i64 process_id{0};
-  i64 process_group_id{0};
-  bool is_primary_process_active{true};
-  bool has_unreported_state_change{false};
-};
-
-struct environment_undo_entry
-{
-  String name;
-  Maybe<String> previous_value;
-};
-
-struct process_substitution
-{
-  os::descriptor shell_fd;
-  os::process child;
-  SourceLocation location;
-  StringView source;
-};
-
-struct process_substitution_mark
-{
-  usize pending{0};
-  usize temp{0};
-};
-
-struct loop_redirect_fd
-{
-  i32 target_fd{-1};
-  os::file_open_mode mode{};
-  String path;
-  os::descriptor fd{};
-};
-
-struct loop_redirect_fd_mark
-{
-  usize count{0};
-};
-
-struct subshell_saved_descriptor
-{
-  usize depth;
-  os::saved_descriptor saved;
-};
-
-/* How a function body's absolute source positions map onto the stored
-   definition copy. The copy holds a "name () " header then the body verbatim,
-   so an absolute position rebases by the body start and header length. */
-struct function_definition_info
-{
-  usize body_start_position{0};
-  usize header_length{0};
-  usize line_offset{0};
-  String filename{heap_allocator()};
-  RuntimeState defining_runtime;
-};
-
-struct shell_option_mutations
-{
-  u64 revision{0};
-  u64 last_revision[static_cast<usize>(shell_option_id::Count)]{};
-
-  fn note(shell_option_id option) wontthrow -> void
-  {
-    revision++;
-    last_revision[static_cast<usize>(option)] = revision;
-  }
-
-  pure fn touched_since(shell_option_id option,
-                        u64 prior_revision) const wontthrow -> bool
-  {
-    return last_revision[static_cast<usize>(option)] > prior_revision;
-  }
-};
-
-enum class definition_state_exit : u8
-{
-  PropagateMutations,
-  RestoreCaller,
-};
-
-struct function_runtime_state
-{
-  RuntimeState previous;
-  RuntimeState entered;
-  shell_option_mutations previous_shell_option_mutations;
-  u64 shell_option_mutation_revision;
-  u64 mood_mutation_revision;
-  u64 warning_mutation_revision;
-  u64 diagnostics_mutation_revision;
-  u64 annoying_diagnostics_mutation_revision;
-  bool was_mood_set_explicitly;
-};
-
-fn record_directory_access(StringView directory, Allocator allocator) throws
-    -> void;
-
-/* A warning the evaluator can silence for the span of a construct.
-   UnsetReference exempts an unset name entirely, so neither the warning nor the
-   set -u abort fires. UnsetTestOperand silences only the advisory unset warning
-   while a test or [ expands its operands, the set -u abort still fires. */
-enum class suppressible_warning : u8
-{
-  UnsetReference,
-  UnsetTestOperand,
-};
-
-class EvalContext;
-
-namespace utils {
-
-class ProgramResolver
-{
-public:
-  enum class Requirement : u8
-  {
-    Regular,
-    Runnable,
-    Execution,
-  };
-
-  enum class CachePolicy : u8
-  {
-    Bypass,
-    ReadOnly,
-    Remember,
-  };
-
-  enum class Status : u8
-  {
-    Missing,
-    Blocked,
-    Runnable,
-  };
-
-  enum class StatusLookup : u8
-  {
-    Cached,
-    Authoritative,
-  };
-
-  enum class SearchMode : u8
-  {
-    First,
-    All,
-  };
-
-  enum class ValidationScope : u8
-  {
-    Prefix,
-    All,
-  };
-
-  enum class CompletionRefresh : u8
-  {
-    Cached,
-    Fresh,
-  };
-
-  ProgramResolver();
-  explicit ProgramResolver(Maybe<String> path);
-
-  fn assign_path(Maybe<String> path) throws -> void;
-  fn restore_path(Maybe<String> path) throws -> void;
-  fn invalidate() throws -> void;
-  fn remember_path(StringView name, const Path &path) throws -> void;
-  fn working_directory_changed() throws -> void;
-  fn initialize_path_map() throws -> void;
-  fn begin_explicit_completion(CompletionRefresh refresh) throws -> void;
-  fn end_explicit_completion() wontthrow -> void;
-  fn search(StringView program_name, SearchMode search_mode = SearchMode::First,
-            Requirement requirement = Requirement::Runnable,
-            CachePolicy cache_policy = CachePolicy::Bypass,
-            Maybe<StringView> path_override = None) throws -> ArrayList<Path>;
-  fn get_status(StringView name,
-                StatusLookup lookup = StatusLookup::Cached) throws -> Status;
-  fn get_command_names(
-      StringView validation_prefix = {},
-      ValidationScope validation_scope = ValidationScope::Prefix) throws
-      -> const ArrayList<String> &;
-  pure fn get_command_name_lower_bound(StringView name) const wontthrow
-      -> usize;
-  fn command_name_has_prefix(StringView prefix) throws -> bool;
-  pure fn has_valid_command_names() const wontthrow -> bool;
-  fn for_each_command_name(auto callback) const throws -> void
-  {
-    for (let const &name : m_command_names)
-      callback(name);
-  }
-
-private:
-  struct CachedPath
-  {
-    Path path;
-    os::program_extension extension{os::program_extension::None};
-  };
-
-  struct CacheEntry
-  {
-    ArrayList<CachedPath> paths{heap_allocator()};
-    Maybe<usize> bare_path_position{};
-  };
-
-  fn mark_command_name_indexes_stale() wontthrow -> void;
-  fn clear_command_name_indexes() wontthrow -> void;
-  fn mark_derived_indexes_stale() wontthrow -> void;
-  fn clear_derived_indexes() wontthrow -> void;
-  fn split_path_dirs(StringView path) throws -> ArrayList<String>;
-  fn deduplicate_path_dirs(const ArrayList<String> &directories) throws
-      -> ArrayList<String>;
-  fn get_path_dirs() throws -> const ArrayList<String> &;
-  fn get_index_path_dirs() throws -> const ArrayList<String> &;
-  fn refresh_path_directory_generations() throws -> void;
-  fn rebuild_path_command_index(CompletionRefresh refresh) throws -> void;
-  fn prepare_complete_path_cache(StringView validation_prefix,
-                                 ValidationScope validation_scope) throws
-      -> void;
-  fn validate_path_directory_generations() throws -> bool;
-  fn revalidate_command_prefix(StringView prefix) throws -> void;
-  fn resolve_along_path(StringView program_name, SearchMode search_mode,
-                        Requirement requirement, CachePolicy cache_policy,
-                        Maybe<StringView> path_override) throws
-      -> ArrayList<Path>;
-  fn cache_resolved_path(StringView name, const Path &full_path,
-                         os::program_extension extension,
-                         bool is_bare_result) throws -> void;
-  pure fn find_cached_program_path(
-      const CacheEntry &entry,
-      os::program_extension wanted_extension) const wontthrow -> const Path *;
-  pure fn command_name_lower_bound_in(const ArrayList<String> &names,
-                                      StringView name) const wontthrow -> usize;
-
-  StringMap<CacheEntry> m_execution_cache{heap_allocator()};
-  ArrayList<String> m_command_names{heap_allocator()};
-  ArrayList<String> m_regular_names{heap_allocator()};
-  Maybe<String> m_path;
-  ArrayList<String> m_path_dirs{heap_allocator()};
-  ArrayList<String> m_index_path_dirs{heap_allocator()};
-  ArrayList<u64> m_path_directory_generations{heap_allocator()};
-  String m_validated_prefix{heap_allocator()};
-  bool m_path_dirs_are_valid{false};
-  bool m_path_directory_generations_are_valid{false};
-  bool m_command_names_are_valid{false};
-  u64 m_path_directories_validation_epoch{0};
-  u64 m_command_names_validation_epoch{0};
-  u64 m_prefix_validation_epoch{0};
-  usize m_explicit_completion_depth{0};
-};
-
-} // namespace utils
-
-using ProgramResolver = utils::ProgramResolver;
-
-struct eval_state_snapshot
-{
-  StringMap<String> shell_variables;
-  StringMap<ArrayList<String>> indexed_arrays;
-  HashSet associative_names;
-  StringMap<String> associative_values;
-  StringMap<String> sparse_array_values;
-  HashSet sparse_array_names;
-  StringMap<bool> shopt_options;
-  StringMap<const Expression *> functions;
-  StringMap<String> function_sources;
-  StringMap<function_definition_info> function_definition_infos;
-  StringMap<String> aliases;
-  ArrayList<String> positional_params;
-  ArrayList<String> directory_stack;
-  os::DirectoryReference working_directory;
-  u32 file_creation_mask;
-  StringMap<String> traps;
-  /* The read-only and integer name sets ride the snapshot too, so a readonly or
-     a declare -i inside a subshell dies with the child rather than leaking its
-     mark to the parent. */
-  HashSet readonly_names;
-  HashSet integer_names;
-  HashSet exported_names;
-  /* The length of the environment undo log when the snapshot was taken, the
-     point restore_state rewinds the process environment back to. */
-  usize environment_undo_mark;
-  RuntimeState runtime;
-  ProgramResolver program_resolver;
-  u8 init_moods_sourcing;
-  u8 initialized_moods;
-  bool was_mood_set_explicitly;
-  u64 mood_mutation_revision;
-  u64 warning_mutation_revision;
-  u64 diagnostics_mutation_revision;
-  u64 annoying_diagnostics_mutation_revision;
-  shell_option_mutations option_mutations;
-};
-
-struct completion_spec
-{
-  String function_name{heap_allocator()};
-  String word_list{heap_allocator()};
-  bool should_use_default{false};
-  RuntimeState defining_runtime;
-
-  fn clone(Allocator allocator) const throws -> completion_spec
-  {
-    let copy = completion_spec{};
-    copy.function_name = String{allocator, function_name.view()};
-    copy.word_list = String{allocator, word_list.view()};
-    copy.should_use_default = should_use_default;
-    copy.defining_runtime = defining_runtime;
-    return copy;
-  }
-};
-
-/* Owns one compiled regex and frees it on destruction, so the regex cache
-   reclaims every entry when the table rehashes, clears, or is torn down. It is
-   move-only, since two owners would each free the same compiled buffer. */
-class CompiledRegex
-{
-public:
-  CompiledRegex() = default;
-  explicit CompiledRegex(os::compiled_regex compiled)
-      : m_re(compiled), m_is_owned(true)
-  {}
-  ~CompiledRegex()
-  {
-    if (m_is_owned) os::free_regex(m_re);
-  }
-  CompiledRegex(CompiledRegex &&other) noexcept
-      : m_re(other.m_re), m_is_owned(other.m_is_owned)
-  {
-    other.m_is_owned = false;
-  }
-  fn operator=(CompiledRegex &&other) noexcept -> CompiledRegex &
-  {
-    if (this != &other) {
-      if (m_is_owned) os::free_regex(m_re);
-      m_re = other.m_re;
-      m_is_owned = other.m_is_owned;
-      other.m_is_owned = false;
-    }
-    return *this;
-  }
-  CompiledRegex(const CompiledRegex &) = delete;
-  CompiledRegex &operator=(const CompiledRegex &) = delete;
-
-  fn get() wontthrow -> os::compiled_regex * { return &m_re; }
-
-private:
-  os::compiled_regex m_re{};
-  bool m_is_owned{false};
-};
 
 class EvalContext
 {
@@ -621,8 +104,8 @@ public:
      concatenates onto the current element. */
   fn assign_array_element(StringView name, StringView subscript,
                           StringView value, bool is_append) throws -> void;
-  fn read_array_element_integer(StringView name, StringView subscript) throws
-      -> i64;
+  fn read_array_element_arithmetic_text(StringView name,
+                                        StringView subscript) throws -> String;
   pure fn lookup_indexed_array(StringView name) const wontthrow
       -> const ArrayList<String> *
   {
@@ -1945,8 +1428,6 @@ protected:
      terminate the shell. */
   fn assign_variable(StringView name, StringView value) throws -> void;
 
-  /* Remove a variable without the read-only check, the same local restore path
-     as assign_variable. */
   fn force_unset_shell_variable(StringView name) throws -> void;
   /* The unset peel, the bash upvar semantics. A local declared by a caller
      rather than the current scope restores that caller's saved value now and
@@ -1962,9 +1443,6 @@ protected:
                                usize source_location_offset = 0) throws
       -> String;
 
-  /* Expand the bash substring form ${name:offset:length}, an arithmetic offset
-     and an optional arithmetic length, each counting from the end when
-     negative. */
   fn apply_substring_expansion(
       StringView name, StringView body,
       const SourceLocation *source_location = nullptr) throws -> String;
@@ -1972,23 +1450,14 @@ protected:
       StringView value, StringView body,
       const SourceLocation *source_location = nullptr) throws -> String;
 
-  /* Expand the bash pattern-replacement forms ${name/pat/rep},
-     ${name//pat/rep}, ${name/#pat/rep}, and ${name/%pat/rep}. A leading second
-     slash replaces every match while # and % anchor the pattern to the start or
-     the end. */
   fn apply_pattern_replacement(
       StringView name, StringView spec,
       const SourceLocation *source_location = nullptr) throws -> String;
 
-  /* The pattern-replacement core that works on an already-resolved value, so an
-     array element ${a[i]/pat/rep} and ${a[@]/pat/rep} reuse it. */
   fn pattern_replace_value(
-      const String &value, StringView spec,
+      StringView value, StringView spec,
       const SourceLocation *source_location = nullptr) throws -> String;
 
-  /* Expand the bash case-modification forms ${name^}, ${name^^}, ${name,}, and
-     ${name,,}. A single operator touches the first character, a doubled one
-     every character. */
   fn apply_case_modification(
       StringView name, StringView spec,
       const SourceLocation *source_location = nullptr) throws -> String;
@@ -1999,29 +1468,19 @@ protected:
   fn apply_case_modification_to_value(
       StringView value, StringView spec,
       const SourceLocation *source_location = nullptr) throws -> String;
-  /* Apply one trailing value-transform modifier, the / replacement, the # and %
-     trims, or the ^ and , case changes, to a single value. */
   fn apply_value_modifier(
       StringView value, StringView modifier,
       const SourceLocation *source_location = nullptr) throws -> String;
 
-  /* Expand the bash array element reference ${name[subscript]}. A subscript of
-     @ or * yields every element, an arithmetic one a single element. */
   fn apply_array_subscript(
       StringView name, StringView subscript,
       const SourceLocation *source_location = nullptr) throws -> String;
-  /* One past the highest set index of an array, so a negative subscript counts
-     back from the true end. */
   fn array_negative_index_base(StringView name) const throws -> i64;
 
-  /* Expand the bash ${!body} form. When body ends with * or @ it lists the
-     variable names that start with the prefix, otherwise it is indirect. */
   fn apply_indirect_or_name_listing(StringView body) throws -> String;
 
   fn matching_prefix_names(StringView prefix) const throws -> ArrayList<String>;
 
-  /* Turn a word into fields, applying tilde, variable expansion, command
-     substitution, and IFS field splitting, but not globbing. */
   fn expand_word(const Word &word) throws -> ArrayList<glob_field>;
 
   fn expand_path_once(const glob_field &field, bool should_expand_files) throws
@@ -2034,136 +1493,8 @@ protected:
   fn expand_tilde(WordSegment &leading_segment, bool word_continues,
                   bool stop_at_colon) const throws -> void;
   fn resolve_tilde_prefix(StringView name) const throws -> Maybe<String>;
-  /* Expands a tilde after each unquoted colon inside one segment, the
-     assignment-only rule bash applies to PATH=~/bin:~/tmp. */
   fn expand_colon_tildes(WordSegment &segment, bool word_continues) const throws
       -> void;
 };
 
-class ExecContext
-{
-public:
-  static fn make_from(SourceLocation location, StringView source,
-                      ArrayList<String> &&args, mimic_mood mood,
-                      bool is_koshkit_enabled,
-                      ProgramResolver &program_resolver,
-                      ArrayList<SourceLocation> &&arg_locations) throws
-      -> ExecContext;
-
-  /* Build directly from an already resolved builtin kind or program path,
-     skipping the PATH search. A simple command memoizes its resolution. */
-  static fn from_resolved(SourceLocation location, ResolvedCommand kind,
-                          ArrayList<String> &&args,
-                          ArrayList<SourceLocation> &&arg_locations) throws
-      -> ExecContext;
-
-  static fn make_unresolved(SourceLocation location,
-                            i32 resolution_status) throws -> ExecContext;
-
-  Maybe<os::descriptor> in_fd{};
-  Maybe<os::descriptor> out_fd{};
-  Maybe<os::descriptor> err_fd{};
-
-  /* 2>&1 routes the standard error to wherever the standard output goes, and
-     1>&2 the reverse. Applied after the file descriptors are placed. When both
-     are present the source order decides the result, since each dup reads the
-     current target of its source descriptor, so was_output_to_error_last
-     records which one the source wrote last. */
-  bool should_duplicate_error_to_output{false};
-  bool should_duplicate_output_to_error{false};
-  bool was_output_to_error_last{false};
-
-  /* exec -c hands the program an empty environment. The flag rides the context
-     to the spawn site, where the envp becomes a single null instead of environ.
-   */
-  bool should_use_empty_environment{false};
-  bool should_use_fallback_argv0{false};
-
-  /* Set when a koshkit utility runs from a symlink. Its help names the kosh
-     binary behind it. */
-  bool is_multicall{false};
-
-  pure fn is_builtin() const wontthrow -> bool;
-  pure fn is_unresolved() const wontthrow -> bool;
-  pure fn get_unresolved_status() const wontthrow -> i32;
-
-  pure fn args() const wontthrow -> const ArrayList<String> &;
-  pure fn program() const wontthrow -> const String &;
-  pure fn source_location() const wontthrow -> const SourceLocation &;
-  pure fn arg_locations() const wontthrow -> const ArrayList<SourceLocation> &;
-  /* The source span of the field at index, clamped to the whole-command span
-     when the index is out of range or the list is empty, so a builtin that
-     forgot to thread spans degrades to the whole-command caret. */
-  pure fn arg_location_at(usize index) const wontthrow -> SourceLocation;
-
-  fn close_fds() throws -> void;
-  fn print_to_stdout(StringView s) const throws -> void;
-  fn print_to_stderr(StringView s) const throws -> void;
-
-  fn execute(execution_mode mode) throws -> i32;
-
-  pure fn program_path() const wontthrow -> const Path &;
-  fn set_program_path(Path path) throws -> void;
-  pure fn builtin_kind() const wontthrow -> const Builtin::Kind &;
-
-  /* Apply the 2>&1 and 1>&2 cross-routing in the order the source wrote them.
-     Each duplication reads the current target of its source descriptor, so when
-     both are present the one that came last in the source must run last. The
-     two callables carry the platform's own way to point one descriptor at the
-     other, a posix_spawn file action, a dup2, or a Windows handle assignment.
-   */
-  template <typename ApplyErrToOut, typename ApplyOutToErr>
-  fn apply_dup_routing(ApplyErrToOut apply_err_to_out,
-                       ApplyOutToErr apply_out_to_err) const -> void
-  {
-    if (should_duplicate_error_to_output && should_duplicate_output_to_error) {
-      if (was_output_to_error_last) {
-        apply_err_to_out();
-        apply_out_to_err();
-      } else {
-        apply_out_to_err();
-        apply_err_to_out();
-      }
-    } else if (should_duplicate_error_to_output) {
-      apply_err_to_out();
-    } else if (should_duplicate_output_to_error) {
-      apply_out_to_err();
-    }
-  }
-
-private:
-  ExecContext(SourceLocation location, ResolvedCommand &&kind,
-              ArrayList<String> &&args,
-              ArrayList<SourceLocation> &&arg_locations);
-
-  ResolvedCommand m_kind;
-
-  SourceLocation m_location;
-  ArrayList<String> m_args{heap_allocator()};
-  ArrayList<SourceLocation> m_arg_locations{heap_allocator()};
-};
-
-/* Parse and evaluate a constant arithmetic expression with no evaluation
-   context. The optimizer's constant fold calls this once the byte scan proves
-   the source holds no variable and no substitution, so the parser never
-   dereferences a context. A malformed constant, such as a division by zero,
-   throws. */
-fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
-
-fn find_substring_length_separator(StringView body) wontthrow -> usize;
-
-/* The abort the set -u read and the ${name:?} report perform even in the bash
-   mood. */
-[[noreturn]] fn throw_script_fatal(String message, StringView note = {}) throws
-    -> void;
-
-/* Source the startup files for each mood in the list, in order, the way the
-   --init-moods flag and the set --init-moods builtin both ask. A kosh flavor
-   reads /etc/koshrc and ~/.koshrc, a bash flavor the bash rc and completion, a
-   posix flavor the ENV file, and each adds its login profiles when is_login is
-   set. */
-fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
-                     const ArrayList<mimic_mood> &moods, bool is_login_shell,
-                     bool should_be_interactive) throws -> void;
-
-} // namespace koshka
+} /* namespace koshka */

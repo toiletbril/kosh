@@ -12,3 +12,12 @@ echo cleared_by_number
 trap "echo got_term" 15
 trap
 echo set_by_number
+
+trap 'printf "quoted=<%s>\n" "a'\''b"' EXIT
+trap_file=/tmp/kosh-trap-replay-$$
+trap -p EXIT > "$trap_file"
+trap - EXIT
+listed=$(koshkit cat "$trap_file")
+koshkit unlink "$trap_file"
+eval "$listed"
+trap -p EXIT

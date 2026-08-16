@@ -39,6 +39,15 @@ printf 'x\n' | "$BIN" -c 'read -r -q; echo "rc=$?"'
 echo "== read -q at EOF returns one:"
 "$BIN" -c 'read -r -q </dev/null; echo "rc=$?"'
 
+echo "== invalid read descriptors do not consume input:"
+printf 'descriptor-kept\n' |
+  "$BIN" -c 'read -r -u bogus value 2>/dev/null; status=$?; read -r kept; printf "status=%s kept=%s\n" "$status" "$kept"'
+echo "== invalid read counts do not consume input:"
+printf 'count-kept\n' |
+  "$BIN" -c 'read -r -n bogus value 2>/dev/null; status=$?; read -r kept; printf "status=%s kept=%s\n" "$status" "$kept"'
+printf 'negative-kept\n' |
+  "$BIN" -c 'read -r -n=-1 value 2>/dev/null; status=$?; read -r kept; printf "negative=%s kept=%s\n" "$status" "$kept"'
+
 #!/bin/sh
 
 unset KOSH_FLAGS

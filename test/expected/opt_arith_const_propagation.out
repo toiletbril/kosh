@@ -5,6 +5,26 @@
     [SimpleCommand "echo" "$((x*2+1))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((x+x))"]
+  [CompoundListCondition, None]
+    [Assign x=4]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x << 1))"]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "x <<= 1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x + 0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign x=16]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x >> 2))"]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "x >>= 2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x + 0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
 [Word
   Unquoted "x=10"
 ]
@@ -20,6 +40,72 @@
 [Word
   ArithmeticExpansion "x+x"
 ]
+[Word
+  Unquoted "x=4"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x << 1"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x + 0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "x=16"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x >> 2"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x + 0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
 21
 20
+8
+8
+8
+4
+4
+4
 [Code 0]

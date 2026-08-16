@@ -14,7 +14,7 @@ fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
 namespace os {
 fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *;
 fn free_aligned(opaque *pointer) wontthrow -> void;
-} // namespace os
+} /* namespace os */
 
 class Allocator
 {
@@ -217,7 +217,7 @@ inline fn fake_free(opaque *context, opaque *pointer, usize length,
 
 inline constexpr Allocator::VTable FAKE_VTABLE{fake_alloc, fake_free};
 
-} // namespace allocators
+} /* namespace allocators */
 
 inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
 {
@@ -234,4 +234,4 @@ inline fn fake_allocator() wontthrow -> Allocator
   return Allocator{nullptr, &allocators::FAKE_VTABLE};
 }
 
-} // namespace koshka
+} /* namespace koshka */

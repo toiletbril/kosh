@@ -137,7 +137,7 @@ fn shopt_reusable_line(StringView name, bool on, bool as_set_option,
   return line;
 }
 
-} // namespace
+} /* namespace */
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {
@@ -301,4 +301,4 @@ fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace koshka
+} /* namespace koshka */

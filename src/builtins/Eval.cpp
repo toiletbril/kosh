@@ -66,4 +66,4 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                         ec.source_location(), StringView{"eval"});
 }
 
-} // namespace koshka
+} /* namespace koshka */

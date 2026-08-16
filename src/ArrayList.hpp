@@ -11,21 +11,24 @@ template <class T>
 class ArrayList
 {
 public:
+  static_assert(std::is_nothrow_destructible_v<T>);
+
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 
-  ArrayList(std::initializer_list<T> elements) : m_allocator(heap_allocator())
+  ArrayList(std::initializer_list<T> elements) : ArrayList(heap_allocator())
   {
     reserve(elements.size());
     for (const T &element : elements)
       push(element);
   }
 
-  cold ArrayList(const ArrayList &other) : m_allocator(other.m_allocator)
+  cold ArrayList(const ArrayList &other) : ArrayList(other.m_allocator)
   {
     reserve(other.m_length);
-    for (usize i = 0; i < other.m_length; i++)
-      new (&m_data[i]) T(other.m_data[i]);
-    m_length = other.m_length;
+    for (usize i = 0; i < other.m_length; i++) {
+      new (&m_data[m_length]) T(other.m_data[i]);
+      m_length++;
+    }
   }
 
   mustuse cold fn clone() const throws -> ArrayList { return ArrayList{*this}; }
@@ -78,11 +81,12 @@ public:
   }
 
   hot flatten mustuse pure fn
-  operator==(const ArrayList &other) const wontthrow->bool
+  operator==(const ArrayList &other) const throws->bool
   {
     if (m_length != other.m_length) return false;
-    if constexpr (std::is_integral_v<T> || std::is_enum_v<T> ||
-                  std::is_pointer_v<T>)
+    if constexpr (std::is_trivially_copyable_v<T> &&
+                  std::has_unique_object_representations_v<T> &&
+                  !std::is_pointer_v<T>)
     {
       return m_length == 0 ||
              __builtin_memcmp(m_data, other.m_data, m_length * sizeof(T)) == 0;
@@ -93,7 +97,7 @@ public:
     }
   }
   hot flatten mustuse pure fn
-  operator!=(const ArrayList &other) const wontthrow->bool
+  operator!=(const ArrayList &other) const throws->bool
   {
     return !(*this == other);
   }
@@ -110,7 +114,7 @@ public:
   }
 
   template <class Wanted>
-  hot mustuse pure fn find(const Wanted &wanted) const wontthrow -> Maybe<usize>
+  hot mustuse pure fn find(const Wanted &wanted) const throws -> Maybe<usize>
   {
     for (usize element_index = 0; element_index < m_length; element_index++)
       if (m_data[element_index] == wanted) return element_index;
@@ -142,7 +146,7 @@ public:
   }
 
   /* The caller guarantees index is in range. */
-  fn remove(usize index) wontthrow -> void
+  fn remove(usize index) throws -> void
   {
     ASSERT(index < m_length, "remove past the end of the list");
     for (usize i = index; i + 1 < m_length; i++)
@@ -206,7 +210,12 @@ public:
       new_capacity *= 2;
     }
     let const fresh = m_allocator.alloc_array<T>(new_capacity);
-    relocate_to(fresh);
+    try {
+      relocate_to(fresh);
+    } catch (...) {
+      m_allocator.free_array(fresh, new_capacity);
+      throw;
+    }
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
     m_data = fresh;
     m_capacity = new_capacity;
@@ -222,7 +231,12 @@ public:
       return;
     }
     let const fresh = m_allocator.alloc_array<T>(m_length);
-    relocate_to(fresh);
+    try {
+      relocate_to(fresh);
+    } catch (...) {
+      m_allocator.free_array(fresh, m_length);
+      throw;
+    }
     m_allocator.free_array(m_data, m_capacity);
     m_data = fresh;
     m_capacity = m_length;
@@ -256,19 +270,32 @@ private:
 
   /* A trivially copyable type relocates as one memcpy, skipping the per-element
      move constructor and destructor the compiler would otherwise emit. */
-  fn relocate_to(T *fresh) wontthrow -> void
+  fn relocate_to(T *fresh) throws -> void
   {
     if constexpr (std::is_trivially_copyable_v<T>) {
       if (m_length > 0) __builtin_memcpy(fresh, m_data, m_length * sizeof(T));
       return;
     }
-    for (usize i = 0; i < m_length; i++) {
-      new (&fresh[i]) T(steal(m_data[i]));
-      m_data[i].~T();
+    usize constructed_count = 0;
+    try {
+      for (; constructed_count < m_length; constructed_count++) {
+        if constexpr (std::is_nothrow_move_constructible_v<T> ||
+                      !std::is_copy_constructible_v<T>)
+          new (&fresh[constructed_count]) T(steal(m_data[constructed_count]));
+        else
+          new (&fresh[constructed_count]) T(m_data[constructed_count]);
+      }
+    } catch (...) {
+      for (usize i = 0; i < constructed_count; i++)
+        fresh[i].~T();
+      throw;
     }
+
+    for (usize i = 0; i < m_length; i++)
+      m_data[i].~T();
   }
 
-  fn swap_elements(usize a, usize b) wontthrow -> void
+  fn swap_elements(usize a, usize b) throws -> void
   {
     T temporary = steal(m_data[a]);
     m_data[a] = steal(m_data[b]);

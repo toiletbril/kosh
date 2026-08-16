@@ -55,4 +55,4 @@ using hu16 = tagged_int<int_base::hex, u16>;
 using hu32 = tagged_int<int_base::hex, u32>;
 using hu64 = tagged_int<int_base::hex, u64>;
 
-} // namespace koshka
+} /* namespace koshka */

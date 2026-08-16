@@ -75,26 +75,68 @@ static fn move_across_devices(StringView source, StringView target,
                               Allocator allocator) throws -> bool
 {
   let const source_path = Path{source};
+  let const is_source_symbolic_link = source_path.is_symbolic_link();
+  if (!is_source_symbolic_link && source_path.is_directory()) return false;
 
-  if (source_path.is_symbolic_link()) {
+  let const target_path = Path{target};
+  let temporary_path = os::write_to_named_temp_file(target_path.parent(),
+                                                    ".kosh_mv", StringView{});
+  if (!temporary_path.has_value())
+    throw Error{
+        "mv: unable to create a temporary file beside '" +
+        String{allocator, target}
+        + "': " + os::last_system_error_message()
+    };
+  defer { unused(os::remove_file(temporary_path->text().view())); };
+
+  if (is_source_symbolic_link) {
     let const link_target = os::read_symlink(source);
-    if (!link_target.has_value()) return false;
+    if (!link_target.has_value())
+      throw Error{
+          "mv: unable to read the symlink '" + String{allocator, source}
+            +
+          "': " + os::last_system_error_message()
+      };
 
-    os::remove_file(target);
-    if (!os::create_symlink(link_target->view(), target)) return false;
+    if (!os::remove_file(temporary_path->text().view()) ||
+        !os::create_symlink(link_target->view(), temporary_path->text().view()))
+    {
+      throw Error{
+          "mv: unable to create a temporary symlink beside '" +
+          String{allocator, target}
+          + "': " + os::last_system_error_message()
+      };
+    }
+  } else {
+    copy_file_contents(source, temporary_path->text().view(), allocator);
 
-    return os::remove_file(source);
+    os::file_status source_status{};
+    if (os::stat_path(source, source_status) &&
+        !os::set_file_mode(temporary_path->text().view(), source_status.mode))
+    {
+      throw Error{
+          "mv: unable to preserve the mode of '" + String{allocator, source}
+            +
+          "': " + os::last_system_error_message()
+      };
+    }
   }
 
-  if (source_path.is_directory()) return false;
+  if (!os::rename_path(temporary_path->text().view(), target))
+    throw Error{
+        "mv: unable to publish '" + String{allocator, target}
+          +
+        "': " + os::last_system_error_message()
+    };
 
-  copy_file_contents(source, target, allocator);
+  if (!os::remove_file(source))
+    throw Error{
+        "mv: unable to remove '" + String{allocator, source}
+          +
+        "': " + os::last_system_error_message()
+    };
 
-  os::file_status source_status{};
-  if (os::stat_path(source, source_status))
-    os::set_file_mode(target, source_status.mode);
-
-  return os::remove_file(source);
+  return true;
 }
 
 Mv::Mv() = default;

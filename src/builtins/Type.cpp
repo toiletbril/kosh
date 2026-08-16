@@ -198,4 +198,4 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return did_find_all ? 0 : 1;
 }
 
-} // namespace koshka
+} /* namespace koshka */

@@ -90,6 +90,6 @@ public:
   }
 };
 
-} // namespace koshka
+} /* namespace koshka */
 
 #define SSK(literal) koshka::PackedStringKey::from_literal(literal)

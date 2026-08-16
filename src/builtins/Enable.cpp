@@ -73,4 +73,4 @@ fn Enable::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace koshka
+} /* namespace koshka */

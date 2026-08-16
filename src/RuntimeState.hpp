@@ -81,4 +81,4 @@ public:
   fn restore(EvalContext &context) const wontthrow -> void;
 };
 
-} // namespace koshka
+} /* namespace koshka */

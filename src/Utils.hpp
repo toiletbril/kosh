@@ -115,6 +115,15 @@ pure fn token_has_uppercase(StringView token) wontthrow -> bool;
 pure fn smart_case_prefix_matches(StringView candidate,
                                   StringView prefix) wontthrow -> bool;
 
+struct decoded_codepoint
+{
+  u32 value;
+  usize length;
+};
+
+pure fn decode_utf8(StringView source, usize position,
+                    u32 invalid_codepoint) wontthrow -> decoded_codepoint;
+
 fn split_lines(StringView text) throws -> ArrayList<StringView>;
 
 fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String;
@@ -311,7 +320,7 @@ private:
   usize m_buffer_position{0};
   usize m_buffer_length{0};
   bool m_is_at_end{false};
-  char m_buffer[65536]{};
+  char m_buffer[65536];
 };
 
 enum class directory_validation : u8

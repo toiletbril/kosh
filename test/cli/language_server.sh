@@ -66,6 +66,10 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":26,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/utf8-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":14}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/warning-action.sh","languageId":"bash","version":1,"text":"[[ 1 > 0 ]]\n"}}}'
   frame '{"jsonrpc":"2.0","id":27,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/warning-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":11}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+  frame '{"jsonrpc":"2.0","id":28,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/warning-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":11}},"context":{"diagnostics":[],"only":["source.fixAll.kosh"]}}}'
+  frame '{"jsonrpc":"2.0","id":29,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"range":{"start":{"line":19,"character":4},"end":{"line":19,"character":4}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+  frame '{"jsonrpc":"2.0","id":30,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"range":{"start":{"line":19,"character":6},"end":{"line":19,"character":6}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+  frame '{"jsonrpc":"2.0","id":31,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"range":{"start":{"line":19,"character":6},"end":{"line":19,"character":7}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -93,6 +97,10 @@ check_contains root-child-action '"id":24,"result":[]'
 check_contains open-child-action "\"id\":25,\"result\":[{\"title\":\"Replace '==' with '='\",\"kind\":\"quickfix\",\"isPreferred\":true,\"edit\":{\"changes\":{\"file://$directory/open-source.sh\":[{\"range\":{\"start\":{\"line\":1,\"character\":4},\"end\":{\"line\":1,\"character\":6}},\"newText\":\"=\"}]}}}"
 check_contains utf8-code-action '"id":26,"result":[{"title":"Replace '\''=='\'' with '\''='\''","kind":"quickfix","isPreferred":true,"edit":{"changes":{"file:///tmp/utf8-action.sh":[{"range":{"start":{"line":0,"character":9},"end":{"line":0,"character":11}},"newText":"="}]}}}'
 check_contains warning-code-action '"id":27,"result":[{"title":"Replace '\''>'\'' with '\''-gt'\''","kind":"quickfix","isPreferred":true,"edit":{"changes":{"file:///tmp/warning-action.sh":[{"range":{"start":{"line":0,"character":5},"end":{"line":0,"character":6}},"newText":"-gt"}]}}}'
+check_contains unsafe-fix-all '"id":28,"result":[]'
+check_contains action-start-cursor '"id":29,"result":[{"title":"Replace '\''=='\'' with '\''='\''"'
+check_contains action-end-cursor '"id":30,"result":[]'
+check_contains action-adjacent-range '"id":31,"result":[]'
 check_contains builtin-help '"id":12,"result":{"contents":{"kind":"plaintext","value":"DESCRIPTION\n  The printf builtin'
 check_contains utility-help '"id":13,"result":{"contents":{"kind":"plaintext","value":"DESCRIPTION\n  The ls utility'
 check_contains allowed-help 'allowed command help'
@@ -145,7 +153,10 @@ utf16_output=$(
     frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/utf16.sh","languageId":"sh","version":1,"text":"#\ud83d\ude00\r\n"}}}'
     frame '{"jsonrpc":"2.0","id":6,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/utf16.sh"}}}'
     frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/versioned.sh","languageId":"sh","version":1,"text":"#!/bin/sh\n[ \"$1\" == y ]\n"}}}'
-    frame '{"jsonrpc":"2.0","id":8,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+    frame '{"jsonrpc":"2.0","id":8,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"current","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/revision-trigger.sh","languageId":"sh","version":1,"text":"#!/bin/sh\n"}}}'
+    frame '{"jsonrpc":"2.0","id":11,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"stale","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
+    frame '{"jsonrpc":"2.0","id":12,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"current","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":2,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/versioned.sh","version":2},"contentChanges":[{"text":"#!/bin/sh\n[ \"$1\" = y ]\n"}]}}'
     frame '{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":12}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/utf16-action.sh","languageId":"sh","version":1,"text":"[ \"\ud83d\ude00\" == x ]\r\n"}}}'
@@ -165,6 +176,27 @@ case $utf16_output in
   printf 'versioned-code-action=ok\n'
   ;;
 *) printf 'versioned-code-action=missing\n' ;;
+esac
+case $utf16_output in
+*'"id":8,"result":[{"title":"Replace'*'"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"current","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}]'*)
+  printf 'current-diagnostic-identity=ok\n'
+  ;;
+*) printf 'current-diagnostic-identity=missing\n' ;;
+esac
+stale_identity_action=${utf16_output#*'"id":11,"result":'}
+stale_identity_action=${stale_identity_action%%Content-Length:*}
+case $stale_identity_action in
+*'"title":"Replace'*'"diagnostics":'*)
+  printf 'stale-diagnostic-identity=attached\n'
+  ;;
+*'"title":"Replace'*) printf 'stale-diagnostic-identity=ok\n' ;;
+*) printf 'stale-diagnostic-identity=missing\n' ;;
+esac
+case $utf16_output in
+*'"id":12,"result":[{"title":"Replace'*'"diagnosticRevision":2'*)
+  printf 'reanalyzed-diagnostic-identity=ok\n'
+  ;;
+*) printf 'reanalyzed-diagnostic-identity=missing\n' ;;
 esac
 case $utf16_output in
 *'"id":9,"result":[]'*) printf 'stale-code-action=ok\n' ;;
@@ -193,6 +225,42 @@ esac
 case $unsupported_output in
 *'"id":31,"result":[]'*) printf 'unsupported-code-action=ok\n' ;;
 *) printf 'unsupported-code-action=missing\n' ;;
+esac
+
+limited_output=$(
+  {
+    frame '{"jsonrpc":"2.0","id":40,"method":"initialize","params":{"capabilities":{"textDocument":{"codeAction":{"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix"]}}}}}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/limited.sh","languageId":"sh","version":1,"text":"[ x == y ]\n"}}}'
+    frame '{"jsonrpc":"2.0","id":41,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/limited.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":10}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+    frame '{"jsonrpc":"2.0","id":42,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/limited.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":10}},"context":{"diagnostics":[],"only":["source.fixAll.kosh"]}}}'
+    frame '{"jsonrpc":"2.0","id":43,"method":"shutdown","params":null}'
+    frame '{"jsonrpc":"2.0","method":"exit"}'
+  } | "$BIN" --language-server
+)
+case $limited_output in
+*'"codeActionKinds":["quickfix"]'*'"id":41,"result":[{"title":"Replace'*'"id":42,"result":[]'*)
+  printf 'limited-actions=ok\n'
+  ;;
+*) printf 'limited-actions=missing\n' ;;
+esac
+case $limited_output in
+*'"data":'*|*'"isPreferred":'*) printf 'optional-action-fields=present\n' ;;
+*) printf 'optional-action-fields=ok\n' ;;
+esac
+
+malformed_output=$(
+  {
+    frame '{"jsonrpc":"2.0","id":50,"method":"initialize","params":{"capabilities":{"textDocument":{"codeAction":{"codeActionLiteralSupport":{}}}}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/malformed.sh","languageId":"sh","version":1,"text":"[ x == y ]\n"}}}'
+    frame '{"jsonrpc":"2.0","id":51,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/malformed.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":10}},"context":{"diagnostics":[]}}}'
+    frame '{"jsonrpc":"2.0","id":52,"method":"shutdown","params":null}'
+    frame '{"jsonrpc":"2.0","method":"exit"}'
+  } | "$BIN" --language-server
+)
+case $malformed_output in
+*'codeActionProvider'*) printf 'malformed-actions=present\n' ;;
+*'"id":51,"result":[]'*) printf 'malformed-actions=ok\n' ;;
+*) printf 'malformed-actions=missing\n' ;;
 esac
 
 frame '{"jsonrpc":"2.0","method":"exit"}' |

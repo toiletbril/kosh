@@ -38,4 +38,4 @@ fn Compopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return 0;
 }
 
-} // namespace koshka
+} /* namespace koshka */

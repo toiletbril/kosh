@@ -146,21 +146,27 @@ public:
      null slot, so the fit test is length + count < capacity. */
   hot fn push(char c) throws -> void
   {
-    if (m_length + 1 < m_capacity) [[likely]] {
+    if (m_length == SIZE_MAX) [[unlikely]]
+      throw std::bad_alloc{};
+    let const new_length = m_length + 1;
+    if (new_length < m_capacity) [[likely]] {
       m_data[m_length++] = c;
       m_data[m_length] = '\0';
       return;
     }
-    reserve(m_length + 1);
+    reserve(new_length);
     m_data[m_length++] = c;
     m_data[m_length] = '\0';
   }
   hot fn append(StringView other) throws -> void
   {
     if (other.length == 0) return;
-    if (m_length + other.length < m_capacity) [[likely]] {
+    if (other.length > SIZE_MAX - m_length) [[unlikely]]
+      throw std::bad_alloc{};
+    let const new_length = m_length + other.length;
+    if (new_length < m_capacity) [[likely]] {
       std::memcpy(m_data + m_length, other.data, other.length);
-      m_length += other.length;
+      m_length = new_length;
       m_data[m_length] = '\0';
       return;
     }
@@ -170,10 +176,10 @@ public:
                            source_address - storage_address < m_length;
     usize source_offset = 0;
     if (is_aliased) source_offset = source_address - storage_address;
-    reserve(m_length + other.length);
+    reserve(new_length);
     if (is_aliased) other.data = m_data + source_offset;
     std::memcpy(m_data + m_length, other.data, other.length);
-    m_length += other.length;
+    m_length = new_length;
     m_data[m_length] = '\0';
   }
 

@@ -127,7 +127,7 @@ fn constant_test_verdict(const ArrayList<const Token *> &args,
   return None;
 }
 
-} // namespace
+} /* namespace */
 
 pure fn is_plain_variable_name(StringView name) wontthrow -> bool
 {
@@ -196,7 +196,7 @@ fn command_word_literal(const Token *token) throws -> Maybe<String>
   return name;
 }
 
-} // namespace
+} /* namespace */
 
 fn plain_variable_reference_name(const Token *token) wontthrow
     -> Maybe<StringView>
@@ -441,6 +441,11 @@ pure fn arithmetic_has_side_effect(StringView text) wontthrow -> bool
     if (text[i] == '=') {
       let const previous = i > 0 ? text[i - 1] : '\0';
       let const next = i + 1 < text.length ? text[i + 1] : '\0';
+      if (i >= 2 && ((previous == '<' && text[i - 2] == '<') ||
+                     (previous == '>' && text[i - 2] == '>')))
+      {
+        return true;
+      }
       if (previous != '=' && previous != '!' && previous != '<' &&
           previous != '>' && next != '=')
       {
@@ -713,7 +718,7 @@ OptimizationRule *const OPTIMIZATION_RULES[] = {
    without progress cannot loop the driver forever. */
 constexpr usize MAX_OPTIMIZATION_PASSES = 8;
 
-} // namespace
+} /* namespace */
 
 fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void
 {
@@ -734,6 +739,6 @@ fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void
       MAX_OPTIMIZATION_PASSES);
 }
 
-} // namespace optimizer
+} /* namespace optimizer */
 
-} // namespace koshka
+} /* namespace koshka */

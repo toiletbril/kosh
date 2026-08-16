@@ -35,4 +35,4 @@ private:
   Maybe<StringView> m_value;
 };
 
-} // namespace koshka
+} /* namespace koshka */

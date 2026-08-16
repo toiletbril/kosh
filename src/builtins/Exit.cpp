@@ -65,4 +65,4 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   utils::quit(static_cast<i32>(status), utils::farewell_policy::Goodbye);
 }
 
-} // namespace koshka
+} /* namespace koshka */

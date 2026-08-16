@@ -34,14 +34,17 @@ namespace lexer {
 
 pure fn is_whitespace(char ch) wontthrow -> bool;
 pure fn is_number(char ch) wontthrow -> bool;
-pure fn is_expression_sentinel(char ch) wontthrow -> bool;
 pure fn is_shell_sentinel(char ch) wontthrow -> bool;
 pure fn is_part_of_identifier(char ch) wontthrow -> bool;
 pure fn is_string_quote(char ch) wontthrow -> bool;
 pure fn is_expandable_char(char ch) wontthrow -> bool;
 pure fn is_variable_name_start(char ch) wontthrow -> bool;
 pure fn is_variable_name(char ch) wontthrow -> bool;
+pure fn word_looks_like_assignment(StringView word) wontthrow -> bool;
 pure fn is_extglob_operator(char ch) wontthrow -> bool;
+
+fn scan_balanced_shell_region(StringView source, usize position,
+                              char closing_byte) throws -> Maybe<usize>;
 
 /* A special shell parameter named by a single punctuation byte, $? $! $# $$ $*
    $@ $- , distinct from a positional digit or an ordinary name. */
@@ -88,9 +91,7 @@ public:
   Lexer(const Lexer &) = delete;
   Lexer &operator=(const Lexer &) = delete;
 
-  mustuse fn peek_expression_token() throws -> Token *;
   mustuse fn peek_shell_token() throws -> Token *;
-  mustuse fn next_expression_token() throws -> Token *;
   mustuse fn next_shell_token() throws -> Token *;
 
   pure fn source() const wontthrow -> StringView;
@@ -130,14 +131,10 @@ protected:
   usize m_cached_offset{0};
 
   /* The parser peeks the next token many times before it consumes one, and each
-     peek would otherwise re-lex from the same position, the hottest cost in a
-     parse-heavy run. The last peeked token is cached and reused while the
-     cursor has not moved and the lexing mode, shell versus expression, is the
-     same. A consumed token advances the cursor, so the stored position no
-     longer matches and the next peek lexes afresh. */
+     peek would otherwise re-lex from the same position. The last token is
+     reused while the cursor has not moved. */
   Token *m_peek_cache{nullptr};
   usize m_peek_cache_position{0};
-  bool m_peek_cache_is_shell{false};
 
   bool m_should_collect_debug_words{false};
   ArrayList<Word> m_debug_words{heap_allocator()};
@@ -161,22 +158,15 @@ protected:
   fn walk_heredoc_body(usize start, StringView delimiter,
                        bool should_strip_tabs, Emit emit_line) throws -> usize;
 
-  fn lex_expression_token() throws -> Token *;
   fn lex_shell_token() throws -> Token *;
 
   fn skip_whitespace() throws -> void;
   fn advance_forward(usize offset) wontthrow -> usize;
   fn chop_character(usize offset = 0) wontthrow -> char;
 
-  fn lex_number() throws -> Token *;
   fn lex_identifier() throws -> Token *;
   fn lex_sentinel() throws -> Token *;
   fn lex_process_substitution(char direction) throws -> Token *;
-
-  /* A heredoc body is raw text, so a quote or paren in it must not disturb
-     the surrounding $(...) or ${...} scan. */
-  fn skip_heredoc_in_substitution(usize byte_count, String &inner) throws
-      -> usize;
 };
 
 } /* namespace koshka */

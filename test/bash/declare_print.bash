@@ -19,6 +19,15 @@ echo "unset rc=$?"
 nums=(10 20 30 40)
 declare -p nums
 
+declare bad-name 2>/dev/null
+echo "invalid_hyphen=$?"
+declare 3name 2>/dev/null
+echo "invalid_digit=$?"
+declare "" 2>/dev/null
+echo "invalid_empty=$?"
+declare -p bad-name >/dev/null 2>&1
+echo "invalid_hidden=$?"
+
 
 # The += append form on declare, local, and export concatenates onto the current
 # value rather than dropping the operator, while a += on a plain command word

@@ -6,3 +6,9 @@ done
 [unset]
 == an unresolved command fails with status 127:
 status=127
+== env isolates builtin directory changes:
+status=0 unchanged=yes
+== env isolates builtin variable changes:
+status=0 state=parent
+== env confines exit and returns its status:
+alive status=7

@@ -17,6 +17,8 @@ template <class T>
 class mustuse Maybe
 {
 public:
+  static_assert(std::is_nothrow_destructible_v<T>);
+
   Maybe() noexcept : m_has_value(false), m_storage{} {}
   Maybe(Nothing) noexcept : m_has_value(false), m_storage{} {}
   Maybe(T value) : m_has_value(true) { new (&m_storage) T(steal(value)); }
@@ -25,7 +27,8 @@ public:
   {
     if (m_has_value) new (&m_storage) T(other.reference());
   }
-  Maybe(Maybe &&other) noexcept : m_has_value(other.m_has_value)
+  Maybe(Maybe &&other) noexcept(std::is_nothrow_move_constructible_v<T>)
+      : m_has_value(other.m_has_value)
   {
     if (m_has_value) new (&m_storage) T(steal(other.reference()));
   }
@@ -43,12 +46,15 @@ public:
     }
     return *this;
   }
-  fn operator=(Maybe &&other) noexcept -> Maybe &
+  fn operator=(Maybe &&other) noexcept(std::is_nothrow_move_constructible_v<T>)
+      ->Maybe &
   {
     if (this != &other) {
       reset();
-      m_has_value = other.m_has_value;
-      if (m_has_value) new (&m_storage) T(steal(other.reference()));
+      if (other.m_has_value) {
+        new (&m_storage) T(steal(other.reference()));
+        m_has_value = true;
+      }
     }
     return *this;
   }
@@ -136,4 +142,4 @@ private:
     t__result.take();                                                          \
   })
 
-} // namespace koshka
+} /* namespace koshka */

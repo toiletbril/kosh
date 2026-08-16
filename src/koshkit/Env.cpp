@@ -133,9 +133,27 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     return static_cast<i32>(resolution_error.command_status());
   }
 
-  return utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
+  let snapshot = cxt.snapshot_state();
+  cxt.enter_subshell();
+  i32 status = 0;
+  try {
+    status =
+        utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
+  } catch (...) {
+    cxt.leave_subshell();
+    cxt.restore_state(steal(snapshot));
+    throw;
+  }
+  if (cxt.has_pending_control_flow()) {
+    status = static_cast<i32>(cxt.pending_control_flow().value);
+    cxt.clear_control_flow();
+  }
+  cxt.leave_subshell();
+  cxt.restore_state(steal(snapshot));
+
+  return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

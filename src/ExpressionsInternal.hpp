@@ -7,6 +7,7 @@
 #include "Platform.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
+#include "Utils.hpp"
 
 #define SET_AND_RETURN_EXIT_STATUS(cxt, status)                                \
   return ::koshka::expressions::set_and_return_exit_status(                    \
@@ -32,6 +33,23 @@ fn static_command_name(const Token *token) throws -> Maybe<StringView>;
    alive for as long as the returned view is read. */
 fn borrowed_token_text(const Token *token, String &storage) throws
     -> StringView;
+fn wrapped_command_index(command_name_id wrapper_id,
+                         const ArrayList<const Token *> &args) throws
+    -> Maybe<usize>;
+fn apply_followed_source_effects(AnalysisContext &actx,
+                                 const followed_source_effects &effects,
+                                 bool should_merge_parent_state,
+                                 bool should_merge_parent_uncertainty) throws
+    -> void;
+fn analyze_followed_source(AnalysisContext &actx,
+                           const ArrayList<const Token *> &args,
+                           usize command_index, bool should_merge_parent_state,
+                           bool should_merge_parent_uncertainty) throws -> bool;
+fn command_resolves(
+    StringView name, SourceLocation location, const AnalysisContext &actx,
+    Maybe<utils::unavailable_path_source_component> &unavailable) throws
+    -> bool;
+pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool;
 
 namespace expressions {
 

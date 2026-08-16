@@ -9,13 +9,17 @@
 #endif
 #endif
 
-#if KOSH_PLATFORM_IS POSIX
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
 /* clang-format off */
 #include "PlatformPosixExtra.cpp"
 #include "PlatformPosix.cpp"
+#include "PlatformPosixFilesystem.cpp"
+#include "PlatformPosixProcess.cpp"
 /* clang-format on */
-#elif KOSH_PLATFORM_IS WIN32
+#elif KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
 #include "PlatformWin32.cpp"
+#include "PlatformWin32Filesystem.cpp"
+#include "PlatformWin32Process.cpp"
 #else
 #error Unsupported platform
 #endif
@@ -52,8 +56,12 @@ namespace os {
 namespace {
 
 #if defined __x86_64__ && !defined __COSMOPOLITAN__
-[[gnu::target("sse4.2")]] pure fn crc32c_update_sse42(u32 crc, const u8 *data,
-                                                      usize length) wontthrow
+#if defined __clang__
+[[gnu::target("crc32")]]
+#else
+[[gnu::target("sse4.2")]]
+#endif
+pure fn crc32c_update_sse42(u32 crc, const u8 *data, usize length) wontthrow
     -> u32
 {
   while (length >= 8) {
@@ -66,6 +74,18 @@ namespace {
   while (length-- > 0)
     crc = _mm_crc32_u8(crc, *data++);
   return crc;
+}
+
+fn is_x86_sse42_available() wontthrow -> bool
+{
+  u32 eax = 1;
+  u32 ebx;
+  u32 ecx;
+  u32 edx;
+  __asm__ volatile("cpuid" : "+a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx));
+  unused(ebx);
+  unused(edx);
+  return (ecx & (1u << 20)) != 0;
 }
 #endif
 
@@ -128,10 +148,7 @@ fn crc32c_update(u32 crc, const void *data, usize length) wontthrow -> u32
   let const bytes = static_cast<const u8 *>(data);
 
 #if defined __x86_64__ && !defined __COSMOPOLITAN__
-  static let const has_sse42 = []() -> bool {
-    __builtin_cpu_init();
-    return __builtin_cpu_supports("sse4.2");
-  }();
+  static let const has_sse42 = is_x86_sse42_available();
   if (has_sse42) return crc32c_update_sse42(crc, bytes, length);
 #elif defined __aarch64__ || defined __arm64__ || defined _M_ARM64
   static let const has_crc32c = is_aarch64_crc32c_available();

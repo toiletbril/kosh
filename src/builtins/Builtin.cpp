@@ -116,4 +116,4 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return execute_builtin(steal(sub), cxt);
 }
 
-} // namespace koshka
+} /* namespace koshka */

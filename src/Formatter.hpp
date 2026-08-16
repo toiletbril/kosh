@@ -22,7 +22,7 @@ struct source_fix
   String title;
   ArrayList<source_edit> edits;
   bool is_preferred{true};
-  bool is_safe_for_fix_all{true};
+  bool is_safe_for_fix_all{false};
 };
 
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,

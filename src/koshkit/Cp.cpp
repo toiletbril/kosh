@@ -100,13 +100,32 @@ static fn copy_path(const ExecContext &ec, StringView source,
                     Allocator allocator) throws -> void
 {
   let const source_path = Path{source};
+  let const destination_path = Path{destination};
+  if (destination_path.exists() &&
+      source_path.is_same_file_as(destination_path))
+  {
+    throw Error{
+        "cp: '" + String{allocator, source     }
+          + "' and '" +
+        String{allocator, destination}
+          + "' are the same file"
+    };
+  }
   let const source_mode = source_permission_bits(source_path, source);
 
   if (source_path.is_symbolic_link() && is_recursive) {
     if (let const target = os::read_symlink(source)) {
       /* Symlink creation fails when the path is already present, so an existing
          destination is removed first. */
-      os::remove_file(destination);
+      if ((destination_path.exists() || destination_path.is_symbolic_link()) &&
+          !os::remove_file(destination))
+      {
+        throw Error{
+            "cp: unable to remove '" + String{allocator, destination}
+              +
+            "': " + os::last_system_error_message()
+        };
+      }
       if (!os::create_symlink(target->view(), destination)) {
         throw Error{
             "cp: unable to create the symlink '" +
@@ -177,7 +196,13 @@ static fn copy_path(const ExecContext &ec, StringView source,
 
   /* A destination symlink is removed so the copy does not follow the link and
      truncate its target. */
-  if (Path{destination}.is_symbolic_link()) os::remove_file(destination);
+  if (destination_path.is_symbolic_link() && !os::remove_file(destination)) {
+    throw Error{
+        "cp: unable to remove '" + String{allocator, destination}
+          +
+        "': " + os::last_system_error_message()
+    };
+  }
 
   let const did_destination_exist = Path{destination}.exists();
   copy_file(ec, source, destination, is_verbose, allocator);
@@ -237,6 +262,6 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

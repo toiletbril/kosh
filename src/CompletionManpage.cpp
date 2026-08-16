@@ -1165,6 +1165,6 @@ fn complete_from_help_subcommands(StringView line, StringView token,
   return matches;
 }
 
-} // namespace completion
+} /* namespace completion */
 
-} // namespace koshka
+} /* namespace koshka */

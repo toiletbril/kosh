@@ -267,7 +267,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
     for (const String &operand : operands)
       targets.push(operand.view());
 
-  sort_stringview_list(targets);
+  targets.sort();
 
   ArrayList<StringView> file_targets{cxt.scratch_allocator()};
   ArrayList<StringView> dir_targets{cxt.scratch_allocator()};
@@ -347,7 +347,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       }
       visible_names.push(name.view());
     }
-    sort_stringview_list(visible_names);
+    visible_names.sort();
 
     if (FLAG_LS_LONG.is_enabled()) {
       ArrayList<long_entry> entries{cxt.scratch_allocator()};
@@ -369,6 +369,6 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

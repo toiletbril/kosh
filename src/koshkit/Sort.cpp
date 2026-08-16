@@ -60,7 +60,7 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  sort_stringview_list(lines);
+  lines.sort();
 
   let output = String{cxt.scratch_allocator()};
   if (FLAG_SORT_REVERSE.is_enabled())
@@ -79,6 +79,6 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

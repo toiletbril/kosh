@@ -461,7 +461,7 @@ struct conditional_evaluator
   }
 };
 
-} // namespace
+} /* namespace */
 
 static constexpr usize REGEX_CACHE_CAP = 128;
 
@@ -526,4 +526,4 @@ fn EvalContext::evaluate_conditional(
   return is_conditional_true;
 }
 
-} // namespace koshka
+} /* namespace koshka */

@@ -372,4 +372,4 @@ pure fn EvalContext::notify() const wontthrow -> bool
   return m_runtime.option_is_enabled(shell_option_id::Notify);
 }
 
-} // namespace koshka
+} /* namespace koshka */

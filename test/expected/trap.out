@@ -21,6 +21,22 @@
     [SimpleCommand "trap"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "set_by_number"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "printf "quoted=<%s>\n" "a'b"" "EXIT"]
+  [CompoundListCondition, None]
+    [Assign trap_file=/tmp/kosh-trap-replay-$$]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-p" "EXIT"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "EXIT"]
+  [CompoundListCondition, None]
+    [Assign listed=$(koshkit cat "$trap_file")]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "unlink" "$trap_file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" "$listed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-p" "EXIT"]
 [Word
   Unquoted "trap"
 ]
@@ -90,8 +106,72 @@
 [Word
   Unquoted "set_by_number"
 ]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "printf "quoted=<%s>\n" "a'b""
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "trap_file=/tmp/kosh-trap-replay-"
+  Variable "$"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Variable "trap_file"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "listed="
+  CommandSubstitution "koshkit cat "$trap_file""
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "trap_file"
+]
+[Word
+  Unquoted "eval"
+]
+[Word
+  Variable "listed"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "EXIT"
+]
 done
 cleared_by_number
 trap -- 'echo got_term' TERM
 set_by_number
+trap -- 'printf "quoted=<%s>\n" "a'\''b"' EXIT
 [Code 0]
+quoted=<a'b>

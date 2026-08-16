@@ -33,7 +33,9 @@ public:
     else
       new (&m_storage) T(other.value_reference());
   }
-  ErrorOr(ErrorOr &&other) noexcept : m_is_error(other.m_is_error)
+  ErrorOr(ErrorOr &&other) noexcept(std::is_nothrow_move_constructible_v<T> &&
+                                    std::is_nothrow_move_constructible_v<Error>)
+      : m_is_error(other.m_is_error)
   {
     if (m_is_error)
       new (&m_storage) Error(steal(other.error_reference()));
@@ -43,30 +45,8 @@ public:
 
   mustuse fn clone() const throws -> ErrorOr { return ErrorOr{*this}; }
 
-  fn operator=(const ErrorOr &other) throws->ErrorOr &
-  {
-    if (this != &other) {
-      destroy();
-      m_is_error = other.m_is_error;
-      if (m_is_error)
-        new (&m_storage) Error(other.error_reference());
-      else
-        new (&m_storage) T(other.value_reference());
-    }
-    return *this;
-  }
-  fn operator=(ErrorOr &&other) noexcept -> ErrorOr &
-  {
-    if (this != &other) {
-      destroy();
-      m_is_error = other.m_is_error;
-      if (m_is_error)
-        new (&m_storage) Error(steal(other.error_reference()));
-      else
-        new (&m_storage) T(steal(other.value_reference()));
-    }
-    return *this;
-  }
+  ErrorOr &operator=(const ErrorOr &) = delete;
+  ErrorOr &operator=(ErrorOr &&) = delete;
 
   ~ErrorOr() { destroy(); }
 
@@ -132,7 +112,7 @@ private:
                                                                : sizeof(Error)];
 };
 
-} // namespace koshka
+} /* namespace koshka */
 
 /* Evaluate a fallible expression, return its error early on failure, and yield
    its value otherwise. Used inside a function that itself returns an ErrorOr.

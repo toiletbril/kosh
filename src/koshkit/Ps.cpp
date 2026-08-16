@@ -164,6 +164,6 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

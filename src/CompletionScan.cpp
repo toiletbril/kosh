@@ -1347,7 +1347,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
         frame.case_depth--;
         frame.is_case_pattern_expected = false;
         frame.is_command_position = false;
-      } else if (frame.is_command_position && word_looks_like_assignment(word))
+      } else if (frame.is_command_position &&
+                 lexer::word_looks_like_assignment(word))
       {
         frame.is_command_position = true;
       } else if (frame.is_command_position && word_is_plain_identifier(word) &&

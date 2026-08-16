@@ -48,6 +48,16 @@ function build {
 build cargo
 echo "build rc $?"
 
+case_return() {
+  case target in
+    target) echo case-head; return 7 ;&
+    *) echo case-tail ;;
+  esac
+  echo case-after
+}
+case_return
+echo "case-status=$?"
+
 # local does not leak to caller.
 function set_local {
     local scoped=private

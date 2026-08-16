@@ -73,6 +73,6 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

@@ -3,5 +3,7 @@
      1 |  readonly x=old; export x=new
        |                         ^~~~~
 rc=1
+== a bare export publishes a read-only value:
+x=old
 == export of an integer-marked name stores the evaluated value:
 7

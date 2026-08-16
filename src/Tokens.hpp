@@ -171,10 +171,6 @@ public:
     /* Significant symbols */
     RightParen,
     LeftParen,
-    LeftSquareBracket,
-    RightSquareBracket,
-    DoubleLeftSquareBracket,
-    DoubleRightSquareBracket,
     RightBracket,
     LeftBracket,
 
@@ -188,9 +184,7 @@ public:
     Dollar,
 
     /* Values */
-    Number,
     Word,
-    Identifier,
     Redirection,
     Assignment,
 
@@ -374,12 +368,8 @@ TOKEN_STRUCT(TripleLess);
 TOKEN_STRUCT(Dot);
 TOKEN_STRUCT(LeftParen);
 TOKEN_STRUCT(RightParen);
-TOKEN_STRUCT(LeftSquareBracket);
-TOKEN_STRUCT(RightSquareBracket);
 TOKEN_STRUCT(LeftBracket);
 TOKEN_STRUCT(RightBracket);
-TOKEN_STRUCT(DoubleLeftSquareBracket);
-TOKEN_STRUCT(DoubleRightSquareBracket);
 
 class Redirection : public Token
 {
@@ -444,9 +434,6 @@ protected:
     Kind kind() const wontthrow override;                                      \
     Flags flags() const wontthrow override;                                    \
   }
-
-VALUE_TOKEN_STRUCT(Number);
-VALUE_TOKEN_STRUCT(Identifier);
 
 class WordToken : public Value
 {
@@ -558,6 +545,6 @@ BINARY_OPERATOR_TOKEN_STRUCT(Equals);
 BINARY_OPERATOR_TOKEN_STRUCT(DoubleEquals);
 BINARY_OPERATOR_TOKEN_STRUCT(ExclamationEquals);
 
-} // namespace tokens
+} /* namespace tokens */
 
-} // namespace koshka
+} /* namespace koshka */

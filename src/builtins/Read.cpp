@@ -63,8 +63,14 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let read_fd = ec.in_fd.value_or(KOSH_STDIN);
   if (FLAG_READ_FD.is_set()) {
-    if (let const parsed = FLAG_READ_FD.value().to<i64>(); !parsed.is_error())
-      read_fd = os::descriptor_from_fd_number(parsed.value());
+    let const parsed = FLAG_READ_FD.value().to<i64>();
+    if (parsed.is_error() || parsed.value() < 0) {
+      report_soft_builtin_error(ec, cxt, FLAG_READ_FD.value_location(),
+                                FLAG_READ_FD.value() +
+                                    ": invalid file descriptor");
+      return 1;
+    }
+    read_fd = os::descriptor_from_fd_number(parsed.value());
   }
 
   i64 timeout_nanos = -1;
@@ -122,6 +128,15 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return os::read_fd(read_fd, &byte, 1);
   };
 
+  let terminal_echo =
+      os::terminal_echo_guard{read_fd, FLAG_READ_SILENT.is_enabled()};
+  if (!terminal_echo.did_succeed()) {
+    report_soft_builtin_error(ec, cxt,
+                              "Unable to disable terminal echo: " +
+                                  os::last_system_error_message());
+    return 1;
+  }
+
   /* A -p prompt prints only when the read's own input is a terminal, matching
      bash for a redirected descriptor. */
   if (FLAG_READ_PROMPT.is_set() &&
@@ -164,9 +179,14 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      input before the count yields the short-read status below. */
   i64 max_bytes = 0;
   if (FLAG_READ_NCHARS.is_set()) {
-    if (let const parsed = FLAG_READ_NCHARS.value().to<i64>();
-        !parsed.is_error())
-      max_bytes = parsed.value();
+    let const parsed = FLAG_READ_NCHARS.value().to<i64>();
+    if (parsed.is_error() || parsed.value() < 0) {
+      report_soft_builtin_error(ec, cxt, FLAG_READ_NCHARS.value_location(),
+                                FLAG_READ_NCHARS.value() +
+                                    ": invalid byte count");
+      return 1;
+    }
+    max_bytes = parsed.value();
   }
 
   let const should_process_escapes = !FLAG_READ_RAW.is_enabled();

@@ -34,7 +34,7 @@ fn name_matches_glob(StringView glob, StringView filename,
                              mask_offset, extglob);
 }
 
-} // namespace
+} /* namespace */
 
 fn EvalContext::expand_path_once(const glob_field &field,
                                  bool should_expand_files) throws
@@ -252,7 +252,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
   }
 }
 
-} // namespace
+} /* namespace */
 
 fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     -> ArrayList<glob_field>
@@ -579,4 +579,4 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
   return values;
 }
 
-} // namespace koshka
+} /* namespace koshka */

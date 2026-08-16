@@ -17,5 +17,10 @@ rc=1
 rc=1
 == read -q at EOF returns one:
 rc=1
+== invalid read descriptors do not consume input:
+status=1 kept=descriptor-kept
+== invalid read counts do not consume input:
+status=1 kept=count-kept
+negative=1 kept=negative-kept
 invalid=1
 eof=1 value=[]

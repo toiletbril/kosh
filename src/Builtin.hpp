@@ -469,4 +469,4 @@ fn quote_for_declare(StringView value) throws -> String;
 fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64;
 
-} // namespace koshka
+} /* namespace koshka */

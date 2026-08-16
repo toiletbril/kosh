@@ -28,6 +28,6 @@ note: Replace it with ${MIMIC_CHAIN_SECOND-} if empty expansion is desired.
      1 |  "$1"
        |  ^~~~
 1:0: trace:
-     1 |  KOSH --mood bash -WWW -c "$1" trace-driver INNER
+     1 |  KOSH --mood bash -WWW -c '"$1"' trace-driver INNER
 0
 rc=0

@@ -173,10 +173,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
     let index = running_index;
     if (parse_explicit_array_index(element.view(), subscript, value)) {
       i64 raw_index = evaluate_arithmetic(subscript);
-      if (raw_index < 0) {
-        if (let const *array = lookup_indexed_array(name))
-          raw_index += static_cast<i64>(array->count());
-      }
+      if (raw_index < 0) raw_index += array_negative_index_base(name);
       if (raw_index < 0)
         throw Error{"Unable to index '" + name +
                     "' because the array subscript is invalid"};
@@ -296,21 +293,36 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
   }
 
   i64 index = evaluate_arithmetic(subscript);
-  if (index < 0) {
-    if (let const *array = lookup_indexed_array(name))
-      index += static_cast<i64>(array->count());
-  }
+  if (index < 0) index += array_negative_index_base(name);
   if (index < 0)
     throw Error{"Unable to index '" + name +
                 "' because the array subscript is invalid"};
 
+  let const resolved_index = static_cast<usize>(index);
+  let const do_lookup_existing_element = [&]() throws -> Maybe<String> {
+    if (let const *array = lookup_indexed_array(name);
+        array != nullptr && resolved_index < array->count())
+      return String{(*array)[resolved_index].view()};
+
+    if (m_sparse_array_names.contains(name)) {
+      let const key =
+          sparse_array_key(name, resolved_index, scratch_allocator());
+      if (let const *sparse = m_sparse_array_values.find(key.view());
+          sparse != nullptr)
+        return String{sparse->view()};
+    }
+
+    if (resolved_index == 0)
+      if (let const *scalar = m_shell_variables.find(name); scalar != nullptr)
+        return String{scalar->view()};
+
+    return None;
+  };
+
   if (is_integer_variable(name)) [[unlikely]] {
     let existing = Maybe<String>{};
-    if (is_append)
-      if (let const *array = lookup_indexed_array(name))
-        if (static_cast<usize>(index) < array->count())
-          existing = String{(*array)[static_cast<usize>(index)].view()};
-    set_array_element(name, static_cast<usize>(index),
+    if (is_append) existing = do_lookup_existing_element();
+    set_array_element(name, resolved_index,
                       do_integer_element_value(steal(existing)));
     return;
   }
@@ -318,13 +330,12 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
   let element = String{scratch_allocator(), value};
   if (is_append) {
     let combined = String{scratch_allocator()};
-    if (let const *array = lookup_indexed_array(name))
-      if (static_cast<usize>(index) < array->count())
-        combined = String{(*array)[static_cast<usize>(index)].view()};
+    if (let const existing = do_lookup_existing_element(); existing.has_value())
+      combined = String{existing->view()};
     combined += value;
     element = steal(combined);
   }
-  set_array_element(name, static_cast<usize>(index), element.view());
+  set_array_element(name, resolved_index, element.view());
 }
 
 fn EvalContext::declare_associative_array(StringView name) throws -> void
@@ -535,7 +546,10 @@ fn EvalContext::declare_local(StringView name) throws -> void
 
 hot fn EvalContext::expand_variable(StringView name) const throws -> String
 {
-  return get_variable_value(name).value_or(String{heap_allocator()});
+  let value = get_variable_value(name);
+  if (value.has_value()) return value.take();
+
+  return String{heap_allocator()};
 }
 
 fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
@@ -690,8 +704,7 @@ fn EvalContext::apply_array_subscript(
   /* The single-string return loses the per-element split of a quoted
      "${a[@]}", the same limitation the positional "$@" has. */
   if (subscript == "@" || subscript == "*") {
-    if (array == nullptr)
-      return get_variable_value(name).value_or(String{heap_allocator()});
+    if (array == nullptr) return expand_variable(name);
     let separator = ' ';
     let has_separator = true;
     if (subscript == "*") {
@@ -712,8 +725,7 @@ fn EvalContext::apply_array_subscript(
   if (array == nullptr) {
     /* A scalar reads as a one-element array, so ${name[0]} is the value and any
        other index is empty. */
-    if (index == 0)
-      return get_variable_value(name).value_or(String{heap_allocator()});
+    if (index == 0) return expand_variable(name);
     return String{scratch_allocator()};
   }
   let const array_count = static_cast<i64>(array->count());
@@ -860,4 +872,4 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   return out;
 }
 
-} // namespace koshka
+} /* namespace koshka */

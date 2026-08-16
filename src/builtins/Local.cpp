@@ -83,6 +83,7 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
+  i32 status = 0;
   for (usize i = first_name; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
@@ -97,6 +98,20 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        plus on the name marks the append and is stripped before the binding. */
     let const is_append = !name.is_empty() && name[name.count() - 1] == '+';
     if (is_append) name = name.substring_of_length(0, name.count() - 1);
+
+    let identifier = name;
+    if (let const bracket = identifier.find_character('[');
+        bracket.has_value() && identifier[identifier.count() - 1] == ']')
+    {
+      identifier = identifier.substring_of_length(0, *bracket);
+    }
+    if (!name_is_valid_identifier(identifier)) {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                StringView{"'"} + arg +
+                                    "' is not a valid identifier");
+      status = 1;
+      continue;
+    }
 
     /* The append reads the name's own value only when it is already local in
        this scope, so a first local += starts from empty the way bash localizes
@@ -139,7 +154,7 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  return 0;
+  return status;
 }
 
-} // namespace koshka
+} /* namespace koshka */

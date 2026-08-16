@@ -223,12 +223,16 @@ printf 'disabled-fallback traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
 unset KOSH_FLAGS
-out=$("$BIN" -c 'echo hi' -c no_such_command_xyz 2>&1)
+out=$("$BIN" -c 'echo hi' -c no_such_command_xyz \
+    '$()' ';' '*' '#' '~' '\' '"' 2>&1)
 rc=$?
 trace_line=$(printf '%s\n' "$out" | grep 'trace:' -A1 | tail -1)
 trace_line="     1 |  KOSH -c ${trace_line#* -c }"
 printf '%s\n' "$trace_line"
 printf '%s\n' "$out" | grep -q -- "-c 'echo hi' -c no_such_command_xyz" && echo "quoted_and_second_c=ok"
+printf '%s\n' "$out" |
+  grep -Fq "'\$()' ';' '*' '#' '~' '\\' '\"'" &&
+  echo "special_arguments_quoted=ok"
 echo "rc=$rc"
 
 unset KOSH_FLAGS

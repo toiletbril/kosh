@@ -78,4 +78,4 @@ fn Return::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return static_cast<i32>(status);
 }
 
-} // namespace koshka
+} /* namespace koshka */

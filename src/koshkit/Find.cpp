@@ -96,7 +96,7 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
     return;
   }
-  sort_string_list(*names);
+  names->sort();
 
   for (let const &child_name : *names) {
     if (os::INTERRUPT_REQUESTED) return;
@@ -250,6 +250,6 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

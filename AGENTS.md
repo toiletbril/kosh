@@ -225,9 +225,11 @@ The main shell ignores SIGPIPE. A forked child restores the default action.
 ### Platform boundary
 
 src/Platform.cpp routes the operating system implementation. POSIX targets use
-PlatformPosix.cpp as the base and PlatformPosixExtra.cpp for Linux and Darwin
-overlays. Windows uses PlatformWin32.cpp. Cosmopolitan flags are registered by
-the POSIX implementation.
+PlatformPosix.cpp as the base, PlatformPosixFilesystem.cpp for filesystem
+operations, PlatformPosixProcess.cpp for process operations, and
+PlatformPosixExtra.cpp for Linux and Darwin overlays. Windows uses the matching
+PlatformWin32 base, filesystem, and process files. Cosmopolitan flags are
+registered by the POSIX implementation.
 
 Platform.hpp owns platform headers. Every platform call and platform type is
 hidden behind an os wrapper. A non-platform source contains no syscall, platform

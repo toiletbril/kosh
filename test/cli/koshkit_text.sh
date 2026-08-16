@@ -41,6 +41,9 @@ echo "--- tr reverse range ---"
 printf "abc\n" | "$BIN" -c 'koshkit tr a-c z-x'
 echo "--- seq into head ---"
 "$BIN" -c 'koshkit seq 5 | koshkit head -n 2'
+echo "--- head minimum signed drop count ---"
+printf 'one\ntwo\n' | "$BIN" -c 'koshkit head -n -9223372036854775808'
+echo "status=$?"
 echo "--- tee then read back ---"
 "$BIN" -c 'koshkit seq 2 | koshkit tee tee.txt'
 "$BIN" -c 'koshkit cat tee.txt'

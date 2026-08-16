@@ -45,8 +45,6 @@ public:
       -> ArrayList<analysis_scope_definition>;
 
 private:
-  static constexpr usize MAX_RECURSION_DEPTH = 64;
-
   /* The compound-command nesting limit guards the native stack against a
      pathologically nested source such as thousands of open parentheses. It is
      looser than the arithmetic limit because a legitimate script nests far
@@ -56,9 +54,6 @@ private:
   Lexer m_lexer;
 
   usize m_command_depth{0};
-  usize m_recursion_depth{0};
-  usize m_if_condition_depth{0};
-  usize m_parentheses_depth{0};
   bool m_should_stop_after_top_level_unit{false};
   bool m_has_parsed_source_command{false};
   bool m_should_collect_analysis_scopes{false};
@@ -166,8 +161,6 @@ private:
      its element tokens. Bash mode expands them into the array, POSIX mode
      discards the list and evaluates the assignment as a no-op. */
   fn consume_bash_array_assignment() throws -> ArrayList<const Token *>;
-
-  mustuse fn parse_expression(u8 min_precedence = 0) throws -> Expression *;
 };
 
 } /* namespace koshka */

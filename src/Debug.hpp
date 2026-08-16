@@ -128,7 +128,7 @@ fn t__string_from_struct(const T &value, AllocatorT allocator) throws -> StringT
   return static_cast<StringT &&>(state.output);
 }
 
-} // namespace koshka
+} /* namespace koshka */
 
 #define STRUCT_STRING(x)                                                       \
   ::koshka::t__string_from_struct<::koshka::String>(                           \

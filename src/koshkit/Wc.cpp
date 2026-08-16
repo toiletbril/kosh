@@ -148,19 +148,20 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
       if (*read_size == 0) break;
       bytes += *read_size;
 
-      if (should_show_lines || should_show_words) {
+      if (should_show_words) {
         for (usize i = 0; i < *read_size; i++) {
           let const c = buffer[i];
           if (should_show_lines && c == '\n') lines++;
-          if (should_show_words) {
-            if (is_blank(c)) {
-              is_in_word = false;
-            } else if (!is_in_word) {
-              is_in_word = true;
-              words++;
-            }
+          if (is_blank(c)) {
+            is_in_word = false;
+          } else if (!is_in_word) {
+            is_in_word = true;
+            words++;
           }
         }
+      } else if (should_show_lines) {
+        for (usize i = 0; i < *read_size; i++)
+          if (buffer[i] == '\n') lines++;
       }
     }
     if (did_read_fail) continue;
@@ -201,6 +202,6 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

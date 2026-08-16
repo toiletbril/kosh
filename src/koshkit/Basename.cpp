@@ -79,6 +79,6 @@ fn Basename::execute(
   return 0;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

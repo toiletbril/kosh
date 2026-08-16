@@ -50,6 +50,6 @@ fn WhoAmI::execute(const ExecContext &ec, EvalContext &cxt,
   return 1;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

@@ -770,4 +770,4 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   return captured;
 }
 
-} // namespace koshka
+} /* namespace koshka */

@@ -13,6 +13,9 @@ val
 == a local shadows an outer value and restores it:
 inner
 outer
+== invalid local names fail without creating hidden bindings:
+status=1
+hidden=1
 == fresh name warns:
 1
 == top-level name is quiet:

@@ -170,4 +170,4 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
 }
 
-} // namespace koshka
+} /* namespace koshka */

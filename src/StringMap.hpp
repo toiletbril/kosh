@@ -14,7 +14,7 @@ class StringMap
 public:
   explicit StringMap(Allocator allocator) : m_allocator(allocator) {}
 
-  cold StringMap(const StringMap &other) : m_allocator(other.m_allocator)
+  cold StringMap(const StringMap &other) : StringMap(other.m_allocator)
   {
     if (other.m_count == 0) return;
     rehash(other.m_capacity);
@@ -69,10 +69,16 @@ public:
 
   cold fn reserve(usize expected_count) throws -> void
   {
-    let const needed = (expected_count * 4 / 3) + 1;
+    let const third = expected_count / 3;
+    if (expected_count > SIZE_MAX - third - 1) [[unlikely]]
+      throw std::bad_alloc{};
+    let const needed = expected_count + third + 1;
     usize new_capacity = m_capacity == 0 ? 16 : m_capacity;
-    while (new_capacity < needed)
+    while (new_capacity < needed) {
+      if (new_capacity > SIZE_MAX / 2) [[unlikely]]
+        throw std::bad_alloc{};
       new_capacity *= 2;
+    }
 
     if (new_capacity > m_capacity) rehash(new_capacity);
   }
@@ -230,10 +236,13 @@ private:
     let const maximum_occupied = (m_capacity >> 1) + (m_capacity >> 2);
     if (m_count + m_tombstones + 1 <= maximum_occupied) return result;
 
-    if (m_count + 1 > maximum_occupied)
+    if (m_count + 1 > maximum_occupied) {
+      if (m_capacity > SIZE_MAX / 2) [[unlikely]]
+        throw std::bad_alloc{};
       rehash(m_capacity * 2);
-    else
+    } else {
       rehash(m_capacity);
+    }
     result = probe(key, hash);
     return result;
   }
@@ -270,31 +279,67 @@ private:
 
   cold fn rehash(usize new_capacity) throws -> void
   {
-    let old_slots = m_slots;
+    let const fresh_slots = m_allocator.alloc_array<slot>(new_capacity);
+    usize constructed_count = 0;
+    try {
+      for (; constructed_count < new_capacity; constructed_count++)
+        new (&fresh_slots[constructed_count]) slot{};
+    } catch (...) {
+      for (usize i = 0; i < constructed_count; i++)
+        fresh_slots[i].~slot();
+      m_allocator.free_array(fresh_slots, new_capacity);
+      throw;
+    }
+
+    let const old_slots = m_slots;
     let const old_capacity = m_capacity;
 
-    m_slots = m_allocator.alloc_array<slot>(new_capacity);
-    for (usize i = 0; i < new_capacity; i++)
-      new (&m_slots[i]) slot{};
-    m_capacity = new_capacity;
-    m_count = 0;
-    m_tombstones = 0;
-    let const mask = m_capacity - 1;
+    usize fresh_count = 0;
+    let const mask = new_capacity - 1;
+    try {
+      for (usize i = 0; i < old_capacity; i++) {
+        if (old_slots[i].state != slot::Occupied) continue;
 
-    for (usize i = 0; i < old_capacity; i++) {
-      if (old_slots[i].state == slot::Occupied) {
         let index = static_cast<usize>(old_slots[i].hash) & mask;
-        while (m_slots[index].state == slot::Occupied)
+        while (fresh_slots[index].state == slot::Occupied)
           index = (index + 1) & mask;
-        let &destination = m_slots[index];
+        let &destination = fresh_slots[index];
         destination.hash = old_slots[i].hash;
-        destination.key = steal(old_slots[i].key);
-        destination.value = steal(old_slots[i].value);
+        destination.key = old_slots[i].key;
         destination.state = slot::Occupied;
-        m_count++;
+        fresh_count++;
       }
-      old_slots[i].~slot();
+
+      for (usize i = 0; i < old_capacity; i++) {
+        if (old_slots[i].state != slot::Occupied) continue;
+
+        let index = static_cast<usize>(old_slots[i].hash) & mask;
+        while (fresh_slots[index].state != slot::Occupied ||
+               fresh_slots[index].hash != old_slots[i].hash ||
+               fresh_slots[index].key.view() != old_slots[i].key.view())
+          index = (index + 1) & mask;
+
+        if constexpr (std::is_copy_assignable_v<Value>) {
+          fresh_slots[index].value = old_slots[i].value;
+        } else {
+          static_assert(std::is_nothrow_move_assignable_v<Value>);
+          fresh_slots[index].value = steal(old_slots[i].value);
+        }
+      }
+    } catch (...) {
+      for (usize i = 0; i < new_capacity; i++)
+        fresh_slots[i].~slot();
+      m_allocator.free_array(fresh_slots, new_capacity);
+      throw;
     }
+
+    m_slots = fresh_slots;
+    m_capacity = new_capacity;
+    m_count = fresh_count;
+    m_tombstones = 0;
+
+    for (usize i = 0; i < old_capacity; i++)
+      old_slots[i].~slot();
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);
   }
 
@@ -316,4 +361,4 @@ private:
   usize m_tombstones{0};
 };
 
-} // namespace koshka
+} /* namespace koshka */

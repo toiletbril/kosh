@@ -41,8 +41,9 @@ disabled-parse traces=0 errors=1
 enabled-fallback traces=3 errors=1
 enabled-fallback-parse traces=2 errors=1
 disabled-fallback traces=0 errors=1
-     1 |  KOSH -c 'echo hi' -c no_such_command_xyz
+     1 |  KOSH -c 'echo hi' -c no_such_command_xyz '$()' ';' '*' '#' '~' '\' '"'
 quoted_and_second_c=ok
+special_arguments_quoted=ok
 rc=1
 traces=0
 error=ok

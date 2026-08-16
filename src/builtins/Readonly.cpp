@@ -93,4 +93,4 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_error ? 1 : 0;
 }
 
-} // namespace koshka
+} /* namespace koshka */

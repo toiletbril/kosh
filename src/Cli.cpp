@@ -606,14 +606,29 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
 pure fn arg_needs_shell_quoting(StringView arg) wontthrow -> bool
 {
   if (arg.is_empty()) return true;
+
   for (usize i = 0; i < arg.length; i++) {
     let const character = arg[i];
-    if (character == ' ' || character == '\t' || character == '\n' ||
-        character == '\'')
-    {
-      return true;
+    let const is_ascii_alphanumeric = (character >= 'a' && character <= 'z') ||
+                                      (character >= 'A' && character <= 'Z') ||
+                                      (character >= '0' && character <= '9');
+    switch (character) {
+    case '_':
+    case '@':
+    case '%':
+    case '+':
+    case '=':
+    case ':':
+    case ',':
+    case '.':
+    case '/':
+    case '-': break;
+    default:
+      if (!is_ascii_alphanumeric) return true;
+      break;
     }
   }
+
   return false;
 }
 
@@ -900,10 +915,9 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
 
 fn print(StringView text) throws -> void
 {
-  /* Flushed at once so it interleaves with the unbuffered write_fd path the
-     builtins use. */
-  std::fwrite(text.data, 1, text.count(), stdout);
-  std::fflush(stdout);
+  if (!os::write_all(KOSH_STDOUT, text.data, text.count()))
+    throw Error{"Unable to write to standard output: " +
+                os::last_system_error_message()};
 }
 
 fn print_error(StringView text) throws -> void
@@ -919,7 +933,12 @@ fn print_error(StringView text) throws -> void
   }
 }
 
-fn flush() throws -> void { std::fflush(stdout); }
+fn flush() throws -> void
+{
+  if (std::fflush(stdout) != 0)
+    throw Error{"Unable to flush standard output: " +
+                os::last_system_error_message()};
+}
 
 /* The first show_message consumes it, so only the leading message of a
    completion run breaks to its own line, not every message after it. */

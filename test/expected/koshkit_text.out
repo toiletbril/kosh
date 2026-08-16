@@ -50,6 +50,8 @@ note: Order the range endpoints so the low byte precedes the high byte.
 --- seq into head ---
 1
 2
+--- head minimum signed drop count ---
+status=0
 --- tee then read back ---
 1
 2

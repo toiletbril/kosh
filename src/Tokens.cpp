@@ -54,25 +54,28 @@ hot fn Word::to_literal_string() const throws -> String
 {
   let result = String{heap_allocator()};
   for (let const &segment : segments) {
-    if (segment.kind == WordSegment::Kind::CommandSubstitution) {
+    switch (segment.kind) {
+    case WordSegment::Kind::CommandSubstitution:
       result += "$(";
       result += segment.text;
       result += ")";
       continue;
-    }
-    if (segment.kind == WordSegment::Kind::FunctionSubstitution) {
+    case WordSegment::Kind::FunctionSubstitution:
       result += "${ ";
       result += segment.text;
       result += " }";
       continue;
-    }
-    if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
+    case WordSegment::Kind::ArithmeticExpansion:
       result += "$((";
       result += segment.text;
       result += "))";
       continue;
+    case WordSegment::Kind::VariableReference: result += '$'; break;
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::UnquotedText:
+    case WordSegment::Kind::DoubleQuotedText:
+    case WordSegment::Kind::ProcessSubstitution: break;
     }
-    if (segment.kind == WordSegment::Kind::VariableReference) result += '$';
     result += segment.text;
   }
   return result;
@@ -103,13 +106,17 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
   if (segments.is_empty()) return false;
   bool has_seen_digit = false;
   for (let const &segment : segments) {
-    if (segment.kind == WordSegment::Kind::VariableReference ||
-        segment.kind == WordSegment::Kind::CommandSubstitution ||
-        segment.kind == WordSegment::Kind::ArithmeticExpansion ||
-        segment.kind == WordSegment::Kind::FunctionSubstitution)
-    {
-      return false;
+    switch (segment.kind) {
+    case WordSegment::Kind::VariableReference:
+    case WordSegment::Kind::CommandSubstitution:
+    case WordSegment::Kind::ArithmeticExpansion:
+    case WordSegment::Kind::FunctionSubstitution: return false;
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::UnquotedText:
+    case WordSegment::Kind::DoubleQuotedText:
+    case WordSegment::Kind::ProcessSubstitution: break;
     }
+
     for (usize i = 0; i < segment.text.count(); i++) {
       const char c = segment.text[i];
       if (c < '0' || c > '9') return false;
@@ -146,10 +153,15 @@ pure fn Word::fd_allocation_name() const wontthrow -> Maybe<StringView>
 pure fn Word::runs_substitution() const wontthrow -> bool
 {
   for (let const &segment : segments) {
-    if (segment.kind == WordSegment::Kind::CommandSubstitution ||
-        segment.kind == WordSegment::Kind::FunctionSubstitution)
-    {
-      return true;
+    switch (segment.kind) {
+    case WordSegment::Kind::CommandSubstitution:
+    case WordSegment::Kind::FunctionSubstitution: return true;
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::UnquotedText:
+    case WordSegment::Kind::DoubleQuotedText:
+    case WordSegment::Kind::VariableReference:
+    case WordSegment::Kind::ProcessSubstitution:
+    case WordSegment::Kind::ArithmeticExpansion: break;
     }
   }
   return false;
@@ -392,10 +404,6 @@ SENTINEL_TOKEN_DECLS(Dot, ".");
 
 SENTINEL_TOKEN_DECLS(LeftParen, "(");
 SENTINEL_TOKEN_DECLS(RightParen, ")");
-SENTINEL_TOKEN_DECLS(LeftSquareBracket, "[");
-SENTINEL_TOKEN_DECLS(DoubleLeftSquareBracket, "[[");
-SENTINEL_TOKEN_DECLS(RightSquareBracket, "]");
-SENTINEL_TOKEN_DECLS(DoubleRightSquareBracket, "]]");
 SENTINEL_TOKEN_DECLS(LeftBracket, "{");
 SENTINEL_TOKEN_DECLS(RightBracket, "}");
 
@@ -404,15 +412,6 @@ Value::Value(SourceLocation location, StringView sv)
 {}
 
 fn Value::raw_string() const throws -> String { return m_value; }
-
-Number::Number(SourceLocation location, StringView sv) : Value(location, sv) {}
-
-fn Number::kind() const wontthrow -> Token::Kind { return Token::Kind::Number; }
-
-fn Number::flags() const wontthrow -> Token::Flags
-{
-  return Token::Flag::Value;
-}
 
 Assignment::Assignment(SourceLocation location, StringView key, Word value,
                        bool is_append)
@@ -463,20 +462,6 @@ fn WordToken::flags() const wontthrow -> Token::Flags
 }
 
 pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }
-
-Identifier::Identifier(SourceLocation location, StringView sv)
-    : Value(location, sv)
-{}
-
-fn Identifier::kind() const wontthrow -> Token::Kind
-{
-  return Token::Kind::Identifier;
-}
-
-fn Identifier::flags() const wontthrow -> Token::Flags
-{
-  return Token::Flag::Value;
-}
 
 Redirection::Redirection(SourceLocation location, StringView what_fd,
                          StringView to_file)
@@ -627,6 +612,6 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
 UNARY_OPERATOR_TOKEN_DECLS(ExclamationMark, "!", 13, LogicalNot);
 UNARY_OPERATOR_TOKEN_DECLS(Tilde, "~", 13, BinaryComplement);
 
-} // namespace tokens
+} /* namespace tokens */
 
-} // namespace koshka
+} /* namespace koshka */

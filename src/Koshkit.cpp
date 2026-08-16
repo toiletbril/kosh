@@ -99,12 +99,12 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index,
                             "koshkit has no utility named '" + String{name} +
                                 "'"};
 
-  ArrayList<String> shifted{heap_allocator()};
+  ArrayList<String> shifted{cxt.scratch_allocator()};
   shifted.reserve(ec.args().count() - name_index);
-  let shifted_locations = ArrayList<SourceLocation>{heap_allocator()};
+  let shifted_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   shifted_locations.reserve(ec.args().count() - name_index);
   for (usize i = name_index; i < ec.args().count(); i++) {
-    shifted.push(ec.args()[i].clone());
+    shifted.push(String{cxt.scratch_allocator(), ec.args()[i].view()});
     shifted_locations.push(ec.arg_location_at(i));
   }
 
@@ -275,21 +275,6 @@ fn source_list_from_operands(const ArrayList<String> &operands,
       sources.push(operands[i].view());
   }
   return sources;
-}
-
-fn sort_string_list(ArrayList<String> &items) wontthrow -> void
-{
-  items.sort([](const String &a, const String &b) { return a < b; });
-}
-
-fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
-{
-  items.sort([](StringView a, StringView b) {
-    let const min_length = a.length < b.length ? a.length : b.length;
-    let const order =
-        min_length == 0 ? 0 : __builtin_memcmp(a.data, b.data, min_length);
-    return order != 0 ? order < 0 : a.length < b.length;
-  });
 }
 
 fn format_signal_list() throws -> String

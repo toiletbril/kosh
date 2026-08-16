@@ -102,6 +102,13 @@ if true
 then
   echo dash
 fi
+continuation-equivalent=yes idempotent=yes
+lone-cr-retained=yes idempotent=yes
+x+=1 [ -n "$x" ]
+arr[0]=v [ -n "${arr[0]}" ]
+arr[1]+=w [ -n "${arr[1]}" ]
+assignment-prefixes-idempotent=yes
+nested-heredoc-equivalent=yes idempotent=yes
 apply-status=0 executable=yes symlink=yes
 for x in a b
 do
@@ -114,21 +121,24 @@ fi
 hardlink-retained=yes
 clean-crlf-status=0 retained=yes
 fixed-crlf-status=0 retained=yes
-lint-apply-status=0 contents=#!/bin/sh|[ "$1" = y ]|printf "%s\n" "$1" "$@"|
-combined-status=0
+lint-apply-status=1 contents=#!/bin/sh|[ "$1" = y ]|printf "%s\n" $1 $@|
+combined-status=1
 #!/bin/bash
 if [ -n "$1" ]
 then
   [ "$1" = y ]
 fi
-if [[ $1 -gt 0 ]]
+if [[ $1 > 0 ]]
 then
   echo positive
 fi
-warning-apply-status=0
+warning-apply-status=1
 #!/bin/bash
-[[ 1 -gt 0 ]]
+[[ 1 > 0 ]]
+safe-and-unsafe-status=1 contents=#!/bin/sh|[ "$1" = y ]|printf "%s\n" $1|
 parse-status=1 unchanged=yes
+lint-parse-status=1 unchanged=yes
+combined-parse-status=1 unchanged=yes
 apply-alone-status=2
 multi-stdout-status=2
 lint-format-stdout-status=0

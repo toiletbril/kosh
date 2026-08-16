@@ -43,7 +43,8 @@ class SynopsisList
 public:
   SynopsisList(std::initializer_list<StringView> lines) wontthrow
   {
-    ASSERT(lines.size() <= countof(m_lines));
+    if (lines.size() > countof(m_lines))
+      TRAP("the help synopsis exceeds its fixed capacity");
     for (let const line : lines)
       m_lines[m_count++] = line;
   }
@@ -70,7 +71,8 @@ class FlagList
 public:
   fn push(Flag *flag) wontthrow -> void
   {
-    ASSERT(m_count < countof(m_flags));
+    if (m_count >= countof(m_flags))
+      TRAP("the flag registry exceeds its fixed capacity");
     m_flags[m_count++] = flag;
   }
 
@@ -269,4 +271,4 @@ fn print(StringView text) throws -> void;
 fn print_error(StringView text) throws -> void;
 fn flush() throws -> void;
 
-} // namespace koshka
+} /* namespace koshka */

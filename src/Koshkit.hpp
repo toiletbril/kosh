@@ -302,9 +302,6 @@ fn source_list_from_operands(const ArrayList<String> &operands,
                              usize first_operand_index = 0) throws
     -> ArrayList<StringView>;
 
-fn sort_string_list(ArrayList<String> &items) wontthrow -> void;
-fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void;
-
 fn format_human_size(u64 bytes, Allocator allocator) throws -> String;
 
 fn parse_koshkit_duration_seconds(StringView text, StringView utility_name,

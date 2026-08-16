@@ -357,9 +357,9 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   let has_child_exited = false;
-  let wait_result =
-      wait_for_process_until(child, process_group, timeout_nanos, status,
-                             has_child_exited, wait_completion::ChildExited);
+  let wait_result = wait_for_process_until(child, process_group, timeout_nanos,
+                                           status, has_child_exited,
+                                           wait_completion::ProcessGroupEmpty);
   if (wait_result == supervision_wait_result::Exited) return status;
   if (wait_result == supervision_wait_result::Interrupted)
     return finish_interrupted_supervision(child, process_group,

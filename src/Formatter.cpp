@@ -78,7 +78,7 @@ constexpr StaticStringSet CASE_TERMINATORS{CASE_TERMINATOR_KEYS};
 
 pure fn is_format_blank(char byte) wontthrow -> bool
 {
-  return byte == ' ' || byte == '\t' || byte == '\r';
+  return lexer::is_whitespace(byte);
 }
 
 pure fn is_format_operator_start(char byte) wontthrow -> bool
@@ -155,36 +155,18 @@ fn scan_quoted_region(StringView source, usize &position, char quote) wontthrow
   }
 }
 
-fn scan_balanced_region(StringView source, usize &position,
-                        char closing) wontthrow -> void
+fn scan_balanced_region(StringView source, usize &position, char closing) throws
+    -> void
 {
-  usize depth = 1;
-
-  while (position < source.length && depth > 0) {
-    let const byte = source[position++];
-    if (byte == '\\' && position < source.length) {
-      position++;
-      continue;
-    }
-    if (byte == '\'' || byte == '"' || byte == '`') {
-      scan_quoted_region(source, position, byte);
-      continue;
-    }
-    if (byte == closing) {
-      depth--;
-      continue;
-    }
-    if ((closing == ')' && byte == '(') || (closing == '}' && byte == '{'))
-      depth++;
-  }
+  let const end = lexer::scan_balanced_shell_region(source, position, closing);
+  position = end.value_or(source.length);
 }
 
-fn scan_format_word_end(StringView source, usize position) wontthrow -> usize
+fn scan_format_word_end(StringView source, usize position) throws -> usize
 {
   while (position < source.length) {
     let const byte = source[position];
     if (byte == '\\' && position + 1 < source.length) {
-      if (source[position + 1] == '\n') break;
       position += 2;
       continue;
     }
@@ -444,21 +426,6 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
   return pieces;
 }
 
-pure fn is_assignment_word(StringView word) wontthrow -> bool
-{
-  let const equals = word.find_character('=');
-  if (!equals.has_value() || *equals == 0) return false;
-
-  for (usize position = 0; position < *equals; position++) {
-    let const byte = word[position];
-    if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
-          byte == '_' || (position > 0 && byte >= '0' && byte <= '9')))
-      return false;
-  }
-
-  return true;
-}
-
 pure fn is_line_operator(StringView text) wontthrow -> bool
 {
   return LINE_OPERATORS.contains(text);
@@ -684,6 +651,9 @@ fn format_word_substitutions(StringView word, usize indent,
     let const inner =
         word.substring_of_length(inner_start, inner_end - inner_start);
     let const pieces = scan_format_pieces(inner);
+    let const should_close_after_heredoc =
+        !pieces.is_empty() && pieces.back().kind == format_piece_kind::Raw &&
+        !pieces.back().text.is_empty() && pieces.back().text.back() == '\n';
     let formatted =
         render_format_pieces(pieces, indent + 2, recursion_depth + 1);
     while (!formatted.is_empty() && formatted[formatted.count() - 1] == '\n')
@@ -699,6 +669,7 @@ fn format_word_substitutions(StringView word, usize indent,
     else
       output.append(word.substring_of_length(position, opener_length));
     output.append(formatted.substring(leading_indent));
+    if (should_close_after_heredoc) output.push('\n');
     if (is_function_substitution)
       output.append("; }");
     else
@@ -860,7 +831,8 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       writer.append_token(rendered_text);
       if ((keyword_flags & formatter_keyword_prefix) != 0)
         is_command_start = true;
-      else if (!is_redirection_descriptor && !is_assignment_word(rendered_text))
+      else if (!is_redirection_descriptor &&
+               !lexer::word_looks_like_assignment(rendered_text))
       {
         is_command_start = false;
       }
@@ -1029,14 +1001,23 @@ fn select_nonconflicting_source_edits(
   let nonconflicting = ArrayList<const source_edit *>{heap_allocator()};
   usize candidate_index = 0;
 
+  let const do_starts_conflict_group =
+      [](const source_edit &candidate, usize group_start, usize group_end,
+         bool group_starts_with_insertion) wontthrow -> bool {
+    if (candidate.start < group_end) return true;
+    if (candidate.start != group_start) return false;
+    return group_starts_with_insertion || candidate.start == candidate.end;
+  };
+
   while (candidate_index < unique.count()) {
     usize group_end = candidate_index + 1;
+    let const group_start = unique[candidate_index]->start;
     usize overlap_end = unique[candidate_index]->end;
+    let const group_starts_with_insertion =
+        group_start == unique[candidate_index]->end;
     while (group_end < unique.count() &&
-           (unique[group_end]->start < overlap_end ||
-            (unique[candidate_index]->start == overlap_end &&
-             unique[candidate_index]->start == unique[candidate_index]->end &&
-             unique[group_end]->start == unique[candidate_index]->start)))
+           do_starts_conflict_group(*unique[group_end], group_start,
+                                    overlap_end, group_starts_with_insertion))
     {
       if (unique[group_end]->end > overlap_end)
         overlap_end = unique[group_end]->end;
@@ -1138,19 +1119,28 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
   let replacement = String{heap_allocator()};
   let title = String{heap_allocator()};
   bool is_fixable = true;
+  bool is_safe_for_fix_all = false;
   let const written =
       source.substring_of_length(location.position, location.length);
 
   switch (id) {
-  case diagnostic_id::sc1082: title = "Remove the byte-order mark"; break;
-  case diagnostic_id::sc1017: title = "Remove the carriage return"; break;
+  case diagnostic_id::sc1082:
+    title = "Remove the byte-order mark";
+    is_safe_for_fix_all = true;
+    break;
+  case diagnostic_id::sc1017:
+    title = "Remove the carriage return";
+    is_safe_for_fix_all = true;
+    break;
   case diagnostic_id::sc1018:
     title = "Replace the separator with a space";
     replacement = " ";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc1100:
     title = "Replace the dash with '-'";
     replacement = "-";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc1101:
     title = "Remove whitespace after the continuation";
@@ -1159,18 +1149,22 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
   case diagnostic_id::sc1084:
     title = "Put '#' before '!'";
     replacement = "#!";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc1104:
     title = "Add '#' before '!'";
     replacement = "#!";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc1113:
     title = "Add '!' after '#'";
     replacement = "#!";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc1114:
   case diagnostic_id::sc1115:
     title = "Remove whitespace from the shebang";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc1029: {
     if (written.length < 2 || written[0] != '\\') {
@@ -1179,19 +1173,23 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
     }
     title = "Remove the unnecessary escape";
     replacement = written.substring(1);
+    is_safe_for_fix_all = true;
     break;
   }
   case diagnostic_id::sc2108:
     title = "Replace '-a' with '&&'";
     replacement = "&&";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc2110:
     title = "Replace '-o' with '||'";
     replacement = "||";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc3014:
     title = "Replace '==' with '='";
     replacement = "=";
+    is_safe_for_fix_all = true;
     break;
   case diagnostic_id::sc2068:
     if (written != "$@") {
@@ -1231,7 +1229,7 @@ fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
   let const edit_end = location.position + location.length;
   edits.push(source_edit{location.position, edit_end, String{written},
                          steal(replacement)});
-  fixes.push(source_fix{steal(title), steal(edits), true, true});
+  fixes.push(source_fix{steal(title), steal(edits), true, is_safe_for_fix_all});
 
   return fixes;
 }

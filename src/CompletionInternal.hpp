@@ -4,14 +4,21 @@
 #include "Arena.hpp"
 #include "Completion.hpp"
 #include "Containers.hpp"
+#include "HashSet.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 
 namespace koshka {
 
+namespace utils {
+struct decoded_shell_word;
+}
+
 namespace completion {
 
 extern BumpArena COMPLETION_ARENA;
+extern BumpArena HIGHLIGHT_ARENA;
+extern usize DEBUG_HIGHLIGHT_INPUT_BYTE_COUNT;
 
 inline fn completion_allocator() wontthrow -> Allocator
 {
@@ -31,8 +38,42 @@ static pure alwaysinline fn skip_blanks(StringView text, usize from) wontthrow
   return from;
 }
 
+struct token_bounds
+{
+  usize start;
+  usize end;
+};
+
+/* The directory part keeps its trailing separator so the basename joins back
+   on. */
+struct path_token
+{
+  StringView directory_part;
+  StringView basename_part;
+};
+
 /* Primitives defined in Completion.cpp and reached from the cascade stages and
    the highlighter. */
+pure fn quoted_run_end(StringView line, usize position) wontthrow -> usize;
+pure fn find_token_bounds(StringView line, usize cursor) wontthrow
+    -> token_bounds;
+pure fn is_in_command_position(StringView line, usize token_start) wontthrow
+    -> bool;
+pure fn command_segment_start(StringView line, usize cursor) wontthrow -> usize;
+pure fn split_path_token(StringView token) wontthrow -> path_token;
+pure fn path_candidate_needs_quoting(StringView candidate) wontthrow -> bool;
+fn quote_path_candidate(StringView candidate) throws -> String;
+fn escape_path_candidate(StringView candidate) throws -> String;
+fn rebuild_shell_syntax_candidate(StringView raw_token,
+                                  const utils::decoded_shell_word &decoded_word,
+                                  StringView decoded_candidate) throws
+    -> String;
+fn resolve_listing_directory(StringView directory_part,
+                             const Path &base_directory, EvalContext &context,
+                             bool is_leading_tilde_active,
+                             bool is_leading_variable_active,
+                             usize leading_variable_expansion_end) throws
+    -> Path;
 fn command_word_of(StringView line) wontthrow -> StringView;
 pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool;
 fn resolve_completion_alias(StringView command, EvalContext &context) throws
@@ -41,13 +82,18 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
     -> String;
 fn split_completion_words(StringView line, usize cursor, usize &cword) throws
     -> ArrayList<String>;
-pure fn word_looks_like_assignment(StringView word) wontthrow -> bool;
 pure fn word_is_plain_identifier(StringView word) wontthrow -> bool;
 pure fn word_defines_function(StringView line, usize word_end,
                               usize end) wontthrow -> bool;
 fn advance_shell_keyword_state(StringView word, usize frame_depth,
                                shell_lexical_state &state) throws
     -> Maybe<bool>;
+fn scan_highlight_range(StringView line, usize begin, usize end,
+                        EvalContext &context, ArrayList<highlight_span> &spans,
+                        HashSet &line_variable_names,
+                        const HashSet *known_function_names,
+                        bool should_stop_at_closing_parenthesis = false) throws
+    -> usize;
 
 /* Defined in CompletionManpage.cpp. */
 fn second_word_of(StringView line) wontthrow -> Maybe<StringView>;

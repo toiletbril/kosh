@@ -53,11 +53,36 @@ public:
   template <class T, class... Args>
   flatten alwaysinline fn create(Args &&...args) throws -> T *
   {
-    let const storage = allocate(sizeof(T), alignof(T));
-    let const object = new (storage) T(std::forward<Args>(args)...);
-    if constexpr (!std::is_trivially_destructible_v<T>)
-      m_destructors.push(pending_destructor{
-          object, [](opaque *p) { static_cast<T *>(p)->~T(); }});
+    static_assert(std::is_nothrow_destructible_v<T>);
+    let const saved = mark();
+    opaque *storage = nullptr;
+    try {
+      storage = allocate(sizeof(T), alignof(T));
+    } catch (...) {
+      release(saved);
+      throw;
+    }
+
+    T *object = nullptr;
+    try {
+      object = new (storage) T(std::forward<Args>(args)...);
+    } catch (...) {
+      release(saved);
+      throw;
+    }
+
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      try {
+        m_destructors.push(
+            pending_destructor{object, [](opaque *pointer) noexcept {
+                                 static_cast<T *>(pointer)->~T();
+                               }});
+      } catch (...) {
+        object->~T();
+        release(saved);
+        throw;
+      }
+    }
     return object;
   }
 
@@ -72,7 +97,7 @@ private:
   struct pending_destructor
   {
     opaque *object;
-    void (*run)(opaque *);
+    void (*run)(opaque *) noexcept;
   };
 
   static constexpr usize DEFAULT_BLOCK_SIZE = 64 * 1024;
@@ -99,4 +124,4 @@ extern BumpArena *FUNCTION_ARENA;
 
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool;
 
-} // namespace koshka
+} /* namespace koshka */

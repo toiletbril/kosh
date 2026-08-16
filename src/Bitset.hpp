@@ -41,9 +41,9 @@ public:
   hot fn push(bool value) throws -> void
   {
     let const bit_position = m_length;
-    m_length++;
     let const word_index = bit_position / BITS_PER_WORD;
     if (word_index >= m_words.count()) m_words.push(0);
+    m_length++;
     if (value) m_words[word_index] |= u64{1} << (bit_position % BITS_PER_WORD);
   }
 
@@ -59,7 +59,9 @@ public:
 
   fn reserve(usize bit_count) throws -> void
   {
-    m_words.reserve((bit_count + BITS_PER_WORD - 1) / BITS_PER_WORD);
+    let const word_count =
+        bit_count / BITS_PER_WORD + (bit_count % BITS_PER_WORD != 0 ? 1 : 0);
+    m_words.reserve(word_count);
   }
 
   fn clear() wontthrow -> void
@@ -105,4 +107,4 @@ private:
   usize m_length{0};
 };
 
-} // namespace koshka
+} /* namespace koshka */

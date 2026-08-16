@@ -115,9 +115,9 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         if (!was_requested) return;
       }
 
-      out += "trap -- '";
-      out += action;
-      out += "' ";
+      out += "trap -- ";
+      append_shell_quoted_arg(out, action.view());
+      out += ' ';
       out += format_listed_condition(condition, should_include_signal_prefix,
                                      cxt.scratch_allocator());
       out += '\n';
@@ -128,11 +128,17 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(args.count() > 1);
 
-  if (args.count() == 2) {
-    let const condition = normalize_condition(args[1], cxt.scratch_allocator());
+  usize action_index = 1;
+  if (args[action_index] == "--") action_index++;
+  if (action_index >= args.count()) return 0;
+
+  if (action_index + 1 == args.count()) {
+    let const condition =
+        normalize_condition(args[action_index], cxt.scratch_allocator());
     if (!is_valid_trap_condition(condition.view())) {
-      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
-                                args[1] + ": invalid signal specification",
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(action_index),
+                                args[action_index] +
+                                    ": invalid signal specification",
                                 "List the signal names with `trap -l`");
       return 2;
     }
@@ -143,11 +149,11 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  let const &action = args[1];
+  let const &action = args[action_index];
   let const is_reset = action == "-";
 
   i32 status = 0;
-  for (usize i = 2; i < args.count(); i++) {
+  for (usize i = action_index + 1; i < args.count(); i++) {
     let const condition = normalize_condition(args[i], cxt.scratch_allocator());
     if (!is_valid_trap_condition(condition.view())) {
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),

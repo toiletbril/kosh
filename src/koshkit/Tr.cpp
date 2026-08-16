@@ -189,27 +189,31 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  let const input = read_fd_to_string(ec.in_fd.value_or(KOSH_STDIN));
-  if (os::INTERRUPT_REQUESTED) return 130;
-  if (!input.has_value()) {
-    report_soft_koshkit_error(
-        ec, cxt, "tr: read failed: " + os::last_system_error_message());
-    return 1;
-  }
-  let output = String{cxt.scratch_allocator()};
-  output.reserve(input->count());
-  let const input_view = input->view();
-  for (usize i = 0; i < input_view.length; i++) {
-    let const c = static_cast<unsigned char>(input_view[i]);
-    if (!is_in_set1[c]) {
-      output.push(static_cast<char>(c));
-      continue;
+  char input[65536];
+  char output[sizeof(input)];
+  loop
+  {
+    let const read_count =
+        os::read_fd(ec.in_fd.value_or(KOSH_STDIN), input, sizeof(input));
+    if (!read_count.has_value()) {
+      if (os::INTERRUPT_REQUESTED) return 130;
+      report_soft_koshkit_error(
+          ec, cxt, "tr: read failed: " + os::last_system_error_message());
+      return 1;
     }
-    if (is_deleting) continue;
-    output.push(static_cast<char>(translation[c]));
+    if (*read_count == 0) break;
+    usize output_count = 0;
+    for (usize i = 0; i < *read_count; i++) {
+      let const byte = static_cast<unsigned char>(input[i]);
+      if (!is_in_set1[byte]) {
+        output[output_count++] = static_cast<char>(byte);
+      } else if (!is_deleting) {
+        output[output_count++] = static_cast<char>(translation[byte]);
+      }
+    }
+    if (output_count > 0) ec.print_to_stdout(StringView{output, output_count});
   }
 
-  ec.print_to_stdout(output);
   return 0;
 }
 

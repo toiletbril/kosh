@@ -49,4 +49,4 @@ public:
   mustuse bool is_unresolved() const { return kind == Kind::Unresolved; }
 };
 
-} // namespace koshka
+} /* namespace koshka */

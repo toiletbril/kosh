@@ -61,7 +61,7 @@ fn should_color_jobs(EvalContext &cxt) throws -> bool
   return cxt.shell_is_interactive() && colors::stdout_wants_color();
 }
 
-} // namespace
+} /* namespace */
 
 Jobs::Jobs() = default;
 
@@ -148,4 +148,4 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace koshka
+} /* namespace koshka */

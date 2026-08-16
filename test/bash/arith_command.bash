@@ -125,6 +125,16 @@ echo "cached-before: $((cached))"
 unset cached
 echo "cached-after: $((cached))"
 
+base=2
+stored[0]='base+1'
+stored[1]='stored[0]+4'
+echo "stored-array=$((stored[1]))"
+
+cycle[0]='cycle[0]'
+( : $((cycle[0])) ) 2>/dev/null
+echo "array-cycle-status=$?"
+echo "array-cycle-survived"
+
 # Bash bitwise arithmetic operators inside $(( )), checked byte-for-byte against
 # bash. Covers complement, and, or, xor, and the two shifts, with negative
 # operands and a precedence mix.

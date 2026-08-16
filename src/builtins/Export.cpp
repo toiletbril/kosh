@@ -176,7 +176,13 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         report_soft_builtin_error(ec, cxt, loc,
                                   StringView{"'"} + name + "' is read-only");
         has_error = true;
+        continue;
       }
+      cxt.record_environment_change(name);
+      os::set_environment_variable(name, value);
+      cxt.mark_exported(name);
+      if (name == "PATH")
+        cxt.get_program_resolver().assign_path(String{value.view()});
       continue;
     }
 
@@ -210,4 +216,4 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return has_error ? 1 : 0;
 }
 
-} // namespace koshka
+} /* namespace koshka */

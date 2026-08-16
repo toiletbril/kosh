@@ -23,11 +23,11 @@ namespace koshkit {
 
 /* Stopping at max_lines keeps an endless producer such as yes from running
    forever, since reading to the end would never return. */
-static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
+static fn read_up_to_lines(os::descriptor fd, u64 max_lines,
                            Allocator allocator) throws -> Maybe<String>
 {
   String out{allocator};
-  i64 line_count = 0;
+  u64 line_count = 0;
   char buffer[4096];
   while (line_count < max_lines) {
     if (os::INTERRUPT_REQUESTED) break;
@@ -45,22 +45,23 @@ static fn read_up_to_lines(os::descriptor fd, i64 max_lines,
   return out;
 }
 
-static fn read_up_to_bytes(os::descriptor fd, i64 max_bytes,
+static fn read_up_to_bytes(os::descriptor fd, u64 max_bytes,
                            Allocator allocator) throws -> Maybe<String>
 {
   String out{allocator};
-  i64 byte_count = 0;
+  u64 byte_count = 0;
   char buffer[4096];
   while (byte_count < max_bytes) {
     if (os::INTERRUPT_REQUESTED) break;
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
     if (!read_count.has_value()) return None;
     if (*read_count == 0) break;
-    let const remaining_count = static_cast<usize>(max_bytes - byte_count);
-    let const take_count =
-        *read_count < remaining_count ? *read_count : remaining_count;
+    let const remaining_count = max_bytes - byte_count;
+    let const take_count = remaining_count < *read_count
+                               ? static_cast<usize>(remaining_count)
+                               : *read_count;
     out.append(StringView{buffer, take_count});
-    byte_count += static_cast<i64>(take_count);
+    byte_count += take_count;
   }
 
   return out;
@@ -74,9 +75,9 @@ static fn read_all(os::descriptor fd, Allocator allocator) throws
 }
 
 static fn line_prefix_length_dropping_last(StringView text,
-                                           i64 drop_count) wontthrow -> usize
+                                           u64 drop_count) wontthrow -> usize
 {
-  i64 total_line_count = 0;
+  u64 total_line_count = 0;
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '\n') total_line_count++;
   }
@@ -85,10 +86,10 @@ static fn line_prefix_length_dropping_last(StringView text,
     total_line_count++;
   }
 
+  if (drop_count >= total_line_count) return 0;
   let const keep_count = total_line_count - drop_count;
-  if (keep_count <= 0) return 0;
 
-  i64 lines_seen = 0;
+  u64 lines_seen = 0;
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '\n') {
       lines_seen++;
@@ -100,13 +101,11 @@ static fn line_prefix_length_dropping_last(StringView text,
 }
 
 static fn byte_prefix_length_dropping_last(StringView text,
-                                           i64 drop_count) wontthrow -> usize
+                                           u64 drop_count) wontthrow -> usize
 {
-  let const total_length = static_cast<i64>(text.length);
-  let const keep_length = total_length - drop_count;
-  if (keep_length <= 0) return 0;
+  if (drop_count >= text.length) return 0;
 
-  return static_cast<usize>(keep_length);
+  return text.length - static_cast<usize>(drop_count);
 }
 
 Head::Head() = default;
@@ -129,11 +128,13 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       has_bytes_flag && (!has_lines_flag || FLAG_HEAD_BYTES.position() >
                                                 FLAG_HEAD_LINES.position());
 
-  i64 count = 10;
+  u64 count = 10;
   bool is_all_but_last = false;
   if (is_byte_mode) {
     let const raw = FLAG_HEAD_BYTES.value();
-    let const parsed_value = raw.to<i64>();
+    is_all_but_last = raw.length > 0 && raw[0] == '-';
+    let const magnitude = is_all_but_last ? raw.substring(1) : raw;
+    let const parsed_value = utils::parse_decimal_u64(magnitude);
     if (parsed_value.is_error()) {
       throw ErrorWithDetails{
           "head: invalid byte count '" + String{cxt.scratch_allocator(), raw}
@@ -142,11 +143,12 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
           "The count must be an integer"
       };
     }
-    is_all_but_last = raw.length > 0 && raw[0] == '-';
-    count = is_all_but_last ? -parsed_value.value() : parsed_value.value();
+    count = parsed_value.value();
   } else if (has_lines_flag) {
     let const raw = FLAG_HEAD_LINES.value();
-    let const parsed_value = raw.to<i64>();
+    is_all_but_last = raw.length > 0 && raw[0] == '-';
+    let const magnitude = is_all_but_last ? raw.substring(1) : raw;
+    let const parsed_value = utils::parse_decimal_u64(magnitude);
     if (parsed_value.is_error()) {
       throw ErrorWithDetails{
           "head: invalid line count '" + String{cxt.scratch_allocator(), raw}
@@ -155,8 +157,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
           "The count must be an integer"
       };
     }
-    is_all_but_last = raw.length > 0 && raw[0] == '-';
-    count = is_all_but_last ? -parsed_value.value() : parsed_value.value();
+    count = parsed_value.value();
   }
 
   let const sources =
@@ -229,6 +230,6 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

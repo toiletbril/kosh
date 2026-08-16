@@ -1427,6 +1427,6 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
-} // namespace expressions
+} /* namespace expressions */
 
-} // namespace koshka
+} /* namespace koshka */

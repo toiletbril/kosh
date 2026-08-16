@@ -78,11 +78,22 @@ fn String::clear() wontthrow -> void
 
 cold fn String::reserve(usize needed) throws -> void
 {
-  if (needed + 1 <= m_capacity) [[likely]]
+  if (needed < m_capacity) [[likely]]
     return;
-  let new_capacity = m_capacity < 64 ? m_capacity * 4 : m_capacity * 2;
-  while (new_capacity < needed + 1)
+  if (needed == SIZE_MAX) [[unlikely]]
+    throw std::bad_alloc{};
+
+  let const required_capacity = needed + 1;
+  let const growth = m_capacity < 64 ? usize{4} : usize{2};
+  let new_capacity =
+      m_capacity > SIZE_MAX / growth ? required_capacity : m_capacity * growth;
+  while (new_capacity < required_capacity) {
+    if (new_capacity > SIZE_MAX / 2) {
+      new_capacity = required_capacity;
+      break;
+    }
     new_capacity *= 2;
+  }
   let fresh = m_allocator.alloc_array<char>(new_capacity);
   let const preserved_length = m_length;
   if (preserved_length > 0) std::memcpy(fresh, m_data, preserved_length);
@@ -122,9 +133,12 @@ fn String::find_substring(StringView needle, usize from) const wontthrow
 {
   if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
   if (needle.length > m_length) return None;
+  let const last_start = m_length - needle.length;
+  if (from > last_start) return None;
+
   let i = from;
-  while (i + needle.length <= m_length) {
-    let const scan_length = m_length - needle.length - i + 1;
+  while (i <= last_start) {
+    let const scan_length = last_start - i + 1;
     let const found = std::memchr(
         m_data + i, static_cast<unsigned char>(needle.data[0]), scan_length);
     if (found == nullptr) return None;
@@ -155,6 +169,8 @@ cold fn String::free_storage() wontthrow -> void
 
 fn operator+(StringView left, StringView right) throws->String
 {
+  if (right.length > SIZE_MAX - left.length) [[unlikely]]
+    throw std::bad_alloc{};
   let result = String{heap_allocator()};
   result.reserve(left.length + right.length);
   result.append(left);

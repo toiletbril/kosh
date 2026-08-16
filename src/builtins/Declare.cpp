@@ -326,6 +326,14 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                       : StringView{};
     if (has_subscript) name = name.substring_of_length(0, *bracket);
 
+    if (!name_is_valid_identifier(name)) {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                StringView{"'"} + operand +
+                                    "' is not a valid identifier");
+      status = 1;
+      continue;
+    }
+
     if ((should_mark_integer_attribute || should_unmark_integer_attribute) &&
         cxt.is_readonly(name))
     {
@@ -415,4 +423,4 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return status;
 }
 
-} // namespace koshka
+} /* namespace koshka */

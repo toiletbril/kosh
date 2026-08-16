@@ -50,7 +50,7 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
   for (const String &name : koshkit::util_names())
     sorted_names.push(name.clone());
-  koshkit::sort_string_list(sorted_names);
+  sorted_names.sort();
 
   if (ec.args().count() >= 2 && ec.args()[1] == "--list") {
     let names_output = String{cxt.scratch_allocator()};
@@ -123,4 +123,4 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return koshkit::dispatch(ec, cxt, 1);
 }
 
-} // namespace koshka
+} /* namespace koshka */

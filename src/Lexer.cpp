@@ -29,31 +29,6 @@ hot pure fn is_number(char ch) wontthrow -> bool
   return ch >= '0' && ch <= '9';
 }
 
-hot pure fn is_expression_sentinel(char ch) wontthrow -> bool
-{
-  switch (ch) {
-  case '\n':
-  case '+':
-  case '-':
-  case '*':
-  case '/':
-  case '%':
-  case ')':
-  case '(':
-  case ';':
-  case '~':
-  case '&':
-  case '|':
-  case '>':
-  case '<':
-  case '^':
-  case '=':
-  case '.':
-  case '!': return true;
-  default: return false;
-  };
-}
-
 hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
 {
   /* A brace is not a sentinel. POSIX recognizes '{' and '}' as reserved words
@@ -68,7 +43,7 @@ hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
   case '<':
   case '>': return true;
   default: return false;
-  };
+  }
 }
 
 hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
@@ -78,8 +53,25 @@ hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
 
 hot pure static fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
 {
-  return is_part_of_identifier(ch) && ch != '$' && ch != '`' && ch != '\\' &&
-         ch != '"' && ch != '\'';
+  switch (ch) {
+  case CEOF:
+  case ' ':
+  case '\t':
+  case '\n':
+  case '|':
+  case '(':
+  case ')':
+  case '&':
+  case ';':
+  case '<':
+  case '>':
+  case '$':
+  case '`':
+  case '\\':
+  case '"':
+  case '\'': return false;
+  default: return true;
+  }
 }
 
 hot pure fn is_string_quote(char ch) wontthrow -> bool
@@ -117,18 +109,60 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
   return is_variable_name_start(ch) || is_number(ch);
 }
 
-pure fn is_extglob_operator(char ch) wontthrow -> bool
+pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
 {
-  return ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!';
+  if (word.is_empty() || !is_variable_name_start(word[0])) return false;
+  usize position = 1;
+  while (position < word.length && is_variable_name(word[position]))
+    position++;
+  if (position < word.length && word[position] == '=') return true;
+  if (position + 1 < word.length && word[position] == '+' &&
+      word[position + 1] == '=')
+    return true;
+  if (position >= word.length || word[position] != '[') return false;
+
+  usize bracket_depth = 1;
+  position++;
+  while (position < word.length && bracket_depth > 0) {
+    if (word[position] == '[')
+      bracket_depth++;
+    else if (word[position] == ']')
+      bracket_depth--;
+    position++;
+  }
+  if (position < word.length && word[position] == '=') return true;
+
+  return position + 1 < word.length && word[position] == '+' &&
+         word[position + 1] == '=';
+}
+
+hot pure fn is_extglob_operator(char ch) wontthrow -> bool
+{
+  switch (ch) {
+  case '?':
+  case '*':
+  case '+':
+  case '@':
+  case '!': return true;
+  default: return false;
+  }
 }
 
 hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 {
-  return ch == '?' || ch == '!' || ch == '#' || ch == '$' || ch == '*' ||
-         ch == '@' || ch == '-';
+  switch (ch) {
+  case '?':
+  case '!':
+  case '#':
+  case '$':
+  case '*':
+  case '@':
+  case '-': return true;
+  default: return false;
+  }
 }
 
-} // namespace lexer
+} /* namespace lexer */
 
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
              Maybe<StringView> filename, mimic_mood mood)
@@ -140,48 +174,15 @@ Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
 
 Lexer::~Lexer() = default;
 
-flatten fn Lexer::peek_expression_token() throws -> Token *
-{
-  skip_whitespace();
-  if (m_peek_cache != nullptr && !m_peek_cache_is_shell &&
-      m_peek_cache_position == m_cursor_position)
-  {
-    return m_peek_cache;
-  }
-  Token *const t = lex_expression_token();
-  m_peek_cache = t;
-  m_peek_cache_is_shell = false;
-  m_peek_cache_position = m_cursor_position;
-  return t;
-}
-
 fn Lexer::peek_shell_token() throws -> Token *
 {
   skip_whitespace();
-  if (m_peek_cache != nullptr && m_peek_cache_is_shell &&
-      m_peek_cache_position == m_cursor_position)
-  {
+  if (m_peek_cache != nullptr && m_peek_cache_position == m_cursor_position) {
     return m_peek_cache;
   }
   Token *const t = lex_shell_token();
   m_peek_cache = t;
-  m_peek_cache_is_shell = true;
   m_peek_cache_position = m_cursor_position;
-  return t;
-}
-
-hot fn Lexer::next_expression_token() throws -> Token *
-{
-  skip_whitespace();
-
-  Token *const t = (m_peek_cache != nullptr && !m_peek_cache_is_shell &&
-                    m_peek_cache_position == m_cursor_position)
-                       ? m_peek_cache
-                       : lex_expression_token();
-  ASSERT(t != nullptr);
-
-  advance_past_last_peek();
-
   return t;
 }
 
@@ -189,10 +190,10 @@ hot fn Lexer::next_shell_token() throws -> Token *
 {
   skip_whitespace();
 
-  Token *const t = (m_peek_cache != nullptr && m_peek_cache_is_shell &&
-                    m_peek_cache_position == m_cursor_position)
-                       ? m_peek_cache
-                       : lex_shell_token();
+  Token *const t =
+      (m_peek_cache != nullptr && m_peek_cache_position == m_cursor_position)
+          ? m_peek_cache
+          : lex_shell_token();
   ASSERT(t != nullptr);
 
   advance_past_last_peek();
@@ -408,97 +409,6 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
   m_pending_heredocs.clear();
 }
 
-cold fn Lexer::skip_heredoc_in_substitution(usize byte_count,
-                                            String &inner) throws -> usize
-{
-  bool should_strip_tabs = false;
-  char quote = 0;
-  let delimiter = String{heap_allocator()};
-
-  for (let c = chop_character(byte_count); c != lexer::CEOF;
-       c = chop_character(byte_count))
-  {
-    if (quote != 0) {
-      byte_count++;
-      inner += c;
-      if (c == quote)
-        quote = 0;
-      else
-        delimiter += c;
-      continue;
-    }
-    if (c == '\\') {
-      byte_count++;
-      inner += c;
-      let const escaped = chop_character(byte_count);
-      if (escaped == lexer::CEOF) break;
-      byte_count++;
-      inner += escaped;
-      delimiter += escaped;
-      continue;
-    }
-    if (c == '\'' || c == '"') {
-      quote = c;
-      byte_count++;
-      inner += c;
-      continue;
-    }
-    if (c == '-' && delimiter.is_empty() && quote == 0) {
-      byte_count++;
-      inner += c;
-      should_strip_tabs = true;
-      continue;
-    }
-    if (c == ' ' || c == '\t') {
-      byte_count++;
-      inner += c;
-      continue;
-    }
-    if (lexer::is_shell_sentinel(c)) break;
-
-    byte_count++;
-    inner += c;
-    delimiter += c;
-  }
-
-  loop
-  {
-    let const c = chop_character(byte_count);
-    if (c == lexer::CEOF) break;
-    byte_count++;
-    inner += c;
-    if (c == '\n') break;
-  }
-
-  let const do_append_raw_line = [&](StringView line, bool has_newline,
-                                     bool is_delimiter) -> bool {
-    inner.append(line);
-    if (has_newline) inner += '\n';
-    return !is_delimiter;
-  };
-  return walk_heredoc_body(m_cursor_position + byte_count, delimiter.view(),
-                           should_strip_tabs, do_append_raw_line) -
-         m_cursor_position;
-}
-
-hot flatten fn Lexer::lex_expression_token() throws -> Token *
-{
-  if (let const ch = chop_character(); ch != lexer::CEOF) [[likely]] {
-    if (lexer::is_number(ch))
-      return lex_number();
-    else if (lexer::is_expression_sentinel(ch))
-      return lex_sentinel();
-    else if (lexer::is_part_of_identifier(ch))
-      return lex_identifier();
-    else [[unlikely]]
-      throw ErrorWithLocationAndDetails{
-          here(m_cursor_position, 1), "Unexpected character",
-          "the character is not valid in an unquoted word here"};
-  }
-
-  return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
-}
-
 hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *t{};
@@ -593,22 +503,6 @@ hot alwaysinline fn Lexer::chop_character(usize offset) wontthrow -> char
     return m_source[m_cursor_position + offset];
 
   return lexer::CEOF;
-}
-
-hot fn Lexer::lex_number() throws -> Token *
-{
-  usize length = 0;
-  while (lexer::is_number(chop_character(length)))
-    length++;
-
-  Token *const num = m_arena->create<tokens::Number>(
-      here(m_cursor_position, length),
-      m_source.view().substring_of_length(m_cursor_position, length));
-  ASSERT(num != nullptr);
-
-  m_cached_offset = length;
-
-  return num;
 }
 
 flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
@@ -744,20 +638,16 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
     if (!is_inside_quote_or_escape && lexer::is_plain_unquoted_run_byte(ch)) {
       let const run_start = byte_count;
-      /* The run stops before an extglob opener such as the ? of ?( so the group
-         capture above takes it on the next turn. */
-      let const do_opens_extglob_at = [this](usize offset) -> bool {
-        return lexer::is_extglob_operator(chop_character(offset)) &&
-               chop_character(offset + 1) == '(';
-      };
-      while (!do_opens_extglob_at(byte_count)) {
+      loop
+      {
         byte_count++;
         let const next = chop_character(byte_count);
         /* The run stops before a '[' so the assignment-subscript capture above
            can protect the bracket group. */
-        if (next == '[' || !lexer::is_plain_unquoted_run_byte(next)) {
+        if (next == '[' || !lexer::is_plain_unquoted_run_byte(next)) break;
+        if (lexer::is_extglob_operator(next) &&
+            chop_character(byte_count + 1) == '(')
           break;
-        }
       }
       do_append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + run_start, byte_count - run_start));
@@ -791,12 +681,15 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       if (quote_char == '"') {
         did_quote_enclose_content = true;
         let const escaped_next = chop_character(byte_count + 1);
-        if (escaped_next == '$' || escaped_next == '`' || escaped_next == '"' ||
-            escaped_next == '\\' || escaped_next == '\n')
-        {
-          should_escape = true;
-        } else {
+        switch (escaped_next) {
+        case '$':
+        case '`':
+        case '"':
+        case '\\':
+        case '\n': should_escape = true; break;
+        default:
           do_append_char(WordSegment::Kind::DoubleQuotedText, '\\');
+          break;
         }
         byte_count++;
         continue;
@@ -1017,157 +910,18 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           continue;
         }
 
-        let inner = String{heap_allocator()};
-        usize depth = 1;
-        char quote = 0;
-        char previous_char = 0;
-        loop
-        {
-          let const c = chop_character(byte_count);
-          if (c == lexer::CEOF) [[unlikely]] {
-            throw ErrorWithLocationAndDetails{
-                here(m_cursor_position, byte_count),
-                "Unterminated command substitution",
-                here(m_cursor_position + byte_count, 1), "expected ) here"};
-          }
-          byte_count++;
-
-          if (quote != 0) {
-            /* A backslash inside double quotes escapes the next char, so a
-               \" does not close the string the way a bare " would. Inside
-               single quotes every char including \ is literal. */
-            if (quote == '"' && c == '\\') {
-              inner += c;
-              let const escaped = chop_character(byte_count);
-              if (escaped != lexer::CEOF) {
-                byte_count++;
-                inner += escaped;
-              }
-              previous_char = c;
-              continue;
-            }
-            /* A $( inside double quotes opens a nested substitution whose
-               closing paren belongs to it, not the outer one. */
-            if (quote == '"' && c == '$' && chop_character(byte_count) == '(') {
-              inner += c;
-              inner += chop_character(byte_count);
-              byte_count++;
-              usize nested_paren_depth = 1;
-              char nested_quote = 0;
-              loop
-              {
-                let const p = chop_character(byte_count);
-                if (p == lexer::CEOF) break;
-                byte_count++;
-                inner += p;
-                if (nested_quote != 0) {
-                  if (nested_quote == '"' && p == '\\') {
-                    let const escaped = chop_character(byte_count);
-                    if (escaped != lexer::CEOF) {
-                      byte_count++;
-                      inner += escaped;
-                    }
-                    continue;
-                  }
-                  if (p == nested_quote) nested_quote = 0;
-                  continue;
-                }
-                if (p == '\\') {
-                  let const escaped = chop_character(byte_count);
-                  if (escaped != lexer::CEOF) {
-                    byte_count++;
-                    inner += escaped;
-                  }
-                  continue;
-                }
-                if (p == '\'' || p == '"') {
-                  nested_quote = p;
-                } else if (p == '(') {
-                  nested_paren_depth++;
-                } else if (p == ')') {
-                  nested_paren_depth--;
-                  if (nested_paren_depth == 0) break;
-                }
-              }
-              previous_char = ')';
-              continue;
-            }
-            if (c == quote) quote = 0;
-            inner += c;
-            previous_char = c;
-            continue;
-          }
-          if (c == '\\') {
-            inner += c;
-            let const escaped = chop_character(byte_count);
-            if (escaped != lexer::CEOF) {
-              byte_count++;
-              inner += escaped;
-            }
-            previous_char = c;
-            continue;
-          }
-          if (c == '\'' || c == '"') {
-            quote = c;
-            inner += c;
-            previous_char = c;
-            continue;
-          }
-          /* A here-string body is a normal word, not a heredoc body, so the
-             three chevrons are consumed before the heredoc branch runs. */
-          if (bash_additions_enabled() && c == '<' &&
-              chop_character(byte_count) == '<' &&
-              chop_character(byte_count + 1) == '<' &&
-              (previous_char == 0 || lexer::is_whitespace(previous_char) ||
-               lexer::is_shell_sentinel(previous_char)))
-          {
-            inner += c;
-            inner += chop_character(byte_count);
-            inner += chop_character(byte_count + 1);
-            byte_count += 2;
-            previous_char = '<';
-            continue;
-          }
-          if (c == '<' && chop_character(byte_count) == '<' &&
-              chop_character(byte_count + 1) != '<' &&
-              (previous_char == 0 || lexer::is_whitespace(previous_char) ||
-               lexer::is_shell_sentinel(previous_char)))
-          {
-            inner += c;
-            inner += chop_character(byte_count);
-            byte_count += 1;
-            byte_count = skip_heredoc_in_substitution(byte_count, inner);
-            previous_char = '\n';
-            continue;
-          }
-          /* An unquoted '#' at a word boundary begins a comment, so a ')'
-             inside it must not close the substitution. */
-          if (c == '#' &&
-              (previous_char == 0 || lexer::is_whitespace(previous_char) ||
-               previous_char == '\n'))
-          {
-            inner += c;
-            loop
-            {
-              let const comment_char = chop_character(byte_count);
-              if (comment_char == lexer::CEOF || comment_char == '\n') {
-                break;
-              }
-              byte_count++;
-              inner += comment_char;
-            }
-            previous_char = '#';
-            continue;
-          }
-          if (c == '(') {
-            depth++;
-          } else if (c == ')') {
-            depth--;
-            if (depth == 0) break;
-          }
-          inner += c;
-          previous_char = c;
+        let const inner_start = m_cursor_position + byte_count;
+        let const substitution_end = lexer::scan_balanced_shell_region(
+            m_source.view(), inner_start, ')');
+        if (!substitution_end.has_value()) [[unlikely]] {
+          throw ErrorWithLocationAndDetails{
+              here(m_cursor_position, m_source.count() - m_cursor_position),
+              "Unterminated command substitution", here(m_source.count(), 1),
+              "expected ) here"};
         }
+        let inner = String{m_source.view().substring_of_length(
+            inner_start, *substitution_end - inner_start - 1)};
+        byte_count = *substitution_end - m_cursor_position;
         word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
                                        steal(inner), is_in_double_quotes});
         word.segments.back().set_source_span(
@@ -1530,8 +1284,6 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
     TOKEN_CASE_ONE('~', Tilde);
     TOKEN_CASE_ONE('^', Cap);
 
-    TOKEN_CASE_TWO(']', RightSquareBracket, ']', DoubleRightSquareBracket);
-    TOKEN_CASE_TWO('[', LeftSquareBracket, '[', DoubleLeftSquareBracket);
     TOKEN_CASE_TWO('!', ExclamationMark, '=', ExclamationEquals);
   /* &> and &>> redirect both streams to a file, riding every mood but POSIX.
    */
@@ -1674,4 +1426,4 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
   return t;
 }
 
-} // namespace koshka
+} /* namespace koshka */

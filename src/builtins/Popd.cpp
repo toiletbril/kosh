@@ -71,4 +71,4 @@ fn Popd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       "Pass a +N or a -N stack index, or no argument to pop the top"};
 }
 
-} // namespace koshka
+} /* namespace koshka */

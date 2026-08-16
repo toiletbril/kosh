@@ -97,4 +97,4 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   return last_value != 0 ? 0 : 1;
 }
 
-} // namespace koshka
+} /* namespace koshka */

@@ -81,6 +81,6 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
   return has_missing_any ? 1 : 0;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

@@ -82,12 +82,6 @@ enum class homoglyph_kind : u8
   Space,
 };
 
-struct decoded_codepoint
-{
-  u32 value;
-  usize length;
-};
-
 constexpr u64 HIGH_BITS = 0x8080808080808080ULL;
 constexpr u64 LOW_BITS = 0x0101010101010101ULL;
 constexpr u64 CARRIAGE_RETURNS = 0x0d0d0d0d0d0d0d0dULL;
@@ -126,46 +120,6 @@ pure fn source_holds_scanned_byte(StringView source) wontthrow -> bool
   }
 
   return false;
-}
-
-pure fn decode_utf8(StringView source, usize at) wontthrow -> decoded_codepoint
-{
-  let const first = static_cast<u8>(source[at]);
-  usize length = 0;
-  u32 value = 0;
-
-  switch (first & 0xf8) {
-  case 0xc0:
-  case 0xc8:
-  case 0xd0:
-  case 0xd8:
-    length = 2;
-    value = first & 0x1fu;
-    break;
-
-  case 0xe0:
-  case 0xe8:
-    length = 3;
-    value = first & 0x0fu;
-    break;
-
-  case 0xf0:
-    length = 4;
-    value = first & 0x07u;
-    break;
-
-  default: return decoded_codepoint{0, 1};
-  }
-
-  if (at + length > source.length) return decoded_codepoint{0, 1};
-
-  for (usize i = 1; i < length; i++) {
-    let const continuation = static_cast<u8>(source[at + i]);
-    if ((continuation & 0xc0) != 0x80) return decoded_codepoint{0, 1};
-    value = (value << 6) | (continuation & 0x3fu);
-  }
-
-  return decoded_codepoint{value, length};
 }
 
 pure fn classify_codepoint(u32 codepoint) wontthrow -> homoglyph_kind
@@ -417,7 +371,7 @@ fn check_source_bytes(AnalysisContext &actx, StringView source) throws -> void
     let const byte = static_cast<u8>(source[at]);
 
     if (byte >= 0x80) {
-      let const decoded = decode_utf8(source, at);
+      let const decoded = utils::decode_utf8(source, at, 0);
       let const id =
           homoglyph_diagnostic(classify_codepoint(decoded.value), state);
 
@@ -588,16 +542,6 @@ constexpr PackedStringKey KNOWN_SHELL_KEYS[] = {
 };
 constexpr StaticStringSet KNOWN_SHELLS{KNOWN_SHELL_KEYS};
 
-pure fn byte_separates_shebang_words(char byte) wontthrow -> bool
-{
-  switch (byte) {
-  case ' ':
-  case '\t': return true;
-
-  default: return false;
-  }
-}
-
 pure fn path_base_name(StringView path) wontthrow -> StringView
 {
   usize at = path.length;
@@ -617,11 +561,11 @@ struct shebang_word_reader
 
   fn read_next_word() wontthrow -> StringView
   {
-    while (at < line.length && byte_separates_shebang_words(line[at]))
+    while (at < line.length && lexer::is_whitespace(line[at]))
       at++;
 
     word_start = at;
-    while (at < line.length && !byte_separates_shebang_words(line[at]))
+    while (at < line.length && !lexer::is_whitespace(line[at]))
       at++;
 
     return line.substring_of_length(word_start, at - word_start);
@@ -646,7 +590,7 @@ pure fn header_holds_shebang(StringView source, usize first_line_end) wontthrow
 
     usize line_start = at;
     while (line_start < source.length &&
-           byte_separates_shebang_words(source[line_start]))
+           lexer::is_whitespace(source[line_start]))
       line_start++;
 
     if (line_start + 1 < source.length && source[line_start] == '#' &&
@@ -680,7 +624,7 @@ fn check_shebang(AnalysisContext &actx, StringView source,
   let const first_line = source.substring_of_length(0, line_end);
 
   usize at = 0;
-  while (at < first_line.length && byte_separates_shebang_words(first_line[at]))
+  while (at < first_line.length && lexer::is_whitespace(first_line[at]))
     at++;
 
   let const indent_length = at;
@@ -706,7 +650,7 @@ fn check_shebang(AnalysisContext &actx, StringView source,
   let const has_hash = at < first_line.length && first_line[at] == '#';
   usize bang_at = has_hash ? at + 1 : at;
   while (bang_at < first_line.length &&
-         byte_separates_shebang_words(first_line[bang_at]))
+         lexer::is_whitespace(first_line[bang_at]))
     bang_at++;
 
   let const has_bang =
@@ -822,16 +766,6 @@ constexpr StaticStringSet CLAUSE_KEYWORDS{CLAUSE_KEYWORD_KEYS};
 
 constexpr usize DIRECTIVE_KEYWORD_LENGTH = 10;
 
-pure fn byte_is_blank(char byte) wontthrow -> bool
-{
-  switch (byte) {
-  case ' ':
-  case '\t': return true;
-
-  default: return false;
-  }
-}
-
 pure fn find_line_start(StringView source, usize position) wontthrow -> usize
 {
   usize at = position;
@@ -845,7 +779,7 @@ pure fn only_blanks_precede(StringView source, usize line_start,
                             usize position) wontthrow -> bool
 {
   for (usize at = line_start; at < position; at++) {
-    if (!byte_is_blank(source[at])) return false;
+    if (!lexer::is_whitespace(source[at])) return false;
   }
 
   return true;
@@ -861,7 +795,7 @@ pure fn read_word_below_directive(StringView source, usize after) wontthrow
   loop
   {
     while (at < source.length &&
-           (byte_is_blank(source[at]) || source[at] == '\n'))
+           (lexer::is_whitespace(source[at]) || source[at] == '\n'))
     {
       at++;
     }
@@ -875,7 +809,8 @@ pure fn read_word_below_directive(StringView source, usize after) wontthrow
   }
 
   let const word_start = at;
-  while (at < source.length && !byte_is_blank(source[at]) && source[at] != '\n')
+  while (at < source.length && !lexer::is_whitespace(source[at]) &&
+         source[at] != '\n')
   {
     at++;
   }
@@ -896,12 +831,12 @@ pure fn read_line_above_directive(StringView source, usize line_start) wontthrow
 
     let const start = find_line_start(source, end);
     usize content_start = start;
-    while (content_start < end && byte_is_blank(source[content_start]))
+    while (content_start < end && lexer::is_whitespace(source[content_start]))
       content_start++;
 
     usize content_end = end;
     while (content_end > content_start &&
-           byte_is_blank(source[content_end - 1]))
+           lexer::is_whitespace(source[content_end - 1]))
       content_end--;
 
     if (content_start < content_end && source[content_start] != '#')
@@ -930,7 +865,7 @@ pure fn line_opens_case_branch(StringView line) wontthrow -> bool
 
   if (line.length >= 2 && line[line.length - 1] == 'n' &&
       line[line.length - 2] == 'i' &&
-      (line.length == 2 || byte_is_blank(line[line.length - 3])))
+      (line.length == 2 || lexer::is_whitespace(line[line.length - 3])))
   {
     return true;
   }
@@ -959,13 +894,13 @@ fn check_directive_body(AnalysisContext &actx, StringView source,
   usize at = span.position + body_position;
 
   while (at < comment_end) {
-    while (at < comment_end && byte_is_blank(source[at]))
+    while (at < comment_end && lexer::is_whitespace(source[at]))
       at++;
 
     if (at >= comment_end) return;
 
     let const token_start = at;
-    while (at < comment_end && !byte_is_blank(source[at]))
+    while (at < comment_end && !lexer::is_whitespace(source[at]))
       at++;
 
     let const token = source.substring_of_length(token_start, at - token_start);
@@ -1006,7 +941,7 @@ fn check_shellcheck_directives(
 
     usize body_position = 1;
     while (body_position < directive.length &&
-           byte_is_blank(source[directive.position + body_position]))
+           lexer::is_whitespace(source[directive.position + body_position]))
     {
       body_position++;
     }

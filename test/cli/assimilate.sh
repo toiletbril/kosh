@@ -142,7 +142,7 @@ printf 'success=%s leftovers=%s\n' "$success_status" "$(leftovers)"
 
 printf 'architecture-old\n' > "$install/kosh"
 : > "$ASSIMILATE_TRANSPORT_LOG"
-export ASSIMILATE_REMOTE_SYSTEM=MismatchOS
+export ASSIMILATE_REMOTE_SYSTEM="MismatchOS;:>$ASSIMILATE_REMOTE/injected"
 export ASSIMILATE_REMOTE_MACHINE=mismatch-arch
 architecture_output=$root/architecture.out
 PATH="$transport${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
@@ -152,8 +152,9 @@ architecture_status=$?
 if [ "$architecture_status" -ne 0 ] &&
     [ "$(cat "$install/kosh")" = architecture-old ] &&
     grep -q '^+ assimilate: preflight$' "$architecture_output" &&
-    grep -q 'Cannot install a .* binary on MismatchOS/mismatch-arch' \
+    grep -Fq "on $ASSIMILATE_REMOTE_SYSTEM/mismatch-arch" \
         "$architecture_output" &&
+    [ ! -e "$ASSIMILATE_REMOTE/injected" ] &&
     ! grep -q '^scp-run$' "$ASSIMILATE_TRANSPORT_LOG"; then
     architecture_result=0
 else

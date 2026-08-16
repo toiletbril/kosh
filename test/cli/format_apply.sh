@@ -70,6 +70,71 @@ printf 'if { true; } && { false; } || true; then :; fi || false\ncase x in x) :;
 printf 'case x in\nx) echo arm\nesac\necho top\n' | "$BIN" --format
 printf 'if true; then echo dash; fi\n' | "$BIN" --format -
 
+printf 'set -- foo\\\nbar\nprintf "<%%s> count=%%s\\n" "\0441" "\044#"\n' \
+  > "$root/continuation.sh"
+"$BIN" --format "$root/continuation.sh" > "$root/continuation-formatted.sh"
+continuation_original=$("$BIN" "$root/continuation.sh")
+continuation_formatted=$("$BIN" "$root/continuation-formatted.sh")
+"$BIN" --format "$root/continuation-formatted.sh" \
+  > "$root/continuation-second.sh"
+printf 'continuation-equivalent=%s idempotent=%s\n' \
+  "$([ "$continuation_original" = "$continuation_formatted" ] && printf yes)" \
+  "$(cmp -s "$root/continuation-formatted.sh" \
+      "$root/continuation-second.sh" && printf yes)"
+
+printf 'printf a\rb\n' > "$root/lone-cr.sh"
+cp "$root/lone-cr.sh" "$root/lone-cr.expected"
+"$BIN" --format "$root/lone-cr.sh" > "$root/lone-cr-formatted.sh"
+"$BIN" --format "$root/lone-cr-formatted.sh" > "$root/lone-cr-second.sh"
+printf 'lone-cr-retained=%s idempotent=%s\n' \
+  "$(cmp -s "$root/lone-cr.expected" "$root/lone-cr-formatted.sh" && \
+      printf yes)" \
+  "$(cmp -s "$root/lone-cr-formatted.sh" "$root/lone-cr-second.sh" && \
+      printf yes)"
+
+cat > "$root/assignment-prefixes.sh" <<'EOF'
+x+=1 test -n "$x"
+arr[0]=v test -n "${arr[0]}"
+arr[1]+=w test -n "${arr[1]}"
+EOF
+"$BIN" --format "$root/assignment-prefixes.sh" \
+  > "$root/assignment-prefixes-formatted.sh"
+cat "$root/assignment-prefixes-formatted.sh"
+"$BIN" --format "$root/assignment-prefixes-formatted.sh" \
+  > "$root/assignment-prefixes-second.sh"
+printf 'assignment-prefixes-idempotent=%s\n' \
+  "$(cmp -s "$root/assignment-prefixes-formatted.sh" \
+      "$root/assignment-prefixes-second.sh" && printf yes)"
+
+cat > "$root/nested-heredoc.sh" <<'SCRIPT'
+one=$(cat <<'ONE'
+) " } # ; $(
+ONE
+)
+two=$(cat <<-TWO
+	) unquoted
+	TWO
+)
+three=$(cat <<LEFT <<'RIGHT'
+ignored )
+LEFT
+right " )
+RIGHT
+)
+printf '<%s>|<%s>|<%s>\n' "$one" "$two" "$three"
+SCRIPT
+"$BIN" --format "$root/nested-heredoc.sh" \
+  > "$root/nested-heredoc-formatted.sh"
+nested_heredoc_original=$("$BIN" "$root/nested-heredoc.sh")
+nested_heredoc_formatted=$("$BIN" "$root/nested-heredoc-formatted.sh")
+"$BIN" --format "$root/nested-heredoc-formatted.sh" \
+  > "$root/nested-heredoc-second.sh"
+printf 'nested-heredoc-equivalent=%s idempotent=%s\n' \
+  "$([ "$nested_heredoc_original" = "$nested_heredoc_formatted" ] && \
+      printf yes)" \
+  "$(cmp -s "$root/nested-heredoc-formatted.sh" \
+      "$root/nested-heredoc-second.sh" && printf yes)"
+
 cat > "$root/first.sh" <<'EOF'
 for x in a b; do test "$x" = a && echo "$x"; done
 EOF
@@ -113,11 +178,31 @@ printf '#!/bin/bash\n[[ 1 > 0 ]]\n' > "$root/warning.sh"
 printf 'warning-apply-status=%s\n' "$?"
 cat "$root/warning.sh"
 
+printf '#!/bin/sh\n[ "\0441" == y ]\nprintf "%%s\\n" \0441\n' \
+  > "$root/safe-and-unsafe.sh"
+"$BIN" --lint --apply --no-traces "$root/safe-and-unsafe.sh" \
+  >/dev/null 2>&1
+printf 'safe-and-unsafe-status=%s contents=%s\n' "$?" \
+  "$(tr '\n' '|' < "$root/safe-and-unsafe.sh")"
+
 printf 'if\n' > "$root/invalid.sh"
 before=$(cat "$root/invalid.sh")
 "$BIN" --format --apply "$root/invalid.sh" >/dev/null 2>&1
 printf 'parse-status=%s unchanged=%s\n' "$?" \
   "$([ "$(cat "$root/invalid.sh")" = "$before" ] && printf yes)"
+
+printf '#!/bin/sh\n[ "\0441" == y ]\nif\n' > "$root/invalid-lint.sh"
+cp "$root/invalid-lint.sh" "$root/invalid-lint.expected"
+"$BIN" --lint --apply --no-traces "$root/invalid-lint.sh" \
+  >/dev/null 2>&1
+printf 'lint-parse-status=%s unchanged=%s\n' "$?" \
+  "$(cmp -s "$root/invalid-lint.sh" "$root/invalid-lint.expected" && \
+      printf yes)"
+"$BIN" --lint --format --apply --no-traces "$root/invalid-lint.sh" \
+  >/dev/null 2>&1
+printf 'combined-parse-status=%s unchanged=%s\n' "$?" \
+  "$(cmp -s "$root/invalid-lint.sh" "$root/invalid-lint.expected" && \
+      printf yes)"
 
 "$BIN" --apply "$root/first.sh" >/dev/null 2>&1
 printf 'apply-alone-status=%s\n' "$?"

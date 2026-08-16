@@ -110,7 +110,7 @@ fn render_limit(const os::resource_limit &limit, u64 divisor,
   return String::from(value / divisor, allocator);
 }
 
-} // namespace
+} /* namespace */
 
 cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
@@ -173,15 +173,20 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const units = block_factor(resource, cxt.is_posix_mode());
   u64 value = os::RESOURCE_UNLIMITED;
   if (requested != "unlimited") {
-    let const parsed =
-        static_cast<u64>(std::strtoull(requested.c_str(), nullptr, 10));
+    let const parsed = utils::parse_decimal_u64(requested.view());
+    if (parsed.is_error()) {
+      report_soft_builtin_error(
+          ec, cxt, ec.arg_location_at(1), requested + ": invalid limit",
+          "The limit must be a non-negative whole number");
+      return 1;
+    }
     /* A scaled resource multiplies the operand by its unit, so an operand that
        would overflow the multiply saturates to unlimited the way bash reports
        it. */
-    if (units != 0 && parsed > os::RESOURCE_UNLIMITED / units) {
+    if (units != 0 && parsed.value() > os::RESOURCE_UNLIMITED / units) {
       value = os::RESOURCE_UNLIMITED;
     } else {
-      value = parsed * units;
+      value = parsed.value() * units;
     }
   }
 
@@ -205,4 +210,4 @@ Ulimit::Ulimit() = default;
 
 pure fn Ulimit::kind() const wontthrow -> Builtin::Kind { return Kind::Ulimit; }
 
-} // namespace koshka
+} /* namespace koshka */

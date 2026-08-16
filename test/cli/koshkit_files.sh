@@ -13,6 +13,12 @@ echo "--- ls ---"
 echo "--- ls a ---"
 "$BIN" -c 'koshkit ls a'
 "$BIN" -c 'koshkit cp nums.txt copy.txt'
+printf 'same-file\n' > same.txt
+"$BIN" -c 'koshkit cp same.txt same.txt' 2>/dev/null
+printf 'cp-same-status=%s contents=%s\n' "$?" "$(cat same.txt)"
+ln same.txt same-link.txt
+"$BIN" -c 'koshkit cp same.txt same-link.txt' 2>/dev/null
+printf 'cp-hardlink-status=%s contents=%s\n' "$?" "$(cat same.txt)"
 "$BIN" -c 'koshkit mv copy.txt moved.txt'
 "$BIN" -c 'koshkit touch stamp'
 "$BIN" -c 'koshkit ln -s nums.txt sym'
@@ -27,6 +33,23 @@ echo "--- ls after operations ---"
 "$BIN" -c 'koshkit ls'
 echo "--- du -s nums.txt ---"
 "$BIN" -c 'koshkit du -s nums.txt'
+mkdir unreadable
+touch unreadable/entry
+chmod 000 unreadable
+if ls unreadable >/dev/null 2>&1; then
+  chmod 700 unreadable
+  echo "du-unreadable=ok"
+else
+  unreadable_output=$("$BIN" -c 'koshkit du unreadable' 2>&1)
+  unreadable_status=$?
+  chmod 700 unreadable
+  if [ "$unreadable_status" -ne 0 ] &&
+    ! printf '%s\n' "$unreadable_output" | grep -q '^0[[:space:]]'; then
+    echo "du-unreadable=ok"
+  else
+    echo "du-unreadable=failed"
+  fi
+fi
 echo "--- basename ---"
 "$BIN" -c 'koshkit basename /usr/local/libfoo.so .so'
 echo "--- dirname ---"

@@ -116,6 +116,6 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   return has_any_match ? 0 : 1;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

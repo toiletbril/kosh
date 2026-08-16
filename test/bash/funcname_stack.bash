@@ -40,6 +40,18 @@ echo "after_colon=[$_]"
 printf '%s\n' x y z
 echo "after_printf=[$_]"
 
+underscore_function() {
+  printf 'function-entry=[%s]\n' "$_"
+  : function-body
+}
+: before-function
+underscore_function call-tail
+printf 'function-after=[%s]\n' "$_"
+
+: snapshot-parent
+printf 'snapshot-sub=[%s] snapshot-underscore=[%s]\n' \
+  "$(: snapshot-child; printf child-output)" "$_"
+
 r=$EPOCHREALTIME
 [[ $r == *.* ]] && echo "has-dot"
 frac=${r#*.}

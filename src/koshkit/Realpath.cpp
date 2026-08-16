@@ -57,6 +57,6 @@ fn Realpath::execute(
   return status;
 }
 
-} // namespace koshkit
+} /* namespace koshkit */
 
-} // namespace koshka
+} /* namespace koshka */

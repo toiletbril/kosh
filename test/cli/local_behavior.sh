@@ -16,6 +16,13 @@ echo "== local -A declares an associative array:"
 "$BIN" -c 'f(){ local -A m; m[key]=val; echo "${m[key]}"; }; f'
 echo "== a local shadows an outer value and restores it:"
 "$BIN" -c 'v=outer; f(){ local v=inner; echo $v; }; f; echo $v'
+echo "== invalid local names fail without creating hidden bindings:"
+"$BIN" -c 'f(){
+  local bad-name "" 3name 2>/dev/null
+  echo "status=$?"
+  declare -p bad-name >/dev/null 2>&1
+  echo "hidden=$?"
+}; f'
 
 unset KOSH_FLAGS
 # The no-local warning fires for a fresh name assigned in a function body, the

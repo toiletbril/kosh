@@ -135,4 +135,4 @@ private:
   String m_text{heap_allocator()};
 };
 
-} // namespace koshka
+} /* namespace koshka */
