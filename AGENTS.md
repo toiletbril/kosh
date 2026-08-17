@@ -299,8 +299,9 @@ records nothing. A hover answer is built from those records and the open
 document source, because the server returns before the startup chain runs and
 holds no user variables or functions.
 
-A document mood is selected from a recognized shebang, then from a recognized
-document extension, then from the client language identifier.
+A document mood is selected from a recognized shebang, then from the client
+language identifier, then from a recognized document extension. The
+`shellscript` identifier selects the bash mood.
 
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare koshkit utility

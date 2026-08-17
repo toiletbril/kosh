@@ -20,14 +20,15 @@ namespace koshka::language_server {
 namespace {
 
 constexpr static_string_entry<mimic_mood> LANGUAGE_MOOD_ENTRIES[] = {
-    {SSK("bash"),       mimic_mood::Bash     },
-    {SSK("bash-posix"), mimic_mood::BashPosix},
-    {SSK("dash"),       mimic_mood::Posix    },
-    {SSK("kosh"),       mimic_mood::Default  },
-    {SSK("posix"),      mimic_mood::Posix    },
-    {SSK("rbash"),      mimic_mood::Bash     },
-    {SSK("sh"),         mimic_mood::Posix    },
-    {SSK("shit"),       mimic_mood::Default  },
+    {SSK("bash"),        mimic_mood::Bash     },
+    {SSK("bash-posix"),  mimic_mood::BashPosix},
+    {SSK("dash"),        mimic_mood::Posix    },
+    {SSK("kosh"),        mimic_mood::Default  },
+    {SSK("posix"),       mimic_mood::Posix    },
+    {SSK("rbash"),       mimic_mood::Bash     },
+    {SSK("sh"),          mimic_mood::Posix    },
+    {SSK("shellscript"), mimic_mood::Bash     },
+    {SSK("shit"),        mimic_mood::Default  },
 };
 constexpr StaticStringMap LANGUAGE_MOODS{LANGUAGE_MOOD_ENTRIES};
 
@@ -814,15 +815,15 @@ pure fn mood_for(const Document &document) throws -> mimic_mood
           detect_mimic_shell_from_source(document.normalized_source.view());
       detected.has_value())
     return *detected;
+  if (let const mood = LANGUAGE_MOODS.find(document.language_id.view());
+      mood.has_value())
+    return *mood;
   if (document.path.has_value()) {
     if (let const mood =
             detect_mimic_shell_from_extension(document.path->extension());
         mood.has_value())
       return *mood;
   }
-  if (let const mood = LANGUAGE_MOODS.find(document.language_id.view());
-      mood.has_value())
-    return *mood;
 
   return mimic_mood::Default;
 }
