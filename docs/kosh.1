@@ -1003,6 +1003,20 @@ The
 .B \-r
 option retains backslashes. A plain read treats a trailing backslash as a line
 continuation.
+.TP
+.B compgen
+The
+.BI "\-V " varname
+option stores the candidates in the named indexed array and writes nothing to
+standard output. An invalid name is a usage error. An associative or read-only
+target is refused. A generator that matches nothing still leaves the array empty
+and returns one. The
+.BI "\-P " prefix
+and
+.BI "\-S " suffix
+options are attached to each candidate after the word prefix test and the
+.B \-X
+filter are applied.
 .SH KOSHKIT UTILITIES
 The
 .B koshkit

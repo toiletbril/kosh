@@ -588,6 +588,29 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
   return &*per_kind_candidates[index];
 }
 
+static fn push_variable_name_candidates(StringView token, EvalContext &context,
+                                        ArrayList<String> &candidates) throws
+    -> void
+{
+  let seen = HashSet{heap_allocator()};
+  let const do_add_name = [&](StringView name) throws {
+    if (!name.starts_with(token)) return;
+    if (!seen.add(name)) return;
+    candidates.push(String{name});
+  };
+
+  context.variable_names().for_each(
+      [&](StringView name) { do_add_name(name); });
+
+  for (let const &name : os::environment_names())
+    do_add_name(name.view());
+
+  let dynamic_names = ArrayList<StringView>{heap_allocator()};
+  context.append_dynamic_variable_names(dynamic_names);
+  for (let const name : dynamic_names)
+    do_add_name(name);
+}
+
 fn complete_from_builtin_flags(StringView line, StringView token,
                                usize token_start, EvalContext &context) throws
     -> Maybe<ArrayList<String>>
@@ -784,6 +807,15 @@ fn complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
+  /* compgen -V names the indexed array that receives the candidates. */
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Compgen &&
+      previous_word == "-V")
+  {
+    push_variable_name_candidates(token, context, candidates);
+    if (!candidates.is_empty()) return candidates;
+    return None;
+  }
+
   /* assimilate --link-mood names the symlink spellings it installs. */
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Assimilate &&
       previous_word == "--link-mood")
@@ -816,27 +848,15 @@ fn complete_from_builtin_flags(StringView line, StringView token,
         unsets_function = true;
     }
 
-    let seen = HashSet{heap_allocator()};
-    let const do_add_name = [&](StringView name) throws {
-      if (!name.starts_with(token)) return;
-      if (!seen.add(name)) return;
-      candidates.push(String{name});
-    };
-
     if (unsets_function) {
-      context.for_each_function_name(
-          [&](StringView name) { do_add_name(name); });
+      let seen = HashSet{heap_allocator()};
+      context.for_each_function_name([&](StringView name) {
+        if (!name.starts_with(token)) return;
+        if (!seen.add(name)) return;
+        candidates.push(String{name});
+      });
     } else {
-      context.variable_names().for_each(
-          [&](StringView name) { do_add_name(name); });
-
-      for (let const &name : os::environment_names())
-        do_add_name(name.view());
-
-      let dynamic_names = ArrayList<StringView>{heap_allocator()};
-      context.append_dynamic_variable_names(dynamic_names);
-      for (let const name : dynamic_names)
-        do_add_name(name);
+      push_variable_name_candidates(token, context, candidates);
     }
 
     if (!candidates.is_empty()) return candidates;

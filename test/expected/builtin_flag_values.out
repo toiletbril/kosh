@@ -28,6 +28,11 @@ dirnames
 == compgen -o joined form:
 default
 dirnames
+== compgen -V names a variable:
+completion_probe_var
+== compgen -V joined form:
+KOSH_ANSI_RED
+KOSH_ANSI_RESET
 == koshkit find entry types:
 d
 f

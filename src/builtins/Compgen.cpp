@@ -7,9 +7,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-c] [-W wordlist] [-G glob] [-A action] [-P prefix] "
-                   "[-S suffix] [-X filterpat] [-F function] [-C command] "
-                   "[word]");
+HELP_SYNOPSIS_DECL("[-c] [-V varname] [-W wordlist] [-G glob] [-A action] "
+                   "[-P prefix] [-S suffix] [-X filterpat] [-F function] "
+                   "[-C command] [word]");
 HELP_DESCRIPTION_DECL(
     "The compgen builtin writes the completion candidates for a word.");
 
@@ -20,8 +20,11 @@ FLAG(COMPGEN_WORDLIST, String, 'W', "",
 FLAG(COMPGEN_GLOB, String, 'G', "", "Probe the filesystem with the glob.");
 FLAG(COMPGEN_FILE, Bool, 'f', "", "List matching filenames.");
 FLAG(COMPGEN_ACTION, String, 'A', "", "List commands for the command action.");
-FLAG(COMPGEN_PREFIX, String, 'P', "", "Accepted without effect.");
-FLAG(COMPGEN_SUFFIX, String, 'S', "", "Accepted without effect.");
+FLAG(COMPGEN_VARIABLE_NAME, String, 'V', "",
+     "Store the candidates in the named indexed array and write nothing to "
+     "standard output.");
+FLAG(COMPGEN_PREFIX, String, 'P', "", "Prepend the prefix to each candidate.");
+FLAG(COMPGEN_SUFFIX, String, 'S', "", "Append the suffix to each candidate.");
 FLAG(COMPGEN_FILTER, String, 'X', "",
      "Remove matching candidates, with leading ! reversing the filter and "
      "unescaped & expanding to the completion word.");
@@ -96,6 +99,51 @@ static fn candidate_is_excluded(StringView candidate,
   return filter.is_negated ? !matches : matches;
 }
 
+struct compgen_sink
+{
+  compgen_sink(Allocator text_allocator, Maybe<StringView> variable_name,
+               StringView prefix, StringView suffix)
+      : text(text_allocator), values(heap_allocator()),
+        variable_name(variable_name), prefix(prefix), suffix(suffix)
+  {}
+
+  fn push_candidate(StringView candidate) throws -> void
+  {
+    has_any_matched = true;
+
+    if (variable_name.has_value()) {
+      let value = String{heap_allocator(), prefix};
+      value.append(candidate);
+      value.append(suffix);
+      values.push(steal(value));
+
+      return;
+    }
+
+    text.append(prefix);
+    text.append(candidate);
+    text.append(suffix);
+    text.push('\n');
+  }
+
+  fn publish(ExecContext &ec, EvalContext &cxt) throws -> i32
+  {
+    if (variable_name.has_value())
+      cxt.set_indexed_array(*variable_name, steal(values));
+    else if (has_any_matched)
+      ec.print_to_stdout(text.view());
+
+    return has_any_matched ? 0 : 1;
+  }
+
+  String text;
+  ArrayList<String> values;
+  Maybe<StringView> variable_name;
+  StringView prefix;
+  StringView suffix;
+  bool has_any_matched{false};
+};
+
 pure fn Compgen::kind() const wontthrow -> Builtin::Kind
 {
   return Kind::Compgen;
@@ -109,6 +157,38 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  let const variable_name =
+      FLAG_COMPGEN_VARIABLE_NAME.is_set()
+          ? Maybe<StringView>{FLAG_COMPGEN_VARIABLE_NAME.value()}
+          : None;
+  if (variable_name.has_value()) {
+    let const target_location = FLAG_COMPGEN_VARIABLE_NAME.value_location();
+
+    if (!name_is_valid_identifier(*variable_name)) {
+      report_soft_builtin_error(ec, cxt, target_location,
+                                StringView{"'"} + *variable_name +
+                                    "' is not a valid identifier");
+
+      return 2;
+    }
+
+    if (cxt.is_associative_array(*variable_name)) {
+      report_soft_builtin_error(ec, cxt, target_location,
+                                StringView{"'"} + *variable_name +
+                                    "' is not an indexed array");
+
+      return 1;
+    }
+
+    if (cxt.is_readonly(*variable_name)) {
+      report_soft_builtin_error(ec, cxt, target_location,
+                                StringView{"'"} + *variable_name +
+                                    "' is read-only");
+
+      return 1;
+    }
+  }
 
   let const wordlist = FLAG_COMPGEN_WORDLIST.is_set()
                            ? Maybe<StringView>{FLAG_COMPGEN_WORDLIST.value()}
@@ -131,12 +211,18 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (filter_pattern.has_value())
     filter = compile_filter(*filter_pattern, word, cxt.scratch_allocator());
 
+  let const prefix =
+      FLAG_COMPGEN_PREFIX.is_set() ? FLAG_COMPGEN_PREFIX.value() : StringView{};
+  let const suffix =
+      FLAG_COMPGEN_SUFFIX.is_set() ? FLAG_COMPGEN_SUFFIX.value() : StringView{};
+  let sink =
+      compgen_sink{cxt.scratch_allocator(), variable_name, prefix, suffix};
+
   if (should_list_commands || (action.has_value() && *action == "command")) {
     cxt.get_program_resolver().begin_explicit_completion(
         ProgramResolver::CompletionRefresh::Fresh);
     defer { cxt.get_program_resolver().end_explicit_completion(); };
-    let out = String{cxt.scratch_allocator()};
-    let has_any_matched = false;
+
     for (let const &candidate : completion::complete_command_names(
              word, completion::command_match_mode::Prefix, cxt))
     {
@@ -145,21 +231,17 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       {
         continue;
       }
-      out.append(candidate.view());
-      out.push('\n');
-      has_any_matched = true;
+      sink.push_candidate(candidate.view());
     }
 
-    if (has_any_matched) ec.print_to_stdout(out.view());
-    return has_any_matched ? 0 : 1;
+    return sink.publish(ec, cxt);
   }
 
   if (glob_pattern.has_value()) {
     LOG(All, "compgen expanding glob '%.*s' for prefix '%.*s'",
         static_cast<int>(glob_pattern->length), glob_pattern->data,
         static_cast<int>(word.length), word.data);
-    let out = String{cxt.scratch_allocator()};
-    let has_any_matched = false;
+
     for (let const &match : cxt.expand_glob_lenient(*glob_pattern)) {
       if (!match.view().starts_with(word)) continue;
       if (filter.has_value() &&
@@ -167,42 +249,36 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       {
         continue;
       }
-      out.append(match.view());
-      out.push('\n');
-      has_any_matched = true;
+      sink.push_candidate(match.view());
     }
 
-    if (has_any_matched) ec.print_to_stdout(out.view());
-    return has_any_matched ? 0 : 1;
+    return sink.publish(ec, cxt);
   }
 
   if (should_list_files) {
     cxt.get_program_resolver().begin_explicit_completion(
         ProgramResolver::CompletionRefresh::Fresh);
     defer { cxt.get_program_resolver().end_explicit_completion(); };
-    let const candidates = completion::complete_filesystem_names(
-        word, cxt, Path::current_directory());
-    let out = String{cxt.scratch_allocator()};
-    for (let const &candidate : candidates) {
+
+    for (let const &candidate : completion::complete_filesystem_names(
+             word, cxt, Path::current_directory()))
+    {
       if (filter.has_value() &&
           candidate_is_excluded(candidate.view(), *filter, cxt))
       {
         continue;
       }
-      out.append(candidate.view());
-      out.push('\n');
+      sink.push_candidate(candidate.view());
     }
-    if (!out.is_empty()) ec.print_to_stdout(out.view());
-    return out.is_empty() ? 1 : 0;
+
+    return sink.publish(ec, cxt);
   }
 
-  if (!wordlist.has_value()) return 1;
+  if (!wordlist.has_value()) return sink.publish(ec, cxt);
 
   LOG(Debug, "compgen filtering word list for prefix '%.*s'",
       static_cast<int>(word.length), word.data);
 
-  let out = String{cxt.scratch_allocator()};
-  let has_any_matched = false;
   for (let const &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
     if (!candidate.view().starts_with(word)) continue;
     if (filter.has_value() &&
@@ -210,13 +286,10 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       continue;
     }
-    out.append(candidate.view());
-    out.push('\n');
-    has_any_matched = true;
+    sink.push_candidate(candidate.view());
   }
 
-  ec.print_to_stdout(out.view());
-  return has_any_matched ? 0 : 1;
+  return sink.publish(ec, cxt);
 }
 
 } /* namespace koshka */

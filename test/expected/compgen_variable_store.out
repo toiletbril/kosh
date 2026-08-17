@@ -1,0 +1,58 @@
+== stored candidates:
+status=0
+declare -a stored=([0]="alpha" [1]="apex")
+== nothing reaches standard output:
+captured=[]
+declare -a stored=([0]="alpha")
+== the store replaces every earlier element:
+declare -a stored=([0]="alpha")
+== a sparse element does not survive the store:
+declare -a stored=([0]="alpha")
+count=1
+== a scalar is promoted to an indexed array:
+declare -a stored=([0]="alpha")
+== no match leaves an empty array and status 1:
+status=1
+declare -a stored=()
+== no generator leaves an empty array and status 1:
+status=1
+declare -a stored=()
+== duplicates are preserved:
+declare -a stored=([0]="alpha" [1]="alpha")
+== the last -V wins:
+declare -a last=([0]="alpha")
+first-status=1
+== the prefix and the suffix reach both the array and the output:
+declare -a stored=([0]="prealphasuf" [1]="preapexsuf")
+prealphasuf
+preapexsuf
+== the filter sees the candidate without its prefix:
+prealpha
+preapex
+raw-status=0
+prefixed-status=1
+== a local target keeps the store inside the function:
+declare -a stored=([0]="alpha")
+outer-status=1
+== the kosh mood stores as well:
+declare -a stored=([0]="alpha")
+== an invalid name is refused:
+1:12: error: Builtin `compgen`: 'stored[0]' is not a valid identifier.
+     1 |  compgen -V "stored[0]" -W "alpha" -- a
+       |             ^~~~~~~~~~~
+status=2
+== an associative target is refused:
+2:12: error: Builtin `compgen`: 'stored' is not an indexed array.
+     2 |  compgen -V stored -W "alpha" -- a
+       |             ^~~~~~
+status=1
+== a read only target is refused:
+2:12: error: Builtin `compgen`: 'stored' is read-only.
+     2 |  compgen -V stored -W "alpha" -- a
+       |             ^~~~~~
+status=1
+== a missing option value is a usage error:
+1:20: error: Builtin `compgen`: No value provided for '-V' flag.
+     1 |  compgen -W "alpha" -V
+       |                     ^~
+status=2
