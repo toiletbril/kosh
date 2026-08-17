@@ -305,6 +305,12 @@ records nothing. A hover answer is built from those records and the open
 document source, because the server returns before the startup chain runs and
 holds no user variables or functions.
 
+The document outline is built from the same records. An entry is sorted by its
+start position, with the wider span first when two entries open together, and a
+scope stack turns an entry contained by a function body into a child of that
+function. A child range is clamped to its parent range. One name assigned again
+in the same scope is one row.
+
 A document mood is selected from a recognized shebang, then from the client
 language identifier, then from a recognized document extension. The
 `shellscript` identifier selects the bash mood.

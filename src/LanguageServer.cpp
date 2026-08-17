@@ -24,21 +24,23 @@ enum class request_method : u8
   Definition,
   Hover,
   SemanticTokens,
+  DocumentSymbols,
 };
 
 constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
-    {SSK("initialize"),                       request_method::Initialize    },
-    {SSK("initialized"),                      request_method::Initialized   },
-    {SSK("shutdown"),                         request_method::Shutdown      },
-    {SSK("exit"),                             request_method::Exit          },
-    {SSK("textDocument/didOpen"),             request_method::DidOpen       },
-    {SSK("textDocument/didChange"),           request_method::DidChange     },
-    {SSK("textDocument/didClose"),            request_method::DidClose      },
-    {SSK("textDocument/completion"),          request_method::Completion    },
-    {SSK("textDocument/codeAction"),          request_method::CodeAction    },
-    {SSK("textDocument/definition"),          request_method::Definition    },
-    {SSK("textDocument/hover"),               request_method::Hover         },
-    {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens},
+    {SSK("initialize"),                       request_method::Initialize     },
+    {SSK("initialized"),                      request_method::Initialized    },
+    {SSK("shutdown"),                         request_method::Shutdown       },
+    {SSK("exit"),                             request_method::Exit           },
+    {SSK("textDocument/didOpen"),             request_method::DidOpen        },
+    {SSK("textDocument/didChange"),           request_method::DidChange      },
+    {SSK("textDocument/didClose"),            request_method::DidClose       },
+    {SSK("textDocument/completion"),          request_method::Completion     },
+    {SSK("textDocument/codeAction"),          request_method::CodeAction     },
+    {SSK("textDocument/definition"),          request_method::Definition     },
+    {SSK("textDocument/hover"),               request_method::Hover          },
+    {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens },
+    {SSK("textDocument/documentSymbol"),      request_method::DocumentSymbols},
 };
 constexpr StaticStringMap REQUEST_METHODS{REQUEST_METHOD_ENTRIES};
 
@@ -64,6 +66,8 @@ private:
   fn definition(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn hover(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn semantic_tokens(const JsonValue *id, const JsonValue *params) throws
+      -> bool;
+  fn document_symbols(const JsonValue *id, const JsonValue *params) throws
       -> bool;
   fn code_actions(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn publish_diagnostics(Document &document) throws -> bool;
@@ -305,7 +309,8 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   append_json_string(result, encoding);
   result.append(",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
                 "\"completionProvider\":{\"resolveProvider\":false},"
-                "\"definitionProvider\":true,\"hoverProvider\":true,");
+                "\"definitionProvider\":true,\"hoverProvider\":true,"
+                "\"documentSymbolProvider\":true,");
   if (m_supports_quick_fixes || m_supports_fix_all) {
     result.append("\"codeActionProvider\":{\"codeActionKinds\":[");
     if (m_supports_quick_fixes) result.append("\"quickfix\"");
@@ -990,6 +995,126 @@ fn Server::definition(const JsonValue *id, const JsonValue *params) throws
   return send_result(id, response.view());
 }
 
+/* The protocol numbers a function 12 and a variable 13. */
+constexpr usize OUTLINE_FUNCTION_KIND = 12;
+constexpr usize OUTLINE_VARIABLE_KIND = 13;
+
+struct outline_entry
+{
+  StringView name;
+  usize kind;
+  usize start;
+  usize end;
+  usize selection_start;
+  usize selection_end;
+};
+
+struct outline_scope
+{
+  usize end;
+  usize child_count;
+  HashSet assigned_names;
+};
+
+fn document_outline(const Document &document) throws -> ArrayList<outline_entry>
+{
+  let entries = ArrayList<outline_entry>{heap_allocator()};
+  let const source_length = document.normalized_source.count();
+
+  for (let const &record : document.symbol_records.functions) {
+    if (record.name_position >= source_length) continue;
+    let const name_end = record.name_position + record.name.count();
+    let const end = record.body_end_position > name_end
+                        ? record.body_end_position
+                        : name_end;
+    entries.push(outline_entry{record.name.view(), OUTLINE_FUNCTION_KIND,
+                               record.name_position, end, record.name_position,
+                               name_end});
+  }
+
+  for (let const &record : document.symbol_records.assignments) {
+    if (record.position >= source_length) continue;
+    let const name_end = record.position + record.name.count();
+    let const end = record.length > record.name.count()
+                        ? record.position + record.length
+                        : name_end;
+    entries.push(outline_entry{record.name.view(), OUTLINE_VARIABLE_KIND,
+                               record.position, end, record.position,
+                               name_end});
+  }
+
+  /* A container has to precede what it holds, so a wider span sorts first when
+     two entries open together. */
+  entries.sort([](const outline_entry &left, const outline_entry &right) {
+    if (left.start != right.start) return left.start < right.start;
+
+    return left.end > right.end;
+  });
+
+  return entries;
+}
+
+fn Server::document_symbols(const JsonValue *id, const JsonValue *params) throws
+    -> bool
+{
+  let const *document = request_document(params);
+  if (document == nullptr) return send_result(id, "[]");
+  let const entries = document_outline(*document);
+  let scopes = ArrayList<outline_scope>{heap_allocator()};
+  let top_level_count = usize{0};
+  let top_level_names = HashSet{heap_allocator()};
+  let response = String{"["};
+  let const do_close_scope = [&]() throws -> void {
+    if (scopes.back().child_count > 0) response.push(']');
+    response.push('}');
+    scopes.pop_back();
+  };
+
+  for (let const &entry : entries) {
+    while (!scopes.is_empty() && scopes.back().end <= entry.start)
+      do_close_scope();
+
+    /* One name assigned again in the same scope is one outline row. */
+    if (entry.kind == OUTLINE_VARIABLE_KIND) {
+      let &names =
+          scopes.is_empty() ? top_level_names : scopes.back().assigned_names;
+      if (!names.add(entry.name)) continue;
+    }
+
+    let const end = scopes.is_empty() || entry.end < scopes.back().end
+                        ? entry.end
+                        : scopes.back().end;
+    if (scopes.is_empty()) {
+      if (top_level_count > 0) response.push(',');
+      top_level_count++;
+    } else if (scopes.back().child_count > 0) {
+      response.push(',');
+      scopes.back().child_count++;
+    } else {
+      response.append(",\"children\":[");
+      scopes.back().child_count++;
+    }
+
+    response.append("{\"name\":");
+    append_json_string(response, entry.name);
+    response.append(",\"kind\":");
+    append_json_integer(response, static_cast<u64>(entry.kind));
+    response.append(",\"range\":");
+    append_protocol_range(response, *document, entry.start, end, m_encoding);
+    response.append(",\"selectionRange\":");
+    append_protocol_range(response, *document, entry.selection_start,
+                          entry.selection_end, m_encoding);
+    scopes.push(outline_scope{end, 0, HashSet{heap_allocator()}});
+  }
+
+  while (!scopes.is_empty())
+    do_close_scope();
+
+  response.push(']');
+
+  return send_result(id, response.view());
+}
+
 fn Server::command_information(StringView command) throws -> Maybe<String>
 {
   static constexpr u64 INFORMATION_TIMEOUT_NANOS = 5'000'000'000;
@@ -1466,6 +1591,7 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
   case request_method::Definition: return definition(id, params);
   case request_method::Hover: return hover(id, params);
   case request_method::SemanticTokens: return semantic_tokens(id, params);
+  case request_method::DocumentSymbols: return document_symbols(id, params);
   case request_method::Initialize:
   case request_method::Initialized:
   case request_method::Shutdown:

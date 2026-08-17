@@ -92,6 +92,9 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":71,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":4,"character":4}}}'
   frame '{"jsonrpc":"2.0","id":72,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":6,"character":4}}}'
   frame '{"jsonrpc":"2.0","id":73,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":7,"character":2}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/outline.sh","languageId":"bash","version":1,"text":"#!/bin/bash\ntop=1\nfunction outer {\n  local inner=2\n  inner=3\n}\nhelper() {\n  count=0\n}\ntop=4\n"}}}'
+  frame '{"jsonrpc":"2.0","id":74,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///tmp/outline.sh"}}}'
+  frame '{"jsonrpc":"2.0","id":75,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///tmp/absent.sh"}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -150,6 +153,9 @@ check_contains slash-function-definition '"id":70,"result":{"uri":"file:///tmp/s
 check_contains slash-function-hover '"id":71,"result":{"contents":{"kind":"plaintext","value":"ble/util/put () \n{\n  printf %s \"$1\"\n}"}'
 check_contains slash-paren-definition '"id":72,"result":{"uri":"file:///tmp/slash-function.sh","range":{"start":{"line":5,"character":0},"end":{"line":5,"character":16}}}'
 check_contains slash-path-stays-a-path '"id":73,"result":null'
+check_contains document-symbol-capability '"documentSymbolProvider":true'
+check_contains document-symbol-outline '"id":74,"result":[{"name":"top","kind":13,"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":5}},"selectionRange":{"start":{"line":1,"character":0},"end":{"line":1,"character":3}}},{"name":"outer","kind":12,"range":{"start":{"line":2,"character":9},"end":{"line":5,"character":1}},"selectionRange":{"start":{"line":2,"character":9},"end":{"line":2,"character":14}},"children":[{"name":"inner","kind":13,"range":{"start":{"line":4,"character":2},"end":{"line":4,"character":9}},"selectionRange":{"start":{"line":4,"character":2},"end":{"line":4,"character":7}}}]},{"name":"helper","kind":12,"range":{"start":{"line":6,"character":0},"end":{"line":8,"character":1}},"selectionRange":{"start":{"line":6,"character":0},"end":{"line":6,"character":6}},"children":[{"name":"count","kind":13,"range":{"start":{"line":7,"character":2},"end":{"line":7,"character":9}},"selectionRange":{"start":{"line":7,"character":2},"end":{"line":7,"character":7}}}]}]'
+check_contains document-symbol-unknown-document '"id":75,"result":[]'
 check_contains method-error '"id":9,"error":{"code":-32601'
 check_contains auxiliary-uri "\"uri\":\"file://$directory/disk-source.sh\""
 check_contains auxiliary-diagnostic disk_aux
