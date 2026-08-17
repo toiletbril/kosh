@@ -73,4 +73,7 @@ unsupported-code-action=ok
 limited-actions=ok
 optional-action-fields=ok
 malformed-actions=ok
+unterminated-status=0
+unterminated-survives=ok
+shift-not-heredoc=ok
 exit-without-shutdown-status=1

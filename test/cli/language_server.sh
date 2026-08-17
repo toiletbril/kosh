@@ -325,6 +325,41 @@ case $malformed_output in
 *) printf 'malformed-actions=missing\n' ;;
 esac
 
+unterminated_output=$(
+  {
+    frame '{"jsonrpc":"2.0","id":60,"method":"initialize","params":{"capabilities":{}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh","languageId":"bash","version":1,"text":"x=1\nfunction f { printf '\''oops ; }\n"}}}'
+    frame '{"jsonrpc":"2.0","id":61,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh"},"position":{"line":1,"character":10}}}'
+    frame '{"jsonrpc":"2.0","id":62,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh"}}}'
+    frame '{"jsonrpc":"2.0","id":63,"method":"shutdown","params":null}'
+    frame '{"jsonrpc":"2.0","method":"exit"}'
+  } | "$BIN" --language-server
+)
+unterminated_status=$?
+printf 'unterminated-status=%s\n' "$unterminated_status"
+case $unterminated_output in
+*'"message":"Unterminated string literal"'*'"id":61,"result":{"uri"'*'"id":62,"result":{"data":['*)
+  printf 'unterminated-survives=ok\n'
+  ;;
+*) printf 'unterminated-survives=missing\n' ;;
+esac
+
+shift_output=$(
+  {
+    frame '{"jsonrpc":"2.0","id":70,"method":"initialize","params":{"capabilities":{}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/shift.sh","languageId":"bash","version":1,"text":"mapfile -t v <<< \"$1\"\n((w<<=1))\ngreet() { :; }\ngreet\n"}}}'
+    frame '{"jsonrpc":"2.0","id":71,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/shift.sh"},"position":{"line":3,"character":2}}}'
+    frame '{"jsonrpc":"2.0","id":72,"method":"shutdown","params":null}'
+    frame '{"jsonrpc":"2.0","method":"exit"}'
+  } | "$BIN" --language-server
+)
+case $shift_output in
+*'"id":71,"result":{"uri":"file:///tmp/shift.sh","range":{"start":{"line":2,'*)
+  printf 'shift-not-heredoc=ok\n'
+  ;;
+*) printf 'shift-not-heredoc=missing\n' ;;
+esac
+
 frame '{"jsonrpc":"2.0","method":"exit"}' |
   "$BIN" --language-server > /dev/null
 printf 'exit-without-shutdown-status=%s\n' "$?"

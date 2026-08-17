@@ -95,9 +95,11 @@ struct shell_lexical_frame
   shell_lexical_frame_kind kind;
   char parent_quote;
   usize case_depth{0};
+  usize array_value_group_depth{0};
   bool has_seen_case_keyword{false};
   bool is_case_pattern_expected{false};
   bool is_command_position{true};
+  bool is_in_array_value{false};
 };
 
 struct shell_pending_heredoc

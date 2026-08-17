@@ -314,63 +314,93 @@ cold fn Parser::construct_ast(
   Expression *first_piece = nullptr;
   let last_location = SourceLocation{};
 
+  /* Render both parts here, since the detail note would be sliced off a
+     base-class copy. */
+  let const do_record_detailed_error = [&](const ErrorWithLocationAndDetails &e)
+                                           throws -> void {
+    LOG(Debug, "recording a detailed parse error and recovering: %s",
+        e.message().c_str());
+    errors.push(e.to_string(m_lexer.source(), context));
+    errors.push(e.details_to_string(m_lexer.source(), context));
+    if (diagnostic_sink == nullptr) return;
+
+    let const location = e.location();
+    let source_name = String{heap_allocator()};
+    if (location.filename.has_value()) source_name = String{*location.filename};
+    let const details_location = e.details_location();
+    let related_source_name = String{heap_allocator()};
+    if (details_location.filename.has_value())
+      related_source_name = String{*details_location.filename};
+    let const related_location = e.details_message().is_empty()
+                                     ? Maybe<SourceLocation>{None}
+                                     : Maybe<SourceLocation>{details_location};
+
+    diagnostic_sink->push(source_diagnostic{
+        None, error_severity::Error, location, steal(source_name),
+        e.message().clone(), String{e.detail_message()}, related_location,
+        steal(related_source_name), String{e.details_message()},
+        ArrayList<source_fix>{heap_allocator()}});
+  };
+
+  let const do_record_error = [&](const ErrorWithLocation &e) throws -> void {
+    LOG(Debug, "recording a parse error and recovering: %s",
+        e.message().c_str());
+    errors.push(e.to_string(m_lexer.source(), context));
+    if (diagnostic_sink == nullptr) return;
+
+    let const location = e.location();
+    let source_name = String{heap_allocator()};
+    if (location.filename.has_value()) source_name = String{*location.filename};
+
+    diagnostic_sink->push(source_diagnostic{
+        None, error_severity::Error, location, steal(source_name),
+        e.message().clone(), String{e.detail_message()}, None,
+        String{heap_allocator()}, String{heap_allocator()},
+        ArrayList<source_fix>{heap_allocator()}});
+  };
+
   loop
   {
+    /* An unterminated quote or here-document is raised by the token read
+       itself, so the scan for the next command records it and stops. */
+    Token *token = nullptr;
     m_lexer.set_should_collect_shellcheck_directives(true);
-    Token *token = m_lexer.peek_shell_token();
+    try {
+      token = m_lexer.peek_shell_token();
+    } catch (const ErrorWithLocationAndDetails &e) {
+      do_record_detailed_error(e);
+    } catch (const ErrorWithLocation &e) {
+      do_record_error(e);
+    }
     m_lexer.set_should_collect_shellcheck_directives(false);
-    ASSERT(token != nullptr);
+    if (token == nullptr) break;
+
     last_location = token->source_location();
     if (token->kind() == Token::Kind::EndOfFile) break;
 
+    let did_parse_fail = false;
     try {
       Expression *piece = parse_command_list(0);
       ASSERT(piece != nullptr);
       if (first_piece == nullptr) first_piece = piece;
     } catch (const ErrorWithLocationAndDetails &e) {
-      /* Render both parts here, since the detail note would be sliced off a
-         base-class copy. */
-      LOG(Debug, "recording a detailed parse error and recovering: %s",
-          e.message().c_str());
-      errors.push(e.to_string(m_lexer.source(), context));
-      errors.push(e.details_to_string(m_lexer.source(), context));
-      if (diagnostic_sink != nullptr) {
-        let const location = e.location();
-        let source_name = String{heap_allocator()};
-        if (location.filename.has_value())
-          source_name = String{*location.filename};
-        let const details_location = e.details_location();
-        let related_source_name = String{heap_allocator()};
-        if (details_location.filename.has_value())
-          related_source_name = String{*details_location.filename};
-        let const related_location =
-            e.details_message().is_empty()
-                ? Maybe<SourceLocation>{None}
-                : Maybe<SourceLocation>{details_location};
-        diagnostic_sink->push(source_diagnostic{
-            None, error_severity::Error, location, steal(source_name),
-            e.message().clone(), String{e.detail_message()}, related_location,
-            steal(related_source_name), String{e.details_message()},
-            ArrayList<source_fix>{heap_allocator()}});
-      }
-      recover_to_next_statement();
+      do_record_detailed_error(e);
+      did_parse_fail = true;
     } catch (const ErrorWithLocation &e) {
-      LOG(Debug, "recording a parse error and recovering: %s",
-          e.message().c_str());
-      errors.push(e.to_string(m_lexer.source(), context));
-      if (diagnostic_sink != nullptr) {
-        let const location = e.location();
-        let source_name = String{heap_allocator()};
-        if (location.filename.has_value())
-          source_name = String{*location.filename};
-        diagnostic_sink->push(source_diagnostic{
-            None, error_severity::Error, location, steal(source_name),
-            e.message().clone(), String{e.detail_message()}, None,
-            String{heap_allocator()}, String{heap_allocator()},
-            ArrayList<source_fix>{heap_allocator()}});
-      }
-      recover_to_next_statement();
+      do_record_error(e);
+      did_parse_fail = true;
     }
+    if (!did_parse_fail) continue;
+
+    /* The recovery scan is reached only once the parse error is recorded, and
+       a lexical error stops that scan at the same place. */
+    let did_recovery_fail = false;
+    try {
+      recover_to_next_statement();
+    } catch (const ErrorWithLocation &) {
+      did_recovery_fail = true;
+    }
+    if (did_recovery_fail) break;
   }
 
   if (first_piece == nullptr)

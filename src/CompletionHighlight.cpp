@@ -885,7 +885,11 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
   let function_name_pending = false;
   let is_case_pattern_expected = false;
   let line_functions = HashSet{bump_allocator(HIGHLIGHT_ARENA)};
+  let is_in_array_value = false;
+  let is_in_arithmetic = false;
   usize parenthesis_depth = 0;
+  usize array_value_parenthesis_depth = 0;
+  usize arithmetic_parenthesis_depth = 0;
 
   let const do_color_backtick =
       [&](usize backtick_position, ArrayList<highlight_span> &word_spans)
@@ -941,8 +945,17 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
+    /* Inside `((...))` a `<<` is a shift, so the here-document scan stays out
+       until the arithmetic closes. */
+    if (!is_in_arithmetic && is_command_position && c == '(' && i + 1 < end &&
+        line[i + 1] == '(')
+    {
+      is_in_arithmetic = true;
+      arithmetic_parenthesis_depth = parenthesis_depth;
+    }
+
     /* <<< is a one-line here-string and falls through to the operator scan. */
-    if (c == '<' && i + 1 < end && line[i + 1] == '<' &&
+    if (!is_in_arithmetic && c == '<' && i + 1 < end && line[i + 1] == '<' &&
         !(i + 2 < end && line[i + 2] == '<'))
     {
       let const operator_start = i;
@@ -1026,6 +1039,15 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
         else if (should_stop_at_closing_parenthesis)
           return i;
       }
+      if (is_in_array_value &&
+          parenthesis_depth <= array_value_parenthesis_depth)
+      {
+        is_in_array_value = false;
+      }
+      if (is_in_arithmetic && parenthesis_depth <= arithmetic_parenthesis_depth)
+      {
+        is_in_arithmetic = false;
+      }
 
       if (has_separator && operator_start + 1 < i &&
           line[operator_start] == ';' &&
@@ -1036,7 +1058,9 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
         is_case_pattern_expected = true;
       }
 
-      if (has_opener || (has_separator && !has_redirect)) {
+      if (!is_in_array_value &&
+          (has_opener || (has_separator && !has_redirect)))
+      {
         is_command_position = true;
         highlight_command_word = StringView{};
         expecting_in = false;
@@ -1244,6 +1268,17 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
         do_push(word_start, word_start + assigned_name.length,
                 highlight_role::assignment_name);
       }
+    }
+
+    /* The words inside `name=(...)` are element values, so the list is left out
+       of command position until it closes. A declare or local operand carries
+       the same form outside command position. */
+    if (is_assignment && word[word.length - 1] == '=' && word_end < end &&
+        line[word_end] == '(')
+    {
+      is_in_array_value = true;
+      array_value_parenthesis_depth = parenthesis_depth;
+      is_command_position = false;
     }
 
     if (plain && word == "]]" && !stack.is_empty() &&

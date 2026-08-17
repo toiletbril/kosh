@@ -1,0 +1,7 @@
+<<<	operator
+echo	resolved-command
+echo	resolved-command
+EOF	heredoc-delimiter
+EOF	heredoc-delimiter
+	heredoc
+echo	resolved-command

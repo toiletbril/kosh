@@ -1108,6 +1108,16 @@ fn advance_shell_lexical_state(StringView source, usize end,
     state.quote = frame.parent_quote;
     return frame;
   };
+  let const do_close_group = [](shell_lexical_frame &frame) wontthrow -> void {
+    if (frame.group_depth == 0) return;
+
+    frame.group_depth--;
+    if (frame.is_in_array_value &&
+        frame.group_depth <= frame.array_value_group_depth)
+    {
+      frame.is_in_array_value = false;
+    }
+  };
 
   while (i < end) {
     if (state.is_in_heredoc) {
@@ -1229,9 +1239,13 @@ fn advance_shell_lexical_state(StringView source, usize end,
         state.frames.is_empty() ||
         state.frames.back().kind == shell_lexical_frame_kind::command ||
         state.frames.back().kind == shell_lexical_frame_kind::backtick;
-    if (is_command_code && c == '<' && i + 1 < end && source[i + 1] == '<' &&
-        !(i + 2 < end && source[i + 2] == '<'))
-    {
+    /* `<<<` is a here-string. The scan reaches its second byte as well, so the
+       neighbours on both sides are checked. */
+    let const is_heredoc_operator = c == '<' && i + 1 < end &&
+                                    source[i + 1] == '<' &&
+                                    !(i + 2 < end && source[i + 2] == '<') &&
+                                    !(i > 0 && source[i - 1] == '<');
+    if (is_command_code && is_heredoc_operator) {
       collect_shell_heredoc(source, i, end, state);
       continue;
     }
@@ -1274,7 +1288,9 @@ fn advance_shell_lexical_state(StringView source, usize end,
         i == frame.body_start || lexer::is_whitespace(source[i - 1]) ||
         source[i - 1] == '\n' || source[i - 1] == ';' || source[i - 1] == '&' ||
         source[i - 1] == '|' || source[i - 1] == '(' || source[i - 1] == ')';
-    if (is_word_start && lexer::is_part_of_identifier(c)) {
+    if (is_word_start && !frame.is_in_array_value &&
+        lexer::is_part_of_identifier(c))
+    {
       let word_end = i;
       while (word_end < end && !lexer::is_whitespace(source[word_end]) &&
              !lexer::is_shell_sentinel(source[word_end]) &&
@@ -1359,6 +1375,16 @@ fn advance_shell_lexical_state(StringView source, usize end,
         else if (!lexer::is_shell_sentinel(c))
           frame.is_command_position = false;
       }
+
+      /* The words inside `name=(...)` are element values, so the scan stays out
+         of them until the list closes. A declare or local operand carries the
+         same form outside command position. */
+      if (!word.is_empty() && word[word.length - 1] == '=' && word_end < end &&
+          source[word_end] == '(' && lexer::word_looks_like_assignment(word))
+      {
+        frame.is_in_array_value = true;
+        frame.array_value_group_depth = frame.group_depth;
+      }
     }
 
     if (c == '\n' || c == '|' || c == '&' || c == ';') {
@@ -1374,11 +1400,23 @@ fn advance_shell_lexical_state(StringView source, usize end,
       }
     }
 
+    /* A bare `((` in command position opens arithmetic, where `<<` is a shift
+       and never a here-document. */
+    if (is_command_code && c == '(' && i + 1 < end && source[i + 1] == '(' &&
+        frame.is_command_position)
+    {
+      state.frames.push(shell_lexical_frame{
+          i + 2, 0, shell_lexical_frame_kind::arithmetic, state.quote});
+      state.quote = 0;
+      i += 2;
+      continue;
+    }
+
     if (state.frames.is_empty()) {
       if (c == '(')
         frame.group_depth++;
       else if (c == ')' && frame.group_depth > 0)
-        frame.group_depth--;
+        do_close_group(frame);
       else if (c == ')' && frame.case_depth > 0 &&
                frame.is_case_pattern_expected)
       {
@@ -1410,7 +1448,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
 
     if (c == ')' && frame.kind == shell_lexical_frame_kind::command) {
       if (frame.group_depth > 0) {
-        frame.group_depth--;
+        do_close_group(frame);
         i++;
         continue;
       }
