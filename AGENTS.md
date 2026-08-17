@@ -348,6 +348,9 @@ ErrorWithLocationAndDetails may store a second location.
 Word segment locations survive parameter modifiers, array subscripts,
 arithmetic expressions, and nested substitutions. A contiguous here-document
 retains its body location. A tab-stripped here-document has no source mapping.
+A compound command carrying trailing redirections ends where the lexer stands
+after the last redirection is consumed, so the span of a function body reaches
+past the closing brace and `declare -f` prints the redirections.
 
 Source traces are attached by eval, command substitution, function
 substitution, and process substitution. A frame is printed once while its source

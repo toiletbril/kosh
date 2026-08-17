@@ -100,6 +100,7 @@ public:
   mustuse fn next_shell_token() throws -> Token *;
 
   pure fn source() const wontthrow -> StringView;
+  pure fn cursor_position() const wontthrow -> usize;
   pure fn is_at_source_end() const wontthrow -> bool;
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   pure fn arena() const wontthrow -> BumpArena &;

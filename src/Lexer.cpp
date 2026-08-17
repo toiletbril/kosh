@@ -205,6 +205,11 @@ hot fn Lexer::next_shell_token() throws -> Token *
 
 pure fn Lexer::source() const wontthrow -> StringView { return m_source; }
 
+pure fn Lexer::cursor_position() const wontthrow -> usize
+{
+  return m_cursor_position;
+}
+
 fn Lexer::set_should_collect_shellcheck_directives(
     bool should_collect) wontthrow -> void
 {

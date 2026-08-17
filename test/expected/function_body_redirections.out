@@ -1,0 +1,285 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "plain"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "truncated"]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "paired"]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "closed"]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "heredoc"]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "herestring"]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "keyword"]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [ForLoop "i"]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "plain"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "truncated"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "paired"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "closed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "heredoc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "herestring"]
+  [CompoundListCondition, None]
+    [SimpleCommand "declare" "-f" "keyword"]
+[Word
+  Unquoted "plain"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "truncated"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "paired"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "closed"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "heredoc"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "EOF"
+]
+[Word
+  Unquoted "herestring"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "here"
+]
+[Word
+  Unquoted "keyword"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "plain"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "truncated"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "paired"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "closed"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "heredoc"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "herestring"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "keyword"
+]
+plain () 
+{ echo hi; }
+truncated () 
+{ echo hi; } >/dev/null
+paired () 
+{ echo hi; } >/dev/null 2>&1
+closed () 
+{ :; } 2>&-
+heredoc () 
+{ cat; } <<EOF
+herestring () 
+{ cat; } <<< here
+keyword () 
+{ for i in 1 2; do :; done; } >/dev/null
+[Code 0]

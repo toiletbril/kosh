@@ -1,0 +1,17 @@
+#!/bin/env kosh
+plain() { echo hi; }
+truncated() { echo hi; } >/dev/null
+paired() { echo hi; } >/dev/null 2>&1
+closed() { :; } 2>&-
+heredoc() { cat; } <<EOF
+data
+EOF
+herestring() { cat; } <<< here
+keyword() { for i in 1 2; do :; done; } >/dev/null
+declare -f plain
+declare -f truncated
+declare -f paired
+declare -f closed
+declare -f heredoc
+declare -f herestring
+declare -f keyword

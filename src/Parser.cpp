@@ -1068,13 +1068,21 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
 {
   ASSERT(compound != nullptr);
 
+  /* The wrapper location is the compound's opening token, so the end is taken
+     from the lexer after each redirection is consumed. Without it the span
+     would close after that one token and a function body would print as `{`. */
+  let end_position = compound->source_end_position();
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
-  while (try_parse_trailing_redirection(redirections)) {}
+  while (try_parse_trailing_redirection(redirections))
+    end_position = m_lexer.cursor_position();
 
   if (redirections.is_empty()) return compound;
 
-  return m_lexer.arena().create<RedirectedCommand>(
+  let redirected = m_lexer.arena().create<RedirectedCommand>(
       compound->source_location(), compound, steal(redirections));
+  redirected->set_source_end_position(end_position);
+
+  return redirected;
 }
 
 /* The bash assignment builtins that parse a NAME=(...) argument as an array
