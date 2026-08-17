@@ -266,7 +266,7 @@ pure fn skip_here_document(StringView source, usize at) wontthrow -> usize
     cursor++;
 
   usize delimiter_start = cursor;
-  usize delimiter_end = cursor;
+  usize delimiter_end;
 
   if (cursor < source.length &&
       (source[cursor] == '\'' || source[cursor] == '"'))

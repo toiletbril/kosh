@@ -11,8 +11,8 @@ namespace koshka {
 
 struct source_edit
 {
-  usize start;
-  usize end;
+  usize start_position;
+  usize end_position;
   String expected;
   String replacement;
 };
@@ -39,8 +39,8 @@ fn source_fixes_for_original_line_endings(
     StringView source, const ArrayList<source_fix> &normalized_fixes) throws
     -> ArrayList<source_fix>;
 
-fn source_fixes_for_diagnostic(diagnostic_id id, StringView source,
-                               SourceLocation location) throws
+fn source_fixes_for_diagnostic(diagnostic_id diagnostic, StringView source,
+                               const SourceLocation &location) throws
     -> ArrayList<source_fix>;
 
 } /* namespace koshka */

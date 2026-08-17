@@ -11,6 +11,7 @@ enum class highlight_role : u8
   operator_,
   string,
   heredoc,
+  heredoc_delimiter,
   variable,
   assignment_name,
   unset_variable,

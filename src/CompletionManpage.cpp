@@ -379,14 +379,11 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
   if (command.is_empty()) return None;
   let const command_end =
       static_cast<usize>(command.data - line.data) + command.length;
-  let i = skip_blanks(line, command_end);
-  let const start = i;
-  while (i < line.length && line[i] != ' ' && line[i] != '\t')
-    i++;
+  let position = command_end;
+  let const word = line.next_ascii_whitespace_word(position);
   /* A word the cursor still sits in is the token under completion, not a
      settled subcommand. */
-  if (i >= line.length) return None;
-  let const word = line.substring_of_length(start, i - start);
+  if (position >= line.length) return None;
   if (word.is_empty() || word[0] == '-') return None;
   return word;
 }
@@ -491,11 +488,7 @@ static fn parse_manpage_option_entries(StringView text) throws
 
   usize i = 0;
   while (i < view.length) {
-    let line_end = i;
-    while (line_end < view.length && view[line_end] != '\n')
-      line_end++;
-    let const raw = view.substring_of_length(i, line_end - i);
-    i = line_end + 1;
+    let const raw = view.next_line(i);
 
     let const indent = skip_blanks(raw, 0);
     if (indent >= raw.length) {
@@ -595,7 +588,6 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
         static_cast<int>(page_name.length), page_name.data);
     return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
   }
-  unused(context);
   let argv = ArrayList<String>{heap_allocator()};
   argv.push(String{man_paths[0].text().view()});
   argv.push(String{page_name});
@@ -686,32 +678,10 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
        remote, add, --help. */
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{paths[0].text().view()});
-    {
-      usize word_start = 0;
-      while (word_start < subcommand.length) {
-        while (word_start < subcommand.length && subcommand[word_start] == ' ')
-          word_start++;
-        let word_end = word_start;
-        while (word_end < subcommand.length && subcommand[word_end] != ' ')
-          word_end++;
-
-        if (word_end > word_start)
-          argv.push(String{subcommand.substring_of_length(
-              word_start, word_end - word_start)});
-        word_start = word_end;
-      }
-    }
-    let const argument_view = StringView{*help_argument};
-    usize i = 0;
-    while (i < argument_view.length) {
-      while (i < argument_view.length && argument_view[i] == ' ')
-        i++;
-      let const start = i;
-      while (i < argument_view.length && argument_view[i] != ' ')
-        i++;
-      if (i > start)
-        argv.push(String{argument_view.substring_of_length(start, i - start)});
-    }
+    subcommand.for_each_ascii_whitespace_word(
+        [&](StringView word) throws { argv.push(String{word}); });
+    StringView{*help_argument}.for_each_ascii_whitespace_word(
+        [&](StringView word) throws { argv.push(String{word}); });
     LOG(Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
     if (Maybe<String> output = capture_completion_program_output(argv);
@@ -747,11 +717,7 @@ static fn parse_help_option_entries(StringView text) throws
   let seen = HashSet{heap_allocator()};
   usize i = 0;
   while (i < text.length) {
-    let line_end = i;
-    while (line_end < text.length && text[line_end] != '\n')
-      line_end++;
-    let const raw = text.substring_of_length(i, line_end - i);
-    i = line_end + 1;
+    let const raw = text.next_line(i);
 
     let const start = skip_blanks(raw, 0);
     if (start >= raw.length || raw[start] != '-') continue;
@@ -798,12 +764,20 @@ static fn ensure_help_parsed(ProgramResolver &resolver, StringView command,
   HELP_PARSED.add(key.view());
 }
 
-static fn help_options_for(ProgramResolver &resolver, StringView command,
+static fn help_entries_for(StringMap<ArrayList<help_entry>> &cache,
+                           ProgramResolver &resolver, StringView command,
                            StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
   ensure_help_parsed(resolver, command, subcommand);
-  return *HELP_OPTION_CACHE.find(help_cache_key(command, subcommand).view());
+  return *cache.find(help_cache_key(command, subcommand).view());
+}
+
+static fn help_options_for(ProgramResolver &resolver, StringView command,
+                           StringView subcommand = {}) throws
+    -> const ArrayList<help_entry> &
+{
+  return help_entries_for(HELP_OPTION_CACHE, resolver, command, subcommand);
 }
 
 static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
@@ -920,11 +894,7 @@ static fn parse_help_subcommands(StringView text, StringView command) throws
   let saw_entry_in_section = false;
   usize i = 0;
   while (i < text.length) {
-    let line_end = i;
-    while (line_end < text.length && text[line_end] != '\n')
-      line_end++;
-    let const raw = text.substring_of_length(i, line_end - i);
-    i = line_end + 1;
+    let const raw = text.next_line(i);
 
     let const trim_start = skip_blanks(raw, 0);
     let const trimmed = raw.trim_blanks();
@@ -1018,9 +988,7 @@ static fn help_subcommands_for(ProgramResolver &resolver, StringView command,
                                StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
-  ensure_help_parsed(resolver, command, subcommand);
-  return *HELP_SUBCOMMAND_CACHE.find(
-      help_cache_key(command, subcommand).view());
+  return help_entries_for(HELP_SUBCOMMAND_CACHE, resolver, command, subcommand);
 }
 
 static fn is_known_help_subcommand(ProgramResolver &resolver,
@@ -1047,24 +1015,19 @@ static fn settled_subcommand_chain(ProgramResolver &resolver,
   if (surface_command.is_empty()) return chain;
 
   usize depth_count = 0;
-  usize i = static_cast<usize>(surface_command.data - line.data) +
-            surface_command.length;
+  usize position = static_cast<usize>(surface_command.data - line.data) +
+                   surface_command.length;
 
   while (depth_count < MAX_SUBCOMMAND_DEPTH) {
-    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-      i++;
-    let const start = i;
-    while (i < line.length && line[i] != ' ' && line[i] != '\t')
-      i++;
+    let const word = line.next_ascii_whitespace_word(position);
+    if (word.is_empty()) break;
+    let const start = static_cast<usize>(word.data - line.data);
 
     /* A word that reaches the token under the cursor is the token itself, so
        the chain ends before it. */
-    if (start >= token_start || i > token_start) {
+    if (start >= token_start || position > token_start) {
       break;
     }
-    if (start == i) break;
-
-    let const word = line.substring_of_length(start, i - start);
     if (word[0] == '-') break;
     if (!is_known_help_subcommand(resolver, resolved_command, chain.view(),
                                   word))

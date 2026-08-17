@@ -256,32 +256,14 @@ fn restore_current_directory(const DirectoryReference &reference) wontthrow
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 {
   const String dir_string{dir};
-  let const handle = ::opendir(dir_string.c_str());
-  if (handle == nullptr) return None;
-
+  let entries = list_directory_typed(dir);
+  if (!entries.has_value()) return None;
   let names = ArrayList<String>{heap_allocator()};
-  loop
-  {
-    errno = 0;
-    let const entry = ::readdir(handle);
-    if (entry == nullptr) {
-      if (errno != 0) {
-        ::closedir(handle);
-        return None;
-      }
-      break;
-    }
-
-    let const name = StringView{entry->d_name};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
-    names.push(String{name});
-  }
-
-  ::closedir(handle);
-
+  names.reserve(entries->count());
+  for (let &entry : *entries)
+    names.push(steal(entry.name));
   LOG(All, "read %zu entries from the directory '%s'", names.count(),
       dir_string.c_str());
-
   return names;
 }
 

@@ -2,8 +2,17 @@
 
 #include "ErrorOr.hpp"
 #include "IntBase.hpp"
+#include "String.hpp"
 
 namespace koshka {
+
+fn StringView::to_lower_ascii(Allocator allocator) const throws -> String
+{
+  let result = String{allocator, *this};
+  result.lowercase_ascii();
+
+  return result;
+}
 
 namespace utils {
 fn parse_decimal_i64(StringView text, bool *out_of_range = nullptr) throws
@@ -110,6 +119,30 @@ fn StringView::substring_of_length(usize start, usize count) const wontthrow
   usize remaining = length - start;
 
   return StringView{data + start, count < remaining ? count : remaining};
+}
+
+fn StringView::next_line(usize &position) const wontthrow -> StringView
+{
+  let const remaining = substring(position);
+  let const newline = remaining.find_character('\n');
+  let const line_length = newline.has_value() ? *newline : remaining.length;
+  let const line = remaining.substring_of_length(0, line_length);
+  position += line_length;
+  if (position < length) position++;
+
+  return line;
+}
+
+fn StringView::next_ascii_whitespace_word(usize &position) const wontthrow
+    -> StringView
+{
+  while (position < length && is_ascii_whitespace(data[position]))
+    position++;
+  let const start_position = position;
+  while (position < length && !is_ascii_whitespace(data[position]))
+    position++;
+
+  return substring_of_length(start_position, position - start_position);
 }
 
 fn StringView::starts_with(StringView prefix) const wontthrow -> bool

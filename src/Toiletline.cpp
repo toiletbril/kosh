@@ -1448,18 +1448,19 @@ fn build_prompt(EvalContext &context) -> String
   }
   context.set_last_exit_status(saved_status);
 
+  String rendered = expand_prompt_escapes(expanded.view(), CACHED_USER.view(),
+                                          full_pwd.view(), context);
+
   PROMPT_CACHE_VALID = false;
   if (is_cacheable) {
     for (let &input : scanned_inputs)
       input.value = context.get_variable_value(input.name.view());
     PROMPT_CACHE_TEMPLATE = ps1_template;
     PROMPT_CACHE_INPUTS = steal(scanned_inputs);
-    PROMPT_CACHE_EXPANSION = expanded;
+    PROMPT_CACHE_EXPANSION = steal(expanded);
     PROMPT_CACHE_VALID = true;
   }
 
-  String rendered = expand_prompt_escapes(expanded.view(), CACHED_USER.view(),
-                                          full_pwd.view(), context);
   if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
   return rendered;
 }

@@ -469,7 +469,7 @@ hot fn EvalContext::process_args(
   }
   let const do_record_location = [expanded_locations](SourceLocation loc)
                                      wontthrow -> void {
-    if (expanded_locations != nullptr) expanded_locations->push(loc);
+    if (expanded_locations != nullptr) expanded_locations->push(steal(loc));
   };
 
   let const fields_mark = m_scratch_arena.mark();
@@ -553,10 +553,10 @@ hot fn EvalContext::process_args(
                     .view());
           } else {
             assignment += '=';
-            if (assignment_token->is_append())
-              assignment.append(get_variable_value(assignment_token->key())
-                                    .value_or(String{scratch_allocator()})
-                                    .view());
+            if (assignment_token->is_append()) {
+              let const existing = get_variable_value(assignment_token->key());
+              if (existing.has_value()) assignment.append(existing->view());
+            }
             let const expanded_value =
                 expand_word_for_assignment(assignment_token->value_word());
             /* An integer name adds rather than concatenates. */
@@ -699,7 +699,9 @@ hot fn EvalContext::process_args(
                 for (usize i = 1; is_plain_name && i < spec.length; i++)
                   if (!lexer::is_variable_name(spec[i])) is_plain_name = false;
                 if (is_plain_name)
-                  if (let const *stored = lookup_shell_variable(spec)) {
+                  if (let const *stored = lookup_shell_variable(spec);
+                      stored != nullptr)
+                  {
                     value += stored->view();
                     break;
                   }

@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -55,7 +56,9 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     contents.push(steal(*content));
-    for (const StringView &line : split_keep_newlines(contents.back().view())) {
+    for (const StringView &line : utils::split_lines(
+             contents.back().view(), cxt.scratch_allocator(), true))
+    {
       lines.push(line.without_trailing_newline());
     }
   }

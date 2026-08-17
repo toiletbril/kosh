@@ -196,7 +196,7 @@ BufferedLineReader::BufferedLineReader(os::descriptor descriptor)
     : m_descriptor(descriptor)
 {}
 
-fn BufferedLineReader::next() throws -> Result
+hot flatten fn BufferedLineReader::next() throws -> Result
 {
   m_line.clear();
 
@@ -479,19 +479,13 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
   let const count_output =
       os::capture_program_output(count_argv, 5'000'000'000);
 
-  let const do_parse_count = [](StringView s) -> i32 {
-    while (!s.is_empty() &&
-           (s[0] == ' ' || s[0] == '\t' || s[0] == '\n' || s[0] == '\r'))
-    {
-      s = s.substring(1);
-    }
-    if (s.is_empty()) return 0;
-    i32 value = 0;
-    for (usize i = 0; i < s.length; i++) {
-      if (s[i] < '0' || s[i] > '9') break;
-      value = value * 10 + (s[i] - '0');
-    }
-    return value;
+  let const do_parse_count = [](StringView text) throws -> i32 {
+    usize position = 0;
+    let const word = text.next_ascii_whitespace_word(position);
+    let const parsed = parse_decimal_u64(word);
+    if (parsed.is_error() || parsed.value() > INT32_MAX) return 0;
+
+    return static_cast<i32>(parsed.value());
   };
 
   if (count_output.has_value()) {

@@ -187,20 +187,21 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     let text = Maybe<String>{};
+    let text_view = StringView{};
     if (is_all_but_last) {
-      let const whole = read_all(fd, cxt.scratch_allocator());
-      if (whole.has_value()) {
+      text = read_all(fd, cxt.scratch_allocator());
+      if (text.has_value()) {
         let const keep_length =
             is_byte_mode
-                ? byte_prefix_length_dropping_last(whole->view(), count)
-                : line_prefix_length_dropping_last(whole->view(), count);
-        text = String{cxt.scratch_allocator(),
-                      whole->view().substring_of_length(0, keep_length)};
+                ? byte_prefix_length_dropping_last(text->view(), count)
+                : line_prefix_length_dropping_last(text->view(), count);
+        text_view = text->view().substring_of_length(0, keep_length);
       }
     } else {
       text = is_byte_mode
                  ? read_up_to_bytes(fd, count, cxt.scratch_allocator())
                  : read_up_to_lines(fd, count, cxt.scratch_allocator());
+      if (text.has_value()) text_view = text->view();
     }
 
     if (was_opened) os::close_fd(fd);
@@ -223,7 +224,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       output += sources[source_index];
       output += " <==\n";
     }
-    output += text->view();
+    output += text_view;
     ec.print_to_stdout(output);
   }
 

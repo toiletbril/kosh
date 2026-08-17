@@ -164,12 +164,13 @@ hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 
 } /* namespace lexer */
 
-Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
-             Maybe<StringView> filename, mimic_mood mood)
-    : m_source(steal(source)), m_arena(&arena), m_filename(filename),
+Lexer::Lexer(StringView source, BumpArena &arena,
+             bool should_collect_debug_words, Maybe<StringView> filename,
+             mimic_mood mood)
+    : m_source(source), m_arena(&arena), m_filename(steal(filename)),
       m_mood(mood), m_should_collect_debug_words(should_collect_debug_words)
 {
-  LOG(Debug, "starting a lexer over %zu bytes of source", m_source.length());
+  LOG(Debug, "starting a lexer over %zu bytes of source", m_source.length);
 }
 
 Lexer::~Lexer() = default;
@@ -180,31 +181,29 @@ fn Lexer::peek_shell_token() throws -> Token *
   if (m_peek_cache != nullptr && m_peek_cache_position == m_cursor_position) {
     return m_peek_cache;
   }
-  Token *const t = lex_shell_token();
-  m_peek_cache = t;
+  Token *const token = lex_shell_token();
+  m_peek_cache = token;
   m_peek_cache_position = m_cursor_position;
-  return t;
+
+  return token;
 }
 
 hot fn Lexer::next_shell_token() throws -> Token *
 {
   skip_whitespace();
 
-  Token *const t =
+  Token *const token =
       (m_peek_cache != nullptr && m_peek_cache_position == m_cursor_position)
           ? m_peek_cache
           : lex_shell_token();
-  ASSERT(t != nullptr);
+  ASSERT(token != nullptr);
 
   advance_past_last_peek();
 
-  return t;
+  return token;
 }
 
-pure fn Lexer::source() const wontthrow -> StringView
-{
-  return m_source.view();
-}
+pure fn Lexer::source() const wontthrow -> StringView { return m_source; }
 
 fn Lexer::set_should_collect_shellcheck_directives(
     bool should_collect) wontthrow -> void
@@ -241,7 +240,7 @@ fn Lexer::take_heredoc_terminator_misses() throws
 
 pure fn Lexer::is_at_source_end() const wontthrow -> bool
 {
-  return m_cursor_position >= m_source.length();
+  return m_cursor_position >= m_source.length;
 }
 
 pure fn Lexer::debug_words() const wontthrow -> const ArrayList<Word> &
@@ -261,9 +260,9 @@ fn Lexer::set_arena(BumpArena &arena) wontthrow -> void
 
 hot fn Lexer::advance_past_last_peek() throws -> usize
 {
-  ASSERT(m_cursor_position + m_cached_offset <= m_source.length());
+  ASSERT(m_cursor_position + m_cached_offset <= m_source.length);
 
-  let const r = advance_forward(m_cached_offset);
+  let const result = advance_forward(m_cached_offset);
   m_cached_offset = 0;
 
   /* The heredoc body sits on the lines after the newline, so it is collected
@@ -273,7 +272,7 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
     collect_pending_heredocs();
   }
 
-  return r;
+  return result;
 }
 
 cold fn Lexer::register_heredoc(StringView delimiter,
@@ -308,16 +307,17 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
 
   loop
   {
-    if (position >= m_source.length()) break;
+    if (position >= m_source.length) break;
     let const line_start = position;
-    usize i = line_start;
-    while (i < m_source.length() && m_source[i] != '\n')
-      i++;
-    let const has_newline = (i < m_source.length());
-    position = has_newline ? i + 1 : i;
+    usize line_end_position = line_start;
+    while (line_end_position < m_source.length &&
+           m_source[line_end_position] != '\n')
+      line_end_position++;
+    let const has_newline = line_end_position < m_source.length;
+    position = has_newline ? line_end_position + 1 : line_end_position;
 
-    usize line_offset = line_start;
-    usize line_length = i - line_start;
+    let const line_offset = line_start;
+    let const line_length = line_end_position - line_start;
     usize stripped_offset = line_offset;
     usize stripped_length = line_length;
     if (should_strip_tabs) {
@@ -382,7 +382,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
   LOG(Debug, "collecting %zu pending heredoc bodies",
       m_pending_heredocs.count());
 
-  for (heredoc_pending &pending : m_pending_heredocs) {
+  for (let &pending : m_pending_heredocs) {
     let collected = String{heap_allocator()};
     ASSERT(pending.contents != nullptr);
     pending.contents->source_position = m_cursor_position;
@@ -411,30 +411,30 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 
 hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
-  Token *t{};
+  Token *token{};
   if (let const ch = chop_character(); ch != lexer::CEOF) [[likely]] {
     /* A < or > opens a process substitution only when a ( follows with no
        space. */
     if ((ch == '<' || ch == '>') && chop_character(1) == '(') {
-      t = lex_process_substitution(ch);
+      token = lex_process_substitution(ch);
     } else if (lexer::is_shell_sentinel(ch)) {
-      t = lex_sentinel();
+      token = lex_sentinel();
     } else if (lexer::is_part_of_identifier(ch)) [[likely]] {
-      t = lex_identifier();
+      token = lex_identifier();
     } else [[unlikely]] {
       throw ErrorWithLocationAndDetails{
           here(m_cursor_position, 1), "Unexpected character",
           "the character is not valid in an unquoted word here"};
     }
   } else {
-    t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
+    token = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
 
-  ASSERT(t != nullptr);
+  ASSERT(token != nullptr);
 
-  m_last_shell_token_was_newline = (t->kind() == Token::Kind::Newline);
+  m_last_shell_token_was_newline = token->kind() == Token::Kind::Newline;
 
-  return t;
+  return token;
 }
 
 hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
@@ -460,7 +460,7 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
          no command would claim. The leading byte compare rejects an ordinary
          comment before anything is read. */
       {
-        let comment = m_source.view().substring_of_length(
+        let comment = m_source.substring_of_length(
             m_cursor_position + comment_start, i - comment_start);
         usize content_position = 1;
         while (content_position < comment.length &&
@@ -492,14 +492,14 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
 
 hot alwaysinline fn Lexer::advance_forward(usize offset) wontthrow -> usize
 {
-  ASSERT(m_cursor_position + offset <= m_source.length());
+  ASSERT(m_cursor_position + offset <= m_source.length);
   m_cursor_position += offset;
   return offset;
 }
 
 hot alwaysinline fn Lexer::chop_character(usize offset) wontthrow -> char
 {
-  if (m_cursor_position + offset < m_source.length())
+  if (m_cursor_position + offset < m_source.length)
     return m_source[m_cursor_position + offset];
 
   return lexer::CEOF;
@@ -510,15 +510,13 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   let word = Word{};
 
   usize byte_count = 0;
-  usize relative_last_quote_char_pos = 0;
+  usize relative_last_quote_position = 0;
 
   bool should_escape = false;
 
   Maybe<char> quote_char;
 
-  /* When the close quote arrives still clear, an empty segment is synthesized
-     so
-     "" and '' each keep one empty field. */
+  /* An empty segment preserves an empty quoted field. */
   bool did_quote_enclose_content = false;
 
   /* A variable reference never merges, since each one carries its own name. */
@@ -549,7 +547,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
   let const do_word_is_plain_array_name = [&word]() -> bool {
     if (word.segments.count() != 1) return false;
-    const WordSegment &segment = word.segments[0];
+    let const &segment = word.segments[0];
     if (segment.kind != WordSegment::Kind::UnquotedText ||
         segment.text.is_empty())
     {
@@ -617,7 +615,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       {
         let const subscript_start = byte_count;
         byte_count = *close;
-        do_append_unquoted_run(m_source.view().substring_of_length(
+        do_append_unquoted_run(m_source.substring_of_length(
             m_cursor_position + subscript_start, byte_count - subscript_start));
         continue;
       }
@@ -631,7 +629,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       let const group_start = byte_count;
       byte_count += 2;
       do_scan_to_matched_close(byte_count, '(', ')');
-      do_append_unquoted_run(m_source.view().substring_of_length(
+      do_append_unquoted_run(m_source.substring_of_length(
           m_cursor_position + group_start, byte_count - group_start));
       continue;
     }
@@ -649,7 +647,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             chop_character(byte_count + 1) == '(')
           break;
       }
-      do_append_unquoted_run(m_source.view().substring_of_length(
+      do_append_unquoted_run(m_source.substring_of_length(
           m_cursor_position + run_start, byte_count - run_start));
       continue;
     }
@@ -713,7 +711,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     if (is_in_double_quotes) did_quote_enclose_content = true;
 
     if (!quote_char.has_value() && lexer::is_string_quote(ch)) {
-      relative_last_quote_char_pos = byte_count;
+      relative_last_quote_position = byte_count;
       did_quote_enclose_content = false;
       quote_char = ch;
       byte_count++;
@@ -911,15 +909,15 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
         }
 
         let const inner_start = m_cursor_position + byte_count;
-        let const substitution_end = lexer::scan_balanced_shell_region(
-            m_source.view(), inner_start, ')');
+        let const substitution_end =
+            lexer::scan_balanced_shell_region(m_source, inner_start, ')');
         if (!substitution_end.has_value()) [[unlikely]] {
           throw ErrorWithLocationAndDetails{
               here(m_cursor_position, m_source.count() - m_cursor_position),
               "Unterminated command substitution", here(m_source.count(), 1),
               "expected ) here"};
         }
-        let inner = String{m_source.view().substring_of_length(
+        let inner = String{m_source.substring_of_length(
             inner_start, *substitution_end - inner_start - 1)};
         byte_count = *substitution_end - m_cursor_position;
         word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
@@ -1158,8 +1156,8 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     expected_quote += *quote_char;
     expected_quote += " here";
     throw ErrorWithLocationAndDetails{
-        here(m_cursor_position + relative_last_quote_char_pos,
-             sub_sat(byte_count, relative_last_quote_char_pos)),
+        here(m_cursor_position + relative_last_quote_position,
+             sub_sat(byte_count, relative_last_quote_position)),
         "Unterminated string literal", here(m_cursor_position + byte_count, 1),
         expected_quote};
   }
@@ -1171,7 +1169,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   }
 
   let const actual_cursor_position = m_cursor_position;
-  ASSERT(actual_cursor_position <= m_source.length());
+  ASSERT(actual_cursor_position <= m_source.length);
 
   for (let &segment : word.segments)
     segment.is_substitution_cache_in_function_arena = m_arena == FUNCTION_ARENA;
@@ -1183,36 +1181,36 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     m_last_collected_word_position = m_cursor_position;
   }
 
-  Token *t{};
+  Token *token{};
 
   if (let assignment_split = word.get_assignment_split();
       assignment_split.has_value())
   {
-    t = m_arena->create<tokens::Assignment>(
+    token = m_arena->create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), assignment_split->name,
         steal(assignment_split->value), assignment_split->is_append);
   } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {
-    const String &word_text = word.segments[0].text;
-    if (let const kw =
-            KEYWORDS.find(StringView{word_text.data(), word_text.count()}))
-    {
-      switch (*kw) {
+    let const &word_text = word.segments[0].text;
+    let const keyword =
+        KEYWORDS.find(StringView{word_text.data(), word_text.count()});
+    if (keyword.has_value()) {
+      switch (*keyword) {
         KW_SWITCH_CASES();
-      default: unreachable("unhandled keyword of type %d", ENUM(*kw));
+      default: unreachable("unhandled keyword of type %d", ENUM(*keyword));
       }
     }
   }
 
-  if (t == nullptr) {
-    t = m_arena->create<tokens::WordToken>(
+  if (token == nullptr) {
+    token = m_arena->create<tokens::WordToken>(
         here(actual_cursor_position, byte_count), steal(word));
   }
 
   m_cached_offset = byte_count;
 
-  return t;
+  return token;
 }
 
 hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
@@ -1222,33 +1220,33 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
 
   usize extra_length = 0;
 
-  Token *tok{};
+  Token *token{};
 
 #define TOKEN_CASE_ONE(byte, t)                                                \
   case byte:                                                                   \
-    tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));              \
+    token = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
     break;
 
 #define TOKEN_CASE_TWO(byte, t, ch, t2)                                        \
   case byte: {                                                                 \
     if (chop_character(1) == ch) {                                             \
-      tok = m_arena->create<tokens::t2>(here(m_cursor_position, 2));           \
+      token = m_arena->create<tokens::t2>(here(m_cursor_position, 2));         \
       extra_length++;                                                          \
     } else {                                                                   \
-      tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
+      token = m_arena->create<tokens::t>(here(m_cursor_position, 1));          \
     }                                                                          \
   } break;
 
 #define TOKEN_CASE_THREE(byte, t, ch2, t2, ch3, t3)                            \
   case byte: {                                                                 \
     if (chop_character(1) == ch2) {                                            \
-      tok = m_arena->create<tokens::t2>(here(m_cursor_position, 2));           \
+      token = m_arena->create<tokens::t2>(here(m_cursor_position, 2));         \
       extra_length++;                                                          \
     } else if (chop_character(1) == ch3) {                                     \
-      tok = m_arena->create<tokens::t3>(here(m_cursor_position, 2));           \
+      token = m_arena->create<tokens::t3>(here(m_cursor_position, 2));         \
       extra_length++;                                                          \
     } else {                                                                   \
-      tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
+      token = m_arena->create<tokens::t>(here(m_cursor_position, 1));          \
     }                                                                          \
   } break;
 
@@ -1258,20 +1256,20 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   case ';': {
     if (chop_character(1) == ';') {
       if (chop_character(2) == '&') {
-        tok = m_arena->create<tokens::DoubleSemicolonAmpersand>(
+        token = m_arena->create<tokens::DoubleSemicolonAmpersand>(
             here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        tok = m_arena->create<tokens::DoubleSemicolon>(
+        token = m_arena->create<tokens::DoubleSemicolon>(
             here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '&') {
-      tok = m_arena->create<tokens::SemicolonAmpersand>(
+      token = m_arena->create<tokens::SemicolonAmpersand>(
           here(m_cursor_position, 2));
       extra_length++;
     } else {
-      tok = m_arena->create<tokens::Semicolon>(here(m_cursor_position, 1));
+      token = m_arena->create<tokens::Semicolon>(here(m_cursor_position, 1));
     }
   } break;
     TOKEN_CASE_ONE('.', Dot);
@@ -1290,33 +1288,34 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   case '&': {
     if (bash_additions_enabled() && chop_character(1) == '>') {
       if (chop_character(2) == '>') {
-        tok = m_arena->create<tokens::AmpersandDoubleGreater>(
+        token = m_arena->create<tokens::AmpersandDoubleGreater>(
             here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        tok = m_arena->create<tokens::AmpersandGreater>(
+        token = m_arena->create<tokens::AmpersandGreater>(
             here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '&') {
-      tok =
+      token =
           m_arena->create<tokens::DoubleAmpersand>(here(m_cursor_position, 2));
       extra_length++;
     } else {
-      tok = m_arena->create<tokens::Ampersand>(here(m_cursor_position, 1));
+      token = m_arena->create<tokens::Ampersand>(here(m_cursor_position, 1));
     }
   } break;
 
   /* |& is the shorthand for 2>&1 |, riding every mood but POSIX. */
   case '|': {
     if (chop_character(1) == '|') {
-      tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
+      token = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
       extra_length++;
     } else if (bash_additions_enabled() && chop_character(1) == '&') {
-      tok = m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
+      token =
+          m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
       extra_length++;
     } else {
-      tok = m_arena->create<tokens::Pipe>(here(m_cursor_position, 1));
+      token = m_arena->create<tokens::Pipe>(here(m_cursor_position, 1));
     }
   } break;
     TOKEN_CASE_TWO('=', Equals, '=', DoubleEquals);
@@ -1328,34 +1327,34 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   case '<': {
     if (chop_character(1) == '<') {
       if (chop_character(2) == '<' && bash_additions_enabled()) {
-        tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
+        token = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        tok = m_arena->create<tokens::DoubleLess>(here(m_cursor_position, 2));
+        token = m_arena->create<tokens::DoubleLess>(here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '=') {
-      tok = m_arena->create<tokens::LessEquals>(here(m_cursor_position, 2));
+      token = m_arena->create<tokens::LessEquals>(here(m_cursor_position, 2));
       extra_length++;
     } else {
-      tok = m_arena->create<tokens::Less>(here(m_cursor_position, 1));
+      token = m_arena->create<tokens::Less>(here(m_cursor_position, 1));
     }
   } break;
 
   default: {
-    let s = String{heap_allocator()};
-    s += "Unknown operator '";
-    s += ch;
-    s += "'";
-    throw ErrorWithLocation{here(m_cursor_position, 1), s};
+    let source_text = String{heap_allocator()};
+    source_text += "Unknown operator '";
+    source_text += ch;
+    source_text += "'";
+    throw ErrorWithLocation{here(m_cursor_position, 1), source_text};
   }
   }
 
-  ASSERT(tok != nullptr);
+  ASSERT(token != nullptr);
 
   m_cached_offset = 1 + extra_length;
 
-  return tok;
+  return token;
 }
 
 hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws

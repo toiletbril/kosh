@@ -286,8 +286,8 @@ static fn run_script_contents(
       LOG(Debug, "parsing a chunk of %zu bytes", script_contents.count());
 
       let p = Parser{
-          Lexer{String{script_contents.view()}, ast_arena,
-                context.show_lexed_words(), filename, context.mood()}
+          Lexer{script_contents.view(), ast_arena, context.show_lexed_words(),
+                filename, context.mood()}
       };
       p.set_should_collect_analysis_scopes(run_analysis);
 
@@ -381,12 +381,13 @@ static fn run_script_contents(
       exit_code = EXIT_SUCCESS;
     } else {
       LOG(Debug, "evaluating the chunk");
-      let const previous_history_event_number =
+      let previous_history_event_number =
           context.current_history_event_number();
-      context.set_current_history_event_number(history_event_number);
+      context.set_current_history_event_number(steal(history_event_number));
       defer
       {
-        context.set_current_history_event_number(previous_history_event_number);
+        context.set_current_history_event_number(
+            steal(previous_history_event_number));
       };
       context.set_current_source(&script_contents, "the script");
       let const command_start_nanos = koshka::os::monotonic_nanos();
@@ -446,13 +447,6 @@ static fn run_script_contents(
   return exit_code;
 }
 
-/* The cached text and parsed tree are kept across prompts so an unchanged hook
-   parses once, in an arena the per-command reset never touches so the cached
-   pointer stays valid. */
-static BumpArena PROMPT_COMMAND_ARENA{};
-static String PROMPT_COMMAND_CACHED_TEXT{heap_allocator()};
-static Expression *PROMPT_COMMAND_CACHED_AST = nullptr;
-
 static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 {
   Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
@@ -470,21 +464,20 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   context.set_prompt_command_running(true);
   defer { context.set_prompt_command_running(false); };
 
-  if (PROMPT_COMMAND_CACHED_AST != nullptr &&
-      PROMPT_COMMAND_CACHED_TEXT.view() == command->view())
-  {
-    run_script_contents(PROMPT_COMMAND_CACHED_TEXT, context, ast_arena,
-                        StringView{"PROMPT_COMMAND"},
-                        PROMPT_COMMAND_CACHED_AST);
+  let &cached_text = context.get_prompt_command_cached_text();
+  let cached_ast = context.get_prompt_command_cached_ast();
+  let &prompt_arena = context.get_prompt_command_arena();
+  if (cached_ast != nullptr && cached_text.view() == command->view()) {
+    run_script_contents(cached_text, context, ast_arena,
+                        StringView{"PROMPT_COMMAND"}, cached_ast);
   } else {
-    /* A changed hook parses once into the prompt arena, reset first so the
-       previous tree is reclaimed, and caches through out_ast. */
-    PROMPT_COMMAND_ARENA.reset();
-    PROMPT_COMMAND_CACHED_AST = nullptr;
-    PROMPT_COMMAND_CACHED_TEXT = String{command->view()};
-    run_script_contents(PROMPT_COMMAND_CACHED_TEXT, context,
-                        PROMPT_COMMAND_ARENA, StringView{"PROMPT_COMMAND"},
-                        nullptr, &PROMPT_COMMAND_CACHED_AST);
+    prompt_arena.reset();
+    context.set_prompt_command_cached_ast(nullptr);
+    cached_text = String{command->view()};
+    Expression *parsed_ast = nullptr;
+    run_script_contents(cached_text, context, prompt_arena,
+                        StringView{"PROMPT_COMMAND"}, nullptr, &parsed_ast);
+    context.set_prompt_command_cached_ast(parsed_ast);
   }
 
   context.set_last_exit_status(saved_exit_status);
@@ -896,7 +889,8 @@ static fn run_format_operation(const ArrayList<String> &file_names,
         for (let const &fix : diagnostic.fixes) {
           let edits = ArrayList<source_edit>{heap_allocator()};
           for (let const &edit : fix.edits)
-            edits.push(source_edit{edit.start, edit.end, edit.expected.clone(),
+            edits.push(source_edit{edit.start_position, edit.end_position,
+                                   edit.expected.clone(),
                                    edit.replacement.clone()});
           normalized_fixes.push(source_fix{fix.title.clone(), steal(edits),
                                            fix.is_preferred,
@@ -929,24 +923,9 @@ static fn run_format_operation(const ArrayList<String> &file_names,
         did_fail = true;
     } else if (colors::stdout_wants_color()) {
       let highlighted = String{heap_allocator()};
-      let highlight_cache = completion::shell_highlight_cache{};
-      usize line_start = 0;
-
-      while (line_start < formatted->count()) {
-        usize line_end = line_start;
-        while (line_end < formatted->count() && (*formatted)[line_end] != '\n')
-          line_end++;
-        if (line_end < formatted->count()) line_end++;
-
-        let const *spans = highlight_cache.spans_for(
-            formatted->view(), line_start, line_end, context);
-        let const line = formatted->view().substring_of_length(
-            line_start, line_end - line_start);
-        completion::append_highlighted_range(
-            highlighted, line, *spans, 0, line.length,
-            colors::PRINTED_SOURCE_HIGHLIGHT_THEME);
-        line_start = line_end;
-      }
+      completion::append_highlighted_source(
+          highlighted, formatted->view(), context,
+          colors::PRINTED_SOURCE_HIGHLIGHT_THEME);
       print(highlighted);
     } else {
       print(formatted->view());
@@ -983,7 +962,8 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
       for (let const &fix : diagnostic.fixes) {
         let edits = ArrayList<source_edit>{heap_allocator()};
         for (let const &edit : fix.edits) {
-          edits.push(source_edit{edit.start, edit.end, edit.expected.clone(),
+          edits.push(source_edit{edit.start_position, edit.end_position,
+                                 edit.expected.clone(),
                                  edit.replacement.clone()});
         }
         normalized_fixes.push(source_fix{fix.title.clone(), steal(edits),

@@ -65,8 +65,7 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
     char number_buffer[24];
     let const number = utils::int_to_text_into(
         static_cast<i64>(i + 1), number_buffer, sizeof(number_buffer));
-    for (usize pad = number.length; pad < 5; pad++)
-      out += ' ';
+    out.append_repeated(' ', number.length < 5 ? 5 - number.length : 0);
     out.append(number);
     out += "  ";
     out.append(lines[i]);

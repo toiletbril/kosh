@@ -75,34 +75,36 @@ fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
     level = static_cast<i64>(m_loop_depth);
   LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
       m_loop_depth);
-  m_control_flow = control_flow{kind, level, location, m_current_source,
+  m_control_flow = control_flow{kind, level, steal(location), m_current_source,
                                 String{m_current_origin}};
 }
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
-  request_loop_control(control_flow::Kind::Break, level, location);
+  request_loop_control(control_flow::Kind::Break, level, steal(location));
 }
 
 fn EvalContext::request_continue(i64 level, SourceLocation location) throws
     -> void
 {
-  request_loop_control(control_flow::Kind::Continue, level, location);
+  request_loop_control(control_flow::Kind::Continue, level, steal(location));
 }
 
 fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
   LOG(Debug, "return requested, status %lld", (long long) status);
-  m_control_flow = control_flow{control_flow::Kind::Return, status, location,
-                                m_current_source, String{m_current_origin}};
+  m_control_flow =
+      control_flow{control_flow::Kind::Return, status, steal(location),
+                   m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Debug, "exit requested, status %lld", (long long) status);
-  m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
-                                m_current_source, String{m_current_origin}};
+  m_control_flow =
+      control_flow{control_flow::Kind::Exit, status, steal(location),
+                   m_current_source, String{m_current_origin}};
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
@@ -147,7 +149,7 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
 fn EvalContext::set_current_history_event_number(Maybe<usize> number) wontthrow
     -> void
 {
-  m_current_history_event_number = number;
+  m_current_history_event_number = steal(number);
 }
 
 pure fn EvalContext::current_history_event_number() const wontthrow
@@ -162,9 +164,9 @@ fn EvalContext::push_root_source_frame(const String *parent_source,
 {
   m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
-      call_site,
-      parent_source, String{heap_allocator()},
-      true, is_only_root_source
+      steal(call_site), parent_source, String{heap_allocator()},
+      true,
+      is_only_root_source
   });
 }
 
@@ -261,7 +263,7 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
 
 fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
 {
-  m_current_location = location;
+  m_current_location = steal(location);
 }
 
 /* TODO: these caps are hand-tuned below the observed native overflow point.
@@ -276,7 +278,7 @@ static constexpr usize MAX_PARAMETER_EXPANSION_DEPTH = 256;
 
 static fn guard_located_depth(usize current_depth, usize cap,
                               [[maybe_unused]] const char *what,
-                              SourceLocation location) throws -> void
+                              const SourceLocation &location) throws -> void
 {
   if (current_depth >= cap) {
     LOG(Debug, "%s depth %zu exceeds cap %zu", what, current_depth, cap);
@@ -285,7 +287,7 @@ static fn guard_located_depth(usize current_depth, usize cap,
   }
 }
 
-fn EvalContext::enter_source(SourceLocation location) throws -> void
+fn EvalContext::enter_source(const SourceLocation &location) throws -> void
 {
   guard_located_depth(m_source_depth, MAX_SOURCE_DEPTH, "source", location);
   m_source_depth++;
@@ -297,7 +299,8 @@ fn EvalContext::leave_source() wontthrow -> void
   m_source_depth--;
 }
 
-fn EvalContext::enter_function_call(SourceLocation location) throws -> void
+fn EvalContext::enter_function_call(const SourceLocation &location) throws
+    -> void
 {
   guard_located_depth(m_function_call_depth, MAX_FUNCTION_CALL_DEPTH,
                       "function call", location);
@@ -656,6 +659,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_warning_mutation_revision,
                              m_diagnostics_mutation_revision,
                              m_annoying_diagnostics_mutation_revision,
+                             m_random_state,
                              m_shell_option_mutations};
 }
 
@@ -687,6 +691,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_diagnostics_mutation_revision = snapshot.diagnostics_mutation_revision;
   m_annoying_diagnostics_mutation_revision =
       snapshot.annoying_diagnostics_mutation_revision;
+  m_random_state = snapshot.random_state;
   m_shell_option_mutations = snapshot.option_mutations;
 
   m_readonly_names = steal(snapshot.readonly_names);
@@ -880,6 +885,86 @@ pure fn EvalContext::should_echo_expanded() const wontthrow -> bool
 pure fn EvalContext::shell_is_interactive() const wontthrow -> bool
 {
   return m_shell_is_interactive;
+}
+
+fn EvalContext::set_show_ast(bool enabled) wontthrow -> void
+{
+  m_runtime.set_option(shell_option_id::ShowAst, enabled);
+}
+
+pure fn EvalContext::show_ast() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::ShowAst);
+}
+
+fn EvalContext::set_show_lexed_words(bool enabled) wontthrow -> void
+{
+  m_runtime.set_option(shell_option_id::ShowLexedWords, enabled);
+}
+
+pure fn EvalContext::show_lexed_words() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::ShowLexedWords);
+}
+
+fn EvalContext::set_show_exit_code(bool enabled) wontthrow -> void
+{
+  m_runtime.set_option(shell_option_id::ShowExitCode, enabled);
+}
+
+pure fn EvalContext::show_exit_code() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::ShowExitCode);
+}
+
+fn EvalContext::set_memory_stats_enabled(bool enabled) wontthrow -> void
+{
+  m_runtime.set_option(shell_option_id::ShowMemory, enabled);
+}
+
+pure fn EvalContext::memory_stats_enabled() const wontthrow -> bool
+{
+  return m_runtime.option_is_enabled(shell_option_id::ShowMemory);
+}
+
+fn EvalContext::set_diagnostics_disabled(bool disabled) wontthrow -> void
+{
+  m_runtime.is_diagnostics_disabled = disabled;
+}
+
+pure fn EvalContext::diagnostics_disabled() const wontthrow -> bool
+{
+  return m_runtime.is_diagnostics_disabled;
+}
+
+fn EvalContext::set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void
+{
+  m_runtime.is_annoying_diagnostics_enabled = enabled;
+}
+
+pure fn EvalContext::annoying_diagnostics_enabled() const wontthrow -> bool
+{
+  return m_runtime.is_annoying_diagnostics_enabled;
+}
+
+fn EvalContext::set_login_shell(bool enabled) wontthrow -> void
+{
+  m_is_login_shell = enabled;
+}
+
+pure fn EvalContext::is_login_shell() const wontthrow -> bool
+{
+  return m_is_login_shell;
+}
+
+fn EvalContext::set_custom_rcfile(bool enabled) wontthrow -> void
+{
+  m_has_custom_rcfile = enabled;
+}
+
+pure fn EvalContext::has_custom_rcfile() const wontthrow -> bool
+{
+  return m_has_custom_rcfile;
 }
 
 pure fn EvalContext::last_expressions_executed() const wontthrow -> usize

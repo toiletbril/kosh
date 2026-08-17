@@ -63,12 +63,24 @@ struct option_text
 
 struct set_option_descriptor
 {
-  shell_option_id id;
-  set_option_behavior behavior;
-  char letter;
+  consteval set_option_descriptor(shell_option_id option_id,
+                                  set_option_behavior option_behavior,
+                                  char short_name, option_text long_name,
+                                  option_text description,
+                                  option_text alias_name = {},
+                                  bool should_list_in_shellopts = false,
+                                  bool should_list = true)
+      : name(long_name), help(description), alias(alias_name), id(option_id),
+        behavior(option_behavior), letter(short_name),
+        is_in_shellopts(should_list_in_shellopts), is_listed(should_list)
+  {}
+
   option_text name;
   option_text help;
   option_text alias{};
+  shell_option_id id;
+  set_option_behavior behavior;
+  char letter;
   bool is_in_shellopts{false};
   bool is_listed{true};
 };
@@ -520,8 +532,9 @@ fn list_options_columnar(const EvalContext &cxt) throws -> String
       continue;
     }
     out += option.name;
-    for (usize pad = option.name.length; pad < name_field_width; pad++)
-      out.push(' ');
+    out.append_repeated(' ', option.name.length < name_field_width
+                                 ? name_field_width - option.name.length
+                                 : 0);
     out.push('\t');
     out += option_is_on(cxt, option) ? "on" : "off";
     out.push('\n');
@@ -574,8 +587,9 @@ fn format_option_table(const EvalContext *cxt,
       name_cell += option.alias;
     }
     out += name_cell.view();
-    for (usize pad = name_cell.count(); pad < name_field_width; pad++)
-      out.push(' ');
+    out.append_repeated(' ', name_cell.count() < name_field_width
+                                 ? name_field_width - name_cell.count()
+                                 : 0);
     if (cxt != nullptr) out += option_is_on(*cxt, option) ? "[on]  " : "[off] ";
     out += option.help;
     out.push('\n');

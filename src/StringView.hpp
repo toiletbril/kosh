@@ -1,12 +1,20 @@
 #pragma once
 
+#include "Allocator.hpp"
 #include "Common.hpp"
 #include "Maybe.hpp"
 
 namespace koshka {
 
+pure constexpr fn is_ascii_whitespace(char byte) wontthrow -> bool
+{
+  return byte == ' ' || byte == '\t' || byte == '\n' || byte == '\v' ||
+         byte == '\f' || byte == '\r';
+}
+
 template <class T>
 class ErrorOr;
+class String;
 
 class StringView
 {
@@ -27,6 +35,8 @@ public:
     ASSERT(i < length, "string-view index is past the end");
     return data[i];
   }
+
+  mustuse fn to_lower_ascii(Allocator allocator) const throws -> String;
 
   hot flatten mustuse pure fn operator==(StringView other) const wontthrow->bool
   {
@@ -77,8 +87,21 @@ public:
 
   mustuse pure fn substring_of_length(usize start, usize count) const wontthrow
       -> StringView;
+  mustuse fn next_line(usize &position) const wontthrow -> StringView;
+  mustuse fn next_ascii_whitespace_word(usize &position) const wontthrow
+      -> StringView;
 
   mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool;
+
+  template <class Callback>
+  fn for_each_ascii_whitespace_word(Callback do_word) const throws -> void
+  {
+    usize position = 0;
+    while (position < length) {
+      let const word = next_ascii_whitespace_word(position);
+      if (!word.is_empty()) do_word(word);
+    }
+  }
 
   /* Whether the view is one or more decimal digits and nothing else, the strict
      digit scan a numeric name, positional, or descriptor shares before it

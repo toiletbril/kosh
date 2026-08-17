@@ -69,17 +69,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* An empty TIMEFORMAT prints nothing, an unset value keeps the pretty
      default. */
-  String report{cxt.scratch_allocator()};
-  if (let const time_format = cxt.get_variable_value("TIMEFORMAT");
-      time_format.has_value())
-  {
-    if (!time_format->is_empty())
-      report = utils::format_time_report_custom(
-          time_format->view(), real_seconds, user_cpu, system_cpu);
-  } else {
-    report = utils::format_time_report_pretty(real_seconds, user_cpu,
-                                              system_cpu, peak_rss_bytes);
-  }
+  let const time_format = cxt.get_variable_value("TIMEFORMAT");
+  let const report = utils::format_time_report(
+      false, time_format, real_seconds, user_cpu, system_cpu, peak_rss_bytes);
 
   if (!report.is_empty()) {
     koshka::print_error(report);

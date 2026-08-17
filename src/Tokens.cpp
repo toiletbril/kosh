@@ -10,7 +10,7 @@
 
 namespace koshka {
 
-Token::Token(SourceLocation location) : m_location(location) {}
+Token::Token(SourceLocation location) : m_location(steal(location)) {}
 
 pure fn Token::source_location() const wontthrow -> SourceLocation
 {
@@ -350,7 +350,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 namespace tokens {
 
 #define KEYWORD_TOKEN_DECLS(t, s)                                              \
-  t::t(SourceLocation location) : Token(location) {}                           \
+  t::t(SourceLocation location) : Token(steal(location)) {}                    \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
   Token::Flags t::flags() const wontthrow { return Token::Flag::Keyword; }     \
   String t::raw_string() const throws { return s; }                            \
@@ -373,7 +373,7 @@ KEYWORD_TOKEN_DECLS(Time, "time");
 KEYWORD_TOKEN_DECLS(Function, "function");
 
 #define SENTINEL_TOKEN_DECLS_COMPOUND(t, s)                                    \
-  t::t(SourceLocation location) : Token(location) {}                           \
+  t::t(SourceLocation location) : Token(steal(location)) {}                    \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
   Token::Flags t::flags() const wontthrow                                      \
   {                                                                            \
@@ -386,7 +386,7 @@ SENTINEL_TOKEN_DECLS_COMPOUND(Newline, "newline");
 SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
 
 #define SENTINEL_TOKEN_DECLS(t, s)                                             \
-  t::t(SourceLocation location) : Token(location) {}                           \
+  t::t(SourceLocation location) : Token(steal(location)) {}                    \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
   Token::Flags t::flags() const wontthrow { return Token::Flag::Sentinel; }    \
   String t::raw_string() const throws { return s; }                            \
@@ -408,14 +408,15 @@ SENTINEL_TOKEN_DECLS(LeftBracket, "{");
 SENTINEL_TOKEN_DECLS(RightBracket, "}");
 
 Value::Value(SourceLocation location, StringView sv)
-    : Token(location), m_value(sv)
+    : Token(steal(location)), m_value(sv)
 {}
 
 fn Value::raw_string() const throws -> String { return m_value; }
 
 Assignment::Assignment(SourceLocation location, StringView key, Word value,
                        bool is_append)
-    : Token(location), m_key(key), m_value(steal(value)), m_is_append(is_append)
+    : Token(steal(location)), m_key(key), m_value(steal(value)),
+      m_is_append(is_append)
 {}
 
 fn Assignment::kind() const wontthrow -> Token::Kind
@@ -446,7 +447,7 @@ pure fn Assignment::value_word() const wontthrow -> const Word &
 }
 
 WordToken::WordToken(SourceLocation location, Word word)
-    : Value(location, ""), m_word(steal(word))
+    : Value(steal(location), ""), m_word(steal(word))
 {
   m_value = m_word.to_literal_string();
 }
@@ -465,7 +466,7 @@ pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }
 
 Redirection::Redirection(SourceLocation location, StringView what_fd,
                          StringView to_file)
-    : Token(location), m_from_fd(what_fd), m_to_file(to_file)
+    : Token(steal(location)), m_from_fd(what_fd), m_to_file(to_file)
 {}
 
 fn Redirection::kind() const wontthrow -> Token::Kind
@@ -488,7 +489,7 @@ pure fn Redirection::to_file() const wontthrow -> const String &
   return m_to_file;
 }
 
-Operator::Operator(SourceLocation location) : Token(location) {}
+Operator::Operator(SourceLocation location) : Token(steal(location)) {}
 
 fn Operator::left_precedence() const wontthrow -> u8 { return 0; }
 
@@ -512,23 +513,24 @@ fn Operator::construct_unary_expression(const Expression *rhs) const throws
   unreachable("Invalid unary operator construction of type %d", ENUM(kind()));
 }
 
-#define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
-  t::t(SourceLocation location) : Operator(location) {}                        \
+#define OPERATOR_TOKEN_DECLS(t, s, token_flags)                                \
+  t::t(SourceLocation location) : Operator(steal(location)) {}                 \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow                                      \
-  {                                                                            \
-    return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;           \
-  }                                                                            \
+  Token::Flags t::flags() const wontthrow { return token_flags; }              \
   String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
+  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
+
+#define BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)                         \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
-  u8 t::unary_precedence() const wontthrow { return up; }                      \
   Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
     ASSERT(AST_ARENA != nullptr);                                              \
     return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
-  }                                                                            \
+  }
+
+#define UNARY_OPERATOR_TOKEN_DECLS_BODY(t, up, uexpr)                          \
+  u8 t::unary_precedence() const wontthrow { return up; }                      \
   Expression *t::construct_unary_expression(const Expression *rhs)             \
       const throws                                                             \
   {                                                                            \
@@ -536,42 +538,23 @@ fn Operator::construct_unary_expression(const Expression *rhs) const throws
     return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
   }
 
+#define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
+  OPERATOR_TOKEN_DECLS(                                                        \
+      t, s, Token::Flag::BinaryOperator | Token::Flag::UnaryOperator)          \
+  BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)                               \
+  UNARY_OPERATOR_TOKEN_DECLS_BODY(t, up, uexpr)
+
 BINARY_UNARY_OPERATOR_TOKEN_DECLS(Plus, "+", 13, 11, Unnegate, Add);
 BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
 
 #define BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(t, s, bp, bexpr)                  \
-  t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow                                      \
-  {                                                                            \
-    return Token::Flag::BinaryOperator | Token::Flag::CompoundList;            \
-  }                                                                            \
-  String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
-  u8 t::left_precedence() const wontthrow { return bp; }                       \
-  Expression *t::construct_binary_expression(                                  \
-      const Expression *lhs, const Expression *rhs) const throws               \
-  {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                              \
-    return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
-  }
+  OPERATOR_TOKEN_DECLS(                                                        \
+      t, s, Token::Flag::BinaryOperator | Token::Flag::CompoundList)           \
+  BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)
 
 #define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
-  t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow                                      \
-  {                                                                            \
-    return Token::Flag::BinaryOperator;                                        \
-  }                                                                            \
-  String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
-  u8 t::left_precedence() const wontthrow { return bp; }                       \
-  Expression *t::construct_binary_expression(                                  \
-      const Expression *lhs, const Expression *rhs) const throws               \
-  {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                              \
-    return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
-  }
+  OPERATOR_TOKEN_DECLS(t, s, Token::Flag::BinaryOperator)                      \
+  BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)
 
 BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(DoublePipe, "||", 4, LogicalOr);
 BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(Ampersand, "&", 7, BinaryAnd);
@@ -593,21 +576,8 @@ BINARY_OPERATOR_TOKEN_DECLS(DoubleEquals, "==", 3, Equal);
 BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
 
 #define UNARY_OPERATOR_TOKEN_DECLS(t, s, up, uexpr)                            \
-  t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow                                      \
-  {                                                                            \
-    return Token::Flag::UnaryOperator;                                         \
-  }                                                                            \
-  String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }    \
-  u8 t::unary_precedence() const wontthrow { return up; }                      \
-  Expression *t::construct_unary_expression(const Expression *rhs)             \
-      const throws                                                             \
-  {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                              \
-    return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
-  }
+  OPERATOR_TOKEN_DECLS(t, s, Token::Flag::UnaryOperator)                       \
+  UNARY_OPERATOR_TOKEN_DECLS_BODY(t, up, uexpr)
 
 UNARY_OPERATOR_TOKEN_DECLS(ExclamationMark, "!", 13, LogicalNot);
 UNARY_OPERATOR_TOKEN_DECLS(Tilde, "~", 13, BinaryComplement);

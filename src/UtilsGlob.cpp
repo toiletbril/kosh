@@ -33,6 +33,35 @@ struct extglob_alternative
   usize mask_offset;
 };
 
+class ExtglobAlternatives
+{
+public:
+  fn push(extglob_alternative alternative) throws -> void
+  {
+    if (m_inline_count < countof(m_inline)) {
+      m_inline[m_inline_count++] = alternative;
+      return;
+    }
+    m_overflow.push(alternative);
+  }
+
+  pure fn count() const wontthrow -> usize
+  {
+    return m_inline_count + m_overflow.count();
+  }
+
+  pure fn get_at(usize index) const wontthrow -> const extglob_alternative &
+  {
+    if (index < m_inline_count) return m_inline[index];
+    return m_overflow[index - m_inline_count];
+  }
+
+private:
+  extglob_alternative m_inline[8]{};
+  usize m_inline_count{0};
+  ArrayList<extglob_alternative> m_overflow{heap_allocator()};
+};
+
 hot fn extglob_active(const Bitset &mask, usize index) wontthrow -> bool
 {
   return index < mask.count() ? mask[index] : true;
@@ -74,7 +103,7 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
 /* Match min_reps or more repetitions of one of the alternatives against the
    front of str, then the suffix against the rest. The min drops to zero after
    the first repetition, so a + needs one and a * needs none. */
-fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
+fn extglob_match_repetition(const ExtglobAlternatives &alternatives,
                             StringView suffix, usize suffix_offset,
                             StringView str, const Bitset &mask,
                             usize min_reps) throws -> bool
@@ -82,7 +111,10 @@ fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
   if (min_reps == 0 && extglob_full_match(suffix, str, mask, suffix_offset)) {
     return true;
   }
-  for (let const &alternative : alternatives) {
+  for (usize alternative_index = 0; alternative_index < alternatives.count();
+       alternative_index++)
+  {
+    let const &alternative = alternatives.get_at(alternative_index);
     for (usize length = 1; length <= str.count(); length++) {
       if (!extglob_full_match(alternative.pattern,
                               str.substring_of_length(0, length), mask,
@@ -115,7 +147,7 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
       const StringView suffix = glob.substring(close + 1);
       const usize suffix_offset = mask_offset + close + 1;
 
-      let alternatives = ArrayList<extglob_alternative>{heap_allocator()};
+      let alternatives = ExtglobAlternatives{};
       usize depth = 0;
       usize start = 0;
       for (usize i = 0; i <= content.count(); i++) {
@@ -140,7 +172,10 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
                                         str, mask, 1);
       case '?':
       case '@':
-        for (let const &alternative : alternatives) {
+        for (usize alternative_index = 0;
+             alternative_index < alternatives.count(); alternative_index++)
+        {
+          let const &alternative = alternatives.get_at(alternative_index);
           for (usize length = head == '?' ? 0 : 1; length <= str.count();
                length++)
           {
@@ -161,7 +196,10 @@ fn extglob_full_match(StringView glob, StringView str, const Bitset &mask,
            match, then the suffix matches the rest. */
         for (usize length = 0; length <= str.count(); length++) {
           bool has_matching_alternative = false;
-          for (let const &alternative : alternatives) {
+          for (usize alternative_index = 0;
+               alternative_index < alternatives.count(); alternative_index++)
+          {
+            let const &alternative = alternatives.get_at(alternative_index);
             if (extglob_full_match(alternative.pattern,
                                    str.substring_of_length(0, length), mask,
                                    alternative.mask_offset))
@@ -281,8 +319,9 @@ pure fn smart_case_prefix_matches(StringView candidate,
   return true;
 }
 
-fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
-                usize mask_offset, bool extglob) throws -> bool
+hot flatten fn glob_matches(StringView glob, StringView str,
+                            const Bitset &glob_active, usize mask_offset,
+                            bool extglob) throws -> bool
 {
   /* The extended-glob grammar needs backtracking over alternatives and
      repetition, so it runs in a separate recursive matcher. It is taken only

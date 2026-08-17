@@ -83,6 +83,24 @@ fn Path::push_component(StringView component) throws -> Path &
   return *this;
 }
 
+pure fn Path::next_component(usize &position) const wontthrow -> component
+{
+  return next_component(m_text.view(), position);
+}
+
+pure fn Path::next_component(StringView path, usize &position) wontthrow
+    -> component
+{
+  while (position < path.length && os::is_directory_separator(path[position]))
+    position++;
+  let const start = position;
+  while (position < path.length && !os::is_directory_separator(path[position]))
+    position++;
+
+  return component{path.substring_of_length(start, position - start), start,
+                   position};
+}
+
 fn Path::with_extension(StringView new_extension) const throws -> Path
 {
   let const current_extension = extension();
@@ -110,15 +128,8 @@ cold fn Path::normalized() const throws -> Path
   let components = ArrayList<StringView>{heap_allocator()};
   usize i = root_length;
   while (i < m_text.count()) {
-    if (os::is_directory_separator(m_text[i])) {
-      i++;
-      continue;
-    }
-    let const component_start = i;
-    while (i < m_text.count() && !os::is_directory_separator(m_text[i]))
-      i++;
-    let const component =
-        m_text.substring_of_length(component_start, i - component_start);
+    let const component = next_component(i).text;
+    if (component.is_empty()) break;
     if (component == StringView{"."}) continue;
     if (component == StringView{".."}) {
       /* A relative path keeps a leading .. because it cannot climb past its own
@@ -159,23 +170,14 @@ cold fn Path::first_unavailable_component() const throws
   usize position = root_length;
   let has_dot_component = false;
   while (position < m_text.count()) {
-    while (position < m_text.count() &&
-           os::is_directory_separator(m_text[position]))
-      position++;
-    if (position >= m_text.count()) break;
-
-    const usize component_start = position;
-    while (position < m_text.count() &&
-           !os::is_directory_separator(m_text[position]))
-      position++;
-
-    let const component =
-        m_text.substring_of_length(component_start, position - component_start);
-    if (component == StringView{"."} || component == StringView{".."}) {
+    let const component = next_component(position);
+    if (component.text.is_empty()) break;
+    if (component.text == StringView{"."} || component.text == StringView{".."})
+    {
       has_dot_component = true;
     }
 
-    let const prefix = Path{m_text.substring_of_length(0, position)};
+    let const prefix = Path{m_text.substring_of_length(0, component.end)};
     let is_available = false;
     let is_directory = false;
     if (has_dot_component) {
@@ -188,23 +190,19 @@ cold fn Path::first_unavailable_component() const throws
     }
     if (!is_available || !is_directory) {
       usize remaining_component_count = 0;
-      usize remaining_position = position;
+      usize remaining_position = component.end;
       while (remaining_position < m_text.count()) {
-        while (remaining_position < m_text.count() &&
-               os::is_directory_separator(m_text[remaining_position]))
-          remaining_position++;
-        if (remaining_position >= m_text.count()) break;
+        let const remaining_component = next_component(remaining_position);
+        if (remaining_component.text.is_empty()) break;
         remaining_component_count++;
-        while (remaining_position < m_text.count() &&
-               !os::is_directory_separator(m_text[remaining_position]))
-          remaining_position++;
       }
       let const component_count =
           component_index + remaining_component_count + 1;
       if (!is_available)
-        return unavailable_path_component{
-            component_start, position, component_index, component_count, false};
-      return unavailable_path_component{component_start, position,
+        return unavailable_path_component{component.start, component.end,
+                                          component_index, component_count,
+                                          false};
+      return unavailable_path_component{component.start, component.end,
                                         component_index, component_count, true};
     }
     component_index++;

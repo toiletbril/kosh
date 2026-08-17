@@ -25,10 +25,7 @@ fn name_matches_glob(StringView glob, StringView filename,
   /* The glob arrives already lowered from the caller, so only the per-entry
      filename is lowered here. Lowering preserves length, so the active mask
      stays aligned. */
-  let lowered_name = String{allocator};
-  lowered_name.reserve(filename.length);
-  for (usize i = 0; i < filename.length; i++)
-    lowered_name += utils::ascii_to_lower(filename[i]);
+  let const lowered_name = filename.to_lower_ascii(allocator);
 
   return utils::glob_matches(glob, lowered_name.view(), glob_active,
                              mask_offset, extglob);
@@ -104,11 +101,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
   let const is_extglob_enabled = extglob_enabled();
 
   let lowered_glob = String{scratch};
-  if (nocaseglob_is_on) {
-    lowered_glob.reserve(glob.length);
-    for (usize i = 0; i < glob.length; i++)
-      lowered_glob += utils::ascii_to_lower(glob[i]);
-  }
+  if (nocaseglob_is_on) lowered_glob = glob.to_lower_ascii(scratch);
   let const match_glob = nocaseglob_is_on ? lowered_glob.view() : glob;
 
   for (let const &entry : *entries) {
@@ -488,7 +481,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
 }
 
 hot fn EvalContext::expand_path(glob_field field,
-                                SourceLocation location) throws
+                                const SourceLocation &location) throws
     -> ArrayList<String>
 {
   let const scratch = scratch_allocator();

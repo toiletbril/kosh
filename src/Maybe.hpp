@@ -99,7 +99,12 @@ public:
     return taken_value;
   }
 
-  mustuse fn value_or(T fallback) const throws -> T
+  mustuse fn value_or(const T &fallback) const throws -> T
+  {
+    return m_has_value ? value() : fallback;
+  }
+
+  mustuse fn value_or(T &&fallback) const throws -> T
   {
     return m_has_value ? value() : steal(fallback);
   }

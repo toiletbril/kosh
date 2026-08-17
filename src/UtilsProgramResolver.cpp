@@ -250,7 +250,8 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
   if (has_status && status.has_file_identity) {
     let const identity_key =
         directory_identity_key(status.device_id, status.file_id);
-    if (let const *position = DIR_LISTING_IDENTITIES.find(identity_key.view()))
+    if (let const *position = DIR_LISTING_IDENTITIES.find(identity_key.view());
+        position != nullptr)
       physical_position = *position;
   }
 
@@ -942,7 +943,7 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
 hot fn ProgramResolver::search(StringView program_name, SearchMode search_mode,
                                Requirement requirement,
                                CachePolicy cache_policy,
-                               Maybe<StringView> path_override) throws
+                               const Maybe<StringView> &path_override) throws
     -> ArrayList<Path>
 {
   if (os::has_directory_separator(program_name)) {

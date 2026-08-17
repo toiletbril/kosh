@@ -20,7 +20,7 @@ namespace koshka {
 
 namespace koshkit {
 
-enum class count_origin
+enum class count_origin : u8
 {
   FromEnd,
   FromStart

@@ -22,7 +22,7 @@ namespace expressions {
 
 ConditionalCommand::ConditionalCommand(SourceLocation location,
                                        ArrayList<conditional_element> elements)
-    : CompoundCommand(location), m_elements(steal(elements))
+    : CompoundCommand(steal(location)), m_elements(steal(elements))
 {}
 
 ConditionalCommand::~ConditionalCommand() = default;
@@ -103,7 +103,7 @@ conditional_operator_view(const conditional_element &element) wontthrow
 
   if (!element.is_bare_unquoted || element.word == nullptr) return None;
 
-  let const view = element.word->raw_view();
+  let view = element.word->raw_view();
   if (!view.has_value() || !is_conditional_binary_operator(*view)) {
     return None;
   }
@@ -475,7 +475,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 }
 
 ArithmeticCommand::ArithmeticCommand(SourceLocation location, String expression)
-    : CompoundCommand(location), m_expression(steal(expression))
+    : CompoundCommand(steal(location)), m_expression(steal(expression))
 {}
 
 ArithmeticCommand::~ArithmeticCommand() = default;
@@ -572,7 +572,7 @@ fn SelectLoop::analyze(AnalysisContext &actx,
 CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
                              String condition, String step,
                              const Expression *body)
-    : CompoundCommand(location), m_init(steal(init)),
+    : CompoundCommand(steal(location)), m_init(steal(init)),
       m_condition(steal(condition)), m_step(steal(step)), m_body(body)
 {}
 
@@ -590,63 +590,6 @@ cold fn CStyleForLoop::to_ast_string(usize layer) const throws -> String
   return pad + "[" + to_string() + " \"" + m_init.view() + ";" +
          m_condition.view() + ";" + m_step.view() + "\"]\n" + pad +
          EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
-}
-
-ArrayAssignCommand::ArrayAssignCommand(SourceLocation location, StringView name,
-                                       ArrayList<const Token *> elements,
-                                       bool is_append)
-    : Command(location), m_name(name), m_elements(steal(elements)),
-      m_is_append(is_append)
-{}
-
-ArrayAssignCommand::~ArrayAssignCommand() = default;
-
-cold fn ArrayAssignCommand::to_string() const throws -> String
-{
-  return "ArrayAssignCommand";
-}
-
-cold fn ArrayAssignCommand::to_ast_string(usize layer) const throws -> String
-{
-  return indent_for_layer(layer) + "[" + to_string() + " " + m_name.view() +
-         (m_is_append ? "+=(...)" : "=(...)") + "]";
-}
-
-fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  cxt.set_current_location(source_location());
-
-  ArrayList<String> values =
-      cxt.process_args(m_elements, argument_lifetime::Persistent,
-                       argument_context::ArrayLiteral);
-  LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
-      m_name.c_str());
-  cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);
-  let ran_substitution = false;
-  for (let const element : m_elements) {
-    if (element->kind() != Token::Kind::Word) continue;
-    if (static_cast<const tokens::WordToken *>(element)
-            ->word()
-            .runs_substitution())
-    {
-      ran_substitution = true;
-      break;
-    }
-  }
-  if (!ran_substitution) cxt.set_last_exit_status(0);
-  cxt.publish_single_pipe_status(cxt.last_exit_status());
-  return cxt.last_exit_status();
-}
-
-fn ArrayAssignCommand::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const throws -> void
-{
-  unused(is_unconditional);
-
-  /* The name is no longer a scalar literal, so the constant table forgets it.
-   */
-  actx.add_array_valued_name(m_name.view());
-  actx.constant_variables.erase(m_name.view());
 }
 
 fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -751,7 +694,7 @@ fn CStyleForLoop::as_cstyle_for_loop() const wontthrow -> const CStyleForLoop *
 }
 
 Subshell::Subshell(SourceLocation location, const Expression *body)
-    : CompoundCommand(location), m_body(body)
+    : CompoundCommand(steal(location)), m_body(body)
 {}
 
 Subshell::~Subshell() = default;
@@ -993,7 +936,7 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
 FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
                                        const Expression *body)
-    : CompoundCommand(location), m_name(name), m_body(body)
+    : CompoundCommand(steal(location)), m_name(name), m_body(body)
 {}
 
 /* The body is owned by the function table, not this node. */
@@ -1124,7 +1067,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
 RedirectedCommand::RedirectedCommand(SourceLocation location,
                                      const Command *child,
                                      ArrayList<Redirection> &&redirections)
-    : Command(location), m_child(child)
+    : Command(steal(location)), m_child(child)
 {
   m_redirections = steal(redirections);
 }
@@ -1260,7 +1203,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 }
 
 UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
-    : Expression(location), m_rhs(rhs)
+    : Expression(steal(location)), m_rhs(rhs)
 {}
 
 UnaryExpression::~UnaryExpression() = default;
@@ -1279,7 +1222,7 @@ cold fn UnaryExpression::to_ast_string(usize layer) const throws -> String
 
 BinaryExpression::BinaryExpression(SourceLocation location,
                                    const Expression *lhs, const Expression *rhs)
-    : Expression(location), m_lhs(lhs), m_rhs(rhs)
+    : Expression(steal(location)), m_lhs(lhs), m_rhs(rhs)
 {}
 
 BinaryExpression::~BinaryExpression() = default;
@@ -1300,7 +1243,7 @@ cold fn BinaryExpression::to_ast_string(usize layer) const throws -> String
 }
 
 ConstantNumber::ConstantNumber(SourceLocation location, i64 value)
-    : Expression(location), m_value(value)
+    : Expression(steal(location)), m_value(value)
 {}
 
 ConstantNumber::~ConstantNumber() = default;
@@ -1326,7 +1269,7 @@ cold fn ConstantNumber::to_string() const throws -> String
 }
 
 ConstantString::ConstantString(SourceLocation location, StringView value)
-    : Expression(location), m_value(value)
+    : Expression(steal(location)), m_value(value)
 {}
 
 ConstantString::~ConstantString() = default;
@@ -1350,7 +1293,7 @@ cold fn ConstantString::to_string() const throws -> String { return m_value; }
 
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \
   e::e(SourceLocation location, const Expression *rhs)                         \
-      : UnaryExpression(location, rhs)                                         \
+      : UnaryExpression(steal(location), rhs)                                  \
   {}                                                                           \
   String e::to_string() const throws { return #expr; }                         \
   i64 e::evaluate_impl(EvalContext &cxt) const throws                          \
@@ -1366,7 +1309,7 @@ UNARY_EXPRESSION_DECLS(BinaryComplement, ~);
 BinaryDummyExpression::BinaryDummyExpression(SourceLocation location,
                                              const Expression *lhs,
                                              const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
+    : BinaryExpression(steal(location), lhs, rhs)
 {}
 
 cold fn BinaryDummyExpression::to_string() const throws -> String
@@ -1382,7 +1325,7 @@ fn BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 Divide::Divide(SourceLocation location, const Expression *lhs,
                const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
+    : BinaryExpression(steal(location), lhs, rhs)
 {}
 
 cold fn Divide::to_string() const throws -> String { return "/"; }
@@ -1401,7 +1344,7 @@ fn Divide::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 #define BINARY_EXPRESSION_DECLS(e, expr)                                       \
   e::e(SourceLocation location, const Expression *lhs, const Expression *rhs)  \
-      : BinaryExpression(location, lhs, rhs)                                   \
+      : BinaryExpression(steal(location), lhs, rhs)                            \
   {}                                                                           \
   String e::to_string() const throws { return #expr; }                         \
   i64 e::evaluate_impl(EvalContext &cxt) const throws                          \

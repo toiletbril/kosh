@@ -91,20 +91,12 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
                                       do_token->source_location(), detail};
   }
 
-  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
-  reject_empty_loop_body(body);
-  Token *done_token = m_lexer.next_shell_token();
-  ASSERT(done_token != nullptr);
-  if (done_token->kind() != Token::Kind::Done) {
-    throw_unterminated(location, "Unterminated loop", m_lexer.source(), "done",
-                       done_token->source_location());
-  }
+  let const parsed_body = parse_loop_body(location, "Unterminated loop");
 
-  let loop_node =
-      m_lexer.arena().create<WhileLoop>(location, condition, body, is_until);
-  let const done_location = done_token->source_location();
-  loop_node->set_source_end_position(done_location.position +
-                                     done_location.length);
+  let loop_node = m_lexer.arena().create<WhileLoop>(location, condition,
+                                                    parsed_body.body, is_until);
+  loop_node->set_source_end_position(parsed_body.done_location.position +
+                                     parsed_body.done_location.length);
   return loop_node;
 }
 
@@ -289,21 +281,13 @@ hot fn Parser::parse_for() throws -> Command *
                                       do_token->source_location(), detail};
   }
 
-  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
-  reject_empty_loop_body(body);
-  Token *done_token = m_lexer.next_shell_token();
-  ASSERT(done_token != nullptr);
-  if (done_token->kind() != Token::Kind::Done) {
-    throw_unterminated(location, "Unterminated for loop", m_lexer.source(),
-                       "done", done_token->source_location());
-  }
+  let const parsed_body = parse_loop_body(location, "Unterminated for loop");
 
   let loop_node = m_lexer.arena().create<ForLoop>(
       location, name_token->source_location(), variable_name.view(),
-      steal(words), has_in_clause, body);
-  let const done_location = done_token->source_location();
-  loop_node->set_source_end_position(done_location.position +
-                                     done_location.length);
+      steal(words), has_in_clause, parsed_body.body);
+  loop_node->set_source_end_position(parsed_body.done_location.position +
+                                     parsed_body.done_location.length);
   return loop_node;
 }
 
@@ -345,17 +329,11 @@ hot fn Parser::parse_select() throws -> Command *
                                       "expected 'do'"};
   }
 
-  Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
-  reject_empty_loop_body(body);
-  Token *done_token = m_lexer.next_shell_token();
-  ASSERT(done_token != nullptr);
-  if (done_token->kind() != Token::Kind::Done) {
-    throw_unterminated(location, "Unterminated select loop", m_lexer.source(),
-                       "done", done_token->source_location());
-  }
+  let const parsed_body = parse_loop_body(location, "Unterminated select loop");
 
   return m_lexer.arena().create<SelectLoop>(location, variable_name.view(),
-                                            steal(words), has_in_clause, body);
+                                            steal(words), has_in_clause,
+                                            parsed_body.body);
 }
 
 /* In a case word or pattern a NAME=VALUE token is a plain word, rebuilt into a
@@ -381,7 +359,7 @@ static fn word_token_from_raw(BumpArena &arena, StringView text,
   let word = Word{};
   word.segments.push(
       WordSegment{WordSegment::Kind::UnquotedText, String{text}, false});
-  return arena.create<tokens::WordToken>(location, steal(word));
+  return arena.create<tokens::WordToken>(steal(location), steal(word));
 }
 
 hot fn Parser::parse_case() throws -> Command *
@@ -601,7 +579,7 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
   ASSERT(second->kind() == Token::Kind::LeftParen);
 
   let const body_start_position = second->source_location().position + 1;
-  usize body_end_position = body_start_position;
+  usize body_end_position;
   usize depth = 0;
   loop
   {
@@ -658,8 +636,8 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 
 /* A bash C-style for, for (( init; cond; step )); do BODY; done. The header is
    split on its two top-level semicolons into three arithmetic clauses. */
-hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
-    -> Command *
+hot fn Parser::parse_c_style_for(const SourceLocation &location,
+                                 Token *open) throws -> Command *
 {
   LOG(Debug, "parsing a c-style for header at byte %zu", location.position);
 
@@ -687,12 +665,11 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
   }
 
   let const allocator = bump_allocator(m_lexer.arena());
-  let const init =
-      String{allocator, header.substring_of_length(0, separators[0])};
-  let const condition = String{
+  let init = String{allocator, header.substring_of_length(0, separators[0])};
+  let condition = String{
       allocator, header.substring_of_length(separators[0] + 1,
                                             separators[1] - separators[0] - 1)};
-  let const step = String{allocator, header.substring(separators[1] + 1)};
+  let step = String{allocator, header.substring(separators[1] + 1)};
 
   skip_semicolons_and_newlines();
 
@@ -704,17 +681,26 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
                                       "expected 'do'"};
   }
 
+  let const parsed_body = parse_loop_body(location, "Unterminated for loop");
+
+  return m_lexer.arena().create<expressions::CStyleForLoop>(
+      location, steal(init), steal(condition), steal(step), parsed_body.body);
+}
+
+fn Parser::parse_loop_body(const SourceLocation &location,
+                           StringView unterminated_message) throws
+    -> parsed_loop_body
+{
   Expression *body = parse_command_list(token_kind_mask(Token::Kind::Done));
   reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
-    throw_unterminated(location, "Unterminated for loop", m_lexer.source(),
-                       "done", done_token->source_location());
+    throw_unterminated(location, unterminated_message, m_lexer.source(), "done",
+                       done_token->source_location());
   }
 
-  return m_lexer.arena().create<expressions::CStyleForLoop>(
-      location, steal(init), steal(condition), steal(step), body);
+  return parsed_loop_body{body, done_token->source_location()};
 }
 
 hot fn Parser::parse_conditional_command() throws -> Command *
@@ -731,8 +717,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
      redirection. The operand words are kept for the evaluator to expand without
      field splitting. */
   let elements = ArrayList<conditional_element>{heap_allocator()};
-  usize close_end_position =
-      open->source_location().position + open->source_location().length;
+  usize close_end_position;
   loop
   {
     Token *t = m_lexer.next_shell_token();

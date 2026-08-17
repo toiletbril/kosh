@@ -83,6 +83,33 @@ inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
   return result;
 }
 
+template <class GetName>
+fn append_name_columns(String &output, usize name_count,
+                       GetName do_get_name) throws -> void
+{
+  usize longest_length = 0;
+  for (usize index = 0; index < name_count; index++) {
+    let const name = do_get_name(index);
+    if (name.length > longest_length) longest_length = name.length;
+  }
+  let const column_width = longest_length + 2;
+  let const column_count = column_width >= 78 ? usize{1} : 78 / column_width;
+
+  for (usize index = 0; index < name_count; index++) {
+    let const name = do_get_name(index);
+    if (index % column_count == 0) output += "  ";
+    output += name;
+    let const is_last_in_row =
+        index % column_count == column_count - 1 || index + 1 == name_count;
+    if (is_last_in_row) {
+      output += "\n";
+    } else {
+      for (usize pad = name.length; pad < column_width; pad++)
+        output += " ";
+    }
+  }
+}
+
 fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
 
 /* Returns false when the value has no control byte, so the caller applies its
@@ -111,6 +138,15 @@ pure alwaysinline fn ascii_to_lower(char ch) wontthrow -> char
   return ch;
 }
 
+pure alwaysinline fn hex_digit_value(char byte) wontthrow -> Maybe<u8>
+{
+  if (byte >= '0' && byte <= '9') return static_cast<u8>(byte - '0');
+  if (byte >= 'a' && byte <= 'f') return static_cast<u8>(byte - 'a' + 10);
+  if (byte >= 'A' && byte <= 'F') return static_cast<u8>(byte - 'A' + 10);
+
+  return None;
+}
+
 pure fn token_has_uppercase(StringView token) wontthrow -> bool;
 pure fn smart_case_prefix_matches(StringView candidate,
                                   StringView prefix) wontthrow -> bool;
@@ -123,8 +159,11 @@ struct decoded_codepoint
 
 pure fn decode_utf8(StringView source, usize position,
                     u32 invalid_codepoint) wontthrow -> decoded_codepoint;
+fn append_utf8(String &output, u32 codepoint) throws -> void;
 
-fn split_lines(StringView text) throws -> ArrayList<StringView>;
+fn split_lines(StringView text, Allocator allocator = heap_allocator(),
+               bool should_keep_newlines = false) throws
+    -> ArrayList<StringView>;
 
 fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String;
 
@@ -147,6 +186,8 @@ fn parse_timeout_seconds_to_nanos(StringView text) throws -> ErrorOr<i64>;
 /* The caller's buffer must hold at least twenty-one bytes. */
 fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
     -> StringView;
+fn uint_to_text_into(u64 value, char *buffer, usize buffer_size) wontthrow
+    -> StringView;
 
 fn format_minutes_seconds(double seconds) throws -> String;
 
@@ -163,6 +204,10 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
 fn format_time_report_custom(StringView format, double real_seconds,
                              double user_seconds, double system_seconds) throws
     -> String;
+fn format_time_report(bool should_use_posix_format,
+                      const Maybe<String> &time_format, double real_seconds,
+                      double user_seconds, double system_seconds,
+                      u64 peak_rss_bytes) throws -> String;
 
 /* The zero-based line number the byte at position falls on. The newline table
    is cached on the source pointer and length, holding one source at a time. */

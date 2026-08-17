@@ -141,6 +141,7 @@ public:
     if (m_capacity == 0) return;
     let const found = probe(key, hash_bytes(key)).found;
     if (found == NO_INDEX) return;
+    ASSERT(m_slots != nullptr);
     let &slot = m_slots[found];
     slot.key = String{m_allocator};
     slot.value = Value{};
@@ -225,6 +226,7 @@ private:
       rehash(16);
     }
 
+    ASSERT(m_slots != nullptr);
     let result = probe(key, hash);
     ASSERT(result.insertion != NO_INDEX);
     if (result.found != NO_INDEX ||

@@ -47,7 +47,7 @@ fn EvalContext::function_definition_info_of(StringView name) const wontthrow
 }
 
 pure fn EvalContext::resolve_render_source(
-    SourceLocation location) const wontthrow -> resolved_render_source
+    const SourceLocation &location) const wontthrow -> resolved_render_source
 {
   let resolved_source = resolved_render_source{};
   resolved_source.text = m_current_source;
@@ -100,7 +100,8 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 fn EvalContext::find_function(StringView name) const wontthrow
     -> const Expression *
 {
-  if (let const *const *slot = m_functions.find(name)) return *slot;
+  if (let const *const *slot = m_functions.find(name); slot != nullptr)
+    return *slot;
   return nullptr;
 }
 
@@ -227,7 +228,7 @@ fn EvalContext::run_pending_traps() throws -> void
   {
     let const name = os::signal_name_from_number(number);
     if (!name.has_value()) continue;
-    if (let const *action = m_traps.find(name->view()))
+    if (let const *action = m_traps.find(name->view()); action != nullptr)
       if (action->count() > 0) {
         LOG(Info, "running the trap action for signal '%s'", name->c_str());
         run_source(action->view(), "the " + *name + " trap");
@@ -251,7 +252,8 @@ cold fn EvalContext::run_exit_trap() throws -> void
      is dropped before the action evaluates. */
   os::INTERRUPT_REQUESTED = 0;
 
-  if (let const *action = m_traps.find(StringView{"EXIT", 4}))
+  if (let const *action = m_traps.find(StringView{"EXIT", 4});
+      action != nullptr)
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action at shell exit");
       run_source(action->view(), "the EXIT trap");
@@ -260,7 +262,8 @@ cold fn EvalContext::run_exit_trap() throws -> void
 
 fn EvalContext::has_exit_trap() const wontthrow -> bool
 {
-  if (let const *action = m_traps.find(StringView{"EXIT", 4}))
+  if (let const *action = m_traps.find(StringView{"EXIT", 4});
+      action != nullptr)
     return action->count() > 0;
   return false;
 }
@@ -275,7 +278,8 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
   /* Only an EXIT action the subshell itself set is present, since the boundary
      cleared the inherited one on entry. It runs before restore_state returns
      the parent's traps. */
-  if (let const *action = m_traps.find(StringView{"EXIT", 4}))
+  if (let const *action = m_traps.find(StringView{"EXIT", 4});
+      action != nullptr)
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action the subshell set at its end");
       run_source(action->view(), "the EXIT trap");

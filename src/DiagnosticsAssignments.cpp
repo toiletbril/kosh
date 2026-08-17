@@ -808,7 +808,7 @@ static pure fn segment_holds_literal_pattern(StringView text) wontthrow -> bool
 }
 
 fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
-                         SourceLocation location) throws
+                         const SourceLocation &location) throws
     -> assignment_value_shape
 {
   assignment_value_shape shape{};
@@ -1065,7 +1065,7 @@ fn check_case_pattern_shape(AnalysisContext &actx, const case_lint_input &input,
                             const Word &pattern_word,
                             StringView pattern_literal,
                             StringView pattern_source,
-                            SourceLocation pattern_location,
+                            const SourceLocation &pattern_location,
                             case_arm_tally &tally) throws -> void
 {
   let const is_bare_pattern =

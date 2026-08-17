@@ -20,6 +20,21 @@
 
 namespace koshka {
 
+fn EvalContext::next_random_u32() const wontthrow -> u32
+{
+  if (m_random_state == 0) {
+    m_random_state = os::realtime_microseconds() ^
+                     (static_cast<u64>(os::get_shell_process_id()) << 32) ^
+                     static_cast<u64>(m_shell_start_time);
+    if (m_random_state == 0) m_random_state = 0x9e3779b97f4a7c15ULL;
+  }
+
+  m_random_state ^= m_random_state >> 12;
+  m_random_state ^= m_random_state << 25;
+  m_random_state ^= m_random_state >> 27;
+  return static_cast<u32>((m_random_state * 0x2545f4914f6cdd1dULL) >> 32);
+}
+
 struct ansi_color_variable
 {
   const char *name;
@@ -343,12 +358,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       if (let const info = BASH_DYNAMIC.find(name); info.has_value()) {
         switch (info->kind) {
         case dynamic_var::RANDOM:
-          if (!m_random_seeded) {
-            std::srand(static_cast<unsigned>(m_shell_start_time) ^
-                       static_cast<unsigned>(os::get_shell_process_id()));
-            m_random_seeded = true;
-          }
-          return String::from(static_cast<usize>(std::rand() % 32768),
+          return String::from(static_cast<usize>(next_random_u32() & 0x7fff),
                               heap_allocator());
         case dynamic_var::SECONDS:
           return String::from(static_cast<i64>(std::time(nullptr)) -
@@ -358,10 +368,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return enabled_shell_option_names(*this);
         }
         case dynamic_var::SRANDOM: {
-          let const value = static_cast<u32>(os::realtime_microseconds()) ^
-                            (static_cast<u32>(std::rand()) << 16) ^
-                            static_cast<u32>(std::rand());
-          return String::from(static_cast<i64>(value), heap_allocator());
+          return String::from(static_cast<i64>(next_random_u32()),
+                              heap_allocator());
         }
         case dynamic_var::EPOCHSECONDS:
           return String::from(static_cast<i64>(std::time(nullptr)),

@@ -57,7 +57,7 @@ pure fn is_special_parameter_char(char ch) wontthrow -> bool;
 class Lexer
 {
 public:
-  Lexer(String source, BumpArena &arena,
+  Lexer(StringView source, BumpArena &arena,
         bool should_collect_debug_words = false,
         Maybe<StringView> filename = None,
         mimic_mood mood = mimic_mood::Default);
@@ -120,7 +120,7 @@ protected:
     return SourceLocation{position, length, m_filename};
   }
 
-  String m_source{heap_allocator()};
+  StringView m_source;
   BumpArena *m_arena;
   /* The name of the file this source came from, or None for an unnamed source
      such as an interactive line. It travels into every SourceLocation the lexer

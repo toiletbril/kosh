@@ -110,18 +110,29 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
                            "Give a non-zero step, e.g. `seq 1 2 10`"};
 
   let output = String{cxt.scratch_allocator()};
+  static constexpr usize OUTPUT_BUFFER_LENGTH = 64 * 1024;
+  output.reserve(OUTPUT_BUFFER_LENGTH);
+  char value_text[21];
   /* The step is guarded against signed overflow before it is taken, so a range
      reaching the integer bounds ends rather than wrapping. */
   if (increment > 0)
     for (i64 value = first; value <= last; value += increment) {
-      output += String::from(value, cxt.scratch_allocator()).view();
+      output += utils::int_to_text_into(value, value_text, sizeof(value_text));
       output += '\n';
+      if (output.count() >= OUTPUT_BUFFER_LENGTH) {
+        ec.print_to_stdout(output);
+        output.clear();
+      }
       if (value > INT64_MAX - increment) break;
     }
   else
     for (i64 value = first; value >= last; value += increment) {
-      output += String::from(value, cxt.scratch_allocator()).view();
+      output += utils::int_to_text_into(value, value_text, sizeof(value_text));
       output += '\n';
+      if (output.count() >= OUTPUT_BUFFER_LENGTH) {
+        ec.print_to_stdout(output);
+        output.clear();
+      }
       if (value < INT64_MIN - increment) break;
     }
 

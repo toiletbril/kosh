@@ -218,7 +218,7 @@ fn propagated_literal_word_value(const Token *token,
                                  const AnalysisContext &actx) throws
     -> Maybe<String>
 {
-  let const literal = literal_word_value(token);
+  let literal = literal_word_value(token);
   if (literal.has_value()) return literal;
 
   let const name = plain_variable_reference_name(token);
@@ -456,9 +456,9 @@ pure fn arithmetic_has_side_effect(StringView text) wontthrow -> bool
   return false;
 }
 
-fn fold_constant_arithmetic_in_word(const Word &word, AnalysisContext &actx,
-                                    SourceLocation fallback_location) throws
-    -> bool
+fn fold_constant_arithmetic_in_word(
+    const Word &word, AnalysisContext &actx,
+    const SourceLocation &fallback_location) throws -> bool
 {
   bool did_fold = false;
   for (let const &segment : word.segments) {
@@ -507,12 +507,16 @@ fn fold_constant_arithmetic_in_token(const Token *token,
 fn rule_fold_constant_arithmetic(const Expression *node,
                                  AnalysisContext &actx) throws -> bool
 {
-  if (const expressions::AssignCommand *assign = node->as_assign_command()) {
+  if (const expressions::AssignCommand *assign = node->as_assign_command();
+      assign != nullptr)
+  {
     return fold_constant_arithmetic_in_word(assign->assignment()->value_word(),
                                             actx, node->source_location());
   }
 
-  if (const expressions::SimpleCommand *cmd = node->as_simple_command()) {
+  if (const expressions::SimpleCommand *cmd = node->as_simple_command();
+      cmd != nullptr)
+  {
     bool did_fold = false;
     for (let const t : cmd->args()) {
       if (fold_constant_arithmetic_in_token(t, actx)) did_fold = true;

@@ -22,10 +22,9 @@ Unlink::Unlink() = default;
 
 pure fn Unlink::kind() const wontthrow -> Utility::Kind { return Kind::Unlink; }
 
-fn Unlink::execute(const ExecContext &ec, EvalContext &cxt,
-                   const ArrayList<String> &args,
-                   const ArrayList<SourceLocation> &arg_locations) const throws
-    -> i32
+cold fn Unlink::execute(
+    const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };

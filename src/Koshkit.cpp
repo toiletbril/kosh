@@ -241,26 +241,6 @@ fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow
   return input_descriptor{*descriptor, true};
 }
 
-fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
-{
-  ArrayList<StringView> lines{heap_allocator()};
-  usize line_count = 1;
-  for (usize i = 0; i < text.length; i++)
-    if (text[i] == '\n') line_count++;
-  lines.reserve(line_count);
-
-  usize start = 0;
-  for (usize i = 0; i < text.length; i++) {
-    if (text[i] == '\n') {
-      lines.push(text.substring_of_length(start, i - start + 1));
-      start = i + 1;
-    }
-  }
-  if (start < text.length)
-    lines.push(text.substring_of_length(start, text.length - start));
-  return lines;
-}
-
 fn source_list_from_operands(const ArrayList<String> &operands,
                              Allocator allocator,
                              usize first_operand_index) throws
@@ -366,8 +346,9 @@ fn parse_koshkit_duration_seconds(StringView text, StringView utility_name,
   return value * multiplier;
 }
 
-fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
-                             StringView message) throws -> void
+cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
+                                           EvalContext &cxt,
+                                           StringView message) throws -> void
 {
   /* The fallback line covers the rare case with no source to caret against. */
   const ErrorWithLocation located{ec.source_location(), message};
@@ -377,8 +358,9 @@ fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
     print_error(String{message} + "\n");
 }
 
-fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
-                             StringView message, StringView note) throws -> void
+cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
+                                           EvalContext &cxt, StringView message,
+                                           StringView note) throws -> void
 {
   report_soft_koshkit_error(ec, cxt, message);
   show_message(Note{String{note}}.to_string());

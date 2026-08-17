@@ -293,8 +293,6 @@ struct input_descriptor
 fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow
     -> Maybe<input_descriptor>;
 
-fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
-
 /* The operand list becomes a source list, a single "-" stdin source when no
    operand is given, otherwise each operand as a view. */
 fn source_list_from_operands(const ArrayList<String> &operands,
@@ -315,12 +313,13 @@ fn format_signal_list() throws -> String;
 /* Report a utility error that must not abort the run, with a located caret in
    the default and posix moods and a soft line in the bash mood. A fatal error
    throws an Error instead. */
-fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
-                             StringView message) throws -> void;
+cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
+                                           EvalContext &cxt,
+                                           StringView message) throws -> void;
 
-fn report_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
-                             StringView message, StringView note) throws
-    -> void;
+cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
+                                           EvalContext &cxt, StringView message,
+                                           StringView note) throws -> void;
 
 } /* namespace koshkit */
 

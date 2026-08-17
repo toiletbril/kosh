@@ -19,21 +19,10 @@ pure fn fold_leading_digits(StringView text, u32 radix) wontthrow -> u64
   u64 magnitude = 0;
 
   for (usize length = 0; length < text.length; length++) {
-    let const current_byte = text[length];
-    u32 digit;
-    if (current_byte >= '0' && current_byte <= '9') {
-      digit = static_cast<u32>(current_byte - '0');
-    } else if (current_byte >= 'a' && current_byte <= 'f') {
-      digit = static_cast<u32>(current_byte - 'a') + 10;
-    } else if (current_byte >= 'A' && current_byte <= 'F') {
-      digit = static_cast<u32>(current_byte - 'A') + 10;
-    } else {
-      break;
-    }
+    let const digit = utils::hex_digit_value(text[length]);
+    if (!digit.has_value() || *digit >= radix) break;
 
-    if (digit >= radix) break;
-
-    magnitude = magnitude * radix + digit;
+    magnitude = magnitude * radix + *digit;
   }
 
   return magnitude;
@@ -149,7 +138,7 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
 
 static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 
-static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64;
+hot static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64;
 
 /* A recursive-descent evaluator for $((...)) following C operator precedence.
  */
@@ -274,7 +263,7 @@ public:
     return source.substring_of_length(name_start, pos - name_start);
   }
 
-  fn write_variable(StringView name, i64 value) throws -> void
+  fn write_variable(StringView name, i64 value) const throws -> void
   {
     if (m_is_skipping) return;
     ASSERT(context != nullptr);
@@ -334,7 +323,7 @@ public:
     return read_variable_value(target.name);
   }
 
-  fn write_lvalue(const lvalue &target, i64 value) throws -> void
+  fn write_lvalue(const lvalue &target, i64 value) const throws -> void
   {
     if (m_is_skipping) return;
     if (target.subscript.has_value()) {
@@ -879,7 +868,7 @@ static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
 
 /* Uses the same helpers as the char parser's ladder so the fast path and the
    full parser agree. */
-static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
+hot static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
 {
   switch (kind) {
   case 'P':
@@ -968,7 +957,7 @@ public:
            toks[ti].text == s;
   }
 
-  fn parse_operand() throws -> i64
+  hot flatten fn parse_operand() throws -> i64
   {
     depth++;
     defer { depth--; };

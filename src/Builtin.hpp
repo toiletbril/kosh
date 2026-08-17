@@ -80,9 +80,6 @@ public:
     Enable,
   };
 
-  void set_fds(os::descriptor in, os::descriptor out) throws;
-  void print_to_stdout(StringView s) const throws;
-
   pure virtual Kind kind() const wontthrow = 0;
   virtual i32 execute(ExecContext &ec, EvalContext &cxt) const throws = 0;
 

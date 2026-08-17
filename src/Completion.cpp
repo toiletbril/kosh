@@ -84,11 +84,7 @@ static pure fn candidate_match(StringView token, StringView candidate,
 class TieredCandidates
 {
 public:
-  TieredCandidates()
-      : by_tier{ArrayList<String>{completion_allocator()},
-                ArrayList<String>{completion_allocator()},
-                ArrayList<String>{completion_allocator()}}
-  {}
+  TieredCandidates() = default;
 
   fn add(match_tier tier, String candidate) throws -> void
   {
@@ -108,7 +104,10 @@ public:
   }
 
 private:
-  ArrayList<String> by_tier[MATCH_TIER_COUNT];
+  ArrayList<String> by_tier[MATCH_TIER_COUNT]{
+      ArrayList<String>{completion_allocator()},
+      ArrayList<String>{completion_allocator()},
+      ArrayList<String>{completion_allocator()}};
 };
 
 class BorrowedStringSet
@@ -403,6 +402,64 @@ enum class path_text_mode : u8
   Literal,
 };
 
+struct filesystem_listing
+{
+  path_token parts;
+  Path directory;
+  const ArrayList<Path::directory_child> *entries;
+};
+
+struct eligible_filesystem_entry
+{
+  bool is_directory;
+};
+
+static fn open_filesystem_listing(const utils::decoded_shell_word &decoded_word,
+                                  const Path &base_directory,
+                                  EvalContext &context) throws
+    -> Maybe<filesystem_listing>
+{
+  let const parts = split_path_token(decoded_word.text.view());
+  let directory =
+      resolve_listing_directory(parts.directory_part, base_directory, context,
+                                decoded_word.is_leading_tilde_active,
+                                decoded_word.is_leading_variable_active,
+                                decoded_word.leading_variable_expansion_end);
+  let const entries = utils::read_directory_cached(
+      directory, utils::directory_validation::Cached,
+      utils::directory_listing_order::FoldedName);
+  if (entries == nullptr) return None;
+
+  return filesystem_listing{parts, steal(directory), entries};
+}
+
+static fn check_filesystem_entry(const filesystem_listing &listing,
+                                 const Path::directory_child &entry,
+                                 filesystem_entry_filter filter) throws
+    -> Maybe<eligible_filesystem_entry>
+{
+  let const name = entry.name.view();
+  if (!name.is_empty() && name[0] == '.' &&
+      (listing.parts.basename_part.is_empty() ||
+       listing.parts.basename_part[0] != '.'))
+  {
+    return None;
+  }
+
+  let const is_directory =
+      utils::directory_entry_kind(listing.directory, entry) ==
+      Path::entry_kind::Directory;
+  if (filter == filesystem_entry_filter::DirectoriesOnly && !is_directory)
+    return None;
+  if (filter == filesystem_entry_filter::RunnableOrDirectories &&
+      !is_directory && !entry_is_executable(listing.directory, name))
+  {
+    return None;
+  }
+
+  return eligible_filesystem_entry{is_directory};
+}
+
 static fn build_filesystem_candidate(
     StringView directory_part, StringView raw_directory_part, StringView name,
     bool is_directory, path_text_mode text_mode, StringView raw_token,
@@ -473,7 +530,9 @@ collect_filesystem_matches(StringView token,
                            Collector &collector) throws -> void
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
-  let parts = split_path_token(decoded_word.text.view());
+  let listing = open_filesystem_listing(decoded_word, base_directory, context);
+  if (!listing.has_value()) return;
+  let const &parts = listing->parts;
   let raw_directory_part = parts.directory_part;
   if (!inside_quote && decoded_word.raw_directory_end > 0) {
     raw_directory_part =
@@ -487,17 +546,6 @@ collect_filesystem_matches(StringView token,
       static_cast<int>(parts.directory_part.length), parts.directory_part.data,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
-  let listing_directory =
-      resolve_listing_directory(parts.directory_part, base_directory, context,
-                                decoded_word.is_leading_tilde_active,
-                                decoded_word.is_leading_variable_active,
-                                decoded_word.leading_variable_expansion_end);
-
-  let const entries = utils::read_directory_cached(
-      listing_directory, utils::directory_validation::Cached,
-      utils::directory_listing_order::FoldedName);
-  if (entries == nullptr) return;
-
   let const do_add_entry = [&](const Path::directory_child &entry) throws {
     let const name = entry.name.view();
     collector.note_source_candidate();
@@ -505,57 +553,38 @@ collect_filesystem_matches(StringView token,
         candidate_match(parts.basename_part, name, is_case_sensitive);
     if (!tier.has_value()) return;
 
-    let const is_directory =
-        utils::directory_entry_kind(listing_directory, entry) ==
-        Path::entry_kind::Directory;
-    if (filter == filesystem_entry_filter::DirectoriesOnly && !is_directory) {
-      return;
-    }
-
-    /* A command-position path completes only runnable files, so a plain data
-       file is dropped, while directories stay for navigation. */
-    if (filter == filesystem_entry_filter::RunnableOrDirectories &&
-        !is_directory && !entry_is_executable(listing_directory, name))
-    {
-      return;
-    }
-
-    /* A dotfile stays hidden unless the user typed a leading dot. */
-    if (name.length > 0 && name[0] == '.' &&
-        (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
-    {
-      return;
-    }
+    let const eligible_entry = check_filesystem_entry(*listing, entry, filter);
+    if (!eligible_entry.has_value()) return;
 
     let candidate = build_filesystem_candidate(
-        parts.directory_part, raw_directory_part, name, is_directory, text_mode,
-        token, decoded_word);
+        parts.directory_part, raw_directory_part, name,
+        eligible_entry->is_directory, text_mode, token, decoded_word);
     collector.add(candidate.view(), *tier);
   };
 
-  let entry_position =
-      utils::directory_entry_name_lower_bound(*entries, parts.basename_part);
-  while (entry_position < entries->count() &&
-         utils::directory_entry_name_has_casefold_prefix(
-             (*entries)[entry_position].name.view(), parts.basename_part))
+  let entry_position = utils::directory_entry_name_lower_bound(
+      *listing->entries, parts.basename_part);
+  while (
+      entry_position < listing->entries->count() &&
+      utils::directory_entry_name_has_casefold_prefix(
+          (*listing->entries)[entry_position].name.view(), parts.basename_part))
   {
-    do_add_entry((*entries)[entry_position]);
+    do_add_entry((*listing->entries)[entry_position]);
     entry_position++;
   }
   if (collector.has_prefix() || !collector.allows_fuzzy_fallback()) return;
 
-  for (let const &entry : *entries)
+  for (let const &entry : *listing->entries)
     if (!utils::directory_entry_name_has_casefold_prefix(entry.name.view(),
                                                          parts.basename_part))
       do_add_entry(entry);
 }
 
-static fn
-complete_filesystem(StringView token, const Path &base_directory,
-                    path_text_mode text_mode, filesystem_entry_filter filter,
-                    EvalContext &context,
-                    const utils::decoded_shell_word *decoded = nullptr) throws
-    -> ArrayList<String>
+template <typename Collector>
+static fn complete_filesystem_with(
+    StringView token, const Path &base_directory, path_text_mode text_mode,
+    filesystem_entry_filter filter, EvalContext &context,
+    const utils::decoded_shell_word *decoded = nullptr) throws -> Collector
 {
   let decoded_storage = utils::decoded_shell_word{completion_allocator()};
   if (decoded == nullptr) {
@@ -565,10 +594,22 @@ complete_filesystem(StringView token, const Path &base_directory,
       decoded_storage = utils::decode_shell_word(token, completion_allocator());
     decoded = &decoded_storage;
   }
-  let collector = CommandListCollector{};
+  let collector = Collector{};
   collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
                              context, collector);
 
+  return collector;
+}
+
+static fn
+complete_filesystem(StringView token, const Path &base_directory,
+                    path_text_mode text_mode, filesystem_entry_filter filter,
+                    EvalContext &context,
+                    const utils::decoded_shell_word *decoded = nullptr) throws
+    -> ArrayList<String>
+{
+  let collector = complete_filesystem_with<CommandListCollector>(
+      token, base_directory, text_mode, filter, context, decoded);
   return collector.take();
 }
 
@@ -586,19 +627,8 @@ static fn complete_filesystem_prefix(
     const utils::decoded_shell_word *decoded = nullptr) throws
     -> GhostPrefixCollector
 {
-  let decoded_storage = utils::decoded_shell_word{completion_allocator()};
-  if (decoded == nullptr) {
-    if (text_mode == path_text_mode::Literal)
-      decoded_storage.text.append(token);
-    else
-      decoded_storage = utils::decode_shell_word(token, completion_allocator());
-    decoded = &decoded_storage;
-  }
-  let collector = GhostPrefixCollector{};
-  collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
-                             context, collector);
-
-  return collector;
+  return complete_filesystem_with<GhostPrefixCollector>(
+      token, base_directory, text_mode, filter, context, decoded);
 }
 
 /* Only the trailing component is globbed. */
@@ -608,21 +638,12 @@ static fn complete_glob(StringView token, const Path &base_directory,
     -> ArrayList<String>
 {
   let candidates = ArrayList<String>{completion_allocator()};
-  let parts = split_path_token(decoded_word.text.view());
+  let listing = open_filesystem_listing(decoded_word, base_directory, context);
+  if (!listing.has_value()) return candidates;
+  let const &parts = listing->parts;
 
   LOG(Debug, "resolving glob token '%.*s'", static_cast<int>(token.length),
       token.data);
-
-  let listing_directory =
-      resolve_listing_directory(parts.directory_part, base_directory, context,
-                                decoded_word.is_leading_tilde_active,
-                                decoded_word.is_leading_variable_active,
-                                decoded_word.leading_variable_expansion_end);
-
-  let const entries = utils::read_directory_cached(
-      listing_directory, utils::directory_validation::Cached,
-      utils::directory_listing_order::FoldedName);
-  if (entries == nullptr) return candidates;
 
   let glob_active = Bitset{completion_allocator()};
   glob_active.reserve(parts.basename_part.length);
@@ -632,27 +653,17 @@ static fn complete_glob(StringView token, const Path &base_directory,
   let normalized_pattern = String{completion_allocator()};
   let match_pattern = parts.basename_part;
   if (!os::FILESYSTEM_IS_CASE_SENSITIVE) {
-    normalized_pattern.reserve(match_pattern.length);
-    for (usize position = 0; position < match_pattern.length; position++)
-      normalized_pattern.push(utils::ascii_to_lower(match_pattern[position]));
+    normalized_pattern.assign_lowercase_ascii(match_pattern);
     match_pattern = normalized_pattern.view();
   }
   let candidate_name = String{completion_allocator()};
 
-  for (let const &entry : *entries) {
+  for (let const &entry : *listing->entries) {
     let const name = entry.name.view();
-    if (!name.is_empty() && name[0] == '.' &&
-        (parts.basename_part.is_empty() || parts.basename_part[0] != '.'))
-    {
-      continue;
-    }
 
     let match_name = name;
     if (!os::FILESYSTEM_IS_CASE_SENSITIVE) {
-      candidate_name.clear();
-      candidate_name.reserve(match_name.length);
-      for (usize position = 0; position < match_name.length; position++)
-        candidate_name.push(utils::ascii_to_lower(match_name[position]));
+      candidate_name.assign_lowercase_ascii(match_name);
       match_name = candidate_name.view();
     }
 
@@ -660,26 +671,17 @@ static fn complete_glob(StringView token, const Path &base_directory,
       continue;
     }
 
-    let const is_directory =
-        utils::directory_entry_kind(listing_directory, entry) ==
-        Path::entry_kind::Directory;
-    if (filter == filesystem_entry_filter::DirectoriesOnly && !is_directory) {
-      continue;
-    }
-
-    if (filter == filesystem_entry_filter::RunnableOrDirectories &&
-        !is_directory && !entry_is_executable(listing_directory, name))
-    {
-      continue;
-    }
+    let const eligible_entry = check_filesystem_entry(*listing, entry, filter);
+    if (!eligible_entry.has_value()) continue;
 
     let const raw_directory_part =
         decoded_word.raw_directory_end > 0
             ? token.substring_of_length(0, decoded_word.raw_directory_end)
             : parts.directory_part;
     let candidate = build_filesystem_candidate(
-        parts.directory_part, raw_directory_part, name, is_directory,
-        path_text_mode::ShellSyntax, token, decoded_word);
+        parts.directory_part, raw_directory_part, name,
+        eligible_entry->is_directory, path_text_mode::ShellSyntax, token,
+        decoded_word);
 
     candidates.push(steal(candidate));
   }
@@ -811,15 +813,8 @@ static fn split_hint_extensions(StringView hint_list,
     -> ArrayList<StringView>
 {
   let extensions = ArrayList<StringView>{allocator};
-  usize start = 0;
-  while (start < hint_list.length) {
-    usize end = start;
-    while (end < hint_list.length && hint_list[end] != ' ')
-      end++;
-    if (end > start)
-      extensions.push(hint_list.substring_of_length(start, end - start));
-    start = end + 1;
-  }
+  hint_list.for_each_ascii_whitespace_word(
+      [&](StringView extension) throws { extensions.push(extension); });
   return extensions;
 }
 
@@ -989,10 +984,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   if (token_is_variable(open_quote_content_token) && is_leading_variable_active)
   {
     candidates = complete_variable(open_quote_content_token, context);
-    if (has_open_quote) {
-      token_start += decoded_token.open_quote_content_start;
-      token_end = cursor;
-    }
+    if (has_open_quote) token_start += decoded_token.open_quote_content_start;
   } else if (token_is_tilde_user_prefix(stage_token) &&
              is_leading_tilde_active && !is_posix_completion)
   {

@@ -26,10 +26,9 @@ Nproc::Nproc() = default;
 
 pure fn Nproc::kind() const wontthrow -> Utility::Kind { return Kind::Nproc; }
 
-fn Nproc::execute(const ExecContext &ec, EvalContext &cxt,
-                  const ArrayList<String> &args,
-                  const ArrayList<SourceLocation> &arg_locations) const throws
-    -> i32
+cold fn Nproc::execute(
+    const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let const operands =

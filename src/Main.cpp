@@ -232,28 +232,19 @@ fn main(int argc, char **argv) -> int
     static constexpr koshka::StaticStringSet IGNORED_KOSH_FLAGS{
         IGNORED_KOSH_FLAG_KEYS};
     let const view = kosh_flags->view();
-    usize token_start = 0;
     /* A -c in KOSH_FLAGS is dropped with the command word after it, since the
        variable must not splice a command into every invocation. */
     bool should_skip_next_command_word = false;
 
-    for (usize i = 0; i <= view.length; i++) {
-      let const c = i < view.length ? view[i] : ' ';
-      if (c == ' ' || c == '\t' || c == '\n') {
-        if (i > token_start) {
-          let const token =
-              view.substring_of_length(token_start, i - token_start);
-          if (should_skip_next_command_word) {
-            should_skip_next_command_word = false;
-          } else if (token == "-c") {
-            should_skip_next_command_word = true;
-          } else if (!IGNORED_KOSH_FLAGS.contains(token)) {
-            kosh_flags_tokens.push(koshka::String{token});
-          }
-        }
-        token_start = i + 1;
+    view.for_each_ascii_whitespace_word([&](koshka::StringView token) throws {
+      if (should_skip_next_command_word) {
+        should_skip_next_command_word = false;
+      } else if (token == "-c") {
+        should_skip_next_command_word = true;
+      } else if (!IGNORED_KOSH_FLAGS.contains(token)) {
+        kosh_flags_tokens.push(koshka::String{token});
       }
-    }
+    });
   }
 
   if (!kosh_flags_tokens.is_empty() && argc > 0) {

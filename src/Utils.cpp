@@ -108,8 +108,8 @@ static fn shell_word_expansion_end(StringView word,
   return expansion_start;
 }
 
-fn decode_shell_word(StringView word, Allocator allocator,
-                     bool should_map_source) throws -> decoded_shell_word
+hot fn decode_shell_word(StringView word, Allocator allocator,
+                         bool should_map_source) throws -> decoded_shell_word
 {
   let decoded = decoded_shell_word{allocator};
   if (should_map_source) decoded.raw_positions.push(0);
@@ -286,34 +286,28 @@ static fn split_path_source_components(StringView path,
   if (position == 0 && os::path_is_drive_relative(path)) position = 2;
   usize opaque_range_position = 0;
   while (position < path.length) {
-    while (position < path.length && os::is_directory_separator(path[position]))
-      position++;
-    if (position >= path.length) break;
-
-    let const start = position;
-    while (position < path.length &&
-           !os::is_directory_separator(path[position]))
-      position++;
+    let const component = Path::next_component(path, position);
+    if (component.text.is_empty()) break;
 
     let is_opaque = false;
     if (decoded != nullptr) {
       while (opaque_range_position < decoded->opaque_ranges.count()) {
         let const &range = decoded->opaque_ranges[opaque_range_position];
         let const range_end = range.decoded_start + range.decoded_length;
-        if (range_end <= start) {
+        if (range_end <= component.start) {
           opaque_range_position++;
           continue;
         }
-        if (range.decoded_start < position && range_end > start) {
+        if (range.decoded_start < component.end && range_end > component.start)
+        {
           is_opaque = true;
         }
         break;
       }
     }
 
-    components.push(
-        path_source_component{path.substring_of_length(start, position - start),
-                              start, position, is_opaque});
+    components.push(path_source_component{component.text, component.start,
+                                          component.end, is_opaque});
   }
   return components;
 }
@@ -552,22 +546,41 @@ pure fn decode_utf8(StringView source, usize position,
   return {value, length};
 }
 
-fn split_lines(StringView text) throws -> ArrayList<StringView>
+fn append_utf8(String &output, u32 codepoint) throws -> void
 {
-  let lines = ArrayList<StringView>{heap_allocator()};
-  usize line_count = 1;
-  for (usize i = 0; i < text.length; i++)
-    if (text[i] == '\n') line_count++;
-  lines.reserve(line_count);
-
-  usize line_start_position = 0;
-  for (usize i = 0; i <= text.length; i++) {
-    if (i != text.length && text[i] != '\n') continue;
-
-    lines.push(
-        text.substring_of_length(line_start_position, i - line_start_position));
-    line_start_position = i + 1;
+  if (codepoint <= 0x7f) {
+    output.push(static_cast<char>(codepoint));
+  } else if (codepoint <= 0x7ff) {
+    output.push(static_cast<char>(0xc0 | (codepoint >> 6)));
+    output.push(static_cast<char>(0x80 | (codepoint & 0x3f)));
+  } else if (codepoint <= 0xffff) {
+    output.push(static_cast<char>(0xe0 | (codepoint >> 12)));
+    output.push(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+    output.push(static_cast<char>(0x80 | (codepoint & 0x3f)));
+  } else {
+    output.push(static_cast<char>(0xf0 | (codepoint >> 18)));
+    output.push(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
+    output.push(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+    output.push(static_cast<char>(0x80 | (codepoint & 0x3f)));
   }
+}
+
+fn split_lines(StringView text, Allocator allocator,
+               bool should_keep_newlines) throws -> ArrayList<StringView>
+{
+  let lines = ArrayList<StringView>{allocator};
+  usize position = 0;
+  while (position < text.length) {
+    let const line_start = position;
+    let line = text.next_line(position);
+    if (should_keep_newlines && position > line_start + line.length)
+      line = text.substring_of_length(line_start, line.length + 1);
+    lines.push(line);
+  }
+  if (!should_keep_newlines &&
+      (text.is_empty() || text[text.length - 1] == '\n'))
+    lines.push(text.substring(text.length));
+
   return lines;
 }
 
@@ -576,7 +589,7 @@ fn format_unix_timestamp(i64 unix_time, const char *format) throws -> String
   return os::format_local_time(format, unix_time);
 }
 
-pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
+hot pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
 {
   static constexpr PackedStringKey RESERVED_WORD_KEYS[] = {
       SSK("!"),    SSK("{"),    SSK("}"),     SSK("case"),

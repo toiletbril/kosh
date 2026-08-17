@@ -153,8 +153,7 @@ cold static fn get_context_pointing_to(
     expanded_line.reserve(context.count() + tab_count * (TAB_WIDTH - 1));
     for (usize i = 0; i < context.count(); i++) {
       if (context[i] == '\t') {
-        for (usize tab_column = 0; tab_column < TAB_WIDTH; tab_column++)
-          expanded_line += ' ';
+        expanded_line.append_repeated(' ', TAB_WIDTH);
       } else {
         expanded_line += context[i];
       }
@@ -369,7 +368,7 @@ WarningWithDetails::WarningWithDetails(StringView message, StringView note)
 {}
 
 InterruptErrorWithLocation::InterruptErrorWithLocation(SourceLocation location)
-    : ErrorWithLocation(location, "Interrupted")
+    : ErrorWithLocation(steal(location), "Interrupted")
 {}
 
 cold fn Warning::get_severity() const wontthrow -> error_severity

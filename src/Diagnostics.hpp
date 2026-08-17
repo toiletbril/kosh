@@ -388,7 +388,7 @@ struct heredoc_terminator_miss
   heredoc_miss_kind kind;
 };
 
-enum class shellcheck_selector_kind
+enum class shellcheck_selector_kind : u8
 {
   All,       /* every catalog entry is disabled */
   Slug,      /* one native or numbered variant is named */
@@ -448,7 +448,7 @@ pure fn shellcheck_selector_disables(const shellcheck_selector &selector,
                                      StringView source,
                                      diagnostic_id id) wontthrow -> bool;
 
-enum class command_name_id : u16
+enum class command_name_id : u8
 {
   Unknown,
   Alias,

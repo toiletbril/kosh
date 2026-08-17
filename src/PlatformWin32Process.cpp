@@ -17,22 +17,6 @@ volatile sig_atomic_t SIGNAL_PENDING = 0;
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
 
-static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
-{
-  return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;
-}
-
-fn take_pending_signal() wontthrow -> i32
-{
-  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
-    if (PENDING_SIGNAL_FLAGS[number] != 0) {
-      PENDING_SIGNAL_FLAGS[number] = 0;
-      return number;
-    }
-  }
-  return 0;
-}
-
 } /* namespace os */
 } /* namespace koshka */
 
@@ -1318,7 +1302,7 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 }
 
 fn run_measured(const ArrayList<String> &argv, measured_output output,
-                Maybe<descriptor> inherited_handle) throws
+                const Maybe<descriptor> &inherited_handle) throws
     -> Maybe<measured_result>
 {
   let const suppress_output = output == measured_output::Suppress;

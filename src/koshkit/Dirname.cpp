@@ -67,12 +67,10 @@ pure fn Dirname::kind() const wontthrow -> Utility::Kind
   return Kind::Dirname;
 }
 
-fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
-                    const ArrayList<String> &args,
-                    const ArrayList<SourceLocation> &arg_locations) const throws
-    -> i32
+cold fn Dirname::execute(
+    const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 

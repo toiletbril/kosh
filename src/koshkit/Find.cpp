@@ -146,7 +146,6 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(cxt);
   unused(arg_locations);
 
   ArrayList<StringView> roots{cxt.scratch_allocator()};

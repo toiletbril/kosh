@@ -111,6 +111,12 @@ public:
         byte = static_cast<char>(byte - 'A' + 'a');
     }
   }
+  hot fn assign_lowercase_ascii(StringView text) throws -> void
+  {
+    clear();
+    append(text);
+    lowercase_ascii();
+  }
   hot fn normalize_crlf_line_endings() wontthrow -> void
   {
     usize output_position = 0;
@@ -183,6 +189,19 @@ public:
     m_data[m_length] = '\0';
   }
 
+  hot fn append_repeated(char byte, usize repeat_count) throws -> void
+  {
+    if (repeat_count == 0) return;
+    if (repeat_count > SIZE_MAX - m_length) [[unlikely]]
+      throw std::bad_alloc{};
+    let const new_length = m_length + repeat_count;
+    if (new_length >= m_capacity) reserve(new_length);
+    std::memset(m_data + m_length, static_cast<unsigned char>(byte),
+                repeat_count);
+    m_length = new_length;
+    m_data[m_length] = '\0';
+  }
+
   cold fn reserve(usize needed) throws -> void;
 
   mustuse pure fn data() const wontthrow -> const char * { return c_str(); }
@@ -194,6 +213,7 @@ public:
   }
 
   fn pop_back() wontthrow -> void;
+  fn strip_trailing_newlines() wontthrow -> void;
 
   hot flatten fn append(char c) throws -> void { push(c); }
   fn operator+=(StringView other) throws->String &;

@@ -32,8 +32,8 @@ fn indent_for_layer(usize layer) throws -> String
 }
 
 Expression::Expression(SourceLocation location)
-    : m_location(location),
-      m_source_end_position(location.position + location.length)
+    : m_location(steal(location)),
+      m_source_end_position(m_location.position + m_location.length)
 {}
 
 pure fn Expression::source_location() const wontthrow -> SourceLocation
@@ -76,25 +76,13 @@ fn Expression::operator delete(opaque *pointer) wontthrow -> void
   ::operator delete(pointer);
 }
 
-fn AnalysisContext::warn(diagnostic_id id, SourceLocation location,
+fn AnalysisContext::warn(diagnostic_id id, const SourceLocation &location,
                          StringView message, StringView suggestion,
                          diagnostic_tier tier,
-                         Maybe<SourceLocation> related_location,
+                         const Maybe<SourceLocation> &related_location,
                          StringView related_message) throws -> void
 {
-  if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
-    return;
-  }
-
-  u8 required_level = 0;
-  switch (tier) {
-  case diagnostic_tier::Strict: required_level = 1; break;
-  case diagnostic_tier::Lenient: required_level = 2; break;
-  case diagnostic_tier::Annoying: required_level = 3; break;
-  }
-  if (!is_default_mood && warning_level < required_level) {
-    return;
-  }
+  if (!should_report(tier)) return;
 
   reported_warning_count++;
 
@@ -236,8 +224,12 @@ cold fn AnalysisContext::print_optimizer_summary() const throws -> void
 
 pure fn AnalysisContext::should_report(diagnostic_id id) const wontthrow -> bool
 {
-  let const tier = get_diagnostic_definition(id).tier;
+  return should_report(get_diagnostic_definition(id).tier);
+}
 
+pure fn AnalysisContext::should_report(diagnostic_tier tier) const wontthrow
+    -> bool
+{
   if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
     return false;
   }
@@ -254,9 +246,9 @@ pure fn AnalysisContext::should_report(diagnostic_id id) const wontthrow -> bool
 }
 
 fn AnalysisContext::report_diagnostic(
-    diagnostic_id id, SourceLocation location,
+    diagnostic_id id, const SourceLocation &location,
     std::initializer_list<StringView> arguments,
-    Maybe<SourceLocation> related_location) throws -> bool
+    const Maybe<SourceLocation> &related_location) throws -> bool
 {
   if (!should_report(id)) return false;
   if (is_diagnostic_suppressed(id, location)) return false;
@@ -302,29 +294,19 @@ cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
 }
 
 cold fn AnalysisContext::print_script_backtrace_if_rooted(
-    SourceLocation location) const throws -> void
+    const SourceLocation &location) const throws -> void
 {
   if (eval_context != nullptr) eval_context->print_source_backtrace(location);
 }
 
-fn AnalysisContext::fail(diagnostic_id id, SourceLocation location,
+fn AnalysisContext::fail(diagnostic_id id, const SourceLocation &location,
                          StringView message, StringView suggestion,
                          diagnostic_tier tier,
-                         Maybe<SourceLocation> related_location,
+                         const Maybe<SourceLocation> &related_location,
                          StringView related_message) throws -> void
 {
-  if (tier == diagnostic_tier::Annoying && !should_emit_annoying_diagnostics) {
-    return;
-  }
-
-  u8 required_level = 0;
-  switch (tier) {
-  case diagnostic_tier::Strict: required_level = 1; break;
-  case diagnostic_tier::Lenient: required_level = 2; break;
-  case diagnostic_tier::Annoying: required_level = 3; break;
-  }
   if (!is_default_mood) {
-    if (warning_level >= required_level)
+    if (should_report(tier))
       warn(id, location, message, suggestion, tier, related_location,
            related_message);
     return;
@@ -386,7 +368,7 @@ fn AnalysisContext::fail(diagnostic_id id, SourceLocation location,
 }
 
 pure fn AnalysisContext::is_diagnostic_suppressed(
-    diagnostic_id id, SourceLocation location) const wontthrow -> bool
+    diagnostic_id id, const SourceLocation &location) const wontthrow -> bool
 {
   if (shellcheck_suppressions == nullptr) return false;
 
@@ -405,9 +387,8 @@ pure fn AnalysisContext::is_diagnostic_suppressed(
   return false;
 }
 
-fn AnalysisContext::note_variable_assignment(StringView name,
-                                             SourceLocation location) throws
-    -> void
+fn AnalysisContext::note_variable_assignment(
+    StringView name, const SourceLocation &location) throws -> void
 {
   if (name.is_empty()) return;
 
@@ -426,7 +407,7 @@ fn AnalysisContext::note_variable_assignment(StringView name,
 
 /* The name an assign form ${name=value} or ${name:=value} writes back, or an
    empty view for every other expansion. */
-pure fn assign_form_target_name(StringView expansion_text) wontthrow
+static pure fn assign_form_target_name(StringView expansion_text) wontthrow
     -> StringView
 {
   let const name = expressions::operand_target_name(expansion_text);
@@ -443,7 +424,8 @@ pure fn assign_form_target_name(StringView expansion_text) wontthrow
   return name;
 }
 
-fn AnalysisContext::note_variable_read(StringView name, SourceLocation location,
+fn AnalysisContext::note_variable_read(StringView name,
+                                       const SourceLocation &location,
                                        bool is_top_level_unconditional) throws
     -> void
 {
@@ -797,8 +779,8 @@ fn analyze_followed_source(AnalysisContext &actx,
   defer { FUNCTION_ARENA = previous_function_arena; };
 
   let parser = Parser{
-      Lexer{String{contents->view()}, *AST_ARENA, false,
-            canonical_path->text().view(), actx.eval_context->mood()}
+      Lexer{contents->view(), *AST_ARENA, false, canonical_path->text().view(),
+            actx.eval_context->mood()}
   };
   parser.set_should_collect_analysis_scopes(true);
 
@@ -867,7 +849,8 @@ fn analyze_followed_source(AnalysisContext &actx,
 }
 
 fn command_resolves(
-    StringView name, SourceLocation location, const AnalysisContext &actx,
+    StringView name, const SourceLocation &location,
+    const AnalysisContext &actx,
     Maybe<utils::unavailable_path_source_component> &unavailable) throws -> bool
 {
   if (name.is_empty()) return false;
@@ -911,7 +894,7 @@ fn command_resolves(
   return was_resolved;
 }
 
-enum class bracket_scan_state
+enum class bracket_scan_state : u8
 {
   Outside,     /* no bracket expression is open */
   AfterOpen,   /* the byte after '[', where a '!' or '^' negates the class */
@@ -1078,7 +1061,8 @@ fn analyze_ast(const Expression *root, StringView source,
 namespace expressions {
 
 pure fn analysis_source_text(const AnalysisContext &actx,
-                             SourceLocation location) wontthrow -> StringView
+                             const SourceLocation &location) wontthrow
+    -> StringView
 {
   if (location.position > actx.source.length ||
       location.length > actx.source.length - location.position)
@@ -1167,7 +1151,7 @@ pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
 
 IfStatement::IfStatement(SourceLocation location, const Expression *condition,
                          const Expression *then, const Expression *otherwise)
-    : Expression(location), m_condition(condition), m_then(then),
+    : Expression(steal(location)), m_condition(condition), m_then(then),
       m_otherwise(otherwise)
 {
   ASSERT(condition != nullptr);
@@ -1220,7 +1204,7 @@ cold fn IfStatement::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-Command::Command(SourceLocation location) : Expression(location) {}
+Command::Command(SourceLocation location) : Expression(steal(location)) {}
 
 fn Command::make_async() wontthrow -> void { m_is_async = true; }
 
@@ -1235,7 +1219,7 @@ fn Command::set_timed(bool posix_format, SourceLocation location) wontthrow
 {
   m_is_timed = true;
   m_is_time_posix_format = posix_format;
-  m_time_location = location;
+  m_time_location = steal(location);
 }
 
 pure fn Command::is_timed() const wontthrow -> bool { return m_is_timed; }
@@ -1282,7 +1266,8 @@ fn Command::append_to(usize target_fd, String &filename, bool duplicate) throws
   redirect_to(target_fd, filename, duplicate);
 }
 
-DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
+DummyExpression::DummyExpression(SourceLocation location)
+    : Expression(steal(location))
 {}
 
 fn DummyExpression::is_dummy() const wontthrow -> bool { return true; }

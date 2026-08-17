@@ -155,7 +155,8 @@ public:
     return arithmetic_internal::consume(source, pos, op);
   }
 
-  fn read_variable(StringView name, usize name_position) throws -> wide_int
+  fn read_variable(StringView name, usize name_position) const throws
+      -> wide_int
   {
     ASSERT(context != nullptr);
 
@@ -263,7 +264,8 @@ public:
 
   /* The variable binds to its right-side expression text so a later read
      re-evaluates it against the current context. */
-  fn write_variable(StringView name, StringView expression_text) throws -> void
+  fn write_variable(StringView name, StringView expression_text) const throws
+      -> void
   {
     if (m_is_skipping) return;
     ASSERT(context != nullptr);

@@ -7,6 +7,12 @@
 
 namespace koshka {
 
+struct parsed_loop_body
+{
+  Expression *body;
+  SourceLocation done_location;
+};
+
 using namespace expressions;
 
 class Parser
@@ -86,26 +92,26 @@ private:
      with a literal non-numeric word is the csh both-streams spelling while
      2>&word keeps the descriptor reading. */
   fn build_file_or_dup_redirection(
-      i32 fd, Token::Kind op_kind, SourceLocation op_location,
+      i32 fd, Token::Kind op_kind, const SourceLocation &op_location,
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out, bool fd_was_explicit,
       const Token *fd_allocation_name_token = nullptr) throws -> void;
 
   fn build_both_streams_redirection(
-      bool is_append, SourceLocation op_location,
+      bool is_append, const SourceLocation &op_location,
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
 
   mustuse fn wrap_with_stderr_to_stdout(Command *command) throws -> Command *;
 
   fn build_here_string_redirection(
-      SourceLocation op_location, Maybe<SourceLocation> &first_location,
+      const SourceLocation &op_location, Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
 
   /* Build one heredoc redirection on descriptor fd. The << operator is already
      consumed and op_location is its position. A digit prefix such as the 3 in
      3<<EOF supplies a non-zero fd. */
-  fn build_heredoc_redirection(i32 fd, SourceLocation op_location,
+  fn build_heredoc_redirection(i32 fd, const SourceLocation &op_location,
                                Maybe<SourceLocation> &first_location,
                                ArrayList<expressions::Redirection> &out) throws
       -> void;
@@ -117,7 +123,7 @@ private:
      the caller decides what the bare number means. Shared by the simple command
      parser and the trailing redirect parser. */
   mustuse fn try_parse_descriptor_prefixed_redirection(
-      const tokens::WordToken *word_token, SourceLocation word_location,
+      const tokens::WordToken *word_token, const SourceLocation &word_location,
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> bool;
 
@@ -133,6 +139,9 @@ private:
      with nothing between 'do' and 'done'. The caret points at the terminator
      the empty list stopped on. */
   fn reject_empty_loop_body(const Expression *body) throws -> void;
+  mustuse fn parse_loop_body(const SourceLocation &location,
+                             StringView unterminated_message) throws
+      -> parsed_loop_body;
 
   mustuse fn parse_if() throws -> Command *;
   mustuse fn parse_while_or_until(bool is_until) throws -> Command *;
@@ -146,15 +155,15 @@ private:
   mustuse fn parse_subshell(Token *open) throws -> Command *;
   mustuse fn capture_double_paren_body(Token *open) throws -> StringView;
   mustuse fn parse_arithmetic_command(Token *open) throws -> Command *;
-  mustuse fn parse_c_style_for(SourceLocation location, Token *open) throws
-      -> Command *;
+  mustuse fn parse_c_style_for(const SourceLocation &location,
+                               Token *open) throws -> Command *;
   mustuse fn parse_conditional_command() throws -> Command *;
   mustuse fn parse_function_definition(const Token *name_token) throws
       -> Command *;
 
   mustuse fn parse_keyword_function_definition() throws -> Command *;
 
-  mustuse fn finish_function_body(SourceLocation location,
+  mustuse fn finish_function_body(const SourceLocation &location,
                                   StringView name) throws -> Command *;
 
   /* Consume a bash array assignment group NAME=(...) or NAME+=(...) and return

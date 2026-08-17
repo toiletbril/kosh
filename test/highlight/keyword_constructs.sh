@@ -28,3 +28,10 @@ for r
 in a
 do :
 done' | grep -E "${tab}(keyword|variable)$"
+
+"$BIN" --debug-highlight-at 'cat <<EOF
+body
+EOF
+cat <<-"DONE"
+	body
+	DONE' | grep -E "${tab}(heredoc|heredoc-delimiter)$"

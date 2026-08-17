@@ -11,6 +11,17 @@
 
 namespace koshka {
 
+static fn clone_word_segments(const Word &word, Allocator allocator) throws
+    -> ArrayList<WordSegment>
+{
+  let segments = ArrayList<WordSegment>{allocator};
+  segments.reserve(word.segments.count());
+  for (let const &segment : word.segments)
+    segments.push(segment.clone(allocator));
+
+  return segments;
+}
+
 struct modifier_array_word
 {
   StringView array_name;
@@ -58,7 +69,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
       !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')
   {
-    tilde_expanded_segments = word.segments;
+    tilde_expanded_segments = clone_word_segments(word, scratch);
     expand_tilde(tilde_expanded_segments.front(),
                  tilde_expanded_segments.count() > 1, !is_posix_mode());
     segments = &tilde_expanded_segments;
@@ -104,7 +115,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
       if (!is_field_separator(byte)) {
         usize start = i;
 #pragma clang loop unroll_count(4)
-        while (i < text.length && !is_field_separator(text.data[i]))
+        while (i < text.length && !is_field_separator(text[i]))
           i++;
         do_append_run(StringView{text.data + start, i - start}, glob_active);
         continue;
@@ -113,8 +124,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
       let const was_field_started = has_current;
       usize delimiter_count = 0;
 #pragma clang loop unroll_count(4)
-      while (i < text.length && is_field_separator(text.data[i])) {
-        let const separator = text.data[i];
+      while (i < text.length && is_field_separator(text[i])) {
+        let const separator = text[i];
         if (separator != ' ' && separator != '\t' && separator != '\n') {
           delimiter_count++;
         }
@@ -179,9 +190,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
       {
         for (usize i = 0; i < m_positional_params.count(); i++) {
           if (i > 0) do_flush();
-          do_append_split_run(StringView{m_positional_params[i].data(),
-                                         m_positional_params[i].count()},
-                              true);
+          do_append_split_run(m_positional_params[i].view(), true);
         }
         break;
       }
@@ -344,27 +353,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
                 : evaluate_arithmetic(
                       offset_text,
                       do_source_location_for(offset_text, offset_location));
-        i64 start = offset < 0 ? total + offset : offset;
-        if (start < 0) start = 0;
-        if (start > total) start = total;
-        i64 end = total;
+        Maybe<i64> requested_length = None;
         if (sep < slice.length) {
           let const length_text = slice.substring(sep + 1);
           let length_location = SourceLocation{};
-          i64 length =
+          requested_length =
               length_text.is_empty()
                   ? 0
                   : evaluate_arithmetic(
                         length_text,
                         do_source_location_for(length_text, length_location));
-          if (length < 0)
-            throw Error{"Unable to take the substring because the length names "
-                        "a point before the offset"};
-          if (length > total) length = total;
-          end = start + length;
         }
-        if (end > total) end = total;
-        if (end < start) end = start;
+        let const bounds = compute_substring_bounds(
+            total, offset, requested_length, substring_subject::List);
+        let const start = bounds.start;
+        let const end = bounds.end;
 
         if (segment.is_in_double_quotes && is_star) {
           let const ifs = m_field_separators.view();
@@ -468,28 +471,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
                   : evaluate_arithmetic(
                         offset_text,
                         do_source_location_for(offset_text, offset_location));
-          i64 start = offset < 0 ? total + offset : offset;
-          if (start < 0) start = 0;
-          if (start > total) start = total;
-          i64 end = total;
+          Maybe<i64> requested_length = None;
           if (sep < slice.length) {
             let const length_text = slice.substring(sep + 1);
             let length_location = SourceLocation{};
-            i64 length =
+            requested_length =
                 length_text.is_empty()
                     ? 0
                     : evaluate_arithmetic(
                           length_text,
                           do_source_location_for(length_text, length_location));
-            if (length < 0)
-              throw Error{
-                  "Unable to take the substring because the length names "
-                  "a point before the offset"};
-            if (length > total) length = total;
-            end = start + length;
           }
-          if (end > total) end = total;
-          if (end < start) end = start;
+          let const bounds = compute_substring_bounds(
+              total, offset, requested_length, substring_subject::List);
+          let const start = bounds.start;
+          let const end = bounds.end;
 
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
@@ -756,7 +752,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     }
   }
   if (has_leading_tilde || has_colon_tilde) {
-    tilde_expanded_segments = word.segments;
+    tilde_expanded_segments = clone_word_segments(word, scratch_allocator());
     if (has_leading_tilde)
       expand_tilde(tilde_expanded_segments.front(),
                    tilde_expanded_segments.count() > 1, true);
@@ -809,7 +805,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')
   {
-    tilde_expanded_segments = word.segments;
+    tilde_expanded_segments = clone_word_segments(word, scratch_allocator());
     expand_tilde(tilde_expanded_segments.front(),
                  tilde_expanded_segments.count() > 1, !is_posix_mode());
     segments = &tilde_expanded_segments;

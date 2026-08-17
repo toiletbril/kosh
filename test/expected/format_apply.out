@@ -33,6 +33,13 @@ idempotent=yes
 printf one two three four five six seven eight nine ten eleven twelve thirteen \
   fourteen fifteen sixteen
 wrap-idempotent=yes maximum=80
+ffmpeg value value --some flag value --some flag -abced --flag as
+ffmpeg first-positional second-positional \
+       --some flag value \
+       --other flag value \
+       -abced \
+       --flag as trailing-positional-value
+option-wrap-idempotent=yes
 echo {a,b}
 items=(one two)
 for ((i=0; i<2; i++))

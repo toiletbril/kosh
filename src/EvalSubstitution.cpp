@@ -13,9 +13,8 @@
 
 namespace koshka {
 
-fn EvalContext::render_contained_substitution_error(std::exception_ptr error,
-                                                    StringView source) throws
-    -> void
+fn EvalContext::render_contained_substitution_error(
+    const std::exception_ptr &error, StringView source) throws -> void
 {
   try {
     std::rethrow_exception(error);
@@ -50,7 +49,7 @@ struct command_substitution_drain_context
   os::descriptor read_fd;
 };
 
-fn drain_command_substitution_pipe(opaque *raw_context) wontthrow -> void
+static fn drain_command_substitution_pipe(opaque *raw_context) wontthrow -> void
 {
   let drain = static_cast<command_substitution_drain_context *>(raw_context);
   loop
@@ -93,7 +92,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   if (AST_ARENA == nullptr) return None;
   let const ast_mark = AST_ARENA->mark();
   defer { AST_ARENA->release(ast_mark); };
-  let lexer = Lexer{String{source.substring_of_length(i, source.length - i)},
+  let lexer = Lexer{source.substring_of_length(i, source.length - i),
                     *AST_ARENA, false, None, mood()};
   Token *name = lexer.next_shell_token();
   if (name == nullptr || name->kind() != Token::Kind::Word) {
@@ -117,8 +116,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
     return String{heap_allocator()};
   }
   let result = steal(*content);
-  while (!result.is_empty() && result.back() == '\n')
-    result.pop_back();
+  result.strip_trailing_newlines();
   return result;
 }
 
@@ -154,7 +152,7 @@ fn EvalContext::capture_command_substitution(
   };
 
   let parser = Parser{
-      Lexer{String{normalized_source.view()}, *AST_ARENA, false, filename,
+      Lexer{normalized_source.view(), *AST_ARENA, false, steal(filename),
             mood()}
   };
   const Expression *ast;
@@ -199,8 +197,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
     if (did_push_source_frame) m_source_frames.pop_back();
   };
   let parser = Parser{
-      Lexer{String{substitution_source.view()}, *AST_ARENA, false, None,
-            mood()}
+      Lexer{substitution_source.view(), *AST_ARENA, false, None, mood()}
   };
   const Expression *ast;
   try {
@@ -384,7 +381,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
         "command substitution ast cache miss for generation %zu, reparsing",
         generation);
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *cache_arena, false, None, mood()}
+        Lexer{segment.text.view(), *cache_arena, false, None, mood()}
     };
     try {
       segment.cached_substitution_ast = parser.construct_ast();
@@ -414,7 +411,7 @@ fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
   return push_substitution_source_frame(*location, origin);
 }
 
-fn EvalContext::push_substitution_source_frame(SourceLocation location,
+fn EvalContext::push_substitution_source_frame(const SourceLocation &location,
                                                StringView origin) throws -> bool
 {
   if (!m_should_print_source_traces || current_source() == nullptr ||
@@ -570,8 +567,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       if (!captured.has_value())
         throw ErrorWithLocation{previous_location,
                                 "Could not read command substitution output"};
-      while (!captured->is_empty() && captured->back() == '\n')
-        captured->pop_back();
+      captured->strip_trailing_newlines();
       return steal(*captured);
     }
   }
@@ -650,8 +646,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     set_last_exit_status(1);
   }
 
-  while (!captured.is_empty() && captured.back() == '\n')
-    captured.pop_back();
+  captured.strip_trailing_newlines();
   return captured;
 }
 
@@ -679,7 +674,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
         "function substitution ast cache miss for generation %zu, reparsing",
         generation);
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *cache_arena, false, None, mood()}
+        Lexer{segment.text.view(), *cache_arena, false, None, mood()}
     };
     try {
       segment.cached_substitution_ast = parser.construct_ast();
@@ -765,8 +760,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     set_last_exit_status(1);
   }
 
-  while (!captured.is_empty() && captured.back() == '\n')
-    captured.pop_back();
+  captured.strip_trailing_newlines();
   return captured;
 }
 

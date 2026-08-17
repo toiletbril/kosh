@@ -24,6 +24,22 @@ namespace completion {
 class shell_highlight_cache;
 } /* namespace completion */
 
+enum class substring_subject : u8
+{
+  Scalar,
+  List,
+};
+
+struct substring_bounds
+{
+  i64 start;
+  i64 end;
+};
+
+fn compute_substring_bounds(i64 value_count, i64 offset, Maybe<i64> length,
+                            substring_subject subject) throws
+    -> substring_bounds;
+
 class EvalContext
 {
 public:
@@ -86,6 +102,7 @@ public:
     return m_shell_executable_path.view();
   }
   fn materialize_kosh_identity() const throws -> Maybe<String>;
+  fn next_random_u32() const wontthrow -> u32;
 
   fn unset_shell_variable(StringView name) throws -> void;
 
@@ -297,7 +314,7 @@ public:
                                  : Maybe<StringView>{filename};
     }
   };
-  pure fn resolve_render_source(SourceLocation location) const wontthrow
+  pure fn resolve_render_source(const SourceLocation &location) const wontthrow
       -> resolved_render_source;
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
@@ -488,7 +505,7 @@ public:
       -> completion::shell_highlight_cache *;
   fn reset_runtime_diagnostic_highlight_cache() wontthrow -> void;
 
-  fn render_contained_substitution_error(std::exception_ptr error,
+  fn render_contained_substitution_error(const std::exception_ptr &error,
                                          StringView source) throws -> void;
 
   fn set_current_location(SourceLocation location) wontthrow -> void;
@@ -568,7 +585,7 @@ public:
   /* A suspicious runtime condition the strict default treats as fatal. Throws
      when fatal and not downgraded, warns under -W, returns otherwise. */
   fn warn_or_throw(bool fatal, bool explicitly_requested,
-                   SourceLocation location, StringView message,
+                   const SourceLocation &location, StringView message,
                    StringView note = {}) throws -> void;
   /* Renders a located runtime warning at the command being evaluated. The _at
      form takes a finer location inside that command. */
@@ -935,6 +952,26 @@ public:
   {
     return m_is_prompt_command_running;
   }
+  fn get_prompt_command_arena() wontthrow -> BumpArena &
+  {
+    return m_prompt_command_arena;
+  }
+  fn get_prompt_command_cached_text() wontthrow -> String &
+  {
+    return m_prompt_command_cached_text;
+  }
+  pure fn get_prompt_command_cached_ast() const wontthrow -> Expression *
+  {
+    return m_prompt_command_cached_ast;
+  }
+  fn set_prompt_command_cached_ast(Expression *ast) wontthrow -> void
+  {
+    m_prompt_command_cached_ast = ast;
+  }
+  fn get_foreground_program_title_buffer() wontthrow -> String &
+  {
+    return m_foreground_program_title_buffer;
+  }
 
   /* Whether a builtin is running as a stage of a multi-stage pipeline. exec
      reads it so exec in a pipeline stage spawns a child rather than replacing
@@ -1008,7 +1045,7 @@ public:
   fn capture_function_substitution(const WordSegment &segment) throws -> String;
   fn push_substitution_source_frame(const WordSegment &segment,
                                     StringView origin) throws -> bool;
-  fn push_substitution_source_frame(SourceLocation location,
+  fn push_substitution_source_frame(const SourceLocation &location,
                                     StringView origin) throws -> bool;
 
   /* The $(< file) shorthand reads the named file directly, when the
@@ -1055,9 +1092,9 @@ public:
       -> Maybe<Path>;
 
   /* Each throws a located error past the recursion cap. */
-  fn enter_source(SourceLocation location) throws -> void;
+  fn enter_source(const SourceLocation &location) throws -> void;
   fn leave_source() wontthrow -> void;
-  fn enter_function_call(SourceLocation location) throws -> void;
+  fn enter_function_call(const SourceLocation &location) throws -> void;
   fn leave_function_call() wontthrow -> void;
   fn enter_substitution() throws -> void;
   fn leave_substitution() wontthrow -> void;
@@ -1132,7 +1169,7 @@ public:
   {
     return m_runtime.option_is_enabled(shell_option_id::Restricted);
   }
-  fn guard_restricted_path(StringView path, SourceLocation location,
+  fn guard_restricted_path(StringView path, const SourceLocation &location,
                            restricted_path_use use) const throws -> void;
 
   fn make_stats_string() const throws -> String;
@@ -1140,75 +1177,30 @@ public:
   fn set_stats_enabled(bool enabled) wontthrow -> void;
   pure fn stats_enabled() const wontthrow -> bool;
 
-  fn set_show_ast(bool enabled) wontthrow -> void
-  {
-    m_runtime.set_option(shell_option_id::ShowAst, enabled);
-  }
-  pure fn show_ast() const wontthrow -> bool
-  {
-    return m_runtime.option_is_enabled(shell_option_id::ShowAst);
-  }
-  fn set_show_lexed_words(bool enabled) wontthrow -> void
-  {
-    m_runtime.set_option(shell_option_id::ShowLexedWords, enabled);
-  }
-  pure fn show_lexed_words() const wontthrow -> bool
-  {
-    return m_runtime.option_is_enabled(shell_option_id::ShowLexedWords);
-  }
-  fn set_show_exit_code(bool enabled) wontthrow -> void
-  {
-    m_runtime.set_option(shell_option_id::ShowExitCode, enabled);
-  }
-  pure fn show_exit_code() const wontthrow -> bool
-  {
-    return m_runtime.option_is_enabled(shell_option_id::ShowExitCode);
-  }
+  fn set_show_ast(bool enabled) wontthrow -> void;
+  pure fn show_ast() const wontthrow -> bool;
+  fn set_show_lexed_words(bool enabled) wontthrow -> void;
+  pure fn show_lexed_words() const wontthrow -> bool;
+  fn set_show_exit_code(bool enabled) wontthrow -> void;
+  pure fn show_exit_code() const wontthrow -> bool;
 
   /* The granular memory report at exit, requested by --show-memory. */
-  fn set_memory_stats_enabled(bool enabled) wontthrow -> void
-  {
-    m_runtime.set_option(shell_option_id::ShowMemory, enabled);
-  }
-  pure fn memory_stats_enabled() const wontthrow -> bool
-  {
-    return m_runtime.option_is_enabled(shell_option_id::ShowMemory);
-  }
+  fn set_memory_stats_enabled(bool enabled) wontthrow -> void;
+  pure fn memory_stats_enabled() const wontthrow -> bool;
 
   /* The --no-diagnostics skip, so set -o no-diagnostics flips the per-chunk
      analysis gate at runtime. */
-  fn set_diagnostics_disabled(bool disabled) wontthrow -> void
-  {
-    m_runtime.is_diagnostics_disabled = disabled;
-  }
-  pure fn diagnostics_disabled() const wontthrow -> bool
-  {
-    return m_runtime.is_diagnostics_disabled;
-  }
-  fn set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void
-  {
-    m_runtime.is_annoying_diagnostics_enabled = enabled;
-  }
-  pure fn annoying_diagnostics_enabled() const wontthrow -> bool
-  {
-    return m_runtime.is_annoying_diagnostics_enabled;
-  }
+  fn set_diagnostics_disabled(bool disabled) wontthrow -> void;
+  pure fn diagnostics_disabled() const wontthrow -> bool;
+  fn set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void;
+  pure fn annoying_diagnostics_enabled() const wontthrow -> bool;
 
   /* The startup facts set -o reports read-only, mirrored from the invocation
      flags once at startup and fixed for the session. */
-  fn set_login_shell(bool enabled) wontthrow -> void
-  {
-    m_is_login_shell = enabled;
-  }
-  pure fn is_login_shell() const wontthrow -> bool { return m_is_login_shell; }
-  fn set_custom_rcfile(bool enabled) wontthrow -> void
-  {
-    m_has_custom_rcfile = enabled;
-  }
-  pure fn has_custom_rcfile() const wontthrow -> bool
-  {
-    return m_has_custom_rcfile;
-  }
+  fn set_login_shell(bool enabled) wontthrow -> void;
+  pure fn is_login_shell() const wontthrow -> bool;
+  fn set_custom_rcfile(bool enabled) wontthrow -> void;
+  pure fn has_custom_rcfile() const wontthrow -> bool;
 
   pure fn last_expressions_executed() const wontthrow -> usize;
   pure fn total_expressions_executed() const wontthrow -> usize;
@@ -1381,7 +1373,7 @@ protected:
   usize m_mimicry_depth{0};
   /* The base $SECONDS counts from. */
   i64 m_shell_start_time{0};
-  mutable bool m_random_seeded{false};
+  mutable u64 m_random_state{0};
   bool m_glob_exempt_for_test{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
@@ -1395,6 +1387,10 @@ protected:
   bool m_is_completion_function_running{false};
   bool m_is_prompt_command_running{false};
   bool m_is_in_pipeline_stage{false};
+  BumpArena m_prompt_command_arena{};
+  String m_prompt_command_cached_text{heap_allocator()};
+  Expression *m_prompt_command_cached_ast{nullptr};
+  String m_foreground_program_title_buffer{heap_allocator()};
 
   fn install_trap_dispositions() throws -> void;
 
@@ -1487,7 +1483,7 @@ protected:
       -> ArrayList<glob_field>;
   fn expand_path_recurse(ArrayList<glob_field> fields) throws
       -> ArrayList<glob_field>;
-  fn expand_path(glob_field field, SourceLocation location) throws
+  fn expand_path(glob_field field, const SourceLocation &location) throws
       -> ArrayList<String>;
 
   fn expand_tilde(WordSegment &leading_segment, bool word_continues,

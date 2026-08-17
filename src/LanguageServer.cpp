@@ -4,6 +4,44 @@ namespace koshka::language_server {
 
 namespace {
 
+struct positioned_document
+{
+  Document *document;
+  protocol_position position;
+};
+
+enum class request_method : u8
+{
+  Initialize,
+  Initialized,
+  Shutdown,
+  Exit,
+  DidOpen,
+  DidChange,
+  DidClose,
+  Completion,
+  CodeAction,
+  Definition,
+  Hover,
+  SemanticTokens,
+};
+
+constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
+    {SSK("initialize"),                       request_method::Initialize    },
+    {SSK("initialized"),                      request_method::Initialized   },
+    {SSK("shutdown"),                         request_method::Shutdown      },
+    {SSK("exit"),                             request_method::Exit          },
+    {SSK("textDocument/didOpen"),             request_method::DidOpen       },
+    {SSK("textDocument/didChange"),           request_method::DidChange     },
+    {SSK("textDocument/didClose"),            request_method::DidClose      },
+    {SSK("textDocument/completion"),          request_method::Completion    },
+    {SSK("textDocument/codeAction"),          request_method::CodeAction    },
+    {SSK("textDocument/definition"),          request_method::Definition    },
+    {SSK("textDocument/hover"),               request_method::Hover         },
+    {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens},
+};
+constexpr StaticStringMap REQUEST_METHODS{REQUEST_METHOD_ENTRIES};
+
 class Server : public AnalysisSourceProvider
 {
 public:
@@ -19,8 +57,8 @@ public:
 private:
   fn dispatch(const JsonValue &message) throws -> bool;
   fn initialize(const JsonValue *id, const JsonValue *params) throws -> bool;
-  fn open_document(const JsonValue *params) throws -> void;
-  fn change_document(const JsonValue *params) throws -> void;
+  fn open_document(const JsonValue *params) throws -> Document *;
+  fn change_document(const JsonValue *params) throws -> Document *;
   fn close_document(const JsonValue *params) throws -> void;
   fn complete(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn definition(const JsonValue *id, const JsonValue *params) throws -> bool;
@@ -33,15 +71,19 @@ private:
                       const ArrayList<source_diagnostic> &diagnostics) throws
       -> bool;
   fn publish_auxiliary_diagnostics() throws -> bool;
-  fn validate_all() throws -> bool;
+  fn validate_all(Document *changed_document = nullptr) throws -> bool;
   pure fn find_document(StringView uri) wontthrow -> Document *;
+  pure fn request_document(const JsonValue *params) wontthrow -> Document *;
+  pure fn request_positioned_document(const JsonValue *params) throws
+      -> Maybe<positioned_document>;
   fn append_diagnostic(String &output, const Document &document,
                        const source_diagnostic &diagnostic,
                        usize diagnostic_index, bool &is_first) throws -> void;
   fn select_document_mood(const Document &document) wontthrow -> void;
-  fn symbol_at(Document &document, protocol_position position) throws
+  fn symbol_at(const Document &document, protocol_position position) throws
       -> Maybe<document_symbol>;
-  fn definition_of(Document &document, const document_symbol &symbol) throws
+  fn definition_of(const Document &document,
+                   const document_symbol &symbol) throws
       -> Maybe<document_symbol>;
   fn command_information(StringView command) throws -> Maybe<String>;
 
@@ -77,30 +119,32 @@ pure fn semantic_style(highlight_role role) wontthrow -> std::pair<u32, u32>
   static constexpr u32 HEREDOC = 1u << 7;
   static constexpr u32 URL = 1u << 8;
 
-  switch (role) {
-  case highlight_role::comment: return {0, 0};
-  case highlight_role::operator_: return {1, 0};
-  case highlight_role::string: return {2, 0};
-  case highlight_role::heredoc: return {2, HEREDOC};
-  case highlight_role::variable: return {3, 0};
-  case highlight_role::assignment_name: return {3, DECLARATION};
-  case highlight_role::unset_variable: return {3, UNRESOLVED};
-  case highlight_role::flag: return {4, READONLY};
-  case highlight_role::keyword: return {5, 0};
-  case highlight_role::invalid_syntax: return {1, INVALID};
-  case highlight_role::function_name: return {6, DECLARATION};
-  case highlight_role::resolved_command: return {6, COMMAND};
-  case highlight_role::partial_command: return {6, COMMAND | PARTIAL};
-  case highlight_role::unknown_command: return {6, COMMAND | UNRESOLVED};
-  case highlight_role::existing_path: return {2, PATH};
-  case highlight_role::partial_path: return {2, PATH | PARTIAL};
-  case highlight_role::invalid_path: return {2, PATH | INVALID};
-  case highlight_role::url: return {2, URL};
-  case highlight_role::glob: return {7, 0};
-  case highlight_role::count: break;
-  }
+  static constexpr std::pair<u32, u32> STYLES[] = {
+      {0, 0                   },
+      {1, 0                   },
+      {2, 0                   },
+      {2, HEREDOC             },
+      {8, HEREDOC             },
+      {3, 0                   },
+      {3, DECLARATION         },
+      {3, UNRESOLVED          },
+      {4, READONLY            },
+      {5, 0                   },
+      {1, INVALID             },
+      {6, DECLARATION         },
+      {6, COMMAND             },
+      {6, COMMAND | PARTIAL   },
+      {6, COMMAND | UNRESOLVED},
+      {2, PATH                },
+      {2, PATH | PARTIAL      },
+      {2, PATH | INVALID      },
+      {2, URL                 },
+      {7, 0                   },
+  };
+  static_assert(countof(STYLES) == static_cast<usize>(highlight_role::count));
+  if (role == highlight_role::count) return {1, 0};
 
-  return {1, 0};
+  return STYLES[static_cast<usize>(role)];
 }
 
 pure fn Server::find_document(StringView uri) wontthrow -> Document *
@@ -111,9 +155,30 @@ pure fn Server::find_document(StringView uri) wontthrow -> Document *
   return nullptr;
 }
 
+pure fn Server::request_document(const JsonValue *params) wontthrow
+    -> Document *
+{
+  let const *text_document =
+      params != nullptr ? params->get("textDocument") : nullptr;
+  let const uri = string_field(text_document, "uri");
+  return uri.has_value() ? find_document(*uri) : nullptr;
+}
+
+pure fn Server::request_positioned_document(const JsonValue *params) throws
+    -> Maybe<positioned_document>
+{
+  let *document = request_document(params);
+  if (document == nullptr) return None;
+  let const position =
+      document_position(params != nullptr ? params->get("position") : nullptr);
+  if (!position.has_value()) return None;
+
+  return positioned_document{document, *position};
+}
+
 fn Server::select_document_mood(const Document &document) wontthrow -> void
 {
-  m_context.set_mood(mood_for(document));
+  m_context.set_mood(document.mood);
   m_context.apply_strictness_for_mood();
   m_context.set_warning_level(3);
   m_context.set_diagnostics_disabled(false);
@@ -123,9 +188,8 @@ fn Server::select_document_mood(const Document &document) wontthrow -> void
 fn Server::read_source(const Path &canonical_path) throws -> Maybe<String>
 {
   for (let const &document : m_documents) {
-    if (!document.path.has_value()) continue;
-    let const open_path = os::canonical_path(*document.path);
-    if (open_path.has_value() && open_path->text() == canonical_path.text())
+    if (document.canonical_path.has_value() &&
+        document.canonical_path->text() == canonical_path.text())
       return document.normalized_source.clone();
   }
 
@@ -229,7 +293,8 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   result.append(
       "\"semanticTokensProvider\":{\"legend\":{\"tokenTypes\":["
       "\"comment\",\"operator\",\"string\",\"variable\",\"parameter\","
-      "\"keyword\",\"function\",\"regexp\"],\"tokenModifiers\":["
+      "\"keyword\",\"function\",\"regexp\",\"heredocDelimiter\"],"
+      "\"tokenModifiers\":["
       "\"declaration\",\"readonly\",\"invalid\",\"unresolved\","
       "\"partial\",\"path\",\"command\",\"heredoc\",\"url\"]},"
       "\"full\":true,\"range\":false}},\"serverInfo\":{\"name\":"
@@ -238,7 +303,7 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   return send_result(id, result.view());
 }
 
-fn Server::open_document(const JsonValue *params) throws -> void
+fn Server::open_document(const JsonValue *params) throws -> Document *
 {
   let const *text_document =
       params != nullptr ? params->get("textDocument") : nullptr;
@@ -246,19 +311,26 @@ fn Server::open_document(const JsonValue *params) throws -> void
   let const language_id = string_field(text_document, "languageId");
   let const text = string_field(text_document, "text");
   let const version = integer_field(text_document, "version");
-  if (!uri.has_value() || !language_id.has_value() || !text.has_value()) return;
+  if (!uri.has_value() || !language_id.has_value() || !text.has_value())
+    return nullptr;
   let const document_version = version.value_or(0);
   if (let *existing = find_document(*uri); existing != nullptr) {
     existing->language_id = String{*language_id};
     existing->replace_source(*text, document_version);
-    return;
+    existing->mood = mood_for(*existing);
+    return existing;
   }
   let document = Document{*uri, *language_id, *text, document_version};
   document.path = decode_file_uri(*uri);
+  if (document.path.has_value())
+    document.canonical_path = os::canonical_path(*document.path);
+  document.mood = mood_for(document);
   m_documents.push(steal(document));
+
+  return &m_documents.back();
 }
 
-fn Server::change_document(const JsonValue *params) throws -> void
+fn Server::change_document(const JsonValue *params) throws -> Document *
 {
   let const *text_document =
       params != nullptr ? params->get("textDocument") : nullptr;
@@ -268,12 +340,15 @@ fn Server::change_document(const JsonValue *params) throws -> void
       params != nullptr ? params->get("contentChanges") : nullptr;
   if (!uri.has_value() || changes == nullptr ||
       changes->kind != json_kind::Array || changes->array.is_empty())
-    return;
+    return nullptr;
   let *document = find_document(*uri);
-  if (document == nullptr) return;
+  if (document == nullptr) return nullptr;
   let const text = string_field(changes->array.back(), "text");
-  if (!text.has_value()) return;
+  if (!text.has_value()) return nullptr;
   document->replace_source(*text, version.value_or(document->version + 1));
+  document->mood = mood_for(*document);
+
+  return document;
 }
 
 fn Server::close_document(const JsonValue *params) throws -> void
@@ -305,7 +380,7 @@ fn Server::append_diagnostic(String &output, const Document &document,
       diagnostic.source_name != document.path->text())
     return;
   let const do_append_diagnostic =
-      [&](SourceLocation location, u8 severity, StringView message,
+      [&](const SourceLocation &location, u8 severity, StringView message,
           Maybe<diagnostic_id> id, bool has_fixes) throws -> void {
     if (!is_first) output.push(',');
     is_first = false;
@@ -313,7 +388,7 @@ fn Server::append_diagnostic(String &output, const Document &document,
     append_protocol_range(output, document, location.position,
                           location.position + location.length, m_encoding);
     output.append(",\"severity\":");
-    output.append(String::from(severity, heap_allocator()).view());
+    append_json_integer(output, static_cast<u64>(severity));
     if (id.has_value()) {
       output.append(",\"code\":");
       append_json_string(output, get_diagnostic_definition(*id).slug);
@@ -323,12 +398,11 @@ fn Server::append_diagnostic(String &output, const Document &document,
     if (has_fixes && m_supports_diagnostic_data && document.version >= 0) {
       output.append(",\"data\":{\"kind\":\"kosh.fix\","
                     "\"documentVersion\":");
-      output.append(String::from(document.version, heap_allocator()).view());
+      append_json_integer(output, document.version);
       output.append(",\"diagnosticRevision\":");
-      output.append(
-          String::from(document.diagnostic_revision, heap_allocator()).view());
+      append_json_integer(output, document.diagnostic_revision);
       output.append(",\"diagnosticIndex\":");
-      output.append(String::from(diagnostic_index, heap_allocator()).view());
+      append_json_integer(output, static_cast<u64>(diagnostic_index));
       output.push('}');
     }
     output.push('}');
@@ -372,12 +446,13 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
   let const filename = document.path.has_value() ? document.path->text().view()
                                                  : document.uri.view();
   let parser = Parser{
-      Lexer{String{document.normalized_source.view()}, m_ast_arena, false,
-            filename, m_context.mood()}
+      Lexer{document.normalized_source.view(), m_ast_arena, false, filename,
+            m_context.mood()}
   };
   parser.set_should_collect_analysis_scopes(true);
   let rendered_errors = ArrayList<String>{heap_allocator()};
   let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
+  let followed_paths = HashSet{heap_allocator()};
   let const ast =
       parser.construct_ast(rendered_errors, &m_context, &diagnostics);
   if (rendered_errors.is_empty()) {
@@ -387,13 +462,9 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
     let const heredoc_misses = parser.take_heredoc_terminator_misses();
     let const functions = m_context.function_names();
     let const aliases = m_context.alias_names();
-    let followed_paths = HashSet{heap_allocator()};
     let source_effects = StringMap<followed_source_effects>{heap_allocator()};
-    if (document.path.has_value()) {
-      if (let canonical = os::canonical_path(*document.path);
-          canonical.has_value())
-        followed_paths.add(canonical->text().view());
-    }
+    if (document.canonical_path.has_value())
+      followed_paths.add(document.canonical_path->text().view());
     analyze_ast(ast, document.normalized_source.view(), functions, aliases,
                 &m_context, 3, false, m_context.mood() == mimic_mood::Default,
                 true, suppressions, scopes, directives, heredoc_misses,
@@ -403,6 +474,7 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
   }
 
   let root_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
+  let auxiliary_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
   let const root_name = document.path.has_value() ? document.path->text().view()
                                                   : document.uri.view();
   for (let const &diagnostic : diagnostics) {
@@ -411,13 +483,15 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
     {
       root_diagnostics.push(diagnostic);
     } else {
-      m_current_auxiliary_diagnostics.push(diagnostic);
+      auxiliary_diagnostics.push(diagnostic);
     }
   }
 
   document.diagnostic_revision++;
   let const did_send = send_diagnostics(document, root_diagnostics);
   document.diagnostics = steal(root_diagnostics);
+  document.auxiliary_diagnostics = steal(auxiliary_diagnostics);
+  document.followed_paths = steal(followed_paths);
 
   return did_send;
 }
@@ -432,7 +506,7 @@ fn Server::send_diagnostics(
   append_json_string(payload, document.uri.view());
   if (document.version >= 0) {
     payload.append(",\"version\":");
-    payload.append(String::from(document.version, heap_allocator()).view());
+    append_json_integer(payload, document.version);
   }
   payload.append(",\"diagnostics\":[");
   bool is_first = true;
@@ -455,12 +529,10 @@ fn Server::publish_auxiliary_diagnostics() throws -> bool
     if (!is_open_source) {
       let const canonical_source = os::canonical_path(source_path);
       for (let const &document : m_documents) {
-        if (!canonical_source.has_value() || !document.path.has_value())
+        if (!canonical_source.has_value() ||
+            !document.canonical_path.has_value())
           continue;
-        let const canonical_document = os::canonical_path(*document.path);
-        if (canonical_document.has_value() &&
-            canonical_document->text() == canonical_source->text())
-        {
+        if (document.canonical_path->text() == canonical_source->text()) {
           is_open_source = true;
           break;
         }
@@ -484,12 +556,24 @@ fn Server::publish_auxiliary_diagnostics() throws -> bool
   return true;
 }
 
-fn Server::validate_all() throws -> bool
+fn Server::validate_all(Document *changed_document) throws -> bool
 {
   m_current_auxiliary_uris.clear();
   m_current_auxiliary_diagnostics.clear();
-  for (let &document : m_documents)
-    if (!publish_diagnostics(document)) return false;
+  for (let &document : m_documents) {
+    let should_reanalyze =
+        changed_document == nullptr || &document == changed_document;
+    if (!should_reanalyze && changed_document != nullptr &&
+        changed_document->canonical_path.has_value())
+    {
+      should_reanalyze = document.followed_paths.contains(
+          changed_document->canonical_path->text().view());
+    }
+    if (should_reanalyze && !publish_diagnostics(document)) return false;
+
+    for (let const &diagnostic : document.auxiliary_diagnostics)
+      m_current_auxiliary_diagnostics.push(diagnostic);
+  }
   if (!publish_auxiliary_diagnostics()) return false;
 
   for (let const &uri : m_published_auxiliary_uris) {
@@ -508,17 +592,11 @@ fn Server::validate_all() throws -> bool
 
 fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
 {
-  let const *text_document =
-      params != nullptr ? params->get("textDocument") : nullptr;
-  let const uri = string_field(text_document, "uri");
-  let const *position_value =
-      params != nullptr ? params->get("position") : nullptr;
-  let const position = document_position(position_value);
-  if (!uri.has_value() || !position.has_value()) return send_result(id, "[]");
-  let *document = find_document(*uri);
-  if (document == nullptr) return send_result(id, "[]");
-  let const cursor =
-      document->byte_position(position->line, position->character, m_encoding);
+  let const request = request_positioned_document(params);
+  if (!request.has_value()) return send_result(id, "[]");
+  let *document = request->document;
+  let const cursor = document->byte_position(
+      request->position.line, request->position.character, m_encoding);
   if (!cursor.has_value()) return send_result(id, "[]");
   select_document_mood(*document);
   let base_directory = m_workspace_root;
@@ -555,11 +633,7 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
     -> bool
 {
   if (!m_supports_code_action_literals) return send_result(id, "[]");
-  let const *text_document =
-      params != nullptr ? params->get("textDocument") : nullptr;
-  let const uri = string_field(text_document, "uri");
-  if (!uri.has_value()) return send_result(id, "[]");
-  let *document = find_document(*uri);
+  let *document = request_document(params);
   if (document == nullptr) return send_result(id, "[]");
 
   usize range_start = 0;
@@ -581,21 +655,21 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
     if (range_end < range_start) return send_result(id, "[]");
   }
 
-  bool wants_quick_fixes = m_supports_quick_fixes;
-  bool wants_fix_all = m_supports_fix_all;
+  bool should_include_quick_fixes = m_supports_quick_fixes;
+  bool should_include_fix_all = m_supports_fix_all;
   let const *context = params != nullptr ? params->get("context") : nullptr;
   let const *only = context != nullptr ? context->get("only") : nullptr;
   if (only != nullptr && only->kind == json_kind::Array) {
-    wants_quick_fixes = false;
-    wants_fix_all = false;
+    should_include_quick_fixes = false;
+    should_include_fix_all = false;
     for (let const *kind : only->array) {
       if (kind->kind != json_kind::String) continue;
       if (m_supports_quick_fixes &&
           code_action_kind_includes(kind->text, "quickfix"))
-        wants_quick_fixes = true;
+        should_include_quick_fixes = true;
       if (m_supports_fix_all &&
           code_action_kind_includes(kind->text, "source.fixAll.kosh"))
-        wants_fix_all = true;
+        should_include_fix_all = true;
     }
   }
 
@@ -656,7 +730,8 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
   let const do_append_edit = [&](String &output, const source_edit &edit)
                                  throws -> void {
     output.append("{\"range\":");
-    append_protocol_range(output, *document, edit.start, edit.end, m_encoding);
+    append_protocol_range(output, *document, edit.start_position,
+                          edit.end_position, m_encoding);
     output.append(",\"newText\":");
     append_json_string(output, edit.replacement.view());
     output.push('}');
@@ -669,7 +744,7 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
       output.append("\"documentChanges\":[{\"textDocument\":{\"uri\":");
       append_json_string(output, document->uri.view());
       output.append(",\"version\":");
-      output.append(String::from(document->version, heap_allocator()).view());
+      append_json_integer(output, document->version);
       output.append("},\"edits\":[");
     } else {
       output.append("\"changes\":{");
@@ -704,7 +779,7 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
     response.push('}');
   };
 
-  if (wants_quick_fixes) {
+  if (should_include_quick_fixes) {
     let edits = ArrayList<const source_edit *>{heap_allocator()};
     for (usize diagnostic_index = 0;
          diagnostic_index < document->diagnostics.count(); diagnostic_index++)
@@ -736,7 +811,7 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
     }
   }
 
-  if (wants_fix_all) {
+  if (should_include_fix_all) {
     let candidates = ArrayList<const source_edit *>{heap_allocator()};
     for (let const &diagnostic : document->diagnostics) {
       for (let const &fix : diagnostic.fixes) {
@@ -756,7 +831,8 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
   return send_result(id, response.view());
 }
 
-fn Server::symbol_at(Document &document, protocol_position position) throws
+fn Server::symbol_at(const Document &document,
+                     protocol_position position) throws
     -> Maybe<document_symbol>
 {
   let const byte_position =
@@ -803,7 +879,7 @@ pure fn variable_name_of(StringView text) wontthrow -> StringView
   return text.substring_of_length(start, end - start);
 }
 
-fn Server::definition_of(Document &document,
+fn Server::definition_of(const Document &document,
                          const document_symbol &symbol) throws
     -> Maybe<document_symbol>
 {
@@ -849,16 +925,11 @@ fn Server::definition_of(Document &document,
 fn Server::definition(const JsonValue *id, const JsonValue *params) throws
     -> bool
 {
-  let const *text_document =
-      params != nullptr ? params->get("textDocument") : nullptr;
-  let const uri = string_field(text_document, "uri");
-  let const position =
-      document_position(params != nullptr ? params->get("position") : nullptr);
-  if (!uri.has_value() || !position.has_value()) return send_result(id, "null");
-  let *document = find_document(*uri);
-  if (document == nullptr) return send_result(id, "null");
+  let const request = request_positioned_document(params);
+  if (!request.has_value()) return send_result(id, "null");
+  let *document = request->document;
   select_document_mood(*document);
-  let const symbol = symbol_at(*document, *position);
+  let const symbol = symbol_at(*document, request->position);
   if (!symbol.has_value()) return send_result(id, "null");
   let const target = definition_of(*document, *symbol);
   if (!target.has_value()) return send_result(id, "null");
@@ -890,8 +961,7 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
     argv.push(String{"--clean"});
     argv.push(String{"-c"});
     argv.push(steal(source));
-    let const output =
-        os::capture_program_output(argv, INFORMATION_TIMEOUT_NANOS);
+    let output = os::capture_program_output(argv, INFORMATION_TIMEOUT_NANOS);
     if (output.has_value() && !output->is_empty()) return output;
     return None;
   }
@@ -925,7 +995,8 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
               os::capture_program_output(man_argv, INFORMATION_TIMEOUT_NANOS);
           page.has_value() && !page->is_empty())
       {
-        for (usize position = 0; position < page->length(); position++) {
+        let const page_length = page->length();
+        for (usize position = 0; position < page_length; position++) {
           let const byte = page->view()[position];
           if (byte == '\b') {
             if (!information.is_empty()) information.pop_back();
@@ -943,31 +1014,19 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
     {
       let help_argv = ArrayList<String>{heap_allocator()};
       help_argv.push(String{paths[0].text().view()});
-      let argument = StringView{*help_argument};
-      usize argument_start = 0;
-
-      while (argument_start < argument.length) {
-        while (argument_start < argument.length &&
-               argument[argument_start] == ' ')
-          argument_start++;
-        let argument_end = argument_start;
-        while (argument_end < argument.length && argument[argument_end] != ' ')
-          argument_end++;
-        if (argument_end > argument_start)
-          help_argv.push(String{argument.substring_of_length(
-              argument_start, argument_end - argument_start)});
-        argument_start = argument_end;
-      }
+      StringView{*help_argument}.for_each_ascii_whitespace_word(
+          [&](StringView word) throws { help_argv.push(String{word}); });
       if (let help =
               os::capture_program_output(help_argv, INFORMATION_TIMEOUT_NANOS);
           help.has_value() && !help->is_empty())
         information = help.take();
     }
   }
-  if (!information.is_empty() &&
-      information.view()[information.length() - 1] != '\n')
+  if (!information.is_empty()) {
+    if (information.view()[information.length() - 1] != '\n')
+      information.push('\n');
     information.push('\n');
-  if (!information.is_empty()) information.push('\n');
+  }
   information.append("Path: ");
   information.append(paths[0].text().view());
 
@@ -976,16 +1035,11 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
 
 fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
 {
-  let const *text_document =
-      params != nullptr ? params->get("textDocument") : nullptr;
-  let const uri = string_field(text_document, "uri");
-  let const position =
-      document_position(params != nullptr ? params->get("position") : nullptr);
-  if (!uri.has_value() || !position.has_value()) return send_result(id, "null");
-  let *document = find_document(*uri);
-  if (document == nullptr) return send_result(id, "null");
+  let const request = request_positioned_document(params);
+  if (!request.has_value()) return send_result(id, "null");
+  let *document = request->document;
   select_document_mood(*document);
-  let const symbol = symbol_at(*document, *position);
+  let const symbol = symbol_at(*document, request->position);
   if (!symbol.has_value()) return send_result(id, "null");
   let const is_command = symbol->role == highlight_role::resolved_command ||
                          symbol->role == highlight_role::partial_command ||
@@ -1008,11 +1062,7 @@ fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
 fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
     -> bool
 {
-  let const *text_document =
-      params != nullptr ? params->get("textDocument") : nullptr;
-  let const uri = string_field(text_document, "uri");
-  if (!uri.has_value()) return send_result(id, "{\"data\":[]}");
-  let *document = find_document(*uri);
+  let *document = request_document(params);
   if (document == nullptr) return send_result(id, "{\"data\":[]}");
   select_document_mood(*document);
   let response = String{"{\"data\":["};
@@ -1030,29 +1080,29 @@ fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
     for (let const &span : *spans) {
       let const absolute_start = line_start + span.start;
       let const absolute_end = line_start + span.end;
-      let const start =
-          document->protocol_position_at(absolute_start, m_encoding);
-      let const delta_line = start.line - previous_line;
+      let const start_character =
+          document->encoded_length(line_start, absolute_start, m_encoding);
+      let const delta_line = line - previous_line;
       let const delta_character = delta_line == 0
-                                      ? start.character - previous_character
-                                      : start.character;
+                                      ? start_character - previous_character
+                                      : start_character;
       let const length =
           document->encoded_length(absolute_start, absolute_end, m_encoding);
       if (length == 0) continue;
       let const[type, modifiers] = semantic_style(span.role);
       if (!is_first) response.push(',');
       is_first = false;
-      response.append(String::from(delta_line, heap_allocator()).view());
+      append_json_integer(response, static_cast<u64>(delta_line));
       response.push(',');
-      response.append(String::from(delta_character, heap_allocator()).view());
+      append_json_integer(response, static_cast<u64>(delta_character));
       response.push(',');
-      response.append(String::from(length, heap_allocator()).view());
+      append_json_integer(response, static_cast<u64>(length));
       response.push(',');
-      response.append(String::from(type, heap_allocator()).view());
+      append_json_integer(response, static_cast<u64>(type));
       response.push(',');
-      response.append(String::from(modifiers, heap_allocator()).view());
-      previous_line = start.line;
-      previous_character = start.character;
+      append_json_integer(response, static_cast<u64>(modifiers));
+      previous_line = line;
+      previous_character = start_character;
     }
   }
   response.append("]}");
@@ -1070,13 +1120,19 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
     if (id != nullptr) return send_error(id, -32600, "Invalid Request");
     return true;
   }
-  if (*method == "initialize") return initialize(id, params);
-  if (*method == "initialized") return true;
-  if (*method == "shutdown") {
+  let const request = REQUEST_METHODS.find(*method);
+  if (!request.has_value()) {
+    if (id != nullptr) return send_error(id, -32601, "Method not found");
+    return true;
+  }
+
+  if (*request == request_method::Initialize) return initialize(id, params);
+  if (*request == request_method::Initialized) return true;
+  if (*request == request_method::Shutdown) {
     m_is_shutdown = true;
     return send_result(id, "null");
   }
-  if (*method == "exit") return false;
+  if (*request == request_method::Exit) return false;
   if (!m_is_initialized) {
     if (id != nullptr) return send_error(id, -32002, "Server not initialized");
     return true;
@@ -1085,25 +1141,20 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
     if (id != nullptr) return send_error(id, -32600, "Server has shut down");
     return true;
   }
-  if (*method == "textDocument/didOpen") {
-    open_document(params);
-    return validate_all();
+  switch (*request) {
+  case request_method::DidOpen: return validate_all(open_document(params));
+  case request_method::DidChange: return validate_all(change_document(params));
+  case request_method::DidClose: close_document(params); return validate_all();
+  case request_method::Completion: return complete(id, params);
+  case request_method::CodeAction: return code_actions(id, params);
+  case request_method::Definition: return definition(id, params);
+  case request_method::Hover: return hover(id, params);
+  case request_method::SemanticTokens: return semantic_tokens(id, params);
+  case request_method::Initialize:
+  case request_method::Initialized:
+  case request_method::Shutdown:
+  case request_method::Exit: return true;
   }
-  if (*method == "textDocument/didChange") {
-    change_document(params);
-    return validate_all();
-  }
-  if (*method == "textDocument/didClose") {
-    close_document(params);
-    return validate_all();
-  }
-  if (*method == "textDocument/completion") return complete(id, params);
-  if (*method == "textDocument/codeAction") return code_actions(id, params);
-  if (*method == "textDocument/definition") return definition(id, params);
-  if (*method == "textDocument/hover") return hover(id, params);
-  if (*method == "textDocument/semanticTokens/full")
-    return semantic_tokens(id, params);
-  if (id != nullptr) return send_error(id, -32601, "Method not found");
 
   return true;
 }
@@ -1116,7 +1167,7 @@ fn Server::run() throws -> int
   {
     let message = reader.read_message();
     if (!message.has_value()) return m_is_shutdown ? 0 : 1;
-    let parser = JsonParser{message->view()};
+    let parser = JsonParser{*message};
     let *root = parser.parse();
     if (root == nullptr) {
       if (!send_error(nullptr, -32700, "Parse error")) return 1;

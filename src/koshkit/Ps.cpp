@@ -47,15 +47,13 @@ static fn append_left(String &output, StringView text, usize width) throws
     -> void
 {
   output += text;
-  for (usize i = text.length; i < width; i++)
-    output += ' ';
+  output.append_repeated(' ', width - text.length);
 }
 
 static fn append_right(String &output, StringView text, usize width) throws
     -> void
 {
-  for (usize i = text.length; i < width; i++)
-    output += ' ';
+  output.append_repeated(' ', width - text.length);
   output += text;
 }
 
@@ -152,8 +150,7 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   output += "  PID CMD\n";
   for (const os::process_entry &process : processes) {
     let const pid = String::from(process.pid, cxt.scratch_allocator());
-    for (usize i = pid.count(); i < 5; i++)
-      output += ' ';
+    output.append_repeated(' ', pid.count() < 5 ? 5 - pid.count() : 0);
     output += pid.view();
     output += ' ';
     output += process.name.view();

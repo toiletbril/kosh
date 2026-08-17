@@ -26,16 +26,13 @@ fn set_foreground_program_title(const ArrayList<String> &arguments,
     return;
   }
 
-  /* The scratch arena is released once per top-level command, and a title built
-     there would grow it for the whole body of a loop. */
-  static String COMMAND_TITLE{heap_allocator()};
-
-  COMMAND_TITLE.clear();
+  let &command_title = cxt.get_foreground_program_title_buffer();
+  command_title.clear();
   for (usize index = 0; index < arguments.count(); index++) {
-    if (index > 0) COMMAND_TITLE.push(' ');
-    append_shell_quoted_arg(COMMAND_TITLE, arguments[index]);
+    if (index > 0) command_title.push(' ');
+    append_shell_quoted_arg(command_title, arguments[index]);
   }
-  toiletline::set_title(COMMAND_TITLE.view());
+  toiletline::set_title(command_title.view());
 }
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt,

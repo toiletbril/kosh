@@ -176,7 +176,7 @@ fn close_fd(os::descriptor fd) wontthrow -> bool
   return true;
 }
 
-fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
+fn TempFileSet::track(Path &&path) throws -> void { m_paths.push(steal(path)); }
 fn TempFileSet::count() const wontthrow -> usize { return m_paths.count(); }
 fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
 {
@@ -758,30 +758,9 @@ fn normalize_program_name(String &program_name) -> program_name_info
 namespace koshka {
 namespace os {
 
-fn get_shell_process_id() wontthrow -> i64
-{
-  return static_cast<i64>(PARENT_SHELL_PID);
-}
-
 fn get_current_process_id() wontthrow -> i64
 {
   return static_cast<i64>(GetCurrentProcessId());
-}
-
-fn get_file_creation_mask() wontthrow -> u32
-{
-  /* umask reads only through a set, so it is read and put back. */
-  let const previous_mask = KOSH_UMASK(0);
-  KOSH_UMASK(previous_mask);
-
-  return static_cast<u32>(previous_mask);
-}
-
-fn set_file_creation_mask(u32 mask) wontthrow -> void { KOSH_UMASK(mask); }
-
-fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
-{
-  return fd == descriptor_for_shell_fd(shell_fd);
 }
 
 fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }

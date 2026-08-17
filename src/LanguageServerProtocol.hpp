@@ -61,8 +61,8 @@ struct json_member
 class JsonValue
 {
 public:
-  explicit JsonValue(json_kind value_kind)
-      : kind(value_kind), array(heap_allocator()), object(heap_allocator())
+  explicit JsonValue(json_kind value_kind, Allocator allocator)
+      : kind(value_kind), text(allocator), array(allocator), object(allocator)
   {}
 
   pure fn get(StringView name) const wontthrow -> const JsonValue *
@@ -75,51 +75,15 @@ public:
 
   json_kind kind;
   bool boolean{false};
-  String text{heap_allocator()};
+  String text;
   ArrayList<JsonValue *> array;
   ArrayList<json_member> object;
 };
 
-fn append_utf8(String &output, u32 codepoint) throws -> void
-{
-  if (codepoint <= 0x7f) {
-    output.push(static_cast<char>(codepoint));
-  } else if (codepoint <= 0x7ff) {
-    output.push(static_cast<char>(0xc0 | (codepoint >> 6)));
-    output.push(static_cast<char>(0x80 | (codepoint & 0x3f)));
-  } else if (codepoint <= 0xffff) {
-    output.push(static_cast<char>(0xe0 | (codepoint >> 12)));
-    output.push(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
-    output.push(static_cast<char>(0x80 | (codepoint & 0x3f)));
-  } else {
-    output.push(static_cast<char>(0xf0 | (codepoint >> 18)));
-    output.push(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
-    output.push(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
-    output.push(static_cast<char>(0x80 | (codepoint & 0x3f)));
-  }
-}
-
-pure fn hex_value(char byte) wontthrow -> Maybe<u8>
-{
-  if (byte >= '0' && byte <= '9') return static_cast<u8>(byte - '0');
-  if (byte >= 'a' && byte <= 'f') return static_cast<u8>(byte - 'a' + 10);
-  if (byte >= 'A' && byte <= 'F') return static_cast<u8>(byte - 'A' + 10);
-
-  return None;
-}
-
 class JsonParser
 {
 public:
-  explicit JsonParser(StringView source)
-      : m_source(source), m_values(heap_allocator())
-  {}
-
-  ~JsonParser()
-  {
-    for (let *value : m_values)
-      delete value;
-  }
+  explicit JsonParser(StringView source) : m_source(source) {}
 
   fn parse() throws -> JsonValue *
   {
@@ -134,10 +98,7 @@ public:
 private:
   fn create(json_kind kind) throws -> JsonValue *
   {
-    let *value = new JsonValue{kind};
-    m_values.push(value);
-
-    return value;
+    return m_arena.create<JsonValue>(kind, bump_allocator(m_arena));
   }
 
   fn skip_blanks() wontthrow -> void
@@ -184,7 +145,7 @@ private:
     if (m_position >= m_source.length || m_source[m_position] != '"')
       return None;
     m_position++;
-    let result = String{heap_allocator()};
+    let result = String{bump_allocator(m_arena)};
 
     while (m_position < m_source.length) {
       let const byte = m_source[m_position++];
@@ -209,7 +170,7 @@ private:
         if (m_position + 4 > m_source.length) return None;
         u32 codepoint = 0;
         for (usize digit_index = 0; digit_index < 4; digit_index++) {
-          let const digit = hex_value(m_source[m_position++]);
+          let const digit = utils::hex_digit_value(m_source[m_position++]);
           if (!digit.has_value()) return None;
           codepoint = (codepoint << 4) | *digit;
         }
@@ -222,7 +183,7 @@ private:
           m_position += 2;
           u32 low = 0;
           for (usize digit_index = 0; digit_index < 4; digit_index++) {
-            let const digit = hex_value(m_source[m_position++]);
+            let const digit = utils::hex_digit_value(m_source[m_position++]);
             if (!digit.has_value()) return None;
             low = (low << 4) | *digit;
           }
@@ -231,7 +192,7 @@ private:
         } else if (codepoint >= 0xdc00 && codepoint <= 0xdfff) {
           return None;
         }
-        append_utf8(result, codepoint);
+        utils::append_utf8(result, codepoint);
         break;
       }
       default: return None;
@@ -291,7 +252,8 @@ private:
     }
     let *value = create(json_kind::Number);
     value->text =
-        String{m_source.substring_of_length(start, m_position - start)};
+        String{bump_allocator(m_arena),
+               m_source.substring_of_length(start, m_position - start)};
 
     return value;
   }
@@ -356,7 +318,7 @@ private:
 
   StringView m_source;
   usize m_position{0};
-  ArrayList<JsonValue *> m_values;
+  BumpArena m_arena;
 };
 
 fn append_json_string(String &output, StringView value) throws -> void
@@ -385,6 +347,18 @@ fn append_json_string(String &output, StringView value) throws -> void
     }
   }
   output.push('"');
+}
+
+fn append_json_integer(String &output, i64 value) throws -> void
+{
+  char buffer[21];
+  output.append(utils::int_to_text_into(value, buffer, sizeof(buffer)));
+}
+
+fn append_json_integer(String &output, u64 value) throws -> void
+{
+  char buffer[20];
+  output.append(utils::uint_to_text_into(value, buffer, sizeof(buffer)));
 }
 
 fn append_json_value(String &output, const JsonValue &value) throws -> void
@@ -432,15 +406,21 @@ fn append_request_id(String &output, const JsonValue *id) throws -> void
 
 fn send_payload(StringView payload) wontthrow -> bool
 {
-  let header = String{"Content-Length: "};
-  try {
-    header.append(String::from(payload.length, heap_allocator()).view());
-    header.append("\r\n\r\n");
-  } catch (...) {
-    return false;
-  }
+  static constexpr StringView PREFIX{"Content-Length: ", 16};
+  static constexpr StringView SUFFIX{"\r\n\r\n", 4};
+  char digits[20];
+  let const length =
+      utils::uint_to_text_into(payload.length, digits, sizeof(digits));
+  char header[64];
+  usize header_length = 0;
+  __builtin_memcpy(header + header_length, PREFIX.data, PREFIX.length);
+  header_length += PREFIX.length;
+  __builtin_memcpy(header + header_length, length.data, length.length);
+  header_length += length.length;
+  __builtin_memcpy(header + header_length, SUFFIX.data, SUFFIX.length);
+  header_length += SUFFIX.length;
 
-  return os::write_all(KOSH_STDOUT, header.view().data, header.count()) &&
+  return os::write_all(KOSH_STDOUT, header, header_length) &&
          os::write_all(KOSH_STDOUT, payload.data, payload.length);
 }
 
@@ -460,7 +440,7 @@ fn send_error(const JsonValue *id, i64 code, StringView message) throws -> bool
   let payload = String{"{\"jsonrpc\":\"2.0\",\"id\":"};
   append_request_id(payload, id);
   payload.append(",\"error\":{\"code\":");
-  payload.append(String::from(code, heap_allocator()).view());
+  append_json_integer(payload, code);
   payload.append(",\"message\":");
   append_json_string(payload, message);
   payload.append("}}");
@@ -471,8 +451,10 @@ fn send_error(const JsonValue *id, i64 code, StringView message) throws -> bool
 class ProtocolReader
 {
 public:
-  fn read_message() throws -> Maybe<String>
+  fn read_message() throws -> Maybe<StringView>
   {
+    compact();
+    m_header_scan_position = m_offset;
     usize header_end = 0;
 
     loop
@@ -493,10 +475,8 @@ public:
     while (m_buffer.count() - body_start < *content_length)
       if (!read_more()) return None;
 
-    let body =
-        String{m_buffer.substring_of_length(body_start, *content_length)};
+    let const body = m_buffer.substring_of_length(body_start, *content_length);
     m_offset = body_start + *content_length;
-    compact();
 
     return body;
   }
@@ -505,18 +485,21 @@ private:
   static constexpr usize MAX_HEADER_LENGTH = 16 * 1024;
   static constexpr usize MAX_MESSAGE_LENGTH = 16 * 1024 * 1024;
 
-  pure fn find_header_end() const wontthrow -> usize
+  fn find_header_end() wontthrow -> usize
   {
-    for (usize position = m_offset; position + 3 < m_buffer.count(); position++)
+    for (usize position = m_header_scan_position;
+         position + 3 < m_buffer.count(); position++)
       if (m_buffer[position] == '\r' && m_buffer[position + 1] == '\n' &&
           m_buffer[position + 2] == '\r' && m_buffer[position + 3] == '\n')
         return position;
 
+    m_header_scan_position =
+        m_buffer.count() > 3 ? m_buffer.count() - 3 : m_offset;
+
     return static_cast<usize>(-1);
   }
 
-  pure fn parse_content_length(StringView headers) const wontthrow
-      -> Maybe<usize>
+  pure fn parse_content_length(StringView headers) const throws -> Maybe<usize>
   {
     static const StringView PREFIX{"Content-Length:"};
     usize line_start = 0;
@@ -533,14 +516,11 @@ private:
                (line[position] == ' ' || line[position] == '\t'))
           position++;
         if (position == line.length) return None;
-        usize length = 0;
-        for (; position < line.length; position++) {
-          if (line[position] < '0' || line[position] > '9') return None;
-          let const digit = static_cast<usize>(line[position] - '0');
-          if (length > (MAX_MESSAGE_LENGTH - digit) / 10) return None;
-          length = length * 10 + digit;
-        }
-        return length;
+        let const parsed = utils::parse_decimal_u64(line.substring(position));
+        if (parsed.is_error() || parsed.value() > MAX_MESSAGE_LENGTH)
+          return None;
+
+        return static_cast<usize>(parsed.value());
       }
       if (line_end == headers.length) break;
       line_start = line_end + 2;
@@ -575,6 +555,7 @@ private:
 
   String m_buffer{heap_allocator()};
   usize m_offset{0};
+  usize m_header_scan_position{0};
 };
 
 pure fn string_field(const JsonValue *object, StringView name) wontthrow
@@ -587,7 +568,7 @@ pure fn string_field(const JsonValue *object, StringView name) wontthrow
   return value->text.view();
 }
 
-pure fn integer_field(const JsonValue *object, StringView name) wontthrow
+pure fn integer_field(const JsonValue *object, StringView name) throws
     -> Maybe<i64>
 {
   if (object == nullptr || object->kind != json_kind::Object) return None;
@@ -595,21 +576,10 @@ pure fn integer_field(const JsonValue *object, StringView name) wontthrow
   if (value == nullptr || value->kind != json_kind::Number ||
       value->text.is_empty())
     return None;
-  usize position = 0;
-  bool is_negative = false;
-  if (value->text[0] == '-') {
-    is_negative = true;
-    position++;
-  }
-  if (position == value->text.count()) return None;
-  i64 result = 0;
-  for (; position < value->text.count(); position++) {
-    let const byte = value->text[position];
-    if (byte < '0' || byte > '9') return None;
-    result = result * 10 + static_cast<i64>(byte - '0');
-  }
+  let const parsed = utils::parse_decimal_i64(value->text.view());
+  if (parsed.is_error()) return None;
 
-  return is_negative ? -result : result;
+  return parsed.value();
 }
 
 enum class position_encoding : u8
@@ -642,7 +612,9 @@ public:
         normalized_source(source),
         version(document_version),
         line_starts(heap_allocator()),
-        diagnostics(heap_allocator())
+        diagnostics(heap_allocator()),
+        auxiliary_diagnostics(heap_allocator()),
+        followed_paths(heap_allocator())
   {
     normalized_source.normalize_crlf_line_endings();
     rebuild_lines();
@@ -742,10 +714,14 @@ public:
   String language_id;
   String normalized_source;
   i64 version;
+  mimic_mood mood{mimic_mood::Default};
   u64 diagnostic_revision{0};
   Maybe<Path> path;
+  Maybe<Path> canonical_path;
   ArrayList<usize> line_starts;
   ArrayList<source_diagnostic> diagnostics;
+  ArrayList<source_diagnostic> auxiliary_diagnostics;
+  HashSet followed_paths;
 
 private:
   fn rebuild_lines() throws -> void
@@ -772,8 +748,8 @@ fn decode_file_uri(StringView uri) throws -> Maybe<Path>
       continue;
     }
     if (position + 2 >= path_text.length) return None;
-    let const high = hex_value(path_text[position + 1]);
-    let const low = hex_value(path_text[position + 2]);
+    let const high = utils::hex_digit_value(path_text[position + 1]);
+    let const low = utils::hex_digit_value(path_text[position + 2]);
     if (!high.has_value() || !low.has_value()) return None;
     decoded.push(static_cast<char>((*high << 4) | *low));
     position += 2;
@@ -811,9 +787,9 @@ fn append_protocol_position(String &output, protocol_position position) throws
     -> void
 {
   output.append("{\"line\":");
-  output.append(String::from(position.line, heap_allocator()).view());
+  append_json_integer(output, static_cast<u64>(position.line));
   output.append(",\"character\":");
-  output.append(String::from(position.character, heap_allocator()).view());
+  append_json_integer(output, static_cast<u64>(position.character));
   output.push('}');
 }
 
@@ -841,7 +817,7 @@ pure fn mood_for(const Document &document) throws -> mimic_mood
   return mimic_mood::Default;
 }
 
-pure fn document_position(const JsonValue *position) wontthrow
+pure fn document_position(const JsonValue *position) throws
     -> Maybe<protocol_position>
 {
   let const line = integer_field(position, "line");

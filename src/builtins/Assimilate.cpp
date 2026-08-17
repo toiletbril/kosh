@@ -371,7 +371,7 @@ fn trace_stage(const ExecContext &ec, trace_output trace,
   ec.print_to_stderr(message.view());
 }
 
-fn run_program(ArrayList<String> arguments, const ExecContext &ec,
+fn run_program(const ArrayList<String> &arguments, const ExecContext &ec,
                trace_output trace, StringView stage) throws -> i32
 {
   trace_stage(ec, trace, stage);
@@ -607,7 +607,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   preflight_arguments.push(arguments[1].clone());
   preflight_arguments.push(preflight_command(
       executable_system.view(), executable_machine.view(), trace, allocator));
-  let status = run_program(steal(preflight_arguments), ec, trace, "preflight");
+  let status = run_program(preflight_arguments, ec, trace, "preflight");
   if (status != 0) return status;
 
   let const transaction_id =
@@ -623,7 +623,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   scp_arguments.push(String{"--"});
   scp_arguments.push(String{*executable});
   scp_arguments.push(String{destination.view()});
-  status = run_program(steal(scp_arguments), ec, trace, "upload");
+  status = run_program(scp_arguments, ec, trace, "upload");
   if (status != 0) return status;
 
   let ssh_arguments = ArrayList<String>{allocator};
@@ -634,7 +634,7 @@ fn Assimilate::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                     expected_identity->view(),
                                     link_moods.view(), trace, allocator));
 
-  status = run_program(steal(ssh_arguments), ec, trace, "install");
+  status = run_program(ssh_arguments, ec, trace, "install");
 
   return status;
 }

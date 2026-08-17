@@ -20,7 +20,9 @@ namespace koshka {
 
 namespace expressions {
 
-CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
+CompoundCommand::CompoundCommand(SourceLocation location)
+    : Command(steal(location))
+{}
 
 fn CompoundCommand::is_compound_command() const wontthrow -> bool
 {
@@ -49,7 +51,7 @@ pure fn CompoundCommand::is_fully_eliminated() const wontthrow -> bool
 
 IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
                    const Expression *otherwise)
-    : CompoundCommand(location), m_branches(steal(branches)),
+    : CompoundCommand(steal(location)), m_branches(steal(branches)),
       m_otherwise(otherwise)
 {}
 
@@ -223,7 +225,7 @@ fn IfClause::as_if_clause() const wontthrow -> const IfClause * { return this; }
 
 WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
                      const Expression *body, bool is_until)
-    : CompoundCommand(location), m_condition(condition), m_body(body),
+    : CompoundCommand(steal(location)), m_condition(condition), m_body(body),
       m_is_until(is_until)
 {}
 
@@ -247,7 +249,7 @@ cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
+hot fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
 {
   if (!cxt.has_pending_control_flow()) return loop_disposition::RunNext;
 
@@ -404,7 +406,7 @@ fn WhileLoop::as_while_loop() const wontthrow -> const WhileLoop *
 SelectLoop::SelectLoop(SourceLocation location, StringView variable_name,
                        ArrayList<const Token *> &&words, bool has_in_clause,
                        const Expression *body)
-    : CompoundCommand(location), m_variable_name(variable_name),
+    : CompoundCommand(steal(location)), m_variable_name(variable_name),
       m_has_in_clause(has_in_clause), m_body(body)
 {
   m_words = steal(words);
@@ -506,9 +508,9 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 ForLoop::ForLoop(SourceLocation location, SourceLocation variable_location,
                  StringView variable_name, ArrayList<const Token *> &&words,
                  bool has_in_clause, const Expression *body)
-    : CompoundCommand(location), m_variable_name(variable_name),
-      m_variable_location(variable_location), m_has_in_clause(has_in_clause),
-      m_body(body)
+    : CompoundCommand(steal(location)), m_variable_name(variable_name),
+      m_variable_location(steal(variable_location)),
+      m_has_in_clause(has_in_clause), m_body(body)
 {
   m_words = steal(words);
 }
@@ -725,7 +727,7 @@ pure fn ForLoop::words() const wontthrow -> const ArrayList<const Token *> &
 
 CaseClause::CaseClause(SourceLocation location, const Token *word,
                        ArrayList<case_item> &&items)
-    : CompoundCommand(location), m_word(word)
+    : CompoundCommand(steal(location)), m_word(word)
 {
   m_items = steal(items);
 }
@@ -961,7 +963,7 @@ fn CaseClause::analyze(AnalysisContext &actx,
 }
 
 BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
-    : CompoundCommand(location), m_body(body)
+    : CompoundCommand(steal(location)), m_body(body)
 {}
 
 BraceGroup::~BraceGroup() = default;

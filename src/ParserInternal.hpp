@@ -17,8 +17,9 @@ consteval fn token_kind_mask(Kinds... kinds) -> u64
 
 hot pure fn is_unquoted_word(const Token *token, StringView expected) wontthrow
     -> bool;
-cold [[noreturn]] fn throw_unterminated(SourceLocation opener, StringView what,
-                                        StringView source, StringView keyword,
+cold [[noreturn]] fn throw_unterminated(const SourceLocation &opener,
+                                        StringView what, StringView source,
+                                        StringView keyword,
                                         SourceLocation fallback) throws -> void;
 
 } /* namespace parser_internal */

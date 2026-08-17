@@ -258,7 +258,7 @@ fn make_synopsis(StringView program_name, const SynopsisList &lines) throws
 fn make_flag_help(const FlagList &flags) throws -> String;
 
 fn wrap_text(StringView text, usize indent, usize width,
-             Maybe<usize> continuation_indent = {}) throws -> String;
+             const Maybe<usize> &continuation_indent = {}) throws -> String;
 
 fn show_message(StringView err) throws -> void;
 

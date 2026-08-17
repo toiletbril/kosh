@@ -11,7 +11,8 @@ namespace expressions {
 
 fn check_posix_arithmetic_operators(AnalysisContext &actx,
                                     StringView expression,
-                                    SourceLocation location) throws -> void
+                                    const SourceLocation &location) throws
+    -> void
 {
   let has_increment = false;
   let has_decrement = false;
@@ -40,7 +41,8 @@ fn check_posix_arithmetic_operators(AnalysisContext &actx,
 
 fn check_arithmetic_expression_lints(AnalysisContext &actx,
                                      StringView expression,
-                                     SourceLocation location) throws -> void
+                                     const SourceLocation &location) throws
+    -> void
 {
   let has_reported_test_operator = false;
   let has_reported_decimal = false;

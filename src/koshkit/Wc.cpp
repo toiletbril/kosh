@@ -148,10 +148,20 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
       if (*read_size == 0) break;
       bytes += *read_size;
 
-      if (should_show_words) {
+      if (should_show_words && should_show_lines) {
         for (usize i = 0; i < *read_size; i++) {
           let const c = buffer[i];
-          if (should_show_lines && c == '\n') lines++;
+          if (c == '\n') lines++;
+          if (is_blank(c)) {
+            is_in_word = false;
+          } else if (!is_in_word) {
+            is_in_word = true;
+            words++;
+          }
+        }
+      } else if (should_show_words) {
+        for (usize i = 0; i < *read_size; i++) {
+          let const c = buffer[i];
           if (is_blank(c)) {
             is_in_word = false;
           } else if (!is_in_word) {
@@ -160,8 +170,15 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
           }
         }
       } else if (should_show_lines) {
-        for (usize i = 0; i < *read_size; i++)
-          if (buffer[i] == '\n') lines++;
+        let remaining = StringView{buffer, *read_size};
+
+        loop
+        {
+          let const newline = remaining.find_character('\n');
+          if (!newline.has_value()) break;
+          lines++;
+          remaining = remaining.substring(*newline + 1);
+        }
       }
     }
     if (did_read_fail) continue;

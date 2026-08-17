@@ -31,7 +31,7 @@ pure fn Flag::value_location() const wontthrow -> SourceLocation
 
 fn Flag::set_value_location(SourceLocation location) wontthrow -> void
 {
-  m_value_location = location;
+  m_value_location = steal(location);
 }
 
 pure fn Flag::short_name() const wontthrow -> char { return m_short_name; }
@@ -778,7 +778,7 @@ cold fn make_synopsis(StringView program_name, const SynopsisList &lines) throws
 }
 
 cold fn wrap_text(StringView text, usize indent, usize width,
-                  Maybe<usize> continuation_indent) throws -> String
+                  const Maybe<usize> &continuation_indent) throws -> String
 {
   let out = String{heap_allocator()};
   let line_indent = indent;
@@ -801,8 +801,7 @@ cold fn wrap_text(StringView text, usize indent, usize width,
         line_used = 0;
       }
       if (!is_line_started) {
-        for (usize j = 0; j < line_indent; j++)
-          out += ' ';
+        out.append_repeated(' ', line_indent);
         is_line_started = true;
       } else {
         out += ' ';

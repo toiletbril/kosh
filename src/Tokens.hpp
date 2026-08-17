@@ -74,10 +74,13 @@ public:
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
 
-  cold fn clone() const throws -> WordSegment
+  cold fn clone(Allocator allocator) const throws -> WordSegment
   {
-    let copy =
-        WordSegment{kind, text.clone(), is_in_double_quotes, is_greedy_name};
+    let copy = WordSegment{
+        kind, String{allocator, text.view()},
+         is_in_double_quotes,
+        is_greedy_name
+    };
     copy.was_ansi_c_quoted = was_ansi_c_quoted;
     copy.is_substitution_cache_in_function_arena =
         is_substitution_cache_in_function_arena;
@@ -87,6 +90,11 @@ public:
     copy.cached_substitution_ast = cached_substitution_ast;
     copy.cached_substitution_generation = cached_substitution_generation;
     return copy;
+  }
+
+  cold fn clone() const throws -> WordSegment
+  {
+    return clone(text.allocator());
   }
 
   pure fn get_folded_arithmetic_result() const wontthrow -> i64
@@ -111,7 +119,7 @@ public:
       -> Maybe<SourceLocation>
   {
     if (source_length == 0) return None;
-    return SourceLocation{source_position, source_length, filename};
+    return SourceLocation{source_position, source_length, steal(filename)};
   }
 
   pure fn has_glob_metacharacter() const wontthrow -> bool;
@@ -302,7 +310,8 @@ inline constexpr StaticStringMap KEYWORDS{KEYWORD_ENTRIES};
 /* clang-format off */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
-    t = m_arena->create<tokens::k>(here(actual_cursor_position, byte_count));  \
+    token =                                                                    \
+        m_arena->create<tokens::k>(here(actual_cursor_position, byte_count));  \
     break
 /* clang-format on */
 
@@ -466,25 +475,31 @@ public:
       -> Expression *;
 };
 
+#define OPERATOR_TOKEN_STRUCT_COMMON(t)                                        \
+public:                                                                        \
+  t(SourceLocation location);                                                  \
+                                                                               \
+  Kind kind() const wontthrow override;                                        \
+  Flags flags() const wontthrow override;                                      \
+  String raw_string() const throws override;                                   \
+  Maybe<StringView> raw_view() const wontthrow override
+
+#define BINARY_OPERATOR_TOKEN_STRUCT_MEMBERS                                   \
+  u8 left_precedence() const wontthrow override;                               \
+  Expression *construct_binary_expression(                                     \
+      const Expression *lhs, const Expression *rhs) const throws override
+
+#define UNARY_OPERATOR_TOKEN_STRUCT_MEMBERS                                    \
+  u8 unary_precedence() const wontthrow override;                              \
+  Expression *construct_unary_expression(const Expression *rhs)                \
+      const throws override
+
 #define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
   class t : public Operator                                                    \
   {                                                                            \
-  public:                                                                      \
-    t(SourceLocation location);                                                \
-                                                                               \
-    Kind kind() const wontthrow override;                                      \
-    Flags flags() const wontthrow override;                                    \
-    String raw_string() const throws override;                                 \
-    Maybe<StringView> raw_view() const wontthrow override;                     \
-                                                                               \
-    u8 left_precedence() const wontthrow override;                             \
-    Expression *                                                               \
-    construct_binary_expression(const Expression *lhs,                         \
-                                const Expression *rhs) const throws override;  \
-                                                                               \
-    u8 unary_precedence() const wontthrow override;                            \
-    Expression *                                                               \
-    construct_unary_expression(const Expression *rhs) const throws override;   \
+    OPERATOR_TOKEN_STRUCT_COMMON(t);                                           \
+    BINARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                      \
+    UNARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                       \
   }
 
 UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
@@ -493,17 +508,8 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
 #define UNARY_OPERATOR_TOKEN_STRUCT(t)                                         \
   class t : public Operator                                                    \
   {                                                                            \
-  public:                                                                      \
-    t(SourceLocation location);                                                \
-                                                                               \
-    Kind kind() const wontthrow override;                                      \
-    Flags flags() const wontthrow override;                                    \
-    String raw_string() const throws override;                                 \
-    Maybe<StringView> raw_view() const wontthrow override;                     \
-                                                                               \
-    u8 unary_precedence() const wontthrow override;                            \
-    Expression *                                                               \
-    construct_unary_expression(const Expression *rhs) const throws override;   \
+    OPERATOR_TOKEN_STRUCT_COMMON(t);                                           \
+    UNARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                       \
   }
 
 UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
@@ -512,18 +518,8 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
 #define BINARY_OPERATOR_TOKEN_STRUCT(t)                                        \
   class t : public Operator                                                    \
   {                                                                            \
-  public:                                                                      \
-    t(SourceLocation location);                                                \
-                                                                               \
-    Kind kind() const wontthrow override;                                      \
-    Flags flags() const wontthrow override;                                    \
-    String raw_string() const throws override;                                 \
-    Maybe<StringView> raw_view() const wontthrow override;                     \
-                                                                               \
-    u8 left_precedence() const wontthrow override;                             \
-    Expression *                                                               \
-    construct_binary_expression(const Expression *lhs,                         \
-                                const Expression *rhs) const throws override;  \
+    OPERATOR_TOKEN_STRUCT_COMMON(t);                                           \
+    BINARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                      \
   }
 
 BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);

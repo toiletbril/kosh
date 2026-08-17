@@ -213,7 +213,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              SourceLocation location, StringView message) throws
     -> void
 {
-  const ErrorWithLocation located{location,
+  const ErrorWithLocation located{steal(location),
                                   builtin_error_message(ec.program(), message)};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
@@ -225,7 +225,7 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              SourceLocation location, StringView message,
                              StringView note) throws -> void
 {
-  report_soft_builtin_error(ec, cxt, location, message);
+  report_soft_builtin_error(ec, cxt, steal(location), message);
   show_message(Note{String{note}}.to_string());
 }
 
@@ -252,8 +252,8 @@ fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
 fn report_usage_error(EvalContext &cxt, SourceLocation location,
                       StringView program_name) throws -> i32
 {
-  const ErrorWithLocation located{location, String{program_name} +
-                                                ": Not enough arguments"};
+  const ErrorWithLocation located{
+      steal(location), String{program_name} + ": Not enough arguments"};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view(), &cxt));
   else
@@ -390,7 +390,7 @@ fn parse_directory_stack_rotation(StringView arg, usize ring_count,
 
 fn logical_working_directory(EvalContext &cxt) throws -> Path
 {
-  let const physical_directory = Path::current_directory();
+  let physical_directory = Path::current_directory();
   let const logical_pwd = cxt.get_variable_value("PWD");
   if (logical_pwd.has_value() && !logical_pwd->is_empty() &&
       os::path_is_absolute(logical_pwd->view()))

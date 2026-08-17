@@ -475,8 +475,9 @@ fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                            StringView source, process_group_mode process_group,
                            i64 process_group_id) throws -> Maybe<process>
 {
-  return fork_compound_stage(in_fd, out_fd, err_fd, location, source,
-                             process_group, process_group_id);
+  return fork_compound_stage(steal(in_fd), steal(out_fd), steal(err_fd),
+                             steal(location), source, process_group,
+                             process_group_id);
 }
 
 fn try_fork_job_process() throws -> Maybe<process>
@@ -545,9 +546,9 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
 {
   unused(source);
   unused(mood);
-  const process child =
-      fork_compound_stage(in_fd, out_fd, err_fd, location, diagnostic_source,
-                          process_group, process_group_id);
+  const process child = fork_compound_stage(
+      steal(in_fd), steal(out_fd), steal(err_fd), steal(location),
+      diagnostic_source, process_group, process_group_id);
   return compound_stage_launch{
       .child = child,
       .should_evaluate_child = child == 0,
@@ -1145,10 +1146,8 @@ fn wait_for_measured_child(pid_t child_pid, i64 &status_out,
 } /* namespace */
 
 fn run_measured(const ArrayList<String> &argv, measured_output output,
-                Maybe<descriptor> inherited_handle) throws
-    -> Maybe<measured_result>
+                const Maybe<descriptor> &) throws -> Maybe<measured_result>
 {
-  unused(inherited_handle);
   if (argv.is_empty()) return None;
 
   measured_result result{};

@@ -19,8 +19,6 @@ namespace koshka {
 
 namespace {
 
-pure fn is_hex_digit(char c) wontthrow -> bool;
-
 struct printf_number
 {
   i64 value;
@@ -87,7 +85,7 @@ fn parse_printf_number(const String &arg) throws -> printf_number
   if (is_hexadecimal) {
     i += 2;
     digit_start = i;
-    while (i < arg.count() && is_hex_digit(arg[i]))
+    while (i < arg.count() && utils::hex_digit_value(arg[i]).has_value())
       i++;
   } else if (is_octal) {
     while (i < arg.count() && arg[i] >= '0' && arg[i] <= '7')
@@ -116,45 +114,6 @@ fn parse_printf_number(const String &arg) throws -> printf_number
 fn parse_printf_integer(const String &arg) throws -> i64
 {
   return parse_printf_number(arg).value;
-}
-
-pure fn is_hex_digit(char c) wontthrow -> bool
-{
-  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-         (c >= 'A' && c <= 'F');
-}
-
-pure fn hex_digit_value(char c) wontthrow -> i32
-{
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-  return c - 'A' + 10;
-}
-
-fn append_utf8_code_point(String &out, u32 code_point) throws -> void
-{
-  if (code_point < 0x80) {
-    out += static_cast<char>(code_point);
-    return;
-  }
-
-  if (code_point < 0x800) {
-    out += static_cast<char>(0xC0 | (code_point >> 6));
-    out += static_cast<char>(0x80 | (code_point & 0x3F));
-    return;
-  }
-
-  if (code_point < 0x10000) {
-    out += static_cast<char>(0xE0 | (code_point >> 12));
-    out += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
-    out += static_cast<char>(0x80 | (code_point & 0x3F));
-    return;
-  }
-
-  out += static_cast<char>(0xF0 | (code_point >> 18));
-  out += static_cast<char>(0x80 | ((code_point >> 12) & 0x3F));
-  out += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
-  out += static_cast<char>(0x80 | (code_point & 0x3F));
 }
 
 fn append_simple_escape(String &out, char e,
@@ -208,13 +167,16 @@ fn append_escape(String &out, const String &fmt, usize &i,
     return;
   }
 
-  if (e == 'x' && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
+  if (e == 'x' && i + 1 < fmt.length() &&
+      utils::hex_digit_value(fmt[i + 1]).has_value())
+  {
     i32 value = 0;
     usize digit_count = 0;
-    while (digit_count < 2 && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1]))
+    while (digit_count < 2 && i + 1 < fmt.length() &&
+           utils::hex_digit_value(fmt[i + 1]).has_value())
     {
       i++;
-      value = value * 16 + hex_digit_value(fmt[i]);
+      value = value * 16 + *utils::hex_digit_value(fmt[i]);
       digit_count++;
     }
     out += static_cast<char>(value);
@@ -222,20 +184,20 @@ fn append_escape(String &out, const String &fmt, usize &i,
   }
 
   if ((e == 'u' || e == 'U') && i + 1 < fmt.length() &&
-      is_hex_digit(fmt[i + 1]))
+      utils::hex_digit_value(fmt[i + 1]).has_value())
   {
     usize max_digit_count = e == 'u' ? 4 : 8;
     u32 code_point = 0;
     usize digit_count = 0;
     while (digit_count < max_digit_count && i + 1 < fmt.length() &&
-           is_hex_digit(fmt[i + 1]))
+           utils::hex_digit_value(fmt[i + 1]).has_value())
     {
       i++;
-      code_point = code_point * 16 + hex_digit_value(fmt[i]);
+      code_point = code_point * 16 + *utils::hex_digit_value(fmt[i]);
       digit_count++;
     }
 
-    append_utf8_code_point(out, code_point);
+    utils::append_utf8(out, code_point);
     return;
   }
 
@@ -253,14 +215,16 @@ fn append_b_argument(String &out, const String &arg,
     }
     let const e = arg[i + 1];
     if (e == 'c') return true;
-    if (e == 'x' && i + 2 < arg.length() && is_hex_digit(arg[i + 2])) {
+    if (e == 'x' && i + 2 < arg.length() &&
+        utils::hex_digit_value(arg[i + 2]).has_value())
+    {
       usize digit_index = i + 2;
       i32 value = 0;
       usize digit_count = 0;
       while (digit_count < 2 && digit_index < arg.length() &&
-             is_hex_digit(arg[digit_index]))
+             utils::hex_digit_value(arg[digit_index]).has_value())
       {
-        value = value * 16 + hex_digit_value(arg[digit_index]);
+        value = value * 16 + *utils::hex_digit_value(arg[digit_index]);
         digit_index++;
         digit_count++;
       }

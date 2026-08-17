@@ -91,11 +91,7 @@ static fn parse_make_database_targets(StringView database,
   let skip_next_rule = false;
   usize i = 0;
   while (i < database.length) {
-    let end = i;
-    while (end < database.length && database[end] != '\n')
-      end++;
-    let const text = database.substring_of_length(i, end - i);
-    i = end + 1;
+    let const text = database.next_line(i);
 
     if (text.starts_with(StringView{"# Files"})) {
       in_files_section = true;
@@ -128,11 +124,7 @@ static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
   let names = ArrayList<String>{heap_allocator()};
   usize i = 0;
   while (i < listing.length) {
-    let end = i;
-    while (end < listing.length && listing[end] != '\n')
-      end++;
-    let const text = listing.substring_of_length(i, end - i);
-    i = end + 1;
+    let const text = listing.next_line(i);
     let const colon = text.find_character(':');
     if (!colon.has_value() || *colon == 0) continue;
     let const name = text.substring_of_length(0, *colon);
@@ -148,11 +140,7 @@ static fn parse_tsh_node_names(StringView listing) throws -> ArrayList<String>
   usize i = 0;
   let has_passed_rule = false;
   while (i < listing.length) {
-    let end = i;
-    while (end < listing.length && listing[end] != '\n')
-      end++;
-    let const row = listing.substring_of_length(i, end - i);
-    i = end + 1;
+    let const row = listing.next_line(i);
 
     if (!has_passed_rule) {
       if (!row.is_empty() && row[0] == '-') has_passed_rule = true;
@@ -237,11 +225,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
     let const text = config->view();
     usize i = 0;
     while (i < text.length) {
-      let end = i;
-      while (end < text.length && text[end] != '\n')
-        end++;
-      let row = text.substring_of_length(i, end - i);
-      i = end + 1;
+      let row = text.next_line(i);
       while (!row.is_empty() && (row[0] == ' ' || row[0] == '\t'))
         row = row.substring(1);
       if (!(row.starts_with(StringView{"Host "}) ||
@@ -274,11 +258,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
     let const text = known->view();
     usize i = 0;
     while (i < text.length) {
-      let end = i;
-      while (end < text.length && text[end] != '\n')
-        end++;
-      let const row = text.substring_of_length(i, end - i);
-      i = end + 1;
+      let const row = text.next_line(i);
       /* A hashed row opens with |1| and hides its host on purpose. */
       if (row.is_empty() || row[0] == '#' || row[0] == '|') continue;
       usize field_end = 0;
@@ -492,11 +472,7 @@ fn complete_from_tools_with_targets(StringView line, StringView token,
       let const text = help.view();
       usize i = 0;
       while (i < text.length) {
-        let end = i;
-        while (end < text.length && text[end] != '\n')
-          end++;
-        let const row = text.substring_of_length(i, end - i);
-        i = end + 1;
+        let const row = text.next_line(i);
         if (!row.starts_with(StringView{"... "})) continue;
         let name = row.substring(4);
         if (let const space = name.find_character(' '); space.has_value())

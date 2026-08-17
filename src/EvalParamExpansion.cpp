@@ -13,6 +13,40 @@
 
 namespace koshka {
 
+fn compute_substring_bounds(i64 value_count, i64 offset, Maybe<i64> length,
+                            substring_subject subject) throws
+    -> substring_bounds
+{
+  i64 start = offset < 0 && offset < -value_count ? -1
+              : offset < 0                        ? value_count + offset
+                                                  : offset;
+  if (start < 0) {
+    if (subject == substring_subject::Scalar) return substring_bounds{0, 0};
+    start = 0;
+  }
+  if (start > value_count) start = value_count;
+
+  i64 end = value_count;
+  if (length.has_value()) {
+    if (*length < 0) {
+      if (subject == substring_subject::List)
+        throw Error{"Unable to take the substring because the length names "
+                    "a point before the offset"};
+      end = *length < -value_count ? -1 : value_count + *length;
+    } else {
+      let const clamped_length = *length > value_count ? value_count : *length;
+      end = clamped_length > value_count - start ? value_count
+                                                 : start + clamped_length;
+    }
+  }
+  if (end > value_count) end = value_count;
+  if (end < start)
+    throw Error{"Unable to take the substring because the length names "
+                "a point before the offset"};
+
+  return substring_bounds{start, end};
+}
+
 namespace {
 
 static fn source_location_for_subview(
@@ -25,7 +59,7 @@ static fn source_location_for_subview(
                                            source_location_offset);
 }
 
-enum class trim_end
+enum class trim_end : u8
 {
   Prefix,
   Suffix,
@@ -615,10 +649,10 @@ hot fn EvalContext::apply_parameter_expansion(
         }
         if (is_test_form) {
           let const element_is_set = array_element_is_set(name, subscript);
-          let const value =
-              element_is_set ? apply_array_subscript(name, subscript,
-                                                     subscript_location_pointer)
-                             : String{scratch_allocator()};
+          let value = element_is_set
+                          ? apply_array_subscript(name, subscript,
+                                                  subscript_location_pointer)
+                          : String{scratch_allocator()};
           let const treat_as_unset =
               is_colon ? value.is_empty() : !element_is_set;
           let const word = modifier.substring(is_colon ? 2 : 1);
@@ -631,7 +665,7 @@ hot fn EvalContext::apply_parameter_expansion(
             return do_expand_modifier_word(word);
           case '=': {
             if (!treat_as_unset) return value;
-            let const assigned = do_expand_modifier_word(word);
+            let assigned = do_expand_modifier_word(word);
             assign_array_element(name, subscript, assigned.view(), false);
             return assigned;
           }
@@ -658,8 +692,9 @@ hot fn EvalContext::apply_parameter_expansion(
       return String{scratch_allocator(), stored->view()};
     let value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
-    return value.has_value() ? String{scratch_allocator(), value->view()}
-                             : String{scratch_allocator()};
+    if (value.has_value()) return String{scratch_allocator(), value->view()};
+
+    return String{scratch_allocator()};
   }
 
   /* A leading colon makes the test forms treat an empty value as unset. */
@@ -819,37 +854,25 @@ fn EvalContext::apply_substring_to_value(
                                                  source_location, body,
                                                  offset_text, offset_location));
 
-  i64 start = offset < 0 ? value_length + offset : offset;
-  if (start < 0) return String{scratch_allocator()};
-  if (start > value_length) start = value_length;
-
-  i64 end = value_length;
+  Maybe<i64> requested_length = None;
   if (separator < body.length) {
     let const length_text = body.substring(separator + 1);
     let length_location = SourceLocation{};
-    i64 length = length_text.is_empty()
-                     ? 0
-                     : evaluate_arithmetic(length_text,
-                                           source_location_for_subview(
-                                               source_location, body,
-                                               length_text, length_location));
-    if (length < 0) {
-      end = value_length + length;
-    } else {
-      /* The length is clamped first to keep start + length from overflowing
-         i64. */
-      if (length > value_length) length = value_length;
-      end = start + length;
-    }
+    requested_length =
+        length_text.is_empty()
+            ? 0
+            : evaluate_arithmetic(length_text,
+                                  source_location_for_subview(source_location,
+                                                              body, length_text,
+                                                              length_location));
   }
-  if (end > value_length) end = value_length;
-  if (end < start)
-    throw Error{"Unable to take the substring because the length names "
-                "a point before the offset"};
+  let const bounds = compute_substring_bounds(
+      value_length, offset, requested_length, substring_subject::Scalar);
 
-  return String{scratch_allocator(),
-                value.substring_of_length(static_cast<usize>(start),
-                                          static_cast<usize>(end - start))};
+  return String{
+      scratch_allocator(),
+      value.substring_of_length(static_cast<usize>(bounds.start),
+                                static_cast<usize>(bounds.end - bounds.start))};
 }
 
 /* A slash inside a quote run or behind a backslash belongs to the pattern, the

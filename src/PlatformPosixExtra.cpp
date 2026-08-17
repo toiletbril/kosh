@@ -388,7 +388,7 @@ public:
     return true;
   }
 
-  fn start() wontthrow -> bool
+  fn start() const wontthrow -> bool
   {
     return get_cpu_counters(true, counter_classes, nullptr, start_counters) ==
            0;

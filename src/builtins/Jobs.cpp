@@ -134,8 +134,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     out.append(state_color(job.state, should_color));
     let state = StringView{state_word(job.state)};
     out.append(state);
-    for (usize pad = state.length; pad < 7; pad++)
-      out.push(' ');
+    out.append_repeated(' ', state.length < 7 ? 7 - state.length : 0);
     if (should_color) out += colors::ansi::RESET;
 
     out += "  ";

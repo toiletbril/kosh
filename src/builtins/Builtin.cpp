@@ -42,29 +42,12 @@ static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
 {
   let const sorted = sorted_builtin_names(allocator);
 
-  usize longest_length = 0;
-  for (let const &builtin_name : sorted)
-    if (builtin_name.length() > longest_length)
-      longest_length = builtin_name.length();
-  let const column_width = longest_length + 2;
-  let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
-
   let out = String{allocator};
   out += "Koshka has ";
   out += String::from(static_cast<i64>(sorted.count()), allocator);
   out += " builtins:\n\n";
-  for (usize i = 0; i < sorted.count(); i++) {
-    if (i % columns == 0) out += "  ";
-    out += sorted[i].view();
-    let const is_last_in_row =
-        i % columns == columns - 1 || i + 1 == sorted.count();
-    if (is_last_in_row) {
-      out += "\n";
-    } else {
-      for (usize pad = sorted[i].length(); pad < column_width; pad++)
-        out += " ";
-    }
-  }
+  utils::append_name_columns(out, sorted.count(),
+                             [&](usize index) { return sorted[index].view(); });
   ec.print_to_stdout(out.view());
 }
 

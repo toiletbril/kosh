@@ -152,7 +152,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
 
   usize running_index = 0;
   if (is_append) {
-    if (let const *array = lookup_indexed_array(name))
+    if (let const *array = lookup_indexed_array(name); array != nullptr)
       running_index = array->count();
     if (m_sparse_array_names.contains(name)) {
       let const sparse = collect_sparse_array_entries(
@@ -198,7 +198,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
   ArrayList<String> *dense = m_indexed_arrays.find(name);
   if (dense == nullptr) {
     let elements = ArrayList<String>{heap_allocator()};
-    if (let const *scalar = m_shell_variables.find(name))
+    if (let const *scalar = m_shell_variables.find(name); scalar != nullptr)
       elements.push(String{heap_allocator(), scalar->view()});
     set_indexed_array(name, steal(elements));
     dense = m_indexed_arrays.find(name);
@@ -282,8 +282,10 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
       return;
     }
     if (is_append) {
-      let combined = String{lookup_associative_element(name, key.view())
-                                .value_or(String{scratch_allocator()})};
+      let const existing = lookup_associative_element(name, key.view());
+      let combined = existing.has_value()
+                         ? String{scratch_allocator(), existing->view()}
+                         : String{scratch_allocator()};
       combined += value;
       set_associative_element(name, key.view(), combined.view());
     } else {
@@ -372,7 +374,8 @@ fn EvalContext::lookup_associative_element(StringView name,
     -> Maybe<String>
 {
   if (let const *value = m_associative_values.find(
-          associative_composite_key(name, key, scratch_allocator()).view()))
+          associative_composite_key(name, key, scratch_allocator()).view());
+      value != nullptr)
     return *value;
   return None;
 }
@@ -436,7 +439,8 @@ fn EvalContext::unset_array_element(StringView name,
     return;
   }
 
-  if (ArrayList<String> *array = m_indexed_arrays.find(name)) {
+  if (ArrayList<String> *array = m_indexed_arrays.find(name); array != nullptr)
+  {
     let const index = evaluate_arithmetic(subscript);
     let const array_count = static_cast<i64>(array->count());
     const i64 resolved =
@@ -555,7 +559,7 @@ hot fn EvalContext::expand_variable(StringView name) const throws -> String
 fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
 {
   i64 base = 0;
-  if (let const *array = m_indexed_arrays.find(name))
+  if (let const *array = m_indexed_arrays.find(name); array != nullptr)
     base = static_cast<i64>(array->count());
 
   if (m_sparse_array_names.contains(name)) {
@@ -694,9 +698,10 @@ fn EvalContext::apply_array_subscript(
     }
     let const key =
         expand_modifier_word(subscript, true, true, source_location);
-    return String{heap_allocator(), lookup_associative_element(name, key.view())
-                                        .value_or(String{scratch_allocator()})
-                                        .view()};
+    let const value = lookup_associative_element(name, key.view());
+    if (value.has_value()) return String{heap_allocator(), value->view()};
+
+    return String{heap_allocator()};
   }
 
   const ArrayList<String> *array = lookup_indexed_array(name);
@@ -775,7 +780,9 @@ fn EvalContext::collect_array_elements(StringView name) const throws
   if (is_associative_array(name)) return associative_values(name);
 
   let out = ArrayList<String>{heap_allocator()};
-  if (const ArrayList<String> *array = lookup_indexed_array(name)) {
+  if (const ArrayList<String> *array = lookup_indexed_array(name);
+      array != nullptr)
+  {
     out.reserve(array->count());
     for (const String &element : *array)
       out.push_managed(element.view());
@@ -803,7 +810,9 @@ fn EvalContext::array_element_is_set(StringView name,
     return lookup_associative_element(name, key.view()).has_value();
   }
   let const index = evaluate_arithmetic(subscript);
-  if (const ArrayList<String> *array = lookup_indexed_array(name)) {
+  if (const ArrayList<String> *array = lookup_indexed_array(name);
+      array != nullptr)
+  {
     let const array_count = static_cast<i64>(array->count());
     /* A negative index counts from the highest set index, so [[ -v a[-1] ]]
        names the element ${a[-1]} reads. */
@@ -856,7 +865,7 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
       out.push(String{heap_allocator(), key.view()});
     return out;
   }
-  if (let const *array = lookup_indexed_array(name)) {
+  if (let const *array = lookup_indexed_array(name); array != nullptr) {
     out.reserve(array->count());
     for (usize i = 0; i < array->count(); i++)
       out.push(String::from(i, heap_allocator()));

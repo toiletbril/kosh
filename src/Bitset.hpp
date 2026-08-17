@@ -13,8 +13,7 @@ public:
 
   explicit Bitset(Allocator allocator) : m_words(allocator) {}
 
-  Bitset(const Bitset &other) : m_words(other.m_words), m_length(other.m_length)
-  {}
+  Bitset(const Bitset &) = default;
   Bitset(Bitset &&other) noexcept
       : m_words(steal(other.m_words)), m_length(other.m_length)
   {

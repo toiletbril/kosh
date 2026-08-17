@@ -487,7 +487,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       ArrayList<String> values =
           cxt.process_args(assignment.elements, argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);
-      cxt.assign_indexed_array_elements(assignment.name, steal(values),
+      cxt.assign_indexed_array_elements(assignment.name, values,
                                         assignment.is_append);
     }
     /* A value that ran a command substitution leaves the status of the last
@@ -842,7 +842,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           cxt.set_associative_element(assignment.name, text, StringView{});
         }
       } else {
-        cxt.assign_indexed_array_elements(assignment.name, steal(values),
+        cxt.assign_indexed_array_elements(assignment.name, values,
                                           assignment.is_append);
       }
       if (is_export) cxt.mark_exported(assignment.name);

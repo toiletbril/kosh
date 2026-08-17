@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
+#include "../Utils.hpp"
 
 /* An option whose pattern engine is not yet wired still records its state so a
    later query reads it back. */
@@ -99,25 +100,10 @@ fn shopt_status_line(StringView name, bool on, Allocator allocator) throws
 
 fn format_option_names_help(Allocator allocator) throws -> String
 {
-  usize longest_length = 0;
-  for (let const &name : SHOPT_OPTION_NAMES)
-    if (name.length > longest_length) longest_length = name.length;
-  let const column_width = longest_length + 2;
-  let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
-
   let section = String{allocator, "OPTION NAMES\n"};
-  let const total = sizeof(SHOPT_OPTION_NAMES) / sizeof(SHOPT_OPTION_NAMES[0]);
-  for (usize i = 0; i < total; i++) {
-    if (i % columns == 0) section += "  ";
-    section += SHOPT_OPTION_NAMES[i];
-    let const is_last_in_row = i % columns == columns - 1 || i + 1 == total;
-    if (is_last_in_row) {
-      section += "\n";
-    } else {
-      for (usize pad = SHOPT_OPTION_NAMES[i].length; pad < column_width; pad++)
-        section += " ";
-    }
-  }
+  let const total = countof(SHOPT_OPTION_NAMES);
+  utils::append_name_columns(
+      section, total, [](usize index) { return SHOPT_OPTION_NAMES[index]; });
   return section;
 }
 
@@ -143,8 +129,7 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {
   static ArrayList<StringView> names = [] throws {
     let collected = ArrayList<StringView>{heap_allocator()};
-    collected.reserve(sizeof(SHOPT_OPTION_NAMES) /
-                      sizeof(SHOPT_OPTION_NAMES[0]));
+    collected.reserve(countof(SHOPT_OPTION_NAMES));
     for (let const &name : SHOPT_OPTION_NAMES)
       collected.push(name);
     return collected;

@@ -15,12 +15,6 @@ namespace koshka {
 
 namespace utils {
 
-static pure fn is_ascii_whitespace(char c) wontthrow -> bool
-{
-  return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||
-         c == '\r';
-}
-
 /* Turn an accumulated magnitude and sign into a saturating signed result. The
    per-base parsers share this so only the digit loop stays base-specific. */
 static pure fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
@@ -59,6 +53,19 @@ fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
     magnitude /= 10;
   } while (magnitude > 0);
   if (is_negative) buffer[--offset] = '-';
+  return StringView{buffer + offset, buffer_size - offset};
+}
+
+fn uint_to_text_into(u64 value, char *buffer, usize buffer_size) wontthrow
+    -> StringView
+{
+  ASSERT(buffer_size >= 20, "the buffer must hold twenty digits");
+  usize offset = buffer_size;
+  do {
+    buffer[--offset] = static_cast<char>('0' + value % 10);
+    value /= 10;
+  } while (value > 0);
+
   return StringView{buffer + offset, buffer_size - offset};
 }
 
@@ -203,6 +210,22 @@ fn format_time_report_custom(StringView format, double real_seconds,
   return report;
 }
 
+fn format_time_report(bool should_use_posix_format,
+                      const Maybe<String> &time_format, double real_seconds,
+                      double user_seconds, double system_seconds,
+                      u64 peak_rss_bytes) throws -> String
+{
+  if (should_use_posix_format)
+    return format_time_report_posix(real_seconds, user_seconds, system_seconds);
+  if (!time_format.has_value())
+    return format_time_report_pretty(real_seconds, user_seconds, system_seconds,
+                                     peak_rss_bytes);
+  if (time_format->is_empty()) return String{heap_allocator()};
+
+  return format_time_report_custom(time_format->view(), real_seconds,
+                                   user_seconds, system_seconds);
+}
+
 /* A newline offset table cached on one source, keyed on the source pointer and
    length, so a $LINENO lookup is a binary search over the newlines. */
 class LineNumberCache
@@ -262,7 +285,7 @@ private:
   ArrayList<usize> m_newline_offsets;
 };
 
-static LineNumberCache LINE_NUMBER_CACHE{};
+static thread_local LineNumberCache LINE_NUMBER_CACHE{};
 
 fn source_line_position_at(StringView source, usize position) throws
     -> source_line_position
@@ -537,31 +560,6 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
 
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
 {
-  let const do_hex_value = [](char h) -> i32 {
-    if (h >= '0' && h <= '9') return h - '0';
-    if (h >= 'a' && h <= 'f') return h - 'a' + 10;
-    if (h >= 'A' && h <= 'F') return h - 'A' + 10;
-    return -1;
-  };
-
-  let const do_emit_codepoint = [&](u32 cp) throws {
-    if (cp < 0x80) {
-      out.push(static_cast<char>(cp));
-    } else if (cp < 0x800) {
-      out.push(static_cast<char>(0xC0 | (cp >> 6)));
-      out.push(static_cast<char>(0x80 | (cp & 0x3F)));
-    } else if (cp < 0x10000) {
-      out.push(static_cast<char>(0xE0 | (cp >> 12)));
-      out.push(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-      out.push(static_cast<char>(0x80 | (cp & 0x3F)));
-    } else {
-      out.push(static_cast<char>(0xF0 | (cp >> 18)));
-      out.push(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
-      out.push(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-      out.push(static_cast<char>(0x80 | (cp & 0x3F)));
-    }
-  };
-
   usize i = 0;
   while (i < body.length) {
     let const c = body[i];
@@ -596,9 +594,9 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
       i32 value = 0;
       i32 digit_count = 0;
       while (digit_count < 2 && i < body.length) {
-        let const digit = do_hex_value(body[i]);
-        if (digit < 0) break;
-        value = value * 16 + digit;
+        let const digit = hex_digit_value(body[i]);
+        if (!digit.has_value()) break;
+        value = value * 16 + *digit;
         i++;
         digit_count++;
       }
@@ -634,9 +632,9 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
       u32 codepoint = 0;
       i32 digit_count = 0;
       while (digit_count < max_digit_count && i < body.length) {
-        let const digit = do_hex_value(body[i]);
-        if (digit < 0) break;
-        codepoint = codepoint * 16 + static_cast<u32>(digit);
+        let const digit = hex_digit_value(body[i]);
+        if (!digit.has_value()) break;
+        codepoint = codepoint * 16 + *digit;
         i++;
         digit_count++;
       }
@@ -644,7 +642,7 @@ fn decode_ansi_c_escapes(String &out, StringView body) throws -> void
         out.push('\\');
         out.push(e);
       } else {
-        do_emit_codepoint(codepoint);
+        append_utf8(out, codepoint);
       }
     } break;
     default:

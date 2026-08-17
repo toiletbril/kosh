@@ -47,3 +47,9 @@ r	variable
 in	keyword
 do	keyword
 done	keyword
+EOF	heredoc-delimiter
+	heredoc
+EOF	heredoc-delimiter
+"DONE"	heredoc-delimiter
+		heredoc
+DONE	heredoc-delimiter

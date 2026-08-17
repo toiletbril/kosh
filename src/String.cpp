@@ -111,6 +111,12 @@ fn String::pop_back() wontthrow -> void
   m_data[m_length] = '\0';
 }
 
+fn String::strip_trailing_newlines() wontthrow -> void
+{
+  while (m_length != 0 && m_data[m_length - 1] == '\n')
+    m_data[--m_length] = '\0';
+}
+
 fn String::operator+=(StringView other) throws -> String &
 {
   append(other);

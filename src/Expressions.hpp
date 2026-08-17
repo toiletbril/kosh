@@ -273,7 +273,7 @@ public:
   fn add_global_assigned_name(StringView name, SourceLocation location) throws
       -> void
   {
-    global_assigned_names.set(name, location);
+    global_assigned_names.set(name, steal(location));
     if (current_source_effects != nullptr)
       current_source_effects->global_assigned_names.add(name);
   }
@@ -335,23 +335,22 @@ public:
 
   /* The result is true when the message was delivered. A suppressed code must
      not suppress a later check. */
-  fn report_diagnostic(diagnostic_id id, SourceLocation location,
-                       std::initializer_list<StringView> arguments = {},
-                       Maybe<SourceLocation> related_location = None) throws
-      -> bool;
+  fn report_diagnostic(
+      diagnostic_id id, const SourceLocation &location,
+      std::initializer_list<StringView> arguments = {},
+      const Maybe<SourceLocation> &related_location = None) throws -> bool;
   fn flush_warnings() throws -> void;
   fn print_diagnostic_summary() const throws -> void;
   fn print_optimizer_summary() const throws -> void;
-  pure fn is_diagnostic_suppressed(diagnostic_id id,
-                                   SourceLocation location) const wontthrow
-      -> bool;
+  pure fn is_diagnostic_suppressed(
+      diagnostic_id id, const SourceLocation &location) const wontthrow -> bool;
 
   /* Whether the mood and the warning level let this code reach the output. A
      check that costs more than a comparison asks first, and the reporting
      funnel asks before it formats anything. */
   pure fn should_report(diagnostic_id id) const wontthrow -> bool;
-  fn note_variable_assignment(StringView name, SourceLocation location) throws
-      -> void;
+  fn note_variable_assignment(StringView name,
+                              const SourceLocation &location) throws -> void;
 
   /* A positional read inside a function body means the body uses the arguments
      its caller passes. */
@@ -375,20 +374,21 @@ public:
     mark_positional_reference();
   }
 
-  fn note_variable_read(StringView name, SourceLocation location,
+  fn note_variable_read(StringView name, const SourceLocation &location,
                         bool is_top_level_unconditional) throws -> void;
   fn trace_optimizer_line(StringView message) const throws -> void;
-  fn print_script_backtrace_if_rooted(SourceLocation location) const throws
-      -> void;
+  fn print_script_backtrace_if_rooted(
+      const SourceLocation &location) const throws -> void;
 
 private:
-  fn warn(diagnostic_id id, SourceLocation location, StringView message,
+  pure fn should_report(diagnostic_tier tier) const wontthrow -> bool;
+  fn warn(diagnostic_id id, const SourceLocation &location, StringView message,
           StringView suggestion, diagnostic_tier tier,
-          Maybe<SourceLocation> related_location,
+          const Maybe<SourceLocation> &related_location,
           StringView related_message) throws -> void;
-  fn fail(diagnostic_id id, SourceLocation location, StringView message,
+  fn fail(diagnostic_id id, const SourceLocation &location, StringView message,
           StringView suggestion, diagnostic_tier tier,
-          Maybe<SourceLocation> related_location,
+          const Maybe<SourceLocation> &related_location,
           StringView related_message) throws -> void;
 };
 
@@ -955,7 +955,7 @@ protected:
 
 /* How an arm ends. ;; stops the case, ;& falls into the next arm body without
    matching it, and ;;& resumes matching at the following arms. */
-enum class case_terminator
+enum class case_terminator : u8
 {
   Break,
   FallThrough,
@@ -1139,27 +1139,6 @@ protected:
   ArrayList<const Token *> m_words{heap_allocator()};
   bool m_has_in_clause;
   const Expression *m_body;
-};
-
-class ArrayAssignCommand : public Command
-{
-public:
-  ArrayAssignCommand(SourceLocation location, StringView name,
-                     ArrayList<const Token *> elements, bool is_append);
-  ~ArrayAssignCommand() override;
-
-  fn to_string() const throws -> String override;
-  fn to_ast_string(usize layer = 0) const throws -> String override;
-
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
-      -> void override;
-
-protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-
-  String m_name;
-  ArrayList<const Token *> m_elements{heap_allocator()};
-  bool m_is_append;
 };
 
 class RedirectedCommand : public Command

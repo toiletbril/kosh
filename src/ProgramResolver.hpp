@@ -79,7 +79,8 @@ public:
   fn search(StringView program_name, SearchMode search_mode = SearchMode::First,
             Requirement requirement = Requirement::Runnable,
             CachePolicy cache_policy = CachePolicy::Bypass,
-            Maybe<StringView> path_override = None) throws -> ArrayList<Path>;
+            const Maybe<StringView> &path_override = None) throws
+      -> ArrayList<Path>;
   fn get_status(StringView name,
                 StatusLookup lookup = StatusLookup::Cached) throws -> Status;
   fn get_command_names(

@@ -230,7 +230,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
                                              const Command *expr)
-    : Expression(location), m_kind(kind), m_cmd(expr)
+    : Expression(steal(location)), m_kind(kind), m_cmd(expr)
 {}
 
 CompoundListCondition::~CompoundListCondition() = default;
@@ -320,20 +320,10 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
     /* The -p form prints the posix report and ignores TIMEFORMAT. Otherwise a
        set TIMEFORMAT drives the format, an empty value prints nothing, and an
        unset value keeps the pretty default. */
-    String report{cxt.scratch_allocator()};
-    if (m_cmd->time_uses_posix_format()) {
-      report =
-          utils::format_time_report_posix(real_seconds, user_cpu, system_cpu);
-    } else if (let const time_format = cxt.get_variable_value("TIMEFORMAT");
-               time_format.has_value())
-    {
-      if (!time_format->is_empty())
-        report = utils::format_time_report_custom(
-            time_format->view(), real_seconds, user_cpu, system_cpu);
-    } else {
-      report = utils::format_time_report_pretty(real_seconds, user_cpu,
-                                                system_cpu, peak_rss_bytes);
-    }
+    let const time_format = cxt.get_variable_value("TIMEFORMAT");
+    let const report = utils::format_time_report(
+        m_cmd->time_uses_posix_format(), time_format, real_seconds, user_cpu,
+        system_cpu, peak_rss_bytes);
 
     if (!report.is_empty()) {
       print_error(report);
@@ -350,7 +340,7 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
   return status;
 }
 
-Pipeline::Pipeline(SourceLocation location) : Command(location) {}
+Pipeline::Pipeline(SourceLocation location) : Command(steal(location)) {}
 
 Pipeline::~Pipeline() = default;
 

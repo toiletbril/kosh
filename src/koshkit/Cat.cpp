@@ -44,6 +44,13 @@ static fn append_cat_source(String &output, StringView source,
     output += source;
     return;
   }
+  if (!should_number) {
+    completion::append_highlighted_source(
+        output, source, context, colors::PRINTED_SOURCE_HIGHLIGHT_THEME);
+    is_at_output_line_start =
+        !source.is_empty() && source[source.length - 1] == '\n';
+    return;
+  }
 
   let highlight_cache = completion::shell_highlight_cache{};
   usize line_start = 0;

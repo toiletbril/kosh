@@ -17,22 +17,6 @@ volatile sig_atomic_t SIGNAL_PENDING = 0;
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
 
-static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
-{
-  return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;
-}
-
-fn take_pending_signal() wontthrow -> i32
-{
-  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
-    if (PENDING_SIGNAL_FLAGS[number] != 0) {
-      PENDING_SIGNAL_FLAGS[number] = 0;
-      return number;
-    }
-  }
-  return 0;
-}
-
 } /* namespace os */
 } /* namespace koshka */
 
@@ -147,7 +131,7 @@ fn close_fd(os::descriptor fd) wontthrow -> bool
   return true;
 }
 
-fn TempFileSet::track(Path path) throws -> void { unused(path); }
+fn TempFileSet::track(Path &&) throws -> void {}
 fn TempFileSet::count() const wontthrow -> usize { return 0; }
 fn TempFileSet::cleanup_from(usize mark) wontthrow -> void { unused(mark); }
 
@@ -886,30 +870,9 @@ fn normalize_program_name(String &program_name) -> program_name_info
 namespace koshka {
 namespace os {
 
-fn get_shell_process_id() wontthrow -> i64
-{
-  return static_cast<i64>(PARENT_SHELL_PID);
-}
-
 fn get_current_process_id() wontthrow -> i64
 {
   return static_cast<i64>(getpid());
-}
-
-fn get_file_creation_mask() wontthrow -> u32
-{
-  /* umask reads only through a set, so it is read and put back. */
-  let const previous_mask = KOSH_UMASK(0);
-  KOSH_UMASK(previous_mask);
-
-  return static_cast<u32>(previous_mask);
-}
-
-fn set_file_creation_mask(u32 mask) wontthrow -> void { KOSH_UMASK(mask); }
-
-fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
-{
-  return fd == descriptor_for_shell_fd(shell_fd);
 }
 
 fn register_platform_flags(FlagList &flags) throws -> void

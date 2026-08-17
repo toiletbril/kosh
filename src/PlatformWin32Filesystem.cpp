@@ -11,6 +11,21 @@ namespace koshka {
 
 namespace os {
 
+static pure fn unc_share_end(StringView path, usize position,
+                             bool should_include_trailing_separator) wontthrow
+    -> usize
+{
+  unused(Path::next_component(path, position));
+  unused(Path::next_component(path, position));
+  if (should_include_trailing_separator && position < path.length &&
+      is_directory_separator(path[position]))
+  {
+    position++;
+  }
+
+  return position;
+}
+
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
   let const do_resolve_direct =
@@ -86,24 +101,12 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
              utils::ascii_to_lower(text[6]) == 'c' &&
              is_directory_separator(text[7]))
   {
-    position = 8;
-    while (position < text.length && !is_directory_separator(text[position]))
-      position++;
-    while (position < text.length && is_directory_separator(text[position]))
-      position++;
-    while (position < text.length && !is_directory_separator(text[position]))
-      position++;
+    position = unc_share_end(text, 8, false);
     resolved = Path{text.substring_of_length(0, position)};
   } else if (text.length >= 2 && is_directory_separator(text[0]) &&
              is_directory_separator(text[1]))
   {
-    position = 2;
-    while (position < text.length && !is_directory_separator(text[position]))
-      position++;
-    while (position < text.length && is_directory_separator(text[position]))
-      position++;
-    while (position < text.length && !is_directory_separator(text[position]))
-      position++;
+    position = unc_share_end(text, 2, false);
     resolved = Path{text.substring_of_length(0, position)};
   } else if (text.length >= 3 && text[1] == ':' &&
              is_directory_separator(text[2]))
@@ -248,32 +251,12 @@ pure fn path_root_length(StringView path) wontthrow -> usize
       utils::ascii_to_lower(path[5]) == 'n' &&
       utils::ascii_to_lower(path[6]) == 'c' && is_directory_separator(path[7]))
   {
-    usize position = 8;
-    while (position < path.length && !is_directory_separator(path[position]))
-      position++;
-    while (position < path.length && is_directory_separator(path[position]))
-      position++;
-    while (position < path.length && !is_directory_separator(path[position]))
-      position++;
-    if (position < path.length && is_directory_separator(path[position])) {
-      position++;
-    }
-    return position;
+    return unc_share_end(path, 8, true);
   }
   if (path.length >= 2 && is_directory_separator(path[0]) &&
       is_directory_separator(path[1]))
   {
-    usize position = 2;
-    while (position < path.length && !is_directory_separator(path[position]))
-      position++;
-    while (position < path.length && is_directory_separator(path[position]))
-      position++;
-    while (position < path.length && !is_directory_separator(path[position]))
-      position++;
-    if (position < path.length && is_directory_separator(path[position])) {
-      position++;
-    }
-    return position;
+    return unc_share_end(path, 2, true);
   }
   if (path.length >= 3 && path[1] == ':' && is_directory_separator(path[2])) {
     return 3;

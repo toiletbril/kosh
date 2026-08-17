@@ -372,7 +372,7 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
 class TempFileSet
 {
 public:
-  fn track(Path path) throws -> void;
+  fn track(Path &&path) throws -> void;
   mustuse fn count() const wontthrow -> usize;
   /* Delete every file tracked at or after the mark on a best-effort basis, and
      keep one still held open by a reader for a later retry. */
@@ -917,7 +917,7 @@ struct measured_result
 };
 
 fn run_measured(const ArrayList<String> &argv, measured_output output,
-                Maybe<descriptor> inherited_handle = {}) throws
+                const Maybe<descriptor> &inherited_handle = {}) throws
     -> Maybe<measured_result>;
 
 /* Script fallback returns KOSH_INVALID_PROCESS when it is allowed and the file

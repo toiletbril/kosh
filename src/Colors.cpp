@@ -15,6 +15,7 @@ static fn make_shell_highlight_theme() wontthrow -> highlight_theme
   theme.set_style(highlight_role::operator_, ansi::BOLD_MAGENTA);
   theme.set_style(highlight_role::string, ansi::BRIGHT_GREEN);
   theme.set_style(highlight_role::heredoc, ansi::BRIGHT_GREEN);
+  theme.set_style(highlight_role::heredoc_delimiter, ansi::BOLD_GREEN);
   theme.set_style(highlight_role::variable, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::assignment_name, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::unset_variable,
@@ -141,30 +142,7 @@ fn terminal_wants_color(bool output_is_terminal) throws -> bool
   return output_is_terminal && !color_is_suppressed_by_environment();
 }
 
-fn terminal_supports_styled_underlines() throws -> bool
-{
-  static constexpr bool IS_STYLED_UNDERLINE_SUPPORT_ENABLED = false;
-  if (!IS_STYLED_UNDERLINE_SUPPORT_ENABLED) return false;
-
-  let const term = os::get_environment_variable("TERM");
-  if (!term.has_value() || term->is_empty()) return false;
-
-  static const StringView SUPPORTED_TERMS[] = {
-      "alacritty",      "alacritty-direct",
-      "contour",        "contour-direct",
-      "foot",           "foot-direct",
-      "foot-extra",     "ghostty",
-      "ghostty-direct", "kitty",
-      "kitty-direct",   "rio",
-      "rio-direct",     "wezterm",
-      "wezterm-direct", "xterm-ghostty",
-      "xterm-kitty",
-  };
-  for (let const supported : SUPPORTED_TERMS)
-    if (term->view() == supported) return true;
-
-  return false;
-}
+fn terminal_supports_styled_underlines() throws -> bool { return false; }
 
 } /* namespace colors */
 
@@ -175,6 +153,7 @@ pure fn highlight_role_name(highlight_role role) wontthrow -> StringView
   case highlight_role::operator_: return "operator";
   case highlight_role::string: return "string";
   case highlight_role::heredoc: return "heredoc";
+  case highlight_role::heredoc_delimiter: return "heredoc-delimiter";
   case highlight_role::variable: return "variable";
   case highlight_role::assignment_name: return "assignment-name";
   case highlight_role::unset_variable: return "unset-variable";

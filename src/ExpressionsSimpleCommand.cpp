@@ -64,7 +64,7 @@ word_is_safe_for_in_process_substitution(const Word &word,
 }
 
 AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
-    : Command(location), m_assignment(a)
+    : Command(steal(location)), m_assignment(a)
 {}
 
 AssignCommand::~AssignCommand() = default;
@@ -291,7 +291,7 @@ fn AssignCommand::can_evaluate_in_process_substitution(
 
 SimpleCommand::SimpleCommand(SourceLocation location,
                              ArrayList<const Token *> &&args)
-    : Command(location), m_args(steal(args))
+    : Command(steal(location)), m_args(steal(args))
 {
 
   /* The location spans from the first word to the end of the last, so a caret
@@ -444,7 +444,7 @@ static fn redirection_open_mode(Redirection::Kind kind,
    duplication-resolve or word-expansion error stays fatal. */
 [[noreturn]] fn
 reject_restricted_output_redirection(const Redirection &redir,
-                                     SourceLocation fallback_location,
+                                     const SourceLocation &fallback_location,
                                      bool *open_or_stage_failed) throws -> void
 {
   if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
@@ -455,7 +455,7 @@ reject_restricted_output_redirection(const Redirection &redir,
 }
 
 fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
-                       SourceLocation fallback_location,
+                       const SourceLocation &fallback_location,
                        bool *open_or_stage_failed,
                        bool allow_fd_memoization) throws -> resolved_redirection
 {
@@ -585,7 +585,8 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
 
 fn allocate_redirection_descriptor(const Redirection &redir,
                                    const resolved_redirection &resolved,
-                                   EvalContext &cxt, SourceLocation location,
+                                   EvalContext &cxt,
+                                   const SourceLocation &location,
                                    bool *open_or_stage_failed) throws -> i32
 {
   if (redir.fd_allocation_name_token == nullptr) return redir.fd;
@@ -644,10 +645,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                          r.opened_fd);
       break;
     case redirection_outcome::Duplicate:
-      /* An arbitrary descriptor or the close form is not one of the stage's
-         three slots and is left to the compound path. */
-      if (r.dup_from_fd == r.target_fd) {
-      } else if (r.target_fd == 2 && r.dup_from_fd == 1) {
+      if (r.dup_from_fd == r.target_fd) break;
+
+      if (r.target_fd == 2 && r.dup_from_fd == 1) {
         ec.should_duplicate_error_to_output = true;
         ec.was_output_to_error_last = false;
       } else if (r.target_fd == 1 && r.dup_from_fd == 2) {

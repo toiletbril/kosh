@@ -54,6 +54,7 @@ struct eval_state_snapshot
   u64 warning_mutation_revision;
   u64 diagnostics_mutation_revision;
   u64 annoying_diagnostics_mutation_revision;
+  u64 random_state;
   shell_option_mutations option_mutations;
 };
 

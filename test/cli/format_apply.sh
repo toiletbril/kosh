@@ -52,6 +52,16 @@ while IFS= read -r line; do
 done <<< "$wrapped"
 printf 'wrap-idempotent=%s maximum=%s\n' \
   "$([ "$wrapped" = "$wrapped_second" ] && printf yes)" "$maximum_width"
+short_options='ffmpeg value value --some flag value --some flag -abced --flag as'
+printf '%s\n' "$short_options" | "$BIN" --format
+long_options='ffmpeg first-positional second-positional'
+long_options="$long_options --some flag value --other flag value"
+long_options="$long_options -abced --flag as trailing-positional-value"
+wrapped_options=$(printf '%s\n' "$long_options" | "$BIN" --format)
+printf '%s\n' "$wrapped_options"
+wrapped_options_second=$(printf '%s\n' "$wrapped_options" | "$BIN" --format)
+printf 'option-wrap-idempotent=%s\n' \
+  "$([ "$wrapped_options" = "$wrapped_options_second" ] && printf yes)"
 printf 'echo {a,b}\nitems=(one two)\nfor ((i=0; i<2; i++)); do echo "\044i"; done\necho @(a|b)\n' |
   "$BIN" --format
 printf 'printf "%%s\\n" if test x = x\nprintf "%%s\\n" ! test x = y\ncase x in test) echo yes;; esac\ntest -n "\044x" # keep\ntest -f x 2>/dev/null\n2>/dev/null test -n x\nprintf err >&2\nexec 3>&1\n(echo sub)\n' |

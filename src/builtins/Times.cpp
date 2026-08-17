@@ -25,8 +25,6 @@ pure fn Times::kind() const wontthrow -> Builtin::Kind { return Kind::Times; }
 
 cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  unused(cxt);
-
   if (ec.args().count() > 1 && ec.args()[1] == "--help") {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
   }

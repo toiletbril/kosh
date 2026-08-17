@@ -320,14 +320,14 @@ fn resolve_listing_directory(StringView directory_part,
             directory_part, leading_variable_expansion_end, context);
         expanded.has_value())
     {
-      let const directory = Path{expanded->view()};
+      let directory = Path{expanded->view()};
       if (directory.is_absolute()) return directory;
       let resolved_path = base_directory.clone();
       resolved_path.push_component(expanded->view());
       return resolved_path;
     }
 
-  let const directory = Path{directory_part};
+  let directory = Path{directory_part};
   if (directory.is_absolute()) return directory;
 
   let resolved_path = base_directory.clone();

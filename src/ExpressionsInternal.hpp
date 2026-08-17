@@ -46,7 +46,8 @@ fn analyze_followed_source(AnalysisContext &actx,
                            usize command_index, bool should_merge_parent_state,
                            bool should_merge_parent_uncertainty) throws -> bool;
 fn command_resolves(
-    StringView name, SourceLocation location, const AnalysisContext &actx,
+    StringView name, const SourceLocation &location,
+    const AnalysisContext &actx,
     Maybe<utils::unavailable_path_source_component> &unavailable) throws
     -> bool;
 pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool;
@@ -54,7 +55,8 @@ pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool;
 namespace expressions {
 
 pure fn analysis_source_text(const AnalysisContext &actx,
-                             SourceLocation location) wontthrow -> StringView;
+                             const SourceLocation &location) wontthrow
+    -> StringView;
 pure fn analysis_source_span(const AnalysisContext &actx,
                              const Expression &expression) wontthrow
     -> StringView;
@@ -95,10 +97,12 @@ fn check_posix_word_portability(AnalysisContext &actx,
     -> void;
 fn check_posix_arithmetic_operators(AnalysisContext &actx,
                                     StringView expression,
-                                    SourceLocation location) throws -> void;
+                                    const SourceLocation &location) throws
+    -> void;
 fn check_arithmetic_expression_lints(AnalysisContext &actx,
                                      StringView expression,
-                                     SourceLocation location) throws -> void;
+                                     const SourceLocation &location) throws
+    -> void;
 fn check_numeric_comparison_operand(AnalysisContext &actx,
                                     StringView operator_view,
                                     const Token *operand_token,
@@ -151,7 +155,7 @@ struct assignment_value_shape
 /* The walk shared by a standalone assignment and a command prefix assignment.
    It gathers the shape and reports the findings one segment decides. */
 fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
-                         SourceLocation location) throws
+                         const SourceLocation &location) throws
     -> assignment_value_shape;
 
 /* The borrowed inputs one assignment's value checks read. The segment walk in
@@ -197,7 +201,7 @@ fn check_case_pattern_shape(AnalysisContext &actx, const case_lint_input &input,
                             const Word &pattern_word,
                             StringView pattern_literal,
                             StringView pattern_source,
-                            SourceLocation pattern_location,
+                            const SourceLocation &pattern_location,
                             case_arm_tally &tally) throws -> void;
 fn check_case_option_coverage(AnalysisContext &actx,
                               const case_lint_input &input,
@@ -253,7 +257,7 @@ alwaysinline fn set_and_return_exit_status(EvalContext &cxt,
   return status;
 }
 
-enum class redirection_outcome
+enum class redirection_outcome : u8
 {
   Heredoc,     /* opened_fd holds a staged temp body for target_fd */
   OpenedFile,  /* opened_fd holds a freshly opened file for target_fd */
@@ -272,18 +276,19 @@ struct resolved_redirection
 };
 
 fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
-                       SourceLocation fallback_location,
+                       const SourceLocation &fallback_location,
                        bool *open_or_stage_failed = nullptr,
                        bool should_allow_fd_memoization = false) throws
     -> resolved_redirection;
 
 fn allocate_redirection_descriptor(const Redirection &redir,
                                    const resolved_redirection &resolved,
-                                   EvalContext &cxt, SourceLocation location,
+                                   EvalContext &cxt,
+                                   const SourceLocation &location,
                                    bool *open_or_stage_failed = nullptr) throws
     -> i32;
 
-enum class loop_disposition
+enum class loop_disposition : u8
 {
   /* No jump, or a continue aimed here, so run the next iteration. */
   RunNext,

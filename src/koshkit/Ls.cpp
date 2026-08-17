@@ -55,40 +55,32 @@ struct id_name_entry
   String name;
 };
 
-static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache,
-                            Allocator allocator) throws -> String
+enum class id_name_kind : u8
 {
-  for (const id_name_entry &entry : cache)
-    if (entry.id == uid) return entry.name.clone();
-  let const looked_up = os::uid_to_username(uid);
-  let name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                   : String::from(uid, allocator);
-  cache.push(id_name_entry{uid, name.clone()});
-  return name;
-}
+  Owner,
+  Group,
+};
 
-static fn cached_group_name(u32 gid, ArrayList<id_name_entry> &cache,
-                            Allocator allocator) throws -> String
+static fn cached_id_name(u32 id, id_name_kind kind,
+                         ArrayList<id_name_entry> &cache,
+                         Allocator allocator) throws -> StringView
 {
   for (const id_name_entry &entry : cache)
-    if (entry.id == gid) return entry.name.clone();
-  let const looked_up = os::gid_to_groupname(gid);
+    if (entry.id == id) return entry.name.view();
+  let const looked_up = kind == id_name_kind::Owner ? os::uid_to_username(id)
+                                                    : os::gid_to_groupname(id);
   let name = looked_up.has_value() ? String{allocator, looked_up->view()}
-                                   : String::from(gid, allocator);
-  cache.push(id_name_entry{gid, name.clone()});
-  return name;
+                                   : String::from(id, allocator);
+  cache.push(id_name_entry{id, steal(name)});
+  return cache.back().name.view();
 }
 
 static fn append_padded(String &output, StringView field, usize width,
                         bool should_pad_on_left) throws -> void
 {
-  if (should_pad_on_left)
-    for (usize i = field.length; i < width; i++)
-      output += ' ';
+  if (should_pad_on_left) output.append_repeated(' ', width - field.length);
   output += field;
-  if (!should_pad_on_left)
-    for (usize i = field.length; i < width; i++)
-      output += ' ';
+  if (!should_pad_on_left) output.append_repeated(' ', width - field.length);
 }
 
 /* A path that cannot be stat'd renders a sparse row so the listing still names
@@ -114,8 +106,10 @@ static fn build_long_entry(const Path &path, StringView name,
 
   entry.mode_string = os::format_mode_string(status.mode);
   entry.link_count = String::from(status.link_count, allocator);
-  entry.owner = cached_owner_name(status.owner_id, uid_cache, allocator);
-  entry.group = cached_group_name(status.group_id, gid_cache, allocator);
+  entry.owner = cached_id_name(status.owner_id, id_name_kind::Owner, uid_cache,
+                               allocator);
+  entry.group = cached_id_name(status.group_id, id_name_kind::Group, gid_cache,
+                               allocator);
   entry.size = FLAG_LS_HUMAN.is_enabled()
                    ? format_human_size(status.size, allocator)
                    : String::from(status.size, allocator);
@@ -172,7 +166,6 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
   return widest;
 }
 
-/* The grid packs column by column, the entry sits at column*rows+row. */
 static fn render_columns(const ArrayList<StringView> &names, String &output,
                          Allocator allocator) throws -> void
 {
@@ -197,9 +190,16 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
     widths.push(name.length);
 
   /* A column-major grid puts the entry at column*rows+row. */
-  let const max_columns = count < terminal_width ? count : terminal_width;
+  usize shortest_name_length = names.front().length;
+  for (let const name : names)
+    if (name.length < shortest_name_length) shortest_name_length = name.length;
+  let const width_limited_columns =
+      terminal_width / (shortest_name_length + COLUMN_GAP);
+  let const bounded_columns =
+      count < width_limited_columns ? count : width_limited_columns;
+  let const max_columns = bounded_columns == 0 ? 1 : bounded_columns;
   usize best_columns = 1;
-  for (usize columns = max_columns; columns >= 1; columns--) {
+  for (usize columns = max_columns;; columns--) {
     let const rows = (count + columns - 1) / columns;
     usize total = 0;
     for (usize c = 0; c < columns; c++) {
@@ -227,8 +227,8 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
       let const has_next =
           (c + 1 < best_columns) && ((c + 1) * rows + r < count);
       if (has_next)
-        for (usize p = widths[index]; p < column_widths[c] + COLUMN_GAP; p++)
-          output += ' ';
+        output.append_repeated(' ',
+                               column_widths[c] + COLUMN_GAP - widths[index]);
     }
     output += '\n';
   }
@@ -254,7 +254,6 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 

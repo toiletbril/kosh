@@ -191,7 +191,7 @@ public:
   pure fn location() const wontthrow -> SourceLocation { return m_location; }
   fn set_location(SourceLocation location) wontthrow -> void
   {
-    m_location = location;
+    m_location = steal(location);
   }
 
   fn set_rendered() wontthrow -> void { m_was_rendered = true; }
@@ -319,7 +319,8 @@ static_assert(
     !std::is_same_v<WarningWithLocationAndDetails, WarningWithLocation>);
 
 [[noreturn]] inline fn relocate_error(const ErrorBase &error,
-                                      SourceLocation location) throws -> void
+                                      const SourceLocation &location) throws
+    -> void
 {
   if (!error.detail_message().is_empty()) {
     let relocated = ErrorWithLocationAndDetails{

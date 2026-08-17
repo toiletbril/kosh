@@ -169,7 +169,8 @@ hot pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
   return m_field_separator_table[static_cast<u8>(c)];
 }
 
-fn EvalContext::guard_restricted_path(StringView path, SourceLocation location,
+fn EvalContext::guard_restricted_path(StringView path,
+                                      const SourceLocation &location,
                                       restricted_path_use use) const throws
     -> void
 {
@@ -392,16 +393,16 @@ fn EvalContext::append_indexed_array(StringView name,
 
 /* The script-fatal mark aborts the whole run, unlike the command-level errors
    the bash mood continues past. */
-[[noreturn]] fn throw_script_fatal(String message, StringView note) throws
+[[noreturn]] fn throw_script_fatal(StringView message, StringView note) throws
     -> void
 {
   if (note.is_empty()) {
-    Error error{message.view()};
+    Error error{message};
     error.set_script_fatal();
     throw error;
   }
 
-  ErrorWithDetails error{message.view(), note};
+  ErrorWithDetails error{message, note};
   error.set_script_fatal();
   throw error;
 }
@@ -446,7 +447,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
 pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
     -> SourceLocation
 {
-  let const fallback = m_current_location;
+  let fallback = m_current_location;
   if (name.is_empty()) return fallback;
   let const resolved_source = resolve_render_source(fallback);
   if (resolved_source.text == nullptr) return fallback;
@@ -564,8 +565,9 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
 }
 
 fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
-                              SourceLocation location, StringView message,
-                              StringView note) throws -> void
+                              const SourceLocation &location,
+                              StringView message, StringView note) throws
+    -> void
 {
   let const should_demote = strict_diagnostics_are_warnings();
   if (fatal && (explicitly_requested || !should_demote)) {
@@ -844,7 +846,7 @@ fn EvalContext::alias_names() const throws -> HashSet
 ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
                          ArrayList<String> &&args,
                          ArrayList<SourceLocation> &&arg_locations)
-    : m_kind(steal(kind)), m_location(location), m_args(steal(args)),
+    : m_kind(steal(kind)), m_location(steal(location)), m_args(steal(args)),
       m_arg_locations(steal(arg_locations))
 {}
 
@@ -947,7 +949,7 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
   }
 }
 
-fn ExecContext::make_from(SourceLocation location, StringView source,
+fn ExecContext::make_from(const SourceLocation &location, StringView source,
                           ArrayList<String> &&args, mimic_mood mood,
                           bool is_koshkit_enabled,
                           ProgramResolver &program_resolver,
@@ -1067,10 +1069,10 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
     -> ExecContext
 {
   ASSERT(args.count() > 0);
-  return {location, steal(kind), steal(args), steal(arg_locations)};
+  return {steal(location), steal(kind), steal(args), steal(arg_locations)};
 }
 
-fn ExecContext::make_unresolved(SourceLocation location,
+fn ExecContext::make_unresolved(const SourceLocation &location,
                                 i32 resolution_status) throws -> ExecContext
 {
   let args = ArrayList<String>{heap_allocator()};

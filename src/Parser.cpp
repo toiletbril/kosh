@@ -170,10 +170,9 @@ cold pure static fn find_standalone_keyword(StringView source,
   return koshka::None;
 }
 
-cold [[noreturn]] fn
-parser_internal::throw_unterminated(SourceLocation opener, StringView what,
-                                    StringView source, StringView keyword,
-                                    SourceLocation fallback) throws -> void
+cold [[noreturn]] fn parser_internal::throw_unterminated(
+    const SourceLocation &opener, StringView what, StringView source,
+    StringView keyword, SourceLocation fallback) throws -> void
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
@@ -670,7 +669,7 @@ static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
 /* A & touching the operator means a descriptor duplication, n>&m, otherwise a
    filename word follows. */
 fn Parser::build_file_or_dup_redirection(
-    i32 fd, Token::Kind op_kind, SourceLocation op_location,
+    i32 fd, Token::Kind op_kind, const SourceLocation &op_location,
     Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out, bool fd_was_explicit,
     const Token *fd_allocation_name_token) throws -> void
@@ -803,7 +802,7 @@ fn Parser::build_file_or_dup_redirection(
 }
 
 fn Parser::build_both_streams_redirection(
-    bool is_append, SourceLocation op_location,
+    bool is_append, const SourceLocation &op_location,
     Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> void
 {
@@ -815,7 +814,7 @@ fn Parser::build_both_streams_redirection(
 }
 
 fn Parser::build_here_string_redirection(
-    SourceLocation op_location, Maybe<SourceLocation> &first_location,
+    const SourceLocation &op_location, Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> void
 {
   if (!first_location) first_location = op_location;
@@ -850,7 +849,8 @@ mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
 }
 
 fn Parser::build_heredoc_redirection(
-    i32 fd, SourceLocation op_location, Maybe<SourceLocation> &first_location,
+    i32 fd, const SourceLocation &op_location,
+    Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> void
 {
   if (!first_location) first_location = op_location;
@@ -915,7 +915,7 @@ fn Parser::build_heredoc_redirection(
 }
 
 mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
-    const tokens::WordToken *word_token, SourceLocation word_location,
+    const tokens::WordToken *word_token, const SourceLocation &word_location,
     Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> bool
 {
@@ -1106,7 +1106,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   };
 
   let const do_add_redirection = [&](i32 fd, Token::Kind op_kind,
-                                     SourceLocation op_location,
+                                     const SourceLocation &op_location,
                                      bool fd_was_explicit) {
     build_file_or_dup_redirection(fd, op_kind, op_location, source_location,
                                   redirections, fd_was_explicit);
@@ -1336,8 +1336,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
   unreachable("the simple-command parser loop terminated without returning");
 }
 
-fn Parser::finish_function_body(SourceLocation location, StringView name) throws
-    -> Command *
+fn Parser::finish_function_body(const SourceLocation &location,
+                                StringView name) throws -> Command *
 {
   skip_newlines_after_pipe();
 

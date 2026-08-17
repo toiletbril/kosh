@@ -20,7 +20,7 @@ namespace koshka {
 class ExecContext
 {
 public:
-  static fn make_from(SourceLocation location, StringView source,
+  static fn make_from(const SourceLocation &location, StringView source,
                       ArrayList<String> &&args, mimic_mood mood,
                       bool is_koshkit_enabled,
                       ProgramResolver &program_resolver,
@@ -34,7 +34,7 @@ public:
                           ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
 
-  static fn make_unresolved(SourceLocation location,
+  static fn make_unresolved(const SourceLocation &location,
                             i32 resolution_status) throws -> ExecContext;
 
   Maybe<os::descriptor> in_fd{};

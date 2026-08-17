@@ -799,9 +799,12 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
       let const next = (line_end < end) ? line_end + 1 : line_end;
 
       if (content == heredoc.delimiter) {
-        if (body_start < line_end)
-          spans.push(
-              highlight_span{body_start, line_end, highlight_role::heredoc});
+        if (body_start < content_start)
+          spans.push(highlight_span{body_start, content_start,
+                                    highlight_role::heredoc});
+        if (content_start < line_end)
+          spans.push(highlight_span{content_start, line_end,
+                                    highlight_role::heredoc_delimiter});
         i = next;
         was_closed = true;
         break;
@@ -932,7 +935,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       let const delimiter_word =
           line.substring_of_length(delimiter_start, i - delimiter_start);
       if (!delimiter_word.is_empty()) {
-        do_push(delimiter_start, i, highlight_role::heredoc);
+        do_push(delimiter_start, i, highlight_role::heredoc_delimiter);
 
         let delimiter = delimiter_word;
         if (delimiter.length >= 2) {

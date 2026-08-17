@@ -200,7 +200,7 @@ cold fn view_has_decimal_fraction(StringView view) wontthrow -> bool
   return position > fraction_start && position == view.length;
 }
 
-pure fn is_arithmetic_operand_byte(char byte) wontthrow -> bool
+static pure fn is_arithmetic_operand_byte(char byte) wontthrow -> bool
 {
   if (lexer::is_variable_name(byte)) return true;
 
@@ -392,22 +392,15 @@ cold fn view_settles_echo_escapes(StringView view) wontthrow -> bool
    back to its last pipe, since that stage writes what the caller collects. */
 cold fn substitution_runs_pattern_matcher(StringView body) throws -> bool
 {
-  usize start = 0;
-  for (usize position = 0; position < body.length; position++)
-    if (body[position] == '|') start = position + 1;
+  usize position = 0;
+  for (usize scan_position = 0; scan_position < body.length; scan_position++)
+    if (body[scan_position] == '|') position = scan_position + 1;
 
-  while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
-    start++;
+  let const command = body.next_ascii_whitespace_word(position);
+  if (command.is_empty()) return false;
 
-  usize end = start;
-  while (end < body.length && body[end] != ' ' && body[end] != '\t' &&
-         body[end] != '\n')
-    end++;
-
-  if (end == start) return false;
-
-  return get_analysis_command_info(body.substring_of_length(start, end - start))
-      .is_in_group(COMMAND_GROUP_PATTERN_MATCHER);
+  return get_analysis_command_info(command).is_in_group(
+      COMMAND_GROUP_PATTERN_MATCHER);
 }
 
 cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
@@ -739,20 +732,10 @@ pure fn ssh_option_takes_value(char letter) wontthrow -> bool
   }
 }
 
-/* The first word of a command line, used where a builtin hands a whole command
-   string to another shell. */
 pure fn leading_command_word(StringView text) wontthrow -> StringView
 {
-  usize start = 0;
-  while (start < text.length && (text[start] == ' ' || text[start] == '\t'))
-    start++;
-
-  usize end = start;
-  while (end < text.length && text[end] != ' ' && text[end] != '\t' &&
-         text[end] != '\n')
-    end++;
-
-  return text.substring_of_length(start, end - start);
+  usize position = 0;
+  return text.next_ascii_whitespace_word(position);
 }
 
 fn check_posix_parameter_expansion(AnalysisContext &actx,

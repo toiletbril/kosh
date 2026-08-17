@@ -82,6 +82,7 @@ check_contains initialize '"positionEncoding":"utf-8"'
 check_contains code-action-capability '"codeActionKinds":["quickfix","source.fixAll.kosh"]'
 check_contains diagnostics '"severity":1'
 check_contains completion '"label":"printf"'
+check_contains semantic-legend '"heredocDelimiter"'
 check_contains semantic-tokens '"id":3,"result":{"data":['
 check_contains variable-definition '"id":10,"result":{"uri":"file:///tmp/server-test.shit","range":{"start":{"line":1,"character":0},"end":{"line":1,"character":5}}}'
 check_contains function-definition '"id":11,"result":{"uri":"file:///tmp/server-test.shit","range":{"start":{"line":2,"character":0},"end":{"line":2,"character":4}}}'
@@ -156,9 +157,9 @@ utf16_output=$(
     frame '{"jsonrpc":"2.0","id":8,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"current","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/revision-trigger.sh","languageId":"sh","version":1,"text":"#!/bin/sh\n"}}}'
     frame '{"jsonrpc":"2.0","id":11,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"stale","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
-    frame '{"jsonrpc":"2.0","id":12,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"current","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":2,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
+    frame '{"jsonrpc":"2.0","id":12,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":13}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"current","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/versioned.sh","version":2},"contentChanges":[{"text":"#!/bin/sh\n[ \"$1\" = y ]\n"}]}}'
-    frame '{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":12}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+    frame '{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/versioned.sh"},"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":12}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":9}},"code":"posix-test-equals","message":"stale","data":{"kind":"kosh.fix","documentVersion":1,"diagnosticRevision":1,"diagnosticIndex":0}}],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/utf16-action.sh","languageId":"sh","version":1,"text":"[ \"\ud83d\ude00\" == x ]\r\n"}}}'
     frame '{"jsonrpc":"2.0","id":10,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/utf16-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":12}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","id":7,"method":"shutdown","params":null}'
@@ -186,17 +187,16 @@ esac
 stale_identity_action=${utf16_output#*'"id":11,"result":'}
 stale_identity_action=${stale_identity_action%%Content-Length:*}
 case $stale_identity_action in
-*'"title":"Replace'*'"diagnostics":'*)
-  printf 'stale-diagnostic-identity=attached\n'
+*'"title":"Replace'*'"diagnosticRevision":1'*)
+  printf 'stable-diagnostic-identity=ok\n'
   ;;
-*'"title":"Replace'*) printf 'stale-diagnostic-identity=ok\n' ;;
-*) printf 'stale-diagnostic-identity=missing\n' ;;
+*) printf 'stable-diagnostic-identity=missing\n' ;;
 esac
 case $utf16_output in
-*'"id":12,"result":[{"title":"Replace'*'"diagnosticRevision":2'*)
-  printf 'reanalyzed-diagnostic-identity=ok\n'
+*'"id":12,"result":[{"title":"Replace'*'"diagnosticRevision":1'*)
+  printf 'unrelated-open-keeps-revision=ok\n'
   ;;
-*) printf 'reanalyzed-diagnostic-identity=missing\n' ;;
+*) printf 'unrelated-open-keeps-revision=missing\n' ;;
 esac
 case $utf16_output in
 *'"id":9,"result":[]'*) printf 'stale-code-action=ok\n' ;;

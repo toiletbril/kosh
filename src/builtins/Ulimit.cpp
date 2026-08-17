@@ -127,8 +127,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (!os::get_resource_limit(entry.kind, limit)) continue;
       let const label = String{cxt.scratch_allocator(), entry.label};
       out += label;
-      for (usize pad = label.count(); pad < 20; pad++)
-        out.push(' ');
+      out.append_repeated(' ', label.count() < 20 ? 20 - label.count() : 0);
       out.push(' ');
       out += render_limit(limit, block_factor(entry, cxt.is_posix_mode()),
                           cxt.scratch_allocator());

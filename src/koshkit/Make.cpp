@@ -467,7 +467,7 @@ static fn ends_with_continuation(StringView line) wontthrow -> bool
 static fn join_continuations(StringView source, Allocator allocator) throws
     -> ArrayList<String>
 {
-  let const physical = split_keep_newlines(source);
+  let const physical = utils::split_lines(source, allocator, true);
   ArrayList<String> logical{allocator};
   usize i = 0;
   while (i < physical.count()) {

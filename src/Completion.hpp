@@ -154,6 +154,9 @@ fn append_highlighted_range(String &output, StringView text,
                             const ArrayList<highlight_span> &spans,
                             usize range_start, usize range_end,
                             const highlight_theme &theme) throws -> void;
+fn append_highlighted_source(String &output, StringView source,
+                             EvalContext &context,
+                             const highlight_theme &theme) throws -> void;
 
 #if !defined NDEBUG
 pure fn debug_highlight_input_byte_count() wontthrow -> usize;

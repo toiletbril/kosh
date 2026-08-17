@@ -208,8 +208,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     m_source_frames.pop_back();
   };
   let parser = Parser{
-      Lexer{String{contents->view()}, *AST_ARENA, false, script_filename,
-            mood()}
+      Lexer{contents->view(), *AST_ARENA, false, script_filename, mood()}
   };
 
   let previous_shell_name = String{m_shell_name};
@@ -238,7 +237,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     for (usize i = saved_fds.count(); i > 0; i--)
       os::restore_descriptor(saved_fds[i - 1]);
   };
-  let const do_render_error = [&](std::exception_ptr error) {
+  let const do_render_error = [&](const std::exception_ptr &error) {
     try {
       std::rethrow_exception(error);
     } catch (const ErrorWithLocationAndDetails &detailed_error) {
@@ -458,7 +457,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
   try {
     let parser = Parser{
-        Lexer{String{source}, *AST_ARENA, false, stable_filename, mood()}
+        Lexer{source, *AST_ARENA, false, stable_filename, mood()}
     };
 
     let const ast = parser.construct_ast();

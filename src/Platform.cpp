@@ -1,5 +1,13 @@
 #include "Platform.hpp"
 
+namespace koshka {
+namespace os {
+
+static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
+
+} /* namespace os */
+} /* namespace koshka */
+
 #if defined __x86_64__ && !defined __COSMOPOLITAN__
 #include <immintrin.h>
 #elif defined __aarch64__ || defined __arm64__ || defined _M_ARM64
@@ -27,6 +35,42 @@
 namespace koshka {
 namespace os {
 
+static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
+{
+  return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;
+}
+
+fn take_pending_signal() wontthrow -> i32
+{
+  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
+    if (PENDING_SIGNAL_FLAGS[number] != 0) {
+      PENDING_SIGNAL_FLAGS[number] = 0;
+      return number;
+    }
+  }
+  return 0;
+}
+
+fn get_shell_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+fn get_file_creation_mask() wontthrow -> u32
+{
+  let const previous_mask = KOSH_UMASK(0);
+  KOSH_UMASK(previous_mask);
+
+  return static_cast<u32>(previous_mask);
+}
+
+fn set_file_creation_mask(u32 mask) wontthrow -> void { KOSH_UMASK(mask); }
+
+fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
+{
+  return fd == descriptor_for_shell_fd(shell_fd);
+}
+
 static u64 DESCRIPTOR_EPOCH = 0;
 
 pure fn get_descriptor_epoch() wontthrow -> u64 { return DESCRIPTOR_EPOCH; }
@@ -42,7 +86,7 @@ fn read_fd_to_string(os::descriptor fd, Allocator allocator) throws
   {
     let const read_count = read_fd(fd, buffer, sizeof(buffer));
     if (!read_count.has_value()) return None;
-    if (*read_count == 0) return contents;
+    if (*read_count == 0) return Maybe<String>{steal(contents)};
     contents.append(StringView{buffer, *read_count});
   }
 }

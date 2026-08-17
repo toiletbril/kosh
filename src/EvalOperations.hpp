@@ -32,8 +32,8 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize;
 
 /* The abort the set -u read and the ${name:?} report perform even in the bash
    mood. */
-[[noreturn]] fn throw_script_fatal(String message, StringView note = {}) throws
-    -> void;
+[[noreturn]] fn throw_script_fatal(StringView message,
+                                   StringView note = {}) throws -> void;
 
 /* Source the startup files for each mood in the list, in order, the way the
    --init-moods flag and the set --init-moods builtin both ask. A kosh flavor

@@ -33,14 +33,7 @@ cold [[noreturn]] static fn fail_conditional_syntax(StringView reason) throws
 static fn ascii_lower_copy(Allocator allocator, StringView text) throws
     -> String
 {
-  let lowered = String{allocator};
-  lowered.reserve(text.length);
-
-  for (usize i = 0; i < text.length; i++) {
-    lowered += utils::ascii_to_lower(text[i]);
-  }
-
-  return lowered;
+  return text.to_lower_ascii(allocator);
 }
 
 namespace {
@@ -62,7 +55,9 @@ struct conditional_evaluator
 
   fn unexpected_token() throws -> String
   {
-    return at_end() ? String{heap_allocator()} : operand_literal(elements[pos]);
+    if (!at_end()) return operand_literal(elements[pos]);
+
+    return String{heap_allocator()};
   }
 
   fn operand_literal(const conditional_element &e) throws -> String

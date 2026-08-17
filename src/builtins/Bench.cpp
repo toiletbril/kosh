@@ -205,8 +205,7 @@ fn make_metric_row(StringView name, const metric_stats &stats, metric_unit unit,
 
 fn append_padding(String &out, usize count) throws -> void
 {
-  for (usize i = 0; i < count; i++)
-    out.push(' ');
+  out.append_repeated(' ', count);
 }
 
 fn append_metric_line(String &out, const MetricRow &row, usize mean_width,
@@ -245,8 +244,7 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
 {
   out += "  ";
   out.append(name);
-  for (usize pad = name.length; pad < 18; pad++)
-    out.push(' ');
+  out.append_repeated(' ', name.length < 18 ? 18 - name.length : 0);
 
   if (first.mean <= 0 || other.mean <= 0) {
     out += "n/a\n";

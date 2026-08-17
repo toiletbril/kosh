@@ -202,6 +202,26 @@ fn append_highlighted_range(String &output, StringView text,
                                        range_end - rendered_position);
 }
 
+fn append_highlighted_source(String &output, StringView source,
+                             EvalContext &context,
+                             const highlight_theme &theme) throws -> void
+{
+  let cache = shell_highlight_cache{};
+  usize line_start = 0;
+  while (line_start < source.length) {
+    let line_end = line_start;
+    while (line_end < source.length && source[line_end] != '\n')
+      line_end++;
+    if (line_end < source.length) line_end++;
+
+    let const *spans = cache.spans_for(source, line_start, line_end, context);
+    let const line =
+        source.substring_of_length(line_start, line_end - line_start);
+    append_highlighted_range(output, line, *spans, 0, line.length, theme);
+    line_start = line_end;
+  }
+}
+
 static constexpr usize DIAGNOSTIC_CHECKPOINT_BYTE_INTERVAL = 4096;
 
 fn shell_highlight_cache::spans_for(StringView source, usize line_start,
