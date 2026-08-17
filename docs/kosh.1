@@ -180,10 +180,20 @@ of
 .BR export ,
 or
 .B readonly
-is a variable assignment too. Hover over a variable reports
-the assignment nearest above the cursor together with its folded value. The
-earlier assignments in the same document are listed below it, and an assignment
-that does not run on every path is marked. Hover over a function shows the
+is a variable assignment too. A name bound by
+.BR for ,
+.BR select ,
+.BR read ,
+.BR mapfile ,
+.BR readarray ,
+.BR getopts ,
+.BR printf " " \-v ,
+or an arithmetic assignment is recorded the same way. Hover over a variable
+reports the assignment nearest above the cursor together with its folded value.
+A name that carries no folded value is described by what bound it, such as a
+loop word, a field read from input, or the result of an arithmetic expression.
+The earlier assignments in the same document are listed below it, and an
+assignment that does not run on every path is marked. Hover over a function shows the
 definition body in the form
 .B declare \-f
 prints. Hover over a command the document does not define reports the external

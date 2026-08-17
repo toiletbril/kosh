@@ -309,6 +309,16 @@ operand reaches analysis as an assignment token, or as a word the shared
 `Word::get_assignment_split` splits, and an element operand records its base
 name without a literal.
 
+Each record carries the binder that produced it. The binders are an ordinary
+assignment, a `for` word, a `select` word, an arithmetic assignment, a `read`
+field, a `mapfile` or `readarray` line list, a `getopts` option letter, and
+`printf -v` formatted text. A record with no folded literal is described by its
+binder in the hover answer. The `read`, `mapfile`, and `readarray` walks skip
+the operand behind a value-carrying option, and the `getopts` name is the second
+bare operand. An arithmetic target is recorded only when its computed span reads
+back as that name, so a caller that cannot place its copy of the expression
+records nothing.
+
 The document outline is built from the same records. An entry is sorted by its
 start position, with the wider span first when two entries open together, and a
 scope stack turns an entry contained by a function body into a child of that

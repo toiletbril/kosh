@@ -211,6 +211,93 @@ fn operand_target_name(StringView text) wontthrow -> StringView
   return text.substring_of_length(0, end);
 }
 
+/* An option that carries a value swallows the operand behind it, so the name
+   slot is not the first bare word. */
+pure fn builtin_value_option_letters(command_name_id command_id) wontthrow
+    -> StringView
+{
+  switch (command_id) {
+  case command_name_id::Read: return StringView{"adinNptu"};
+
+  case command_name_id::Mapfile:
+  case command_name_id::Readarray: return StringView{"CcdnOsu"};
+
+  default: return StringView{};
+  }
+}
+
+pure fn builtin_target_binder(command_name_id command_id) wontthrow
+    -> assignment_binder
+{
+  switch (command_id) {
+  case command_name_id::Read: return assignment_binder::ReadInput;
+
+  case command_name_id::Mapfile:
+  case command_name_id::Readarray: return assignment_binder::MappedLines;
+
+  case command_name_id::Getopts: return assignment_binder::ParsedOption;
+
+  default: return assignment_binder::Assignment;
+  }
+}
+
+fn note_variable_target_operands(AnalysisContext &actx,
+                                 command_name_id command_id,
+                                 const ArrayList<const Token *> &args,
+                                 bool should_note_assignment,
+                                 bool is_conditional) throws -> void
+{
+  let const value_options = builtin_value_option_letters(command_id);
+  let const binder = builtin_target_binder(command_id);
+  let const takes_one_named_operand = command_id == command_name_id::Getopts;
+
+  let should_skip_option_value = false;
+  let is_array_option_value = false;
+  let bare_operand_count = usize{0};
+
+  for (usize i = 1; i < args.count(); i++) {
+    let const literal = args[i]->kind() == Token::Kind::Word
+                            ? static_cast<const tokens::WordToken *>(args[i])
+                                  ->word()
+                                  .to_literal_string()
+                            : args[i]->raw_string();
+    let const view = literal.view();
+
+    if (should_skip_option_value) {
+      should_skip_option_value = false;
+      if (!is_array_option_value) continue;
+    } else if (!value_options.is_empty() && view.length >= 2 && view[0] == '-')
+    {
+      let const last_letter = view[view.length - 1];
+      should_skip_option_value =
+          value_options.find_character(last_letter).has_value();
+      is_array_option_value =
+          last_letter == 'a' && command_id == command_name_id::Read;
+      continue;
+    }
+
+    bare_operand_count++;
+    if (takes_one_named_operand && bare_operand_count != 2) continue;
+
+    let const target = operand_target_name(view);
+    if (target.is_empty()) continue;
+
+    if (should_note_assignment)
+      actx.note_variable_assignment(target, args[i]->source_location());
+
+    /* The assignment builtin walk owns its operands and folds their values. */
+    if (binder == assignment_binder::Assignment) continue;
+
+    let const name_location =
+        args[i]->source_location().length == view.length
+            ? args[i]->source_location().subspan(0, target.length)
+            : args[i]->source_location();
+
+    actx.note_variable_binding_record(target, name_location, binder,
+                                      is_conditional);
+  }
+}
+
 fn SimpleCommand::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
@@ -413,9 +500,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   }
   let const command_is_assignment_builtin =
       command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN);
-  let const lint_input = command_lint_input{
-      m_args,          m_redirections, m_local_vars,       source_location(),
-      command_literal, command_info,   is_command_shadowed};
+  let const lint_input =
+      command_lint_input{m_args,
+                         m_redirections,
+                         m_local_vars,
+                         source_location(),
+                         command_literal,
+                         command_info,
+                         is_command_shadowed,
+                         !is_unconditional || actx.has_seen_runtime_definer};
 
   /* A declare-family builtin writes its NAME=value operands, and those reach
      analysis as command arguments rather than as prefix assignments. */
@@ -622,18 +715,28 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         }
 
         switch (segment.kind) {
-        case WordSegment::Kind::ArithmeticExpansion:
+        case WordSegment::Kind::ArithmeticExpansion: {
           quote_sandwich_state = 0;
-          check_arithmetic_expression_lints(
-              actx, segment.text.view(),
+
+          let const segment_location =
               segment.get_source_location(arg_location.filename)
-                  .value_or(arg_location));
+                  .value_or(arg_location);
+          let const base_position =
+              segment_location.length == segment.text.count()
+                  ? Maybe<usize>{segment_location.position}
+                  : None;
+
+          check_arithmetic_expression_lints(actx, segment.text.view(),
+                                            segment_location, base_position,
+                                            lint_input.is_conditional);
+
           if (is_operand && !has_external_arithmetic_read &&
               arithmetic_reads_external_input(actx, segment.text.view()))
           {
             has_external_arithmetic_read = true;
           }
           break;
+        }
 
         case WordSegment::Kind::CommandSubstitution:
           quote_sandwich_state = 0;
@@ -1053,43 +1156,42 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   let const is_top_level_unconditional =
       actx.function_scope_depth == 0 && is_unconditional;
-  if (is_top_level_unconditional && !is_command_shadowed) {
-    if (command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET)) {
-      for (usize i = 1; i < m_args.count(); i++) {
-        let const word = m_args[i]->kind() == Token::Kind::Word
-                             ? static_cast<const tokens::WordToken *>(m_args[i])
-                                   ->word()
-                                   .to_literal_string()
-                             : m_args[i]->raw_string();
-        actx.note_variable_assignment(operand_target_name(word.view()),
-                                      m_args[i]->source_location());
+  if (!is_command_shadowed &&
+      command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET))
+  {
+    note_variable_target_operands(
+        actx, command_id, m_args, is_top_level_unconditional,
+        !is_unconditional || actx.has_seen_runtime_definer);
+  }
+
+  if (!is_top_level_unconditional || is_command_shadowed) return;
+  if (command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET) ||
+      command_info.is_in_group(COMMAND_GROUP_VARIABLE_PROBE))
+  {
+    return;
+  }
+
+  for (usize i = 1; i < m_args.count(); i++) {
+    if (m_args[i]->kind() != Token::Kind::Word) continue;
+
+    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
+    for (let const &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::VariableReference) continue;
+
+      /* A read of a name this command also assigns as a prefix is reported by
+         the prefix check, which names that shape exactly. */
+      let is_read_of_own_prefix = false;
+      for (let const &var : m_local_vars) {
+        if (var.name.view() != segment.text.view()) continue;
+
+        is_read_of_own_prefix = true;
+        break;
       }
-    } else if (!command_info.is_in_group(COMMAND_GROUP_VARIABLE_PROBE)) {
-      for (usize i = 1; i < m_args.count(); i++) {
-        if (m_args[i]->kind() != Token::Kind::Word) continue;
 
-        let const &word =
-            static_cast<const tokens::WordToken *>(m_args[i])->word();
-        for (let const &segment : word.segments) {
-          if (segment.kind != WordSegment::Kind::VariableReference) continue;
+      if (is_read_of_own_prefix) continue;
 
-          /* A read of a name this command also assigns as a prefix is reported
-             by the prefix check, which names that shape exactly. */
-          let is_read_of_own_prefix = false;
-          for (let const &var : m_local_vars) {
-            if (var.name.view() != segment.text.view()) continue;
-
-            is_read_of_own_prefix = true;
-            break;
-          }
-
-          if (is_read_of_own_prefix) continue;
-
-          actx.note_variable_read(segment.text.view(),
-                                  m_args[i]->source_location(),
-                                  is_top_level_unconditional);
-        }
-      }
+      actx.note_variable_read(segment.text.view(), m_args[i]->source_location(),
+                              is_top_level_unconditional);
     }
   }
 }

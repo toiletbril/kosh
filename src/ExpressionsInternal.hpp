@@ -99,10 +99,14 @@ fn check_posix_arithmetic_operators(AnalysisContext &actx,
                                     StringView expression,
                                     const SourceLocation &location) throws
     -> void;
-fn check_arithmetic_expression_lints(AnalysisContext &actx,
-                                     StringView expression,
-                                     const SourceLocation &location) throws
-    -> void;
+/* expression_base_position is the source position of the first byte of
+   expression, and None when the caller holds a copy it cannot place. A target
+   name is recorded only when the computed span reads back as that name. */
+fn check_arithmetic_expression_lints(
+    AnalysisContext &actx, StringView expression,
+    const SourceLocation &location,
+    Maybe<usize> expression_base_position = None,
+    bool is_conditional = false) throws -> void;
 fn check_numeric_comparison_operand(AnalysisContext &actx,
                                     StringView operator_view,
                                     const Token *operand_token,
@@ -122,6 +126,7 @@ struct command_lint_input
   StringView command_literal;
   analysis_command_info command_info;
   bool is_command_shadowed;
+  bool is_conditional;
 
   pure fn command_id() const wontthrow -> command_name_id
   {

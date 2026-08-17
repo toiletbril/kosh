@@ -78,10 +78,28 @@ static pure fn arithmetic_expansion_assigns(StringView expression,
   return at + 1 >= expression.length || expression[at + 1] != '=';
 }
 
+fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
+                                 StringView target,
+                                 const SourceLocation &location,
+                                 Maybe<usize> expression_base_position,
+                                 bool is_conditional) throws -> void
+{
+  if (!expression_base_position.has_value()) return;
+
+  let const target_offset = static_cast<usize>(target.data - expression.data);
+  const SourceLocation name_location{*expression_base_position + target_offset,
+                                     target.length, location.filename};
+  if (analysis_source_text(actx, name_location) != target) return;
+
+  actx.note_variable_binding_record(
+      target, name_location, assignment_binder::Arithmetic, is_conditional);
+}
+
 fn check_arithmetic_expression_lints(AnalysisContext &actx,
                                      StringView expression,
-                                     const SourceLocation &location) throws
-    -> void
+                                     const SourceLocation &location,
+                                     Maybe<usize> expression_base_position,
+                                     bool is_conditional) throws -> void
 {
   let has_reported_test_operator = false;
   let has_reported_decimal = false;
@@ -156,7 +174,11 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
       has_pending_division = false;
 
       let const target = arithmetic_assignment_target(expression, position);
-      if (!target.is_empty()) actx.note_variable_assignment(target, location);
+      if (target.is_empty()) break;
+
+      actx.note_variable_assignment(target, location);
+      note_arithmetic_target_record(actx, expression, target, location,
+                                    expression_base_position, is_conditional);
       break;
     }
 
@@ -719,6 +741,19 @@ fn check_command_word_shape(AnalysisContext &actx,
   return has_explained_resolution_failure;
 }
 
+fn note_formatted_target(AnalysisContext &actx, const command_lint_input &input,
+                         StringView name, const SourceLocation &location) throws
+    -> void
+{
+  if (name.is_empty() || input.is_command_shadowed) return;
+
+  if (!input.is_conditional && actx.function_scope_depth == 0)
+    actx.note_variable_assignment(name, location);
+
+  actx.note_variable_binding_record(
+      name, location, assignment_binder::FormattedText, input.is_conditional);
+}
+
 fn check_operand_lints_after_scan(AnalysisContext &actx,
                                   const command_lint_input &input) throws
     -> void
@@ -969,8 +1004,14 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                                args[i]->source_location());
 
+      let const operand_location = args[i]->source_location();
+      let const base_position = operand_location.length == expression.count()
+                                    ? Maybe<usize>{operand_location.position}
+                                    : None;
+
       check_arithmetic_expression_lints(actx, expression.view(),
-                                        args[i]->source_location());
+                                        operand_location, base_position,
+                                        input.is_conditional);
 
       if (actx.is_posix_sh_shebang) {
         check_posix_arithmetic_operators(actx, expression.view(),
@@ -983,9 +1024,25 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
     usize format_index = 1;
     if (format_index < args.count()) {
       let const leading = args[format_index]->raw_string();
-      if (leading.view() == "-v") {
+      let const view = leading.view();
+
+      if (view == "-v") {
         format_index += 2;
-      } else if (leading.view() == "--") {
+        if (format_index - 1 < args.count()) {
+          let const name = args[format_index - 1]->raw_string();
+          note_formatted_target(actx, input, operand_target_name(name.view()),
+                                args[format_index - 1]->source_location());
+        }
+      } else if (view.length > 2 && view[0] == '-' && view[1] == 'v') {
+        let const name = operand_target_name(view.substring(2));
+        let const option_location = args[format_index]->source_location();
+        let const is_span_verbatim = option_location.length == view.length;
+        note_formatted_target(actx, input, name,
+                              is_span_verbatim
+                                  ? option_location.subspan(2, name.length)
+                                  : option_location);
+        format_index++;
+      } else if (view == "--") {
         format_index++;
       }
     }

@@ -331,9 +331,9 @@ hot fn Parser::parse_select() throws -> Command *
 
   let const parsed_body = parse_loop_body(location, "Unterminated select loop");
 
-  return m_lexer.arena().create<SelectLoop>(location, variable_name.view(),
-                                            steal(words), has_in_clause,
-                                            parsed_body.body);
+  return m_lexer.arena().create<SelectLoop>(
+      location, name_token->source_location(), variable_name.view(),
+      steal(words), has_in_clause, parsed_body.body);
 }
 
 /* In a case word or pattern a NAME=VALUE token is a plain word, rebuilt into a
@@ -684,7 +684,8 @@ hot fn Parser::parse_c_style_for(const SourceLocation &location,
   let const parsed_body = parse_loop_body(location, "Unterminated for loop");
 
   return m_lexer.arena().create<expressions::CStyleForLoop>(
-      location, steal(init), steal(condition), steal(step), parsed_body.body);
+      location, open->source_location().position + 2, steal(init),
+      steal(condition), steal(step), parsed_body.body);
 }
 
 fn Parser::parse_loop_body(const SourceLocation &location,

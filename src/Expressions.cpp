@@ -428,7 +428,22 @@ fn AnalysisContext::note_variable_assignment_record(
 
   symbol_records->assignments.push(variable_assignment_record{
       String{name}, steal(literal_value), is_conditional, is_append,
-      value_word == nullptr, location.position, location.length});
+      value_word == nullptr, location.position, location.length,
+      assignment_binder::Assignment});
+}
+
+fn AnalysisContext::note_variable_binding_record(StringView name,
+                                                 const SourceLocation &location,
+                                                 assignment_binder binder,
+                                                 bool is_conditional) throws
+    -> void
+{
+  if (symbol_records == nullptr) return;
+  if (name.is_empty()) return;
+
+  symbol_records->assignments.push(variable_assignment_record{
+      String{name}, None, is_conditional, false, false, location.position,
+      location.length, binder});
 }
 
 fn AnalysisContext::note_function_body_record(StringView name,

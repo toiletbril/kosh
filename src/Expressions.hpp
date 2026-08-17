@@ -91,6 +91,20 @@ struct command_name_assignment_record
   SourceLocation location;
 };
 
+/* What put a value in the name, so a reader who asks about a name a command
+   binds is told where the value comes from. */
+enum class assignment_binder : u8
+{
+  Assignment,
+  ForLoop,
+  SelectLoop,
+  Arithmetic,
+  ReadInput,
+  MappedLines,
+  ParsedOption,
+  FormattedText,
+};
+
 /* One assignment a reader may ask about. The name and the folded value are
    owned, and the span is a plain byte range, since the language server releases
    the analysis arena before it answers. */
@@ -103,6 +117,7 @@ struct variable_assignment_record
   bool is_array{false};
   usize position{0};
   usize length{0};
+  assignment_binder binder{assignment_binder::Assignment};
 };
 
 /* One function definition a reader may ask about. The body span is recovered
@@ -398,6 +413,12 @@ public:
                                      const SourceLocation &location,
                                      bool is_conditional, bool is_append) throws
       -> void;
+  /* A command that binds a name supplies no value word and no literal, so the
+     binder is what a reader is told. */
+  fn note_variable_binding_record(StringView name,
+                                  const SourceLocation &location,
+                                  assignment_binder binder,
+                                  bool is_conditional) throws -> void;
   fn note_function_body_record(StringView name, usize name_position,
                                usize body_position,
                                usize body_end_position) throws -> void;
@@ -1129,8 +1150,8 @@ protected:
 class CStyleForLoop : public CompoundCommand
 {
 public:
-  CStyleForLoop(SourceLocation location, String init, String condition,
-                String step, const Expression *body);
+  CStyleForLoop(SourceLocation location, usize header_position, String init,
+                String condition, String step, const Expression *body);
   ~CStyleForLoop() override;
 
   fn to_string() const throws -> String override;
@@ -1152,6 +1173,9 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
+  /* The source position of the first byte of the init clause, so each clause
+     base is recovered from the lengths that precede it. */
+  usize m_header_position;
   String m_init;
   String m_condition;
   String m_step;
@@ -1172,9 +1196,9 @@ protected:
 class SelectLoop : public CompoundCommand
 {
 public:
-  SelectLoop(SourceLocation location, StringView variable_name,
-             ArrayList<const Token *> &&words, bool has_in_clause,
-             const Expression *body);
+  SelectLoop(SourceLocation location, SourceLocation variable_location,
+             StringView variable_name, ArrayList<const Token *> &&words,
+             bool has_in_clause, const Expression *body);
   ~SelectLoop() override;
 
   fn to_string() const throws -> String override;
@@ -1187,6 +1211,7 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   String m_variable_name;
+  SourceLocation m_variable_location;
   ArrayList<const Token *> m_words{heap_allocator()};
   bool m_has_in_clause;
   const Expression *m_body;

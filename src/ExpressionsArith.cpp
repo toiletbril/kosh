@@ -539,13 +539,14 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 fn ArithmeticCommand::analyze(AnalysisContext &actx,
                               bool is_unconditional) const throws -> void
 {
-  unused(is_unconditional);
   if (arithmetic_reads_external_input(actx, m_expression.view()))
     actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                            source_location());
 
-  check_arithmetic_expression_lints(actx, m_expression.view(),
-                                    source_location());
+  check_arithmetic_expression_lints(
+      actx, m_expression.view(), source_location(),
+      source_location().position + 2,
+      !is_unconditional || actx.has_seen_runtime_definer);
 
   if (actx.is_posix_sh_shebang) {
     actx.report_diagnostic(diagnostic_id::sc3006, source_location());
@@ -562,18 +563,24 @@ fn SelectLoop::analyze(AnalysisContext &actx,
                        bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
-  unused(is_unconditional);
+
+  actx.note_variable_binding_record(m_variable_name.view(), m_variable_location,
+                                    assignment_binder::SelectLoop,
+                                    !is_unconditional ||
+                                        actx.has_seen_runtime_definer);
+
   actx.constant_variables.clear();
   actx.loop_body_depth++;
   m_body->analyze(actx, false);
   actx.loop_body_depth--;
 }
 
-CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
-                             String condition, String step,
+CStyleForLoop::CStyleForLoop(SourceLocation location, usize header_position,
+                             String init, String condition, String step,
                              const Expression *body)
-    : CompoundCommand(steal(location)), m_init(steal(init)),
-      m_condition(steal(condition)), m_step(steal(step)), m_body(body)
+    : CompoundCommand(steal(location)), m_header_position(header_position),
+      m_init(steal(init)), m_condition(steal(condition)), m_step(steal(step)),
+      m_body(body)
 {}
 
 CStyleForLoop::~CStyleForLoop() = default;
@@ -647,19 +654,24 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
-  unused(is_unconditional);
 
   /* The folding rule reads the three clauses while unchanged, so the optimizer
      runs before the constant table is cleared for the body. */
   optimizer::optimize_node(this, actx);
 
+  let const is_conditional = !is_unconditional || actx.has_seen_runtime_definer;
+  let clause_base_position = m_header_position;
+
   for (let const clause : {m_init.view(), m_condition.view(), m_step.view()}) {
-    if (clause.is_empty()) continue;
+    if (!clause.is_empty()) {
+      check_arithmetic_expression_lints(actx, clause, source_location(),
+                                        clause_base_position, is_conditional);
 
-    check_arithmetic_expression_lints(actx, clause, source_location());
+      if (actx.is_posix_sh_shebang)
+        check_posix_arithmetic_operators(actx, clause, source_location());
+    }
 
-    if (actx.is_posix_sh_shebang)
-      check_posix_arithmetic_operators(actx, clause, source_location());
+    clause_base_position += clause.length + 1;
   }
 
   actx.constant_variables.clear();
@@ -1113,7 +1125,8 @@ fn RedirectedCommand::analyze(AnalysisContext &actx,
                                             source_location(),
                                             StringView{},
                                             analysis_command_info::unknown(),
-                                            false};
+                                            false,
+                                            !is_unconditional};
 
   check_redirection_lints(actx, lint_input);
 }

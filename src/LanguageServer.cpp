@@ -1221,12 +1221,61 @@ pure fn clamped_source_span(const Document &document, usize position,
                                                                length);
 }
 
-/* An array assignment location covers the name and the operator alone. The
-   elements are recovered from the rest of the line. */
+/* What each binder puts in the name, in the order of the enum. */
+static constexpr const char *BINDER_DESCRIPTIONS[] = {
+    "",
+    "The name takes each word of the loop list in turn.",
+    "The name takes the menu entry the reader selects.",
+    "The value is the result of an arithmetic expression.",
+    "The value is a field read from input.",
+    "The value is a list of lines read from input.",
+    "The value is the option letter the parse reached.",
+    "The value is the formatted text.",
+};
+static_assert(countof(BINDER_DESCRIPTIONS) ==
+              static_cast<usize>(assignment_binder::FormattedText) + 1);
+
+pure fn binder_description(assignment_binder binder) wontthrow -> StringView
+{
+  let const index = static_cast<usize>(binder);
+  if (index >= countof(BINDER_DESCRIPTIONS)) return StringView{};
+
+  return BINDER_DESCRIPTIONS[index];
+}
+
+pure fn source_line_span(const Document &document, usize position) wontthrow
+    -> StringView
+{
+  let const source = document.normalized_source.view();
+  let line_start = position;
+  while (line_start > 0 && source[line_start - 1] != '\n')
+    line_start--;
+
+  while (line_start < position &&
+         (source[line_start] == ' ' || source[line_start] == '\t'))
+  {
+    line_start++;
+  }
+
+  let const rest = source.substring(line_start);
+  let const line_end = rest.find_character('\n');
+
+  return line_end.has_value() ? rest.substring_of_length(0, *line_end) : rest;
+}
+
+/* An array assignment location covers the name and the operator alone, and a
+   binding location covers the name alone. The rest is recovered from the
+   line. */
 pure fn assignment_headline_span(
     const Document &document,
     const variable_assignment_record &record) wontthrow -> StringView
 {
+  if (record.position >= document.normalized_source.count())
+    return StringView{};
+
+  if (record.binder != assignment_binder::Assignment)
+    return source_line_span(document, record.position);
+
   let const span =
       clamped_source_span(document, record.position, record.length);
   if (span.is_empty() || span[span.length - 1] != '=') return span;
@@ -1358,7 +1407,10 @@ fn Server::variable_hover_text(
   append_hover_block(text, headline.view(), m_supports_markdown_hover,
                      StringView{"shell"});
 
-  if (nearest.is_array) {
+  if (nearest.binder != assignment_binder::Assignment) {
+    text.push('\n');
+    text.append(binder_description(nearest.binder));
+  } else if (nearest.is_array) {
     text.append("\nThe value is a list, and the elements are not folded.");
   } else if (nearest.is_append) {
     text.append("\nThe value appends to what came before.");

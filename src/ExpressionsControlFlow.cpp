@@ -407,10 +407,13 @@ fn WhileLoop::as_while_loop() const wontthrow -> const WhileLoop *
   return this;
 }
 
-SelectLoop::SelectLoop(SourceLocation location, StringView variable_name,
+SelectLoop::SelectLoop(SourceLocation location,
+                       SourceLocation variable_location,
+                       StringView variable_name,
                        ArrayList<const Token *> &&words, bool has_in_clause,
                        const Expression *body)
     : CompoundCommand(steal(location)), m_variable_name(variable_name),
+      m_variable_location(steal(variable_location)),
       m_has_in_clause(has_in_clause), m_body(body)
 {
   m_words = steal(words);
@@ -593,7 +596,9 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 {
   ASSERT(m_body != nullptr);
 
-  unused(is_unconditional);
+  actx.note_variable_binding_record(
+      m_variable_name.view(), m_variable_location, assignment_binder::ForLoop,
+      !is_unconditional || actx.has_seen_runtime_definer);
 
   let const outer_loop_location =
       actx.active_loop_variables.find(m_variable_name.view());
