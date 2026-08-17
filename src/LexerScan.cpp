@@ -143,8 +143,9 @@ fn scan_balanced_shell_region(StringView source, usize position,
       previous_byte = byte;
       continue;
     }
-    if (byte == '#' && (previous_byte == 0 || previous_byte == '\n' ||
-                        is_whitespace(previous_byte)))
+    if (closing_byte != '}' && byte == '#' &&
+        (previous_byte == 0 || previous_byte == '\n' ||
+         is_whitespace(previous_byte)))
     {
       while (position < source.length && source[position] != '\n')
         position++;

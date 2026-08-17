@@ -608,6 +608,40 @@ pure fn word_looks_like_option(StringView word) wontthrow -> bool
   return word.length > 1 && word[0] == '-';
 }
 
+struct word_layout
+{
+  usize display_length{0};
+  bool has_hard_newline{false};
+};
+
+static fn measure_word_layout(StringView word) throws -> word_layout
+{
+  let measure = word_layout{};
+  usize segment_start = 0;
+  usize position = 0;
+
+  while (position < word.length) {
+    if (word[position] == '\\' && position + 1 < word.length &&
+        word[position + 1] == '\n')
+    {
+      measure.display_length += toiletline::display_width(
+          word.substring_of_length(segment_start, position - segment_start));
+      measure.display_length++;
+      position += 2;
+      while (position < word.length && is_format_blank(word[position]))
+        position++;
+      segment_start = position;
+      continue;
+    }
+    if (word[position] == '\n') measure.has_hard_newline = true;
+    position++;
+  }
+  measure.display_length += toiletline::display_width(
+      word.substring_of_length(segment_start, word.length - segment_start));
+
+  return measure;
+}
+
 fn collect_option_wrap_positions(const ArrayList<format_piece> &pieces) throws
     -> ArrayList<option_wrap_position>
 {
@@ -624,10 +658,10 @@ fn collect_option_wrap_positions(const ArrayList<format_piece> &pieces) throws
       usize line_width = 0;
       bool has_multiline_word = false;
       for (usize index = segment_start; index < segment_end; index++) {
-        let const word = pieces[index].text;
-        line_width += toiletline::display_width(word);
+        let const measure = measure_word_layout(pieces[index].text);
+        line_width += measure.display_length;
         if (index != segment_start) line_width++;
-        if (word.find_character('\n').has_value()) has_multiline_word = true;
+        if (measure.has_hard_newline) has_multiline_word = true;
       }
 
       let const is_plain_command =
@@ -808,6 +842,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   let case_pattern_states = ArrayList<bool>{heap_allocator()};
   bool should_attach_heredoc_delimiter = false;
   bool should_attach_redirection_operand = false;
+  bool should_attach_case_pattern = false;
   bool does_command_start_after_redirection = false;
   usize subshell_depth = 0;
   usize conditional_depth = 0;
@@ -904,8 +939,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         writer.set_indent(indent);
       }
       if ((keyword_flags & formatter_keyword_vertical) != 0 || is_case_in) {
-        do_finish_command();
-        writer.finish_line();
+        if (!is_case_in) {
+          do_finish_command();
+          writer.finish_line();
+        }
         writer.append_token(rendered_text);
         if (index + 1 < pieces.count() &&
             pieces[index + 1].kind == format_piece_kind::Comment &&
@@ -961,7 +998,12 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (is_test_command && !has_closed_test && is_redirection_descriptor)
         do_close_test();
 
-      writer.append_token(rendered_text);
+      if (should_attach_case_pattern) {
+        writer.append_attached(rendered_text);
+        should_attach_case_pattern = false;
+      } else {
+        writer.append_token(rendered_text);
+      }
       if ((keyword_flags & formatter_keyword_prefix) != 0)
         is_command_start = true;
       else if (!is_redirection_descriptor &&
@@ -984,6 +1026,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       do_finish_command();
       continue;
     case format_operator::OpenParen:
+      if (conditional_depth > 0) {
+        writer.append_token(text);
+        continue;
+      }
+      if (!case_pattern_states.is_empty() && case_pattern_states.back()) {
+        writer.append_token(text);
+        should_attach_case_pattern = true;
+        continue;
+      }
       if (!is_command_start) break;
       writer.append_token(text);
       if (!is_followed_by_inline_comment) writer.finish_line();
@@ -1032,6 +1083,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       do_finish_command();
       continue;
     case format_operator::CloseParen: {
+      if (conditional_depth > 0) {
+        writer.append_token(text);
+        continue;
+      }
       let const is_case_pattern =
           !case_pattern_states.is_empty() && case_pattern_states.back();
       if (is_case_pattern) {
@@ -1040,6 +1095,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         indent += 2;
         writer.set_indent(indent);
         case_pattern_states.back() = false;
+        should_attach_case_pattern = false;
         is_command_start = true;
       } else if (subshell_depth > 0) {
         do_finish_command();

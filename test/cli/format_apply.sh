@@ -250,6 +250,39 @@ printf 'skipped-fixes-status=%s contents=%s\n' "$?" \
   "$(tr '\n' '|' < "$root/skipped-fixes.sh")"
 cat "$root/skipped-fixes.err"
 
+cat > "$root/shapes.sh" <<'EOF'
+items=(one two three)
+flag=on left=right other=
+count=${#items[@]}
+if [[ $flag && ( $left == right || $other ) ]]; then echo cond; fi
+case $1 in
+(alpha) echo first ;;
+(beta|gamma) echo second ;;
+*) echo "rest $count" ;;
+esac
+for name in one two; do echo "${#name}"; done
+EOF
+"$BIN" --format "$root/shapes.sh" > "$root/shapes-formatted.sh"
+cat "$root/shapes-formatted.sh"
+"$BIN" --format "$root/shapes-formatted.sh" > "$root/shapes-second.sh"
+shapes_original=$("$BIN" --no-diagnostics "$root/shapes.sh" alpha)
+shapes_formatted=$("$BIN" --no-diagnostics "$root/shapes-formatted.sh" alpha)
+printf 'shapes-equivalent=%s idempotent=%s\n' \
+  "$([ "$shapes_original" = "$shapes_formatted" ] && printf yes)" \
+  "$(cmp -s "$root/shapes-formatted.sh" "$root/shapes-second.sh" && \
+      printf yes)"
+
+printf 'builtin eval -- "\044(one/two/three.dump | four/five:six/seven.awk resolve 2>/dev/null)"\n' \
+  > "$root/substitution-wrap.sh"
+"$BIN" --format "$root/substitution-wrap.sh" \
+  > "$root/substitution-wrap-formatted.sh"
+cat "$root/substitution-wrap-formatted.sh"
+"$BIN" --format "$root/substitution-wrap-formatted.sh" \
+  > "$root/substitution-wrap-second.sh"
+printf 'substitution-wrap-idempotent=%s\n' \
+  "$(cmp -s "$root/substitution-wrap-formatted.sh" \
+      "$root/substitution-wrap-second.sh" && printf yes)"
+
 printf 'if\n' > "$root/invalid.sh"
 before=$(cat "$root/invalid.sh")
 "$BIN" --format --apply "$root/invalid.sh" >/dev/null 2>&1

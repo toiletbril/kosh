@@ -49,8 +49,7 @@ done
 echo @(a|b)
 printf "%s\n" if test x = x
 printf "%s\n" ! test x = y
-case x
-in
+case x in
   test)
     echo yes
   ;;
@@ -93,14 +92,12 @@ if
 then
   :
 fi || false
-case x
-in
+case x in
   x)
     :
   ;;
 esac | cat
-case x
-in
+case x in
   x)
     echo arm
 esac
@@ -123,8 +120,7 @@ while false
 do
   :
 done 2>/dev/null
-case x
-in
+case x in
   x)
     :
   ;;
@@ -209,6 +205,33 @@ Fixed 3 warnings.
   deprecated-egrep (SC2196)               1 warning
   deprecated-fgrep (SC2197)               1 warning
 Encountered 2 warnings and 1 error.
+items=(one two three)
+flag=on left=right other=
+count=${#items[@]}
+if [[ $flag && ( $left == right || $other ) ]]
+then
+  echo cond
+fi
+case $1 in
+  (alpha)
+    echo first
+  ;;
+  (beta | gamma)
+    echo second
+  ;;
+  *)
+    echo "rest $count"
+  ;;
+esac
+for name in one two
+do
+  echo "${#name}"
+done
+shapes-equivalent=yes idempotent=yes
+builtin eval \
+        -- \
+  "$(one/two/three.dump | four/five:six/seven.awk resolve 2>/dev/null)"
+substitution-wrap-idempotent=yes
 parse-status=1 unchanged=yes
 lint-parse-status=1 unchanged=yes
 combined-parse-status=1 unchanged=yes
