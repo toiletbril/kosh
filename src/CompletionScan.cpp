@@ -1153,6 +1153,11 @@ fn advance_shell_lexical_state(StringView source, usize end,
     if (state.is_in_comment) {
       if (c == '\n') {
         state.is_in_comment = false;
+        /* The separator block never reaches this newline, so the frame is
+           returned to command position here. */
+        let &comment_frame =
+            state.frames.is_empty() ? state.root_frame : state.frames.back();
+        comment_frame.is_command_position = true;
         i++;
         if (!state.pending_heredocs.is_empty()) state.is_in_heredoc = true;
       } else {
@@ -1162,7 +1167,14 @@ fn advance_shell_lexical_state(StringView source, usize end,
     }
 
     if (state.quote == '\'') {
-      if (c == '\'') state.quote = 0;
+      if (state.is_in_ansi_c_quote && c == '\\' && i + 1 < end) {
+        i += 2;
+        continue;
+      }
+      if (c == '\'') {
+        state.quote = 0;
+        state.is_in_ansi_c_quote = false;
+      }
       i++;
       continue;
     }
@@ -1188,6 +1200,16 @@ fn advance_shell_lexical_state(StringView source, usize end,
         i++;
         continue;
       }
+    }
+
+    /* A backslash escapes the next byte inside `$'...'`, so the quote is
+       tracked apart from a plain single quote. Inside double quotes the `$'`
+       is literal. */
+    if (c == '$' && state.quote == 0 && i + 1 < end && source[i + 1] == '\'') {
+      state.quote = '\'';
+      state.is_in_ansi_c_quote = true;
+      i += 2;
+      continue;
     }
 
     if (c == '\'' || c == '"') {

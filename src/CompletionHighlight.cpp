@@ -137,10 +137,38 @@ static pure fn is_highlight_function_name_char(char c) wontthrow -> bool
   case ':':
   case '@':
   case '#':
-  case '%': return true;
+  case '%':
+  case '{':
+  case '}': return true;
 
   default: return false;
   }
+}
+
+/* A brace pair holding `..` is a range expansion and an unpaired brace is a
+   fragment, so neither one belongs to a name. */
+static pure fn word_braces_are_literal(StringView word) wontthrow -> bool
+{
+  usize brace_depth = 0;
+  for (usize i = 0; i < word.length; i++) {
+    if (word[i] == '{') {
+      brace_depth++;
+      continue;
+    }
+    if (word[i] == '}') {
+      if (brace_depth == 0) return false;
+
+      brace_depth--;
+      continue;
+    }
+    if (brace_depth > 0 && word[i] == '.' && i + 1 < word.length &&
+        word[i + 1] == '.')
+    {
+      return false;
+    }
+  }
+
+  return brace_depth == 0;
 }
 
 /* The shell looks a command word up in the function table before it treats the
@@ -148,10 +176,14 @@ static pure fn is_highlight_function_name_char(char c) wontthrow -> bool
 pure fn word_is_function_name(StringView word) wontthrow -> bool
 {
   if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
-  for (usize i = 1; i < word.length; i++)
-    if (!is_highlight_function_name_char(word[i])) return false;
 
-  return true;
+  let has_brace = false;
+  for (usize i = 1; i < word.length; i++) {
+    if (!is_highlight_function_name_char(word[i])) return false;
+    if (word[i] == '{' || word[i] == '}') has_brace = true;
+  }
+
+  return !has_brace || word_braces_are_literal(word);
 }
 
 pure fn word_defines_function(StringView line, usize word_end,
@@ -1116,6 +1148,19 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
               highlight_span{literal_start, i, highlight_role::string});
       } else if (d == '`') {
         i = do_color_backtick(i, word_spans);
+      } else if (d == '$' && i + 1 < end && line[i + 1] == '\'') {
+        let const string_start = i;
+        i += 2;
+        while (i < end && line[i] != '\'') {
+          if (line[i] == '\\' && i + 1 < end) {
+            i += 2;
+            continue;
+          }
+          i++;
+        }
+        if (i < end) i++;
+        word_spans.push(
+            highlight_span{string_start, i, highlight_role::string});
       } else if (d == '$') {
         i = color_dollar(line, i, end, word_spans, context, line_variable_names,
                          known_function_names);

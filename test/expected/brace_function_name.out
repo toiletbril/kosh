@@ -1,0 +1,6 @@
+ble/highlight/layer:{selection}/getg	function-name
+ble/highlight/layer:{selection}/getg	resolved-command
+ble/prompt/unit:{section}/get	function-name
+ble/prompt/unit:{section}/get	resolved-command
+bad{1..3}	invalid-syntax
+bad{unclosed	invalid-syntax

@@ -591,11 +591,6 @@ fn main(int argc, char **argv) -> int
     should_execute_commands = !FLAG_COMMAND.is_empty();
     should_read_files = !file_names.is_empty();
   } else if (FLAG_LINT.is_enabled()) {
-    if (koshka::os::is_stdin_a_tty()) {
-      koshka::show_message("No file operand and no '-c' command string reached "
-                           "'--lint', so the script is read from the terminal. "
-                           "End the input with Ctrl-D.");
-    }
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
     if (FLAG_INTERACTIVE.is_enabled()) {

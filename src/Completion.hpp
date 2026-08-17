@@ -123,6 +123,7 @@ struct shell_lexical_state
   usize source_position{0};
   usize active_heredoc_index{0};
   char quote{0};
+  bool is_in_ansi_c_quote{false};
   bool is_in_comment{false};
   bool is_in_heredoc{false};
 };
