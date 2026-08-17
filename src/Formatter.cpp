@@ -1184,7 +1184,9 @@ fn select_nonconflicting_source_edits(
 }
 
 fn apply_source_fixes(StringView source, const ArrayList<source_fix> &fixes,
-                      bool safe_only) throws -> Maybe<String>
+                      bool safe_only,
+                      ArrayList<diagnostic_id> *applied_origins) throws
+    -> Maybe<String>
 {
   let candidates = ArrayList<const source_edit *>{heap_allocator()};
   for (let const &fix : fixes) {
@@ -1202,6 +1204,25 @@ fn apply_source_fixes(StringView source, const ArrayList<source_fix> &fixes,
   }
   let const nonconflicting =
       select_nonconflicting_source_edits(steal(candidates));
+
+  if (applied_origins != nullptr) {
+    for (let const &fix : fixes) {
+      if (!fix.origin.has_value()) continue;
+      if (safe_only && !fix.is_safe_for_fix_all) continue;
+
+      bool was_applied = false;
+      for (let const &edit : fix.edits) {
+        for (let const *selected_edit : nonconflicting) {
+          if (selected_edit != &edit) continue;
+          was_applied = true;
+          break;
+        }
+        if (was_applied) break;
+      }
+
+      if (was_applied) applied_origins->push(*fix.origin);
+    }
+  }
 
   let output = String{heap_allocator()};
   usize output_length = source.length;
@@ -1260,10 +1281,178 @@ fn source_fixes_for_original_line_endings(
     }
     if (!is_valid) continue;
     fixes.push(source_fix{fix.title.clone(), steal(edits), fix.is_preferred,
-                          fix.is_safe_for_fix_all});
+                          fix.is_safe_for_fix_all, fix.origin});
   }
 
   return fixes;
+}
+
+static pure fn skip_source_blanks(StringView source, usize position) wontthrow
+    -> usize
+{
+  while (position < source.length &&
+         (source[position] == ' ' || source[position] == '\t'))
+  {
+    position++;
+  }
+
+  return position;
+}
+
+static pure fn source_word_end(StringView source, usize position) wontthrow
+    -> usize
+{
+  while (position < source.length) {
+    switch (source[position]) {
+    case ' ':
+    case '\t':
+    case '\n':
+    case '\r':
+    case ';':
+    case '&':
+    case '|':
+    case '(':
+    case ')':
+    case '<':
+    case '>': return position;
+    default: position++;
+    }
+  }
+
+  return position;
+}
+
+static pure fn is_plain_test_literal(StringView text) wontthrow -> bool
+{
+  if (text.is_empty()) return false;
+
+  for (usize position = 0; position < text.length; position++) {
+    let const byte = text[position];
+    if ((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+        (byte >= '0' && byte <= '9'))
+    {
+      continue;
+    }
+
+    switch (byte) {
+    case '_':
+    case '-':
+    case '.':
+    case '/':
+    case ':':
+    case ',':
+    case '+':
+    case '@':
+    case '=': continue;
+    default: return false;
+    }
+  }
+
+  return true;
+}
+
+static fn test_operand_without_x_prefix(StringView operand) throws
+    -> Maybe<String>
+{
+  if (operand.length < 2 || operand[0] == '\'') return None;
+
+  if (operand[0] == '"' && operand[operand.length - 1] == '"' &&
+      operand.length >= 3 && operand[1] == 'x')
+  {
+    let stripped = String{"\""};
+    stripped.append(operand.substring(2));
+
+    return stripped;
+  }
+
+  if (operand[0] == 'x' && operand[1] == '"' &&
+      operand[operand.length - 1] == '"')
+  {
+    return String{operand.substring(1)};
+  }
+
+  if (operand[0] == 'x' && is_plain_test_literal(operand.substring(1)))
+    return String{operand.substring(1)};
+
+  return None;
+}
+
+static fn x_prefix_test_fix(StringView source,
+                            const SourceLocation &location) throws
+    -> Maybe<source_fix>
+{
+  let const left =
+      source.substring_of_length(location.position, location.length);
+  if (left.length < 3) return None;
+
+  let left_replacement = test_operand_without_x_prefix(left);
+  if (!left_replacement.has_value()) return None;
+
+  let const operator_start =
+      skip_source_blanks(source, location.position + location.length);
+  if (operator_start == location.position + location.length) return None;
+
+  let const operator_end = source_word_end(source, operator_start);
+  let const written_operator =
+      source.substring_of_length(operator_start, operator_end - operator_start);
+  if (written_operator != "=" && written_operator != "!=") return None;
+
+  let const right_start = skip_source_blanks(source, operator_end);
+  if (right_start == operator_end) return None;
+
+  let const right_end = source_word_end(source, right_start);
+  let const right =
+      source.substring_of_length(right_start, right_end - right_start);
+  let right_replacement = test_operand_without_x_prefix(right);
+  if (!right_replacement.has_value()) return None;
+
+  let edits = ArrayList<source_edit>{heap_allocator()};
+  edits.push(source_edit{location.position, location.position + location.length,
+                         String{left}, left_replacement.take()});
+  edits.push(source_edit{right_start, right_end, String{right},
+                         right_replacement.take()});
+
+  return source_fix{String{"Drop the 'x' prefix from both operands"},
+                    steal(edits), true, true, diagnostic_id::sc2268};
+}
+
+static fn negated_test_operator_fix(diagnostic_id diagnostic, StringView source,
+                                    const SourceLocation &location) throws
+    -> Maybe<source_fix>
+{
+  let const negated = diagnostic == diagnostic_id::sc2236;
+  let const written_operator = negated ? StringView{"-z"} : StringView{"-n"};
+  let const replacement_operator =
+      negated ? StringView{"-n"} : StringView{"-z"};
+
+  if (source.substring_of_length(location.position, location.length) != "!")
+    return None;
+
+  let const operator_start =
+      skip_source_blanks(source, location.position + location.length);
+  if (operator_start == location.position + location.length) return None;
+
+  let const operator_end = source_word_end(source, operator_start);
+  if (source.substring_of_length(
+          operator_start, operator_end - operator_start) != written_operator)
+  {
+    return None;
+  }
+
+  let edits = ArrayList<source_edit>{heap_allocator()};
+  edits.push(
+      source_edit{location.position, operator_start,
+                  String{source.substring_of_length(
+                      location.position, operator_start - location.position)},
+                  String{heap_allocator()}});
+  edits.push(source_edit{operator_start, operator_end, String{written_operator},
+                         String{replacement_operator}});
+
+  let title = String{"Replace the negation with `"};
+  title.append(replacement_operator);
+  title.push('`');
+
+  return source_fix{steal(title), steal(edits), true, true, diagnostic};
 }
 
 fn source_fixes_for_diagnostic(diagnostic_id diagnostic, StringView source,
@@ -1347,6 +1536,50 @@ fn source_fixes_for_diagnostic(diagnostic_id diagnostic, StringView source,
     replacement = "=";
     is_safe_for_fix_all = true;
     break;
+  case diagnostic_id::sc2196:
+    title = "Replace 'egrep' with 'grep -E'";
+    replacement = "grep -E";
+    is_safe_for_fix_all = true;
+    break;
+  case diagnostic_id::sc2197:
+    title = "Replace 'fgrep' with 'grep -F'";
+    replacement = "grep -F";
+    is_safe_for_fix_all = true;
+    break;
+  case diagnostic_id::sc2007: {
+    if (written.length < 3 || !written.starts_with(StringView{"$["}) ||
+        written[written.length - 1] != ']')
+    {
+      is_fixable = false;
+      break;
+    }
+    let const inner = written.substring_of_length(2, written.length - 3);
+    if (inner.find_character('[').has_value() ||
+        inner.find_character(']').has_value())
+    {
+      is_fixable = false;
+      break;
+    }
+    title = "Replace '$[...]' with '$((...))'";
+    replacement = "$((";
+    replacement.append(inner);
+    replacement.append("))");
+    is_safe_for_fix_all = true;
+    break;
+  }
+  case diagnostic_id::sc2268: {
+    let operand_fix = x_prefix_test_fix(source, location);
+    if (operand_fix.has_value()) fixes.push(operand_fix.take());
+
+    return fixes;
+  }
+  case diagnostic_id::sc2236:
+  case diagnostic_id::sc2237: {
+    let negation_fix = negated_test_operator_fix(diagnostic, source, location);
+    if (negation_fix.has_value()) fixes.push(negation_fix.take());
+
+    return fixes;
+  }
   case diagnostic_id::sc2068:
     if (written != "$@") {
       is_fixable = false;
@@ -1385,8 +1618,8 @@ fn source_fixes_for_diagnostic(diagnostic_id diagnostic, StringView source,
   let const edit_end = location.position + location.length;
   edits.push(source_edit{location.position, edit_end, String{written},
                          steal(replacement)});
-  fixes.push(
-      source_fix{String{title}, steal(edits), true, is_safe_for_fix_all});
+  fixes.push(source_fix{String{title}, steal(edits), true, is_safe_for_fix_all,
+                        diagnostic});
 
   return fixes;
 }

@@ -171,6 +171,44 @@ warning-apply-status=1
 #!/bin/bash
 [[ 1 > 0 ]]
 safe-and-unsafe-status=1 contents=#!/bin/sh|[ "$1" = y ]|printf "%s\n" $1|
+summary-status=1
+.test-work/format-apply/summary.sh:4:15: error: An unquoted variable can split into words and expand globs. (SC2086)
+     4 |  printf "%s\n" $1
+       |                ^~
+note: Quote the expansion to keep one argument.
+Fixed 3 errors.
+  posix-test-equals (SC3014)  2 errors
+  byte-order-mark (SC1082)    1 error
+safe-fixes-status=0
+Fixed 4 warnings.
+  x-prefix-test (SC2268)  2 warnings
+  negated-z (SC2236)      1 warning
+  negated-n (SC2237)      1 warning
+safe-fixes-equivalent=yes
+#!/bin/sh
+value=yes
+test "$value" = yes && echo one
+[ "$value" = "yes" ] && echo two
+[ -n "$value" ] && echo three
+[ -z "$value" ] || echo four
+skipped-fixes-status=1 contents=#!/bin/sh|grep -E pattern /dev/null|grep -F pattern /dev/null|echo $((1+2))|[ x$1 = xbare ] && echo unquoted|echo $[v[0]+1]|
+.test-work/format-apply/skipped-fixes.sh:5:3: warning: The x-prefix test workaround is obsolete. (SC2268)
+     5 |  [ x$1 = xbare ] && echo unquoted
+       |    ^~~
+note: Quote the variable directly.
+.test-work/format-apply/skipped-fixes.sh:5:4: error: The unquoted test operand vanishes when the value is empty. (SC2086)
+     5 |  [ x$1 = xbare ] && echo unquoted
+       |     ^~
+note: Quote it to avoid an empty or split argument.
+.test-work/format-apply/skipped-fixes.sh:6:6: warning: The `$[...]` spelling is not defined by POSIX. (SC2007)
+     6 |  echo $[v[0]+1]
+       |       ^~~~~~~~~
+note: Use `$((...))` for arithmetic expansion.
+Fixed 3 warnings.
+  obsolete-arithmetic-expansion (SC2007)  1 warning
+  deprecated-egrep (SC2196)               1 warning
+  deprecated-fgrep (SC2197)               1 warning
+Encountered 2 warnings and 1 error.
 parse-status=1 unchanged=yes
 lint-parse-status=1 unchanged=yes
 combined-parse-status=1 unchanged=yes

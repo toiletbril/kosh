@@ -836,6 +836,117 @@ static fn replace_file_contents(const apply_file_snapshot &snapshot,
   return true;
 }
 
+struct applied_fix_tally
+{
+  diagnostic_id id;
+  error_severity severity;
+  usize count;
+};
+
+static fn record_applied_fix(ArrayList<applied_fix_tally> &tallies,
+                             diagnostic_id id, error_severity severity) throws
+    -> void
+{
+  for (let &tally : tallies) {
+    if (tally.id != id || tally.severity != severity) continue;
+    tally.count++;
+
+    return;
+  }
+
+  tallies.push(applied_fix_tally{id, severity, 1});
+}
+
+static fn append_applied_fix_label(String &label, diagnostic_id id) throws
+    -> void
+{
+  let const &definition = get_diagnostic_definition(id);
+  label.append(definition.slug);
+
+  if (!definition.shellcheck_code.has_value()) return;
+
+  label.append(" (SC");
+  label.append(String::from(*definition.shellcheck_code, heap_allocator()));
+  label.push(')');
+}
+
+cold static fn
+print_applied_fix_summary(ArrayList<applied_fix_tally> &tallies) throws -> void
+{
+  if (tallies.is_empty()) return;
+
+  tallies.sort([](const applied_fix_tally &left, const applied_fix_tally &right)
+                   wontthrow -> bool {
+                     if (left.count != right.count)
+                       return left.count > right.count;
+                     return ENUM(left.id) < ENUM(right.id);
+                   });
+
+  usize warning_count = 0;
+  usize error_count = 0;
+  usize label_width = 0;
+  let labels = ArrayList<String>{heap_allocator()};
+  for (let const &tally : tallies) {
+    if (tally.severity == error_severity::Warning)
+      warning_count += tally.count;
+    else
+      error_count += tally.count;
+
+    let label = String{heap_allocator()};
+    append_applied_fix_label(label, tally.id);
+    if (label.count() > label_width) label_width = label.count();
+    labels.push(steal(label));
+  }
+
+  let const wants_color = colors::stderr_wants_color();
+  let const warning_color = wants_color ? colors::ansi::YELLOW : StringView{};
+  let const error_color =
+      wants_color ? colors::ansi::BOLD_BRIGHT_RED : StringView{};
+  let const reset = wants_color ? colors::ansi::RESET : StringView{};
+
+  let summary = String{"Fixed "};
+
+  if (warning_count > 0) {
+    summary.append(warning_color);
+    summary.append(String::from(warning_count, heap_allocator()));
+    summary.append(warning_count == 1 ? " warning" : " warnings");
+    summary.append(reset);
+  }
+
+  if (warning_count > 0 && error_count > 0) summary.append(" and ");
+
+  if (error_count > 0) {
+    summary.append(error_color);
+    summary.append(String::from(error_count, heap_allocator()));
+    summary.append(error_count == 1 ? " error" : " errors");
+    summary.append(reset);
+  }
+
+  summary.append(".");
+  show_message(summary.view());
+
+  for (usize tally_index = 0; tally_index < tallies.count(); tally_index++) {
+    let const &tally = tallies[tally_index];
+    let const is_warning = tally.severity == error_severity::Warning;
+
+    let line = String{"  "};
+    line.append(labels[tally_index].view());
+    for (usize padding = labels[tally_index].count(); padding < label_width;
+         padding++)
+      line.push(' ');
+    line.append("  ");
+    line.append(is_warning ? warning_color : error_color);
+    line.append(String::from(tally.count, heap_allocator()));
+    if (is_warning)
+      line.append(tally.count == 1 ? " warning" : " warnings");
+    else
+      line.append(tally.count == 1 ? " error" : " errors");
+    line.append(reset);
+
+    show_message(line.view());
+  }
+}
+
 static fn run_format_operation(const ArrayList<String> &file_names,
                                bool should_apply, bool should_apply_lint_fixes,
                                mimic_mood mood, BumpArena &ast_arena,
@@ -892,9 +1003,9 @@ static fn run_format_operation(const ArrayList<String> &file_names,
             edits.push(source_edit{edit.start_position, edit.end_position,
                                    edit.expected.clone(),
                                    edit.replacement.clone()});
-          normalized_fixes.push(source_fix{fix.title.clone(), steal(edits),
-                                           fix.is_preferred,
-                                           fix.is_safe_for_fix_all});
+          normalized_fixes.push(
+              source_fix{fix.title.clone(), steal(edits), fix.is_preferred,
+                         fix.is_safe_for_fix_all, fix.origin});
         }
       }
       let const fixes = source_fixes_for_original_line_endings(
@@ -941,6 +1052,7 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
 {
   bool did_fail = false;
   let final_totals = analysis_diagnostic_totals{};
+  let applied_tallies = ArrayList<applied_fix_tally>{heap_allocator()};
 
   for (let const &file_name : file_names) {
     let const path = Path{file_name.view()};
@@ -955,10 +1067,15 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     unused(run_script_contents(source, context, ast_arena, file_name.view(),
                                nullptr, nullptr, None, nullptr, &diagnostics));
     let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
+    let reported_severities = ArrayList<applied_fix_tally>{heap_allocator()};
     for (let const &diagnostic : diagnostics) {
       if (!diagnostic.source_name.is_empty() &&
           diagnostic.source_name != file_name.view())
         continue;
+      if (diagnostic.id.has_value()) {
+        record_applied_fix(reported_severities, *diagnostic.id,
+                           diagnostic.severity);
+      }
       for (let const &fix : diagnostic.fixes) {
         let edits = ArrayList<source_edit>{heap_allocator()};
         for (let const &edit : fix.edits) {
@@ -968,12 +1085,14 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
         }
         normalized_fixes.push(source_fix{fix.title.clone(), steal(edits),
                                          fix.is_preferred,
-                                         fix.is_safe_for_fix_all});
+                                         fix.is_safe_for_fix_all, fix.origin});
       }
     }
     let fixes = source_fixes_for_original_line_endings(
         snapshot->contents.view(), normalized_fixes);
-    let fixed = apply_source_fixes(snapshot->contents.view(), fixes);
+    let applied_origins = ArrayList<diagnostic_id>{heap_allocator()};
+    let fixed = apply_source_fixes(snapshot->contents.view(), fixes, true,
+                                   &applied_origins);
     if (!fixed.has_value()) {
       show_message("Unable to apply non-conflicting fixes to '" + path.text() +
                    "'.");
@@ -1016,6 +1135,18 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
       continue;
     }
 
+    for (let const applied_id : applied_origins) {
+      Maybe<error_severity> severity = None;
+      for (let const &reported : reported_severities) {
+        if (reported.id != applied_id) continue;
+        severity = reported.severity;
+        break;
+      }
+
+      if (!severity.has_value()) continue;
+      record_applied_fix(applied_tallies, applied_id, *severity);
+    }
+
     let analyzed_source = final_source.clone();
     analyzed_source.normalize_crlf_line_endings();
     let const final_status = run_script_contents(
@@ -1023,6 +1154,7 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
         None, &final_totals);
     if (final_status != EXIT_SUCCESS) did_fail = true;
   }
+  print_applied_fix_summary(applied_tallies);
   print_analysis_diagnostic_summary(final_totals);
 
   return did_fail ? EXIT_FAILURE : EXIT_SUCCESS;

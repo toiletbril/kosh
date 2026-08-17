@@ -215,6 +215,41 @@ printf '#!/bin/sh\n[ "\0441" == y ]\nprintf "%%s\\n" \0441\n' \
 printf 'safe-and-unsafe-status=%s contents=%s\n' "$?" \
   "$(tr '\n' '|' < "$root/safe-and-unsafe.sh")"
 
+printf '\357\273\277#!/bin/sh\n[ "\0441" == y ]\n[ "\0442" == n ]\nprintf "%%s\\n" \0441\n' \
+  > "$root/summary.sh"
+"$BIN" --lint --apply --no-traces "$root/summary.sh" \
+  > /dev/null 2> "$root/summary.err"
+printf 'summary-status=%s\n' "$?"
+cat "$root/summary.err"
+
+cat > "$root/safe-fixes.sh" <<'EOF'
+#!/bin/sh
+value=yes
+test "x$value" = xyes && echo one
+[ x"$value" = "xyes" ] && echo two
+[ ! -z "$value" ] && echo three
+[ ! -n "$value" ] || echo four
+EOF
+safe_fixes_original=$("$BIN" --no-diagnostics "$root/safe-fixes.sh")
+"$BIN" --lint --apply --no-traces "$root/safe-fixes.sh" \
+  > /dev/null 2> "$root/safe-fixes.err"
+printf 'safe-fixes-status=%s\n' "$?"
+cat "$root/safe-fixes.err"
+safe_fixes_applied=$("$BIN" --no-diagnostics "$root/safe-fixes.sh")
+printf 'safe-fixes-equivalent=%s\n' \
+  "$([ "$safe_fixes_original" = "$safe_fixes_applied" ] && printf yes)"
+cat "$root/safe-fixes.sh"
+
+printf '#!/bin/sh\negrep pattern /dev/null\nfgrep pattern /dev/null\n' \
+  > "$root/skipped-fixes.sh"
+printf 'echo \044[1+2]\n[ x\0441 = xbare ] && echo unquoted\necho \044[v[0]+1]\n' \
+  >> "$root/skipped-fixes.sh"
+"$BIN" --lint --apply --no-traces "$root/skipped-fixes.sh" \
+  > /dev/null 2> "$root/skipped-fixes.err"
+printf 'skipped-fixes-status=%s contents=%s\n' "$?" \
+  "$(tr '\n' '|' < "$root/skipped-fixes.sh")"
+cat "$root/skipped-fixes.err"
+
 printf 'if\n' > "$root/invalid.sh"
 before=$(cat "$root/invalid.sh")
 "$BIN" --format --apply "$root/invalid.sh" >/dev/null 2>&1

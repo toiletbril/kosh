@@ -23,13 +23,16 @@ struct source_fix
   ArrayList<source_edit> edits;
   bool is_preferred{true};
   bool is_safe_for_fix_all{false};
+  Maybe<diagnostic_id> origin{None};
 };
 
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
                        ArrayList<String> &errors) throws -> Maybe<String>;
 
 fn apply_source_fixes(StringView source, const ArrayList<source_fix> &fixes,
-                      bool safe_only = true) throws -> Maybe<String>;
+                      bool safe_only = true,
+                      ArrayList<diagnostic_id> *applied_origins =
+                          nullptr) throws -> Maybe<String>;
 
 fn select_nonconflicting_source_edits(
     ArrayList<const source_edit *> &&candidates) throws

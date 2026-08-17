@@ -351,9 +351,11 @@ aliases, functions, and search path of the invoking session.
 With
 .BR \-\-apply ,
 safe structured fixes are written to each named file. The updated source is
-analyzed again, and only the remaining diagnostics are reported. A warning-only
-result exits successfully. A remaining error or an input or write failure exits
-with status 1.
+analyzed again, and only the remaining diagnostics are reported. The written
+fixes are then summarized, with one line for each diagnostic slug and its
+ShellCheck code, counted as warnings or errors. A warning-only result exits
+successfully. A remaining error or an input or write failure exits with status
+1.
 .TP
 .BR \-W ", " \-WW ", " \-WWW
 The analysis stage has strict, lenient, and annoying tiers. In the default
