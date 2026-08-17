@@ -303,7 +303,11 @@ collects each variable assignment and each function body span. The language
 server passes one and every other caller leaves it null, so an ordinary run
 records nothing. A hover answer is built from those records and the open
 document source, because the server returns before the startup chain runs and
-holds no user variables or functions.
+holds no user variables or functions. A `NAME=value` operand of an
+assignment builtin is recorded beside the prefix and standalone forms. The
+operand reaches analysis as an assignment token, or as a word the shared
+`Word::get_assignment_split` splits, and an element operand records its base
+name without a literal.
 
 The document outline is built from the same records. An entry is sorted by its
 start position, with the wider span first when two entries open together, and a

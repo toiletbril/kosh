@@ -417,6 +417,50 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       m_args,          m_redirections, m_local_vars,       source_location(),
       command_literal, command_info,   is_command_shadowed};
 
+  /* A declare-family builtin writes its NAME=value operands, and those reach
+     analysis as command arguments rather than as prefix assignments. */
+  if (command_is_assignment_builtin && !is_command_shadowed &&
+      actx.symbol_records != nullptr)
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      let split = Maybe<word_assignment_split>{None};
+      StringView recorded_name;
+      const Word *recorded_value = nullptr;
+      bool is_append = false;
+
+      if (m_args[i]->kind() == Token::Kind::Assignment) {
+        let const *assignment =
+            static_cast<const tokens::Assignment *>(m_args[i]);
+        recorded_name = assignment->key().view();
+        recorded_value = &assignment->value_word();
+        is_append = assignment->is_append();
+      } else if (m_args[i]->kind() == Token::Kind::Word) {
+        split = static_cast<const tokens::WordToken *>(m_args[i])
+                    ->word()
+                    .get_assignment_split();
+        if (!split.has_value()) continue;
+
+        recorded_name = split->name.view();
+        recorded_value = &split->value;
+        is_append = split->is_append;
+      } else {
+        continue;
+      }
+
+      /* An element assignment carries no scalar literal for the base name. */
+      if (let const bracket = recorded_name.find_character('[');
+          bracket.has_value())
+      {
+        recorded_name = recorded_name.substring_of_length(0, *bracket);
+        recorded_value = nullptr;
+      }
+
+      actx.note_variable_assignment_record(
+          recorded_name, recorded_value, m_args[i]->source_location(),
+          !is_unconditional || actx.has_seen_runtime_definer, is_append);
+    }
+  }
+
   usize source_command_index = m_args.count();
   if (!is_command_shadowed && (command_id == command_name_id::Dot ||
                                command_id == command_name_id::Source))

@@ -172,7 +172,15 @@ information, semantic tokens, and a document outline. A fix-all action applies
 every non-conflicting safe fix in the open document. The outline is a tree of
 the function definitions and the variable assignments in the document. An
 assignment inside a function body is a child of that function, and one name
-assigned again in the same body is one outline row. Hover over a variable reports
+assigned again in the same body is one outline row. A name written as an operand
+of
+.BR local ,
+.BR declare ,
+.BR typeset ,
+.BR export ,
+or
+.B readonly
+is a variable assignment too. Hover over a variable reports
 the assignment nearest above the cursor together with its folded value. The
 earlier assignments in the same document are listed below it, and an assignment
 that does not run on every path is marked. Hover over a function shows the
