@@ -109,6 +109,34 @@ if true
 then
   echo dash
 fi
+{
+  echo brace
+} >&2
+(
+  echo sub
+) >&2
+for i in 1
+do
+  echo "$i"
+done >/dev/null
+while false
+do
+  :
+done 2>/dev/null
+case x
+in
+  x)
+    :
+  ;;
+esac >/dev/null 2>&1
+if true
+then
+  echo cond
+fi >/dev/null
+{
+  echo both
+} >/dev/null 2>&1
+compound-redirect-equivalent=yes captured=yes
 continuation-equivalent=yes idempotent=yes
 lone-cr-retained=yes idempotent=yes
 x+=1 [ -n "$x" ]

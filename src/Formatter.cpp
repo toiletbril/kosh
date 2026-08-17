@@ -464,6 +464,24 @@ pure fn is_redirection_operator(StringView text) wontthrow -> bool
   }
 }
 
+pure fn piece_begins_redirection(const ArrayList<format_piece> &pieces,
+                                 usize index) wontthrow -> bool
+{
+  if (index >= pieces.count()) return false;
+  let const &piece = pieces[index];
+
+  if (piece.kind == format_piece_kind::Operator)
+    return is_redirection_operator(piece.text);
+  if (piece.kind != format_piece_kind::Word) return false;
+  if (!piece.text.is_all_decimal_digits()) return false;
+
+  return index + 1 < pieces.count() &&
+         pieces[index + 1].kind == format_piece_kind::Operator &&
+         is_redirection_operator(pieces[index + 1].text) &&
+         piece.source_position + piece.text.count() ==
+             pieces[index + 1].source_position;
+}
+
 class FormatWriter
 {
 public:
@@ -820,6 +838,8 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         index + 1 < pieces.count() &&
         pieces[index + 1].kind == format_piece_kind::Comment &&
         !pieces[index + 1].does_start_line;
+    let const is_followed_by_redirection =
+        piece_begins_redirection(pieces, index + 1);
     if (piece.kind == format_piece_kind::Raw) {
       writer.append_raw(text);
       continue;
@@ -894,8 +914,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
           index++;
           writer.append_comment(pieces[index].text, false);
         }
-        if (!is_followed_by_continuation && !is_followed_by_inline_comment)
+        let const is_compound_terminator =
+            (keyword_flags & formatter_keyword_closes) != 0 &&
+            (keyword_flags & formatter_keyword_indents) == 0;
+        if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
+            !(is_compound_terminator && is_followed_by_redirection))
+        {
           writer.finish_line();
+        }
+
         if ((keyword_flags & formatter_keyword_indents) != 0 || is_case_in)
           indent += 2;
         writer.set_indent(indent);
@@ -971,8 +998,12 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (indent >= 2) indent -= 2;
       writer.set_indent(indent);
       writer.append_token(text);
-      if (!is_followed_by_continuation && !is_followed_by_inline_comment)
+      if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
+          !is_followed_by_redirection)
+      {
         writer.finish_line();
+      }
+
       continue;
     case format_operator::CaseTerminator:
       do_finish_command();

@@ -79,6 +79,26 @@ printf 'if { true; } && { false; } || true; then :; fi || false\ncase x in x) :;
   "$BIN" --format
 printf 'case x in\nx) echo arm\nesac\necho top\n' | "$BIN" --format
 printf 'if true; then echo dash; fi\n' | "$BIN" --format -
+printf '{ echo brace; } >&2\n( echo sub ) >&2\nfor i in 1; do echo "\044i"; done >/dev/null\nwhile false; do :; done 2>/dev/null\ncase x in x) :;; esac >/dev/null 2>&1\nif true; then echo cond; fi >/dev/null\n{ echo both; } >/dev/null 2>&1\n' |
+  "$BIN" --format
+
+cat > "$root/compound-redirect.sh" <<'EOF'
+target=$1
+{ echo grouped; } > "$target"
+for word in one two; do echo "$word"; done >> "$target"
+while [ -n "$target" ]; do target=; done 2>/dev/null
+case $1 in *) echo arm ;; esac >> "$1"
+if true; then echo branch; fi >> "$1"
+cat "$1"
+EOF
+"$BIN" --format "$root/compound-redirect.sh" \
+  > "$root/compound-redirect-formatted.sh"
+compound_original=$("$BIN" "$root/compound-redirect.sh" "$root/compound-one.txt")
+compound_formatted=$("$BIN" "$root/compound-redirect-formatted.sh" \
+  "$root/compound-two.txt")
+printf 'compound-redirect-equivalent=%s captured=%s\n' \
+  "$([ "$compound_original" = "$compound_formatted" ] && printf yes)" \
+  "$(cmp -s "$root/compound-one.txt" "$root/compound-two.txt" && printf yes)"
 
 printf 'set -- foo\\\nbar\nprintf "<%%s> count=%%s\\n" "\0441" "\044#"\n' \
   > "$root/continuation.sh"
