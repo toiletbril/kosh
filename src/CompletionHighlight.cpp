@@ -766,7 +766,7 @@ color_arithmetic(StringView line, usize begin, usize end, EvalContext &context,
 
 struct heredoc_pending_highlight
 {
-  StringView delimiter;
+  String delimiter;
   bool should_strip_tabs;
 };
 
@@ -798,7 +798,7 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
           line.substring_of_length(content_start, line_end - content_start);
       let const next = (line_end < end) ? line_end + 1 : line_end;
 
-      if (content == heredoc.delimiter) {
+      if (content == heredoc.delimiter.view()) {
         if (body_start < content_start)
           spans.push(highlight_span{body_start, content_start,
                                     highlight_role::heredoc});
@@ -937,17 +937,10 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       if (!delimiter_word.is_empty()) {
         do_push(delimiter_start, i, highlight_role::heredoc_delimiter);
 
-        let delimiter = delimiter_word;
-        if (delimiter.length >= 2) {
-          let const quote = delimiter[0];
-          if ((quote == '\'' || quote == '"') &&
-              delimiter[delimiter.length - 1] == quote)
-          {
-            delimiter = delimiter.substring_of_length(1, delimiter.length - 2);
-          }
-        }
+        let delimiter = lexer::unquote_heredoc_delimiter(
+            delimiter_word, bump_allocator(HIGHLIGHT_ARENA));
         pending_heredocs.push(
-            heredoc_pending_highlight{delimiter, should_strip_tabs});
+            heredoc_pending_highlight{steal(delimiter), should_strip_tabs});
       }
       continue;
     }

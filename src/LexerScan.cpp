@@ -18,9 +18,10 @@ struct balanced_scan_heredoc
   bool should_strip_tabs;
 };
 
-fn unquote_balanced_scan_delimiter(StringView word) throws -> String
+fn unquote_heredoc_delimiter(StringView word, Allocator allocator) throws
+    -> String
 {
-  let delimiter = String{heap_allocator()};
+  let delimiter = String{allocator};
   char quote = 0;
 
   for (usize position = 0; position < word.length; position++) {
@@ -180,9 +181,10 @@ fn scan_balanced_shell_region(StringView source, usize position,
         position++;
       let const delimiter_start = position;
       position = balanced_scan_delimiter_end(source, position);
-      let delimiter =
-          unquote_balanced_scan_delimiter(source.substring_of_length(
-              delimiter_start, position - delimiter_start));
+      let delimiter = unquote_heredoc_delimiter(
+          source.substring_of_length(delimiter_start,
+                                     position - delimiter_start),
+          heap_allocator());
       if (!delimiter.is_empty())
         pending_heredocs.push(
             balanced_scan_heredoc{steal(delimiter), should_strip_tabs});

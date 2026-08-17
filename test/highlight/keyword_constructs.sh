@@ -35,3 +35,8 @@ EOF
 cat <<-"DONE"
 	body
 	DONE' | grep -E "${tab}(heredoc|heredoc-delimiter)$"
+
+"$BIN" --debug-highlight-at 'cat <<\_ACEOF
+body
+_ACEOF
+echo tail' | grep -E "${tab}(heredoc|heredoc-delimiter|resolved-command)$"

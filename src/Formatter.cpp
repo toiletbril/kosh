@@ -134,32 +134,6 @@ pure fn is_format_operator_at(StringView source, usize position) wontthrow
   return previous_is_boundary && next_is_boundary;
 }
 
-fn unquoted_heredoc_delimiter(StringView word) throws -> String
-{
-  let delimiter = String{heap_allocator()};
-  bool is_single_quoted = false;
-  bool is_double_quoted = false;
-
-  for (usize position = 0; position < word.length; position++) {
-    let const byte = word[position];
-    if (byte == '\\' && !is_single_quoted && position + 1 < word.length) {
-      delimiter.push(word[++position]);
-      continue;
-    }
-    if (byte == '\'' && !is_double_quoted) {
-      is_single_quoted = !is_single_quoted;
-      continue;
-    }
-    if (byte == '"' && !is_single_quoted) {
-      is_double_quoted = !is_double_quoted;
-      continue;
-    }
-    delimiter.push(byte);
-  }
-
-  return delimiter;
-}
-
 fn scan_quoted_region(StringView source, usize &position, char quote) wontthrow
     -> void
 {
@@ -465,8 +439,9 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
     let const text =
         source.substring_of_length(position, end_position - position);
     if (is_expecting_heredoc_delimiter) {
-      pending_heredocs.push(pending_heredoc{unquoted_heredoc_delimiter(text),
-                                            should_pending_heredoc_strip_tabs});
+      pending_heredocs.push(pending_heredoc{
+          lexer::unquote_heredoc_delimiter(text, heap_allocator()),
+          should_pending_heredoc_strip_tabs});
       is_expecting_heredoc_delimiter = false;
     }
     pieces.push(format_piece{text, position, format_piece_kind::Word,

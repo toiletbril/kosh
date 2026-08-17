@@ -46,6 +46,11 @@ pure fn is_extglob_operator(char ch) wontthrow -> bool;
 fn scan_balanced_shell_region(StringView source, usize position,
                               char closing_byte) throws -> Maybe<usize>;
 
+/* The quotes and the escapes of a heredoc delimiter word, so <<\EOF and <<'EOF'
+   both terminate on EOF. */
+fn unquote_heredoc_delimiter(StringView word, Allocator allocator) throws
+    -> String;
+
 /* A special shell parameter named by a single punctuation byte, $? $! $# $$ $*
    $@ $- , distinct from a positional digit or an ordinary name. */
 pure fn is_special_parameter_char(char ch) wontthrow -> bool;
