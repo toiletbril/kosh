@@ -39,6 +39,45 @@ fn check_posix_arithmetic_operators(AnalysisContext &actx,
   if (has_exponent) actx.report_diagnostic(diagnostic_id::sc3019, location);
 }
 
+/* An expansion that stands left of an arithmetic assignment names the variable
+   the assignment writes, so the dollar sign carries the indirection and cannot
+   be dropped. */
+static pure fn arithmetic_expansion_assigns(StringView expression,
+                                            usize expansion_end) wontthrow
+    -> bool
+{
+  usize at = expansion_end;
+
+  while (at < expression.length && lexer::is_whitespace(expression[at]))
+    at++;
+
+  if (at >= expression.length) return false;
+
+  switch (expression[at]) {
+  case '<':
+  case '>':
+    if (at + 1 >= expression.length || expression[at + 1] != expression[at])
+      return false;
+    at += 2;
+    break;
+
+  case '+':
+  case '-':
+  case '*':
+  case '/':
+  case '%':
+  case '&':
+  case '|':
+  case '^': at++; break;
+
+  default: break;
+  }
+
+  if (at >= expression.length || expression[at] != '=') return false;
+
+  return at + 1 >= expression.length || expression[at + 1] != '=';
+}
+
 fn check_arithmetic_expression_lints(AnalysisContext &actx,
                                      StringView expression,
                                      const SourceLocation &location) throws
@@ -126,16 +165,15 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     case '$': {
       has_pending_division = false;
 
+      let const dollar_position = position;
       usize name_start = position + 1;
       let const is_braced =
           name_start < expression.length && expression[name_start] == '{';
       if (is_braced) name_start++;
 
-      if (name_start < expression.length &&
-          lexer::is_variable_name_start(expression[name_start]))
-      {
-        has_redundant_dollar = true;
-      }
+      let const has_plain_name =
+          name_start < expression.length &&
+          lexer::is_variable_name_start(expression[name_start]);
 
       usize name_end = name_start;
       while (name_end < expression.length &&
@@ -158,6 +196,21 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
           (name_end >= expression.length || expression[name_end] != '}'))
       {
         break;
+      }
+
+      /* A name character on either side means the expansion builds a longer
+         name, and dropping the sign would merge the parts into one
+         identifier. */
+      let const expansion_end = is_braced ? name_end + 1 : name_end;
+      let const is_name_part =
+          (dollar_position > 0 &&
+           lexer::is_variable_name(expression[dollar_position - 1])) ||
+          (expansion_end < expression.length &&
+           lexer::is_variable_name(expression[expansion_end]));
+      if (has_plain_name && !is_name_part &&
+          !arithmetic_expansion_assigns(expression, expansion_end))
+      {
+        has_redundant_dollar = true;
       }
 
       actx.note_positional_reference(

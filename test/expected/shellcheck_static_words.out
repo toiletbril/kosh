@@ -366,6 +366,28 @@
         [CompoundList]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$((1 + $?))"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "arithmetic_dollar_sign"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "counter"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "total = $counter"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "total = ${counter}"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "prefix_$counter"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "${prefix}_counter"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "$name = 4"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "$name += 4"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$total"]
 [Word
   Unquoted "lint_only"
 ]
@@ -1775,6 +1797,77 @@
 [Word
   Unquoted "}"
 ]
+[Word
+  Unquoted "arithmetic_dollar_sign"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "counter=1"
+]
+[Word
+  Unquoted "prefix=slot"
+]
+[Word
+  Unquoted "name=counter"
+]
+[Word
+  Unquoted "counter"
+]
+[Word
+  Unquoted "total"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "counter"
+]
+[Word
+  Unquoted "total"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "counter"
+]
+[Word
+  Unquoted "prefix_"
+  Variable "counter"
+]
+[Word
+  Variable "prefix"
+  Unquoted "_counter"
+]
+[Word
+  Variable "name"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Variable "name"
+]
+[Word
+  Unquoted "+="
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "total"
+]
+[Word
+  Unquoted "}"
+]
 3:8: warning: A bare glob can expand to a filename that begins with `-`. (SC2035)
      3 |    grep *.txt file
        |         ^~~~~
@@ -2274,7 +2367,15 @@ note: Move the specific pattern before the broader pattern.
 141:8: warning: This `case` has no default `*)` branch. (SC2249)
    141 |    case value in
        |         ^~~~~
-Encountered 122 warnings.
+158:3: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
+   158 |    ((total = $counter))
+       |    ^~~~~~~~~~~~~~~~~~~~
+note: Use the variable name directly inside arithmetic.
+159:3: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
+   159 |    ((total = ${counter}))
+       |    ^~~~~~~~~~~~~~~~~~~~~~
+note: Use the variable name directly inside arithmetic.
+Encountered 124 warnings.
 done
 done
 done

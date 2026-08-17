@@ -66,6 +66,8 @@ Encountered 2 warnings.
      2 |  later_helper() {
        |  ^~~~~~~~~~~~ the definition runs after the call.
 note: Move the definition of 'later_helper' above this call.
+== a call to a builtin name defined later stays quiet:
+rc=0
 == a definition above the call stays quiet:
 rc=0
 == a call inside another body stays quiet:

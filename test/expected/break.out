@@ -61,6 +61,30 @@
           [SimpleCommand "echo" "unreached"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "after"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "condition_break"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign count=0]
+          [CompoundListCondition, None]
+            [WhileLoop]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Assign count=$((count + 1))]
+                [CompoundListCondition, None]
+                  [SimpleCommand "[" "$count" "-gt" "2" "]"]
+                [CompoundListCondition, &&]
+                  [SimpleCommand "break"]
+                [CompoundListCondition, None]
+                  [SimpleCommand "true"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "condition-body $count"]
+  [CompoundListCondition, None]
+    [SimpleCommand "condition_break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "end-condition-break"]
 [Word
   Unquoted "for"
 ]
@@ -307,6 +331,68 @@
 [Word
   Unquoted "after"
 ]
+[Word
+  Unquoted "condition_break"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "count=0"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "count="
+  ArithmeticExpansion "count + 1"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "count"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "condition-body "
+  Variable "count"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "condition_break"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "end-condition-break"
+]
 7:25: warning: An unquoted variable can split into words and expand globs. (SC2086)
      7 |  for x in 1 2 3; do echo $x; break; done
        |                          ^~
@@ -337,4 +423,7 @@ after-continue
     18 |  for i in 1 2; do break 0; echo unreached; done
        |                         ^
 after
+condition-body 1
+condition-body 2
+end-condition-break
 [Code 0]

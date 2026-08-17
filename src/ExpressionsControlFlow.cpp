@@ -354,7 +354,11 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let const saved_getopts = actx.active_getopts;
   actx.active_getopts = {};
   actx.is_analyzing_condition = true;
+  /* The loop is already entered when its condition list runs, so a break or a
+     continue there leaves this loop. */
+  actx.loop_body_depth++;
   m_condition->analyze(actx, is_unconditional);
+  actx.loop_body_depth--;
   actx.is_analyzing_condition = was_analyzing_condition;
   actx.should_retain_tested_command_names = was_retaining_tested_command_names;
   let const has_input_reading_loop_condition =

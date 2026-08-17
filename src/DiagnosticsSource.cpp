@@ -1,3 +1,4 @@
+#include "Builtin.hpp"
 #include "DiagnosticsChecksInternal.hpp"
 #include "Lexer.hpp"
 #include "PackedStringKey.hpp"
@@ -1198,6 +1199,10 @@ fn check_call_before_definition(AnalysisContext &actx) throws -> void
 {
   for (let const &call : actx.function_calls) {
     if (call.is_inside_function_body) continue;
+
+    /* A name that is also a builtin runs the builtin until the definition is
+       reached, so the earlier call is not a forward reference. */
+    if (search_builtin(call.name).has_value()) continue;
 
     for (let const &definition : actx.function_definitions) {
       if (definition.name != call.name) continue;

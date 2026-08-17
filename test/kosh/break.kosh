@@ -17,3 +17,16 @@ echo after-continue
 
 for i in 1 2; do break 0; echo unreached; done
 echo after
+
+condition_break() {
+  count=0
+  while
+    count=$((count + 1))
+    [ "$count" -gt 2 ] && break
+    true
+  do
+    echo "condition-body $count"
+  done
+}
+condition_break
+echo end-condition-break

@@ -60,6 +60,13 @@ later_helper() {
   echo "$1"
 }' 2>&1
 
+echo '== a call to a builtin name defined later stays quiet:'
+"$BIN" -n -WWW -c 'exit 0
+function exit {
+  builtin exit "$@"
+}' 2>&1
+echo "rc=$?"
+
 echo '== a definition above the call stays quiet:'
 "$BIN" -n -WWW -c 'early_helper() {
   echo "$1"

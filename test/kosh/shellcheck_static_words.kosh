@@ -151,3 +151,15 @@ annoying_safety_diagnostics() {
 special_parameter_arithmetic() {
   echo $((1 + $?))
 }
+
+arithmetic_dollar_sign() {
+  counter=1 prefix=slot name=counter
+  ((counter))
+  ((total = $counter))
+  ((total = ${counter}))
+  ((prefix_$counter))
+  ((${prefix}_counter))
+  (($name = 4))
+  (($name += 4))
+  echo "$total"
+}
