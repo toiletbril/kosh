@@ -270,6 +270,12 @@ scanner and semantic highlight roles. Completion, highlighting, and command
 lookup share directory scans. PATH changes invalidate the derived indexes and
 the execution hash.
 
+`word_is_function_name` accepts a name character together with the separators
+`/`, `.`, `-`, `+`, `:`, `@`, `#`, and `%`, so a name such as `ble/util/put` is
+recorded as a function. A command word is matched against the recorded function
+names before it is treated as a path, the way the shell searches the function
+table first.
+
 DiagnosticsCatalog.cpp owns each analysis diagnostic's code, slug, summary,
 message, suggestion, related detail, tier, and delivery.
 DiagnosticsDispatch.cpp owns the command name dispatch table. The remaining

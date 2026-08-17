@@ -1303,8 +1303,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
                      highlight_construct_phase::function_name &&
                  word != "function")
       {
-        if (word_is_plain_identifier(word))
-          state.known_function_names.add(word);
+        if (word_is_function_name(word)) state.known_function_names.add(word);
         active_construct->phase = highlight_construct_phase::body;
         frame.is_command_position = false;
       } else if (is_active_construct_in_frame &&
@@ -1347,7 +1346,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
                  lexer::word_looks_like_assignment(word))
       {
         frame.is_command_position = true;
-      } else if (frame.is_command_position && word_is_plain_identifier(word) &&
+      } else if (frame.is_command_position && word_is_function_name(word) &&
                  word_defines_function(source, word_end, end))
       {
         state.known_function_names.add(word);

@@ -125,6 +125,35 @@ pure fn word_is_plain_identifier(StringView word) wontthrow -> bool
   return true;
 }
 
+static pure fn is_highlight_function_name_char(char c) wontthrow -> bool
+{
+  if (is_highlight_name_char(c)) return true;
+
+  switch (c) {
+  case '/':
+  case '.':
+  case '-':
+  case '+':
+  case ':':
+  case '@':
+  case '#':
+  case '%': return true;
+
+  default: return false;
+  }
+}
+
+/* The shell looks a command word up in the function table before it treats the
+   word as a path, so a name such as ble/util/put is a call and not a file. */
+pure fn word_is_function_name(StringView word) wontthrow -> bool
+{
+  if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
+  for (usize i = 1; i < word.length; i++)
+    if (!is_highlight_function_name_char(word[i])) return false;
+
+  return true;
+}
+
 pure fn word_defines_function(StringView line, usize word_end,
                               usize end) wontthrow -> bool
 {
@@ -1177,6 +1206,11 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
 
       return true;
     };
+    let const do_names_known_function = [&](StringView command) throws -> bool {
+      return line_functions.contains(command) ||
+             (known_function_names != nullptr &&
+              known_function_names->contains(command));
+    };
     let const do_command_role = [&](StringView command)
                                     throws -> highlight_role {
       let const is_command_resolved = first_word_resolves(command, context);
@@ -1184,12 +1218,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
           !is_command_resolved && !is_word_terminated
               ? command_word_prefixes_any(command, context)
               : false;
-      let const is_known_source_function =
-          known_function_names != nullptr &&
-          known_function_names->contains(command);
-      if (is_command_resolved || line_functions.contains(command) ||
-          is_known_source_function)
-      {
+      if (is_command_resolved || do_names_known_function(command)) {
         return highlight_role::resolved_command;
       }
       if (command_has_prefix) return highlight_role::partial_command;
@@ -1258,7 +1287,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
     if (function_name_pending) {
       function_name_pending = false;
       is_command_position = false;
-      if (plain && word_is_plain_identifier(word)) {
+      if (plain && word_is_function_name(word)) {
         do_push(word_start, word_end, highlight_role::function_name);
         line_functions.add(word);
       } else {
@@ -1359,14 +1388,15 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       highlight_command_word = word;
       if (word == "~" && !is_word_terminated) {
         do_push(word_start, word_end, highlight_role::partial_path);
-      } else if (os::has_directory_separator(word) &&
+      } else if (word_defines_function(line, word_end, end)) {
+        do_push(word_start, word_end, highlight_role::function_name);
+        line_functions.add(word);
+      } else if (!do_names_known_function(word) &&
+                 os::has_directory_separator(word) &&
                  !word_has_erased_directory_separator(word))
       {
         color_path_argument(word_start, word, is_word_terminated, false,
                             word[0] == '~', spans);
-      } else if (word_defines_function(line, word_end, end)) {
-        do_push(word_start, word_end, highlight_role::function_name);
-        line_functions.add(word);
       } else {
         do_push(word_start, word_end, do_command_role(word));
       }

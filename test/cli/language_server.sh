@@ -87,6 +87,11 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":67,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":17,"character":1}}}'
   frame '{"jsonrpc":"2.0","id":68,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":18,"character":6}}}'
   frame '{"jsonrpc":"2.0","id":69,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":19,"character":1}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh","languageId":"bash","version":1,"text":"#!/bin/bash\nfunction ble/util/put {\n  printf %s \"$1\"\n}\nble/util/put hello\nble/string#quote() { :; }\nble/string#quote x\n/bin/sh -c true\n"}}}'
+  frame '{"jsonrpc":"2.0","id":70,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":4,"character":4}}}'
+  frame '{"jsonrpc":"2.0","id":71,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":4,"character":4}}}'
+  frame '{"jsonrpc":"2.0","id":72,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":6,"character":4}}}'
+  frame '{"jsonrpc":"2.0","id":73,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/slash-function.sh"},"position":{"line":7,"character":2}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -141,6 +146,10 @@ check_contains hover-array-value '"id":66,"result":{"contents":{"kind":"plaintex
 check_contains hover-append-value '"id":67,"result":{"contents":{"kind":"plaintext","value":"total+=two\nThe value appends to what came before.\n\nEarlier assignments:\nline 17: total=one"}'
 check_contains hover-unassigned-variable '"id":68,"result":null'
 check_contains hover-forward-function '"id":69,"result":null'
+check_contains slash-function-definition '"id":70,"result":{"uri":"file:///tmp/slash-function.sh","range":{"start":{"line":1,"character":9},"end":{"line":1,"character":21}}}'
+check_contains slash-function-hover '"id":71,"result":{"contents":{"kind":"plaintext","value":"ble/util/put () \n{\n  printf %s \"$1\"\n}"}'
+check_contains slash-paren-definition '"id":72,"result":{"uri":"file:///tmp/slash-function.sh","range":{"start":{"line":5,"character":0},"end":{"line":5,"character":16}}}'
+check_contains slash-path-stays-a-path '"id":73,"result":null'
 check_contains method-error '"id":9,"error":{"code":-32601'
 check_contains auxiliary-uri "\"uri\":\"file://$directory/disk-source.sh\""
 check_contains auxiliary-diagnostic disk_aux

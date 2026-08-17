@@ -83,6 +83,7 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
 fn split_completion_words(StringView line, usize cursor, usize &cword) throws
     -> ArrayList<String>;
 pure fn word_is_plain_identifier(StringView word) wontthrow -> bool;
+pure fn word_is_function_name(StringView word) wontthrow -> bool;
 pure fn word_defines_function(StringView line, usize word_end,
                               usize end) wontthrow -> bool;
 fn advance_shell_keyword_state(StringView word, usize frame_depth,
