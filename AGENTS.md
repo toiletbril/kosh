@@ -162,6 +162,8 @@ src/koshkit. Every builtin remains enabled. The enable `-d`, `-n`, `-f`, and
 
 MimicMood.hpp owns `parse_mood_name` and `mood_name`. The flag parser,
 `set --mood`, and `set --init-moods` use that table.
+`detect_mimic_shell_from_extension` owns the shell extension table, and
+`Path::is_shell_source` and the language server both read it.
 
 RuntimeState owns the mood, diagnostic controls, explicit strictness marks, and
 shell option bits. Capture and restore copy the complete state. The set builtin
@@ -296,6 +298,9 @@ server passes one and every other caller leaves it null, so an ordinary run
 records nothing. A hover answer is built from those records and the open
 document source, because the server returns before the startup chain runs and
 holds no user variables or functions.
+
+A document mood is selected from a recognized shebang, then from a recognized
+document extension, then from the client language identifier.
 
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare koshkit utility

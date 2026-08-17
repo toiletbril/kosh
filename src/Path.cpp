@@ -433,14 +433,7 @@ fn Path::detect_mimic_shell() const throws -> Maybe<mimic_mood>
 
 fn Path::is_shell_source(StringView source) const throws -> bool
 {
-  static constexpr static_string_entry<bool> EXTENSION_ENTRIES[] = {
-      {SSK(".bash"), true},
-      {SSK(".dash"), true},
-      {SSK(".sh"),   true},
-      {SSK(".kosh"), true},
-  };
-  static constexpr StaticStringMap EXTENSIONS{EXTENSION_ENTRIES};
-  return EXTENSIONS.find(extension()).has_value() ||
+  return detect_mimic_shell_from_extension(extension()).has_value() ||
          detect_mimic_shell_from_source(source).has_value();
 }
 

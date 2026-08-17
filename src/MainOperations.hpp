@@ -153,8 +153,8 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     let h = String{heap_allocator()};
     h += "KOSHKA";
     h += "\n";
-    h += wrap_text("Koshka is a pedantic, Bash-compatible command line "
-                   "interpreter, diagnostic tool and a "
+    h += wrap_text("Koshka is a fast and pedantic Bash-compatible command line "
+                   "interpreter, formatter, linter, language server and a "
                    "friendly interactive shell.\n\n",
                    HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);

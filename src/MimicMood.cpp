@@ -4,6 +4,19 @@
 
 namespace koshka {
 
+pure fn detect_mimic_shell_from_extension(StringView extension) throws
+    -> Maybe<mimic_mood>
+{
+  static constexpr static_string_entry<mimic_mood> EXTENSION_ENTRIES[] = {
+      {SSK(".bash"), mimic_mood::Bash   },
+      {SSK(".dash"), mimic_mood::Posix  },
+      {SSK(".kosh"), mimic_mood::Default},
+      {SSK(".sh"),   mimic_mood::Posix  },
+  };
+  static constexpr StaticStringMap EXTENSIONS{EXTENSION_ENTRIES};
+  return EXTENSIONS.find(extension);
+}
+
 fn detect_mimic_shell_from_source(StringView source) throws -> Maybe<mimic_mood>
 {
   if (!source.starts_with("#!")) return None;

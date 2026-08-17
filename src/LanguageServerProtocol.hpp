@@ -810,12 +810,19 @@ fn append_protocol_range(String &output, const Document &document, usize start,
 
 pure fn mood_for(const Document &document) throws -> mimic_mood
 {
-  let const id = document.language_id.view();
-  if (let const mood = LANGUAGE_MOODS.find(id); mood.has_value()) return *mood;
   if (let const detected =
           detect_mimic_shell_from_source(document.normalized_source.view());
       detected.has_value())
     return *detected;
+  if (document.path.has_value()) {
+    if (let const mood =
+            detect_mimic_shell_from_extension(document.path->extension());
+        mood.has_value())
+      return *mood;
+  }
+  if (let const mood = LANGUAGE_MOODS.find(document.language_id.view());
+      mood.has_value())
+    return *mood;
 
   return mimic_mood::Default;
 }
