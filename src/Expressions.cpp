@@ -405,6 +405,45 @@ fn AnalysisContext::note_variable_assignment(
   }
 }
 
+/* One pathological value is a likelier memory hog than the record count. */
+static constexpr usize RECORDED_LITERAL_LENGTH_LIMIT = 256;
+
+fn AnalysisContext::note_variable_assignment_record(
+    StringView name, const Word *value_word, const SourceLocation &location,
+    bool is_conditional, bool is_append) throws -> void
+{
+  if (symbol_records == nullptr) return;
+  if (name.is_empty()) return;
+
+  let literal_value = Maybe<String>{None};
+  if (value_word != nullptr) {
+    let folded = optimizer::literal_word_value(*value_word);
+    if (folded.has_value()) {
+      literal_value = folded->count() > RECORDED_LITERAL_LENGTH_LIMIT
+                          ? String{folded->view().substring_of_length(
+                                0, RECORDED_LITERAL_LENGTH_LIMIT)}
+                          : steal(*folded);
+    }
+  }
+
+  symbol_records->assignments.push(variable_assignment_record{
+      String{name}, steal(literal_value), is_conditional, is_append,
+      value_word == nullptr, location.position, location.length});
+}
+
+fn AnalysisContext::note_function_body_record(StringView name,
+                                              usize name_position,
+                                              usize body_position,
+                                              usize body_end_position) throws
+    -> void
+{
+  if (symbol_records == nullptr) return;
+  if (name.is_empty()) return;
+
+  symbol_records->functions.push(function_body_record{
+      String{name}, name_position, body_position, body_end_position});
+}
+
 /* The name an assign form ${name=value} or ${name:=value} writes back, or an
    empty view for every other expansion. */
 static pure fn assign_form_target_name(StringView expansion_text) wontthrow
@@ -960,7 +999,8 @@ fn analyze_ast(const Expression *root, StringView source,
                bool should_merge_parent_uncertainty,
                followed_source_effects *source_effects,
                ArrayList<source_diagnostic> *diagnostic_sink,
-               AnalysisSourceProvider *source_provider) throws -> bool
+               AnalysisSourceProvider *source_provider,
+               analysis_symbol_records *symbol_records) throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -977,6 +1017,9 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.followed_source_effects_cache = source_effects_cache;
   actx.diagnostic_sink = diagnostic_sink;
   actx.source_provider = source_provider;
+  /* A followed source file is left out. Its byte positions index another
+     source string. */
+  actx.symbol_records = symbol_records;
   if (parent_analysis_context != nullptr) {
     actx.has_seen_runtime_definer =
         parent_analysis_context->has_seen_runtime_definer;

@@ -91,6 +91,42 @@ struct command_name_assignment_record
   SourceLocation location;
 };
 
+/* One assignment a reader may ask about. The name and the folded value are
+   owned, and the span is a plain byte range, since the language server releases
+   the analysis arena before it answers. */
+struct variable_assignment_record
+{
+  String name;
+  Maybe<String> literal_value;
+  bool is_conditional{false};
+  bool is_append{false};
+  bool is_array{false};
+  usize position{0};
+  usize length{0};
+};
+
+/* One function definition a reader may ask about. The body span is recovered
+   from the document source, in the shape declare -f prints. */
+struct function_body_record
+{
+  String name;
+  usize name_position{0};
+  usize body_position{0};
+  usize body_end_position{0};
+};
+
+struct analysis_symbol_records
+{
+  ArrayList<variable_assignment_record> assignments{heap_allocator()};
+  ArrayList<function_body_record> functions{heap_allocator()};
+
+  fn clear() wontthrow -> void
+  {
+    assignments.clear();
+    functions.clear();
+  }
+};
+
 struct analysis_diagnostic_totals
 {
   usize warning_count{0};
@@ -245,6 +281,10 @@ public:
   ArrayList<source_diagnostic> *diagnostic_sink{nullptr};
   AnalysisSourceProvider *source_provider{nullptr};
 
+  /* Null outside the language server. A record costs an owned name and a folded
+     value, so an ordinary run pays one null test per assignment. */
+  analysis_symbol_records *symbol_records{nullptr};
+
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
   fn add_defined_function(StringView name) throws -> void
@@ -352,6 +392,16 @@ public:
   fn note_variable_assignment(StringView name,
                               const SourceLocation &location) throws -> void;
 
+  /* A null value word means the assignment has no scalar word to fold, so an
+     array element or a NAME=(...) list. */
+  fn note_variable_assignment_record(StringView name, const Word *value_word,
+                                     const SourceLocation &location,
+                                     bool is_conditional, bool is_append) throws
+      -> void;
+  fn note_function_body_record(StringView name, usize name_position,
+                               usize body_position,
+                               usize body_end_position) throws -> void;
+
   /* A positional read inside a function body means the body uses the arguments
      its caller passes. */
   fn mark_positional_reference() wontthrow -> void
@@ -410,7 +460,8 @@ fn analyze_ast(
     bool should_merge_parent_uncertainty = true,
     followed_source_effects *source_effects = nullptr,
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
-    AnalysisSourceProvider *source_provider = nullptr) throws -> bool;
+    AnalysisSourceProvider *source_provider = nullptr,
+    analysis_symbol_records *symbol_records = nullptr) throws -> bool;
 
 mustuse pure fn is_source_location_variable(StringView name) wontthrow -> bool;
 

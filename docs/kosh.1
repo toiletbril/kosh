@@ -169,8 +169,16 @@ and
 .BR *.shit .
 The server supplies diagnostics, quick fixes, completion, navigation, command
 information, and semantic tokens. A fix-all action applies every
-non-conflicting safe fix in the open document. A client language identifier
-selects the matching mood. A generic identifier uses a recognized shebang and
+non-conflicting safe fix in the open document. Hover over a variable reports
+the assignment nearest above the cursor together with its folded value. The
+earlier assignments in the same document are listed below it, and an assignment
+that does not run on every path is marked. Hover over a function shows the
+definition body in the form
+.B declare \-f
+prints. Hover over a command the document does not define reports the external
+help text. Markdown content is used when the client advertises it. A client
+language identifier selects the matching mood. A generic identifier uses a
+recognized shebang and
 otherwise uses the
 .B kosh
 mood. This option does not accept file operands,

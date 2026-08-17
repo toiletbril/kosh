@@ -70,6 +70,17 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":29,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"range":{"start":{"line":19,"character":4},"end":{"line":19,"character":4}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
   frame '{"jsonrpc":"2.0","id":30,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"range":{"start":{"line":19,"character":6},"end":{"line":19,"character":6}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
   frame '{"jsonrpc":"2.0","id":31,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"range":{"start":{"line":19,"character":6},"end":{"line":19,"character":7}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh","languageId":"bash","version":1,"text":"#!/bin/bash\nname=first\nif [ -n \"$1\" ]; then\n  name=$1\nfi\nname=second\nprintf %s \"$name\"\ngreet() {\n  printf %s \"$name\"\n}\nfunction greet {\n  printf other\n}\ngreet\nlist=(a b)\nlist+=(c)\ntotal=one\ntotal+=two\necho $unseen\nlater\nlater() { :; }\n"}}}'
+  frame '{"jsonrpc":"2.0","id":60,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":6,"character":11}}}'
+  frame '{"jsonrpc":"2.0","id":61,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":5,"character":1}}}'
+  frame '{"jsonrpc":"2.0","id":62,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":8,"character":14}}}'
+  frame '{"jsonrpc":"2.0","id":63,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":13,"character":1}}}'
+  frame '{"jsonrpc":"2.0","id":64,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":7,"character":1}}}'
+  frame '{"jsonrpc":"2.0","id":65,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":10,"character":10}}}'
+  frame '{"jsonrpc":"2.0","id":66,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":15,"character":1}}}'
+  frame '{"jsonrpc":"2.0","id":67,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":17,"character":1}}}'
+  frame '{"jsonrpc":"2.0","id":68,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":18,"character":6}}}'
+  frame '{"jsonrpc":"2.0","id":69,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-test.sh"},"position":{"line":19,"character":1}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -111,6 +122,16 @@ case $output in
 *'\b'*) printf 'manpage-overstrike=present\n' ;;
 *) printf 'manpage-overstrike=ok\n' ;;
 esac
+check_contains hover-variable-value '"id":60,"result":{"contents":{"kind":"plaintext","value":"name=second\nValue: second\n\nEarlier assignments:\nline 4: name=$1 (conditional)\nline 2: name=first"}'
+check_contains hover-assignment-name '"id":61,"result":{"contents":{"kind":"plaintext","value":"name=second\nValue: second\n\nEarlier assignments:'
+check_contains hover-variable-in-body '"id":62,"result":{"contents":{"kind":"plaintext","value":"name=second\nValue: second\n\nEarlier assignments:'
+check_contains hover-latest-body '"id":63,"result":{"contents":{"kind":"plaintext","value":"greet () \n{\n  printf other\n}"}'
+check_contains hover-first-body '"id":64,"result":{"contents":{"kind":"plaintext","value":"greet () \n{\n  printf %s \"$name\"\n}"}'
+check_contains hover-keyword-body '"id":65,"result":{"contents":{"kind":"plaintext","value":"greet () \n{\n  printf other\n}"}'
+check_contains hover-array-value '"id":66,"result":{"contents":{"kind":"plaintext","value":"list+=(c)\nThe value is a list, and the elements are not folded.\n\nEarlier assignments:\nline 15: list=(a b)"}'
+check_contains hover-append-value '"id":67,"result":{"contents":{"kind":"plaintext","value":"total+=two\nThe value appends to what came before.\n\nEarlier assignments:\nline 17: total=one"}'
+check_contains hover-unassigned-variable '"id":68,"result":null'
+check_contains hover-forward-function '"id":69,"result":null'
 check_contains method-error '"id":9,"error":{"code":-32601'
 check_contains auxiliary-uri "\"uri\":\"file://$directory/disk-source.sh\""
 check_contains auxiliary-diagnostic disk_aux
@@ -207,6 +228,29 @@ case $utf16_output in
   printf 'utf16-code-action=ok\n'
   ;;
 *) printf 'utf16-code-action=missing\n' ;;
+esac
+
+markdown_output=$(
+  {
+    frame '{"jsonrpc":"2.0","id":70,"method":"initialize","params":{"capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"hover":{"contentFormat":["markdown","plaintext"]}}}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/hover-markdown.sh","languageId":"bash","version":1,"text":"#!/bin/bash\nname=one\nname=two\necho \"$name\"\nshow() {\n  printf ok\n}\nshow\n"}}}'
+    frame '{"jsonrpc":"2.0","id":71,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-markdown.sh"},"position":{"line":3,"character":6}}}'
+    frame '{"jsonrpc":"2.0","id":72,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-markdown.sh"},"position":{"line":7,"character":1}}}'
+    frame '{"jsonrpc":"2.0","id":73,"method":"shutdown","params":null}'
+    frame '{"jsonrpc":"2.0","method":"exit"}'
+  } | "$BIN" --language-server
+)
+case $markdown_output in
+*'"id":71,"result":{"contents":{"kind":"markdown","value":"```shell\nname=two\n```\nValue: two\n\nEarlier assignments:\n\n- line 2: `name=one`"}'*)
+  printf 'markdown-variable-hover=ok\n'
+  ;;
+*) printf 'markdown-variable-hover=missing\n' ;;
+esac
+case $markdown_output in
+*'"id":72,"result":{"contents":{"kind":"markdown","value":"```shell\nshow () \n{\n  printf ok\n}\n```"}'*)
+  printf 'markdown-function-hover=ok\n'
+  ;;
+*) printf 'markdown-function-hover=missing\n' ;;
 esac
 
 unsupported_output=$(

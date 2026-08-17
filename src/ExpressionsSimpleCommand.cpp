@@ -155,6 +155,10 @@ fn AssignCommand::analyze(AnalysisContext &actx,
                                source_location());
     }
     actx.note_variable_assignment(base, source_location());
+    actx.note_variable_assignment_record(base, nullptr, source_location(),
+                                         !is_unconditional ||
+                                             actx.has_seen_runtime_definer,
+                                         m_assignment->is_append());
     actx.add_array_valued_name(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
@@ -165,6 +169,12 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   }
 
   actx.note_variable_assignment(name.view(), source_location());
+  /* The record is taken before the constant table gives up on this name. A
+     conditional or appending assignment stays answerable. */
+  actx.note_variable_assignment_record(
+      name.view(), &m_assignment->value_word(), source_location(),
+      !is_unconditional || actx.has_seen_runtime_definer,
+      m_assignment->is_append());
 
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
       actx.function_local_names.find(name.view()) == nullptr &&

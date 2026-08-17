@@ -86,6 +86,14 @@ private:
                    const document_symbol &symbol) throws
       -> Maybe<document_symbol>;
   fn command_information(StringView command) throws -> Maybe<String>;
+  fn variable_hover_text(
+      const Document &document,
+      const ArrayList<const variable_assignment_record *> &reaching) throws
+      -> String;
+  fn function_hover_text(const Document &document,
+                         const function_body_record &record) throws -> String;
+  fn send_hover(const JsonValue *id, const Document &document,
+                const document_symbol &symbol, StringView value) throws -> bool;
 
   EvalContext &m_context;
   BumpArena &m_ast_arena;
@@ -105,6 +113,7 @@ private:
   bool m_supports_fix_all{false};
   bool m_supports_diagnostic_data{false};
   bool m_supports_preferred_actions{false};
+  bool m_supports_markdown_hover{false};
 };
 
 pure fn semantic_style(highlight_role role) wontthrow -> std::pair<u32, u32>
@@ -262,6 +271,20 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
     m_supports_diagnostic_data = data_support != nullptr &&
                                  data_support->kind == json_kind::Boolean &&
                                  data_support->boolean;
+    let const *hover =
+        text_document != nullptr ? text_document->get("hover") : nullptr;
+    let const *content_formats =
+        hover != nullptr ? hover->get("contentFormat") : nullptr;
+    m_supports_markdown_hover = false;
+    if (content_formats != nullptr && content_formats->kind == json_kind::Array)
+    {
+      for (let const *format : content_formats->array) {
+        if (format->kind == json_kind::String && format->text == "markdown") {
+          m_supports_markdown_hover = true;
+          break;
+        }
+      }
+    }
     let const *general =
         capabilities != nullptr ? capabilities->get("general") : nullptr;
     let const *encodings =
@@ -453,6 +476,9 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
   let rendered_errors = ArrayList<String>{heap_allocator()};
   let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
   let followed_paths = HashSet{heap_allocator()};
+  /* A document that does not parse leaves the records empty. Hover then answers
+     nothing. */
+  let symbol_records = analysis_symbol_records{};
   let const ast =
       parser.construct_ast(rendered_errors, &m_context, &diagnostics);
   if (rendered_errors.is_empty()) {
@@ -470,7 +496,7 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
                 true, suppressions, scopes, directives, heredoc_misses,
                 document.path.has_value(), false, &followed_paths,
                 &source_effects, nullptr, nullptr, true, true, nullptr,
-                &diagnostics, this);
+                &diagnostics, this, &symbol_records);
   }
 
   let root_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
@@ -492,6 +518,7 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
   document.diagnostics = steal(root_diagnostics);
   document.auxiliary_diagnostics = steal(auxiliary_diagnostics);
   document.followed_paths = steal(followed_paths);
+  document.symbol_records = steal(symbol_records);
 
   return did_send;
 }
@@ -847,18 +874,42 @@ fn Server::symbol_at(const Document &document,
   let const *spans = m_highlight_cache.spans_for(
       document.normalized_source.view(), line_start, line_end, m_context);
 
+  let touching = Maybe<document_symbol>{};
+
   for (let const &span : *spans) {
     let const start = line_start + span.start;
     let const end = line_start + span.end;
     if (*byte_position < start || *byte_position > end) continue;
 
-    return document_symbol{
-        String{
-            document.normalized_source.substring_of_length(start, end - start)},
-        span.role, start, end};
+    let symbol =
+        document_symbol{String{document.normalized_source.substring_of_length(
+                            start, end - start)},
+                        span.role, start, end};
+
+    /* A cursor sitting on a boundary belongs to the span that opens there. */
+    if (*byte_position == end) {
+      if (!touching.has_value()) touching = steal(symbol);
+      continue;
+    }
+
+    return symbol;
   }
 
-  return None;
+  return touching;
+}
+
+pure fn role_reads_variable(highlight_role role) wontthrow -> bool
+{
+  return role == highlight_role::variable ||
+         role == highlight_role::unset_variable ||
+         role == highlight_role::assignment_name;
+}
+
+pure fn role_reads_function(highlight_role role) wontthrow -> bool
+{
+  return role == highlight_role::function_name ||
+         role == highlight_role::resolved_command ||
+         role == highlight_role::unknown_command;
 }
 
 pure fn variable_name_of(StringView text) wontthrow -> StringView
@@ -883,12 +934,8 @@ fn Server::definition_of(const Document &document,
                          const document_symbol &symbol) throws
     -> Maybe<document_symbol>
 {
-  let const is_variable = symbol.role == highlight_role::variable ||
-                          symbol.role == highlight_role::unset_variable ||
-                          symbol.role == highlight_role::assignment_name;
-  let const is_function = symbol.role == highlight_role::function_name ||
-                          symbol.role == highlight_role::resolved_command ||
-                          symbol.role == highlight_role::unknown_command;
+  let const is_variable = role_reads_variable(symbol.role);
+  let const is_function = role_reads_function(symbol.role);
   if (!is_variable && !is_function) return None;
   let const name =
       is_variable ? variable_name_of(symbol.text.view()) : symbol.text.view();
@@ -1033,6 +1080,260 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
   return information;
 }
 
+/* A generated script would flood the card with assignment sites. */
+static constexpr usize HOVER_EARLIER_ASSIGNMENT_LIMIT = 8;
+static constexpr usize HOVER_ASSIGNMENT_TEXT_LENGTH_LIMIT = 200;
+static constexpr usize HOVER_BODY_LINE_LIMIT = 40;
+
+pure fn clamped_source_span(const Document &document, usize position,
+                            usize length) wontthrow -> StringView
+{
+  let const source_length = document.normalized_source.count();
+  if (position >= source_length) return StringView{};
+  if (position + length > source_length) length = source_length - position;
+
+  return document.normalized_source.view().substring_of_length(position,
+                                                               length);
+}
+
+/* An array assignment location covers the name and the operator alone. The
+   elements are recovered from the rest of the line. */
+pure fn assignment_headline_span(
+    const Document &document,
+    const variable_assignment_record &record) wontthrow -> StringView
+{
+  let const span =
+      clamped_source_span(document, record.position, record.length);
+  if (span.is_empty() || span[span.length - 1] != '=') return span;
+
+  let const rest = document.normalized_source.substring(record.position);
+  let const line_end = rest.find_character('\n');
+
+  return line_end.has_value() ? rest.substring_of_length(0, *line_end) : rest;
+}
+
+fn append_hover_line_number(String &output, const Document &document,
+                            usize position, position_encoding encoding) throws
+    -> void
+{
+  let const line = document.protocol_position_at(position, encoding).line;
+  output.append("line ");
+  output.append(String::from(line + 1, heap_allocator()).view());
+}
+
+fn append_hover_clipped_text(String &output, StringView text,
+                             usize length_limit) throws -> void
+{
+  if (text.length <= length_limit) {
+    output.append(text);
+    return;
+  }
+
+  output.append(text.substring_of_length(0, length_limit));
+  output.append("...");
+}
+
+/* A marker line is appended outside the fence. The two content kinds stay
+   structurally identical. */
+fn append_hover_block(String &output, StringView text, bool is_markdown,
+                      StringView language) throws -> void
+{
+  if (!is_markdown) {
+    output.append(text);
+    return;
+  }
+
+  output.append("```");
+  output.append(language);
+  output.push('\n');
+  output.append(text);
+  output.append("\n```");
+}
+
+pure fn clipped_line_span(StringView text, usize line_limit,
+                          usize &dropped_line_count) wontthrow -> StringView
+{
+  dropped_line_count = 0;
+
+  usize kept_line_count = 0;
+  usize position = 0;
+  while (position < text.length) {
+    if (text[position] == '\n') {
+      kept_line_count++;
+      if (kept_line_count == line_limit) break;
+    }
+    position++;
+  }
+
+  if (position + 1 >= text.length) return text;
+
+  for (usize scan = position; scan < text.length; scan++) {
+    if (text[scan] == '\n') dropped_line_count++;
+  }
+
+  return text.substring_of_length(0, position);
+}
+
+fn assignments_reaching(const Document &document,
+                        const document_symbol &symbol) throws
+    -> ArrayList<const variable_assignment_record *>
+{
+  let reaching =
+      ArrayList<const variable_assignment_record *>{heap_allocator()};
+  let const name = variable_name_of(symbol.text.view());
+  if (name.is_empty()) return reaching;
+
+  for (let const &record : document.symbol_records.assignments) {
+    if (record.position > symbol.start) continue;
+    if (record.name.view() != name) continue;
+
+    reaching.push(&record);
+  }
+
+  /* The walk is in source order today, and the sort keeps that out of the
+     contract. */
+  reaching.sort([](const variable_assignment_record *left,
+                   const variable_assignment_record *right) {
+    return left->position > right->position;
+  });
+
+  return reaching;
+}
+
+pure fn function_body_for(const Document &document,
+                          const document_symbol &symbol) wontthrow
+    -> const function_body_record *
+{
+  const function_body_record *nearest = nullptr;
+
+  for (let const &record : document.symbol_records.functions) {
+    if (record.name_position > symbol.start) continue;
+    if (record.name.view() != symbol.text.view()) continue;
+    if (nearest != nullptr && record.name_position < nearest->name_position)
+      continue;
+
+    nearest = &record;
+  }
+
+  return nearest;
+}
+
+fn Server::variable_hover_text(
+    const Document &document,
+    const ArrayList<const variable_assignment_record *> &reaching) throws
+    -> String
+{
+  let const &nearest = *reaching.front();
+  let headline = String{heap_allocator()};
+  append_hover_clipped_text(headline,
+                            assignment_headline_span(document, nearest),
+                            HOVER_ASSIGNMENT_TEXT_LENGTH_LIMIT);
+
+  let text = String{heap_allocator()};
+  append_hover_block(text, headline.view(), m_supports_markdown_hover,
+                     StringView{"shell"});
+
+  if (nearest.is_array) {
+    text.append("\nThe value is a list, and the elements are not folded.");
+  } else if (nearest.is_append) {
+    text.append("\nThe value appends to what came before.");
+  } else if (nearest.literal_value.has_value()) {
+    text.append("\nValue: ");
+    append_hover_clipped_text(text, nearest.literal_value->view(),
+                              HOVER_ASSIGNMENT_TEXT_LENGTH_LIMIT);
+  } else {
+    text.append("\nThe value is known only at run time.");
+  }
+
+  if (nearest.is_conditional)
+    text.append("\nThe assignment does not run on every path.");
+
+  let const earlier_count = reaching.count() - 1;
+  if (earlier_count == 0) return text;
+
+  text.append("\n\nEarlier assignments:");
+  if (m_supports_markdown_hover) text.push('\n');
+
+  let const listed_count = earlier_count < HOVER_EARLIER_ASSIGNMENT_LIMIT
+                               ? earlier_count
+                               : HOVER_EARLIER_ASSIGNMENT_LIMIT;
+  for (usize index = 1; index <= listed_count; index++) {
+    let const &record = *reaching[index];
+    text.push('\n');
+
+    if (m_supports_markdown_hover) text.append("- ");
+    append_hover_line_number(text, document, record.position, m_encoding);
+    text.append(": ");
+
+    if (m_supports_markdown_hover) text.push('`');
+    append_hover_clipped_text(text, assignment_headline_span(document, record),
+                              HOVER_ASSIGNMENT_TEXT_LENGTH_LIMIT);
+    if (m_supports_markdown_hover) text.push('`');
+
+    if (record.is_conditional) text.append(" (conditional)");
+  }
+
+  /* A cap that stayed silent would read as complete coverage. */
+  if (listed_count < earlier_count) {
+    text.append("\n\n");
+    text.append(
+        String::from(earlier_count - listed_count, heap_allocator()).view());
+    text.append(" earlier assignments are not shown.");
+  }
+
+  return text;
+}
+
+fn Server::function_hover_text(const Document &document,
+                               const function_body_record &record) throws
+    -> String
+{
+  let body = StringView{};
+  if (record.body_end_position > record.body_position) {
+    body = clamped_source_span(document, record.body_position,
+                               record.body_end_position - record.body_position);
+  }
+
+  usize dropped_line_count = 0;
+  let const kept_body =
+      clipped_line_span(body, HOVER_BODY_LINE_LIMIT, dropped_line_count);
+
+  /* The rendered shape follows FunctionDefinition::evaluate_impl. The form is
+     the one declare -f prints. */
+  let definition = String{heap_allocator()};
+  definition.append(record.name.view());
+  definition.append(" () \n");
+  definition.append(kept_body);
+
+  let text = String{heap_allocator()};
+  append_hover_block(text, definition.view(), m_supports_markdown_hover,
+                     StringView{"shell"});
+
+  if (dropped_line_count > 0) {
+    text.append("\n\n");
+    text.append(String::from(dropped_line_count, heap_allocator()).view());
+    text.append(" more lines are not shown.");
+  }
+
+  return text;
+}
+
+fn Server::send_hover(const JsonValue *id, const Document &document,
+                      const document_symbol &symbol, StringView value) throws
+    -> bool
+{
+  let response = String{"{\"contents\":{\"kind\":"};
+  response.append(m_supports_markdown_hover ? "\"markdown\"" : "\"plaintext\"");
+  response.append(",\"value\":");
+  append_json_string(response, value);
+  response.append("},\"range\":");
+  append_protocol_range(response, document, symbol.start, symbol.end,
+                        m_encoding);
+  response.push('}');
+
+  return send_result(id, response.view());
+}
+
 fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
 {
   let const request = request_positioned_document(params);
@@ -1041,6 +1342,24 @@ fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
   select_document_mood(*document);
   let const symbol = symbol_at(*document, request->position);
   if (!symbol.has_value()) return send_result(id, "null");
+
+  if (role_reads_variable(symbol->role)) {
+    let const reaching = assignments_reaching(*document, *symbol);
+    if (reaching.is_empty()) return send_result(id, "null");
+
+    return send_hover(id, *document, *symbol,
+                      variable_hover_text(*document, reaching).view());
+  }
+
+  if (role_reads_function(symbol->role)) {
+    if (let const *record = function_body_for(*document, *symbol);
+        record != nullptr)
+    {
+      return send_hover(id, *document, *symbol,
+                        function_hover_text(*document, *record).view());
+    }
+  }
+
   let const is_command = symbol->role == highlight_role::resolved_command ||
                          symbol->role == highlight_role::partial_command ||
                          symbol->role == highlight_role::unknown_command;
@@ -1049,14 +1368,11 @@ fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
     return send_result(id, "null");
   let const information = command_information(symbol->text.view());
   if (!information.has_value()) return send_result(id, "null");
-  let response = String{"{\"contents\":{\"kind\":\"plaintext\",\"value\":"};
-  append_json_string(response, information->view());
-  response.append("},\"range\":");
-  append_protocol_range(response, *document, symbol->start, symbol->end,
-                        m_encoding);
-  response.push('}');
+  let text = String{heap_allocator()};
+  append_hover_block(text, information->view(), m_supports_markdown_hover,
+                     StringView{});
 
-  return send_result(id, response.view());
+  return send_hover(id, *document, *symbol, text.view());
 }
 
 fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws

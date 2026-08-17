@@ -1048,6 +1048,11 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.active_function_definition_index = actx.function_definitions.count();
   actx.function_definitions.push(
       function_definition_record{m_name.view(), source_location()});
+  /* Both syntactic forms take their node location from the name token. The body
+     span is the one that slices to valid shell. */
+  actx.note_function_body_record(m_name.view(), source_location().position,
+                                 m_body->source_location().position,
+                                 m_body->source_end_position());
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
   actx.current_source_effects = saved_source_effects;

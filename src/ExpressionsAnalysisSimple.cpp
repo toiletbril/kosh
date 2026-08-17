@@ -235,8 +235,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (is_source_location_variable(var.name.view()))
       actx.mark_working_directory_unknown();
 
-    if (prefix_outlives_command)
+    if (prefix_outlives_command) {
       actx.note_variable_assignment(var.name.view(), var.location);
+      actx.note_variable_assignment_record(
+          var.name.view(), &var.value, var.location,
+          !is_unconditional || actx.has_seen_runtime_definer, var.is_append);
+    }
 
     if (actx.is_posix_sh_shebang && var.is_append) {
       actx.report_diagnostic(diagnostic_id::sc3024, var.location,
@@ -252,6 +256,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   for (let const &assignment : m_array_args) {
     actx.note_variable_assignment(assignment.name.view(), assignment.location);
+    actx.note_variable_assignment_record(
+        assignment.name.view(), nullptr, assignment.location,
+        !is_unconditional || actx.has_seen_runtime_definer,
+        assignment.is_append);
     actx.add_array_valued_name(assignment.name.view());
     actx.constant_variables.erase(assignment.name.view());
 

@@ -290,6 +290,13 @@ dataflow findings are reported by one sweep at the end of `analyze_ast`. Each
 analyzed root follows every readable static source path once and skips dynamic
 or unavailable source operands.
 
+`analyze_ast` accepts an optional `analysis_symbol_records` out-param that
+collects each variable assignment and each function body span. The language
+server passes one and every other caller leaves it null, so an ordinary run
+records nothing. A hover answer is built from those records and the open
+document source, because the server returns before the startup chain runs and
+holds no user variables or functions.
+
 Variable completion includes the dynamic variables available in the active
 mood. Builtin command completion includes every builtin. Bare koshkit utility
 completion is active in the default mood and when the koshkit option is enabled.

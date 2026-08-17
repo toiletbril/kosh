@@ -625,6 +625,8 @@ public:
     normalized_source = String{source};
     normalized_source.normalize_crlf_line_endings();
     version = document_version;
+    /* A recorded position belongs to one revision. */
+    symbol_records.clear();
     rebuild_lines();
   }
 
@@ -722,6 +724,7 @@ public:
   ArrayList<source_diagnostic> diagnostics;
   ArrayList<source_diagnostic> auxiliary_diagnostics;
   HashSet followed_paths;
+  analysis_symbol_records symbol_records;
 
 private:
   fn rebuild_lines() throws -> void
