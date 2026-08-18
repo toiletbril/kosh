@@ -1,0 +1,14 @@
+V	assignment-name
+V	variable
+NOPE	unset-variable
+SHIPPED	assignment-name
+-a	flag
+rows	assignment-name
+frozen	assignment-name
+scoped	assignment-name
+-i	flag
+counted	assignment-name
+-v	flag
+V	variable
+$SHIPPED	variable
+$rows	variable

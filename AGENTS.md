@@ -270,6 +270,13 @@ scanner and semantic highlight roles. Completion, highlighting, and command
 lookup share directory scans. PATH changes invalidate the derived indexes and
 the execution hash.
 
+A plain operand of `declare`, `export`, `local`, `readonly`, or `typeset` is
+highlighted as an assignment name, and the name is added to the known set for
+the rest of the scan. An operand of `unset` is highlighted as a set or an unset
+variable by the same test a bare name inside an arithmetic expression uses. The
+recognized name is the operand with its `=value`, `+=`, and `[index]` parts
+removed.
+
 `word_is_function_name` accepts a name character together with the separators
 `/`, `.`, `-`, `+`, `:`, `@`, `#`, and `%`, so a name such as `ble/util/put` is
 recorded as a function. A command word is matched against the recorded function

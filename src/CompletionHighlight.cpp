@@ -885,6 +885,38 @@ scan_heredoc_bodies(StringView line, usize position, usize end,
   return i;
 }
 
+static constexpr static_string_entry<bool> VARIABLE_NAME_COMMAND_ENTRIES[] = {
+    {SSK("declare"),  true },
+    {SSK("export"),   true },
+    {SSK("local"),    true },
+    {SSK("readonly"), true },
+    {SSK("typeset"),  true },
+    {SSK("unset"),    false},
+};
+static constexpr StaticStringMap VARIABLE_NAME_COMMANDS{
+    VARIABLE_NAME_COMMAND_ENTRIES};
+
+static pure fn variable_name_operand_of(StringView word) wontthrow -> StringView
+{
+  let name = word;
+
+  if (Maybe<usize> assignment_position = name.find_character('=');
+      assignment_position.has_value())
+  {
+    let name_length = assignment_position.value();
+    if (name_length > 0 && name[name_length - 1] == '+') name_length--;
+    name = name.substring_of_length(0, name_length);
+  }
+
+  if (Maybe<usize> bracket_position = name.find_character('[');
+      bracket_position.has_value())
+  {
+    name = name.substring_of_length(0, bracket_position.value());
+  }
+
+  return word_is_plain_identifier(name) ? name : StringView{};
+}
+
 /* A command substitution recurses with its own command-position and construct
    state, so a nested command line colors on its own. */
 fn scan_highlight_range(StringView line, usize begin, usize end,
@@ -1324,6 +1356,30 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       is_in_array_value = true;
       array_value_parenthesis_depth = parenthesis_depth;
       is_command_position = false;
+    }
+
+    if (!is_command_position && plain) {
+      let const does_command_bind =
+          VARIABLE_NAME_COMMANDS.find(highlight_command_word);
+
+      if (does_command_bind.has_value()) {
+        let const name = variable_name_operand_of(word);
+
+        if (!name.is_empty()) {
+          if (*does_command_bind) {
+            do_push(word_start, word_start + name.length,
+                    highlight_role::assignment_name);
+            line_variable_names.add(name);
+          } else {
+            do_push(word_start, word_start + name.length,
+                    dollar_name_is_set(name, line_variable_names, context)
+                        ? highlight_role::variable
+                        : highlight_role::unset_variable);
+          }
+
+          continue;
+        }
+      }
     }
 
     if (plain && word == "]]" && !stack.is_empty() &&
