@@ -13,8 +13,8 @@ class String
 {
 public:
   /* The inline buffer length. A string shorter than this, counting the trailing
-     null, lives inline. The value keeps sizeof(String) at forty-eight bytes
-     next to the sixteen-byte allocator and the three size words. */
+     null, lives inline. The value keeps sizeof(String) at sixty-four bytes next
+     to the sixteen-byte allocator and the three size words. */
   static constexpr usize INLINE_CAPACITY = 24;
 
   explicit String(Allocator allocator) : m_allocator(allocator)
@@ -298,6 +298,8 @@ private:
   usize m_capacity{0};
   char m_inline[INLINE_CAPACITY];
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(String) == 64);
 
 template <>
 fn String::from<f64>(f64 value, Allocator allocator) throws -> String;

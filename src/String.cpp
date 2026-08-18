@@ -84,16 +84,26 @@ cold fn String::reserve(usize needed) throws -> void
     throw std::bad_alloc{};
 
   let const required_capacity = needed + 1;
-  let const growth = m_capacity < 64 ? usize{4} : usize{2};
-  let new_capacity =
-      m_capacity > SIZE_MAX / growth ? required_capacity : m_capacity * growth;
-  while (new_capacity < required_capacity) {
-    if (new_capacity > SIZE_MAX / 2) {
-      new_capacity = required_capacity;
-      break;
+  let new_capacity = required_capacity;
+
+  /* The first heap block is exact. Most strings that outgrow the inline buffer
+     are built from one known run and are never appended to again, and the heap
+     pool rounds the request up to a power of two on top of any slack left
+     here. A string that keeps growing pays one extra copy and then grows
+     geometrically from its second block on. */
+  if (!is_inline()) {
+    let const growth = m_capacity < 64 ? usize{4} : usize{2};
+    new_capacity = m_capacity > SIZE_MAX / growth ? required_capacity
+                                                  : m_capacity * growth;
+    while (new_capacity < required_capacity) {
+      if (new_capacity > SIZE_MAX / 2) {
+        new_capacity = required_capacity;
+        break;
+      }
+      new_capacity *= 2;
     }
-    new_capacity *= 2;
   }
+
   let fresh = m_allocator.alloc_array<char>(new_capacity);
   let const preserved_length = m_length;
   if (preserved_length > 0) std::memcpy(fresh, m_data, preserved_length);

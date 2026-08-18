@@ -484,7 +484,8 @@ value type becomes a method on that type. Existing examples include
 `find().has_value()`. Logic shared by POSIX and Windows lives in Utils.cpp.
 
 ArrayList allocates nothing during default construction and grows
-geometrically. String has a small inline buffer and grows geometrically. A
+geometrically. String has a small inline buffer, and its first heap block is
+sized to the exact request while every later block grows geometrically. A
 scratch arena uses mark and release lifetime within one scope.
 
 WordSegment retains its source position beside one pointer to a
