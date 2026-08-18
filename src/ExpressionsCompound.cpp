@@ -610,8 +610,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (has_compound_stage) return evaluate_with_compound_stages(cxt);
 
-  /* The rewind runs no destructor, so a stage still holding open descriptors on
-     an early exit is closed by the defer before the release. */
+  /* The arena runs a destructor only for an object it created, and this list
+     took plain storage, so a stage still holding open descriptors on an early
+     exit is closed by the defer before the release. */
   let const pipeline_mark = cxt.scratch_mark();
   let ecs = ArrayList<ExecContext>{cxt.scratch_allocator()};
   defer

@@ -358,8 +358,7 @@ fn SimpleCommand::can_evaluate_in_process_substitution(
 fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void
 {
-  m_redirections = steal(redirections);
-  m_redirections.shrink_to_fit();
+  m_redirections.fill(steal(redirections));
 }
 
 fn SimpleCommand::set_array_args(
@@ -681,7 +680,7 @@ pure fn SimpleCommand::args() const wontthrow
 }
 
 pure fn SimpleCommand::redirections() const wontthrow
-    -> const ArrayList<Redirection> &
+    -> const SparseList<Redirection> &
 {
   return m_redirections;
 }

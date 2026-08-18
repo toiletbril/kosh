@@ -113,6 +113,11 @@ private:
       DEFAULT_BLOCK_SIZE / sizeof(pending_destructor);
 
   ArrayList<block> m_blocks{heap_allocator()};
+  /* The half-open address range covering every live block. A pointer outside it
+     belongs to no block, so the ownership scan is skipped. The range only ever
+     widens while blocks are added, and it stays conservative after a reset. */
+  uintptr m_lowest_address{UINTPTR_MAX};
+  uintptr m_highest_address{0};
   ArrayList<pending_destructor *> m_destructor_chunks{heap_allocator()};
   usize m_destructor_count{0};
   usize m_reset_generation{0};

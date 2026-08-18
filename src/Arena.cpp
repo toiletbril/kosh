@@ -92,6 +92,10 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
     std::free(base);
     throw;
   }
+
+  let const low = reinterpret_cast<uintptr>(base);
+  if (low < m_lowest_address) m_lowest_address = low;
+  if (low + size > m_highest_address) m_highest_address = low + size;
 }
 
 hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
@@ -124,6 +128,10 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
 hot fn BumpArena::owns(const opaque *pointer) const wontthrow -> bool
 {
   let const candidate = reinterpret_cast<uintptr>(pointer);
+  if (candidate < m_lowest_address || candidate >= m_highest_address) {
+    return false;
+  }
+
   for (usize i = m_blocks.count(); i > 0; i--) {
     const block &block = m_blocks[i - 1];
     let const base = reinterpret_cast<uintptr>(block.base);

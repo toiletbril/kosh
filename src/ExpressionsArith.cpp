@@ -583,7 +583,25 @@ CStyleForLoop::CStyleForLoop(SourceLocation location, usize header_position,
       m_body(body)
 {}
 
-CStyleForLoop::~CStyleForLoop() = default;
+CStyleForLoop::~CStyleForLoop()
+{
+  for (arith_token_cache *cache : {m_condition_cache, m_step_cache}) {
+    if (cache == nullptr) continue;
+    cache->~arith_token_cache();
+    heap_allocator().free_array(cache, 1);
+  }
+}
+
+fn CStyleForLoop::get_clause_cache(arith_token_cache *&slot) throws
+    -> arith_token_cache &
+{
+  if (slot == nullptr) {
+    let const block = heap_allocator().alloc_array<arith_token_cache>(1);
+    slot = new (block) arith_token_cache{};
+  }
+
+  return *slot;
+}
 
 cold fn CStyleForLoop::to_string() const throws -> String
 {
@@ -628,14 +646,19 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const condition_is_blank = is_blank_clause(m_condition.view());
   let const step_is_blank = is_blank_clause(m_step.view());
 
+  let const do_evaluate_condition = [&]() throws -> i64 {
+    let &cache = get_clause_cache(m_condition_cache);
+
+    return cxt.evaluate_arithmetic_cached_clause(
+        m_condition.view(), cache.tokens, cache.is_tokenized, cache.is_simple);
+  };
+
   i64 ret = 0;
   /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (condition_is_blank ||
          (m_folded_condition.has_value() && can_skip_condition_commands
               ? (*m_folded_condition != 0)
-              : cxt.evaluate_arithmetic_cached_clause(
-                    m_condition.view(), m_condition_tokens,
-                    m_condition_tokenized, m_condition_simple) != 0))
+              : do_evaluate_condition() != 0))
   {
     ret = m_body->evaluate(cxt);
     if (cxt.no_exec()) break;
@@ -643,8 +666,9 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The step runs after the body on every iteration, including one ended by a
        continue. */
     if (!step_is_blank) {
-      cxt.evaluate_arithmetic_cached_clause(m_step.view(), m_step_tokens,
-                                            m_step_tokenized, m_step_simple);
+      let &cache = get_clause_cache(m_step_cache);
+      cxt.evaluate_arithmetic_cached_clause(
+          m_step.view(), cache.tokens, cache.is_tokenized, cache.is_simple);
     }
   }
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
@@ -1088,7 +1112,7 @@ RedirectedCommand::RedirectedCommand(SourceLocation location,
                                      ArrayList<Redirection> &&redirections)
     : Command(steal(location)), m_child(child)
 {
-  m_redirections = steal(redirections);
+  m_redirections.fill(steal(redirections));
 }
 
 RedirectedCommand::~RedirectedCommand() = default;

@@ -120,7 +120,7 @@ pure fn is_test_unary_operator_word(StringView op) wontthrow -> bool;
 struct command_lint_input
 {
   const ArrayList<const Token *> &args;
-  const ArrayList<Redirection> &redirections;
+  const SparseList<Redirection> &redirections;
   const SparseList<prefix_assignment> &local_vars;
   SourceLocation command_source_location;
   StringView command_literal;

@@ -396,8 +396,8 @@ public:
       current_source_effects->has_seen_runtime_definer = true;
   }
 
-  fn apply_scope_definitions(
-      const ArrayList<analysis_scope_definition> &definitions) throws -> void
+  template <class Definitions>
+  fn apply_scope_definitions(const Definitions &definitions) throws -> void
   {
     for (let const &definition : definitions) {
       if (definition.is_alias) {
@@ -701,7 +701,10 @@ protected:
   bool m_is_negated{false};
   bool m_is_timed{false};
   bool m_is_time_posix_format{false};
-  SourceLocation m_time_location{};
+  /* The keyword is always the literal `time` in the source the command itself
+     is stamped with, so the length and the source name are recovered and only
+     the position is retained. */
+  u32 m_time_position{0};
   SparseList<prefix_assignment> m_local_vars{};
 };
 
@@ -752,21 +755,21 @@ public:
      which closes fd rather than copying another descriptor onto it. */
   static constexpr i32 DUP_FD_CLOSE = -2;
 
-  i32 fd;
-  Kind kind;
   /* Null for a duplication whose descriptor was a literal in the source. */
   const Token *target;
+  const heredoc_contents *heredoc;
+  const Token *fd_allocation_name_token;
+  i32 fd;
   /* The literal descriptor to copy from, or DUP_FD_CLOSE for the close form,
      or -1 when the descriptor is a dynamic word held in target. */
   i32 dup_fd;
-  const heredoc_contents *heredoc;
+  Kind kind;
   bool should_expand_heredoc;
   /* True for a bare >&word outside POSIX mode, where a word that expands to
      neither a number nor a dash is the csh both-streams spelling bash reads
      as >word 2>&1, resolved after the expansion the way bash decides it. */
   bool is_dup_filename_allowed;
   bool is_both_streams_spelling;
-  const Token *fd_allocation_name_token;
 
   pure fn opens_output_file() const wontthrow -> bool
   {
@@ -816,7 +819,7 @@ public:
   fn is_simple_command() const wontthrow -> bool override;
 
   pure fn args() const wontthrow -> const ArrayList<const Token *> &;
-  pure fn redirections() const wontthrow -> const ArrayList<Redirection> &;
+  pure fn redirections() const wontthrow -> const SparseList<Redirection> &;
 
   fn to_string() const throws -> String override;
 
@@ -844,7 +847,7 @@ protected:
 
   mutable Maybe<bool> m_command_word_is_glob{};
 
-  ArrayList<Redirection> m_redirections{heap_allocator()};
+  SparseList<Redirection> m_redirections{};
   SparseList<array_builtin_assignment> m_array_args{};
 };
 
@@ -1074,10 +1077,10 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   String m_variable_name;
-  SourceLocation m_variable_location;
   ArrayList<const Token *> m_words{heap_allocator()};
-  bool m_has_in_clause;
   const Expression *m_body;
+  SourceLocation m_variable_location;
+  bool m_has_in_clause;
 };
 
 /* How an arm ends. ;; stops the case, ;& falls into the next arm body without
@@ -1148,17 +1151,16 @@ public:
   fn as_subshell() const wontthrow -> const Subshell * override;
 
   fn set_analysis_scope_definitions(
-      ArrayList<analysis_scope_definition> definitions) wontthrow -> void
+      ArrayList<analysis_scope_definition> definitions) throws -> void
   {
-    m_analysis_scope_definitions = steal(definitions);
+    m_analysis_scope_definitions.fill(steal(definitions));
   }
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   const Expression *m_body;
-  ArrayList<analysis_scope_definition> m_analysis_scope_definitions{
-      heap_allocator()};
+  SparseList<analysis_scope_definition> m_analysis_scope_definitions{};
 };
 
 class ConditionalCommand : public CompoundCommand
@@ -1238,14 +1240,13 @@ protected:
 
   mutable Maybe<i64> m_folded_condition{};
 
-  /* A simple clause runs the token fast path, a complex clause falls back to
-     the char parser, decided once when the tokens are filled. */
-  mutable ArrayList<arith_token> m_condition_tokens{heap_allocator()};
-  mutable ArrayList<arith_token> m_step_tokens{heap_allocator()};
-  mutable bool m_condition_tokenized{false};
-  mutable bool m_step_tokenized{false};
-  mutable bool m_condition_simple{false};
-  mutable bool m_step_simple{false};
+  /* A loop that is only analyzed never tokenizes a clause, so each cache is
+     allocated on the first evaluation that needs it. */
+  mutable arith_token_cache *m_condition_cache{nullptr};
+  mutable arith_token_cache *m_step_cache{nullptr};
+
+  static fn get_clause_cache(arith_token_cache *&slot) throws
+      -> arith_token_cache &;
 };
 
 class SelectLoop : public CompoundCommand
@@ -1266,10 +1267,10 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   String m_variable_name;
-  SourceLocation m_variable_location;
   ArrayList<const Token *> m_words{heap_allocator()};
-  bool m_has_in_clause;
   const Expression *m_body;
+  SourceLocation m_variable_location;
+  bool m_has_in_clause;
 };
 
 class RedirectedCommand : public Command
@@ -1288,7 +1289,7 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   const Command *m_child;
-  ArrayList<Redirection> m_redirections{heap_allocator()};
+  SparseList<Redirection> m_redirections{};
 };
 
 class FunctionDefinition : public CompoundCommand
@@ -1307,9 +1308,9 @@ public:
       -> void override;
 
   fn set_analysis_scope_definitions(
-      ArrayList<analysis_scope_definition> definitions) wontthrow -> void
+      ArrayList<analysis_scope_definition> definitions) throws -> void
   {
-    m_analysis_scope_definitions = steal(definitions);
+    m_analysis_scope_definitions.fill(steal(definitions));
   }
 
 protected:
@@ -1317,8 +1318,7 @@ protected:
 
   String m_name;
   const Expression *m_body;
-  ArrayList<analysis_scope_definition> m_analysis_scope_definitions{
-      heap_allocator()};
+  SparseList<analysis_scope_definition> m_analysis_scope_definitions{};
 };
 
 class ConstantNumber : public Expression

@@ -413,8 +413,8 @@ SelectLoop::SelectLoop(SourceLocation location,
                        ArrayList<const Token *> &&words, bool has_in_clause,
                        const Expression *body)
     : CompoundCommand(steal(location)), m_variable_name(variable_name),
-      m_variable_location(steal(variable_location)),
-      m_has_in_clause(has_in_clause), m_body(body)
+      m_body(body), m_variable_location(steal(variable_location)),
+      m_has_in_clause(has_in_clause)
 {
   m_words = steal(words);
 }
@@ -516,8 +516,8 @@ ForLoop::ForLoop(SourceLocation location, SourceLocation variable_location,
                  StringView variable_name, ArrayList<const Token *> &&words,
                  bool has_in_clause, const Expression *body)
     : CompoundCommand(steal(location)), m_variable_name(variable_name),
-      m_variable_location(steal(variable_location)),
-      m_has_in_clause(has_in_clause), m_body(body)
+      m_body(body), m_variable_location(steal(variable_location)),
+      m_has_in_clause(has_in_clause)
 {
   m_words = steal(words);
 }

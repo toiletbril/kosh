@@ -200,7 +200,7 @@ public:
     if (needed > MAXIMUM_ELEMENT_COUNT) [[unlikely]]
       throw std::bad_alloc{};
 
-    constexpr usize INITIAL_ALLOCATION_BYTES = 256;
+    constexpr usize INITIAL_ALLOCATION_BYTES = 64;
     constexpr usize MAXIMUM_INITIAL_ELEMENT_COUNT = 16;
     constexpr usize INITIAL_ELEMENT_COUNT =
         sizeof(T) >= INITIAL_ALLOCATION_BYTES

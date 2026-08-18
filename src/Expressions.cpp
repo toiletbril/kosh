@@ -1322,14 +1322,17 @@ fn Command::set_timed(bool posix_format, SourceLocation location) wontthrow
 {
   m_is_timed = true;
   m_is_time_posix_format = posix_format;
-  m_time_location = steal(location);
+  m_time_position = location.position;
 }
 
 pure fn Command::is_timed() const wontthrow -> bool { return m_is_timed; }
 
 pure fn Command::time_location() const wontthrow -> SourceLocation
 {
-  return m_time_location;
+  constexpr usize TIME_KEYWORD_LENGTH = 4;
+
+  return SourceLocation{m_time_position, TIME_KEYWORD_LENGTH,
+                        source_location().source_name_index};
 }
 
 pure fn Command::time_uses_posix_format() const wontthrow -> bool
