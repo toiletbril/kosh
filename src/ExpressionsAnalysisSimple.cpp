@@ -481,7 +481,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   let const is_command_shadowed = command_is_defined_function ||
                                   actx.known_aliases.contains(command_literal);
 
-  if (command_is_defined_function && borrowed_command_literal.has_value()) {
+  if (command_is_defined_function) {
     actx.function_calls.push(function_call_record{
         String{heap_allocator(), command_literal},
         m_args[0]->source_location(),
