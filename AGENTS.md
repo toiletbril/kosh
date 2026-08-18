@@ -528,6 +528,14 @@ so its pointer stays null. An arithmetic segment is never a substitution
 segment, so one arena generation stamp guards both caches. The 64-bit layout is
 88 bytes.
 
+A word with one borrowable segment becomes a WordToken and lends that segment's
+text. Every other word becomes an ExpandedWordToken, which owns the flattened
+text. The flattened text is built on the first read, because analysis walks the
+segments and most tokens are never asked for a flattened form. An empty result
+marks the text as not yet built, and a word whose flattened text is empty
+rebuilds it at no cost. A build that runs out of memory answers `raw_view` as an
+unavailable view, the same answer a word with no borrowable segment gives.
+
 ## Logging
 
 The log macros live in src/Trace.hpp. `LOG(level, fmt, ...)` prints at or below

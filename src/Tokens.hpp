@@ -607,7 +607,9 @@ protected:
 };
 
 /* A word carrying a substitution or several segments has no single segment to
-   borrow the flattened text from, so the flattened form is owned here. */
+   borrow the flattened text from, so the flattened form is owned here. It is
+   built on the first read, because analysis walks the segments and most tokens
+   are never asked for their flattened text. */
 class ExpandedWordToken : public WordToken
 {
 public:
@@ -617,7 +619,9 @@ public:
   fn raw_view() const wontthrow -> Maybe<StringView> override;
 
 protected:
-  String m_literal;
+  fn fill_literal() const throws -> void;
+
+  mutable String m_literal{heap_allocator()};
 };
 
 fn create_word_token(BumpArena &arena, SourceLocation location,

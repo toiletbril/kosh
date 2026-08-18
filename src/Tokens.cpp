@@ -589,16 +589,36 @@ fn WordToken::flags() const wontthrow -> Token::Flags
 pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }
 
 ExpandedWordToken::ExpandedWordToken(SourceLocation location, Word word)
-    : WordToken(steal(location), steal(word)),
-      m_literal(m_word.to_literal_string())
+    : WordToken(steal(location), steal(word))
 {}
+
+/* The flattened text of such a word is empty only when every segment is empty,
+   and rebuilding an empty result costs nothing, so the empty string doubles as
+   the not-yet-built mark. */
+fn ExpandedWordToken::fill_literal() const throws -> void
+{
+  if (m_literal.is_empty()) m_literal = m_word.to_literal_string();
+}
 
 fn ExpandedWordToken::raw_view() const wontthrow -> Maybe<StringView>
 {
+  /* The override is noexcept, so a failed build answers as an unavailable view
+     the same way a word with no borrowable segment does. */
+  try {
+    fill_literal();
+  } catch (...) {
+    return None;
+  }
+
   return m_literal.view();
 }
 
-fn ExpandedWordToken::raw_string() const throws -> String { return m_literal; }
+fn ExpandedWordToken::raw_string() const throws -> String
+{
+  fill_literal();
+
+  return m_literal;
+}
 
 fn create_word_token(BumpArena &arena, SourceLocation location,
                      Word word) throws -> WordToken *
