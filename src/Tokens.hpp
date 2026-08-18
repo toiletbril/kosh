@@ -811,6 +811,7 @@ class ExpandedWordToken : public WordToken
 {
 public:
   ExpandedWordToken(SourceLocation location, Word word);
+  ~ExpandedWordToken() override;
 
   fn raw_string() const throws -> String override;
   fn raw_view() const wontthrow -> Maybe<StringView> override;
@@ -818,8 +819,13 @@ public:
 protected:
   fn fill_literal() const throws -> void;
 
-  mutable String m_literal{heap_allocator()};
+  /* The flattened text is a bare buffer. Word holds its constant value the
+     same way. */
+  mutable char *m_literal_data{nullptr};
+  mutable u32 m_literal_length{0};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(ExpandedWordToken) == 80);
 
 fn create_word_token(BumpArena &arena, SourceLocation location,
                      Word word) throws -> WordToken *;

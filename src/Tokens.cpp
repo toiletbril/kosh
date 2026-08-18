@@ -661,12 +661,31 @@ ExpandedWordToken::ExpandedWordToken(SourceLocation location, Word word)
     : WordToken(steal(location), steal(word))
 {}
 
+ExpandedWordToken::~ExpandedWordToken()
+{
+  if (m_literal_data == nullptr) return;
+
+  heap_allocator().free_array(m_literal_data, m_literal_length);
+}
+
 /* The flattened text of such a word is empty only when every segment is empty,
-   and rebuilding an empty result costs nothing, so the empty string doubles as
+   and rebuilding an empty result costs nothing, so the null buffer doubles as
    the not-yet-built mark. */
 fn ExpandedWordToken::fill_literal() const throws -> void
 {
-  if (m_literal.is_empty()) m_literal = m_word.to_literal_string();
+  if (m_literal_data != nullptr) return;
+
+  let const built = m_word.to_literal_string();
+  let const view = built.view();
+
+  if (view.length == 0) return;
+  if (view.length > ~static_cast<u32>(0)) throw std::bad_alloc{};
+
+  let buffer = heap_allocator().alloc_array<char>(view.length);
+  __builtin_memcpy(buffer, view.data, view.length);
+
+  m_literal_data = buffer;
+  m_literal_length = static_cast<u32>(view.length);
 }
 
 fn ExpandedWordToken::raw_view() const wontthrow -> Maybe<StringView>
@@ -679,14 +698,20 @@ fn ExpandedWordToken::raw_view() const wontthrow -> Maybe<StringView>
     return None;
   }
 
-  return m_literal.view();
+  if (m_literal_data == nullptr) return StringView{};
+
+  return StringView{m_literal_data, m_literal_length};
 }
 
 fn ExpandedWordToken::raw_string() const throws -> String
 {
   fill_literal();
 
-  return m_literal;
+  if (m_literal_data == nullptr) return String{heap_allocator()};
+
+  return String{
+      StringView{m_literal_data, m_literal_length}
+  };
 }
 
 fn create_word_token(BumpArena &arena, SourceLocation location,

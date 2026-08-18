@@ -262,7 +262,8 @@ hot fn Parser::parse_for() throws -> Command *
                                       "Drop the '$' and any quotes"};
   }
 
-  let const variable_name = name_token->raw_string();
+  let const variable_name =
+      name_token->raw_string().view().copy_to(bump_allocator(m_lexer.arena()));
 
   ArrayList<const Token *> words{heap_allocator()};
   let const has_in_clause = parse_optional_in_clause_words(words);
@@ -284,8 +285,8 @@ hot fn Parser::parse_for() throws -> Command *
   let const parsed_body = parse_loop_body(location, "Unterminated for loop");
 
   let loop_node = m_lexer.arena().create<ForLoop>(
-      location, name_token->source_location(), variable_name.view(),
-      steal(words), has_in_clause, parsed_body.body);
+      location, name_token->source_location(), variable_name, steal(words),
+      has_in_clause, parsed_body.body);
   loop_node->set_source_end_position(parsed_body.done_location.position +
                                      parsed_body.done_location.length);
   return loop_node;
@@ -314,7 +315,8 @@ hot fn Parser::parse_select() throws -> Command *
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'select'"};
   }
-  let const variable_name = name_token->raw_string();
+  let const variable_name =
+      name_token->raw_string().view().copy_to(bump_allocator(m_lexer.arena()));
 
   ArrayList<const Token *> words{heap_allocator()};
   let const has_in_clause = parse_optional_in_clause_words(words);
@@ -332,8 +334,8 @@ hot fn Parser::parse_select() throws -> Command *
   let const parsed_body = parse_loop_body(location, "Unterminated select loop");
 
   return m_lexer.arena().create<SelectLoop>(
-      location, name_token->source_location(), variable_name.view(),
-      steal(words), has_in_clause, parsed_body.body);
+      location, name_token->source_location(), variable_name, steal(words),
+      has_in_clause, parsed_body.body);
 }
 
 /* In a case word or pattern a NAME=VALUE token is a plain word, rebuilt into a
@@ -635,7 +637,7 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
   const SourceLocation full_location{open_location.position, body.length + 4,
                                      open_location.source_name_index};
   return m_lexer.arena().create<expressions::ArithmeticCommand>(
-      full_location, String{bump_allocator(m_lexer.arena()), body});
+      full_location, body.copy_to(bump_allocator(m_lexer.arena())));
 }
 
 /* A bash C-style for, for (( init; cond; step )); do BODY; done. The header is
@@ -669,11 +671,14 @@ hot fn Parser::parse_c_style_for(const SourceLocation &location,
   }
 
   let const allocator = bump_allocator(m_lexer.arena());
-  let init = String{allocator, header.substring_of_length(0, separators[0])};
-  let condition = String{
-      allocator, header.substring_of_length(separators[0] + 1,
-                                            separators[1] - separators[0] - 1)};
-  let step = String{allocator, header.substring(separators[1] + 1)};
+  let const init =
+      header.substring_of_length(0, separators[0]).copy_to(allocator);
+  let const condition =
+      header
+          .substring_of_length(separators[0] + 1,
+                               separators[1] - separators[0] - 1)
+          .copy_to(allocator);
+  let const step = header.substring(separators[1] + 1).copy_to(allocator);
 
   skip_semicolons_and_newlines();
 
@@ -688,8 +693,8 @@ hot fn Parser::parse_c_style_for(const SourceLocation &location,
   let const parsed_body = parse_loop_body(location, "Unterminated for loop");
 
   return m_lexer.arena().create<expressions::CStyleForLoop>(
-      location, open->source_location().position + 2, steal(init),
-      steal(condition), steal(step), parsed_body.body);
+      location, open->source_location().position + 2, init, condition, step,
+      parsed_body.body);
 }
 
 fn Parser::parse_loop_body(const SourceLocation &location,

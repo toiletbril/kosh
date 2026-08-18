@@ -474,8 +474,9 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
 
-ArithmeticCommand::ArithmeticCommand(SourceLocation location, String expression)
-    : CompoundCommand(steal(location)), m_expression(steal(expression))
+ArithmeticCommand::ArithmeticCommand(SourceLocation location,
+                                     StringView expression)
+    : CompoundCommand(steal(location)), m_expression(expression)
 {}
 
 ArithmeticCommand::~ArithmeticCommand() = default;
@@ -495,8 +496,8 @@ cold fn ArithmeticCommand::to_string() const throws -> String
 
 cold fn ArithmeticCommand::to_ast_string(usize layer) const throws -> String
 {
-  return indent_for_layer(layer) + "[" + to_string() + " \"" +
-         m_expression.view() + "\"]";
+  return indent_for_layer(layer) + "[" + to_string() + " \"" + m_expression +
+         "\"]";
 }
 
 static pure fn is_blank_clause(StringView text) wontthrow -> bool
@@ -510,11 +511,12 @@ static pure fn is_blank_clause(StringView text) wontthrow -> bool
 
 fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  LOG(Debug, "evaluating the arithmetic command '%s'", m_expression.c_str());
+  LOG(Debug, "evaluating the arithmetic command '%.*s'",
+      static_cast<int>(m_expression.length), m_expression.data);
 
   cxt.set_current_location(source_location());
 
-  if (is_blank_clause(m_expression.view())) {
+  if (is_blank_clause(m_expression)) {
     cxt.publish_single_pipe_status(1);
     SET_AND_RETURN_EXIT_STATUS(cxt, 1);
   }
@@ -525,7 +527,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     const SourceLocation body_base{source_location().position + 2, 0,
                                    source_location().source_name_index};
-    value = cxt.evaluate_arithmetic(m_expression.view(), &body_base);
+    value = cxt.evaluate_arithmetic(m_expression, &body_base);
   } catch (const ErrorWithLocation &) {
     throw;
   } catch (const Error &e) {
@@ -539,19 +541,17 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 fn ArithmeticCommand::analyze(AnalysisContext &actx,
                               bool is_unconditional) const throws -> void
 {
-  if (arithmetic_reads_external_input(actx, m_expression.view()))
+  if (arithmetic_reads_external_input(actx, m_expression))
     actx.report_diagnostic(diagnostic_id::external_arithmetic_input,
                            source_location());
 
   check_arithmetic_expression_lints(
-      actx, m_expression.view(), source_location(),
-      source_location().position + 2,
+      actx, m_expression, source_location(), source_location().position + 2,
       !is_unconditional || actx.has_seen_runtime_definer);
 
   if (actx.is_posix_sh_shebang) {
     actx.report_diagnostic(diagnostic_id::sc3006, source_location());
-    check_posix_arithmetic_operators(actx, m_expression.view(),
-                                     source_location());
+    check_posix_arithmetic_operators(actx, m_expression, source_location());
   }
 
   /* The prepass does not parse the expression, which may assign any name, so
@@ -564,10 +564,9 @@ fn SelectLoop::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
 
-  actx.note_variable_binding_record(m_variable_name.view(), m_variable_location,
-                                    assignment_binder::SelectLoop,
-                                    !is_unconditional ||
-                                        actx.has_seen_runtime_definer);
+  actx.note_variable_binding_record(
+      m_variable_name, m_variable_location, assignment_binder::SelectLoop,
+      !is_unconditional || actx.has_seen_runtime_definer);
 
   actx.constant_variables.clear();
   actx.loop_body_depth++;
@@ -576,11 +575,10 @@ fn SelectLoop::analyze(AnalysisContext &actx,
 }
 
 CStyleForLoop::CStyleForLoop(SourceLocation location, usize header_position,
-                             String init, String condition, String step,
-                             const Expression *body)
+                             StringView init, StringView condition,
+                             StringView step, const Expression *body)
     : CompoundCommand(steal(location)), m_header_position(header_position),
-      m_init(steal(init)), m_condition(steal(condition)), m_step(steal(step)),
-      m_body(body)
+      m_init(init), m_condition(condition), m_step(step), m_body(body)
 {}
 
 CStyleForLoop::~CStyleForLoop()
@@ -612,9 +610,9 @@ cold fn CStyleForLoop::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
   let const pad = indent_for_layer(layer);
-  return pad + "[" + to_string() + " \"" + m_init.view() + ";" +
-         m_condition.view() + ";" + m_step.view() + "\"]\n" + pad +
-         EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
+  return pad + "[" + to_string() + " \"" + m_init + ";" + m_condition + ";" +
+         m_step + "\"]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
 }
 
 fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -634,23 +632,25 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_current_location(source_location());
 
   LOG(Debug,
-      "entering the c-style for loop with init '%s', condition '%s', step "
-      "'%s'",
-      m_init.c_str(), m_condition.c_str(), m_step.c_str());
+      "entering the c-style for loop with init '%.*s', condition '%.*s', step "
+      "'%.*s'",
+      static_cast<int>(m_init.length), m_init.data,
+      static_cast<int>(m_condition.length), m_condition.data,
+      static_cast<int>(m_step.length), m_step.data);
 
-  if (!is_blank_clause(m_init.view())) cxt.evaluate_arithmetic(m_init.view());
+  if (!is_blank_clause(m_init)) cxt.evaluate_arithmetic(m_init);
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
-  let const condition_is_blank = is_blank_clause(m_condition.view());
-  let const step_is_blank = is_blank_clause(m_step.view());
+  let const condition_is_blank = is_blank_clause(m_condition);
+  let const step_is_blank = is_blank_clause(m_step);
 
   let const do_evaluate_condition = [&]() throws -> i64 {
     let &cache = get_clause_cache(m_condition_cache);
 
     return cxt.evaluate_arithmetic_cached_clause(
-        m_condition.view(), cache.tokens, cache.is_tokenized, cache.is_simple);
+        m_condition, cache.tokens, cache.is_tokenized, cache.is_simple);
   };
 
   i64 ret = 0;
@@ -668,7 +668,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (!step_is_blank) {
       let &cache = get_clause_cache(m_step_cache);
       cxt.evaluate_arithmetic_cached_clause(
-          m_step.view(), cache.tokens, cache.is_tokenized, cache.is_simple);
+          m_step, cache.tokens, cache.is_tokenized, cache.is_simple);
     }
   }
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
@@ -686,7 +686,7 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
   let const is_conditional = !is_unconditional || actx.has_seen_runtime_definer;
   let clause_base_position = m_header_position;
 
-  for (let const clause : {m_init.view(), m_condition.view(), m_step.view()}) {
+  for (let const clause : {m_init, m_condition, m_step}) {
     if (!clause.is_empty()) {
       check_arithmetic_expression_lints(actx, clause, source_location(),
                                         clause_base_position, is_conditional);
@@ -706,12 +706,12 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
 
 pure fn CStyleForLoop::condition_clause() const wontthrow -> StringView
 {
-  return m_condition.view();
+  return m_condition;
 }
 
 pure fn CStyleForLoop::init_clause() const wontthrow -> StringView
 {
-  return m_init.view();
+  return m_init;
 }
 
 fn CStyleForLoop::set_folded_condition(i64 value) const wontthrow -> void

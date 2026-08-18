@@ -1076,7 +1076,8 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
-  String m_variable_name;
+  /* The name is a slice of the arena that holds this node. */
+  StringView m_variable_name;
   ArrayList<const Token *> m_words{heap_allocator()};
   const Expression *m_body;
   SourceLocation m_variable_location;
@@ -1185,7 +1186,7 @@ protected:
 class ArithmeticCommand : public CompoundCommand
 {
 public:
-  ArithmeticCommand(SourceLocation location, String expression);
+  ArithmeticCommand(SourceLocation location, StringView expression);
   ~ArithmeticCommand() override;
 
   fn to_string() const throws -> String override;
@@ -1201,14 +1202,15 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
-  String m_expression;
+  /* The expression is a slice of the arena that holds this node. */
+  StringView m_expression;
 };
 
 class CStyleForLoop : public CompoundCommand
 {
 public:
-  CStyleForLoop(SourceLocation location, usize header_position, String init,
-                String condition, String step, const Expression *body);
+  CStyleForLoop(SourceLocation location, usize header_position, StringView init,
+                StringView condition, StringView step, const Expression *body);
   ~CStyleForLoop() override;
 
   fn to_string() const throws -> String override;
@@ -1233,9 +1235,11 @@ protected:
   /* The source position of the first byte of the init clause, so each clause
      base is recovered from the lengths that precede it. */
   usize m_header_position;
-  String m_init;
-  String m_condition;
-  String m_step;
+  /* The three clauses are slices of the arena that holds this node, so they
+     stay readable for as long as the node does. */
+  StringView m_init;
+  StringView m_condition;
+  StringView m_step;
   const Expression *m_body;
 
   mutable Maybe<i64> m_folded_condition{};
@@ -1266,7 +1270,8 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
-  String m_variable_name;
+  /* The name is a slice of the arena that holds this node. */
+  StringView m_variable_name;
   ArrayList<const Token *> m_words{heap_allocator()};
   const Expression *m_body;
   SourceLocation m_variable_location;

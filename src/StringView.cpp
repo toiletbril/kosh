@@ -14,6 +14,16 @@ fn StringView::to_lower_ascii(Allocator allocator) const throws -> String
   return result;
 }
 
+fn StringView::copy_to(Allocator allocator) const throws -> StringView
+{
+  if (length == 0) return StringView{};
+
+  let const bytes = allocator.alloc_array<char>(length);
+  __builtin_memcpy(bytes, data, length);
+
+  return StringView{bytes, length};
+}
+
 namespace utils {
 fn parse_decimal_i64(StringView text, bool *out_of_range = nullptr) throws
     -> ErrorOr<i64>;

@@ -423,7 +423,7 @@ SelectLoop::~SelectLoop() = default;
 
 cold fn SelectLoop::to_string() const throws -> String
 {
-  return "SelectLoop \"" + StringView{m_variable_name} + "\"";
+  return "SelectLoop \"" + m_variable_name + "\"";
 }
 
 cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
@@ -445,8 +445,8 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
   if (values.is_empty()) return 0;
 
-  LOG(Debug, "the select loop offers %zu choices for '%s'", values.count(),
-      m_variable_name.c_str());
+  LOG(Debug, "the select loop offers %zu choices for '%.*s'", values.count(),
+      static_cast<int>(m_variable_name.length), m_variable_name.data);
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
@@ -527,7 +527,7 @@ ForLoop::~ForLoop() = default;
 cold fn ForLoop::to_string() const throws -> String
 {
   let result = String{"ForLoop \""};
-  result += StringView{m_variable_name};
+  result += m_variable_name;
   result += "\"";
   return result;
 }
@@ -572,7 +572,8 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   };
 
-  LOG(Debug, "the for loop binds '%s' over %zu values", m_variable_name.c_str(),
+  LOG(Debug, "the for loop binds '%.*s' over %zu values",
+      static_cast<int>(m_variable_name.length), m_variable_name.data,
       values.count());
 
   cxt.enter_loop();
@@ -597,29 +598,29 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   ASSERT(m_body != nullptr);
 
   actx.note_variable_binding_record(
-      m_variable_name.view(), m_variable_location, assignment_binder::ForLoop,
+      m_variable_name, m_variable_location, assignment_binder::ForLoop,
       !is_unconditional || actx.has_seen_runtime_definer);
 
   let const outer_loop_location =
-      actx.active_loop_variables.find(m_variable_name.view());
+      actx.active_loop_variables.find(m_variable_name);
   if (outer_loop_location != nullptr) {
     actx.report_diagnostic(diagnostic_id::sc2165, m_variable_location,
-                           {m_variable_name.view()}, *outer_loop_location);
+                           {m_variable_name}, *outer_loop_location);
     actx.report_diagnostic(diagnostic_id::sc2167, *outer_loop_location,
-                           {m_variable_name.view()}, m_variable_location);
+                           {m_variable_name}, m_variable_location);
   }
 
   let const had_outer_loop_variable = outer_loop_location != nullptr;
   let saved_outer_loop_location = SourceLocation{};
   if (had_outer_loop_variable) saved_outer_loop_location = *outer_loop_location;
-  actx.active_loop_variables.set(m_variable_name.view(), m_variable_location);
+  actx.active_loop_variables.set(m_variable_name, m_variable_location);
   defer
   {
     if (had_outer_loop_variable)
-      actx.active_loop_variables.set(m_variable_name.view(),
+      actx.active_loop_variables.set(m_variable_name,
                                      saved_outer_loop_location);
     else
-      actx.active_loop_variables.erase(m_variable_name.view());
+      actx.active_loop_variables.erase(m_variable_name);
   };
 
   /* One walk of the word list decides every word-shaped finding, so a further

@@ -43,6 +43,10 @@ public:
 
   mustuse fn to_lower_ascii(Allocator allocator) const throws -> String;
 
+  /* A copy of these bytes in the allocator, borrowed for as long as that
+     allocator keeps them. An arena copy lives as long as the arena. */
+  mustuse fn copy_to(Allocator allocator) const throws -> StringView;
+
   hot flatten mustuse pure fn operator==(StringView other) const wontthrow->bool
   {
     if (length != other.length) return false;
