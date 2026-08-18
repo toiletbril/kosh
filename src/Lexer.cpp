@@ -193,12 +193,12 @@ Lexer::~Lexer() = default;
 fn Lexer::peek_shell_token() throws -> Token *
 {
   skip_whitespace();
-  if (m_peek_cache != nullptr && m_peek_cache_position == m_cursor_position) {
-    return m_peek_cache;
-  }
+  if (peek_cache_is_live()) return m_peek_cache;
+
   Token *const token = lex_shell_token();
   m_peek_cache = token;
   m_peek_cache_position = m_cursor_position;
+  m_peek_cache_generation = m_arena->reset_generation();
 
   return token;
 }
@@ -207,10 +207,7 @@ hot fn Lexer::next_shell_token() throws -> Token *
 {
   skip_whitespace();
 
-  Token *const token =
-      (m_peek_cache != nullptr && m_peek_cache_position == m_cursor_position)
-          ? m_peek_cache
-          : lex_shell_token();
+  Token *const token = peek_cache_is_live() ? m_peek_cache : lex_shell_token();
   ASSERT(token != nullptr);
 
   advance_past_last_peek();
@@ -274,8 +271,23 @@ fn Lexer::set_arena(BumpArena &arena) wontthrow -> void
 {
   LOG(Debug, "switching the lexer arena and dropping the cached peek");
   m_arena = &arena;
-  /* The cached token lives in the old arena and must not survive the swap. */
-  m_peek_cache = nullptr;
+  drop_peek_cache();
+}
+
+/* The cached token lives in the arena, so a caller that swaps the arena or
+   rewinds it below the token calls this before the next peek. */
+fn Lexer::drop_peek_cache() wontthrow -> void { m_peek_cache = nullptr; }
+
+fn Lexer::peek_cache_is_live() const wontthrow -> bool
+{
+  if (m_peek_cache == nullptr || m_peek_cache_position != m_cursor_position) {
+    return false;
+  }
+
+  ASSERT(m_peek_cache_generation == m_arena->reset_generation(),
+         "the arena was rewound without dropping the cached peek");
+
+  return true;
 }
 
 hot fn Lexer::advance_past_last_peek() throws -> usize

@@ -109,6 +109,7 @@ public:
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   pure fn arena() const wontthrow -> BumpArena &;
   fn set_arena(BumpArena &arena) wontthrow -> void;
+  fn drop_peek_cache() wontthrow -> void;
   fn advance_past_last_peek() throws -> usize;
 
   fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
@@ -130,6 +131,8 @@ protected:
     return SourceLocation{position, length, m_source_name_index};
   }
 
+  fn peek_cache_is_live() const wontthrow -> bool;
+
   StringView m_source;
   BumpArena *m_arena;
   /* The interned name of the file this source came from, or zero for an unnamed
@@ -142,9 +145,11 @@ protected:
 
   /* The parser peeks the next token many times before it consumes one, and each
      peek would otherwise re-lex from the same position. The last token is
-     reused while the cursor has not moved. */
+     reused while the cursor has not moved and the arena holding it has not been
+     rewound under it. */
   Token *m_peek_cache{nullptr};
   usize m_peek_cache_position{0};
+  usize m_peek_cache_generation{0};
 
   bool m_should_collect_debug_words{false};
   ArrayList<Word> m_debug_words{heap_allocator()};
