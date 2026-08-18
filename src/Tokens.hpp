@@ -273,28 +273,28 @@ public:
   ~WordSegment() { release_eval_cache(); }
 
   cold WordSegment(const WordSegment &other) throws
-      : kind{other.kind},
+      : source_position{other.source_position},
+        source_length{other.source_length},
+        kind{other.kind},
         is_in_double_quotes{other.is_in_double_quotes},
         is_greedy_name{other.is_greedy_name},
         was_ansi_c_quoted{other.was_ansi_c_quoted},
         is_substitution_cache_in_function_arena{
             other.is_substitution_cache_in_function_arena},
-        source_position{other.source_position},
-        source_length{other.source_length},
         text{other.text}
   {
     if (other.m_eval_cache != nullptr) get_eval_cache() = *other.m_eval_cache;
   }
 
   WordSegment(WordSegment &&other) wontthrow
-      : kind{other.kind},
+      : source_position{other.source_position},
+        source_length{other.source_length},
+        kind{other.kind},
         is_in_double_quotes{other.is_in_double_quotes},
         is_greedy_name{other.is_greedy_name},
         was_ansi_c_quoted{other.was_ansi_c_quoted},
         is_substitution_cache_in_function_arena{
             other.is_substitution_cache_in_function_arena},
-        source_position{other.source_position},
-        source_length{other.source_length},
         text{steal(other.text)},
         m_eval_cache{other.m_eval_cache}
   {
@@ -331,16 +331,16 @@ public:
     return *this;
   }
 
-  /* The small fields lead so they fill the padding the text would otherwise
-     leave. The segment is forty bytes. */
-  Kind kind;
-  bool is_in_double_quotes{false};
-  bool is_greedy_name{false};
-  bool was_ansi_c_quoted{false};
-  bool is_substitution_cache_in_function_arena{false};
-
+  /* The span length and the flags share one four-byte unit, so the group costs
+     nothing beside the position. The segment is thirty-two bytes. */
   mutable u32 source_position{0};
-  mutable u32 source_length{0};
+
+  mutable u32 source_length : 24 {0};
+  Kind kind : 3;
+  bool is_in_double_quotes : 1 {false};
+  bool is_greedy_name : 1 {false};
+  bool was_ansi_c_quoted : 1 {false};
+  bool is_substitution_cache_in_function_arena : 1 {false};
 
   SegmentText text;
 
@@ -393,12 +393,14 @@ public:
     cache.has_folded_arithmetic_result = true;
   }
 
-  /* A source beyond four gigabytes has no representable span here, so the
-     segment reports no location instead of a wrapped one. */
+  /* A position beyond four gigabytes or a span beyond sixteen megabytes has no
+     representable form here, so the segment reports no location instead of a
+     wrapped one. */
   fn set_source_span(usize position, usize length) wontthrow -> void
   {
-    constexpr usize MAXIMUM_SOURCE_OFFSET = ~static_cast<u32>(0);
-    if (position > MAXIMUM_SOURCE_OFFSET || length > MAXIMUM_SOURCE_OFFSET) {
+    constexpr usize MAXIMUM_SOURCE_POSITION = ~static_cast<u32>(0);
+    constexpr usize MAXIMUM_SOURCE_LENGTH = (usize{1} << 24) - 1;
+    if (position > MAXIMUM_SOURCE_POSITION || length > MAXIMUM_SOURCE_LENGTH) {
       source_position = 0;
       source_length = 0;
       return;
@@ -429,7 +431,7 @@ private:
   mutable segment_eval_cache *m_eval_cache{nullptr};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 40);
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 32);
 
 class Word
 {

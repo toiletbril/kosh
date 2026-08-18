@@ -520,13 +520,15 @@ memory report names the live count and the chunked capacity of each arena.
 
 WordSegment retains its source position beside one pointer to a
 segment_eval_cache. A DEBUG trap or xtrace reevaluates the original expression.
-The source span is a pair of 32-bit offsets, and a source beyond four gigabytes
-reports no span at all. The cache holds the substitution tree, the arithmetic
-token cache, the folded arithmetic result, and the arena generation, and it is
-allocated on the heap on first use. A literal segment never reaches evaluation,
-so its pointer stays null. An arithmetic segment is never a substitution
-segment, so one arena generation stamp guards both caches. The 64-bit layout is
-40 bytes.
+The source span is a 32-bit position beside a 24-bit length, and a position
+beyond four gigabytes or a span beyond sixteen megabytes reports no span at all.
+The segment kind and the four flag bits share the four-byte unit the length
+opens, so the group costs nothing beside the position. The cache holds the
+substitution tree, the arithmetic token cache, the folded arithmetic result, and
+the arena generation, and it is allocated on the heap on first use. A literal
+segment never reaches evaluation, so its pointer stays null. An arithmetic
+segment is never a substitution segment, so one arena generation stamp guards
+both caches. The 64-bit layout is 32 bytes.
 
 The segment text is a SegmentText, which is a pointer, a 32-bit length, and a
 32-bit capacity. A zero capacity means the bytes are borrowed and the destructor

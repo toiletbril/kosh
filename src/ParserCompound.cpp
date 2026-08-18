@@ -830,7 +830,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
                   WordSegment::Kind::UnquotedText,
                   SegmentText{bump_allocator(m_lexer.arena()),
                               m_lexer.source().substring_of_length(end_position,
-                                                                  gap_length)},
+                              gap_length)},
                   false
               });
             }
