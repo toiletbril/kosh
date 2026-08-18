@@ -305,6 +305,18 @@ per-keystroke highlighter. src/CompletionInternal.hpp declares shared helpers.
 src/CompletionPolicy.hpp owns program policies, help allowlists, extension
 hints, custom completer routing, and transparent prefixes.
 
+The language server wraps its `completion::complete` call in
+`begin_explicit_completion` with the `Cached` refresh, the way the interactive
+editor does. Without that wrapper the resolver returns before it builds the PATH
+command index, so no external program is offered. A command-position item that
+holds no directory separator carries `CompletionItemKind.Function` and a `data`
+object naming the command. `completionItem/resolve` reads that name and fills
+`documentation` from `command_information`, so the one highlighted item pays the
+fork and a PATH listing of thousands of names does not.
+`Server::command_information` answers a builtin first, then a program on the
+active PATH, and the bundled koshkit utility only for a name PATH does not hold,
+which is the order `Eval.cpp` resolves a command word in.
+
 Completion, highlighting, diagnostics, and koshkit cat share the tolerant
 scanner and semantic highlight roles. Completion, highlighting, and command
 lookup share directory scans. PATH changes invalidate the derived indexes and

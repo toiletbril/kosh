@@ -21,6 +21,7 @@ enum class request_method : u8
   DidChange,
   DidClose,
   Completion,
+  ResolveCompletion,
   CodeAction,
   Definition,
   Hover,
@@ -29,19 +30,20 @@ enum class request_method : u8
 };
 
 constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
-    {SSK("initialize"),                       request_method::Initialize     },
-    {SSK("initialized"),                      request_method::Initialized    },
-    {SSK("shutdown"),                         request_method::Shutdown       },
-    {SSK("exit"),                             request_method::Exit           },
-    {SSK("textDocument/didOpen"),             request_method::DidOpen        },
-    {SSK("textDocument/didChange"),           request_method::DidChange      },
-    {SSK("textDocument/didClose"),            request_method::DidClose       },
-    {SSK("textDocument/completion"),          request_method::Completion     },
-    {SSK("textDocument/codeAction"),          request_method::CodeAction     },
-    {SSK("textDocument/definition"),          request_method::Definition     },
-    {SSK("textDocument/hover"),               request_method::Hover          },
-    {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens },
-    {SSK("textDocument/documentSymbol"),      request_method::DocumentSymbols},
+    {SSK("initialize"),                       request_method::Initialize       },
+    {SSK("initialized"),                      request_method::Initialized      },
+    {SSK("shutdown"),                         request_method::Shutdown         },
+    {SSK("exit"),                             request_method::Exit             },
+    {SSK("textDocument/didOpen"),             request_method::DidOpen          },
+    {SSK("textDocument/didChange"),           request_method::DidChange        },
+    {SSK("textDocument/didClose"),            request_method::DidClose         },
+    {SSK("textDocument/completion"),          request_method::Completion       },
+    {SSK("completionItem/resolve"),           request_method::ResolveCompletion},
+    {SSK("textDocument/codeAction"),          request_method::CodeAction       },
+    {SSK("textDocument/definition"),          request_method::Definition       },
+    {SSK("textDocument/hover"),               request_method::Hover            },
+    {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens   },
+    {SSK("textDocument/documentSymbol"),      request_method::DocumentSymbols  },
 };
 constexpr StaticStringMap REQUEST_METHODS{REQUEST_METHOD_ENTRIES};
 
@@ -64,6 +66,8 @@ private:
   fn change_document(const JsonValue *params) throws -> Document *;
   fn close_document(const JsonValue *params) throws -> void;
   fn complete(const JsonValue *id, const JsonValue *params) throws -> bool;
+  fn resolve_completion(const JsonValue *id, const JsonValue *params) throws
+      -> bool;
   fn definition(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn hover(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn semantic_tokens(const JsonValue *id, const JsonValue *params) throws
@@ -315,7 +319,7 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   let result = String{"{\"capabilities\":{\"positionEncoding\":"};
   append_json_string(result, encoding);
   result.append(",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
-                "\"completionProvider\":{\"resolveProvider\":false},"
+                "\"completionProvider\":{\"resolveProvider\":true},"
                 "\"definitionProvider\":true,\"hoverProvider\":true,"
                 "\"documentSymbolProvider\":true,");
   if (m_supports_quick_fixes || m_supports_fix_all) {
@@ -640,6 +644,10 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   select_document_mood(*document);
   let base_directory = m_workspace_root;
   if (document->path.has_value()) base_directory = document->path->parent();
+  let &resolver = m_context.get_program_resolver();
+  resolver.begin_explicit_completion(
+      ProgramResolver::CompletionRefresh::Cached);
+  defer { resolver.end_explicit_completion(); };
   let result = completion::complete(document->normalized_source.view(), *cursor,
                                     m_context, base_directory,
                                     completion::completion_mode::Listing);
@@ -656,6 +664,14 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
       response.append(",\"detail\":");
       append_json_string(response, description->view());
     }
+    if (result.is_command_position &&
+        !os::has_directory_separator(candidate.view()))
+    {
+      /* Kind 3 is CompletionItemKind.Function. */
+      response.append(",\"kind\":3,\"data\":{\"command\":");
+      append_json_string(response, candidate.view());
+      response.push('}');
+    }
     response.append(",\"textEdit\":{\"range\":");
     append_protocol_range(response, *document, result.token_start,
                           result.token_end, m_encoding);
@@ -664,6 +680,38 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
     response.append("}}");
   }
   response.push(']');
+
+  return send_result(id, response.view());
+}
+
+fn Server::resolve_completion(const JsonValue *id,
+                              const JsonValue *params) throws -> bool
+{
+  if (params == nullptr || params->kind != json_kind::Object)
+    return send_result(id, "{}");
+  let const *data = params->get("data");
+  let const *command = data != nullptr ? data->get("command") : nullptr;
+
+  let information = Maybe<String>{None};
+  if (command != nullptr && command->kind == json_kind::String)
+    information = command_information(command->text.view());
+
+  let response = String{"{"};
+
+  for (usize index = 0; index < params->object.count(); index++) {
+    let const name = params->object[index].name.view();
+    if (information.has_value() && name == "documentation") continue;
+    if (response.count() > 1) response.push(',');
+    append_json_string(response, name);
+    response.push(':');
+    append_json_value(response, *params->object[index].value);
+  }
+  if (information.has_value()) {
+    if (response.count() > 1) response.push(',');
+    response.append("\"documentation\":");
+    append_json_string(response, information->view());
+  }
+  response.push('}');
 
   return send_result(id, response.view());
 }
@@ -1149,31 +1197,43 @@ fn Server::document_symbols(const JsonValue *id, const JsonValue *params) throws
 fn Server::command_information(StringView command) throws -> Maybe<String>
 {
   static constexpr u64 INFORMATION_TIMEOUT_NANOS = 5'000'000'000;
-  let source = String{heap_allocator()};
-  if (search_builtin(command).has_value()) {
-    source.append("help ");
-    source.append(command);
-  } else if (koshkit::find_util(command).has_value()) {
-    source.append("koshkit ");
-    source.append(command);
-    source.append(" --help");
-  }
-  if (!source.is_empty()) {
+  let const do_run_shell_help = [&](String help_source)
+                                    throws -> Maybe<String> {
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{m_context.shell_executable_path()});
     argv.push(String{"--clean"});
     argv.push(String{"-c"});
-    argv.push(steal(source));
+    argv.push(steal(help_source));
     let output = os::capture_program_output(argv, INFORMATION_TIMEOUT_NANOS);
     if (output.has_value() && !output->is_empty()) return output;
+
     return None;
+  };
+
+  if (search_builtin(command).has_value()) {
+    let source = String{"help "};
+    source.append(command);
+
+    return do_run_shell_help(steal(source));
   }
 
   let const paths = m_context.get_program_resolver().search(
       command, ProgramResolver::SearchMode::First,
       ProgramResolver::Requirement::Runnable,
       ProgramResolver::CachePolicy::Bypass);
-  if (paths.is_empty()) return None;
+
+  /* A PATH program is what an ordinary command word resolves to, so the
+     bundled utility answers only for a name PATH does not hold. */
+  if (paths.is_empty()) {
+    if (!koshkit::find_util(command).has_value()) return None;
+
+    let source = String{"koshkit "};
+    source.append(command);
+    source.append(" --help");
+
+    return do_run_shell_help(steal(source));
+  }
+
   let information = String{heap_allocator()};
   let const man_paths = m_context.get_program_resolver().search(
       "man", ProgramResolver::SearchMode::First,
@@ -1737,6 +1797,7 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
   case request_method::DidChange: return validate_all(change_document(params));
   case request_method::DidClose: close_document(params); return validate_all();
   case request_method::Completion: return complete(id, params);
+  case request_method::ResolveCompletion: return resolve_completion(id, params);
   case request_method::CodeAction: return code_actions(id, params);
   case request_method::Definition: return definition(id, params);
   case request_method::Hover: return hover(id, params);
