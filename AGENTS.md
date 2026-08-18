@@ -493,6 +493,12 @@ geometrically. String has a small inline buffer, and its first heap block is
 sized to the exact request while every later block grows geometrically. A
 scratch arena uses mark and release lifetime within one scope.
 
+A bump arena registers one destructor per non-trivially-destructible object it
+creates. The registry is a list of 64 KiB chunks, so a script with two million
+such objects appends a chunk and never copies the entries already registered. A
+reset keeps the first chunk and hands the rest back to the heap pool. The
+memory report names the live count and the chunked capacity of each arena.
+
 WordSegment retains its source position beside one pointer to a
 segment_eval_cache. A DEBUG trap or xtrace reevaluates the original expression.
 The source span is a pair of 32-bit offsets, and a source beyond four gigabytes

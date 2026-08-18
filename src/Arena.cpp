@@ -26,17 +26,51 @@ BumpArena::BumpArena() = default;
 BumpArena::~BumpArena()
 {
   run_destructors_down_to(0);
+  release_destructor_chunks(0);
 
   for (block &block : m_blocks)
     std::free(block.base);
 }
 
+fn BumpArena::push_destructor(pending_destructor pending) throws -> void
+{
+  let const chunk_index = m_destructor_count / DESTRUCTORS_PER_CHUNK;
+
+  if (chunk_index == m_destructor_chunks.count()) [[unlikely]] {
+    let const chunk =
+        heap_allocator().alloc_array<pending_destructor>(DESTRUCTORS_PER_CHUNK);
+    try {
+      m_destructor_chunks.push(chunk);
+    } catch (...) {
+      heap_allocator().free_array(chunk, DESTRUCTORS_PER_CHUNK);
+      throw;
+    }
+  }
+
+  m_destructor_chunks[chunk_index][m_destructor_count % DESTRUCTORS_PER_CHUNK] =
+      pending;
+  m_destructor_count++;
+}
+
 cold fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
 {
-  while (m_destructors.count() > first) {
-    let const pending = m_destructors.back();
-    m_destructors.pop_back();
+  while (m_destructor_count > first) {
+    m_destructor_count--;
+    let const &pending =
+        m_destructor_chunks[m_destructor_count / DESTRUCTORS_PER_CHUNK]
+                           [m_destructor_count % DESTRUCTORS_PER_CHUNK];
     pending.run(pending.object);
+  }
+}
+
+/* The kept chunks are handed to the next fill without another allocation. */
+cold fn BumpArena::release_destructor_chunks(usize kept_chunk_count) wontthrow
+    -> void
+{
+  while (m_destructor_chunks.count() > kept_chunk_count) {
+    heap_allocator().free_array(m_destructor_chunks.back(),
+                                DESTRUCTORS_PER_CHUNK);
+    m_destructor_chunks.pop_back();
   }
 }
 
@@ -111,10 +145,10 @@ fn BumpArena::bytes_used() const wontthrow -> usize
 fn BumpArena::mark() const wontthrow -> BumpArena::Mark
 {
   if (m_current_index >= m_blocks.count())
-    return Mark{m_current_index, 0, m_destructors.count()};
+    return Mark{m_current_index, 0, m_destructor_count};
 
   return Mark{m_current_index, m_blocks[m_current_index].used,
-              m_destructors.count()};
+              m_destructor_count};
 }
 
 fn BumpArena::release(Mark saved) wontthrow -> void
@@ -141,6 +175,7 @@ cold fn BumpArena::reset() wontthrow -> void
       m_blocks.count(), bytes_used());
 
   run_destructors_down_to(0);
+  release_destructor_chunks(1);
 
   /* Bumping the generation invalidates any cache keyed on an earlier one. */
   m_reset_generation++;

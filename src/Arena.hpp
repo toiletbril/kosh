@@ -31,6 +31,11 @@ public:
   fn bytes_used() const wontthrow -> usize;
 
   fn block_count() const wontthrow -> usize { return m_blocks.count(); }
+  fn destructor_count() const wontthrow -> usize { return m_destructor_count; }
+  fn destructor_capacity() const wontthrow -> usize
+  {
+    return m_destructor_chunks.count() * DESTRUCTORS_PER_CHUNK;
+  }
   fn bytes_capacity() const wontthrow -> usize
   {
     usize total = 0;
@@ -73,7 +78,7 @@ public:
 
     if constexpr (!std::is_trivially_destructible_v<T>) {
       try {
-        m_destructors.push(
+        push_destructor(
             pending_destructor{object, [](opaque *pointer) noexcept {
                                  static_cast<T *>(pointer)->~T();
                                }});
@@ -101,19 +106,27 @@ private:
   };
 
   static constexpr usize DEFAULT_BLOCK_SIZE = 64 * 1024;
+  /* One chunk is 64 KiB, the largest block the heap pool keeps on a free list.
+     A registry of two million entries grows by appending a chunk, and no
+     doubling copies the entries already registered. */
+  static constexpr usize DESTRUCTORS_PER_CHUNK =
+      DEFAULT_BLOCK_SIZE / sizeof(pending_destructor);
 
   ArrayList<block> m_blocks{heap_allocator()};
-  ArrayList<pending_destructor> m_destructors{heap_allocator()};
+  ArrayList<pending_destructor *> m_destructor_chunks{heap_allocator()};
+  usize m_destructor_count{0};
   usize m_reset_generation{0};
   /* Every block above this index is empty, so a release rewinds the index and
      the blocks it reclaimed are handed out again. */
   usize m_current_index{0};
 
   fn add_block(usize minimum_size) throws -> void;
+  fn push_destructor(pending_destructor pending) throws -> void;
   /* Run and drop every registered destructor from the index down to first, in
      reverse of registration so an object tears down before the one it followed.
    */
   fn run_destructors_down_to(usize first) wontthrow -> void;
+  fn release_destructor_chunks(usize kept_chunk_count) wontthrow -> void;
 };
 
 /* The arena that the lexer and parser allocate nodes from while a command is

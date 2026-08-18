@@ -68,6 +68,7 @@ public:
   ~ArrayList() { destroy_all(); }
 
   hot mustuse pure fn count() const wontthrow -> usize { return m_length; }
+  mustuse pure fn capacity() const wontthrow -> usize { return m_capacity; }
   mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
   hot mustuse pure fn operator[](usize i) wontthrow->T &
   {

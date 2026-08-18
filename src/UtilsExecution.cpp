@@ -611,13 +611,20 @@ fn set_quit_context(const EvalContext *context) wontthrow -> void
 cold fn print_memory_report() wontthrow -> void
 {
   if (AST_ARENA != nullptr)
-    std::fprintf(stderr, "AST arena: used %zu, reserved %zu, blocks %zu\n",
+    std::fprintf(stderr,
+                 "AST arena: used %zu, reserved %zu, blocks %zu, destructors "
+                 "%zu of %zu\n",
                  AST_ARENA->bytes_used(), AST_ARENA->bytes_capacity(),
-                 AST_ARENA->block_count());
+                 AST_ARENA->block_count(), AST_ARENA->destructor_count(),
+                 AST_ARENA->destructor_capacity());
   if (FUNCTION_ARENA != nullptr)
-    std::fprintf(stderr, "Function arena: used %zu, reserved %zu, blocks %zu\n",
+    std::fprintf(stderr,
+                 "Function arena: used %zu, reserved %zu, blocks %zu, "
+                 "destructors %zu of %zu\n",
                  FUNCTION_ARENA->bytes_used(), FUNCTION_ARENA->bytes_capacity(),
-                 FUNCTION_ARENA->block_count());
+                 FUNCTION_ARENA->block_count(),
+                 FUNCTION_ARENA->destructor_count(),
+                 FUNCTION_ARENA->destructor_capacity());
   os::malloc_heap_stats heap_stats{};
   if (os::read_malloc_heap_stats(heap_stats))
     std::fprintf(stderr,
