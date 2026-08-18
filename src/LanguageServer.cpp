@@ -667,8 +667,12 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
     if (result.is_command_position &&
         !os::has_directory_separator(candidate.view()))
     {
-      /* Kind 3 is CompletionItemKind.Function. */
-      response.append(",\"kind\":3,\"data\":{\"command\":");
+      /* 14 is CompletionItemKind.Keyword and 3 is
+         CompletionItemKind.Function. */
+      if (KEYWORDS.find(candidate.view()).has_value())
+        response.append(",\"kind\":14,\"data\":{\"command\":");
+      else
+        response.append(",\"kind\":3,\"data\":{\"command\":");
       append_json_string(response, candidate.view());
       response.push('}');
     }

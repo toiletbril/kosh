@@ -684,6 +684,8 @@ inline constexpr static_string_entry<Token::Kind> KEYWORD_ENTRIES[] = {
 
 inline constexpr StaticStringMap KEYWORDS{KEYWORD_ENTRIES};
 
+const ArrayList<String> &keyword_names() throws;
+
 /* clang-format off */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \

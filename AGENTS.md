@@ -305,14 +305,23 @@ per-keystroke highlighter. src/CompletionInternal.hpp declares shared helpers.
 src/CompletionPolicy.hpp owns program policies, help allowlists, extension
 hints, custom completer routing, and transparent prefixes.
 
+`collect_command_names` reads the shell keywords, the builtins, the bundled
+utilities, the functions and the aliases of the context, and the PATH command
+index. `keyword_names` in src/Tokens.cpp unpacks `KEYWORD_ENTRIES` once into a
+static list, the way `builtin_names` unpacks `BUILTIN_ENTRIES`, so a keyword
+added to the lexer table reaches completion with no second list to maintain. A
+keyword claims its name before the builtin loop runs, because a command word
+resolves to the keyword first.
+
 The language server wraps its `completion::complete` call in
 `begin_explicit_completion` with the `Cached` refresh, the way the interactive
 editor does. Without that wrapper the resolver returns before it builds the PATH
 command index, so no external program is offered. A command-position item that
-holds no directory separator carries `CompletionItemKind.Function` and a `data`
-object naming the command. `completionItem/resolve` reads that name and fills
-`documentation` from `command_information`, so the one highlighted item pays the
-fork and a PATH listing of thousands of names does not.
+holds no directory separator carries a `data` object naming the command, and its
+kind is `CompletionItemKind.Keyword` for a name the lexer keyword table holds and
+`CompletionItemKind.Function` otherwise. `completionItem/resolve` reads that name
+and fills `documentation` from `command_information`, so the one highlighted item
+pays the fork and a PATH listing of thousands of names does not.
 `Server::command_information` answers a builtin first, then a program on the
 active PATH, and the bundled koshkit utility only for a name PATH does not hold,
 which is the order `Eval.cpp` resolves a command word in.

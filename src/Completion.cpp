@@ -308,6 +308,11 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
     if (tier.has_value() && seen.add(name)) collector.add(name, *tier);
   };
 
+  /* A keyword is resolved before a builtin of the same name, so it claims the
+     name first and the builtin loop then skips it. */
+  for (let const &keyword_name : keyword_names())
+    do_add(keyword_name.view());
+
   for (let const &builtin_name : builtin_names())
     do_add(builtin_name.view());
 

@@ -27,6 +27,19 @@ cold fn Token::to_ast_string() const throws -> String { return raw_string(); }
 
 fn Token::raw_view() const wontthrow -> Maybe<StringView> { return None; }
 
+fn keyword_names() throws -> const ArrayList<String> &
+{
+  static ArrayList<String> names = [] throws {
+    let collected = ArrayList<String>{heap_allocator()};
+    for (const static_string_entry<Token::Kind> &entry : KEYWORD_ENTRIES)
+      collected.push(entry.key.to_string());
+
+    return collected;
+  }();
+
+  return names;
+}
+
 pure fn WordSegment::is_split_eligible() const wontthrow -> bool
 {
   return kind == Kind::UnquotedText ||
