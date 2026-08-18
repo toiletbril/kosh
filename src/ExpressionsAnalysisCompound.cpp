@@ -400,7 +400,43 @@ node_inequality_left_operand(const CompoundListCondition *node) wontthrow
 fn CompoundList::analyze(AnalysisContext &actx,
                          bool is_unconditional) const throws -> void
 {
-  const Token *first_directory_change = nullptr;
+  top_level_sibling_carry *const carry = actx.stream_sibling_carry;
+  actx.stream_sibling_carry = nullptr;
+  defer { actx.stream_sibling_carry = carry; };
+
+  /* A top-level unit ends at a newline, so the node that follows always joins
+     with Kind::None. The checks that only wanted to know that a next node
+     exists are answered here. */
+  if (carry != nullptr && !m_nodes.is_empty()) {
+    if (carry->pending_unchecked_cd.has_value())
+      actx.report_diagnostic(diagnostic_id::sc2164,
+                             *carry->pending_unchecked_cd);
+
+    if (carry->pending_exec_replacement.has_value()) {
+      let const next_command = m_nodes[0]->command();
+      ASSERT(next_command != nullptr);
+      actx.report_diagnostic(diagnostic_id::sc2093,
+                             *carry->pending_exec_replacement, {},
+                             next_command->source_location());
+    }
+
+    if (carry->pending_negated_command.has_value())
+      actx.report_diagnostic(diagnostic_id::sc2251,
+                             *carry->pending_negated_command);
+  }
+  if (carry != nullptr) {
+    carry->pending_unchecked_cd = None;
+    carry->pending_exec_replacement = None;
+    carry->pending_negated_command = None;
+  }
+
+  Maybe<SourceLocation> first_directory_change =
+      carry != nullptr ? carry->first_directory_change : None;
+  defer
+  {
+    if (carry != nullptr)
+      carry->first_directory_change = first_directory_change;
+  };
 
   for (usize i = 0; i < m_nodes.count(); i++) {
     ASSERT(m_nodes[i] != nullptr);
@@ -427,6 +463,8 @@ fn CompoundList::analyze(AnalysisContext &actx,
           {
             actx.report_diagnostic(diagnostic_id::sc2164,
                                    simple->args()[0]->source_location());
+          } else if (carry != nullptr && i + 1 == m_nodes.count()) {
+            carry->pending_unchecked_cd = simple->args()[0]->source_location();
           }
 
           /* A subshell restores the directory on its own, so the return trip is
@@ -443,22 +481,25 @@ fn CompoundList::analyze(AnalysisContext &actx,
           }
 
           if (!is_return_trip) {
-            first_directory_change = simple->args()[0];
-          } else if (first_directory_change != nullptr) {
+            first_directory_change = simple->args()[0]->source_location();
+          } else if (first_directory_change.has_value()) {
             actx.report_diagnostic(diagnostic_id::sc2103,
-                                   first_directory_change->source_location(),
-                                   {}, simple->args()[0]->source_location());
-            first_directory_change = nullptr;
+                                   *first_directory_change, {},
+                                   simple->args()[0]->source_location());
+            first_directory_change = None;
           }
         }
-        if (*name == "exec" && simple->args().count() > 1 &&
-            i + 1 < m_nodes.count())
-        {
-          let const next_command = m_nodes[i + 1]->command();
-          ASSERT(next_command != nullptr);
-          actx.report_diagnostic(diagnostic_id::sc2093,
-                                 simple->args()[0]->source_location(), {},
-                                 next_command->source_location());
+        if (*name == "exec" && simple->args().count() > 1) {
+          if (i + 1 < m_nodes.count()) {
+            let const next_command = m_nodes[i + 1]->command();
+            ASSERT(next_command != nullptr);
+            actx.report_diagnostic(diagnostic_id::sc2093,
+                                   simple->args()[0]->source_location(), {},
+                                   next_command->source_location());
+          } else if (carry != nullptr) {
+            carry->pending_exec_replacement =
+                simple->args()[0]->source_location();
+          }
         }
       }
     }
@@ -484,9 +525,22 @@ fn CompoundList::analyze(AnalysisContext &actx,
     }
   }
 
-  usize repeated_append_count = 0;
-  String repeated_append_target{heap_allocator()};
-  SourceLocation repeated_append_location{};
+  usize repeated_append_count =
+      carry != nullptr ? carry->repeated_append_count : 0;
+  String repeated_append_target{
+      heap_allocator(),
+      carry != nullptr ? carry->repeated_append_target.view() : StringView{}};
+  SourceLocation repeated_append_location =
+      carry != nullptr ? carry->repeated_append_location : SourceLocation{};
+  defer
+  {
+    if (carry != nullptr) {
+      carry->repeated_append_count = repeated_append_count;
+      carry->repeated_append_target = String{repeated_append_target.view()};
+      carry->repeated_append_location = repeated_append_location;
+    }
+  };
+
   for (let const node : m_nodes) {
     let const command = node->command();
     let const simple =
@@ -582,10 +636,14 @@ fn CompoundList::analyze(AnalysisContext &actx,
        status unread, shellcheck SC2251. */
     if (!actx.is_analyzing_condition && node->is_negated() &&
         node->kind() == CompoundListCondition::Kind::None && !next_node_joins &&
-        i + 1 < m_nodes.count() && node->command() != nullptr)
+        node->command() != nullptr)
     {
-      actx.report_diagnostic(diagnostic_id::sc2251,
-                             node->command()->source_location());
+      if (i + 1 < m_nodes.count()) {
+        actx.report_diagnostic(diagnostic_id::sc2251,
+                               node->command()->source_location());
+      } else if (carry != nullptr) {
+        carry->pending_negated_command = node->command()->source_location();
+      }
     }
 
     /* A semicolon or newline node runs whenever the list runs, an && or || node

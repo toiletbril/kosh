@@ -241,6 +241,42 @@ static fn report_escaped_control_flow(EvalContext &context,
   context.clear_control_flow();
 }
 
+/* One top-level command at a time for the paths that only lint. The arena is
+   rewound to the mark taken before each unit, so a large script costs the
+   memory of its widest command and not the memory of its whole syntax tree. */
+class StreamedAnalysisUnits final : public AnalysisUnitStream
+{
+public:
+  StreamedAnalysisUnits(Parser &parser, BumpArena &arena,
+                        ArrayList<String> &parse_errors, EvalContext &context,
+                        ArrayList<source_diagnostic> *diagnostic_sink)
+      : m_parser{parser}, m_arena{arena}, m_parse_errors{parse_errors},
+        m_context{context}, m_diagnostic_sink{diagnostic_sink}
+  {}
+
+  fn next_unit() throws -> const Expression * override
+  {
+    m_mark = m_arena.mark();
+
+    return m_parser.construct_next_top_level_ast(m_parse_errors, &m_context,
+                                                 m_diagnostic_sink);
+  }
+
+  fn release_unit() throws -> void override
+  {
+    m_parser.drop_lexer_peek_cache();
+    m_arena.release(m_mark);
+  }
+
+private:
+  Parser &m_parser;
+  BumpArena &m_arena;
+  ArrayList<String> &m_parse_errors;
+  EvalContext &m_context;
+  ArrayList<source_diagnostic> *m_diagnostic_sink;
+  BumpArena::Mark m_mark{};
+};
+
 static fn run_script_contents(
     const String &script_contents, EvalContext &context, BumpArena &ast_arena,
     Maybe<StringView> filename = None, Expression *precompiled_ast = nullptr,
@@ -279,10 +315,71 @@ static fn run_script_contents(
            context.warnings_enabled()) &&
           !context.diagnostics_disabled()));
 
+    /* A run that only lints holds one top-level command at a time, so the peak
+       memory of a large script is the memory of its widest command. */
+    let const should_stream_units =
+        run_analysis && precompiled_ast == nullptr && context.no_exec() &&
+        out_ast == nullptr && !context.show_ast() &&
+        !context.show_lexed_words();
+
+    /* A function body parsed into the function arena would outlive the unit
+       that defined it, and that arena is never reset. */
+    BumpArena *const previous_function_arena = FUNCTION_ARENA;
+    if (should_stream_units) FUNCTION_ARENA = nullptr;
+    defer { FUNCTION_ARENA = previous_function_arena; };
+
+    /* A file with any parse error must not run, so every error is collected
+       and reported at once. */
+    let parse_errors = ArrayList<koshka::String>{heap_allocator()};
+
+    let const do_report_parse_errors = [&]() throws -> bool {
+      if (parse_errors.is_empty()) return false;
+
+      if (diagnostic_sink == nullptr)
+        for (let const &e : parse_errors)
+          show_message(e);
+      context.set_last_exit_status(EXIT_FAILURE);
+
+      return true;
+    };
+
     /* A precompiled tree lives in a caller-owned arena that outlives this call.
      */
     Expression *ast = precompiled_ast;
-    if (precompiled_ast == nullptr) {
+    if (should_stream_units) {
+      LOG(Debug, "scanning a chunk of %zu bytes for analysis scopes",
+          script_contents.count());
+
+      /* The whole file is scanned first, because analysis resolves a call to a
+         function the source defines further down. */
+      let scan_parser = Parser{
+          Lexer{script_contents.view(), ast_arena, false, filename,
+                context.mood()}
+      };
+      scan_parser.set_should_collect_analysis_scopes(true);
+
+      let const scan_mark = ast_arena.mark();
+      loop
+      {
+        let const unit_mark = ast_arena.mark();
+        let const *unit = scan_parser.construct_next_top_level_ast(
+            parse_errors, &context, diagnostic_sink);
+        if (unit == nullptr) break;
+
+        scan_parser.drop_lexer_peek_cache();
+        ast_arena.release(unit_mark);
+      }
+      ast_arena.release(scan_mark);
+
+      shellcheck_suppressions = scan_parser.take_shellcheck_suppressions();
+      analysis_scope_definitions =
+          scan_parser.take_analysis_scope_definitions();
+      shellcheck_directive_spans =
+          scan_parser.take_shellcheck_directive_spans();
+      heredoc_terminator_misses = scan_parser.take_heredoc_terminator_misses();
+
+      if (do_report_parse_errors()) return EXIT_FAILURE;
+    } else if (precompiled_ast == nullptr) {
       LOG(Debug, "parsing a chunk of %zu bytes", script_contents.count());
 
       let p = Parser{
@@ -291,18 +388,9 @@ static fn run_script_contents(
       };
       p.set_should_collect_analysis_scopes(run_analysis);
 
-      /* A file with any parse error must not run, so every error is collected
-         and reported at once. */
-      let parse_errors = ArrayList<koshka::String>{heap_allocator()};
       ast = p.construct_ast(parse_errors, &context, diagnostic_sink);
 
-      if (!parse_errors.is_empty()) {
-        if (diagnostic_sink == nullptr)
-          for (let const &e : parse_errors)
-            show_message(e);
-        context.set_last_exit_status(EXIT_FAILURE);
-        return EXIT_FAILURE;
-      }
+      if (do_report_parse_errors()) return EXIT_FAILURE;
 
       if (context.show_ast()) {
         print(ast->to_ast_string());
@@ -351,17 +439,35 @@ static fn run_script_contents(
       {
         context.set_diagnostic_highlight_cache(previous_highlight_cache);
       };
-      did_analysis_fail = !analyze_ast(
-          ast, script_contents, context.function_names(), context.alias_names(),
-          &context, context.warning_level(),
-          context.warnings_enabled() && context.shell_is_interactive(),
-          context.mood() == mimic_mood::Default,
-          context.annoying_diagnostics_enabled(), shellcheck_suppressions,
-          analysis_scope_definitions, shellcheck_directive_spans,
-          heredoc_terminator_misses, filename.has_value(),
-          FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled(), &followed_source_paths,
-          &source_effects_cache, nullptr, diagnostic_totals, true, true,
-          nullptr, diagnostic_sink);
+      let const do_analyze = [&](AnalysisUnitStream *units) throws -> bool {
+        return analyze_ast(
+            ast, script_contents, context.function_names(),
+            context.alias_names(), &context, context.warning_level(),
+            context.warnings_enabled() && context.shell_is_interactive(),
+            context.mood() == mimic_mood::Default,
+            context.annoying_diagnostics_enabled(), shellcheck_suppressions,
+            analysis_scope_definitions, shellcheck_directive_spans,
+            heredoc_terminator_misses, filename.has_value(),
+            FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled(), &followed_source_paths,
+            &source_effects_cache, nullptr, diagnostic_totals, true, true,
+            nullptr, diagnostic_sink, nullptr, nullptr, units);
+      };
+
+      if (should_stream_units) {
+        let unit_parser = Parser{
+            Lexer{script_contents.view(), ast_arena, false, filename,
+                  context.mood()}
+        };
+        /* A function body and a subshell carry their own definitions on the
+           node, and the walk seeds them when it enters. */
+        unit_parser.set_should_collect_analysis_scopes(true);
+
+        let units = StreamedAnalysisUnits{unit_parser, ast_arena, parse_errors,
+                                          context, diagnostic_sink};
+        did_analysis_fail = !do_analyze(&units);
+      } else {
+        did_analysis_fail = !do_analyze(nullptr);
+      }
     }
 #if !defined NDEBUG
     LOG(All, "diagnostic highlighting consumed %zu source bytes",

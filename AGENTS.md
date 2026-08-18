@@ -152,6 +152,25 @@ analysis.
 A C-style for loop whose condition folds to zero is removed only when its init
 clause is empty. A nonempty init clause runs once before the condition.
 
+A run that only analyzes holds one top-level command at a time, so the peak
+memory of a large script is the memory of its widest command. The path is
+selected when analysis is on, no tree is precompiled or handed back, execution
+is off, and neither the tree nor the lexed words are shown. Two streaming passes
+are made over the same source. The first pass collects the suppressions, the
+analysis scopes, the directive spans, and the here-document terminator misses,
+and any parse error is reported before the second pass begins. The second pass
+hands each unit to `analyze_ast` through an `AnalysisUnitStream`, and the arena
+span of a unit is released once the walk over it is finished. FUNCTION_ARENA is
+null across both passes, because a function body parsed into it would outlive
+the unit that defined it and that arena is never reset. Findings are reported in
+source order.
+
+The sibling checks of a command list read the node that follows, and a streamed
+unit holds one and-or chain. `top_level_sibling_carry` keeps what those checks
+need from the unit before, so SC2164, SC2103, SC2093, SC2129, and SC2251 are
+still reported across a top-level command boundary. Every field of the carry is
+owned, so a rewind of the syntax tree leaves it readable.
+
 Owned shell source normalizes CRLF pairs before lexing, analysis, evaluation,
 and diagnostics. Named files, standard input, command strings, sourced text,
 and executable fallback use the same normalization. A lone carriage return

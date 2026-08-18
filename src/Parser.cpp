@@ -305,6 +305,61 @@ cold fn Parser::recover_to_next_statement() throws -> void
   }
 }
 
+cold fn Parser::record_detailed_parse_error(
+    const ErrorWithLocationAndDetails &error, ArrayList<String> &errors,
+    EvalContext *context, ArrayList<source_diagnostic> *diagnostic_sink) throws
+    -> void
+{
+  LOG(Debug, "recording a detailed parse error and recovering: %s",
+      error.message().c_str());
+  errors.push(error.to_string(m_lexer.source(), context));
+  errors.push(error.details_to_string(m_lexer.source(), context));
+  if (diagnostic_sink == nullptr) return;
+
+  let const location = error.location();
+  let source_name = String{heap_allocator()};
+  if (let const name = location.get_filename(); name.has_value())
+    source_name = String{*name};
+  let const details_location = error.details_location();
+  let related_source_name = String{heap_allocator()};
+  if (let const related_name = details_location.get_filename();
+      related_name.has_value())
+  {
+    related_source_name = String{*related_name};
+  }
+  let const related_location = error.details_message().is_empty()
+                                   ? Maybe<SourceLocation>{None}
+                                   : Maybe<SourceLocation>{details_location};
+
+  diagnostic_sink->push(source_diagnostic{
+      None, error_severity::Error, location, steal(source_name),
+      error.message().clone(), String{error.detail_message()}, related_location,
+      steal(related_source_name), String{error.details_message()},
+      ArrayList<source_fix>{heap_allocator()}});
+}
+
+cold fn Parser::record_parse_error(
+    const ErrorWithLocation &error, ArrayList<String> &errors,
+    EvalContext *context, ArrayList<source_diagnostic> *diagnostic_sink) throws
+    -> void
+{
+  LOG(Debug, "recording a parse error and recovering: %s",
+      error.message().c_str());
+  errors.push(error.to_string(m_lexer.source(), context));
+  if (diagnostic_sink == nullptr) return;
+
+  let const location = error.location();
+  let source_name = String{heap_allocator()};
+  if (let const name = location.get_filename(); name.has_value())
+    source_name = String{*name};
+
+  diagnostic_sink->push(source_diagnostic{
+      None, error_severity::Error, location, steal(source_name),
+      error.message().clone(), String{error.detail_message()}, None,
+      String{heap_allocator()}, String{heap_allocator()},
+      ArrayList<source_fix>{heap_allocator()}});
+}
+
 /* Parse every top-level command, recovering from a syntax error instead of
    aborting at the first. */
 cold fn Parser::construct_ast(
@@ -313,56 +368,6 @@ cold fn Parser::construct_ast(
 {
   Expression *first_piece = nullptr;
   let last_location = SourceLocation{};
-
-  /* Render both parts here, since the detail note would be sliced off a
-     base-class copy. */
-  let const do_record_detailed_error = [&](const ErrorWithLocationAndDetails &e)
-                                           throws -> void {
-    LOG(Debug, "recording a detailed parse error and recovering: %s",
-        e.message().c_str());
-    errors.push(e.to_string(m_lexer.source(), context));
-    errors.push(e.details_to_string(m_lexer.source(), context));
-    if (diagnostic_sink == nullptr) return;
-
-    let const location = e.location();
-    let source_name = String{heap_allocator()};
-    if (let const name = location.get_filename(); name.has_value())
-      source_name = String{*name};
-    let const details_location = e.details_location();
-    let related_source_name = String{heap_allocator()};
-    if (let const related_name = details_location.get_filename();
-        related_name.has_value())
-    {
-      related_source_name = String{*related_name};
-    }
-    let const related_location = e.details_message().is_empty()
-                                     ? Maybe<SourceLocation>{None}
-                                     : Maybe<SourceLocation>{details_location};
-
-    diagnostic_sink->push(source_diagnostic{
-        None, error_severity::Error, location, steal(source_name),
-        e.message().clone(), String{e.detail_message()}, related_location,
-        steal(related_source_name), String{e.details_message()},
-        ArrayList<source_fix>{heap_allocator()}});
-  };
-
-  let const do_record_error = [&](const ErrorWithLocation &e) throws -> void {
-    LOG(Debug, "recording a parse error and recovering: %s",
-        e.message().c_str());
-    errors.push(e.to_string(m_lexer.source(), context));
-    if (diagnostic_sink == nullptr) return;
-
-    let const location = e.location();
-    let source_name = String{heap_allocator()};
-    if (let const name = location.get_filename(); name.has_value())
-      source_name = String{*name};
-
-    diagnostic_sink->push(source_diagnostic{
-        None, error_severity::Error, location, steal(source_name),
-        e.message().clone(), String{e.detail_message()}, None,
-        String{heap_allocator()}, String{heap_allocator()},
-        ArrayList<source_fix>{heap_allocator()}});
-  };
 
   loop
   {
@@ -373,9 +378,9 @@ cold fn Parser::construct_ast(
     try {
       token = m_lexer.peek_shell_token();
     } catch (const ErrorWithLocationAndDetails &e) {
-      do_record_detailed_error(e);
+      record_detailed_parse_error(e, errors, context, diagnostic_sink);
     } catch (const ErrorWithLocation &e) {
-      do_record_error(e);
+      record_parse_error(e, errors, context, diagnostic_sink);
     }
     m_lexer.set_should_collect_shellcheck_directives(false);
     if (token == nullptr) break;
@@ -389,10 +394,10 @@ cold fn Parser::construct_ast(
       ASSERT(piece != nullptr);
       if (first_piece == nullptr) first_piece = piece;
     } catch (const ErrorWithLocationAndDetails &e) {
-      do_record_detailed_error(e);
+      record_detailed_parse_error(e, errors, context, diagnostic_sink);
       did_parse_fail = true;
     } catch (const ErrorWithLocation &e) {
-      do_record_error(e);
+      record_parse_error(e, errors, context, diagnostic_sink);
       did_parse_fail = true;
     }
     if (!did_parse_fail) continue;
@@ -412,6 +417,49 @@ cold fn Parser::construct_ast(
     return m_lexer.arena().create<DummyExpression>(last_location);
 
   return first_piece;
+}
+
+cold fn Parser::construct_next_top_level_ast(
+    ArrayList<String> &errors, EvalContext *context,
+    ArrayList<source_diagnostic> *diagnostic_sink) throws -> Expression *
+{
+  m_should_stop_after_top_level_unit = true;
+  defer { m_should_stop_after_top_level_unit = false; };
+
+  loop
+  {
+    Token *token = nullptr;
+    m_lexer.set_should_collect_shellcheck_directives(true);
+    try {
+      token = m_lexer.peek_shell_token();
+    } catch (const ErrorWithLocationAndDetails &e) {
+      record_detailed_parse_error(e, errors, context, diagnostic_sink);
+    } catch (const ErrorWithLocation &e) {
+      record_parse_error(e, errors, context, diagnostic_sink);
+    }
+    m_lexer.set_should_collect_shellcheck_directives(false);
+
+    if (token == nullptr || token->kind() == Token::Kind::EndOfFile)
+      return nullptr;
+
+    try {
+      Expression *piece = parse_command_list(0);
+      ASSERT(piece != nullptr);
+      return piece;
+    } catch (const ErrorWithLocationAndDetails &e) {
+      record_detailed_parse_error(e, errors, context, diagnostic_sink);
+    } catch (const ErrorWithLocation &e) {
+      record_parse_error(e, errors, context, diagnostic_sink);
+    }
+
+    let did_recovery_fail = false;
+    try {
+      recover_to_next_statement();
+    } catch (const ErrorWithLocation &) {
+      did_recovery_fail = true;
+    }
+    if (did_recovery_fail) return nullptr;
+  }
 }
 
 fn Parser::reject_empty_loop_body(const Expression *body) throws -> void

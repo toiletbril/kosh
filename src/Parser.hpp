@@ -30,6 +30,16 @@ public:
                    ArrayList<source_diagnostic> *diagnostic_sink =
                        nullptr) throws -> Expression *;
 
+  /* One top-level command, recovering from a syntax error the way the
+     whole-file overload does. A null return means the source is exhausted. */
+  fn construct_next_top_level_ast(
+      ArrayList<String> &errors, EvalContext *context,
+      ArrayList<source_diagnostic> *diagnostic_sink) throws -> Expression *;
+
+  /* The cached token lives in the arena, so a caller that rewinds the arena
+     between two units drops it first. */
+  fn drop_lexer_peek_cache() wontthrow -> void { m_lexer.drop_peek_cache(); }
+
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   fn take_shellcheck_suppressions() throws -> ArrayList<shellcheck_suppression>;
   fn take_shellcheck_directive_spans() throws
@@ -81,6 +91,17 @@ private:
   mustuse fn parse_simple_command() throws -> Command *;
 
   fn recover_to_next_statement() throws -> void;
+
+  /* Both parts are rendered here, since the detail note would be sliced off a
+     base-class copy. */
+  cold fn record_detailed_parse_error(
+      const ErrorWithLocationAndDetails &error, ArrayList<String> &errors,
+      EvalContext *context,
+      ArrayList<source_diagnostic> *diagnostic_sink) throws -> void;
+  cold fn record_parse_error(
+      const ErrorWithLocation &error, ArrayList<String> &errors,
+      EvalContext *context,
+      ArrayList<source_diagnostic> *diagnostic_sink) throws -> void;
 
   fn skip_newlines_after_pipe() throws -> void;
   fn skip_semicolons_and_newlines() throws -> void;

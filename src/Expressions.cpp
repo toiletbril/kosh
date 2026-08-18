@@ -1022,9 +1022,10 @@ fn analyze_ast(const Expression *root, StringView source,
                followed_source_effects *source_effects,
                ArrayList<source_diagnostic> *diagnostic_sink,
                AnalysisSourceProvider *source_provider,
-               analysis_symbol_records *symbol_records) throws -> bool
+               analysis_symbol_records *symbol_records,
+               AnalysisUnitStream *unit_stream) throws -> bool
 {
-  ASSERT(root != nullptr);
+  ASSERT(root != nullptr || unit_stream != nullptr);
 
   AnalysisContext actx{source};
   actx.warning_level = warning_level;
@@ -1094,7 +1095,25 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.current_source_effects = source_effects;
   actx.apply_scope_definitions(scope_definitions);
 
-  root->analyze(actx, true);
+  if (unit_stream != nullptr) {
+    /* Each unit is flushed before its arena span is handed back, so a warning
+       never outlives the tree that produced it. */
+    let sibling_carry = top_level_sibling_carry{};
+    loop
+    {
+      let const *unit = unit_stream->next_unit();
+      if (unit == nullptr) break;
+
+      actx.stream_sibling_carry = &sibling_carry;
+      unit->analyze(actx, true);
+      actx.stream_sibling_carry = nullptr;
+
+      actx.flush_warnings();
+      unit_stream->release_unit();
+    }
+  } else {
+    root->analyze(actx, true);
+  }
 
   expressions::check_command_name_assignments(actx);
   expressions::check_unassigned_variable_reads(actx);

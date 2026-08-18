@@ -45,6 +45,18 @@ public:
       -> Maybe<String> = 0;
 };
 
+/* A source handed to the analysis stage one top-level command at a time. The
+   stream owns the parser and the arena mark, and the analysis stage releases
+   each unit before it asks for the next, so a large script costs the memory of
+   its widest command and not the memory of its whole syntax tree. */
+class AnalysisUnitStream
+{
+public:
+  virtual ~AnalysisUnitStream() = default;
+  virtual fn next_unit() throws -> const Expression * = 0;
+  virtual fn release_unit() throws -> void = 0;
+};
+
 namespace expressions {
 class IfClause;
 class WhileLoop;
@@ -190,6 +202,23 @@ inline pure fn reference_names_positional(StringView name) wontthrow -> bool
   }
 }
 
+/* The sibling checks of a command list read the node that follows, and a
+   streamed run holds one top-level command at a time. The carry keeps what
+   those checks need from the unit before, so a finding that spans two
+   top-level commands is still reported. Every field is owned, so a rewind of
+   the syntax tree leaves it readable. */
+struct top_level_sibling_carry
+{
+  Maybe<SourceLocation> first_directory_change{};
+  Maybe<SourceLocation> pending_unchecked_cd{};
+  Maybe<SourceLocation> pending_exec_replacement{};
+  Maybe<SourceLocation> pending_negated_command{};
+
+  String repeated_append_target{heap_allocator()};
+  SourceLocation repeated_append_location{};
+  usize repeated_append_count{0};
+};
+
 class AnalysisContext
 {
 public:
@@ -293,6 +322,10 @@ public:
   HashSet *followed_source_paths{nullptr};
   StringMap<followed_source_effects> *followed_source_effects_cache{nullptr};
   followed_source_effects *current_source_effects{nullptr};
+
+  /* Armed for one streamed top-level command, and the list that reads it
+     takes it so a nested list keeps its own sibling state. */
+  top_level_sibling_carry *stream_sibling_carry{nullptr};
 
   ArrayList<pending_analysis_warning> pending_warnings{heap_allocator()};
   ArrayList<source_diagnostic> *diagnostic_sink{nullptr};
@@ -484,7 +517,8 @@ fn analyze_ast(
     followed_source_effects *source_effects = nullptr,
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
     AnalysisSourceProvider *source_provider = nullptr,
-    analysis_symbol_records *symbol_records = nullptr) throws -> bool;
+    analysis_symbol_records *symbol_records = nullptr,
+    AnalysisUnitStream *unit_stream = nullptr) throws -> bool;
 
 mustuse pure fn is_source_location_variable(StringView name) wontthrow -> bool;
 
