@@ -1147,40 +1147,55 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
 
 namespace {
 
-/* Whether an earlier record already carries the name, so a redefinition is
-   judged by the first body the file gives the name. */
-pure fn definition_is_redefinition(
-    const ArrayList<function_definition_record> &definitions,
-    usize index) wontthrow -> bool
+constexpr usize NO_DEFINITION_INDEX = ~usize{0};
+
+/* Every definition and call the script gave one name, gathered once so the
+   sweep no longer costs definitions times calls on a large script. */
+struct function_name_summary
 {
-  for (usize earlier = 0; earlier < index; earlier++) {
-    if (definitions[earlier].name == definitions[index].name) return true;
+  usize first_definition_index{NO_DEFINITION_INDEX};
+  u32 first_definition_position{0};
+  bool has_call_with_arguments{false};
+  bool has_call_without_arguments{false};
+};
+
+fn build_function_name_summaries(const AnalysisContext &actx) throws
+    -> StringMap<function_name_summary>
+{
+  StringMap<function_name_summary> summaries{heap_allocator()};
+  summaries.reserve(actx.function_definitions.count());
+
+  for (usize index = 0; index < actx.function_definitions.count(); index++) {
+    let const &definition = actx.function_definitions[index];
+    let &summary = summaries.get_or_create(definition.name, {});
+    if (summary.first_definition_index != NO_DEFINITION_INDEX) continue;
+
+    summary.first_definition_index = index;
+    summary.first_definition_position = definition.location.position;
   }
 
-  return false;
-}
-
-fn check_function_argument_use(AnalysisContext &actx, usize index) throws
-    -> void
-{
-  let const &definition = actx.function_definitions[index];
-
-  let has_call_with_arguments = false;
-  let has_call_without_arguments = false;
   for (let const &call : actx.function_calls) {
-    if (call.name != definition.name) continue;
+    let const summary = summaries.find(call.name);
+    if (summary == nullptr) continue;
 
     if (call.has_arguments) {
-      has_call_with_arguments = true;
-      break;
+      summary->has_call_with_arguments = true;
+    } else {
+      summary->has_call_without_arguments = true;
     }
-
-    has_call_without_arguments = true;
   }
 
+  return summaries;
+}
+
+fn check_function_argument_use(AnalysisContext &actx,
+                               const function_definition_record &definition,
+                               const function_name_summary &summary) throws
+    -> void
+{
   /* A definition no call reaches may belong to a sourced library, where the
      caller lives outside this file. */
-  if (has_call_with_arguments || !has_call_without_arguments) {
+  if (summary.has_call_with_arguments || !summary.has_call_without_arguments) {
     return;
   }
 
@@ -1195,7 +1210,9 @@ fn check_function_argument_use(AnalysisContext &actx, usize index) throws
   }
 }
 
-fn check_call_before_definition(AnalysisContext &actx) throws -> void
+fn check_call_before_definition(
+    AnalysisContext &actx,
+    const StringMap<function_name_summary> &summaries) throws -> void
 {
   for (let const &call : actx.function_calls) {
     if (call.is_inside_function_body) continue;
@@ -1204,16 +1221,13 @@ fn check_call_before_definition(AnalysisContext &actx) throws -> void
        reached, so the earlier call is not a forward reference. */
     if (search_builtin(call.name).has_value()) continue;
 
-    for (let const &definition : actx.function_definitions) {
-      if (definition.name != call.name) continue;
+    let const summary = summaries.find(call.name);
+    if (summary == nullptr) continue;
+    if (call.location.position >= summary->first_definition_position) continue;
 
-      if (call.location.position < definition.location.position) {
-        actx.report_diagnostic(diagnostic_id::sc2218, call.location,
-                               {call.name}, definition.location);
-      }
-
-      break;
-    }
+    actx.report_diagnostic(
+        diagnostic_id::sc2218, call.location, {call.name},
+        actx.function_definitions[summary->first_definition_index].location);
   }
 }
 
@@ -1223,24 +1237,36 @@ fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
 {
   if (actx.function_definitions.is_empty()) return;
 
-  if (actx.should_report(diagnostic_id::sc2119) ||
-      actx.should_report(diagnostic_id::sc2120))
-  {
-    for (usize index = 0; index < actx.function_definitions.count(); index++) {
-      if (!actx.function_definitions[index].has_positional_reads) continue;
-      if (definition_is_redefinition(actx.function_definitions, index))
-        continue;
-
-      check_function_argument_use(actx, index);
-    }
-  }
+  let const should_check_argument_use =
+      actx.should_report(diagnostic_id::sc2119) ||
+      actx.should_report(diagnostic_id::sc2120);
 
   /* An interactive chunk runs against a live shell whose functions the file
      never defines, so the order the file states is not the order that runs. */
-  if (actx.should_silence_unresolved_commands) return;
-  if (!actx.should_report(diagnostic_id::sc2218)) return;
+  let const should_check_definition_order =
+      !actx.should_silence_unresolved_commands &&
+      actx.should_report(diagnostic_id::sc2218);
 
-  check_call_before_definition(actx);
+  if (!should_check_argument_use && !should_check_definition_order) return;
+
+  let const summaries = build_function_name_summaries(actx);
+
+  if (should_check_argument_use) {
+    for (usize index = 0; index < actx.function_definitions.count(); index++) {
+      let const &definition = actx.function_definitions[index];
+      if (!definition.has_positional_reads) continue;
+
+      /* A redefinition is judged by the first body the file gives the name. */
+      let const summary = summaries.find(definition.name);
+      if (summary == nullptr || summary->first_definition_index != index)
+        continue;
+
+      check_function_argument_use(actx, definition, *summary);
+    }
+  }
+
+  if (should_check_definition_order)
+    check_call_before_definition(actx, summaries);
 }
 
 } /* namespace expressions */
