@@ -489,6 +489,14 @@ value type becomes a method on that type. Existing examples include
 `ArrayList::find` returns `Maybe<usize>`. Membership checks use
 `find().has_value()`. Logic shared by POSIX and Windows lives in Utils.cpp.
 
+An Allocator is one tagged word. The kinds are the pooled heap, a bump arena,
+and the fake allocator a container carries while it holds no storage. An arena
+address leaves the two low bits clear, so those bits carry the kind and the rest
+carries the address. Allocation dispatches on a switch over the kind, and a free
+outside the heap kind returns at once. Every Allocator is built by
+`heap_allocator`, `bump_allocator`, or `fake_allocator`, and no caller reads the
+word.
+
 ArrayList allocates nothing during default construction and grows
 geometrically. String has a small inline buffer, and its first heap block is
 sized to the exact request while every later block grows geometrically. A

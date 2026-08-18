@@ -241,7 +241,7 @@ private:
   mutable segment_eval_cache *m_eval_cache{nullptr};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 88);
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 80);
 
 class Word
 {
@@ -348,7 +348,7 @@ private:
   mutable bool m_has_cached_plain_kind{false};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(Word) == 56);
+static_assert(sizeof(usize) != 8 || sizeof(Word) == 48);
 
 struct word_assignment_split
 {

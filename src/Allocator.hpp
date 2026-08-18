@@ -16,69 +16,7 @@ fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *;
 fn free_aligned(opaque *pointer) wontthrow -> void;
 } /* namespace os */
 
-class Allocator
-{
-public:
-  struct VTable
-  {
-    opaque *(*alloc)(opaque *context, usize length, usize alignment);
-    void (*free)(opaque *context, opaque *pointer, usize length,
-                 usize alignment);
-  };
-
-  opaque *context;
-  const VTable *vtable;
-
-  hot flatten fn raw_alloc(usize length, usize alignment) const throws
-      -> opaque *
-  {
-    return vtable->alloc(context, length, alignment);
-  }
-  flatten fn raw_free(opaque *pointer, usize length,
-                      usize alignment) const wontthrow -> void
-  {
-    vtable->free(context, pointer, length, alignment);
-  }
-
-  template <class T>
-  hot flatten fn alloc_array(usize count) const throws -> T *
-  {
-    /* The product overflows usize for a large enough count, wrapping to a small
-       request that the caller then writes past. The division guards the
-       multiply, since count times sizeof(T) cannot exceed the max when count is
-       at most the max divided by sizeof(T). */
-    if (sizeof(T) != 0 && count > (static_cast<usize>(-1) / sizeof(T)))
-        [[unlikely]]
-    {
-      throw std::bad_alloc{};
-    }
-    return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
-  }
-  template <class T>
-  flatten fn free_array(T *pointer, usize count) const wontthrow -> void
-  {
-    raw_free(pointer, count * sizeof(T), alignof(T));
-  }
-};
-
 namespace allocators {
-
-hot inline fn bump_alloc(opaque *context, usize length, usize alignment) throws
-    -> opaque *
-{
-  return bump_arena_allocate(static_cast<BumpArena *>(context), length,
-                             alignment);
-}
-inline fn bump_free(opaque *context, opaque *pointer, usize length,
-                    usize alignment) wontthrow -> void
-{
-  unused(context);
-  unused(pointer);
-  unused(length);
-  unused(alignment);
-}
-
-inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_free};
 
 /* A size-classed cache over the C allocator. musl returns a freed page group to
    the kernel at once, so a tight allocate then free of the same size churns
@@ -168,10 +106,8 @@ hot inline fn heap_pool_instance() wontthrow -> HeapPool &
   return pool;
 }
 
-hot inline fn heap_alloc(opaque *context, usize length,
-                         usize alignment) wontthrow -> opaque *
+hot inline fn heap_alloc(usize length, usize alignment) wontthrow -> opaque *
 {
-  unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
   common request stays on the pooled path. The over-aligned path is rare and
      stays uncached, and its length is rounded up to a multiple of the alignment
@@ -183,10 +119,9 @@ hot inline fn heap_alloc(opaque *context, usize length,
   }
   return heap_pool_instance().take(length);
 }
-hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
+hot inline fn heap_free(opaque *pointer, usize length,
                         usize alignment) wontthrow -> void
 {
-  unused(context);
   /* An over-aligned block skips the pool, so a pooled block always belongs to
      one size class. */
   if (alignment > alignof(max_align_t)) {
@@ -196,42 +131,101 @@ hot inline fn heap_free(opaque *context, opaque *pointer, usize length,
   heap_pool_instance().give(pointer, length);
 }
 
-inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_free};
-
-inline fn fake_alloc(opaque *context, usize length, usize alignment) wontthrow
-    -> opaque *
-{
-  unused(context);
-  unused(length);
-  unused(alignment);
-  unreachable("a container with the fake allocator attempted to allocate");
-}
-inline fn fake_free(opaque *context, opaque *pointer, usize length,
-                    usize alignment) wontthrow -> void
-{
-  unused(context);
-  unused(pointer);
-  unused(length);
-  unused(alignment);
-}
-
-inline constexpr Allocator::VTable FAKE_VTABLE{fake_alloc, fake_free};
-
 } /* namespace allocators */
+
+/* One tagged word. The three kinds are the pooled heap, a bump arena, and the
+   fake allocator a container carries while it holds no storage. An arena is
+   aligned well past four bytes, so the two low bits carry the kind and the
+   remaining bits carry the arena address. The heap and the fake kind hold no
+   address. */
+class Allocator
+{
+public:
+  enum class Kind : uintptr
+  {
+    Heap = 0,
+    Bump = 1,
+    Fake = 2,
+  };
+
+  static constexpr uintptr KIND_MASK = 3;
+
+  uintptr tagged;
+
+  pure fn get_kind() const wontthrow -> Kind
+  {
+    return static_cast<Kind>(tagged & KIND_MASK);
+  }
+
+  hot flatten fn raw_alloc(usize length, usize alignment) const throws
+      -> opaque *
+  {
+    switch (get_kind()) {
+    case Kind::Heap: return allocators::heap_alloc(length, alignment);
+    case Kind::Bump: return bump_arena_allocate(get_arena(), length, alignment);
+    case Kind::Fake:
+      unreachable("a container with the fake allocator attempted to allocate");
+    }
+
+    unreachable("the allocator carries no known kind");
+  }
+
+  flatten fn raw_free(opaque *pointer, usize length,
+                      usize alignment) const wontthrow -> void
+  {
+    /* An arena hands nothing back, and the fake allocator never handed anything
+       out. */
+    if (get_kind() != Kind::Heap) return;
+
+    allocators::heap_free(pointer, length, alignment);
+  }
+
+  template <class T>
+  hot flatten fn alloc_array(usize count) const throws -> T *
+  {
+    /* The product overflows usize for a large enough count, wrapping to a small
+       request that the caller then writes past. The division guards the
+       multiply, since count times sizeof(T) cannot exceed the max when count is
+       at most the max divided by sizeof(T). */
+    if (sizeof(T) != 0 && count > (static_cast<usize>(-1) / sizeof(T)))
+        [[unlikely]]
+    {
+      throw std::bad_alloc{};
+    }
+    return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
+  }
+  template <class T>
+  flatten fn free_array(T *pointer, usize count) const wontthrow -> void
+  {
+    raw_free(pointer, count * sizeof(T), alignof(T));
+  }
+
+private:
+  pure fn get_arena() const wontthrow -> BumpArena *
+  {
+    return reinterpret_cast<BumpArena *>(tagged & ~KIND_MASK);
+  }
+};
+
+static_assert(sizeof(usize) != 8 || sizeof(Allocator) == 8);
 
 inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
 {
-  return Allocator{&arena, &allocators::BUMP_VTABLE};
+  let const address = reinterpret_cast<uintptr>(&arena);
+  ASSERT((address & Allocator::KIND_MASK) == 0,
+         "an arena address must leave the two tag bits clear");
+
+  return Allocator{address | static_cast<uintptr>(Allocator::Kind::Bump)};
 }
 
 inline fn heap_allocator() wontthrow -> Allocator
 {
-  return Allocator{nullptr, &allocators::HEAP_VTABLE};
+  return Allocator{static_cast<uintptr>(Allocator::Kind::Heap)};
 }
 
 inline fn fake_allocator() wontthrow -> Allocator
 {
-  return Allocator{nullptr, &allocators::FAKE_VTABLE};
+  return Allocator{static_cast<uintptr>(Allocator::Kind::Fake)};
 }
 
 } /* namespace koshka */
