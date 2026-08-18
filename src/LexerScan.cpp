@@ -73,7 +73,7 @@ pure fn balanced_scan_delimiter_end(StringView source, usize position) wontthrow
       position++;
       continue;
     }
-    if (byte == '\n' || is_whitespace(byte) || is_shell_sentinel(byte)) break;
+    if (is_whitespace(byte) || is_shell_sentinel(byte)) break;
     position++;
   }
 
@@ -119,7 +119,7 @@ fn scan_balanced_shell_region(StringView source, usize position,
         previous_byte = byte;
         continue;
       }
-      if (quote == '"' && byte == '$' && position < source.length &&
+      if (byte == '$' && quote == '"' && position < source.length &&
           source[position] == '(')
       {
         let const nested =
@@ -133,26 +133,34 @@ fn scan_balanced_shell_region(StringView source, usize position,
       previous_byte = byte;
       continue;
     }
-    if (byte == '\\' && position < source.length) {
-      position++;
-      previous_byte = byte;
-      continue;
-    }
-    if (byte == '\'' || byte == '"' || byte == '`') {
+    switch (byte) {
+    case '\\':
+      if (position < source.length) {
+        position++;
+        previous_byte = byte;
+        continue;
+      }
+      break;
+
+    case '\'':
+    case '"':
+    case '`':
       quote = byte;
       previous_byte = byte;
       continue;
-    }
-    if (closing_byte != '}' && byte == '#' &&
-        (previous_byte == 0 || previous_byte == '\n' ||
-         is_whitespace(previous_byte)))
-    {
-      while (position < source.length && source[position] != '\n')
-        position++;
-      previous_byte = '#';
-      continue;
-    }
-    if (byte == '\n') {
+
+    case '#':
+      if (closing_byte != '}' && (previous_byte == 0 || previous_byte == '\n' ||
+                                  is_whitespace(previous_byte)))
+      {
+        while (position < source.length && source[position] != '\n')
+          position++;
+        previous_byte = '#';
+        continue;
+      }
+      break;
+
+    case '\n':
       if (!pending_heredocs.is_empty()) {
         position = skip_balanced_scan_heredoc_bodies(source, position,
                                                      pending_heredocs);
@@ -160,38 +168,47 @@ fn scan_balanced_shell_region(StringView source, usize position,
       }
       previous_byte = '\n';
       continue;
-    }
-    let const is_redirection_boundary =
-        previous_byte == 0 || previous_byte == '\n' ||
-        is_whitespace(previous_byte) || is_shell_sentinel(previous_byte);
-    if (byte == '<' && position < source.length && source[position] == '<' &&
-        is_redirection_boundary)
-    {
-      if (position + 1 < source.length && source[position + 1] == '<') {
-        position += 2;
-        previous_byte = '<';
+
+    case '<':
+      if (position < source.length && source[position] == '<' &&
+          (previous_byte == 0 || previous_byte == '\n' ||
+           is_whitespace(previous_byte) || is_shell_sentinel(previous_byte)))
+      {
+        if (position + 1 < source.length && source[position + 1] == '<') {
+          position += 2;
+          previous_byte = '<';
+          continue;
+        }
+
+        position++;
+        bool should_strip_tabs = false;
+        if (position < source.length && source[position] == '-') {
+          should_strip_tabs = true;
+          position++;
+        }
+
+        while (position < source.length && is_whitespace(source[position]))
+          position++;
+
+        let const delimiter_start = position;
+        position = balanced_scan_delimiter_end(source, position);
+        let delimiter = unquote_heredoc_delimiter(
+            source.substring_of_length(delimiter_start,
+                                       position - delimiter_start),
+            heap_allocator());
+        if (!delimiter.is_empty()) {
+          pending_heredocs.push(
+              balanced_scan_heredoc{steal(delimiter), should_strip_tabs});
+        }
+
+        previous_byte = position > 0 ? source[position - 1] : '<';
         continue;
       }
-      position++;
-      bool should_strip_tabs = false;
-      if (position < source.length && source[position] == '-') {
-        should_strip_tabs = true;
-        position++;
-      }
-      while (position < source.length && is_whitespace(source[position]))
-        position++;
-      let const delimiter_start = position;
-      position = balanced_scan_delimiter_end(source, position);
-      let delimiter = unquote_heredoc_delimiter(
-          source.substring_of_length(delimiter_start,
-                                     position - delimiter_start),
-          heap_allocator());
-      if (!delimiter.is_empty())
-        pending_heredocs.push(
-            balanced_scan_heredoc{steal(delimiter), should_strip_tabs});
-      previous_byte = position > 0 ? source[position - 1] : '<';
-      continue;
+      break;
+
+    default: break;
     }
+
     if (byte == opening_byte) {
       depth++;
     } else if (byte == closing_byte) {

@@ -198,6 +198,17 @@ cold fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
+static pure fn segment_holds_literal_text(WordSegment::Kind kind) wontthrow
+    -> bool
+{
+  switch (kind) {
+  case WordSegment::Kind::LiteralText:
+  case WordSegment::Kind::UnquotedText:
+  case WordSegment::Kind::DoubleQuotedText: return true;
+  default: return false;
+  }
+}
+
 static fn append_subscript_segment_source(const WordSegment &segment,
                                           String &out) throws -> bool
 {
@@ -229,10 +240,6 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     -> Maybe<word_assignment_split>
 {
   const WordSegment &first = segments[0];
-  if (first.text.is_empty() || !lexer::is_variable_name_start(first.text[0])) {
-    return koshka::None;
-  }
-
   usize name_end = 1;
   while (name_end < first.text.count() &&
          lexer::is_variable_name(first.text[name_end]))
@@ -250,10 +257,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
 
   for (usize i = 1; i < segments.count(); i++) {
     let const &segment = segments[i];
-    const bool is_text = segment.kind == WordSegment::Kind::UnquotedText ||
-                         segment.kind == WordSegment::Kind::DoubleQuotedText ||
-                         segment.kind == WordSegment::Kind::LiteralText;
-    if (!is_text) {
+    if (!segment_holds_literal_text(segment.kind)) {
       if (!append_subscript_segment_source(segment, subscript))
         return koshka::None;
       continue;
@@ -305,6 +309,10 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   const WordSegment &first = segments[0];
   if (first.kind != WordSegment::Kind::UnquotedText) return koshka::None;
 
+  if (first.text.is_empty() || !lexer::is_variable_name_start(first.text[0])) {
+    return koshka::None;
+  }
+
   let const equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
     if (first.text.find_character('[').has_value())
@@ -319,7 +327,6 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   const usize name_length = is_append ? *equals_position - 1 : *equals_position;
   if (name_length == 0) return koshka::None;
 
-  if (!lexer::is_variable_name_start(first.text[0])) return koshka::None;
   usize name_cursor = 1;
   while (name_cursor < name_length &&
          lexer::is_variable_name(first.text[name_cursor]))
@@ -345,14 +352,6 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
     value.segments.push(segments[i]);
 
   return word_assignment_split{steal(name), steal(value), is_append};
-}
-
-static pure fn segment_holds_literal_text(WordSegment::Kind kind) wontthrow
-    -> bool
-{
-  return kind == WordSegment::Kind::LiteralText ||
-         kind == WordSegment::Kind::UnquotedText ||
-         kind == WordSegment::Kind::DoubleQuotedText;
 }
 
 /* The name characters ahead of the first literal =, gathered across the

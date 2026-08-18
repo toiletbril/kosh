@@ -61,14 +61,19 @@ public:
      first zero byte and capped at the byte capacity. A key built from a name
      round-trips its length here, so a packed match alone does not let a
      NUL-padded query stand in for a shorter name. */
-  hot mustuse pure fn packed_length() const wontthrow -> usize
+  hot mustuse pure constexpr fn packed_length() const wontthrow -> usize
   {
     for (usize k = 0; k < WORD_COUNT; k++) {
       let const w = words[k];
       let const z = (w - 0x0101010101010101ull) & ~w & 0x8080808080808080ull;
-      if (z != 0) return k * 8 + static_cast<usize>(__builtin_ctzll(z) >> 3);
+      if (z != 0) return (k * 8) + static_cast<usize>(__builtin_ctzll(z) >> 3);
     }
     return BYTE_CAPACITY;
+  }
+
+  mustuse pure constexpr fn leading_byte() const wontthrow -> u8
+  {
+    return static_cast<u8>(words[0] & 0xFF);
   }
 
   /* Unpack the bytes back into a String, stopping at the first NUL or the byte

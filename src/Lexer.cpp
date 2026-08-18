@@ -48,7 +48,20 @@ hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
 
 hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
 {
-  return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
+  switch (ch) {
+  case CEOF:
+  case ' ':
+  case '\t':
+  case '\n':
+  case '|':
+  case '(':
+  case ')':
+  case '&':
+  case ';':
+  case '<':
+  case '>': return false;
+  default: return true;
+  }
 }
 
 hot pure static fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
@@ -418,13 +431,15 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *token{};
   if (let const ch = chop_character(); ch != lexer::CEOF) [[likely]] {
-    /* A < or > opens a process substitution only when a ( follows with no
-       space. */
-    if ((ch == '<' || ch == '>') && chop_character(1) == '(') {
-      token = lex_process_substitution(ch);
-    } else if (lexer::is_shell_sentinel(ch)) {
-      token = lex_sentinel();
-    } else if (lexer::is_part_of_identifier(ch)) [[likely]] {
+    if (lexer::is_shell_sentinel(ch)) {
+      /* A < or > opens a process substitution only when a ( follows with no
+         space. */
+      if ((ch == '<' || ch == '>') && chop_character(1) == '(') {
+        token = lex_process_substitution(ch);
+      } else {
+        token = lex_sentinel();
+      }
+    } else if (!lexer::is_whitespace(ch)) [[likely]] {
       token = lex_identifier();
     } else [[unlikely]] {
       throw ErrorWithLocationAndDetails{
@@ -449,14 +464,17 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
   {
     while (lexer::is_whitespace(chop_character(i)))
       i++;
+
+    let const byte = chop_character(i);
+
     /* A backslash before a newline continues the line and both bytes vanish. A
        backslash before any other byte is left for the identifier lexer. */
-    if (chop_character(i) == '\\' && chop_character(i + 1) == '\n') {
+    if (byte == '\\' && chop_character(i + 1) == '\n') {
       i += 2;
       continue;
     }
     /* The newline is left in place so it still terminates the command. */
-    if (chop_character(i) == '#') {
+    if (byte == '#') {
       let const comment_start = i;
       while (chop_character(i) != '\n' && chop_character(i) != lexer::CEOF)
         i++;
@@ -475,7 +493,7 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
           content_position++;
         }
         let const directive_text = comment.substring(content_position);
-        if (directive_text.starts_with(StringView{"shellcheck"}) &&
+        if (directive_text.starts_with(StringView{"shellcheck", 10}) &&
             (directive_text.length == 10 || directive_text[10] == ' ' ||
              directive_text[10] == '\t'))
         {
@@ -558,9 +576,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     {
       return false;
     }
-    if (!lexer::is_variable_name_start(segment.text.view()[0])) return false;
-    for (usize i = 1; i < segment.text.count(); i++)
-      if (!lexer::is_variable_name(segment.text.view()[i])) return false;
+    let const text = segment.text.view();
+    if (!lexer::is_variable_name_start(text[0])) return false;
+    for (usize i = 1; i < text.length; i++)
+      if (!lexer::is_variable_name(text[i])) return false;
+
     return true;
   };
 
@@ -603,8 +623,8 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
     let const is_inside_quote_or_escape =
         quote_char.has_value() || should_escape;
-    if (!lexer::is_part_of_identifier(ch) &&
-        !(is_inside_quote_or_escape && ch != lexer::CEOF))
+    if (!(is_inside_quote_or_escape && ch != lexer::CEOF) &&
+        !lexer::is_part_of_identifier(ch))
     {
       break;
     }
@@ -1130,9 +1150,16 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
         }
         if (c == '\\') {
           let const escaped = chop_character(byte_count + 1);
-          if (escaped == '`' || escaped == '$' || escaped == '\\' ||
-              (is_in_double_quotes && escaped == '"'))
-          {
+          bool is_stripped_escape = false;
+          switch (escaped) {
+          case '`':
+          case '$':
+          case '\\': is_stripped_escape = true; break;
+          case '"': is_stripped_escape = is_in_double_quotes; break;
+          default: break;
+          }
+
+          if (is_stripped_escape) {
             inner += escaped;
             byte_count += 2;
             continue;
@@ -1176,8 +1203,10 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   let const actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length);
 
+  let const is_cache_in_function_arena = m_arena == FUNCTION_ARENA;
   for (let &segment : word.segments)
-    segment.is_substitution_cache_in_function_arena = m_arena == FUNCTION_ARENA;
+    segment.is_substitution_cache_in_function_arena =
+        is_cache_in_function_arena;
 
   if (m_should_collect_debug_words &&
       m_cursor_position != m_last_collected_word_position)

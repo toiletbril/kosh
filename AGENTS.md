@@ -124,6 +124,13 @@ Three or more name comparisons use a static table. A hot leading-byte dispatch
 uses a switch. A static dispatch table uses `consteval StaticStringMap` and SSK
 keys.
 
+`StaticStringMap` and `StaticStringSet` each carry a `static_string_prefilter`
+built by the same consteval constructor that sorts the table. The filter holds a
+256-bit leading-byte mask and the shortest and longest key lengths. A query
+outside the length range or carrying an unknown leading byte is rejected before
+the 64-byte pack and the binary search are reached. The filter is derived from
+the table, so a table edit cannot leave it stale.
+
 ### State and reuse
 
 Per-executor state passes through EvalContext and constructors. The codebase has

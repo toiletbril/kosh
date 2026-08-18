@@ -381,19 +381,26 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
 pure fn word_segment_has_glob_metacharacter(
     const WordSegment &segment) wontthrow -> bool
 {
-  for (usize i = 0; i < segment.text.count(); i++) {
-    let const c = segment.text[i];
-    if (c == '*' || c == '?' || c == '[') {
-      return true;
-    }
+  let const text = segment.text.view();
+
+  for (usize i = 0; i < text.length; i++) {
+    switch (text[i]) {
+    case '*':
+    case '?':
+    case '[': return true;
+
     /* An extended-glob opener such as @( still globs against names, so it keeps
        the word off the literal fast path. */
-    if ((c == '+' || c == '@' || c == '!') && i + 1 < segment.text.count() &&
-        segment.text[i + 1] == '(')
-    {
-      return true;
+    case '+':
+    case '@':
+    case '!':
+      if (i + 1 < text.length && text[i + 1] == '(') return true;
+      break;
+
+    default: break;
     }
   }
+
   return false;
 }
 
