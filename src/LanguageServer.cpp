@@ -12,6 +12,12 @@ struct positioned_document
   protocol_position position;
 };
 
+struct positioned_symbol
+{
+  Document *document;
+  document_symbol symbol;
+};
+
 enum class request_method : u8
 {
   Initialize,
@@ -91,18 +97,21 @@ private:
   fn rename_kind_of(const document_symbol &symbol) throws -> Maybe<rename_kind>;
   fn collect_rename_spans(const Document &document, rename_kind kind,
                           StringView name,
-                          ArrayList<document_symbol> &out_spans) throws -> void;
+                          ArrayList<rename_span> &out_spans) throws -> void;
   fn code_actions(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn publish_diagnostics(Document &document) throws -> bool;
   fn send_diagnostics(const Document &document,
                       const ArrayList<source_diagnostic> &diagnostics) throws
       -> bool;
   fn publish_auxiliary_diagnostics() throws -> bool;
+  fn send_empty_diagnostics(StringView uri) throws -> bool;
   fn validate_all(Document *changed_document = nullptr) throws -> bool;
   pure fn find_document(StringView uri) wontthrow -> Document *;
   pure fn request_document(const JsonValue *params) wontthrow -> Document *;
   pure fn request_positioned_document(const JsonValue *params) throws
       -> Maybe<positioned_document>;
+  fn request_positioned_symbol(const JsonValue *params) throws
+      -> Maybe<positioned_symbol>;
   fn append_diagnostic(String &output, const Document &document,
                        const source_diagnostic &diagnostic,
                        usize diagnostic_index, bool &is_first) throws -> void;
@@ -127,6 +136,12 @@ private:
                          const function_body_record &record) throws -> String;
   fn send_hover(const JsonValue *id, const Document &document,
                 const document_symbol &symbol, StringView value) throws -> bool;
+  fn append_text_edit(String &output, const Document &document,
+                      usize start_position, usize end_position,
+                      StringView replacement) throws -> void;
+  fn open_workspace_edit(String &output, const Document &document) throws
+      -> void;
+  fn close_workspace_edit(String &output) throws -> void;
 
   EvalContext &m_context;
   BumpArena &m_ast_arena;
@@ -249,32 +264,13 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
         m_workspace_root = path.take();
     }
     let const *capabilities = params->get("capabilities");
-    let const *workspace =
-        capabilities != nullptr ? capabilities->get("workspace") : nullptr;
-    let const *workspace_edit =
-        workspace != nullptr ? workspace->get("workspaceEdit") : nullptr;
-    let const *document_changes = workspace_edit != nullptr
-                                      ? workspace_edit->get("documentChanges")
-                                      : nullptr;
-    m_supports_document_changes =
-        document_changes != nullptr &&
-        document_changes->kind == json_kind::Boolean &&
-        document_changes->boolean;
-    let const *text_document =
-        capabilities != nullptr ? capabilities->get("textDocument") : nullptr;
     let const *code_action =
-        text_document != nullptr ? text_document->get("codeAction") : nullptr;
-    let const *literal_support =
-        code_action != nullptr ? code_action->get("codeActionLiteralSupport")
-                               : nullptr;
-    let const *kind_support =
-        literal_support != nullptr && literal_support->kind == json_kind::Object
-            ? literal_support->get("codeActionKind")
-            : nullptr;
-    let const *kind_values =
-        kind_support != nullptr && kind_support->kind == json_kind::Object
-            ? kind_support->get("valueSet")
-            : nullptr;
+        json_field_path(capabilities, "textDocument", "codeAction");
+    let const *kind_values = json_field_path(
+        code_action, "codeActionLiteralSupport", "codeActionKind", "valueSet");
+
+    m_supports_document_changes = json_field_is_true(json_field_path(
+        capabilities, "workspace", "workspaceEdit", "documentChanges"));
     m_supports_code_action_literals =
         kind_values != nullptr && kind_values->kind == json_kind::Array;
     m_supports_quick_fixes = false;
@@ -288,47 +284,20 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
           m_supports_fix_all = true;
       }
     }
-    let const *preferred_support = code_action != nullptr
-                                       ? code_action->get("isPreferredSupport")
-                                       : nullptr;
+
     m_supports_preferred_actions =
-        preferred_support != nullptr &&
-        preferred_support->kind == json_kind::Boolean &&
-        preferred_support->boolean;
-    let const *publish_diagnostics =
-        text_document != nullptr ? text_document->get("publishDiagnostics")
-                                 : nullptr;
-    let const *data_support = publish_diagnostics != nullptr
-                                  ? publish_diagnostics->get("dataSupport")
-                                  : nullptr;
-    m_supports_diagnostic_data = data_support != nullptr &&
-                                 data_support->kind == json_kind::Boolean &&
-                                 data_support->boolean;
-    let const *hover =
-        text_document != nullptr ? text_document->get("hover") : nullptr;
-    let const *content_formats =
-        hover != nullptr ? hover->get("contentFormat") : nullptr;
-    m_supports_markdown_hover = false;
-    if (content_formats != nullptr && content_formats->kind == json_kind::Array)
+        json_field_is_true(json_field_path(code_action, "isPreferredSupport"));
+    m_supports_diagnostic_data = json_field_is_true(json_field_path(
+        capabilities, "textDocument", "publishDiagnostics", "dataSupport"));
+    m_supports_markdown_hover = json_array_holds(
+        json_field_path(capabilities, "textDocument", "hover", "contentFormat"),
+        "markdown");
+
+    if (json_array_holds(
+            json_field_path(capabilities, "general", "positionEncodings"),
+            "utf-8"))
     {
-      for (let const *format : content_formats->array) {
-        if (format->kind == json_kind::String && format->text == "markdown") {
-          m_supports_markdown_hover = true;
-          break;
-        }
-      }
-    }
-    let const *general =
-        capabilities != nullptr ? capabilities->get("general") : nullptr;
-    let const *encodings =
-        general != nullptr ? general->get("positionEncodings") : nullptr;
-    if (encodings != nullptr && encodings->kind == json_kind::Array) {
-      for (let const *encoding : encodings->array) {
-        if (encoding->kind == json_kind::String && encoding->text == "utf-8") {
-          m_encoding = position_encoding::Utf8;
-          break;
-        }
-      }
+      m_encoding = position_encoding::Utf8;
     }
   }
   m_is_initialized = true;
@@ -409,18 +378,24 @@ fn Server::change_document(const JsonValue *params) throws -> Document *
   return document;
 }
 
+fn Server::send_empty_diagnostics(StringView uri) throws -> bool
+{
+  let payload = String{"{\"jsonrpc\":\"2.0\",\"method\":"
+                       "\"textDocument/publishDiagnostics\",\"params\":{"
+                       "\"uri\":"};
+  append_json_string(payload, uri);
+  payload.append(",\"diagnostics\":[]}}");
+
+  return send_payload(payload.view());
+}
+
 fn Server::close_document(const JsonValue *params) throws -> void
 {
   let const *text_document =
       params != nullptr ? params->get("textDocument") : nullptr;
   let const uri = string_field(text_document, "uri");
   if (!uri.has_value()) return;
-  let payload = String{"{\"jsonrpc\":\"2.0\",\"method\":"
-                       "\"textDocument/publishDiagnostics\",\"params\":{"
-                       "\"uri\":"};
-  append_json_string(payload, *uri);
-  payload.append(",\"diagnostics\":[]}}");
-  send_payload(payload.view());
+  send_empty_diagnostics(*uri);
 
   for (usize index = 0; index < m_documents.count(); index++) {
     if (m_documents[index].uri != *uri) continue;
@@ -640,12 +615,7 @@ fn Server::validate_all(Document *changed_document) throws -> bool
 
   for (let const &uri : m_published_auxiliary_uris) {
     if (m_current_auxiliary_uris.find(uri).has_value()) continue;
-    let payload = String{"{\"jsonrpc\":\"2.0\",\"method\":"
-                         "\"textDocument/publishDiagnostics\",\"params\":{"
-                         "\"uri\":"};
-    append_json_string(payload, uri.view());
-    payload.append(",\"diagnostics\":[]}}");
-    if (!send_payload(payload.view())) return false;
+    if (!send_empty_diagnostics(uri.view())) return false;
   }
   m_published_auxiliary_uris = steal(m_current_auxiliary_uris);
 
@@ -695,12 +665,10 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
       append_json_string(response, candidate.view());
       response.push('}');
     }
-    response.append(",\"textEdit\":{\"range\":");
-    append_protocol_range(response, *document, result.token_start,
-                          result.token_end, m_encoding);
-    response.append(",\"newText\":");
-    append_json_string(response, candidate.view());
-    response.append("}}");
+    response.append(",\"textEdit\":");
+    append_text_edit(response, *document, result.token_start, result.token_end,
+                     candidate.view());
+    response.push('}');
   }
   response.push(']');
 
@@ -737,6 +705,41 @@ fn Server::resolve_completion(const JsonValue *id,
   response.push('}');
 
   return send_result(id, response.view());
+}
+
+fn Server::append_text_edit(String &output, const Document &document,
+                            usize start_position, usize end_position,
+                            StringView replacement) throws -> void
+{
+  output.append("{\"range\":");
+  append_protocol_range(output, document, start_position, end_position,
+                        m_encoding);
+  output.append(",\"newText\":");
+  append_json_string(output, replacement);
+  output.push('}');
+}
+
+fn Server::open_workspace_edit(String &output, const Document &document) throws
+    -> void
+{
+  if (m_supports_document_changes) {
+    output.append("\"documentChanges\":[{\"textDocument\":{\"uri\":");
+    append_json_string(output, document.uri.view());
+    output.append(",\"version\":");
+    append_json_integer(output, document.version);
+    output.append("},\"edits\":[");
+
+    return;
+  }
+
+  output.append("\"changes\":{");
+  append_json_string(output, document.uri.view());
+  output.append(":[");
+}
+
+fn Server::close_workspace_edit(String &output) throws -> void
+{
+  output.append(m_supports_document_changes ? "]}]}" : "]}}");
 }
 
 fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
@@ -837,35 +840,20 @@ fn Server::code_actions(const JsonValue *id, const JsonValue *params) throws
 
     return nullptr;
   };
-  let const do_append_edit = [&](String &output, const source_edit &edit)
-                                 throws -> void {
-    output.append("{\"range\":");
-    append_protocol_range(output, *document, edit.start_position,
-                          edit.end_position, m_encoding);
-    output.append(",\"newText\":");
-    append_json_string(output, edit.replacement.view());
-    output.push('}');
-  };
   let const do_append_workspace_edit =
       [&](String &output, const ArrayList<const source_edit *> &edits)
           throws -> void {
     output.append("\"edit\":{");
-    if (m_supports_document_changes) {
-      output.append("\"documentChanges\":[{\"textDocument\":{\"uri\":");
-      append_json_string(output, document->uri.view());
-      output.append(",\"version\":");
-      append_json_integer(output, document->version);
-      output.append("},\"edits\":[");
-    } else {
-      output.append("\"changes\":{");
-      append_json_string(output, document->uri.view());
-      output.append(":[");
-    }
+    open_workspace_edit(output, *document);
+
     for (usize edit_index = 0; edit_index < edits.count(); edit_index++) {
       if (edit_index != 0) output.push(',');
-      do_append_edit(output, *edits[edit_index]);
+      append_text_edit(output, *document, edits[edit_index]->start_position,
+                       edits[edit_index]->end_position,
+                       edits[edit_index]->replacement.view());
     }
-    output.append(m_supports_document_changes ? "]}]}" : "]}}");
+
+    close_workspace_edit(output);
   };
   let const do_append_action = [&](StringView title, StringView kind,
                                    const ArrayList<const source_edit *> &edits,
@@ -950,10 +938,7 @@ fn Server::symbol_at(const Document &document,
   if (!byte_position.has_value() ||
       position.line >= document.line_starts.count())
     return None;
-  let const line_start = document.line_starts[position.line];
-  let line_end = document.normalized_source.count();
-  if (position.line + 1 < document.line_starts.count())
-    line_end = document.line_starts[position.line + 1] - 1;
+  let const[line_start, line_end] = document.get_line_bounds(position.line);
   let const *spans = m_highlight_cache.spans_for(
       document.normalized_source.view(), line_start, line_end, m_context);
 
@@ -1009,13 +994,8 @@ pure fn variable_name_of(StringView text) wontthrow -> StringView
   let const start = variable_name_start_of(text);
   let end = start;
 
-  while (end < text.length) {
-    let const byte = text[end];
-    if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
-          (byte >= '0' && byte <= '9') || byte == '_'))
-      break;
+  while (end < text.length && lexer::is_variable_name(text[end]))
     end++;
-  }
 
   return text.substring_of_length(start, end - start);
 }
@@ -1047,10 +1027,7 @@ fn Server::definition_of(const Document &document,
   let result = Maybe<document_symbol>{};
 
   for (usize line = 0; line < document.line_starts.count(); line++) {
-    let const line_start = document.line_starts[line];
-    let line_end = document.normalized_source.count();
-    if (line + 1 < document.line_starts.count())
-      line_end = document.line_starts[line + 1] - 1;
+    let const[line_start, line_end] = document.get_line_bounds(line);
     let const *spans = m_highlight_cache.spans_for(
         document.normalized_source.view(), line_start, line_end, m_context);
 
@@ -1073,15 +1050,25 @@ fn Server::definition_of(const Document &document,
   return result;
 }
 
+fn Server::request_positioned_symbol(const JsonValue *params) throws
+    -> Maybe<positioned_symbol>
+{
+  let const request = request_positioned_document(params);
+  if (!request.has_value()) return None;
+  select_document_mood(*request->document);
+  let symbol = symbol_at(*request->document, request->position);
+  if (!symbol.has_value()) return None;
+
+  return positioned_symbol{request->document, steal(*symbol)};
+}
+
 fn Server::definition(const JsonValue *id, const JsonValue *params) throws
     -> bool
 {
-  let const request = request_positioned_document(params);
-  if (!request.has_value()) return send_result(id, "null");
-  let *document = request->document;
-  select_document_mood(*document);
-  let const symbol = symbol_at(*document, request->position);
-  if (!symbol.has_value()) return send_result(id, "null");
+  let const found = request_positioned_symbol(params);
+  if (!found.has_value()) return send_result(id, "null");
+  let *document = found->document;
+  let const *symbol = &found->symbol;
   let const target = definition_of(*document, *symbol);
   if (!target.has_value()) return send_result(id, "null");
   let response = String{"{\"uri\":"};
@@ -1104,7 +1091,7 @@ pure fn role_names_command(highlight_role role) wontthrow -> bool
   return role_reads_function(role) || role == highlight_role::partial_command;
 }
 
-pure fn spans_hold_definition(const ArrayList<document_symbol> &spans) wontthrow
+pure fn spans_hold_definition(const ArrayList<rename_span> &spans) wontthrow
     -> bool
 {
   for (let const &span : spans) {
@@ -1118,8 +1105,7 @@ fn Server::rename_kind_of(const document_symbol &symbol) throws
     -> Maybe<rename_kind>
 {
   if (role_reads_variable(symbol.role)) {
-    if (!completion::word_is_plain_identifier(
-            variable_name_of(symbol.text.view())))
+    if (!lexer::word_is_variable_name(variable_name_of(symbol.text.view())))
       return None;
 
     return rename_kind::variable;
@@ -1133,14 +1119,11 @@ fn Server::rename_kind_of(const document_symbol &symbol) throws
 
 fn Server::collect_rename_spans(const Document &document, rename_kind kind,
                                 StringView name,
-                                ArrayList<document_symbol> &out_spans) throws
+                                ArrayList<rename_span> &out_spans) throws
     -> void
 {
   for (usize line = 0; line < document.line_starts.count(); line++) {
-    let const line_start = document.line_starts[line];
-    let line_end = document.normalized_source.count();
-    if (line + 1 < document.line_starts.count())
-      line_end = document.line_starts[line + 1] - 1;
+    let const[line_start, line_end] = document.get_line_bounds(line);
     let const *spans = m_highlight_cache.spans_for(
         document.normalized_source.view(), line_start, line_end, m_context);
 
@@ -1156,14 +1139,14 @@ fn Server::collect_rename_spans(const Document &document, rename_kind kind,
 
       if (kind == rename_kind::command) {
         if (text != name) continue;
-        out_spans.push(document_symbol{String{name}, span.role, start, end});
+        out_spans.push(rename_span{span.role, start, end});
         continue;
       }
 
       if (variable_name_of(text) != name) continue;
       let const name_start = start + variable_name_start_of(text);
-      out_spans.push(document_symbol{String{name}, span.role, name_start,
-                                     name_start + name.length});
+      out_spans.push(
+          rename_span{span.role, name_start, name_start + name.length});
     }
   }
 }
@@ -1174,18 +1157,16 @@ fn Server::collect_rename_spans(const Document &document, rename_kind kind,
 fn Server::prepare_rename(const JsonValue *id, const JsonValue *params) throws
     -> bool
 {
-  let const request = request_positioned_document(params);
-  if (!request.has_value()) return send_result(id, "null");
-  let *document = request->document;
-  select_document_mood(*document);
-  let const symbol = symbol_at(*document, request->position);
-  if (!symbol.has_value()) return send_result(id, "null");
+  let const found = request_positioned_symbol(params);
+  if (!found.has_value()) return send_result(id, "null");
+  let *document = found->document;
+  let const *symbol = &found->symbol;
   let const kind = rename_kind_of(*symbol);
   if (!kind.has_value()) return send_result(id, "null");
   let const is_variable = *kind == rename_kind::variable;
   let const name =
       is_variable ? variable_name_of(symbol->text.view()) : symbol->text.view();
-  let spans = ArrayList<document_symbol>{heap_allocator()};
+  let spans = ArrayList<rename_span>{heap_allocator()};
   collect_rename_spans(*document, *kind, name, spans);
 
   if (!is_variable && !spans_hold_definition(spans)) {
@@ -1207,15 +1188,13 @@ fn Server::prepare_rename(const JsonValue *id, const JsonValue *params) throws
 
 fn Server::rename(const JsonValue *id, const JsonValue *params) throws -> bool
 {
-  let const request = request_positioned_document(params);
-  if (!request.has_value()) return send_result(id, "null");
-  let *document = request->document;
-  select_document_mood(*document);
-  let const symbol = symbol_at(*document, request->position);
-  if (!symbol.has_value()) {
+  let const found = request_positioned_symbol(params);
+  if (!found.has_value()) {
     return send_error(id, REQUEST_FAILED_ERROR,
                       "There is no renameable symbol here.");
   }
+  let *document = found->document;
+  let const *symbol = &found->symbol;
   let const kind = rename_kind_of(*symbol);
   if (!kind.has_value()) {
     return send_error(id, REQUEST_FAILED_ERROR,
@@ -1225,7 +1204,7 @@ fn Server::rename(const JsonValue *id, const JsonValue *params) throws -> bool
   let const new_name = string_field(params, "newName");
   let const is_new_name_valid =
       new_name.has_value() &&
-      (is_variable ? completion::word_is_plain_identifier(*new_name)
+      (is_variable ? lexer::word_is_variable_name(*new_name)
                    : completion::word_is_function_name(*new_name));
 
   if (!is_new_name_valid) {
@@ -1238,7 +1217,7 @@ fn Server::rename(const JsonValue *id, const JsonValue *params) throws -> bool
 
   let const name =
       is_variable ? variable_name_of(symbol->text.view()) : symbol->text.view();
-  let spans = ArrayList<document_symbol>{heap_allocator()};
+  let spans = ArrayList<rename_span>{heap_allocator()};
   collect_rename_spans(*document, *kind, name, spans);
 
   if (!is_variable && !spans_hold_definition(spans)) {
@@ -1247,29 +1226,15 @@ fn Server::rename(const JsonValue *id, const JsonValue *params) throws -> bool
   }
 
   let response = String{"{"};
-  if (m_supports_document_changes) {
-    response.append("\"documentChanges\":[{\"textDocument\":{\"uri\":");
-    append_json_string(response, document->uri.view());
-    response.append(",\"version\":");
-    append_json_integer(response, document->version);
-    response.append("},\"edits\":[");
-  } else {
-    response.append("\"changes\":{");
-    append_json_string(response, document->uri.view());
-    response.append(":[");
-  }
+  open_workspace_edit(response, *document);
 
   for (usize span_index = 0; span_index < spans.count(); span_index++) {
     if (span_index != 0) response.push(',');
-    response.append("{\"range\":");
-    append_protocol_range(response, *document, spans[span_index].start,
-                          spans[span_index].end, m_encoding);
-    response.append(",\"newText\":");
-    append_json_string(response, *new_name);
-    response.push('}');
+    append_text_edit(response, *document, spans[span_index].start,
+                     spans[span_index].end, *new_name);
   }
 
-  response.append(m_supports_document_changes ? "]}]}" : "]}}");
+  close_workspace_edit(response);
 
   return send_result(id, response.view());
 }
@@ -1435,6 +1400,7 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
   /* A PATH program is what an ordinary command word resolves to, so the
      bundled utility answers only for a name PATH does not hold. */
   if (paths.is_empty()) {
+    if (!m_context.koshkit_utilities_are_reachable()) return None;
     if (!koshkit::find_util(command).has_value()) return None;
 
     let source = String{"koshkit "};
@@ -1444,57 +1410,9 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
     return do_run_shell_help(steal(source));
   }
 
-  let information = String{heap_allocator()};
-  let const man_paths = m_context.get_program_resolver().search(
-      "man", ProgramResolver::SearchMode::First,
-      ProgramResolver::Requirement::Runnable,
-      ProgramResolver::CachePolicy::Bypass);
-  if (!man_paths.is_empty() &&
-      os::directory_is_trusted_for_exec(man_paths[0].parent()))
-  {
-    let locate_argv = ArrayList<String>{heap_allocator()};
-    locate_argv.push(String{man_paths[0].text().view()});
-    locate_argv.push(String{"-w"});
-    locate_argv.push(String{command});
-    let const location =
-        os::capture_program_output(locate_argv, INFORMATION_TIMEOUT_NANOS);
-    if (location.has_value() &&
-        location->view().find_character('/').has_value())
-    {
-      let man_argv = ArrayList<String>{heap_allocator()};
-      man_argv.push(String{man_paths[0].text().view()});
-      man_argv.push(String{command});
-      if (let page =
-              os::capture_program_output(man_argv, INFORMATION_TIMEOUT_NANOS);
-          page.has_value() && !page->is_empty())
-      {
-        let const page_length = page->length();
-        for (usize position = 0; position < page_length; position++) {
-          let const byte = page->view()[position];
-          if (byte == '\b') {
-            if (!information.is_empty()) information.pop_back();
-            continue;
-          }
-          information.push(byte);
-        }
-      }
-    }
-  }
-  if (information.is_empty()) {
-    if (let const help_argument = completion::HELP_ALLOWLIST.find(command);
-        help_argument.has_value() &&
-        os::directory_is_trusted_for_exec(paths[0].parent()))
-    {
-      let help_argv = ArrayList<String>{heap_allocator()};
-      help_argv.push(String{paths[0].text().view()});
-      StringView{*help_argument}.for_each_ascii_whitespace_word(
-          [&](StringView word) throws { help_argv.push(String{word}); });
-      if (let help =
-              os::capture_program_output(help_argv, INFORMATION_TIMEOUT_NANOS);
-          help.has_value() && !help->is_empty())
-        information = help.take();
-    }
-  }
+  let information = String{completion::manpage_text_for(command, m_context)};
+  if (information.is_empty())
+    information = String{completion::help_text_of(command, m_context)};
   if (!information.is_empty()) {
     if (information.view()[information.length() - 1] != '\n')
       information.push('\n');
@@ -1511,19 +1429,8 @@ static constexpr usize HOVER_EARLIER_ASSIGNMENT_LIMIT = 8;
 static constexpr usize HOVER_ASSIGNMENT_TEXT_LENGTH_LIMIT = 200;
 static constexpr usize HOVER_BODY_LINE_LIMIT = 40;
 
-pure fn clamped_source_span(const Document &document, usize position,
-                            usize length) wontthrow -> StringView
-{
-  let const source_length = document.normalized_source.count();
-  if (position >= source_length) return StringView{};
-  if (position + length > source_length) length = source_length - position;
-
-  return document.normalized_source.view().substring_of_length(position,
-                                                               length);
-}
-
 /* What each binder puts in the name, in the order of the enum. */
-static constexpr const char *BINDER_DESCRIPTIONS[] = {
+static constexpr StringView BINDER_DESCRIPTIONS[] = {
     "",
     "The name takes each word of the loop list in turn.",
     "The name takes the menu entry the reader selects.",
@@ -1578,8 +1485,8 @@ pure fn assignment_headline_span(
   if (record.binder != assignment_binder::Assignment)
     return source_line_span(document, record.position);
 
-  let const span =
-      clamped_source_span(document, record.position, record.length);
+  let const span = document.normalized_source.substring_of_length(
+      record.position, record.length);
   if (span.is_empty() || span[span.length - 1] != '=') return span;
 
   let const rest = document.normalized_source.substring(record.position);
@@ -1619,11 +1526,36 @@ fn append_hover_block(String &output, StringView text, bool is_markdown,
     return;
   }
 
-  output.append("```");
+  /* A fence longer than the longest backquote run inside the text keeps a
+     command substitution from closing the block early. */
+  usize longest_backquote_run = 0;
+  usize position = 0;
+  while (position < text.length) {
+    if (text[position] != '`') {
+      position++;
+      continue;
+    }
+
+    let const run_start = position;
+    while (position < text.length && text[position] == '`')
+      position++;
+    if (position - run_start > longest_backquote_run)
+      longest_backquote_run = position - run_start;
+  }
+
+  let const fence_length =
+      longest_backquote_run < 3 ? 3 : longest_backquote_run + 1;
+  let const do_append_fence = [&]() throws -> void {
+    for (usize count = 0; count < fence_length; count++)
+      output.push('`');
+  };
+
+  do_append_fence();
   output.append(language);
   output.push('\n');
   output.append(text);
-  output.append("\n```");
+  output.push('\n');
+  do_append_fence();
 }
 
 pure fn clipped_line_span(StringView text, usize line_limit,
@@ -1822,8 +1754,8 @@ fn Server::function_hover_text(const Document &document,
 {
   let body = StringView{};
   if (record.body_end_position > record.body_position) {
-    body = clamped_source_span(document, record.body_position,
-                               record.body_end_position - record.body_position);
+    body = document.normalized_source.substring_of_length(
+        record.body_position, record.body_end_position - record.body_position);
   }
 
   usize dropped_line_count = 0;
@@ -1868,12 +1800,10 @@ fn Server::send_hover(const JsonValue *id, const Document &document,
 
 fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
 {
-  let const request = request_positioned_document(params);
-  if (!request.has_value()) return send_result(id, "null");
-  let *document = request->document;
-  select_document_mood(*document);
-  let const symbol = symbol_at(*document, request->position);
-  if (!symbol.has_value()) return send_result(id, "null");
+  let const found = request_positioned_symbol(params);
+  if (!found.has_value()) return send_result(id, "null");
+  let *document = found->document;
+  let const *symbol = &found->symbol;
 
   if (role_reads_variable(symbol->role)) {
     let const name = hover_variable_name_of(symbol->text.view());
@@ -1932,10 +1862,7 @@ fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
   bool is_first = true;
 
   for (usize line = 0; line < document->line_starts.count(); line++) {
-    let const line_start = document->line_starts[line];
-    let line_end = document->normalized_source.count();
-    if (line + 1 < document->line_starts.count())
-      line_end = document->line_starts[line + 1] - 1;
+    let const[line_start, line_end] = document->get_line_bounds(line);
     let const *spans = m_highlight_cache.spans_for(
         document->normalized_source.view(), line_start, line_end, m_context);
     for (let const &span : *spans) {

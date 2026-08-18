@@ -453,9 +453,11 @@ enum class command_name_id : u8
   Unknown,
   Alias,
   Arch,
+  Awk,
   Basename,
   Break,
   Builtin,
+  Cat,
   Cd,
   Chmod,
   Chown,
@@ -463,9 +465,11 @@ enum class command_name_id : u8
   Command,
   Continue,
   Cp,
+  Curl,
   Date,
   Declare,
   Dirname,
+  Docker,
   Dot,
   DoubleBracket,
   Echo,
@@ -479,6 +483,7 @@ enum class command_name_id : u8
   Fgrep,
   Find,
   Getopts,
+  Git,
   Grep,
   Hostname,
   Id,
@@ -534,6 +539,11 @@ constexpr u32 COMMAND_GROUP_NON_STDIN_READER = 1u << 6;
 constexpr u32 COMMAND_GROUP_ENVIRONMENT_NEUTRAL = 1u << 7;
 constexpr u32 COMMAND_GROUP_PATTERN_MATCHER = 1u << 8;
 constexpr u32 COMMAND_GROUP_HTML_ENTITY_TAIL = 1u << 9;
+/* A bare word naming one of these programs is almost always a missing command
+   substitution or a missing pipe, shellcheck SC2209 and SC2238. A name that
+   reads naturally as data, such as test, id, set, true, and echo, is left
+   out. */
+constexpr u32 COMMAND_GROUP_NAME_AS_VALUE = 1u << 10;
 
 struct analysis_command_info
 {

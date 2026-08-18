@@ -557,7 +557,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
           let const declared = optimizer::literal_word_value(word);
           if (!declared.has_value()) continue;
-          if (!optimizer::is_plain_variable_name(declared->view())) continue;
+          if (!lexer::word_is_variable_name(declared->view())) continue;
 
           actx.note_variable_binding_record(
               declared->view(), m_args[i]->source_location(),

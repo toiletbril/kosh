@@ -89,11 +89,6 @@ KOSH_STRINGVIEW_TO(hu32)
 KOSH_STRINGVIEW_TO(hu64)
 #undef KOSH_STRINGVIEW_TO
 
-StringView::StringView(const char *cstr) wontthrow
-    : data(cstr),
-      length(cstr != nullptr ? std::strlen(cstr) : 0)
-{}
-
 fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
 {
   if (length == 0) return None;

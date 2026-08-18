@@ -1039,7 +1039,7 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 
 fn ExecContext::make_from(const SourceLocation &location, StringView source,
                           ArrayList<String> &&args, mimic_mood mood,
-                          bool is_koshkit_enabled,
+                          bool are_koshkit_utilities_reachable,
                           ProgramResolver &program_resolver,
                           ArrayList<SourceLocation> &&arg_locations) throws
     -> ExecContext
@@ -1115,7 +1115,7 @@ fn ExecContext::make_from(const SourceLocation &location, StringView source,
       LOG(Debug, "resolved '%s' to the program '%s'", program.c_str(),
           resolved_program_path->text().c_str());
       kind = ResolvedCommand::from_program(steal(*resolved_program_path));
-    } else if ((is_koshkit_enabled || mood == mimic_mood::Default) &&
+    } else if (are_koshkit_utilities_reachable &&
                koshkit::find_util(program.view()).has_value())
     {
       LOG(Debug, "no program matches '%s', using the koshkit utility",

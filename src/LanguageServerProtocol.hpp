@@ -19,16 +19,11 @@ namespace koshka::language_server {
 
 namespace {
 
+/* The client language identifiers `parse_mood_name` does not already answer. */
 constexpr static_string_entry<mimic_mood> LANGUAGE_MOOD_ENTRIES[] = {
-    {SSK("bash"),        mimic_mood::Bash     },
-    {SSK("bash-posix"),  mimic_mood::BashPosix},
-    {SSK("dash"),        mimic_mood::Posix    },
-    {SSK("kosh"),        mimic_mood::Default  },
-    {SSK("posix"),       mimic_mood::Posix    },
-    {SSK("rbash"),       mimic_mood::Bash     },
-    {SSK("sh"),          mimic_mood::Posix    },
-    {SSK("shellscript"), mimic_mood::Bash     },
-    {SSK("shit"),        mimic_mood::Default  },
+    {SSK("rbash"),       mimic_mood::Bash   },
+    {SSK("shellscript"), mimic_mood::Bash   },
+    {SSK("shit"),        mimic_mood::Default},
 };
 constexpr StaticStringMap LANGUAGE_MOODS{LANGUAGE_MOOD_ENTRIES};
 
@@ -559,6 +554,37 @@ private:
   usize m_header_scan_position{0};
 };
 
+/* A client capability sits at the end of a chain of optional objects, and a
+   missing link anywhere along the chain means the client named nothing. */
+template <class... Names>
+pure fn json_field_path(const JsonValue *object, Names... names) wontthrow
+    -> const JsonValue *
+{
+  for (let const name : {StringView{names}...}) {
+    if (object == nullptr) return nullptr;
+    object = object->get(name);
+  }
+
+  return object;
+}
+
+pure fn json_field_is_true(const JsonValue *value) wontthrow -> bool
+{
+  return value != nullptr && value->kind == json_kind::Boolean &&
+         value->boolean;
+}
+
+pure fn json_array_holds(const JsonValue *value, StringView wanted) wontthrow
+    -> bool
+{
+  if (value == nullptr || value->kind != json_kind::Array) return false;
+  for (let const *element : value->array)
+    if (element->kind == json_kind::String && element->text == wanted)
+      return true;
+
+  return false;
+}
+
 pure fn string_field(const JsonValue *object, StringView name) wontthrow
     -> Maybe<StringView>
 {
@@ -603,6 +629,22 @@ struct document_symbol
   usize end;
 };
 
+/* A rename edits the source in place, so a collected occurrence carries no
+   text of its own. */
+struct rename_span
+{
+  highlight_role role;
+  usize start;
+  usize end;
+};
+
+/* The end excludes the line terminator. */
+struct line_bounds
+{
+  usize start;
+  usize end;
+};
+
 class Document
 {
 public:
@@ -631,14 +673,21 @@ public:
     rebuild_lines();
   }
 
+  pure fn get_line_bounds(usize line) const wontthrow -> line_bounds
+  {
+    let const start = line_starts[line];
+    let end = normalized_source.count();
+    if (line + 1 < line_starts.count()) end = line_starts[line + 1] - 1;
+
+    return {start, end};
+  }
+
   pure fn byte_position(usize line, usize character,
                         position_encoding encoding) const wontthrow
       -> Maybe<usize>
   {
     if (line >= line_starts.count()) return None;
-    let const start = line_starts[line];
-    let end = normalized_source.count();
-    if (line + 1 < line_starts.count()) end = line_starts[line + 1] - 1;
+    let const[start, end] = get_line_bounds(line);
     if (encoding == position_encoding::Utf8) {
       if (character > end - start) return None;
       let const position = start + character;
@@ -815,6 +864,9 @@ pure fn mood_for(const Document &document) throws -> mimic_mood
           detect_mimic_shell_from_source(document.normalized_source.view());
       detected.has_value())
     return *detected;
+  if (let const mood = parse_mood_name(document.language_id.view());
+      mood.has_value())
+    return *mood;
   if (let const mood = LANGUAGE_MOODS.find(document.language_id.view());
       mood.has_value())
     return *mood;

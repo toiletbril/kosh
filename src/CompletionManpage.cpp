@@ -597,6 +597,62 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
 }
 
+/* An empty entry records a page that is absent or untrusted, so the fork
+   happens once per name for the session. */
+static StringMap<String> MANPAGE_TEXT_CACHE{heap_allocator()};
+
+fn manpage_text_for(StringView page_name, EvalContext &context) throws
+    -> StringView
+{
+  if (let const cached = MANPAGE_TEXT_CACHE.find(page_name); cached != nullptr)
+    return cached->view();
+
+  let text = String{heap_allocator()};
+  let const man_paths = context.get_program_resolver().search(
+      "man", ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
+  if (man_paths.is_empty() ||
+      !command_directory_is_trusted(man_paths[0].text().view()))
+  {
+    LOG(Debug,
+        "skipping the man fork for '%.*s' because man is absent or untrusted",
+        static_cast<int>(page_name.length), page_name.data);
+
+    return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
+  }
+
+  let locate_argv = ArrayList<String>{heap_allocator()};
+  locate_argv.push(String{man_paths[0].text().view()});
+  locate_argv.push(String{"-w"});
+  locate_argv.push(String{page_name});
+  let const location = capture_completion_program_output(locate_argv);
+  if (!location.has_value() ||
+      !location->view().find_character('/').has_value())
+  {
+    return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
+  }
+
+  let argv = ArrayList<String>{heap_allocator()};
+  argv.push(String{man_paths[0].text().view()});
+  argv.push(String{page_name});
+  if (Maybe<String> page = capture_completion_program_output(argv);
+      page.has_value() && !page->is_empty())
+  {
+    let const page_view = page->view();
+    for (usize position = 0; position < page_view.length; position++) {
+      let const byte = page_view[position];
+      if (byte == '\b') {
+        if (!text.is_empty()) text.pop_back();
+        continue;
+      }
+      text.push(byte);
+    }
+  }
+
+  return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
+}
+
 /* Runs only on an explicit tab and a dash token, so the ghost never forks man.
    None falls through to the spec and files. */
 fn complete_from_manpage(StringView line, StringView token,
@@ -708,6 +764,20 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
         paths[0].text().view().data);
   }
   return text;
+}
+
+/* The parsed caches keep entries and free the raw text, so a reader that wants
+   the text keeps its own copy. */
+static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
+
+fn help_text_of(StringView command, EvalContext &context) throws -> StringView
+{
+  if (let const cached = HELP_TEXT_CACHE.find(command); cached != nullptr)
+    return cached->view();
+
+  let text = help_text_for(context.get_program_resolver(), command);
+
+  return HELP_TEXT_CACHE.set(command, steal(text))->view();
 }
 
 static fn parse_help_option_entries(StringView text) throws

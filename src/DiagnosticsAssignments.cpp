@@ -59,18 +59,11 @@ fn check_posix_redirection_portability(AnalysisContext &actx,
   }
 }
 
-/* A bare word naming one of these programs is almost always a missing command
-   substitution or a missing pipe, shellcheck SC2209 and SC2238. Words that read
-   naturally as data, such as test, id, set, true, and echo, are left out. */
-constexpr PackedStringKey COMMAND_NAME_VALUE_KEYS[] = {
-    SSK("awk"),   SSK("cat"),    SSK("chmod"), SSK("chown"), SSK("cp"),
-    SSK("curl"),  SSK("docker"), SSK("git"),   SSK("grep"),  SSK("hostname"),
-    SSK("ln"),    SSK("ls"),     SSK("mkdir"), SSK("mv"),    SSK("printf"),
-    SSK("pwd"),   SSK("rm"),     SSK("rmdir"), SSK("sed"),   SSK("ssh"),
-    SSK("sudo"),  SSK("touch"),  SSK("tr"),    SSK("uname"), SSK("whoami"),
-    SSK("xargs"),
-};
-constexpr StaticStringSet COMMAND_NAME_VALUES{COMMAND_NAME_VALUE_KEYS};
+fn word_names_a_command_as_a_value(StringView word) throws -> bool
+{
+  return get_analysis_command_info(word).is_in_group(
+      COMMAND_GROUP_NAME_AS_VALUE);
+}
 
 cold fn plain_output_redirection_spelling(Redirection::Kind kind) wontthrow
     -> Maybe<StringView>
@@ -187,7 +180,7 @@ fn check_redirection_lints(AnalysisContext &actx,
 
         /* Quoting the name states that a file is meant, and the word literal
            drops the quotes, so the source text decides, shellcheck SC2238. */
-        if (digits.has_value() && COMMAND_NAME_VALUES.contains(*digits)) {
+        if (digits.has_value() && word_names_a_command_as_a_value(*digits)) {
           let const target_source =
               redirection.target->source_location().get_source_text(
                   actx.source);
@@ -901,7 +894,7 @@ fn check_assignment_value_shape(AnalysisContext &actx,
 
   if (!input.is_append && !is_deliberate_command_prefix &&
       input.shape.has_bare_literal_value &&
-      COMMAND_NAME_VALUES.contains(value) &&
+      word_names_a_command_as_a_value(value) &&
       actx.should_report(diagnostic_id::sc2209))
   {
     actx.command_name_assignments.push(command_name_assignment_record{

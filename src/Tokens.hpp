@@ -250,7 +250,10 @@ static_assert(sizeof(usize) != 8 || sizeof(SegmentText) == 16);
 class WordSegment
 {
 public:
-  enum class Kind : u8
+  /* The underlying type is four bytes so the kind shares a storage unit with
+     the length and the flags under the Microsoft bitfield rules, which open a
+     new unit for every change of declared type size. */
+  enum class Kind : u32
   {
     LiteralText,
     UnquotedText,
@@ -332,15 +335,17 @@ public:
   }
 
   /* The span length and the flags share one four-byte unit, so the group costs
-     nothing beside the position. The segment is thirty-two bytes. */
+     nothing beside the position. The segment is thirty-two bytes. Every field
+     of the group carries a four-byte declared type, which is what keeps the
+     packing identical on the Itanium and the Microsoft ABI. */
   mutable u32 source_position{0};
 
   mutable u32 source_length : 24 {0};
   Kind kind : 3;
-  bool is_in_double_quotes : 1 {false};
-  bool is_greedy_name : 1 {false};
-  bool was_ansi_c_quoted : 1 {false};
-  bool is_substitution_cache_in_function_arena : 1 {false};
+  u32 is_in_double_quotes : 1 {false};
+  u32 is_greedy_name : 1 {false};
+  u32 was_ansi_c_quoted : 1 {false};
+  u32 is_substitution_cache_in_function_arena : 1 {false};
 
   SegmentText text;
 

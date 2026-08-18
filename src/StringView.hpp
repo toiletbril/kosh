@@ -26,7 +26,12 @@ public:
   constexpr StringView(const char *bytes, usize count)
       : data(bytes), length(count)
   {}
-  StringView(const char *cstr) wontthrow;
+  /* The length folds at compile time for a literal, so a static table of views
+     costs no startup work and no strlen on read. */
+  constexpr StringView(const char *cstr) wontthrow
+      : data(cstr),
+        length(cstr != nullptr ? __builtin_strlen(cstr) : 0)
+  {}
 
   hot mustuse pure fn count() const wontthrow -> usize { return length; }
   hot mustuse pure fn is_empty() const wontthrow -> bool { return length == 0; }

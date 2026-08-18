@@ -40,6 +40,7 @@ action-end-cursor=ok
 action-adjacent-range=ok
 builtin-help=ok
 utility-help=ok
+posix-mood-utility-help=ok
 path-shadows-utility=ok
 allowed-help=ok
 path-fallback=ok

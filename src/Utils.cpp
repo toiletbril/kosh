@@ -507,6 +507,49 @@ pure fn strip_sig_prefix(StringView name) wontthrow -> StringView
   return name;
 }
 
+/* A decimal operand is the signal number itself, and kill accepts it for a
+   signal the table does not name. */
+fn find_signal_number(const signal_pair *pairs, usize pair_count,
+                      StringView name) throws -> Maybe<i32>
+{
+  if (name.is_all_decimal_digits()) {
+    const ErrorOr<i64> parsed_value = name.to<i64>();
+    if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
+        parsed_value.value() > INT32_MAX)
+    {
+      return None;
+    }
+
+    return static_cast<i32>(parsed_value.value());
+  }
+
+  let const bare = strip_sig_prefix(name);
+  for (usize i = 0; i < pair_count; i++)
+    if (pairs[i].name == bare) return pairs[i].number;
+
+  return None;
+}
+
+fn find_signal_name(const signal_pair *pairs, usize pair_count,
+                    i32 number) throws -> Maybe<String>
+{
+  for (usize i = 0; i < pair_count; i++)
+    if (pairs[i].number == number) return String{pairs[i].name};
+
+  return None;
+}
+
+fn collect_signal_names(const signal_pair *pairs, usize pair_count) throws
+    -> ArrayList<StringView>
+{
+  let collected = ArrayList<StringView>{heap_allocator()};
+  collected.reserve(pair_count);
+  for (usize i = 0; i < pair_count; i++)
+    collected.push(pairs[i].name);
+
+  return collected;
+}
+
 pure fn decode_utf8(StringView source, usize position,
                     u32 invalid_codepoint) wontthrow -> decoded_codepoint
 {

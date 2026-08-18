@@ -84,6 +84,7 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
                                  Maybe<usize> expression_base_position,
                                  bool is_conditional) throws -> void
 {
+  if (actx.symbol_records == nullptr) return;
   if (!expression_base_position.has_value()) return;
 
   let const target_offset = static_cast<usize>(target.data - expression.data);

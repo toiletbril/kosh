@@ -129,16 +129,6 @@ fn constant_test_verdict(const ArrayList<const Token *> &args,
 
 } /* namespace */
 
-pure fn is_plain_variable_name(StringView name) wontthrow -> bool
-{
-  if (name.length == 0) return false;
-  if (!lexer::is_variable_name_start(name[0])) return false;
-  for (usize i = 1; i < name.length; i++) {
-    if (!lexer::is_variable_name(name[i])) return false;
-  }
-  return true;
-}
-
 fn literal_word_value(const Word &word) throws -> Maybe<String>
 {
   let value = String{heap_allocator()};
@@ -210,7 +200,7 @@ fn plain_variable_reference_name(const Token *token) wontthrow
   const WordSegment &segment = word.segments[0];
   if (segment.kind != WordSegment::Kind::VariableReference) return None;
   let const name = segment.text.view();
-  if (!is_plain_variable_name(name)) return None;
+  if (!lexer::word_is_variable_name(name)) return None;
   return name;
 }
 

@@ -22,7 +22,7 @@ class ExecContext
 public:
   static fn make_from(const SourceLocation &location, StringView source,
                       ArrayList<String> &&args, mimic_mood mood,
-                      bool is_koshkit_enabled,
+                      bool are_koshkit_utilities_reachable,
                       ProgramResolver &program_resolver,
                       ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;

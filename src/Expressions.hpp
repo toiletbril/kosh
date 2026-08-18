@@ -228,6 +228,7 @@ public:
   usize reported_error_count{0};
   u8 warning_level{0};
   bool is_default_mood{true};
+  bool are_koshkit_utilities_reachable{true};
   bool should_emit_annoying_diagnostics{true};
   const ArrayList<shellcheck_suppression> *shellcheck_suppressions{nullptr};
   bool has_seen_runtime_definer{false};
@@ -651,6 +652,22 @@ struct array_builtin_assignment
   SourceLocation location;
   bool is_append;
 };
+
+/* The bash assignment builtins that parse a NAME=(...) argument as an array
+   assignment. The parser recognizes the form by this classification and the
+   evaluator applies the elements with the scope and the marks the same
+   classification selects. */
+enum class assignment_builtin : u8
+{
+  None,
+  Local,
+  Declare,
+  Readonly,
+  Export,
+};
+
+pure fn classify_assignment_builtin(StringView name) wontthrow
+    -> assignment_builtin;
 
 class Command : public Expression
 {

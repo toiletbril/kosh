@@ -122,6 +122,17 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
   return is_variable_name_start(ch) || is_number(ch);
 }
 
+pure fn word_is_variable_name(StringView word) wontthrow -> bool
+{
+  if (word.is_empty() || !is_variable_name_start(word[0])) return false;
+
+  for (usize position = 1; position < word.length; position++) {
+    if (!is_variable_name(word[position])) return false;
+  }
+
+  return true;
+}
+
 pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
 {
   if (word.is_empty() || !is_variable_name_start(word[0])) return false;
@@ -594,12 +605,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     {
       return false;
     }
-    let const text = segment.text.view();
-    if (!lexer::is_variable_name_start(text[0])) return false;
-    for (usize i = 1; i < text.length; i++)
-      if (!lexer::is_variable_name(text[i])) return false;
-
-    return true;
+    return lexer::word_is_variable_name(segment.text.view());
   };
 
   let const do_subscript_closes_with_assignment =

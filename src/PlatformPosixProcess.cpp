@@ -832,12 +832,7 @@ fn process_from_pid(i64 pid) wontthrow -> process
   return static_cast<process>(pid);
 }
 
-struct signal_pair
-{
-  i32 number;
-  StringView name;
-};
-static const signal_pair SIGNAL_PAIRS[] = {
+static const utils::signal_pair SIGNAL_PAIRS[] = {
     {SIGHUP,  "HUP" },
     {SIGINT,  "INT" },
     {SIGQUIT, "QUIT"},
@@ -855,37 +850,19 @@ static const signal_pair SIGNAL_PAIRS[] = {
 
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
-  if (name.is_all_decimal_digits()) {
-    const ErrorOr<i64> parsed_value = name.to<i64>();
-    if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
-        parsed_value.value() > INT32_MAX)
-      return koshka::None;
-    return static_cast<i32>(parsed_value.value());
-  }
-
-  let const bare = utils::strip_sig_prefix(name);
-
-  for (let const &pair : SIGNAL_PAIRS)
-    if (pair.name == bare) return pair.number;
-  return koshka::None;
+  return utils::find_signal_number(SIGNAL_PAIRS, countof(SIGNAL_PAIRS), name);
 }
 
 fn signal_name_from_number(i32 number) throws -> Maybe<String>
 {
-  for (let const &pair : SIGNAL_PAIRS)
-    if (pair.number == number) return String{pair.name};
-  return koshka::None;
+  return utils::find_signal_name(SIGNAL_PAIRS, countof(SIGNAL_PAIRS), number);
 }
 
 fn signal_names() throws -> const ArrayList<StringView> &
 {
-  static ArrayList<StringView> names = [] throws {
-    let collected = ArrayList<StringView>{heap_allocator()};
-    collected.reserve(sizeof(SIGNAL_PAIRS) / sizeof(SIGNAL_PAIRS[0]));
-    for (let const &pair : SIGNAL_PAIRS)
-      collected.push(pair.name);
-    return collected;
-  }();
+  static ArrayList<StringView> names =
+      utils::collect_signal_names(SIGNAL_PAIRS, countof(SIGNAL_PAIRS));
+
   return names;
 }
 

@@ -958,52 +958,32 @@ fn process_from_pid(i64 pid) wontthrow -> process
   return reinterpret_cast<process>(encoded);
 }
 
+/* The numbers are the POSIX values the shell scripts name, and the Windows
+   runtime raises none of them, so the table is the whole of what this platform
+   answers. */
+static const utils::signal_pair SIGNAL_PAIRS[] = {
+    {1,  "HUP" },
+    {2,  "INT" },
+    {3,  "QUIT"},
+    {9,  "KILL"},
+    {15, "TERM"},
+};
+
 fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
-  if (name.is_all_decimal_digits()) {
-    const ErrorOr<i64> parsed_value = name.to<i64>();
-    if (parsed_value.is_error() || parsed_value.value() < INT32_MIN ||
-        parsed_value.value() > INT32_MAX)
-      return koshka::None;
-    return static_cast<i32>(parsed_value.value());
-  }
-
-  let const bare = utils::strip_sig_prefix(name);
-
-  static constexpr static_string_entry<i32> NAME_ENTRIES[] = {
-      {SSK("HUP"),  1 },
-      {SSK("QUIT"), 3 },
-      {SSK("KILL"), 9 },
-      {SSK("TERM"), 15},
-      {SSK("INT"),  2 },
-  };
-  static constexpr StaticStringMap NAMES{NAME_ENTRIES};
-  return NAMES.find(bare);
+  return utils::find_signal_number(SIGNAL_PAIRS, countof(SIGNAL_PAIRS), name);
 }
 
 fn signal_name_from_number(i32 number) -> Maybe<String>
 {
-  switch (number) {
-  case 1: return String{"HUP"};
-  case 2: return String{"INT"};
-  case 3: return String{"QUIT"};
-  case 9: return String{"KILL"};
-  case 15: return String{"TERM"};
-  }
-
-  return None;
+  return utils::find_signal_name(SIGNAL_PAIRS, countof(SIGNAL_PAIRS), number);
 }
 
 fn signal_names() throws -> const ArrayList<StringView> &
 {
-  static ArrayList<StringView> names = [] throws {
-    let collected = ArrayList<StringView>{heap_allocator()};
-    static const StringView WINDOWS_SIGNAL_NAMES[] = {"HUP", "INT", "QUIT",
-                                                      "KILL", "TERM"};
-    for (const StringView name : WINDOWS_SIGNAL_NAMES)
-      collected.push(name);
-    return collected;
-  }();
+  static ArrayList<StringView> names =
+      utils::collect_signal_names(SIGNAL_PAIRS, countof(SIGNAL_PAIRS));
+
   return names;
 }
 

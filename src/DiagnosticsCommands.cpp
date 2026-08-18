@@ -432,12 +432,12 @@ fn check_command_value_lints(AnalysisContext &actx,
      shellcheck SC2155. The value rides an Assignment token. */
   if (input.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN)) {
     let has_reported_substitution_value = false;
-    let does_declare_an_array = false;
+    let has_array_declaration = false;
     for (usize i = 1; i < args.count(); i++) {
       if (args[i]->kind() == Token::Kind::Assignment) {
         let const *assignment =
             static_cast<const tokens::Assignment *>(args[i]);
-        if (does_declare_an_array)
+        if (has_array_declaration)
           actx.add_array_valued_name(assignment->key().view());
 
         if (has_reported_substitution_value) continue;
@@ -469,13 +469,13 @@ fn check_command_value_lints(AnalysisContext &actx,
         if (view.find_character('a').has_value() ||
             view.find_character('A').has_value())
         {
-          does_declare_an_array = true;
+          has_array_declaration = true;
         }
 
         continue;
       }
 
-      if (!does_declare_an_array) continue;
+      if (!has_array_declaration) continue;
 
       let const target = operand_target_name(view);
       if (!target.is_empty()) actx.add_array_valued_name(target);

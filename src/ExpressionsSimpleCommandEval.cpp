@@ -612,11 +612,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                 ? String{cxt.scratch_allocator()}
                                 : program_args.back();
 
-  /* The command name is copied for the array-argument application below, since
-     the argument vector moves into the exec context before that point. */
-  let array_command_name = String{cxt.scratch_allocator()};
+  /* The command name is classified for the array-argument application below,
+     since the argument vector moves into the exec context before that point. */
+  let array_command_kind = assignment_builtin::None;
   if (!m_array_args.is_empty())
-    array_command_name = String{program_args[0].view()};
+    array_command_kind = classify_assignment_builtin(program_args[0].view());
 
   if (const Expression *function_body = command_word_function;
       function_body != nullptr)
@@ -754,7 +754,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     let const *source = cxt.current_source();
     resolved_ec = ExecContext::make_from(
         source_location(), source != nullptr ? source->view() : StringView{},
-        steal(program_args), cxt.mood(), cxt.koshkit(),
+        steal(program_args), cxt.mood(), cxt.koshkit_utilities_are_reachable(),
         cxt.get_program_resolver(), steal(program_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);
@@ -780,13 +780,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      outside a function has already errored and the elements never reach here.
    */
   if (!m_array_args.is_empty()) {
-    let const is_local = array_command_name == "local";
-    let const is_declare =
-        array_command_name == "declare" || array_command_name == "typeset";
+    let const is_local = array_command_kind == assignment_builtin::Local;
+    let const is_declare = array_command_kind == assignment_builtin::Declare;
     let const is_function_local = is_declare && cxt.in_function_scope();
-    let const is_export = array_command_name == "export";
+    let const is_export = array_command_kind == assignment_builtin::Export;
     /* The -r flag sits in the builtin's arguments, so it is read off them. */
-    let is_readonly_request = array_command_name == "readonly";
+    let is_readonly_request =
+        array_command_kind == assignment_builtin::Readonly;
     /* The -A flag routes to the string-keyed store rather than the indexed
        one. */
     let is_associative_request = false;

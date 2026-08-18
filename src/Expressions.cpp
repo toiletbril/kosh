@@ -471,7 +471,7 @@ static pure fn assign_form_target_name(StringView expansion_text) wontthrow
     -> StringView
 {
   let const name = expressions::operand_target_name(expansion_text);
-  if (!optimizer::is_plain_variable_name(name)) return StringView{};
+  if (!lexer::word_is_variable_name(name)) return StringView{};
 
   let remainder = expansion_text.substring(name.length);
   if (!remainder.is_empty() && remainder[0] == ':')
@@ -492,7 +492,7 @@ fn AnalysisContext::note_variable_read(StringView name,
   if (!is_top_level_unconditional) return;
   if (has_seen_runtime_definer) return;
 
-  if (!optimizer::is_plain_variable_name(name)) {
+  if (!lexer::word_is_variable_name(name)) {
     let const assigned = assign_form_target_name(name);
     if (!assigned.is_empty()) note_variable_assignment(assigned, location);
 
@@ -916,10 +916,11 @@ fn command_resolves(
 {
   if (name.is_empty()) return false;
   if (search_builtin(name).has_value()) return true;
-  /* The prepass runs only in the default mood, where a coreutil falls back to
-     its koshkit implementation, so a koshkit name resolves without a PATH
-     binary. */
-  if (koshkit::find_util(name).has_value()) return true;
+  if (actx.are_koshkit_utilities_reachable &&
+      koshkit::find_util(name).has_value())
+  {
+    return true;
+  }
   if (os::has_directory_separator(name)) {
     let const expanded = expanded_command_path(name, heap_allocator());
     let const typed_path = Path{expanded.view()};
@@ -1030,6 +1031,9 @@ fn analyze_ast(const Expression *root, StringView source,
   AnalysisContext actx{source};
   actx.warning_level = warning_level;
   actx.is_default_mood = is_default_mood;
+  actx.are_koshkit_utilities_reachable =
+      eval_context != nullptr ? eval_context->koshkit_utilities_are_reachable()
+                              : is_default_mood;
   actx.should_emit_annoying_diagnostics = should_emit_annoying_diagnostics;
   actx.shellcheck_suppressions = &shellcheck_suppressions;
   actx.should_silence_unresolved_commands = silence_unresolved_commands;
@@ -1152,6 +1156,21 @@ pure fn analysis_source_text(const AnalysisContext &actx,
       location.length > actx.source.length - location.position)
     return {};
   return actx.source.substring_of_length(location.position, location.length);
+}
+
+pure fn classify_assignment_builtin(StringView name) wontthrow
+    -> assignment_builtin
+{
+  static constexpr static_string_entry<assignment_builtin> ENTRIES[] = {
+      {SSK("declare"),  assignment_builtin::Declare },
+      {SSK("export"),   assignment_builtin::Export  },
+      {SSK("local"),    assignment_builtin::Local   },
+      {SSK("readonly"), assignment_builtin::Readonly},
+      {SSK("typeset"),  assignment_builtin::Declare },
+  };
+  static constexpr StaticStringMap ASSIGNMENT_BUILTINS{ENTRIES};
+
+  return ASSIGNMENT_BUILTINS.find(name).value_or(assignment_builtin::None);
 }
 
 /* A word segment spans the name and its modifiers, and the sigil and the braces

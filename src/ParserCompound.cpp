@@ -252,7 +252,7 @@ hot fn Parser::parse_for() throws -> Command *
       name_word.segments[0].kind == WordSegment::Kind::UnquotedText;
   if (is_name_plain) {
     is_name_plain =
-        optimizer::is_plain_variable_name(name_word.segments[0].text.view());
+        lexer::word_is_variable_name(name_word.segments[0].text.view());
   }
   if (!is_name_plain) {
     throw ErrorWithLocationAndDetails{name_token->source_location(),

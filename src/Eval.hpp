@@ -628,6 +628,10 @@ public:
   pure fn no_exec() const wontthrow -> bool;
   fn set_koshkit(bool enabled) wontthrow -> void;
   pure fn koshkit() const wontthrow -> bool;
+  pure fn koshkit_utilities_are_reachable() const wontthrow -> bool
+  {
+    return m_runtime.koshkit_utilities_are_reachable();
+  }
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
   /* Marks the glob strictness as the script's own set -o failglob rather than

@@ -669,7 +669,7 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
 
       /* A |& pipe routes the left command's stderr into the pipe too, the
          shorthand for 2>&1 |. */
-      let const does_left_pipe_stderr =
+      let const has_left_stderr_pipe =
           token->kind() == Token::Kind::PipeAmpersand;
       m_lexer.advance_past_last_peek();
       skip_newlines_after_pipe();
@@ -677,7 +677,7 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
       Pipeline *pipeline =
           m_lexer.arena().create<Pipeline>(token->source_location());
       pipeline->append_command(
-          does_left_pipe_stderr ? wrap_with_stderr_to_stdout(lhs) : lhs);
+          has_left_stderr_pipe ? wrap_with_stderr_to_stdout(lhs) : lhs);
 
       Token *last_pipe_token = token;
 
@@ -1138,18 +1138,6 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
   return redirected;
 }
 
-/* The bash assignment builtins that parse a NAME=(...) argument as an array
-   assignment. */
-static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
-{
-  static constexpr PackedStringKey KEYS[] = {
-      SSK("local"),    SSK("declare"), SSK("typeset"),
-      SSK("readonly"), SSK("export"),
-  };
-  static constexpr StaticStringSet ASSIGNMENT_BUILTINS{KEYS};
-  return ASSIGNMENT_BUILTINS.contains(name);
-}
-
 enum class command_position_word : u8
 {
   None,
@@ -1351,7 +1339,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
       if (!args_accumulator.is_empty()) {
         if (is_array_assignment) {
           let const command_name = args_accumulator[0]->raw_string();
-          if (is_assignment_builtin_name(command_name.view())) {
+          if (classify_assignment_builtin(command_name.view()) !=
+              assignment_builtin::None)
+          {
             ArrayList<const Token *> elements = consume_bash_array_assignment();
             array_args.push(
                 array_builtin_assignment{a->key().clone(), steal(elements),

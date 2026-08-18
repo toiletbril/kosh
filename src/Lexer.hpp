@@ -40,6 +40,7 @@ pure fn is_string_quote(char ch) wontthrow -> bool;
 pure fn is_expandable_char(char ch) wontthrow -> bool;
 pure fn is_variable_name_start(char ch) wontthrow -> bool;
 pure fn is_variable_name(char ch) wontthrow -> bool;
+pure fn word_is_variable_name(StringView word) wontthrow -> bool;
 pure fn word_looks_like_assignment(StringView word) wontthrow -> bool;
 pure fn is_extglob_operator(char ch) wontthrow -> bool;
 

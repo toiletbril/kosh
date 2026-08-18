@@ -63,7 +63,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
   if (path_status != ProgramResolver::Status::Missing) return resolves;
 
-  return (context.koshkit() || context.mood() == mimic_mood::Default) &&
+  return context.koshkit_utilities_are_reachable() &&
          koshkit::find_util(word).has_value();
 }
 
@@ -92,7 +92,7 @@ static fn command_word_prefixes_any(StringView word,
 
   if (context.get_program_resolver().command_name_has_prefix(word)) return true;
 
-  if (context.koshkit() || context.mood() == mimic_mood::Default) {
+  if (context.koshkit_utilities_are_reachable()) {
     for (let const &util_name : koshkit::util_names())
       if (do_has_prefix(util_name.view())) return true;
   }
@@ -115,14 +115,6 @@ static pure fn is_highlight_name_start(char c) wontthrow -> bool
 static pure fn is_highlight_name_char(char c) wontthrow -> bool
 {
   return lexer::is_variable_name(c);
-}
-
-pure fn word_is_plain_identifier(StringView word) wontthrow -> bool
-{
-  if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
-  for (usize i = 1; i < word.length; i++)
-    if (!is_highlight_name_char(word[i])) return false;
-  return true;
 }
 
 static pure fn is_highlight_function_name_char(char c) wontthrow -> bool
@@ -369,6 +361,26 @@ constexpr static_string_entry<keyword_spec> HIGHLIGHT_KEYWORD_ENTRIES[] = {
 };
 
 constexpr StaticStringMap HIGHLIGHT_KEYWORDS{HIGHLIGHT_KEYWORD_ENTRIES};
+
+/* The highlight table carries `[[` and `in`, which the lexer keyword table does
+   not hold, so the coupling is a subset test in one direction. */
+consteval fn every_lexer_keyword_has_a_highlight_spec() wontthrow -> bool
+{
+  for (let const &keyword : KEYWORD_ENTRIES) {
+    bool has_spec = false;
+    for (let const &spec : HIGHLIGHT_KEYWORD_ENTRIES) {
+      if (spec.key == keyword.key) has_spec = true;
+    }
+
+    if (!has_spec) return false;
+  }
+
+  return true;
+}
+
+static_assert(every_lexer_keyword_has_a_highlight_spec(),
+              "A lexer keyword reaches the highlighter with no spec, so its "
+              "construct never opens.");
 
 } /* namespace */
 
@@ -937,7 +949,7 @@ static pure fn variable_name_operand_of(StringView word) wontthrow -> StringView
     name = name.substring_of_length(0, bracket_position.value());
   }
 
-  return word_is_plain_identifier(name) ? name : StringView{};
+  return lexer::word_is_variable_name(name) ? name : StringView{};
 }
 
 /* A command substitution recurses with its own command-position and construct
@@ -1355,15 +1367,9 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (is_assignment && is_command_position) {
-      let assigned_name_end = word.find_character('=').value();
-      if (assigned_name_end > 0 && word[assigned_name_end - 1] == '+') {
-        assigned_name_end--;
-      }
-      let assigned_name = word.substring_of_length(0, assigned_name_end);
-      if (Maybe<usize> bracket = assigned_name.find_character('[');
-          bracket.has_value())
-        assigned_name = assigned_name.substring_of_length(0, bracket.value());
-      if (word_is_plain_identifier(assigned_name)) {
+      let const assigned_name = variable_name_operand_of(word);
+
+      if (!assigned_name.is_empty()) {
         pending_assignment_names.push(assigned_name);
         do_push(word_start, word_start + assigned_name.length,
                 highlight_role::assignment_name);
@@ -1445,7 +1451,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_variable_pending) {
       for_variable_pending = false;
       is_command_position = false;
-      if (!plain || !word_is_plain_identifier(word)) {
+      if (!plain || !lexer::word_is_variable_name(word)) {
         do_push(word_start, word_end, highlight_role::invalid_syntax);
       } else {
         do_push(word_start, word_end, highlight_role::variable);

@@ -30,7 +30,6 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
                        ArrayList<String> &errors) throws -> Maybe<String>;
 
 fn apply_source_fixes(StringView source, const ArrayList<source_fix> &fixes,
-                      bool safe_only = true,
                       ArrayList<diagnostic_id> *applied_origins =
                           nullptr) throws -> Maybe<String>;
 

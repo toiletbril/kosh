@@ -132,6 +132,22 @@ fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
 
 pure fn strip_sig_prefix(StringView name) wontthrow -> StringView;
 
+/* The signals a platform names. Each platform owns its own table, since the
+   numbers come from that platform's headers, and the three lookups below read
+   the table in both directions. */
+struct signal_pair
+{
+  i32 number;
+  StringView name;
+};
+
+fn find_signal_number(const signal_pair *pairs, usize pair_count,
+                      StringView name) throws -> Maybe<i32>;
+fn find_signal_name(const signal_pair *pairs, usize pair_count,
+                    i32 number) throws -> Maybe<String>;
+fn collect_signal_names(const signal_pair *pairs, usize pair_count) throws
+    -> ArrayList<StringView>;
+
 pure alwaysinline fn ascii_to_lower(char ch) wontthrow -> char
 {
   if (ch >= 'A' && ch <= 'Z') return static_cast<char>(ch - 'A' + 'a');

@@ -109,54 +109,53 @@ struct dynamic_variable_info
   StringView name;
   dynamic_var kind;
   bool is_process_sensitive;
-  bool is_bash_only_diagnostic;
 };
 
-#define DYNAMIC_VARIABLE(name, kind, process_sensitive, bash_only)             \
+#define DYNAMIC_VARIABLE(name, kind, process_sensitive)                        \
   {                                                                            \
     SSK(name),                                                                 \
     {                                                                          \
-      StringView{name, sizeof(name) - 1}, dynamic_var::kind,                   \
-          process_sensitive, bash_only                                         \
+      StringView{name, sizeof(name) - 1}, dynamic_var::kind, process_sensitive \
     }                                                                          \
   }
 
 constexpr static_string_entry<dynamic_variable_info> ALWAYS_DYNAMIC_ENTRIES[] =
     {
-        DYNAMIC_VARIABLE("IFS", IFS, false, false),
-        DYNAMIC_VARIABLE("LINENO", LINENO, false, false),
-        DYNAMIC_VARIABLE("KOSH_GIT_BRANCH", KOSH_GIT_BRANCH, false, false),
-        DYNAMIC_VARIABLE("KOSH_GIT_AHEAD", KOSH_GIT_AHEAD, false, false),
-        DYNAMIC_VARIABLE("KOSH_GIT_BEHIND", KOSH_GIT_BEHIND, false, false),
-        DYNAMIC_VARIABLE("KOSH_IDENTITY", KOSH_IDENTITY, false, false),
+        DYNAMIC_VARIABLE("IFS", IFS, false),
+        DYNAMIC_VARIABLE("LINENO", LINENO, false),
+        DYNAMIC_VARIABLE("KOSH_GIT_BRANCH", KOSH_GIT_BRANCH, false),
+        DYNAMIC_VARIABLE("KOSH_GIT_AHEAD", KOSH_GIT_AHEAD, false),
+        DYNAMIC_VARIABLE("KOSH_GIT_BEHIND", KOSH_GIT_BEHIND, false),
+        DYNAMIC_VARIABLE("KOSH_IDENTITY", KOSH_IDENTITY, false),
 };
 constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
 
+/* Every name here is a bash extension, so membership answers the bash-only
+   diagnostic. */
 constexpr static_string_entry<dynamic_variable_info> BASH_DYNAMIC_ENTRIES[] = {
-    DYNAMIC_VARIABLE("BASH_COMMAND", BASH_COMMAND, false, true),
-    DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false,
-                     true),
-    DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false, true),
-    DYNAMIC_VARIABLE("BASH_MONOSECONDS", BASH_MONOSECONDS, false, true),
-    DYNAMIC_VARIABLE("BASH_SOURCE", BASH_SOURCE, false, true),
-    DYNAMIC_VARIABLE("BASH_SUBSHELL", BASH_SUBSHELL, false, true),
-    DYNAMIC_VARIABLE("BASH_ARGV0", BASH_ARGV0, false, true),
-    DYNAMIC_VARIABLE("BASHPID", BASHPID, true, true),
-    DYNAMIC_VARIABLE("EPOCHREALTIME", EPOCHREALTIME, false, true),
-    DYNAMIC_VARIABLE("EPOCHSECONDS", EPOCHSECONDS, false, true),
-    DYNAMIC_VARIABLE("EUID", EUID, false, true),
-    DYNAMIC_VARIABLE("FUNCNAME", FUNCNAME, false, true),
-    DYNAMIC_VARIABLE("GROUPS", GROUPS, false, true),
-    DYNAMIC_VARIABLE("HOSTNAME", HOSTNAME, false, true),
-    DYNAMIC_VARIABLE("HOSTTYPE", HOSTTYPE, false, true),
-    DYNAMIC_VARIABLE("MACHTYPE", MACHTYPE, false, true),
-    DYNAMIC_VARIABLE("OSTYPE", OSTYPE, false, true),
-    DYNAMIC_VARIABLE("PPID", PPID, true, true),
-    DYNAMIC_VARIABLE("RANDOM", RANDOM, true, true),
-    DYNAMIC_VARIABLE("SECONDS", SECONDS, false, true),
-    DYNAMIC_VARIABLE("SHELLOPTS", SHELLOPTS, false, true),
-    DYNAMIC_VARIABLE("SRANDOM", SRANDOM, true, true),
-    DYNAMIC_VARIABLE("UID", UID, false, true),
+    DYNAMIC_VARIABLE("BASH_COMMAND", BASH_COMMAND, false),
+    DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false),
+    DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false),
+    DYNAMIC_VARIABLE("BASH_MONOSECONDS", BASH_MONOSECONDS, false),
+    DYNAMIC_VARIABLE("BASH_SOURCE", BASH_SOURCE, false),
+    DYNAMIC_VARIABLE("BASH_SUBSHELL", BASH_SUBSHELL, false),
+    DYNAMIC_VARIABLE("BASH_ARGV0", BASH_ARGV0, false),
+    DYNAMIC_VARIABLE("BASHPID", BASHPID, true),
+    DYNAMIC_VARIABLE("EPOCHREALTIME", EPOCHREALTIME, false),
+    DYNAMIC_VARIABLE("EPOCHSECONDS", EPOCHSECONDS, false),
+    DYNAMIC_VARIABLE("EUID", EUID, false),
+    DYNAMIC_VARIABLE("FUNCNAME", FUNCNAME, false),
+    DYNAMIC_VARIABLE("GROUPS", GROUPS, false),
+    DYNAMIC_VARIABLE("HOSTNAME", HOSTNAME, false),
+    DYNAMIC_VARIABLE("HOSTTYPE", HOSTTYPE, false),
+    DYNAMIC_VARIABLE("MACHTYPE", MACHTYPE, false),
+    DYNAMIC_VARIABLE("OSTYPE", OSTYPE, false),
+    DYNAMIC_VARIABLE("PPID", PPID, true),
+    DYNAMIC_VARIABLE("RANDOM", RANDOM, true),
+    DYNAMIC_VARIABLE("SECONDS", SECONDS, false),
+    DYNAMIC_VARIABLE("SHELLOPTS", SHELLOPTS, false),
+    DYNAMIC_VARIABLE("SRANDOM", SRANDOM, true),
+    DYNAMIC_VARIABLE("UID", UID, false),
 };
 constexpr StaticStringMap BASH_DYNAMIC{BASH_DYNAMIC_ENTRIES};
 
@@ -176,8 +175,7 @@ pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
 
 pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool
 {
-  let const info = BASH_DYNAMIC.find(name);
-  return info.has_value() && info->is_bash_only_diagnostic;
+  return BASH_DYNAMIC.find(name).has_value();
 }
 
 pure fn is_process_dynamic_variable_name(StringView name) wontthrow -> bool

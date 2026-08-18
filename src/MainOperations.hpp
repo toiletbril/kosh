@@ -1197,8 +1197,8 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let fixes = source_fixes_for_original_line_endings(
         snapshot->contents.view(), normalized_fixes);
     let applied_origins = ArrayList<diagnostic_id>{heap_allocator()};
-    let fixed = apply_source_fixes(snapshot->contents.view(), fixes, true,
-                                   &applied_origins);
+    let fixed =
+        apply_source_fixes(snapshot->contents.view(), fixes, &applied_origins);
     if (!fixed.has_value()) {
       show_message("Unable to apply non-conflicting fixes to '" + path.text() +
                    "'.");

@@ -68,6 +68,12 @@ public:
     return (shell_options & option_mask(option)) != 0;
   }
 
+  pure fn koshkit_utilities_are_reachable() const wontthrow -> bool
+  {
+    return option_is_enabled(shell_option_id::Koshkit) ||
+           mood == mimic_mood::Default;
+  }
+
   fn set_option(shell_option_id option, bool enabled) wontthrow -> void
   {
     if (enabled)

@@ -67,8 +67,6 @@ pure fn classify_plain_literal(const Word &word) wontthrow
 fn literal_word_value(const Word &word) throws -> Maybe<String>;
 fn literal_word_value(const Token *token) throws -> Maybe<String>;
 
-pure fn is_plain_variable_name(StringView name) wontthrow -> bool;
-
 /* The single plain variable name a word references, when the word is exactly
    one VariableReference segment whose text is a bare name with no parameter
    expansion modifier. None otherwise. The constant-propagation rule reads this

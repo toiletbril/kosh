@@ -82,7 +82,6 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
     -> String;
 fn split_completion_words(StringView line, usize cursor, usize &cword) throws
     -> ArrayList<String>;
-pure fn word_is_plain_identifier(StringView word) wontthrow -> bool;
 pure fn word_is_function_name(StringView word) wontthrow -> bool;
 pure fn word_defines_function(StringView line, usize word_end,
                               usize end) wontthrow -> bool;
@@ -98,6 +97,9 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
 
 /* Defined in CompletionManpage.cpp. */
 fn second_word_of(StringView line) wontthrow -> Maybe<StringView>;
+fn manpage_text_for(StringView page_name, EvalContext &context) throws
+    -> StringView;
+fn help_text_of(StringView command, EvalContext &context) throws -> StringView;
 fn complete_from_man_subcommands(StringView line, StringView token,
                                  usize token_start, completion_mode mode,
                                  EvalContext &context) throws

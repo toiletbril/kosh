@@ -316,7 +316,7 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
   for (let const &builtin_name : builtin_names())
     do_add(builtin_name.view());
 
-  if (context.koshkit() || context.mood() == mimic_mood::Default) {
+  if (context.koshkit_utilities_are_reachable()) {
     for (const String &util_name : koshkit::util_names())
       do_add(util_name.view());
   }
