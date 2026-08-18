@@ -1220,7 +1220,8 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   if (let assignment_split = word.get_assignment_split();
       assignment_split.has_value())
   {
-    assignment_split->value.segments.shrink_to_fit();
+    assignment_split->value.segments.move_to_allocator(
+        bump_allocator(*m_arena));
     token = m_arena->create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), assignment_split->name,
         steal(assignment_split->value), assignment_split->is_append);
@@ -1239,7 +1240,6 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   }
 
   if (token == nullptr) {
-    word.segments.shrink_to_fit();
     token = tokens::create_word_token(
         *m_arena, here(actual_cursor_position, byte_count), steal(word));
   }

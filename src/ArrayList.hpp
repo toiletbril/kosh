@@ -221,6 +221,32 @@ public:
     m_capacity = new_capacity;
   }
 
+  /* The exact-size move to another allocator. A list is built on the heap where
+     growth is cheap and is then parked in an arena without its growth slack. */
+  cold fn move_to_allocator(Allocator allocator) throws -> void
+  {
+    if (m_length == 0) {
+      if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
+      m_data = nullptr;
+      m_capacity = 0;
+      m_allocator = allocator;
+      return;
+    }
+
+    let const fresh = allocator.alloc_array<T>(m_length);
+    try {
+      relocate_to(fresh);
+    } catch (...) {
+      allocator.free_array(fresh, m_length);
+      throw;
+    }
+
+    m_allocator.free_array(m_data, m_capacity);
+    m_allocator = allocator;
+    m_data = fresh;
+    m_capacity = m_length;
+  }
+
   cold fn shrink_to_fit() throws -> void
   {
     if (m_length == m_capacity) return;

@@ -603,6 +603,10 @@ fn ExpandedWordToken::raw_string() const throws -> String { return m_literal; }
 fn create_word_token(BumpArena &arena, SourceLocation location,
                      Word word) throws -> WordToken *
 {
+  /* The list is grown on the heap and parked here, so the token and its
+     segments share one arena block run and one lifetime. */
+  word.segments.move_to_allocator(bump_allocator(arena));
+
   if (borrowed_word_literal(word).has_value())
     return arena.create<WordToken>(steal(location), steal(word));
 

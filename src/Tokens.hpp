@@ -157,8 +157,14 @@ public:
   ~Word() { release_constant_value(); }
 
   /* A copy carries the segments alone. The flattened text is a cache, and it is
-     rebuilt on the copy when something asks for it. */
-  cold Word(const Word &other) throws : segments(other.segments) {}
+     rebuilt on the copy when something asks for it. The copy is held on the
+     heap, because the original may sit in an arena the copy has to outlive. */
+  cold Word(const Word &other) throws : segments(heap_allocator())
+  {
+    segments.reserve(other.segments.count());
+    for (let const &segment : other.segments)
+      segments.push(segment.clone(heap_allocator()));
+  }
 
   Word(Word &&other) wontthrow
       : segments(steal(other.segments)),
