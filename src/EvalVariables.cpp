@@ -402,22 +402,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(static_cast<i64>(m_subshell_depth),
                               heap_allocator());
         case dynamic_var::BASH_SOURCE:
-          for (usize i = m_source_frames.count(); i > 0; i--) {
-            let const &path = m_source_frames[i - 1].source_path;
-            if (!path.is_empty()) {
-              return String{heap_allocator(), path.view()};
-            }
-          }
-          if (funcname_frame_count() > 0) {
-            let const *info =
-                m_function_definition_infos.find(funcname_frame_at(0));
-            if (info != nullptr && !info->filename.is_empty()) {
-              return String{heap_allocator(), info->filename.view()};
-            }
-          }
-          if (m_is_script_run)
-            return String{heap_allocator(), m_shell_name.view()};
-          return String{heap_allocator()};
+          return String{heap_allocator(), bash_source_frame_at(0)};
         case dynamic_var::BASH_LINENO:
           if (funcname_frame_count() > 0)
             return String::from(funcname_line_at(0), heap_allocator());

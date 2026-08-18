@@ -1,0 +1,167 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign kosh_binary=$(koshkit realpath "$BIN")]
+  [CompoundListCondition, None]
+    [Assign d=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$kosh_binary" "./main.sh"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$kosh_binary" "--mood" "sh" "-c" "echo "sh-mood=[${BASH_SOURCE[0]}]""]
+  [CompoundListCondition, None]
+    [SimpleCommand "$kosh_binary" "-c" "echo "command-string=[$BASH_SOURCE] depth=[${#BASH_SOURCE[@]}]""]
+  [CompoundListCondition, None]
+    [Assign own_name=$("$kosh_binary" -c 'f() { echo "${BASH_SOURCE[0]}"; }; f')]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "$own_name" "=" "$kosh_binary" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "command-string-function=own-name"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-n" "$d" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "rm" "-r" "$d"]
+[Word
+  Unquoted "kosh_binary="
+  CommandSubstitution "koshkit realpath "$BIN""
+]
+[Word
+  Unquoted "d="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "lib.sh"
+]
+[Word
+  Literal "EOF"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "main.sh"
+]
+[Word
+  Literal "EOF"
+]
+[Word
+  Variable "kosh_binary"
+]
+[Word
+  Unquoted "./main.sh"
+]
+[Word
+  Variable "kosh_binary"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "echo "sh-mood=[${BASH_SOURCE[0]}]""
+]
+[Word
+  Variable "kosh_binary"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "echo "command-string=[$BASH_SOURCE] depth=[${#BASH_SOURCE[@]}]""
+]
+[Word
+  Unquoted "own_name="
+  CommandSubstitution ""$kosh_binary" -c 'f() { echo "${BASH_SOURCE[0]}"; }; f'"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "own_name"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "kosh_binary"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "command-string-function=own-name"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Variable "d"
+]
+main-scalar=./main.sh
+main[0]=./main.sh depth=1
+lib-top=./lib.sh depth=2
+sourcing-call=./lib.sh ./lib.sh ./main.sh depth=3
+inner[0]=./lib.sh
+inner[1]=./main.sh
+inner-all=./lib.sh ./main.sh depth=2
+inner-last=./main.sh
+inner-past=[]
+inner[0]=./lib.sh
+inner[1]=./main.sh
+inner-all=./lib.sh ./main.sh ./main.sh depth=3
+inner-last=./main.sh
+inner-past=[]
+sh-mood=[]
+command-string=[] depth=[0]
+command-string-function=own-name
+[Code 0]

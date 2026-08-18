@@ -409,6 +409,23 @@ public:
   mustuse fn funcname_line_at(usize index) const throws -> usize;
   /* A frame past the source stack reports an empty path. */
   mustuse fn funcname_source_at(usize index) const wontthrow -> StringView;
+  /* The BASH_SOURCE frame list, the innermost sourced file first and the script
+     name at the bottom. A frame past the stack reports an empty path. */
+  mustuse fn bash_source_frame_at(usize index) const wontthrow -> StringView;
+  mustuse fn bash_source_frame_count() const wontthrow -> usize;
+
+  enum class CallStackVariable : u8
+  {
+    FunctionName,
+    LineNumber,
+    SourcePath,
+  };
+  mustuse fn call_stack_frame_count(CallStackVariable which) const wontthrow
+      -> usize;
+  mustuse fn call_stack_frame_text(CallStackVariable which, usize index,
+                                   Allocator result_allocator) const throws
+      -> String;
+
   mustuse fn
   line_number_at_location(const SourceLocation &location) const throws -> usize;
   fn set_script_run(bool is_script_run) wontthrow -> void

@@ -1,0 +1,35 @@
+#!/bin/env kosh
+kosh_binary=$(koshkit realpath "$BIN")
+d=$(mktemp -d)
+cd "$d"
+koshkit cat > lib.sh <<'EOF'
+inner()
+{
+  printf 'inner[0]=%s\n' "${BASH_SOURCE[0]}"
+  printf 'inner[1]=%s\n' "${BASH_SOURCE[1]}"
+  printf 'inner-all=%s depth=%s\n' "${BASH_SOURCE[*]}" "${#BASH_SOURCE[@]}"
+  printf 'inner-last=%s\n' "${BASH_SOURCE[-1]}"
+  printf 'inner-past=[%s]\n' "${BASH_SOURCE[9]}"
+}
+printf 'lib-top=%s depth=%s\n' "${BASH_SOURCE[0]}" "${#BASH_SOURCE[@]}"
+called_while_sourcing()
+{
+  printf 'sourcing-call=%s depth=%s\n' "${BASH_SOURCE[*]}" "${#BASH_SOURCE[@]}"
+}
+called_while_sourcing
+EOF
+koshkit cat > main.sh <<'EOF'
+printf 'main-scalar=%s\n' "$BASH_SOURCE"
+printf 'main[0]=%s depth=%s\n' "${BASH_SOURCE[0]}" "${#BASH_SOURCE[@]}"
+. ./lib.sh
+inner
+wrap() { inner; }
+wrap
+EOF
+"$kosh_binary" ./main.sh
+"$kosh_binary" --mood sh -c 'echo "sh-mood=[${BASH_SOURCE[0]}]"'
+"$kosh_binary" -c 'echo "command-string=[$BASH_SOURCE] depth=[${#BASH_SOURCE[@]}]"'
+own_name=$("$kosh_binary" -c 'f() { echo "${BASH_SOURCE[0]}"; }; f')
+[ "$own_name" = "$kosh_binary" ] && echo "command-string-function=own-name"
+cd /
+[ -n "$d" ] && rm -r "$d"

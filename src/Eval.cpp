@@ -778,6 +778,82 @@ pure fn EvalContext::funcname_source_at(usize index) const wontthrow
   return StringView{};
 }
 
+pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
+    -> StringView
+{
+  if (index < m_function_call_names.count()) {
+    let const *info =
+        m_function_definition_infos.find(funcname_frame_at(index));
+    if (info != nullptr && !info->filename.is_empty())
+      return info->filename.view();
+
+    return m_shell_name.view();
+  }
+
+  usize frame_index = m_function_call_names.count();
+  let outermost_source_path = StringView{};
+  for (usize i = m_source_frames.count(); i > 0; i--) {
+    let const &path = m_source_frames[i - 1].source_path;
+    if (path.is_empty()) continue;
+
+    if (frame_index == index) return path.view();
+    frame_index++;
+    outermost_source_path = path.view();
+  }
+
+  /* The script closes the stack unless it is already the outermost source. */
+  if (m_is_script_run && index == frame_index &&
+      outermost_source_path != m_shell_name.view())
+  {
+    return m_shell_name.view();
+  }
+
+  return StringView{};
+}
+
+pure fn EvalContext::bash_source_frame_count() const wontthrow -> usize
+{
+  usize frame_count = m_function_call_names.count();
+
+  let outermost_source_path = StringView{};
+  for (usize i = m_source_frames.count(); i > 0; i--) {
+    let const &path = m_source_frames[i - 1].source_path;
+    if (path.is_empty()) continue;
+
+    frame_count++;
+    outermost_source_path = path.view();
+  }
+
+  if (m_is_script_run && outermost_source_path != m_shell_name.view())
+    frame_count++;
+
+  return frame_count;
+}
+
+fn EvalContext::call_stack_frame_count(CallStackVariable which) const wontthrow
+    -> usize
+{
+  if (which == CallStackVariable::SourcePath) return bash_source_frame_count();
+
+  return funcname_frame_count();
+}
+
+fn EvalContext::call_stack_frame_text(CallStackVariable which, usize index,
+                                      Allocator result_allocator) const throws
+    -> String
+{
+  switch (which) {
+  case CallStackVariable::FunctionName:
+    return String{result_allocator, funcname_frame_at(index)};
+  case CallStackVariable::LineNumber:
+    return String::from(funcname_line_at(index), result_allocator);
+  case CallStackVariable::SourcePath:
+    return String{result_allocator, bash_source_frame_at(index)};
+  }
+
+  return String{result_allocator};
+}
+
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
 {
   return m_local_scope_depth != 0;

@@ -4,10 +4,20 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {
+
+static constexpr static_string_entry<EvalContext::CallStackVariable>
+    CALL_STACK_VARIABLE_ENTRIES[] = {
+        {SSK("BASH_LINENO"), EvalContext::CallStackVariable::LineNumber  },
+        {SSK("BASH_SOURCE"), EvalContext::CallStackVariable::SourcePath  },
+        {SSK("FUNCNAME"),    EvalContext::CallStackVariable::FunctionName},
+};
+static constexpr StaticStringMap CALL_STACK_VARIABLES{
+    CALL_STACK_VARIABLE_ENTRIES};
 
 static fn sparse_array_key(StringView name, usize index,
                            Allocator allocator) throws -> String
@@ -579,10 +589,9 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
 
 fn EvalContext::array_element_count(StringView name) const throws -> usize
 {
-  if ((name == "FUNCNAME" || name == "BASH_LINENO") &&
-      bash_dynamic_variables_enabled()) [[unlikely]]
-  {
-    return funcname_frame_count();
+  if (bash_dynamic_variables_enabled()) [[unlikely]] {
+    if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value())
+      return call_stack_frame_count(*which);
   }
 
   if (is_associative_array(name)) {
@@ -620,60 +629,41 @@ fn EvalContext::apply_array_subscript(
     StringView name, StringView subscript,
     const SourceLocation *source_location) throws -> String
 {
-  if (name == "FUNCNAME" && bash_dynamic_variables_enabled()) [[unlikely]] {
-    let const depth = funcname_frame_count();
-    if (subscript == "@" || subscript == "*") {
-      /* The * form joins with the first IFS byte, the @ form with a space. */
-      let separator = ' ';
-      let has_separator = true;
-      if (subscript == "*") {
-        has_separator = !m_field_separators.is_empty();
-        if (has_separator) separator = m_field_separators.first_character();
-      }
-      let out = String{scratch_allocator()};
-      for (usize i = 0; i < depth; i++) {
-        if (i > 0 && has_separator) {
-          out.push(separator);
-        }
-        out.append(funcname_frame_at(i));
-      }
-      return out;
-    }
-    let const index = evaluate_arithmetic(subscript, source_location);
-    if (index >= 0 && static_cast<usize>(index) < depth) {
-      return String{scratch_allocator(),
-                    funcname_frame_at(static_cast<usize>(index))};
-    }
-    return String{scratch_allocator()};
-  }
+  if (bash_dynamic_variables_enabled()) [[unlikely]] {
+    if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value()) {
+      let const depth = call_stack_frame_count(*which);
 
-  if (name == "BASH_LINENO" && bash_dynamic_variables_enabled()) [[unlikely]] {
-    let const depth = funcname_frame_count();
-    if (subscript == "@" || subscript == "*") {
-      let separator = ' ';
-      let has_separator = true;
-      if (subscript == "*") {
-        has_separator = !m_field_separators.is_empty();
-        if (has_separator) separator = m_field_separators.first_character();
-      }
-      let out = String{scratch_allocator()};
-      for (usize i = 0; i < depth; i++) {
-        if (i > 0 && has_separator) {
-          out.push(separator);
+      if (subscript == "@" || subscript == "*") {
+        /* The * form joins with the first IFS byte, the @ form with a space. */
+        let separator = ' ';
+        let has_separator = true;
+        if (subscript == "*") {
+          has_separator = !m_field_separators.is_empty();
+          if (has_separator) separator = m_field_separators.first_character();
         }
-        out.append(String::from(funcname_line_at(i), heap_allocator()).view());
-      }
-      return out;
-    }
 
-    let const index = evaluate_arithmetic(subscript, source_location);
-    if (index >= 0 && static_cast<usize>(index) < depth) {
-      return String{scratch_allocator(),
-                    String::from(funcname_line_at(static_cast<usize>(index)),
-                                 heap_allocator())
-                        .view()};
+        let out = String{scratch_allocator()};
+        for (usize i = 0; i < depth; i++) {
+          if (i > 0 && has_separator) {
+            out.push(separator);
+          }
+          out.append(
+              call_stack_frame_text(*which, i, scratch_allocator()).view());
+        }
+
+        return out;
+      }
+
+      let index = evaluate_arithmetic(subscript, source_location);
+      if (index < 0) index += static_cast<i64>(depth);
+
+      if (index >= 0 && static_cast<usize>(index) < depth) {
+        return call_stack_frame_text(*which, static_cast<usize>(index),
+                                     scratch_allocator());
+      }
+
+      return String{scratch_allocator()};
     }
-    return String{scratch_allocator()};
   }
 
   /* The associative values come back in the store's order, which need not match
@@ -754,27 +744,19 @@ fn EvalContext::apply_array_subscript(
 fn EvalContext::collect_array_elements(StringView name) const throws
     -> ArrayList<String>
 {
-  if (name == "FUNCNAME" && bash_dynamic_variables_enabled() &&
-      funcname_frame_count() > 0) [[unlikely]]
-  {
-    let const depth = funcname_frame_count();
-    let frames = ArrayList<String>{heap_allocator()};
-    frames.reserve(depth);
-    for (usize i = 0; i < depth; i++)
-      frames.push_managed(funcname_frame_at(i));
-    return frames;
-  }
+  if (bash_dynamic_variables_enabled()) [[unlikely]] {
+    if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value()) {
+      let const depth = call_stack_frame_count(*which);
 
-  if (name == "BASH_LINENO" && bash_dynamic_variables_enabled() &&
-      funcname_frame_count() > 0) [[unlikely]]
-  {
-    let const depth = funcname_frame_count();
-    let lines = ArrayList<String>{heap_allocator()};
-    lines.reserve(depth);
-    for (usize i = 0; i < depth; i++)
-      lines.push_managed(
-          String::from(funcname_line_at(i), heap_allocator()).view());
-    return lines;
+      if (depth > 0) {
+        let frames = ArrayList<String>{heap_allocator()};
+        frames.reserve(depth);
+        for (usize i = 0; i < depth; i++)
+          frames.push(call_stack_frame_text(*which, i, heap_allocator()));
+
+        return frames;
+      }
+    }
   }
 
   if (is_associative_array(name)) return associative_values(name);

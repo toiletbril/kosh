@@ -196,6 +196,15 @@ Sparse indexed array names are tracked separately. Resetting a dense array does
 not scan unrelated sparse entries. A one-element PIPESTATUS update reuses its
 dense slot.
 
+FUNCNAME, BASH_LINENO, and BASH_SOURCE share one call stack accessor.
+`call_stack_frame_count` and `call_stack_frame_text` on EvalContext answer for
+all three, and one static table in src/EvalArrays.cpp maps the name to a
+`CallStackVariable` selector. The length query, the subscript path, and the full
+element collection each read that table once. The BASH_SOURCE frame list is the
+function definition file of each active call, then the live source paths with
+the innermost first, then the script name unless it is already the outermost
+source path. A negative subscript counts back from the frame count.
+
 ### Jobs and process execution
 
 An asynchronous pipeline job owns every stage process. POSIX stages share one
