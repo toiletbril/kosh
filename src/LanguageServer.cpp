@@ -1,3 +1,4 @@
+#include "CompletionInternal.hpp"
 #include "LanguageServerProtocol.hpp"
 #include "ShellVariables.hpp"
 
@@ -27,6 +28,8 @@ enum class request_method : u8
   Hover,
   SemanticTokens,
   DocumentSymbols,
+  PrepareRename,
+  Rename,
 };
 
 constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
@@ -44,8 +47,16 @@ constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
     {SSK("textDocument/hover"),               request_method::Hover            },
     {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens   },
     {SSK("textDocument/documentSymbol"),      request_method::DocumentSymbols  },
+    {SSK("textDocument/prepareRename"),       request_method::PrepareRename    },
+    {SSK("textDocument/rename"),              request_method::Rename           },
 };
 constexpr StaticStringMap REQUEST_METHODS{REQUEST_METHOD_ENTRIES};
+
+enum class rename_kind : u8
+{
+  variable,
+  command,
+};
 
 class Server : public AnalysisSourceProvider
 {
@@ -74,6 +85,13 @@ private:
       -> bool;
   fn document_symbols(const JsonValue *id, const JsonValue *params) throws
       -> bool;
+  fn prepare_rename(const JsonValue *id, const JsonValue *params) throws
+      -> bool;
+  fn rename(const JsonValue *id, const JsonValue *params) throws -> bool;
+  fn rename_kind_of(const document_symbol &symbol) throws -> Maybe<rename_kind>;
+  fn collect_rename_spans(const Document &document, rename_kind kind,
+                          StringView name,
+                          ArrayList<document_symbol> &out_spans) throws -> void;
   fn code_actions(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn publish_diagnostics(Document &document) throws -> bool;
   fn send_diagnostics(const Document &document,
@@ -321,7 +339,8 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   result.append(",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
                 "\"completionProvider\":{\"resolveProvider\":true},"
                 "\"definitionProvider\":true,\"hoverProvider\":true,"
-                "\"documentSymbolProvider\":true,");
+                "\"documentSymbolProvider\":true,"
+                "\"renameProvider\":{\"prepareProvider\":true},");
   if (m_supports_quick_fixes || m_supports_fix_all) {
     result.append("\"codeActionProvider\":{\"codeActionKinds\":[");
     if (m_supports_quick_fixes) result.append("\"quickfix\"");
@@ -976,11 +995,18 @@ pure fn role_reads_function(highlight_role role) wontthrow -> bool
          role == highlight_role::unknown_command;
 }
 
-pure fn variable_name_of(StringView text) wontthrow -> StringView
+pure fn variable_name_start_of(StringView text) wontthrow -> usize
 {
   usize start = 0;
   if (!text.is_empty() && text[0] == '$') start++;
   if (start < text.length && text[start] == '{') start++;
+
+  return start;
+}
+
+pure fn variable_name_of(StringView text) wontthrow -> StringView
+{
+  let const start = variable_name_start_of(text);
   let end = start;
 
   while (end < text.length) {
@@ -1064,6 +1090,186 @@ fn Server::definition(const JsonValue *id, const JsonValue *params) throws
   append_protocol_range(response, *document, target->start, target->end,
                         m_encoding);
   response.push('}');
+
+  return send_result(id, response.view());
+}
+
+/* The protocol code for a request the server understood and refused. */
+constexpr i64 REQUEST_FAILED_ERROR = -32803;
+
+/* A word that only prefixes a PATH entry still sits in command position, and it
+   is renamed with the rest once the document defines the name. */
+pure fn role_names_command(highlight_role role) wontthrow -> bool
+{
+  return role_reads_function(role) || role == highlight_role::partial_command;
+}
+
+pure fn spans_hold_definition(const ArrayList<document_symbol> &spans) wontthrow
+    -> bool
+{
+  for (let const &span : spans) {
+    if (span.role == highlight_role::function_name) return true;
+  }
+
+  return false;
+}
+
+fn Server::rename_kind_of(const document_symbol &symbol) throws
+    -> Maybe<rename_kind>
+{
+  if (role_reads_variable(symbol.role)) {
+    if (!completion::word_is_plain_identifier(
+            variable_name_of(symbol.text.view())))
+      return None;
+
+    return rename_kind::variable;
+  }
+
+  if (!role_names_command(symbol.role)) return None;
+  if (!completion::word_is_function_name(symbol.text.view())) return None;
+
+  return rename_kind::command;
+}
+
+fn Server::collect_rename_spans(const Document &document, rename_kind kind,
+                                StringView name,
+                                ArrayList<document_symbol> &out_spans) throws
+    -> void
+{
+  for (usize line = 0; line < document.line_starts.count(); line++) {
+    let const line_start = document.line_starts[line];
+    let line_end = document.normalized_source.count();
+    if (line + 1 < document.line_starts.count())
+      line_end = document.line_starts[line + 1] - 1;
+    let const *spans = m_highlight_cache.spans_for(
+        document.normalized_source.view(), line_start, line_end, m_context);
+
+    for (let const &span : *spans) {
+      let const is_wanted = kind == rename_kind::variable
+                                ? role_reads_variable(span.role)
+                                : role_names_command(span.role);
+      if (!is_wanted) continue;
+      let const start = line_start + span.start;
+      let const end = line_start + span.end;
+      let const text =
+          document.normalized_source.substring_of_length(start, end - start);
+
+      if (kind == rename_kind::command) {
+        if (text != name) continue;
+        out_spans.push(document_symbol{String{name}, span.role, start, end});
+        continue;
+      }
+
+      if (variable_name_of(text) != name) continue;
+      let const name_start = start + variable_name_start_of(text);
+      out_spans.push(document_symbol{String{name}, span.role, name_start,
+                                     name_start + name.length});
+    }
+  }
+}
+
+/* An alias and a function are defined in the open document, so a command name
+   is renamed only when that definition is present. A program on PATH keeps its
+   name everywhere. */
+fn Server::prepare_rename(const JsonValue *id, const JsonValue *params) throws
+    -> bool
+{
+  let const request = request_positioned_document(params);
+  if (!request.has_value()) return send_result(id, "null");
+  let *document = request->document;
+  select_document_mood(*document);
+  let const symbol = symbol_at(*document, request->position);
+  if (!symbol.has_value()) return send_result(id, "null");
+  let const kind = rename_kind_of(*symbol);
+  if (!kind.has_value()) return send_result(id, "null");
+  let const is_variable = *kind == rename_kind::variable;
+  let const name =
+      is_variable ? variable_name_of(symbol->text.view()) : symbol->text.view();
+  let spans = ArrayList<document_symbol>{heap_allocator()};
+  collect_rename_spans(*document, *kind, name, spans);
+
+  if (!is_variable && !spans_hold_definition(spans)) {
+    return send_result(id, "null");
+  }
+
+  let const name_start =
+      symbol->start +
+      (is_variable ? variable_name_start_of(symbol->text.view()) : 0);
+  let response = String{"{\"range\":"};
+  append_protocol_range(response, *document, name_start,
+                        name_start + name.length, m_encoding);
+  response.append(",\"placeholder\":");
+  append_json_string(response, name);
+  response.push('}');
+
+  return send_result(id, response.view());
+}
+
+fn Server::rename(const JsonValue *id, const JsonValue *params) throws -> bool
+{
+  let const request = request_positioned_document(params);
+  if (!request.has_value()) return send_result(id, "null");
+  let *document = request->document;
+  select_document_mood(*document);
+  let const symbol = symbol_at(*document, request->position);
+  if (!symbol.has_value()) {
+    return send_error(id, REQUEST_FAILED_ERROR,
+                      "There is no renameable symbol here.");
+  }
+  let const kind = rename_kind_of(*symbol);
+  if (!kind.has_value()) {
+    return send_error(id, REQUEST_FAILED_ERROR,
+                      "This symbol cannot be renamed.");
+  }
+  let const is_variable = *kind == rename_kind::variable;
+  let const new_name = string_field(params, "newName");
+  let const is_new_name_valid =
+      new_name.has_value() &&
+      (is_variable ? completion::word_is_plain_identifier(*new_name)
+                   : completion::word_is_function_name(*new_name));
+
+  if (!is_new_name_valid) {
+    return send_error(id, REQUEST_FAILED_ERROR,
+                      is_variable
+                          ? "A variable name holds letters, digits, and "
+                            "underscores, and never opens with a digit."
+                          : "A command name holds no shell metacharacter.");
+  }
+
+  let const name =
+      is_variable ? variable_name_of(symbol->text.view()) : symbol->text.view();
+  let spans = ArrayList<document_symbol>{heap_allocator()};
+  collect_rename_spans(*document, *kind, name, spans);
+
+  if (!is_variable && !spans_hold_definition(spans)) {
+    return send_error(id, REQUEST_FAILED_ERROR,
+                      "This command is not defined in this document.");
+  }
+
+  let response = String{"{"};
+  if (m_supports_document_changes) {
+    response.append("\"documentChanges\":[{\"textDocument\":{\"uri\":");
+    append_json_string(response, document->uri.view());
+    response.append(",\"version\":");
+    append_json_integer(response, document->version);
+    response.append("},\"edits\":[");
+  } else {
+    response.append("\"changes\":{");
+    append_json_string(response, document->uri.view());
+    response.append(":[");
+  }
+
+  for (usize span_index = 0; span_index < spans.count(); span_index++) {
+    if (span_index != 0) response.push(',');
+    response.append("{\"range\":");
+    append_protocol_range(response, *document, spans[span_index].start,
+                          spans[span_index].end, m_encoding);
+    response.append(",\"newText\":");
+    append_json_string(response, *new_name);
+    response.push('}');
+  }
+
+  response.append(m_supports_document_changes ? "]}]}" : "]}}");
 
   return send_result(id, response.view());
 }
@@ -1807,6 +2013,8 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
   case request_method::Hover: return hover(id, params);
   case request_method::SemanticTokens: return semantic_tokens(id, params);
   case request_method::DocumentSymbols: return document_symbols(id, params);
+  case request_method::PrepareRename: return prepare_rename(id, params);
+  case request_method::Rename: return rename(id, params);
   case request_method::Initialize:
   case request_method::Initialized:
   case request_method::Shutdown:

@@ -412,6 +412,21 @@ scope stack turns an entry contained by a function body into a child of that
 function. A child range is clamped to its parent range. One name assigned again
 in the same scope is one row.
 
+A rename walks the highlight spans of every line of the open document. A
+variable rename collects the variable, unset variable, and assignment name
+roles, and it edits only the name bytes inside a span, so the sigils and braces
+of `$name` and `${name}` are kept. A command rename collects the function name,
+resolved command, unknown command, and partial command roles, and it replaces
+the whole span. `role_names_command` widens `role_reads_function` with the
+partial command role, because a name that also prefixes a PATH entry carries
+that role once the command index is warm. `spans_hold_definition` refuses a
+command rename with no function name span in the document, so a builtin, a
+bundled utility, and a program on PATH keep their names. A new name is checked
+with `word_is_plain_identifier` for a variable and `word_is_function_name` for a
+command, and a refusal is reported as protocol error -32803. An alias definition
+name carries a function name span in the tolerant highlighter, so go to
+definition and rename both reach it.
+
 A document mood is selected from a recognized shebang, then from the client
 language identifier, then from a recognized document extension. The
 `shellscript` identifier selects the bash mood.

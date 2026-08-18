@@ -167,10 +167,11 @@ The editor starts this mode and associates it with
 and
 .BR *.kosh .
 The server supplies diagnostics, quick fixes, completion, navigation, command
-information, semantic tokens, and a document outline. A fix-all action applies
-every non-conflicting safe fix in the open document. Completion in command
-position offers the shell keywords, the builtins, the bundled utilities, the
-functions and the aliases of the document, and the commands on the active PATH.
+information, semantic tokens, a document outline, and rename. A fix-all action
+applies every non-conflicting safe fix in the open document. Completion in
+command position offers the shell keywords, the builtins, the bundled
+utilities, the functions and the aliases of the document, and the commands on
+the active PATH.
 A keyword item is a keyword to the client and every other item is a function.
 A command item carries the name it completes, and the help text of that command
 is produced when the client resolves the item, so only the highlighted item
@@ -204,7 +205,17 @@ prints. Hover over a command the document does not define reports the external
 help text. A builtin is answered first, then a program on the active PATH, and
 the bundled utility answers only for a name PATH does not hold, which is the
 order an ordinary command word resolves in. Markdown content is used when the
-client advertises it. The mood is
+client advertises it.
+A variable, a function, and an alias are renamed across the open document. A
+read written as
+.B $name
+or
+.B ${name}
+keeps its sigils and braces, and only the name bytes are replaced. A command
+name is renamed only when the document defines it, so a builtin, a bundled
+utility, and a program on the active PATH are refused. A new variable name
+holds letters, digits, and underscores and never opens with a digit. A new
+command name holds no shell metacharacter. The mood is
 selected from a recognized shebang first, then from the client language
 identifier, then from a recognized document extension. An unrecognized document
 uses the
