@@ -465,7 +465,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   } catch (const Error &e) {
     SourceLocation span = source_location();
     if (source_end_position() > span.position)
-      span.length = source_end_position() - span.position;
+      span.length = static_cast<u32>(source_end_position() - span.position);
     relocate_error(e, span);
   }
   LOG(Debug, "the [[ ]] conditional yielded status %lld",

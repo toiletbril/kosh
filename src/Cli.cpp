@@ -306,8 +306,8 @@ static fn attached_flag_value_location(
       argument_location(argv, argument_index, base_position, arg_locations);
   if (location.length != std::strlen(argv[argument_index])) return location;
 
-  location.position += static_cast<usize>(value - argv[argument_index]);
-  location.length = std::strlen(value);
+  location.position += static_cast<u32>(value - argv[argument_index]);
+  location.length = static_cast<u32>(std::strlen(value));
   return location;
 }
 

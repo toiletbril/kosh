@@ -530,7 +530,8 @@ fn window_function_body_error(EvalContext &cxt,
   }
 
   let rebased = error.location();
-  rebased.position = resolved.to_render_position(rebased.position);
+  rebased.position =
+      static_cast<u32>(resolved.to_render_position(rebased.position));
   rebased.filename = resolved.filename_or_none();
   if (rebased.position > resolved.text->count()) return None;
 

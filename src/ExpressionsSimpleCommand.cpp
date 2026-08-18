@@ -310,7 +310,8 @@ SimpleCommand::SimpleCommand(SourceLocation location,
     let const first = m_args[0]->source_location();
     let const last = m_args.back()->source_location();
     m_location.position = first.position;
-    m_location.length = last.position + last.length - first.position;
+    m_location.length =
+        static_cast<u32>(last.position + last.length - first.position);
   }
 }
 

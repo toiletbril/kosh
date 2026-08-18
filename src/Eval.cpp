@@ -425,7 +425,8 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     let const resolved_source = resolve_render_source(location);
     usize line_offset = 0;
     if (resolved_source.is_windowed) {
-      location.position = resolved_source.to_render_position(location.position);
+      location.position = static_cast<u32>(
+          resolved_source.to_render_position(location.position));
       location.filename = resolved_source.filename_or_none();
       line_offset = resolved_source.line_offset;
     }

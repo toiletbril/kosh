@@ -399,10 +399,13 @@ and the foreground program command line while it runs.
 
 ### Diagnostics and source locations
 
-src/Errors.cpp renders located carets and trailing notes. Diagnostic identifiers
-live in src/Diagnostics.hpp. A type whose name contains WithLocation owns or
-inherits a source location. A type whose name contains WithDetails owns a
-trailing note. The semantic classes remain separate for catch routing.
+src/Errors.cpp renders located carets and trailing notes. A SourceLocation holds
+a 32-bit position and a 32-bit length beside the source name. Every token and
+every syntax node carries one, so the pair is narrow. The constructor accepts
+usize, so a call site that computes an offset needs no cast. Diagnostic
+identifiers live in src/Diagnostics.hpp. A type whose name contains WithLocation
+owns or inherits a source location. A type whose name contains WithDetails owns
+a trailing note. The semantic classes remain separate for catch routing.
 ErrorWithLocationAndDetails may store a second location.
 
 `relocate_error` wraps an unlocated error with a span and retains its details.

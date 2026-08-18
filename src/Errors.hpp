@@ -31,11 +31,23 @@ pure inline fn get_error_severity_word(error_severity severity) wontthrow
   unreachable("invalid error severity %d", ENUM(severity));
 }
 
+/* The offsets are 32-bit because one shell source is far below four gigabytes,
+   and every token and every syntax node carries one of these. The constructor
+   accepts usize so the many call sites that compute an offset need no cast. */
 struct SourceLocation
 {
-  usize position{0};
-  usize length{0};
+  u32 position{0};
+  u32 length{0};
   Maybe<StringView> filename{};
+
+  SourceLocation() = default;
+
+  SourceLocation(usize position, usize length,
+                 Maybe<StringView> filename = {}) wontthrow
+      : position{static_cast<u32>(position)},
+        length{static_cast<u32>(length)},
+        filename{steal(filename)}
+  {}
 
   pure fn get_source_text(StringView source) const wontthrow
       -> Maybe<StringView>

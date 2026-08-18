@@ -24,7 +24,7 @@ hot fn Parser::parse_if() throws -> Command *
   ASSERT(if_token->kind() == Token::Kind::If);
   let const location = if_token->source_location();
 
-  LOG(Debug, "parsing an if clause at byte %zu", location.position);
+  LOG(Debug, "parsing an if clause at byte %u", location.position);
 
   let branches = ArrayList<if_branch>{heap_allocator()};
   const Expression *otherwise = nullptr;
@@ -77,7 +77,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   ASSERT(keyword != nullptr);
   let const location = keyword->source_location();
 
-  LOG(Debug, "parsing a %s loop at byte %zu", is_until ? "until" : "while",
+  LOG(Debug, "parsing a %s loop at byte %u", is_until ? "until" : "while",
       location.position);
 
   Expression *condition = parse_command_list(token_kind_mask(Token::Kind::Do));
@@ -198,7 +198,7 @@ hot fn Parser::parse_for() throws -> Command *
   ASSERT(keyword != nullptr);
   let const location = keyword->source_location();
 
-  LOG(Debug, "parsing a for loop at byte %zu", location.position);
+  LOG(Debug, "parsing a for loop at byte %u", location.position);
 
   /* A for header opening with (( is the bash C-style loop, riding every mood
      but POSIX where the bare-name reading holds. */
@@ -300,7 +300,7 @@ hot fn Parser::parse_select() throws -> Command *
   ASSERT(is_unquoted_word(keyword, "select"));
   let const location = keyword->source_location();
 
-  LOG(Debug, "parsing a select loop at byte %zu", location.position);
+  LOG(Debug, "parsing a select loop at byte %u", location.position);
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
@@ -368,7 +368,7 @@ hot fn Parser::parse_case() throws -> Command *
   ASSERT(keyword != nullptr);
   let const location = keyword->source_location();
 
-  LOG(Debug, "parsing a case clause at byte %zu", location.position);
+  LOG(Debug, "parsing a case clause at byte %u", location.position);
 
   Token *word = m_lexer.next_shell_token();
   ASSERT(word != nullptr);
@@ -493,7 +493,7 @@ hot fn Parser::parse_brace_group() throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(is_unquoted_word(open, "{"));
 
-  LOG(Debug, "parsing a brace group at byte %zu",
+  LOG(Debug, "parsing a brace group at byte %u",
       open->source_location().position);
 
   Expression *body =
@@ -544,8 +544,7 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
-  LOG(Debug, "parsing a subshell at byte %zu",
-      open->source_location().position);
+  LOG(Debug, "parsing a subshell at byte %u", open->source_location().position);
 
   let const scope_mark = open_analysis_scope();
   Expression *body =
@@ -621,7 +620,7 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
 
 hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 {
-  LOG(Debug, "parsing an arithmetic command at byte %zu",
+  LOG(Debug, "parsing an arithmetic command at byte %u",
       open->source_location().position);
 
   let const body = capture_double_paren_body(open);
@@ -639,7 +638,7 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 hot fn Parser::parse_c_style_for(const SourceLocation &location,
                                  Token *open) throws -> Command *
 {
-  LOG(Debug, "parsing a c-style for header at byte %zu", location.position);
+  LOG(Debug, "parsing a c-style for header at byte %u", location.position);
 
   let const header = capture_double_paren_body(open);
 
@@ -710,7 +709,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(is_unquoted_word(open, "[["));
 
-  LOG(Debug, "parsing a conditional command at byte %zu",
+  LOG(Debug, "parsing a conditional command at byte %u",
       open->source_location().position);
 
   /* The tokens between [[ and ]] are collected raw rather than run through the
@@ -827,7 +826,8 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             do_append_segments(next);
           }
           SourceLocation regex_location = first->source_location();
-          regex_location.length = end_position - regex_location.position;
+          regex_location.length =
+              static_cast<u32>(end_position - regex_location.position);
           elements.push({Kind::Operand,
                          m_lexer.arena().create<tokens::WordToken>(
                              regex_location, steal(regex_word)),
