@@ -64,19 +64,20 @@ struct active_getopts_call
   SourceLocation location;
 };
 
-/* One function this script defines. The name points into the syntax tree, which
-   outlives the analysis. */
+/* One function this script defines. The whole-script sweep reads these after
+   the walk, so the name is owned and never a slice of the syntax tree. */
 struct function_definition_record
 {
-  StringView name;
+  String name;
   SourceLocation location;
   bool has_positional_reads{false};
 };
 
-/* One call of a name this script defines as a function. */
+/* One call of a name this script defines as a function. The name is owned for
+   the same reason the definition name is. */
 struct function_call_record
 {
-  StringView name;
+  String name;
   SourceLocation location;
   bool has_arguments{false};
   bool is_inside_function_body{false};

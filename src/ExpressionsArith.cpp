@@ -1058,8 +1058,10 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.loop_body_depth = 0;
   let const saved_active_function = actx.active_function_definition_index;
   actx.active_function_definition_index = actx.function_definitions.count();
-  actx.function_definitions.push(
-      function_definition_record{m_name.view(), source_location()});
+  actx.function_definitions.push(function_definition_record{
+      String{heap_allocator(), m_name.view()},
+      source_location()
+  });
   /* Both syntactic forms take their node location from the name token. The body
      span is the one that slices to valid shell. */
   actx.note_function_body_record(m_name.view(), source_location().position,

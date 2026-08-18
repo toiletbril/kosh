@@ -158,6 +158,10 @@ fn BumpArena::release(Mark saved) wontthrow -> void
 
   run_destructors_down_to(saved.destructor_count);
 
+  /* The rewound span is handed out again, so a cache holding an address inside
+     it would read a later object. */
+  m_reset_generation++;
+
   for (usize i = saved.block_index + 1; i < m_blocks.count(); i++)
     m_blocks[i].used = 0;
 

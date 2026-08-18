@@ -1167,7 +1167,7 @@ fn build_function_name_summaries(const AnalysisContext &actx) throws
 
   for (usize index = 0; index < actx.function_definitions.count(); index++) {
     let const &definition = actx.function_definitions[index];
-    let &summary = summaries.get_or_create(definition.name, {});
+    let &summary = summaries.get_or_create(definition.name.view(), {});
     if (summary.first_definition_index != NO_DEFINITION_INDEX) continue;
 
     summary.first_definition_index = index;
@@ -1175,7 +1175,7 @@ fn build_function_name_summaries(const AnalysisContext &actx) throws
   }
 
   for (let const &call : actx.function_calls) {
-    let const summary = summaries.find(call.name);
+    let const summary = summaries.find(call.name.view());
     if (summary == nullptr) continue;
 
     if (call.has_arguments) {
@@ -1200,13 +1200,13 @@ fn check_function_argument_use(AnalysisContext &actx,
   }
 
   actx.report_diagnostic(diagnostic_id::sc2120, definition.location,
-                         {definition.name});
+                         {definition.name.view()});
 
   for (let const &call : actx.function_calls) {
     if (call.name != definition.name) continue;
 
     actx.report_diagnostic(diagnostic_id::sc2119, call.location,
-                           {definition.name}, definition.location);
+                           {definition.name.view()}, definition.location);
   }
 }
 
@@ -1219,14 +1219,14 @@ fn check_call_before_definition(
 
     /* A name that is also a builtin runs the builtin until the definition is
        reached, so the earlier call is not a forward reference. */
-    if (search_builtin(call.name).has_value()) continue;
+    if (search_builtin(call.name.view()).has_value()) continue;
 
-    let const summary = summaries.find(call.name);
+    let const summary = summaries.find(call.name.view());
     if (summary == nullptr) continue;
     if (call.location.position >= summary->first_definition_position) continue;
 
     actx.report_diagnostic(
-        diagnostic_id::sc2218, call.location, {call.name},
+        diagnostic_id::sc2218, call.location, {call.name.view()},
         actx.function_definitions[summary->first_definition_index].location);
   }
 }
@@ -1257,7 +1257,7 @@ fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
       if (!definition.has_positional_reads) continue;
 
       /* A redefinition is judged by the first body the file gives the name. */
-      let const summary = summaries.find(definition.name);
+      let const summary = summaries.find(definition.name.view());
       if (summary == nullptr || summary->first_definition_index != index)
         continue;
 

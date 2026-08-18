@@ -481,13 +481,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   let const is_command_shadowed = command_is_defined_function ||
                                   actx.known_aliases.contains(command_literal);
 
-  /* A literal command word borrows from the syntax tree, which outlives the
-     sweep. A word the analysis had to build lives in a local and is left out.
-   */
   if (command_is_defined_function && borrowed_command_literal.has_value()) {
     actx.function_calls.push(function_call_record{
-        command_literal, m_args[0]->source_location(), m_args.count() > 1,
-        actx.function_scope_depth != 0});
+        String{heap_allocator(), command_literal},
+        m_args[0]->source_location(),
+        m_args.count() > 1, actx.function_scope_depth != 0
+    });
   }
 
   let const command_info = get_analysis_command_info(command_literal);
