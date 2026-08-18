@@ -23,9 +23,17 @@ enum class format_piece_kind : u8
 struct format_piece
 {
   StringView text;
-  usize source_position;
+  u32 source_position;
   format_piece_kind kind;
   bool does_start_line{false};
+
+  format_piece(StringView text, usize source_position, format_piece_kind kind,
+               bool does_start_line) wontthrow
+      : text{text},
+        source_position{static_cast<u32>(source_position)},
+        kind{kind},
+        does_start_line{does_start_line}
+  {}
 };
 
 struct pending_heredoc
@@ -260,7 +268,7 @@ fn scan_format_operator_end(StringView source, usize position) wontthrow
 fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
 {
   let pieces = ArrayList<format_piece>{heap_allocator()};
-  pieces.reserve(source.length / 8 + 1);
+  pieces.reserve(source.length / 6 + 1);
   let pending_heredocs = ArrayList<pending_heredoc>{heap_allocator()};
   usize position = 0;
   usize line_start = 0;
@@ -1143,7 +1151,14 @@ fn validate_formatted_source(StringView source, mimic_mood mood,
     -> bool
 {
   let const mark = arena.mark();
-  defer { arena.release(mark); };
+  let const function_mark = FUNCTION_ARENA != nullptr
+                                ? FUNCTION_ARENA->mark()
+                                : BumpArena::Mark{0, 0, 0};
+  defer
+  {
+    arena.release(mark);
+    if (FUNCTION_ARENA != nullptr) FUNCTION_ARENA->release(function_mark);
+  };
   let parser = Parser{
       Lexer{source, arena, false, None, mood}
   };
@@ -1157,11 +1172,16 @@ fn validate_formatted_source(StringView source, mimic_mood mood,
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
                        ArrayList<String> &errors) throws -> Maybe<String>
 {
-  let normalized = String{source};
-  normalized.normalize_crlf_line_endings();
-  if (!validate_formatted_source(normalized.view(), mood, arena, errors))
-    return None;
-  let const pieces = scan_format_pieces(normalized.view());
+  let normalized = String{heap_allocator()};
+  let source_view = source;
+  if (source.find_character('\r').has_value()) {
+    normalized = String{source};
+    normalized.normalize_crlf_line_endings();
+    source_view = normalized.view();
+  }
+
+  if (!validate_formatted_source(source_view, mood, arena, errors)) return None;
+  let const pieces = scan_format_pieces(source_view);
   let formatted = render_format_pieces(pieces);
   let formatted_errors = ArrayList<String>{heap_allocator()};
   if (!validate_formatted_source(formatted.view(), mood, arena,
