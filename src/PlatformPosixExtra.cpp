@@ -770,6 +770,16 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
     stats.mapped_bytes = info.hblkhd < 0 ? 0 : static_cast<usize>(info.hblkhd);
   }
   return true;
+#elif defined __APPLE__
+  /* The default zone answers for every ordinary malloc, and the size allocated
+     is the region total the zone holds from the kernel. */
+  malloc_statistics_t zone_stats{};
+  malloc_zone_statistics(malloc_default_zone(), &zone_stats);
+  stats.bytes_in_use = zone_stats.size_in_use;
+  stats.arena_bytes = zone_stats.size_allocated;
+  stats.mapped_bytes = zone_stats.max_size_in_use;
+
+  return true;
 #else
   unused(stats);
   return false;

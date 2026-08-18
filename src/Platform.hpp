@@ -43,6 +43,7 @@
 #include <dlfcn.h>
 #include <libproc.h>
 #include <mach-o/dyld.h>
+#include <malloc/malloc.h>
 #include <sys/proc.h>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
