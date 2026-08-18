@@ -407,7 +407,8 @@ source with no name. A row is copied once and never released, so a stamped
 index stays readable for the life of the run and across a fork. The lexer
 interns the file name once and stamps that index onto every location it
 produces. The constructor accepts usize, so a call site that computes an offset
-needs no cast. Diagnostic
+needs no cast. A syntax node keeps its end position in the four-byte hole that
+location leaves, and the accessor still answers in usize. Diagnostic
 identifiers live in src/Diagnostics.hpp. A type whose name contains WithLocation
 owns or inherits a source location. A type whose name contains WithDetails owns
 a trailing note. The semantic classes remain separate for catch routing.

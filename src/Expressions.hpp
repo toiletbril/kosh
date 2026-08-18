@@ -558,7 +558,9 @@ protected:
   virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
 
   SourceLocation m_location;
-  usize m_source_end_position;
+  /* This sits in the hole the twelve-byte location leaves, and a source beyond
+     four gigabytes is already out of reach of the location itself. */
+  u32 m_source_end_position;
 };
 
 namespace expressions {

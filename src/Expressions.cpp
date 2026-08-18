@@ -48,7 +48,7 @@ pure fn Expression::source_end_position() const wontthrow -> usize
 
 fn Expression::set_source_end_position(usize position) wontthrow -> void
 {
-  m_source_end_position = position;
+  m_source_end_position = static_cast<u32>(position);
 }
 
 cold fn Expression::to_ast_string(usize layer) const throws -> String
