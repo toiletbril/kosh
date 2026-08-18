@@ -349,7 +349,7 @@ static fn word_token_from_assignment(BumpArena &arena,
       WordSegment{WordSegment::Kind::UnquotedText, steal(prefix), false});
   for (let const &segment : a->value_word().segments)
     word.segments.push(segment.clone());
-  return arena.create<tokens::WordToken>(a->source_location(), steal(word));
+  return tokens::create_word_token(arena, a->source_location(), steal(word));
 }
 
 static fn word_token_from_raw(BumpArena &arena, StringView text,
@@ -359,7 +359,7 @@ static fn word_token_from_raw(BumpArena &arena, StringView text,
   let word = Word{};
   word.segments.push(
       WordSegment{WordSegment::Kind::UnquotedText, String{text}, false});
-  return arena.create<tokens::WordToken>(steal(location), steal(word));
+  return tokens::create_word_token(arena, steal(location), steal(word));
 }
 
 hot fn Parser::parse_case() throws -> Command *
@@ -828,10 +828,11 @@ hot fn Parser::parse_conditional_command() throws -> Command *
           SourceLocation regex_location = first->source_location();
           regex_location.length =
               static_cast<u32>(end_position - regex_location.position);
-          elements.push({Kind::Operand,
-                         m_lexer.arena().create<tokens::WordToken>(
-                             regex_location, steal(regex_word)),
-                         false, None});
+          elements.push(
+              {Kind::Operand,
+               tokens::create_word_token(m_lexer.arena(), regex_location,
+                                         steal(regex_word)),
+               false, None});
         }
       }
       break;

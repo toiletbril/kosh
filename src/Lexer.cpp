@@ -1240,8 +1240,8 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
   if (token == nullptr) {
     word.segments.shrink_to_fit();
-    token = m_arena->create<tokens::WordToken>(
-        here(actual_cursor_position, byte_count), steal(word));
+    token = tokens::create_word_token(
+        *m_arena, here(actual_cursor_position, byte_count), steal(word));
   }
 
   m_cached_offset = byte_count;
@@ -1455,8 +1455,8 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
   word.segments.push(
       WordSegment{WordSegment::Kind::ProcessSubstitution, steal(inner), false});
   word.segments.back().set_source_span(open_position, byte_count);
-  let t = m_arena->create<tokens::WordToken>(here(open_position, byte_count),
-                                             steal(word));
+  let t = tokens::create_word_token(*m_arena, here(open_position, byte_count),
+                                    steal(word));
   m_cached_offset = byte_count;
   return t;
 }

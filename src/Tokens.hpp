@@ -7,6 +7,7 @@
 
 namespace koshka {
 
+class BumpArena;
 class Expression;
 
 struct word_assignment_split;
@@ -445,33 +446,7 @@ protected:
   bool m_is_append;
 };
 
-class Value : public Token
-{
-public:
-  Value(SourceLocation location, StringView sv);
-
-  fn raw_string() const throws -> String override;
-
-  fn raw_view() const wontthrow -> Maybe<StringView> override
-  {
-    return m_value.view();
-  }
-
-protected:
-  String m_value;
-};
-
-#define VALUE_TOKEN_STRUCT(t)                                                  \
-  class t : public Value                                                       \
-  {                                                                            \
-  public:                                                                      \
-    t(SourceLocation location, StringView sv);                                 \
-                                                                               \
-    Kind kind() const wontthrow override;                                      \
-    Flags flags() const wontthrow override;                                    \
-  }
-
-class WordToken : public Value
+class WordToken : public Token
 {
 public:
   WordToken(SourceLocation location, Word word);
@@ -479,11 +454,31 @@ public:
   fn kind() const wontthrow -> Kind override;
   fn flags() const wontthrow -> Flags override;
 
+  fn raw_string() const throws -> String override;
+  fn raw_view() const wontthrow -> Maybe<StringView> override;
+
   pure fn word() const wontthrow -> const Word &;
 
 protected:
   Word m_word;
 };
+
+/* A word carrying a substitution or several segments has no single segment to
+   borrow the flattened text from, so the flattened form is owned here. */
+class ExpandedWordToken : public WordToken
+{
+public:
+  ExpandedWordToken(SourceLocation location, Word word);
+
+  fn raw_string() const throws -> String override;
+  fn raw_view() const wontthrow -> Maybe<StringView> override;
+
+protected:
+  String m_literal;
+};
+
+fn create_word_token(BumpArena &arena, SourceLocation location,
+                     Word word) throws -> WordToken *;
 
 class Operator : public Token
 {

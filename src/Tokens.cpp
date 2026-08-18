@@ -487,12 +487,6 @@ SENTINEL_TOKEN_DECLS(RightParen, ")");
 SENTINEL_TOKEN_DECLS(LeftBracket, "{");
 SENTINEL_TOKEN_DECLS(RightBracket, "}");
 
-Value::Value(SourceLocation location, StringView sv)
-    : Token(steal(location)), m_value(sv)
-{}
-
-fn Value::raw_string() const throws -> String { return m_value; }
-
 Assignment::Assignment(SourceLocation location, StringView key, Word value,
                        bool is_append)
     : Token(steal(location)), m_key(key), m_value(steal(value)),
@@ -526,10 +520,44 @@ pure fn Assignment::value_word() const wontthrow -> const Word &
   return m_value;
 }
 
-WordToken::WordToken(SourceLocation location, Word word)
-    : Value(steal(location), ""), m_word(steal(word))
+namespace {
+
+/* A word whose flattened text is already spelled out by one of its segments,
+   so nothing has to be built and owned to answer for it. */
+pure fn borrowed_word_literal(const Word &word) wontthrow -> Maybe<StringView>
 {
-  m_value = m_word.to_literal_string();
+  if (word.segments.is_empty()) return StringView{};
+  if (word.segments.count() != 1) return None;
+
+  switch (word.segments.front().kind) {
+  case WordSegment::Kind::LiteralText:
+  case WordSegment::Kind::UnquotedText:
+  case WordSegment::Kind::DoubleQuotedText:
+  case WordSegment::Kind::ProcessSubstitution:
+    return word.segments.front().text.view();
+  default: return None;
+  }
+}
+
+} /* namespace */
+
+WordToken::WordToken(SourceLocation location, Word word)
+    : Token(steal(location)), m_word(steal(word))
+{}
+
+fn WordToken::raw_view() const wontthrow -> Maybe<StringView>
+{
+  return borrowed_word_literal(m_word);
+}
+
+fn WordToken::raw_string() const throws -> String
+{
+  if (let const borrowed = borrowed_word_literal(m_word); borrowed.has_value())
+  {
+    return String{heap_allocator(), *borrowed};
+  }
+
+  return m_word.to_literal_string();
 }
 
 fn WordToken::kind() const wontthrow -> Token::Kind
@@ -543,6 +571,27 @@ fn WordToken::flags() const wontthrow -> Token::Flags
 }
 
 pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }
+
+ExpandedWordToken::ExpandedWordToken(SourceLocation location, Word word)
+    : WordToken(steal(location), steal(word)),
+      m_literal(m_word.to_literal_string())
+{}
+
+fn ExpandedWordToken::raw_view() const wontthrow -> Maybe<StringView>
+{
+  return m_literal.view();
+}
+
+fn ExpandedWordToken::raw_string() const throws -> String { return m_literal; }
+
+fn create_word_token(BumpArena &arena, SourceLocation location,
+                     Word word) throws -> WordToken *
+{
+  if (borrowed_word_literal(word).has_value())
+    return arena.create<WordToken>(steal(location), steal(word));
+
+  return arena.create<ExpandedWordToken>(steal(location), steal(word));
+}
 
 Redirection::Redirection(SourceLocation location, StringView what_fd,
                          StringView to_file)
