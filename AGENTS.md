@@ -307,7 +307,11 @@ holds no user variables or functions. A `NAME=value` operand of an
 assignment builtin is recorded beside the prefix and standalone forms. The
 operand reaches analysis as an assignment token, or as a word the shared
 `Word::get_assignment_split` splits, and an element operand records its base
-name without a literal.
+name without a literal. A quoted operand such as `export "name=value"` is
+split by `Word::get_quoted_assignment_split`, which gathers the name across the
+literal segments the quoting produced. Word expansion does not read that split,
+so the SC2086 and SC2046 exemptions are unaffected. The outline selects the
+whole entry when the recorded name is not a slice of the source.
 
 Each record carries the binder that produced it. The binders are an ordinary
 assignment, a `for` word, a `select` word, an arithmetic assignment, a `read`

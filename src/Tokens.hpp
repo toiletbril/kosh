@@ -144,6 +144,13 @@ public:
 
   fn get_assignment_split() const throws -> Maybe<word_assignment_split>;
 
+  /* The split for an operand whose name is quoted, such as "name=value", which
+     an assignment builtin still assigns. The name may run across several
+     literal segments. Word expansion is unaffected, so this is read by
+     analysis alone. */
+  cold fn get_quoted_assignment_split() const throws
+      -> Maybe<word_assignment_split>;
+
   enum class PlainLiteral : u8
   {
     NotPlain,

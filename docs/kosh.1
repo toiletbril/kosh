@@ -180,7 +180,9 @@ of
 .BR export ,
 or
 .B readonly
-is a variable assignment too. A name bound by
+is a variable assignment too, and the operand may be quoted, as in
+.BR "export \(dqname=value\(dq" .
+A name bound by
 .BR for ,
 .BR select ,
 .BR read ,

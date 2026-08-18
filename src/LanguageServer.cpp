@@ -1032,15 +1032,25 @@ fn document_outline(const Document &document) throws -> ArrayList<outline_entry>
                                name_end});
   }
 
+  let const source = document.normalized_source.view();
+
   for (let const &record : document.symbol_records.assignments) {
     if (record.position >= source_length) continue;
     let const name_end = record.position + record.name.count();
     let const end = record.length > record.name.count()
                         ? record.position + record.length
                         : name_end;
+
+    /* A quoted operand spells the name across quotes, so the name span is not
+       a slice of the source and the whole entry is selected. */
+    let const is_name_verbatim =
+        name_end <= source_length &&
+        source.substring_of_length(record.position, record.name.count()) ==
+            record.name.view();
+
     entries.push(outline_entry{record.name.view(), OUTLINE_VARIABLE_KIND,
                                record.position, end, record.position,
-                               name_end});
+                               is_name_verbatim ? name_end : end});
   }
 
   /* A container has to precede what it holds, so a wider span sorts first when

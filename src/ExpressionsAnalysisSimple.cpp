@@ -528,9 +528,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         recorded_value = &assignment->value_word();
         is_append = assignment->is_append();
       } else if (m_args[i]->kind() == Token::Kind::Word) {
-        split = static_cast<const tokens::WordToken *>(m_args[i])
-                    ->word()
-                    .get_assignment_split();
+        let const &word =
+            static_cast<const tokens::WordToken *>(m_args[i])->word();
+
+        split = word.get_assignment_split();
+        if (!split.has_value()) split = word.get_quoted_assignment_split();
         if (!split.has_value()) continue;
 
         recorded_name = split->name.view();

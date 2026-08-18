@@ -347,6 +347,87 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   return word_assignment_split{steal(name), steal(value), is_append};
 }
 
+static pure fn segment_holds_literal_text(WordSegment::Kind kind) wontthrow
+    -> bool
+{
+  return kind == WordSegment::Kind::LiteralText ||
+         kind == WordSegment::Kind::UnquotedText ||
+         kind == WordSegment::Kind::DoubleQuotedText;
+}
+
+/* The name characters ahead of the first literal =, gathered across the
+   literal segments the quoting split the operand into. */
+static fn quoted_assignment_name_prefix(const ArrayList<WordSegment> &segments,
+                                        usize &equals_segment,
+                                        usize &equals_position) throws -> String
+{
+  let prefix = String{heap_allocator()};
+
+  for (usize i = 0; i < segments.count(); i++) {
+    if (!segment_holds_literal_text(segments[i].kind)) break;
+
+    let const text = segments[i].text.view();
+    let const found = text.find_character('=');
+    if (!found.has_value()) {
+      prefix.append(text);
+      continue;
+    }
+
+    prefix.append(text.substring_of_length(0, *found));
+    equals_segment = i;
+    equals_position = *found;
+    break;
+  }
+
+  return prefix;
+}
+
+cold fn Word::get_quoted_assignment_split() const throws
+    -> Maybe<word_assignment_split>
+{
+  let equals_segment = segments.count();
+  let equals_position = usize{0};
+  let const prefix =
+      quoted_assignment_name_prefix(segments, equals_segment, equals_position);
+  if (equals_segment == segments.count()) return koshka::None;
+
+  let const prefix_view = prefix.view();
+  let const is_append =
+      !prefix_view.is_empty() && prefix_view[prefix_view.length - 1] == '+';
+  let const name_length =
+      is_append ? prefix_view.length - 1 : prefix_view.length;
+  if (name_length == 0) return koshka::None;
+
+  if (!lexer::is_variable_name_start(prefix_view[0])) return koshka::None;
+
+  usize name_cursor = 1;
+  while (name_cursor < name_length &&
+         lexer::is_variable_name(prefix_view[name_cursor]))
+    name_cursor++;
+
+  if (name_cursor < name_length && prefix_view[name_cursor] == '[') {
+    if (prefix_view[name_length - 1] != ']' || name_length - name_cursor < 3) {
+      return koshka::None;
+    }
+    name_cursor = name_length;
+  }
+
+  if (name_cursor != name_length) return koshka::None;
+
+  const WordSegment &carrier = segments[equals_segment];
+
+  let value = Word{};
+  value.segments.push(WordSegment{carrier.kind,
+                                  carrier.text.substring(equals_position + 1),
+                                  carrier.is_in_double_quotes});
+  for (usize i = equals_segment + 1; i < segments.count(); i++)
+    value.segments.push(segments[i]);
+
+  return word_assignment_split{
+      String{prefix_view.substring_of_length(0, name_length)}, steal(value),
+      is_append};
+}
+
 namespace tokens {
 
 #define KEYWORD_TOKEN_DECLS(t, s)                                              \
