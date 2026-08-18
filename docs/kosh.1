@@ -164,9 +164,8 @@ The editor starts this mode and associates it with
 .BR *.sh ,
 .BR *.dash ,
 .BR *.bash ,
-.BR *.kosh ,
 and
-.BR *.shit .
+.BR *.kosh .
 The server supplies diagnostics, quick fixes, completion, navigation, command
 information, semantic tokens, and a document outline. A fix-all action applies
 every non-conflicting safe fix in the open document. The outline is a tree of
@@ -225,6 +224,13 @@ NAME selects
 .BR sh ,
 or
 .BR bash-posix .
+The name
+.B default
+is accepted for kosh, and
+.B posix
+and
+.B dash
+are accepted for sh.
 .TP
 .BR \-L ", " \-\-init\-moods =\fILIST\fR
 Startup files for each listed mood are sourced in order. LIST accepts
@@ -882,7 +888,8 @@ recency determine the ranking.
 .SS Compatibility forms
 .TP
 .B set
-A minus enables an option. A plus disables it. The forms
+With no option and no operand, the shell variables are printed as sorted
+assignments. A minus enables an option. A plus disables it. The forms
 .BR "set \-o NAME" " and " "set +o NAME"
 select the option by long name. With no NAME,
 .B set \-o
@@ -899,7 +906,19 @@ and
 forms control errtrace, physical directory resolution, functrace, and brace
 expansion. The custom forms
 .BR "set \-\-mood" " and " "set \-\-init\-moods"
-use the same mood table as the command-line options. The
+use the same mood table as the command-line options, and
+.B \-M
+and
+.B \-L
+are their short names. Without a value,
+.B set \-\-mood
+prints the active mood name. The
+.BR \-b ,
+.BR \-h ,
+.BR \-k ,
+and
+.B \-m
+letters are accepted without effect. The
 .BR \-W ,
 .BR \-WW ,
 and
@@ -933,11 +952,21 @@ option records path as the location of each name.
 .B history
 The
 .B \-r
-option reads the history file. The
+and
+.B \-n
+options read the history file into the list. The
 .B \-w
-option writes it. The
+and
+.B \-a
+options write the list to the file. The
 .B \-c
-option clears the stored history.
+option clears the stored history, and
+.B \-p
+prints its operands without storing them. The
+.B \-d
+and
+.B \-s
+options accept their operands and leave the list unchanged.
 .TP
 .B "fc [\-e editor] [\-lnr] [first [last]]"
 The selected history events are edited and executed in the current shell. A
@@ -982,9 +1011,10 @@ Without a pattern, builtin names are printed one per line. A builtin name
 renders the same help as its
 .B \-\-help
 flag. An unknown name is an error. The
-.B \-d
+.BR \-d ,
+.BR \-m ,
 and
-.B \-m
+.B \-s
 flags are accepted without effect.
 .TP
 .B logout
@@ -997,19 +1027,71 @@ operation unless
 .B \-f
 is present.
 .TP
-.BR "declare, local, typeset, readonly"
-These builtins accept
+.BR "declare, typeset"
+An indexed array is declared by
+.BR \-a ,
+an associative array by
+.BR \-A ,
+an arithmetic integer by
+.BR \-i ,
+and an exported name by
+.BR \-x .
+The
+.B \-f
+and
+.B \-F
+options restrict the operands to functions, printing each recorded definition or
+only its name. The
+.B \-p
+option prints the matching declarations. The
+.BR \-g ,
+.BR \-l ,
+.BR \-n ,
+.BR \-r ,
+.BR \-t ,
+and
+.B \-u
+options are accepted without effect.
+.TP
+.B local
+The name is restricted to the running function. The attribute letters
 .BR \-a ,
 .BR \-A ,
 .BR \-i ,
+and
+.B \-x
+carry the same meaning they carry for declare, and
+.BR \-l ,
+.BR \-n ,
 .BR \-r ,
 and
-.BR \-x .
+.B \-u
+are accepted without effect.
+.TP
+.B readonly
+Each named variable is marked read-only. The
+.B \-p
+option lists the read-only variables in a reusable form. No attribute letter is
+accepted.
 .TP
 .BR "mapfile, readarray"
 The
 .B \-t
-option reads input lines into an array without their delimiters.
+option reads input lines into an array without their delimiters. The
+.B \-n
+option limits the line count, and
+.B \-s
+discards leading lines. The
+.B \-O
+option selects the first array index. The
+.B \-d
+option replaces the newline delimiter with the first byte of its value. The
+.B \-u
+option reads from a file descriptor. The
+.B \-C
+and
+.B \-c
+callback options are accepted without effect.
 .TP
 .B printf
 The
@@ -1020,7 +1102,27 @@ option assigns the formatted result to a variable.
 The
 .B \-r
 option retains backslashes. A plain read treats a trailing backslash as a line
-continuation.
+continuation. The
+.B \-a
+option splits the line into a named indexed array. The
+.B \-d
+option replaces the newline delimiter, and an empty value reads to a NUL byte.
+The
+.B \-n
+option bounds the byte count, and
+.B \-t
+bounds the wait in seconds. The
+.B \-p
+option prints a prompt at a terminal, and
+.B \-s
+keeps terminal input unechoed. The
+.B \-u
+option reads from a file descriptor. The
+.B \-q
+option reads one byte and returns zero for y or Y. The
+.B \-e
+option is accepted without effect. The line editor is always used at a
+terminal.
 .TP
 .B compgen
 The
@@ -1043,6 +1145,9 @@ supports
 .BR \-\-help .
 A utility invoked through a matching executable name also supports
 .BR \-\-version .
+The
+.B koshkit \-\-list
+form prints the utility names one per line.
 .PP
 The command
 .BI "koshkit \-\-assimilate " DIR
@@ -1054,9 +1159,9 @@ The final path component is printed. An optional suffix operand is removed.
 .TP
 .B calc
 Arithmetic operands are evaluated. The
-.B \-i
+.BR \-i ", " \-\-interactive
 and
-.B \-p
+.BR \-p ", " \-\-pipe
 options read expressions interactively or from a pipe.
 .TP
 .B cat
@@ -1099,7 +1204,9 @@ and
 .BR \-print .
 .TP
 .B flock
-A command runs while a directory lock is held.
+A command runs while a directory lock is held. The
+.B \-\-transaction\-held\-lock
+option keeps the lock after the process that launched the transaction exits.
 .TP
 .B grep
 Regular-expression matches are printed. The
@@ -1475,6 +1582,14 @@ disables prompt, diagnostic, and koshkit cat color.
 .B MANPATH
 Completion searches these manual paths for subcommands and options.
 .TP
+.B OPTERR
+A value of zero silences the diagnostics of
+.BR getopts .
+A leading colon in the option string silences them too.
+.TP
+.B TMPDIR
+The value names the directory used for a temporary file. The default is /tmp.
+.TP
 .BR PIPESTATUS ", " REPLY ", " OPTIND ", " OPTARG ", " TIMEFORMAT
 These variables hold pipeline statuses, default read and select input, getopts
 state, and time formatting.
@@ -1514,11 +1629,15 @@ The names BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, their BRIGHT_
 forms, BOLD, DIM, and RESET supply terminal escapes. A recognized name is empty
 when color is disabled. An explicit assignment takes precedence.
 .TP
-.BR RANDOM ", " SRANDOM ", " SECONDS ", " LINENO ", " EPOCHSECONDS ", " EPOCHREALTIME
-These dynamic values supply random numbers, elapsed time, source line, and wall
-clock time. They are unavailable in the
+.BR RANDOM ", " SRANDOM ", " SECONDS ", " EPOCHSECONDS ", " EPOCHREALTIME
+These dynamic values supply random numbers, elapsed time, and wall clock time.
+They are unavailable in the
 .B sh
 mood.
+.TP
+.BR IFS ", " LINENO
+The field separator and the line number of the running command are available in
+every mood.
 .TP
 .BR BASHPID ", " PPID ", " UID ", " EUID ", " GROUPS ", " HOSTNAME ", " HOSTTYPE ", " MACHTYPE ", " OSTYPE
 These dynamic values identify the current evaluator process, parent, ids,
