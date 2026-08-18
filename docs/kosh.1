@@ -1,4 +1,4 @@
-.TH KOSH 1 "2026-08-16" "kosh" "User Commands"
+.TH KOSH 1 "2026-08-18" "kosh" "User Commands"
 .SH NAME
 kosh \- a very fast and debuggable POSIX- and Bash-compatible command shell,
 formatter and language\-server
@@ -49,8 +49,8 @@ extensions.
 Koshka contains ~300 built-in shellcheck diagnostics and is 5x faster than
 bash, or ~100x faster than shellcheck.
 .PP
-The shell guarantees first tier support for Linux, macOS and Windows,
-preserving equivalent behavior on either of these systems.
+The shell guarantees first tier support for Linux, macOS and Windows, and the
+behavior is equivalent on each of these systems.
 .PP
 The grammar is the same on every operating system. An unquoted backslash is an
 escape on Windows. A native Windows path therefore uses a quoted backslash, an
@@ -172,26 +172,12 @@ information, semantic tokens, and a document outline. A fix-all action applies
 every non-conflicting safe fix in the open document. The outline is a tree of
 the function definitions and the variable assignments in the document. An
 assignment inside a function body is a child of that function, and one name
-assigned again in the same body is one outline row. A name written as an operand
-of
+assigned again in the same body is one outline row. A name bound by
 .BR local ,
 .BR declare ,
 .BR typeset ,
 .BR export ,
-or
-.B readonly
-is a variable assignment too, and the operand may be quoted, as in
-.BR "export \(dqname=value\(dq" .
-A bare name such as
-.B "declare \-a rows"
-is a declaration that carries no value, and it is recorded the same way. A
-.BR \-f ,
-.BR \-F ,
-or
-.B \-p
-operand asks the builtin to report a name, so that command line declares
-nothing.
-A name bound by
+.BR readonly ,
 .BR for ,
 .BR select ,
 .BR read ,
@@ -199,23 +185,14 @@ A name bound by
 .BR readarray ,
 .BR getopts ,
 .BR printf " " \-v ,
-or an arithmetic assignment is recorded the same way. Hover over a variable
+or an arithmetic assignment is a variable assignment too. Hover over a variable
 reports the assignment nearest above the cursor together with its folded value.
 A name that carries no folded value is described by what bound it, such as a
 loop word, a field read from input, or the result of an arithmetic expression.
 The earlier assignments in the same document are listed below it, and an
 assignment that does not run on every path is marked. A name the shell itself
-defines is described from the builtin variable catalog. The description names a
-value the shell recomputes on each read, a list, a read-only name, an exported
-name, a name this shell does not maintain, and a name that bash defines and
-POSIX does not. A special parameter such as
-.B $?
-is described the same way, and a
-.B KOSH_ANSI_
-color name is answered by its prefix. When the document also assigns such a
-name, the assignment is reported first and the catalog description follows it.
-Hover over a function shows the
-definition body in the form
+defines carries its description from the builtin variable catalog. Hover over a
+function shows the definition body in the form
 .B declare \-f
 prints. Hover over a command the document does not define reports the external
 help text. Markdown content is used when the client advertises it. The mood is
@@ -227,7 +204,6 @@ mood. This option does not accept file operands,
 .BR \-c ,
 .BR \-s ,
 .BR \-i ,
-or
 .BR \-\-lint ,
 .BR \-\-format ,
 or
@@ -664,9 +640,9 @@ described below. The
 mood rejects Bash-only syntax. Compatibility differences are listed under
 .BR COMPATIBILITY .
 .PP
-The analysis prepass may fold constants and remove an unreachable command. A
-C-style for loop whose condition folds to zero is removed only when its init
-clause is empty. A nonempty init clause still runs once.
+The analysis prepass may fold constants and remove an unreachable command. The
+init clause of a C-style for loop still runs once when the condition folds to
+zero.
 .PP
 An if command with no selected branch and no else command returns status zero.
 This rule also applies at the end of a sourced file.
@@ -765,16 +741,14 @@ A redirection of the form {var}> or {var}< allocates a descriptor numbered ten
 or greater and assigns its number to var. The form {var}>&\- closes the
 descriptor named by var.
 .PP
-A contiguous here-document retains its source location. A tab-stripped
-here-document has no source mapping because its collected bytes are not
-contiguous.
+A diagnostic inside a tab-stripped here-document carries no source caret.
 .SH COMMAND EXECUTION
 Command lookup checks functions, builtins, remembered command paths, PATH, and
-enabled koshkit fallback according to the active mood and options. Completion
-indexes do not populate the execution hash. Actual execution and the
+enabled koshkit fallback according to the active mood and options. Execution and
+the
 .B hash
 builtin remember a resolved program path. A PATH directory membership change
-invalidates the derived indexes and execution hash.
+discards every remembered path.
 .PP
 A command path ending in a directory separator fails with status 126 when the
 typed target is not a directory. Components are resolved in order. An
@@ -881,9 +855,9 @@ options replace ssh and scp. COMMAND is split at literal spaces.
 .PP
 The candidate identity is validated before the target is replaced. A handled
 failure restores the prior file or symlink and removes transaction files.
-Concurrent transactions are serialized. A later transaction recovers a
-published or orphaned journal. A failure before the remote transaction starts
-cannot alter the installed target. An unusable partial upload may remain.
+Concurrent transactions are serialized, and an interrupted one is recovered by
+the next. A failure before the remote transaction starts cannot alter the
+installed target. An unusable partial upload may remain.
 .TP
 .B bench
 Commands are sampled through
@@ -935,8 +909,8 @@ forms control the diagnostic level. The options
 .BR no-diagnostics ,
 and
 .B koshkit
-control the annoying tier, the analysis stage, and bundled command lookup.
-Runtime snapshots restore set state after an in-process substitution.
+control the annoying tier, the analysis stage, and bundled command lookup. A
+command substitution restores every set option when it finishes.
 .TP
 .B enable
 Every builtin remains enabled. The
@@ -1320,8 +1294,7 @@ PROMPT_COMMAND or PS1 can replace the idle title.
 Ghost text uses prefix matches from completion and history. Tab also offers
 smart-case and subsequence matches. An empty command position includes
 builtins, functions, aliases, koshkit utilities, and programs from PATH. An
-exact prefix ranks before a subsequence match. Empty ghost completion does not
-scan PATH.
+exact prefix ranks before a subsequence match.
 .PP
 Completion handles quoted separators, command substitutions, and here-document
 bodies when it selects the command segment at the cursor. Quoted, escaped,
@@ -1366,29 +1339,25 @@ Ctrl-G leaves the mode.
 An asynchronous pipeline job owns every stage. POSIX stages share one process
 group. The final stage supplies $!, the ordinary pipeline status, and the
 primary job identity. Pipefail may replace that status with the rightmost
-failing stage. Polling, waiting, foregrounding, backgrounding, signaling, and
-disowning retain or reap earlier stages.
+failing stage.
 .PP
-A stopped event from any retained stage remains recorded. The
+A stopped stage is recorded even when it is not the final one. The
 .B wait
-builtin returns the first stored stopped status without waiting for that
-process again. The
+builtin returns that stored status without waiting for the process again. The
 .B fg
 and
 .B bg
-builtins resume every retained stage.
+builtins resume every stage of the job.
 .SH SIGNALS
 The main shell ignores SIGPIPE. A forked child restores the default SIGPIPE
 action. A producer terminated by SIGPIPE therefore returns status 141.
 .PP
-An interactive timeout child waits until its process group owns the controlling
-terminal. On Windows, a background process receives a new console process group
-without a Job Object.
+On Windows, a background process runs in its own console process group.
 .SH DIAGNOSTICS
 Errors, warnings, and analysis diagnostics include source locations when a
 mapping exists. A diagnostic may include a source line, caret, detail location,
-and trailing note. The complete source line is highlighted before terminal
-clipping.
+and trailing note. A quoted source line is syntax colored and clipped to the
+terminal width.
 .PP
 The analysis stage follows readable static source operands recursively. Dynamic
 and unavailable operands are skipped.
@@ -1424,9 +1393,8 @@ or a pipe does not apply. These comments do not suppress parser or runtime
 diagnostics outside the analysis catalog.
 .PP
 Eval, command substitution, function substitution, and process substitution add
-their call sites to a source backtrace. A frame is printed once while its source
-remains live. A backtrace is omitted when only one synthetic command-line root
-exists. A printed frame begins with
+their call sites to a source backtrace. A repeated frame is printed once. A
+printed frame begins with
 .BR trace: .
 .PP
 NO_COLOR disables color.
