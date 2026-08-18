@@ -485,8 +485,12 @@ geometrically. String has a small inline buffer and grows geometrically. A
 scratch arena uses mark and release lifetime within one scope.
 
 WordSegment retains its source position beside a folded arithmetic result. A
-DEBUG trap or xtrace reevaluates the original expression. The 64-bit layout is
-168 bytes.
+DEBUG trap or xtrace reevaluates the original expression. The source span is a
+pair of 32-bit offsets, and a source beyond four gigabytes reports no span at
+all. The arithmetic token cache is allocated from the arena on first evaluation
+and is reached through one pointer. An arithmetic segment is never a
+substitution segment, so one arena generation stamp guards both caches. The
+64-bit layout is 120 bytes.
 
 ## Logging
 

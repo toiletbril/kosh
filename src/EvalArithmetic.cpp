@@ -1076,9 +1076,27 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
 {
   let const source_location =
       segment.get_source_location(m_current_location.filename);
+
+  let cache_arena = segment.is_substitution_cache_in_function_arena
+                        ? FUNCTION_ARENA
+                        : AST_ARENA;
+  if (cache_arena == nullptr) {
+    return evaluate_arithmetic(segment.text.view(), source_location.has_value()
+                                                        ? &*source_location
+                                                        : nullptr);
+  }
+
+  let const generation = cache_arena->reset_generation();
+  if (segment.cached_arith == nullptr ||
+      segment.cached_arena_generation != generation)
+  {
+    segment.cached_arith = cache_arena->create<arith_token_cache>();
+    segment.cached_arena_generation = generation;
+  }
+
   return evaluate_arithmetic_cached_clause(
-      segment.text.view(), segment.cached_arith_tokens,
-      segment.is_arith_tokenized, segment.is_arith_simple,
+      segment.text.view(), segment.cached_arith->tokens,
+      segment.cached_arith->is_tokenized, segment.cached_arith->is_simple,
       source_location.has_value() ? &*source_location : nullptr);
 }
 

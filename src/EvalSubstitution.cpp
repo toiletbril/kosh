@@ -375,7 +375,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
     if (did_push_source_frame) m_source_frames.pop_back();
   };
   if (segment.cached_substitution_ast == nullptr ||
-      segment.cached_substitution_generation != generation)
+      segment.cached_arena_generation != generation)
   {
     LOG(Debug,
         "command substitution ast cache miss for generation %zu, reparsing",
@@ -395,7 +395,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
                                           segment.text.view());
       throw;
     }
-    segment.cached_substitution_generation = generation;
+    segment.cached_arena_generation = generation;
   }
   ASSERT(segment.cached_substitution_ast != nullptr);
 
@@ -668,7 +668,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     if (did_push_source_frame) m_source_frames.pop_back();
   };
   if (segment.cached_substitution_ast == nullptr ||
-      segment.cached_substitution_generation != generation)
+      segment.cached_arena_generation != generation)
   {
     LOG(Debug,
         "function substitution ast cache miss for generation %zu, reparsing",
@@ -683,7 +683,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
                                           segment.text.view());
       throw;
     }
-    segment.cached_substitution_generation = generation;
+    segment.cached_arena_generation = generation;
   }
   ASSERT(segment.cached_substitution_ast != nullptr);
 

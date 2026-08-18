@@ -25,6 +25,16 @@ struct arith_token
   StringView text{};
 };
 
+/* The tokenized form of one arithmetic segment. A segment reaches this cache
+   only while it is evaluated, so the list is allocated on first evaluation and
+   an unevaluated segment carries a null pointer. */
+struct arith_token_cache
+{
+  ArrayList<arith_token> tokens{heap_allocator()};
+  bool is_tokenized{false};
+  bool is_simple{false};
+};
+
 class WordSegment
 {
 public:
@@ -57,18 +67,18 @@ public:
   mutable bool has_folded_arithmetic_result{false};
 
   mutable i64 folded_arithmetic_result{0};
-  mutable usize source_position{0};
-  mutable usize source_length{0};
 
-  /* The tree lives in AST_ARENA and a function-body segment in FUNCTION_ARENA,
-     so the cache records the arena generation it was filled in and a hit from
-     an earlier generation is treated as stale and reparsed. */
+  /* Both caches live in AST_ARENA, and a function-body segment puts them in
+     FUNCTION_ARENA, so each records the arena generation it was filled in and a
+     hit from an earlier generation is treated as stale and refilled. An
+     arithmetic segment is never a substitution segment, so the two caches never
+     share one segment and one generation stamp answers for both. */
   mutable const Expression *cached_substitution_ast{nullptr};
-  mutable usize cached_substitution_generation{0};
+  mutable arith_token_cache *cached_arith{nullptr};
+  mutable usize cached_arena_generation{0};
 
-  mutable ArrayList<arith_token> cached_arith_tokens{heap_allocator()};
-  mutable bool is_arith_tokenized{false};
-  mutable bool is_arith_simple{false};
+  mutable u32 source_position{0};
+  mutable u32 source_length{0};
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
@@ -88,7 +98,8 @@ public:
       copy.set_folded_arithmetic_result(get_folded_arithmetic_result());
     if (source_length > 0) copy.set_source_span(source_position, source_length);
     copy.cached_substitution_ast = cached_substitution_ast;
-    copy.cached_substitution_generation = cached_substitution_generation;
+    copy.cached_arith = cached_arith;
+    copy.cached_arena_generation = cached_arena_generation;
     return copy;
   }
 
@@ -109,10 +120,19 @@ public:
     has_folded_arithmetic_result = true;
   }
 
+  /* A source beyond four gigabytes has no representable span here, so the
+     segment reports no location instead of a wrapped one. */
   fn set_source_span(usize position, usize length) wontthrow -> void
   {
-    source_position = position;
-    source_length = length;
+    constexpr usize MAXIMUM_SOURCE_OFFSET = ~static_cast<u32>(0);
+    if (position > MAXIMUM_SOURCE_OFFSET || length > MAXIMUM_SOURCE_OFFSET) {
+      source_position = 0;
+      source_length = 0;
+      return;
+    }
+
+    source_position = static_cast<u32>(position);
+    source_length = static_cast<u32>(length);
   }
 
   pure fn get_source_location(Maybe<StringView> filename) const wontthrow
@@ -125,7 +145,7 @@ public:
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 168);
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 120);
 
 class Word
 {
