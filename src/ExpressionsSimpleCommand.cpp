@@ -303,6 +303,7 @@ SimpleCommand::SimpleCommand(SourceLocation location,
                              ArrayList<const Token *> &&args)
     : Command(steal(location)), m_args(steal(args))
 {
+  m_args.shrink_to_fit();
 
   /* The location spans from the first word to the end of the last, so a caret
      covers the whole command and not only the command word. */
@@ -358,12 +359,14 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void
 {
   m_redirections = steal(redirections);
+  m_redirections.shrink_to_fit();
 }
 
 fn SimpleCommand::set_array_args(
     ArrayList<array_builtin_assignment> &&array_args) throws -> void
 {
   m_array_args = steal(array_args);
+  m_array_args.shrink_to_fit();
 }
 
 namespace {

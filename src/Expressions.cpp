@@ -1296,6 +1296,7 @@ pure fn Command::time_uses_posix_format() const wontthrow -> bool
 fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
 {
   m_local_vars = steal(vars);
+  m_local_vars.shrink_to_fit();
 }
 
 pure fn Command::local_vars() const wontthrow
