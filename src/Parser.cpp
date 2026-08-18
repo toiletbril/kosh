@@ -109,7 +109,7 @@ static_assert(static_cast<u8>(Token::Kind::Function) < 64);
    single unquoted segment, so a quoted or escaped brace is rejected. */
 /* [[ and ]] arrive from the lexer as ordinary single unquoted words. */
 hot pure static fn get_unquoted_word_text(const Token *token) wontthrow
-    -> const String *
+    -> const SegmentText *
 {
   if (token == nullptr || token->kind() != Token::Kind::Word) return nullptr;
   let const &word = static_cast<const tokens::WordToken *>(token)->word();

@@ -427,7 +427,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment, bool word_continues,
   let expanded = String{heap_allocator()};
   expanded.append(directory->view());
   expanded.append(text.view().substring(name_end));
-  text = steal(expanded);
+  text.assign_copy(heap_allocator(), expanded.view());
 }
 
 fn EvalContext::resolve_tilde_prefix(StringView name) const throws
@@ -476,7 +476,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
   }
   if (was_changed) {
     LOG(All, "rewrote colon tilde prefixes in an assignment value");
-    segment.text = steal(rewritten);
+    segment.text.assign_copy(heap_allocator(), rewritten.view());
   }
 }
 

@@ -345,10 +345,13 @@ static fn word_token_from_assignment(BumpArena &arena,
   let word = Word{};
   let prefix = a->key().clone();
   prefix += a->is_append() ? "+=" : "=";
-  word.segments.push(
-      WordSegment{WordSegment::Kind::UnquotedText, steal(prefix), false});
+  word.segments.push(WordSegment{
+      WordSegment::Kind::UnquotedText,
+      SegmentText{bump_allocator(arena), prefix.view()},
+      false
+  });
   for (let const &segment : a->value_word().segments)
-    word.segments.push(segment.clone());
+    word.segments.push(segment.clone(bump_allocator(arena)));
   return tokens::create_word_token(arena, a->source_location(), steal(word));
 }
 
@@ -357,8 +360,10 @@ static fn word_token_from_raw(BumpArena &arena, StringView text,
     -> tokens::WordToken *
 {
   let word = Word{};
-  word.segments.push(
-      WordSegment{WordSegment::Kind::UnquotedText, String{text}, false});
+  word.segments.push(WordSegment{
+      WordSegment::Kind::UnquotedText, SegmentText{bump_allocator(arena), text},
+      false
+  });
   return tokens::create_word_token(arena, steal(location), steal(word));
 }
 
@@ -782,10 +787,15 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             if (tok->kind() == Token::Kind::Word) {
               for (let const &segment :
                    static_cast<const tokens::WordToken *>(tok)->word().segments)
-                regex_word.segments.push(segment);
+                regex_word.segments.push(
+                    segment.clone(bump_allocator(m_lexer.arena())));
             } else {
               regex_word.segments.push(WordSegment{
-                  WordSegment::Kind::UnquotedText, tok->raw_string(), false});
+                  WordSegment::Kind::UnquotedText,
+                  SegmentText{bump_allocator(m_lexer.arena()),
+                              tok->raw_string().view()},
+                  false
+              });
             }
             if (tok->kind() == Token::Kind::LeftParen)
               ++regex_parenthesis_depth;
@@ -813,12 +823,16 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             }
             if (next->source_location().position != end_position) {
               if (regex_parenthesis_depth == 0) break;
+
+              let const gap_length =
+                  next->source_location().position - end_position;
               regex_word.segments.push(WordSegment{
                   WordSegment::Kind::UnquotedText,
-                  m_lexer.source().substring_of_length(
-                      end_position,
-                      next->source_location().position - end_position),
-                  false});
+                  SegmentText{bump_allocator(m_lexer.arena()),
+                              m_lexer.source().substring_of_length(end_position,
+                                                                  gap_length)},
+                  false
+              });
             }
             m_lexer.advance_past_last_peek();
             end_position = next->source_location().position +

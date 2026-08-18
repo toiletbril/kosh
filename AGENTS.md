@@ -526,7 +526,16 @@ token cache, the folded arithmetic result, and the arena generation, and it is
 allocated on the heap on first use. A literal segment never reaches evaluation,
 so its pointer stays null. An arithmetic segment is never a substitution
 segment, so one arena generation stamp guards both caches. The 64-bit layout is
-88 bytes.
+40 bytes.
+
+The segment text is a SegmentText, which is a pointer, a 32-bit length, and a
+32-bit capacity. A zero capacity means the bytes are borrowed and the destructor
+frees nothing. A parsed segment borrows its bytes from the arena that holds the
+segment, and a segment built during evaluation owns its bytes on the heap. A
+character-at-a-time segment is owned from the start, because the first append
+would copy an arena slice to the heap anyway. An append on a borrowed text
+copies to the heap first, and the source view is rebound when it aliases the
+buffer that moved.
 
 A word with one borrowable segment becomes a WordToken and lends that segment's
 text. Every other word becomes an ExpandedWordToken, which owns the flattened

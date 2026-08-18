@@ -336,8 +336,10 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
 
       if (is_opaque_marker) {
         if (!run.is_empty()) {
-          out.segments.push(
-              WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
+          out.segments.push(WordSegment{
+              WordSegment::Kind::UnquotedText, SegmentText{alloc, run.view()},
+              false
+          });
           run = String{alloc};
         }
         out.segments.push(*opaque_segments[opaque_index]);
@@ -347,8 +349,10 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
       }
     }
     if (!run.is_empty()) {
-      out.segments.push(
-          WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
+      out.segments.push(WordSegment{
+          WordSegment::Kind::UnquotedText, SegmentText{alloc, run.view()},
+          false
+      });
     }
 
     for (usize s = 0; s + 1 < out.segments.count(); s++) {
@@ -366,12 +370,16 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
         taken++;
       if (taken == 0) continue;
 
-      reference.text.append(
-          following.text.view().substring_of_length(0, taken));
-      if (taken == following.text.count())
+      let joined = String{alloc, reference.text.view()};
+      joined.append(following.text.view().substring_of_length(0, taken));
+      reference.text.assign_copy(alloc, joined.view());
+
+      if (taken == following.text.count()) {
         out.segments.remove(s + 1);
-      else
-        following.text = String{alloc, following.text.view().substring(taken)};
+      } else {
+        following.text.assign_copy(alloc,
+                                   following.text.view().substring(taken));
+      }
     }
 
     words.push(steal(out));
@@ -578,8 +586,11 @@ hot fn EvalContext::process_args(
         key_literal += "=";
         fallback_word = Word{};
         fallback_word->segments = ArrayList<WordSegment>{scratch_allocator()};
-        fallback_word->segments.push(WordSegment{WordSegment::Kind::LiteralText,
-                                                 steal(key_literal), false});
+        fallback_word->segments.push(WordSegment{
+            WordSegment::Kind::LiteralText,
+            SegmentText{scratch_allocator(), key_literal.view()},
+            false
+        });
         let const &value = assignment_token->value_word();
         for (const WordSegment &value_segment : value.segments)
           fallback_word->segments.push(value_segment);
@@ -588,7 +599,10 @@ hot fn EvalContext::process_args(
         fallback_word = Word{};
         fallback_word->segments = ArrayList<WordSegment>{scratch_allocator()};
         fallback_word->segments.push(WordSegment{
-            WordSegment::Kind::UnquotedText, token->raw_string(), false});
+            WordSegment::Kind::UnquotedText,
+            SegmentText{scratch_allocator(), token->raw_string().view()},
+            false
+        });
         word = &*fallback_word;
       }
 

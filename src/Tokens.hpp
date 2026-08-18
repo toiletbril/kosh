@@ -54,6 +54,199 @@ struct segment_eval_cache
   bool has_folded_arithmetic_result{false};
 };
 
+/* The text of one word segment. A parsed segment borrows its bytes from the
+   arena that holds the segment, and a segment built during evaluation owns its
+   bytes on the heap. The capacity is zero while the bytes are borrowed, so the
+   destructor frees nothing and an append copies to the heap first. The value is
+   sixteen bytes, which keeps WordSegment at forty. */
+class SegmentText
+{
+public:
+  SegmentText() = default;
+
+  SegmentText(Allocator allocator, StringView initial) throws
+  {
+    assign_copy(allocator, initial);
+  }
+
+  cold SegmentText(const SegmentText &other) throws
+  {
+    assign_copy(heap_allocator(), other.view());
+  }
+
+  SegmentText(SegmentText &&other) wontthrow : m_data{other.m_data},
+                                               m_length{other.m_length},
+                                               m_capacity{other.m_capacity}
+  {
+    other.m_data = nullptr;
+    other.m_length = 0;
+    other.m_capacity = 0;
+  }
+
+  ~SegmentText() { release(); }
+
+  cold fn operator=(const SegmentText &other) throws->SegmentText &
+  {
+    if (this == &other) return *this;
+
+    assign_copy(heap_allocator(), other.view());
+
+    return *this;
+  }
+
+  fn operator=(SegmentText &&other) wontthrow->SegmentText &
+  {
+    if (this == &other) return *this;
+
+    release();
+    m_data = other.m_data;
+    m_length = other.m_length;
+    m_capacity = other.m_capacity;
+    other.m_data = nullptr;
+    other.m_length = 0;
+    other.m_capacity = 0;
+
+    return *this;
+  }
+
+  /* The heap allocator makes the copy owned, and an arena makes it borrowed for
+     the life of that arena. */
+  fn assign_copy(Allocator allocator, StringView source) throws -> void
+  {
+    if (source.length == 0) {
+      release();
+      return;
+    }
+    if (source.length > MAXIMUM_TEXT_LENGTH) [[unlikely]]
+      throw std::bad_alloc{};
+
+    /* The source may be a view of this text, so the copy is taken before the
+       old bytes are released. */
+    let const bytes = allocator.alloc_array<char>(source.length);
+    std::memcpy(bytes, source.data, source.length);
+    release();
+    m_data = bytes;
+    m_length = static_cast<u32>(source.length);
+    m_capacity = allocator.get_kind() == Allocator::Kind::Heap
+                     ? static_cast<u32>(source.length)
+                     : 0;
+  }
+
+  hot mustuse pure fn view() const wontthrow -> StringView
+  {
+    return StringView{m_data, m_length};
+  }
+  operator StringView() const wontthrow { return view(); }
+
+  hot mustuse pure fn count() const wontthrow -> usize { return m_length; }
+  mustuse pure fn length() const wontthrow -> usize { return m_length; }
+  hot mustuse pure fn is_empty() const wontthrow -> bool
+  {
+    return m_length == 0;
+  }
+  mustuse pure fn data() const wontthrow -> const char * { return m_data; }
+
+  hot mustuse pure fn operator[](usize index) const wontthrow->char
+  {
+    ASSERT(index < m_length, "segment text index is past the end");
+    return m_data[index];
+  }
+  mustuse pure fn back() const wontthrow -> char
+  {
+    ASSERT(m_length > 0, "back() on an empty segment text");
+    return m_data[m_length - 1];
+  }
+  mustuse pure fn first_character() const wontthrow -> char
+  {
+    ASSERT(m_length > 0, "first_character() on an empty segment text");
+    return m_data[0];
+  }
+
+  flatten mustuse pure fn substring(usize start) const wontthrow -> StringView
+  {
+    return view().substring(start);
+  }
+  flatten mustuse pure fn substring_of_length(usize start,
+                                              usize count) const wontthrow
+      -> StringView
+  {
+    return view().substring_of_length(start, count);
+  }
+  flatten mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool
+  {
+    return view().starts_with(prefix);
+  }
+  flatten mustuse pure fn find_character(char wanted) const wontthrow
+      -> Maybe<usize>
+  {
+    return view().find_character(wanted);
+  }
+  mustuse pure fn find_last_character(char wanted) const wontthrow
+      -> Maybe<usize>
+  {
+    for (usize index = m_length; index > 0; index--) {
+      if (m_data[index - 1] == wanted) return index - 1;
+    }
+
+    return None;
+  }
+  mustuse pure fn find_substring(StringView needle,
+                                 usize from = 0) const wontthrow -> Maybe<usize>
+  {
+    if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
+    if (needle.length > m_length) return None;
+
+    for (usize start = from; start + needle.length <= m_length; start++) {
+      if (std::memcmp(m_data + start, needle.data, needle.length) == 0)
+        return start;
+    }
+
+    return None;
+  }
+  flatten mustuse pure fn is_all_decimal_digits() const wontthrow -> bool
+  {
+    return view().is_all_decimal_digits();
+  }
+
+  hot mustuse pure fn operator==(StringView other) const wontthrow->bool
+  {
+    return view() == other;
+  }
+  hot mustuse pure fn operator!=(StringView other) const wontthrow->bool
+  {
+    return !(view() == other);
+  }
+
+  fn clear() wontthrow -> void { m_length = 0; }
+
+  fn append(StringView other) throws -> void;
+  fn append(char byte) throws -> void { append(StringView{&byte, 1}); }
+  fn push(char byte) throws -> void { append(StringView{&byte, 1}); }
+
+private:
+  static constexpr usize MAXIMUM_TEXT_LENGTH =
+      static_cast<usize>(~static_cast<u32>(0));
+
+  cold fn grow_owned(usize needed) throws -> void;
+
+  fn release() wontthrow -> void
+  {
+    if (m_capacity != 0) {
+      heap_allocator().free_array(const_cast<char *>(m_data), m_capacity);
+    }
+
+    m_data = nullptr;
+    m_length = 0;
+    m_capacity = 0;
+  }
+
+  const char *m_data{nullptr};
+  u32 m_length{0};
+  u32 m_capacity{0};
+};
+
+static_assert(sizeof(usize) != 8 || sizeof(SegmentText) == 16);
+
 class WordSegment
 {
 public:
@@ -71,7 +264,7 @@ public:
     FunctionSubstitution,
   };
 
-  WordSegment(Kind kind, String text, bool is_in_double_quotes = false,
+  WordSegment(Kind kind, SegmentText text, bool is_in_double_quotes = false,
               bool is_greedy_name = false)
       : kind{kind}, is_in_double_quotes{is_in_double_quotes},
         is_greedy_name{is_greedy_name}, text{steal(text)}
@@ -138,8 +331,8 @@ public:
     return *this;
   }
 
-  /* The small fields lead so they fill the padding the String would otherwise
-     leave. The segment is eighty bytes. */
+  /* The small fields lead so they fill the padding the text would otherwise
+     leave. The segment is forty bytes. */
   Kind kind;
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
@@ -149,7 +342,7 @@ public:
   mutable u32 source_position{0};
   mutable u32 source_length{0};
 
-  String text;
+  SegmentText text;
 
   fn get_eval_cache() const throws -> segment_eval_cache &
   {
@@ -168,7 +361,7 @@ public:
   cold fn clone(Allocator allocator) const throws -> WordSegment
   {
     let copy = WordSegment{
-        kind, String{allocator, text.view()},
+        kind, SegmentText{allocator, text.view()},
          is_in_double_quotes,
         is_greedy_name
     };
@@ -179,11 +372,6 @@ public:
     if (m_eval_cache != nullptr) copy.get_eval_cache() = *m_eval_cache;
 
     return copy;
-  }
-
-  cold fn clone() const throws -> WordSegment
-  {
-    return clone(text.allocator());
   }
 
   hot pure fn has_folded_arithmetic_result() const wontthrow -> bool
@@ -241,7 +429,7 @@ private:
   mutable segment_eval_cache *m_eval_cache{nullptr};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 80);
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 40);
 
 class Word
 {

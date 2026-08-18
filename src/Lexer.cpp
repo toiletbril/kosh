@@ -544,29 +544,33 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   /* An empty segment preserves an empty quoted field. */
   bool did_quote_enclose_content = false;
 
-  /* A variable reference never merges, since each one carries its own name. */
+  /* A variable reference never merges, since each one carries its own name. A
+     character-at-a-time segment owns its bytes from the start, because the
+     first append would copy an arena slice to the heap anyway. */
   let const do_append_char = [&word](WordSegment::Kind kind, char ch) {
     if (!word.segments.is_empty() && word.segments.back().kind == kind &&
         kind != WordSegment::Kind::VariableReference)
     {
-      word.segments.back().text += ch;
+      word.segments.back().text.push(ch);
     } else {
-      let single = String{heap_allocator()};
-      single.push(ch);
-      word.segments.push(WordSegment{kind, steal(single), false});
+      word.segments.push(WordSegment{
+          kind, SegmentText{heap_allocator(), StringView{&ch, 1}},
+           false
+      });
     }
   };
 
-  let const do_append_unquoted_run = [&word](StringView run) {
+  let const do_append_unquoted_run = [&word, this](StringView run) {
     if (!word.segments.is_empty() &&
         word.segments.back().kind == WordSegment::Kind::UnquotedText)
     {
       word.segments.back().text.append(run);
     } else {
-      let text = String{heap_allocator()};
-      text.append(run);
-      word.segments.push(
-          WordSegment{WordSegment::Kind::UnquotedText, steal(text), false});
+      word.segments.push(WordSegment{
+          WordSegment::Kind::UnquotedText,
+          SegmentText{bump_allocator(arena()), run},
+          false
+      });
     }
   };
 
@@ -690,7 +694,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       if (ch == '\'') {
         if (!did_quote_enclose_content)
           word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
-                                         String{heap_allocator()}, false});
+                                         SegmentText{}, false});
         quote_char.reset();
       } else {
         do_append_char(WordSegment::Kind::LiteralText, ch);
@@ -729,7 +733,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     if (is_in_double_quotes && ch == '"') {
       if (!did_quote_enclose_content)
         word.segments.push(WordSegment{WordSegment::Kind::DoubleQuotedText,
-                                       String{heap_allocator()}, false});
+                                       SegmentText{}, false});
       quote_char.reset();
       byte_count++;
       continue;
@@ -782,7 +786,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
         /* An empty $'' still produces one empty field, the way '' and "" do. */
         if (decoded.is_empty()) {
           word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
-                                         String{heap_allocator()}, false});
+                                         SegmentText{}, false});
         } else {
           for (usize k = 0; k < decoded.count(); k++)
             do_append_char(WordSegment::Kind::LiteralText, decoded[k]);
@@ -926,9 +930,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
               byte_count++;
             }
           }
-          word.segments.push(WordSegment{WordSegment::Kind::ArithmeticExpansion,
-                                         steal(arithmetic),
-                                         is_in_double_quotes});
+          word.segments.push(WordSegment{
+              WordSegment::Kind::ArithmeticExpansion,
+              SegmentText{bump_allocator(arena()), arithmetic.view()},
+              is_in_double_quotes
+          });
           word.segments.back().set_source_span(
               m_cursor_position + expansion_start + 3,
               word.segments.back().text.count());
@@ -944,8 +950,10 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
               "Unterminated command substitution", here(m_source.count(), 1),
               "expected ) here"};
         }
-        let inner = String{m_source.substring_of_length(
-            inner_start, *substitution_end - inner_start - 1)};
+        let inner =
+            SegmentText{bump_allocator(arena()),
+                        m_source.substring_of_length(
+                            inner_start, *substitution_end - inner_start - 1)};
         byte_count = *substitution_end - m_cursor_position;
         word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
                                        steal(inner), is_in_double_quotes});
@@ -1092,7 +1100,9 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
         word.segments.push(WordSegment{
             is_function_substitution ? WordSegment::Kind::FunctionSubstitution
                                      : WordSegment::Kind::VariableReference,
-            steal(name), is_in_double_quotes});
+            SegmentText{bump_allocator(arena()), name.view()},
+            is_in_double_quotes
+        });
         let &expansion_segment = word.segments.back();
         if (is_function_substitution)
           expansion_segment.set_source_span(m_cursor_position + expansion_start,
@@ -1107,8 +1117,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           name += next;
           byte_count++;
         }
-        word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       steal(name), is_in_double_quotes, true});
+        word.segments.push(WordSegment{
+            WordSegment::Kind::VariableReference,
+            SegmentText{bump_allocator(arena()), name.view()},
+            is_in_double_quotes, true
+        });
         word.segments.back().set_source_span(m_cursor_position +
                                                  expansion_start + 1,
                                              word.segments.back().text.count());
@@ -1116,10 +1129,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                  lexer::is_number(next))
       {
         byte_count++;
-        let special = String{heap_allocator()};
-        special.push(next);
-        word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       steal(special), is_in_double_quotes});
+        word.segments.push(WordSegment{
+            WordSegment::Kind::VariableReference,
+            SegmentText{bump_allocator(arena()), StringView{&next, 1}},
+            is_in_double_quotes
+        });
         word.segments.back().set_source_span(
             m_cursor_position + expansion_start + 1, 1);
       } else {
@@ -1170,8 +1184,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
         inner += c;
         byte_count++;
       }
-      word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
-                                     steal(inner), is_in_double_quotes});
+      word.segments.push(WordSegment{
+          WordSegment::Kind::CommandSubstitution,
+          SegmentText{bump_allocator(arena()), inner.view()},
+          is_in_double_quotes
+      });
       word.segments.back().set_source_span(
           m_cursor_position + relative_open_backtick_pos,
           byte_count - relative_open_backtick_pos);
@@ -1454,8 +1471,11 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
   LOG(Debug, "capturing a process substitution of %zu bytes", byte_count);
 
   let word = Word{};
-  word.segments.push(
-      WordSegment{WordSegment::Kind::ProcessSubstitution, steal(inner), false});
+  word.segments.push(WordSegment{
+      WordSegment::Kind::ProcessSubstitution,
+      SegmentText{bump_allocator(*m_arena), inner.view()},
+      false
+  });
   word.segments.back().set_source_span(open_position, byte_count);
   let t = tokens::create_word_token(*m_arena, here(open_position, byte_count),
                                     steal(word));

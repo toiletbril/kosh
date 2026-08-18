@@ -306,9 +306,11 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     LOG(All, "folding the subscript into array element key '%s'", key.c_str());
 
     let value = Word{};
-    value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
-                                    String{after.substring(value_start)},
-                                    false});
+    value.segments.push(WordSegment{
+        WordSegment::Kind::UnquotedText,
+        SegmentText{heap_allocator(), after.substring(value_start)},
+        false
+    });
     for (usize j = i + 1; j < segments.count(); j++)
       value.segments.push(segments[j]);
 
@@ -361,9 +363,11 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   let value = Word{};
   /* The value always begins with an unquoted segment, even when empty, so that
      FOO= produces one empty field rather than no field at all. */
-  value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
-                                  first.text.substring(*equals_position + 1),
-                                  false});
+  value.segments.push(WordSegment{
+      WordSegment::Kind::UnquotedText,
+      SegmentText{heap_allocator(), first.text.substring(*equals_position + 1)},
+      false
+  });
   for (usize i = 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
@@ -432,15 +436,67 @@ cold fn Word::get_quoted_assignment_split() const throws
   const WordSegment &carrier = segments[equals_segment];
 
   let value = Word{};
-  value.segments.push(WordSegment{carrier.kind,
-                                  carrier.text.substring(equals_position + 1),
-                                  carrier.is_in_double_quotes});
+  value.segments.push(WordSegment{
+      carrier.kind,
+      SegmentText{heap_allocator(),
+                  carrier.text.substring(equals_position + 1)},
+      carrier.is_in_double_quotes
+  });
   for (usize i = equals_segment + 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
   return word_assignment_split{
       String{prefix_view.substring_of_length(0, name_length)}, steal(value),
       is_append};
+}
+
+cold fn SegmentText::grow_owned(usize needed) throws -> void
+{
+  usize new_capacity =
+      m_capacity == 0 ? needed : static_cast<usize>(m_capacity);
+  while (new_capacity < needed) {
+    if (new_capacity > MAXIMUM_TEXT_LENGTH / 2) {
+      new_capacity = needed;
+      break;
+    }
+    new_capacity *= 2;
+  }
+
+  let const fresh = heap_allocator().alloc_array<char>(new_capacity);
+  if (m_length > 0) std::memcpy(fresh, m_data, m_length);
+  if (m_capacity != 0) {
+    heap_allocator().free_array(const_cast<char *>(m_data), m_capacity);
+  }
+
+  m_data = fresh;
+  m_capacity = static_cast<u32>(new_capacity);
+}
+
+fn SegmentText::append(StringView other) throws -> void
+{
+  if (other.length == 0) return;
+  if (other.length > MAXIMUM_TEXT_LENGTH - m_length) [[unlikely]]
+    throw std::bad_alloc{};
+
+  let const needed = static_cast<usize>(m_length) + other.length;
+  if (needed > m_capacity) {
+    /* The source may live inside this text, so its offset is kept and the view
+       is rebound after the buffer moves. */
+    let const source_address = reinterpret_cast<uintptr>(other.data);
+    let const storage_address = reinterpret_cast<uintptr>(m_data);
+    let const is_aliased = m_data != nullptr &&
+                           source_address >= storage_address &&
+                           source_address - storage_address < m_length;
+    let const source_offset =
+        is_aliased ? source_address - storage_address : usize{0};
+
+    grow_owned(needed);
+
+    if (is_aliased) other.data = m_data + source_offset;
+  }
+
+  std::memcpy(const_cast<char *>(m_data) + m_length, other.data, other.length);
+  m_length = static_cast<u32>(needed);
 }
 
 namespace tokens {

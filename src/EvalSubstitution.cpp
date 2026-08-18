@@ -399,7 +399,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   }
   ASSERT(cache.substitution_ast != nullptr);
 
-  return run_captured_substitution(cache.substitution_ast, segment.text);
+  return run_captured_substitution(
+      cache.substitution_ast, String{heap_allocator(), segment.text.view()});
 }
 
 fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
@@ -688,7 +689,9 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   ASSERT(cache.substitution_ast != nullptr);
 
   let const ast = cache.substitution_ast;
-  const String &source = segment.text;
+  /* The trace and LINENO paths hold the address of the running source for the
+     whole body, so the segment text is materialized here. */
+  let const source = String{heap_allocator(), segment.text.view()};
   LOG(Debug, "running a function substitution body of %zu bytes",
       source.count());
 
