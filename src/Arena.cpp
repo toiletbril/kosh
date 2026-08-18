@@ -62,11 +62,12 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
 
 hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
 {
+  if (size > SIZE_MAX - alignment) throw std::bad_alloc{};
+
   loop
   {
-    if (!m_blocks.is_empty()) {
-      let &block = m_blocks.back();
-      if (block.used > SIZE_MAX - (alignment - 1)) throw std::bad_alloc{};
+    while (m_current_index < m_blocks.count()) {
+      let &block = m_blocks[m_current_index];
       let const aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
 
       if (aligned <= block.size && size <= block.size - aligned) [[likely]] {
@@ -77,10 +78,12 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
 
         return pointer;
       }
+
+      m_current_index++;
     }
 
-    if (size > SIZE_MAX - alignment) throw std::bad_alloc{};
     add_block(size + alignment);
+    m_current_index = m_blocks.count() - 1;
   }
 }
 
@@ -107,24 +110,29 @@ fn BumpArena::bytes_used() const wontthrow -> usize
 
 fn BumpArena::mark() const wontthrow -> BumpArena::Mark
 {
-  if (m_blocks.is_empty()) return Mark{0, 0, m_destructors.count()};
-  return Mark{m_blocks.count(), m_blocks.back().used, m_destructors.count()};
+  if (m_current_index >= m_blocks.count())
+    return Mark{m_current_index, 0, m_destructors.count()};
+
+  return Mark{m_current_index, m_blocks[m_current_index].used,
+              m_destructors.count()};
 }
 
 fn BumpArena::release(Mark saved) wontthrow -> void
 {
-  ASSERT(saved.block_count <= m_blocks.count(),
-         "mark cannot name more blocks than the arena holds");
+  ASSERT(saved.block_index <= m_current_index,
+         "mark cannot name a block above the current one");
 
   run_destructors_down_to(saved.destructor_count);
 
-  for (usize i = saved.block_count; i < m_blocks.count(); i++)
+  for (usize i = saved.block_index + 1; i < m_blocks.count(); i++)
     m_blocks[i].used = 0;
 
-  if (saved.block_count > 0) {
-    ASSERT(saved.used_in_last <= m_blocks[saved.block_count - 1].size);
-    m_blocks[saved.block_count - 1].used = saved.used_in_last;
+  if (saved.block_index < m_blocks.count()) {
+    ASSERT(saved.used_in_block <= m_blocks[saved.block_index].size);
+    m_blocks[saved.block_index].used = saved.used_in_block;
   }
+
+  m_current_index = saved.block_index;
 }
 
 cold fn BumpArena::reset() wontthrow -> void
@@ -142,6 +150,8 @@ cold fn BumpArena::reset() wontthrow -> void
   while (m_blocks.count() > 1)
     m_blocks.pop_back();
   if (!m_blocks.is_empty()) m_blocks.front().used = 0;
+
+  m_current_index = 0;
 }
 
 } /* namespace koshka */

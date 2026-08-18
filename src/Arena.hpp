@@ -43,8 +43,8 @@ public:
      the mark while leaving earlier allocations alone. The marks nest. */
   struct Mark
   {
-    usize block_count;
-    usize used_in_last;
+    usize block_index;
+    usize used_in_block;
     usize destructor_count;
   };
   fn mark() const wontthrow -> Mark;
@@ -105,6 +105,9 @@ private:
   ArrayList<block> m_blocks{heap_allocator()};
   ArrayList<pending_destructor> m_destructors{heap_allocator()};
   usize m_reset_generation{0};
+  /* Every block above this index is empty, so a release rewinds the index and
+     the blocks it reclaimed are handed out again. */
+  usize m_current_index{0};
 
   fn add_block(usize minimum_size) throws -> void;
   /* Run and drop every registered destructor from the index down to first, in
