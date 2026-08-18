@@ -747,7 +747,7 @@ fn check_posix_parameter_expansion(AnalysisContext &actx,
 
   let const do_get_location = [&]() -> SourceLocation {
     return expansion_location_with_sigil(
-        actx, segment.get_source_location(fallback_location.filename)
+        actx, segment.get_source_location(fallback_location.source_name_index)
                   .value_or(fallback_location));
   };
 

@@ -241,7 +241,7 @@ struct function_definition_info
   usize body_start_position{0};
   usize header_length{0};
   usize line_offset{0};
-  String filename{heap_allocator()};
+  u32 source_name_index{0};
   RuntimeState defining_runtime;
 };
 

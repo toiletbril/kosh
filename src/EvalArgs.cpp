@@ -705,8 +705,8 @@ hot fn EvalContext::process_args(
                     value += stored->view();
                     break;
                   }
-                let const source_location =
-                    segment.get_source_location(m_current_location.filename);
+                let const source_location = segment.get_source_location(
+                    m_current_location.source_name_index);
                 value += apply_parameter_expansion(
                     spec,
                     source_location.has_value() ? &*source_location : nullptr);

@@ -121,8 +121,10 @@ fn check_command_name_lints(AnalysisContext &actx,
           actx.report_diagnostic(
               diagnostic_id::sc2086_test,
               expansion_location_with_sigil(
-                  actx, segment.get_source_location(operand_location.filename)
-                            .value_or(operand_location)));
+                  actx,
+                  segment
+                      .get_source_location(operand_location.source_name_index)
+                      .value_or(operand_location)));
           break;
         }
       }

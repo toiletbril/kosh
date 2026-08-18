@@ -127,15 +127,15 @@ protected:
   pure alwaysinline fn here(usize position, usize length) const wontthrow
       -> SourceLocation
   {
-    return SourceLocation{position, length, m_filename};
+    return SourceLocation{position, length, m_source_name_index};
   }
 
   StringView m_source;
   BumpArena *m_arena;
-  /* The name of the file this source came from, or None for an unnamed source
-     such as an interactive line. It travels into every SourceLocation the lexer
-     stamps. */
-  Maybe<StringView> m_filename{};
+  /* The interned name of the file this source came from, or zero for an unnamed
+     source such as an interactive line. It travels into every SourceLocation
+     the lexer stamps. */
+  u32 m_source_name_index{0};
   mimic_mood m_mood{mimic_mood::Default};
   usize m_cursor_position{0};
   usize m_cached_offset{0};

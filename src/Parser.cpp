@@ -177,13 +177,13 @@ cold [[noreturn]] fn parser_internal::throw_unterminated(
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
   {
-    found->filename = opener.filename;
+    found->source_name_index = opener.source_name_index;
     throw ErrorWithLocationAndDetails{
         opener, what, *found,
         "this '" + keyword +
             "' was read as an argument, so put a ';' or a newline before it"};
   }
-  fallback.filename = opener.filename;
+  fallback.source_name_index = opener.source_name_index;
   throw ErrorWithLocationAndDetails{opener, what, fallback,
                                     "expected '" + keyword + "'"};
 }
@@ -326,11 +326,15 @@ cold fn Parser::construct_ast(
 
     let const location = e.location();
     let source_name = String{heap_allocator()};
-    if (location.filename.has_value()) source_name = String{*location.filename};
+    if (let const name = location.get_filename(); name.has_value())
+      source_name = String{*name};
     let const details_location = e.details_location();
     let related_source_name = String{heap_allocator()};
-    if (details_location.filename.has_value())
-      related_source_name = String{*details_location.filename};
+    if (let const related_name = details_location.get_filename();
+        related_name.has_value())
+    {
+      related_source_name = String{*related_name};
+    }
     let const related_location = e.details_message().is_empty()
                                      ? Maybe<SourceLocation>{None}
                                      : Maybe<SourceLocation>{details_location};
@@ -350,7 +354,8 @@ cold fn Parser::construct_ast(
 
     let const location = e.location();
     let source_name = String{heap_allocator()};
-    if (location.filename.has_value()) source_name = String{*location.filename};
+    if (let const name = location.get_filename(); name.has_value())
+      source_name = String{*name};
 
     diagnostic_sink->push(source_diagnostic{
         None, error_severity::Error, location, steal(source_name),

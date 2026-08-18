@@ -216,7 +216,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
           is_bash_compatible(), should_print_source_traces());
     } catch (const ErrorBase &error) {
       let const location =
-          segment.get_source_location(m_current_location.filename);
+          segment.get_source_location(m_current_location.source_name_index);
       if (!location.has_value() || current_source() == nullptr) {
         throw;
       }
@@ -405,7 +405,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
 fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
                                                StringView origin) throws -> bool
 {
-  let const location = segment.get_source_location(m_current_location.filename);
+  let const location =
+      segment.get_source_location(m_current_location.source_name_index);
   if (!location.has_value()) return false;
   return push_substitution_source_frame(*location, origin);
 }

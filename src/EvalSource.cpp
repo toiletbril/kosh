@@ -445,19 +445,9 @@ fn EvalContext::run_source(StringView source, StringView origin,
     m_source_frames.pop_back();
   };
 
-  /* Retain an owned copy of the filename, so the views the lexer stamps onto
-     every location stay valid after a control-flow jump carries a stamped
-     location out to the top level. */
-  Maybe<StringView> stable_filename = None;
-  if (filename.has_value()) {
-    let const retained_filename = new String{*filename};
-    m_retained_sources.push(retained_filename);
-    stable_filename = retained_filename->view();
-  }
-
   try {
     let parser = Parser{
-        Lexer{source, *AST_ARENA, false, stable_filename, mood()}
+        Lexer{source, *AST_ARENA, false, filename, mood()}
     };
 
     let const ast = parser.construct_ast();

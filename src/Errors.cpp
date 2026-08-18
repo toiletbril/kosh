@@ -12,6 +12,57 @@
 
 namespace koshka {
 
+struct interned_source_name
+{
+  const char *data;
+  u32 length;
+};
+
+/* The table outlives every location that indexes it, and a fork keeps its rows
+   at the same indexes, so an index stamped before the fork still reads back in
+   the child. */
+static fn get_source_name_table() wontthrow -> ArrayList<interned_source_name> &
+{
+  static ArrayList<interned_source_name> table{heap_allocator()};
+
+  return table;
+}
+
+/* One run touches a handful of distinct names, so a linear scan finds a row
+   faster than a hash of the path would. */
+cold fn intern_source_name(StringView name) throws -> u32
+{
+  if (name.is_empty()) return 0;
+
+  let &table = get_source_name_table();
+  for (usize row_index = 0; row_index < table.count(); row_index++) {
+    let const &row = table[row_index];
+    if (row.length == name.length &&
+        std::memcmp(row.data, name.data, name.length) == 0)
+    {
+      return static_cast<u32>(row_index + 1);
+    }
+  }
+
+  let const copy = heap_allocator().alloc_array<char>(name.length + 1);
+  std::memcpy(copy, name.data, name.length);
+  copy[name.length] = '\0';
+  table.push(interned_source_name{copy, static_cast<u32>(name.length)});
+
+  return static_cast<u32>(table.count());
+}
+
+pure fn source_name_at(u32 source_name_index) wontthrow -> Maybe<StringView>
+{
+  if (source_name_index == 0) return None;
+
+  let const &table = get_source_name_table();
+  if (source_name_index > table.count()) return None;
+  let const &row = table[source_name_index - 1];
+
+  return StringView{row.data, row.length};
+}
+
 /* Each field is empty when color is off, so the render code appends them
    unconditionally and emits nothing on the plain path. */
 struct diagnostic_color
@@ -432,7 +483,7 @@ fn ErrorWithLocation::to_string(StringView source,
 
   let result = String{heap_allocator()};
   result += color.location;
-  if (let const name = m_location.filename; name.has_value()) {
+  if (let const name = m_location.get_filename(); name.has_value()) {
     result += *name;
     result += ':';
   }
@@ -565,7 +616,7 @@ cold fn DetailsWithLocation::to_string(StringView source,
 
   let result = String{heap_allocator()};
   result += color.location;
-  if (let const name = m_location.filename; name.has_value()) {
+  if (let const name = m_location.get_filename(); name.has_value()) {
     result += *name;
     result += ':';
   }

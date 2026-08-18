@@ -524,7 +524,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   i64 value;
   try {
     const SourceLocation body_base{source_location().position + 2, 0,
-                                   source_location().filename};
+                                   source_location().source_name_index};
     value = cxt.evaluate_arithmetic(m_expression.view(), &body_base);
   } catch (const ErrorWithLocation &) {
     throw;
@@ -1029,9 +1029,9 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
        body_source[m_name.count()] == '\n' ||
        body_source[m_name.count()] == ';'))
   {
-    let const call_location =
-        SourceLocation{static_cast<usize>(body_source.data - actx.source.data),
-                       m_name.count(), m_body->source_location().filename};
+    let const call_location = SourceLocation{
+        static_cast<usize>(body_source.data - actx.source.data), m_name.count(),
+        m_body->source_location().source_name_index};
     actx.report_diagnostic(diagnostic_id::sc2264, call_location,
                            {m_name.view()}, source_location());
   }

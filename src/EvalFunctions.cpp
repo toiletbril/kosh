@@ -34,8 +34,7 @@ fn EvalContext::register_function(StringView name, const Expression *body,
         utils::line_number_at(m_current_source->view(), body_start_position);
     info.line_offset = body_line > 2 ? body_line - 2 : 0;
   }
-  if (definition_location.filename.has_value())
-    info.filename = String{*definition_location.filename};
+  info.source_name_index = definition_location.source_name_index;
   info.defining_runtime = RuntimeState::capture(*this);
   m_function_definition_infos.set(name, steal(info));
 }
@@ -76,8 +75,7 @@ pure fn EvalContext::resolve_render_source(
   resolved_source.body_start_position = info->body_start_position;
   resolved_source.header_length = info->header_length;
   resolved_source.line_offset = info->line_offset;
-  resolved_source.filename =
-      info->filename.is_empty() ? StringView{} : info->filename.view();
+  resolved_source.source_name_index = info->source_name_index;
   return resolved_source;
 }
 

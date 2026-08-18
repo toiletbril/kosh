@@ -628,7 +628,7 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
      entire expression. */
   let const open_location = open->source_location();
   const SourceLocation full_location{open_location.position, body.length + 4,
-                                     open_location.filename};
+                                     open_location.source_name_index};
   return m_lexer.arena().create<expressions::ArithmeticCommand>(
       full_location, String{bump_allocator(m_lexer.arena()), body});
 }

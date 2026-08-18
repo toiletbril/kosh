@@ -300,18 +300,13 @@ public:
     usize body_start_position{0};
     usize header_length{0};
     usize line_offset{0};
-    StringView filename{};
+    u32 source_name_index{0};
 
     pure fn to_render_position(usize absolute_position) const wontthrow -> usize
     {
       return is_windowed
                  ? absolute_position - body_start_position + header_length
                  : absolute_position;
-    }
-    pure fn filename_or_none() const wontthrow -> Maybe<StringView>
-    {
-      return filename.is_empty() ? Maybe<StringView>{}
-                                 : Maybe<StringView>{filename};
     }
   };
   pure fn resolve_render_source(const SourceLocation &location) const wontthrow

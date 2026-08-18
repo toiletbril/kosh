@@ -185,11 +185,13 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
     for (usize i = m_source_frames.count(); i > 0; i--) {
       let &frame = m_source_frames[i - 1];
       if (!frame.should_defer_trace) continue;
-      if (error_location.has_value() &&
-          (!error_location->filename.has_value() ||
-           *error_location->filename != frame.source_path.view()))
-      {
-        break;
+      if (error_location.has_value()) {
+        let const error_source_name = error_location->get_filename();
+        if (!error_source_name.has_value() ||
+            *error_source_name != frame.source_path.view())
+        {
+          break;
+        }
       }
       frame.has_deferred_trace = true;
       frame.deferred_trace_location = error_location;
@@ -198,10 +200,7 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
   }
 
   let const do_location_match = [](SourceLocation left, SourceLocation right) {
-    let const same_file =
-        left.filename.has_value() == right.filename.has_value() &&
-        (!left.filename.has_value() || *left.filename == *right.filename);
-    return same_file && left.position == right.position &&
+    return left.has_same_source_as(right) && left.position == right.position &&
            left.length == right.length;
   };
   let const do_frame_repeat_error = [&](const source_frame &frame) {

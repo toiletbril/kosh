@@ -928,7 +928,7 @@ fn main(int argc, char **argv) -> int
                         parse_argv[a + 1], std::strlen(parse_argv[a + 1])});
                 let const span = quoted_length + 1 + argument_length;
                 root_frame_call_site =
-                    koshka::SourceLocation{flag_offset, span, koshka::None};
+                    koshka::SourceLocation{flag_offset, span};
                 break;
               }
             }
@@ -961,8 +961,8 @@ fn main(int argc, char **argv) -> int
           let const operand_offset = koshka::quoted_argv_offset_until(
               parse_argc, parse_argv, file_name.view());
           const koshka::SourceLocation operand_location{
-              operand_offset, koshka::shell_quoted_arg_length(file_name.view()),
-              koshka::None};
+              operand_offset,
+              koshka::shell_quoted_arg_length(file_name.view())};
           const koshka::Path script_path{file_name.view()};
 
           if (script_path.is_directory()) {

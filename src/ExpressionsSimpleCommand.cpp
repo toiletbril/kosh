@@ -497,7 +497,7 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
         if (redir.heredoc->has_contiguous_source) {
           source_location =
               SourceLocation{redir.heredoc->source_position, body.length,
-                             fallback_location.filename};
+                             fallback_location.source_name_index};
           source_location_pointer = &source_location;
         }
         expanded_body = cxt.expand_heredoc_body(body, source_location_pointer);

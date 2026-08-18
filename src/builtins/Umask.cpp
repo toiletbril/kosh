@@ -154,9 +154,6 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let const &requested = operands[1];
-  let const requested_location = operand_locations.count() > 1
-                                     ? operand_locations[1]
-                                     : ec.source_location();
 
   LOG(Debug, "umask setting the file creation mask from '%s'",
       requested.c_str());

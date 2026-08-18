@@ -169,7 +169,7 @@ public:
                                  : source.is_empty() ? 0
                                                      : source.length - 1;
       const SourceLocation location{precise_base->position + error_position, 1,
-                                    precise_base->filename};
+                                    precise_base->source_name_index};
       if (note.is_empty()) throw ErrorWithLocation{location, message};
       throw ErrorWithLocationAndDetails{location, message, note};
     }
@@ -193,7 +193,7 @@ public:
     if (precise_base.has_value()) {
       const SourceLocation location{precise_base->position + start_position,
                                     end_position - start_position,
-                                    precise_base->filename};
+                                    precise_base->source_name_index};
       if (note.is_empty()) throw ErrorWithLocation{location, message};
       throw ErrorWithLocationAndDetails{location, message, note};
     }
@@ -1075,7 +1075,7 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
     -> i64
 {
   let const source_location =
-      segment.get_source_location(m_current_location.filename);
+      segment.get_source_location(m_current_location.source_name_index);
 
   let cache_arena = segment.is_substitution_cache_in_function_arena
                         ? FUNCTION_ARENA

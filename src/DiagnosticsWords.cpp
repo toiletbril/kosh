@@ -88,7 +88,7 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
 
   let const target_offset = static_cast<usize>(target.data - expression.data);
   const SourceLocation name_location{*expression_base_position + target_offset,
-                                     target.length, location.filename};
+                                     target.length, location.source_name_index};
   if (analysis_source_text(actx, name_location) != target) return;
 
   actx.note_variable_binding_record(
@@ -321,7 +321,7 @@ fn check_posix_word_portability(AnalysisContext &actx,
   let const text = segment.text.view();
   let const do_get_location = [&]() -> SourceLocation {
     return expansion_location_with_sigil(
-        actx, segment.get_source_location(fallback_location.filename)
+        actx, segment.get_source_location(fallback_location.source_name_index)
                   .value_or(fallback_location));
   };
 

@@ -400,9 +400,14 @@ and the foreground program command line while it runs.
 ### Diagnostics and source locations
 
 src/Errors.cpp renders located carets and trailing notes. A SourceLocation holds
-a 32-bit position and a 32-bit length beside the source name. Every token and
-every syntax node carries one, so the pair is narrow. The constructor accepts
-usize, so a call site that computes an offset needs no cast. Diagnostic
+a 32-bit position, a 32-bit length, and a 32-bit source name index, so it is
+twelve bytes. Every token and every syntax node carries one. The name index
+selects a row of the intern table in src/Errors.cpp, and index zero is the
+source with no name. A row is copied once and never released, so a stamped
+index stays readable for the life of the run and across a fork. The lexer
+interns the file name once and stamps that index onto every location it
+produces. The constructor accepts usize, so a call site that computes an offset
+needs no cast. Diagnostic
 identifiers live in src/Diagnostics.hpp. A type whose name contains WithLocation
 owns or inherits a source location. A type whose name contains WithDetails owns
 a trailing note. The semantic classes remain separate for catch routing.

@@ -427,7 +427,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     if (resolved_source.is_windowed) {
       location.position = static_cast<u32>(
           resolved_source.to_render_position(location.position));
-      location.filename = resolved_source.filename_or_none();
+      location.source_name_index = resolved_source.source_name_index;
       line_offset = resolved_source.line_offset;
     }
     if (resolved_source.text == nullptr ||
@@ -492,7 +492,7 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
         reference_end++;
       }
       return SourceLocation{i + absolute_shift, reference_end - i,
-                            fallback.filename};
+                            fallback.source_name_index};
     }
     i++;
   }
@@ -510,7 +510,8 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
         (k + name.length == source.length ||
          !lexer::is_variable_name(source[k + name.length])))
     {
-      return SourceLocation{k + absolute_shift, name.length, fallback.filename};
+      return SourceLocation{k + absolute_shift, name.length,
+                            fallback.source_name_index};
     }
     k++;
   }
@@ -773,8 +774,13 @@ pure fn EvalContext::funcname_source_at(usize index) const wontthrow
   if (index < m_function_call_names.count()) {
     let const frame_name = funcname_frame_at(index);
     let const *info = m_function_definition_infos.find(frame_name);
-    if (info != nullptr && !info->filename.is_empty())
-      return info->filename.view();
+    if (info != nullptr) {
+      if (let const name = source_name_at(info->source_name_index);
+          name.has_value())
+      {
+        return *name;
+      }
+    }
   }
   return StringView{};
 }
@@ -785,8 +791,13 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
   if (index < m_function_call_names.count()) {
     let const *info =
         m_function_definition_infos.find(funcname_frame_at(index));
-    if (info != nullptr && !info->filename.is_empty())
-      return info->filename.view();
+    if (info != nullptr) {
+      if (let const name = source_name_at(info->source_name_index);
+          name.has_value())
+      {
+        return *name;
+      }
+    }
 
     return m_shell_name.view();
   }

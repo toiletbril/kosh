@@ -754,7 +754,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           quote_sandwich_state = 0;
 
           let const segment_location =
-              segment.get_source_location(arg_location.filename)
+              segment.get_source_location(arg_location.source_name_index)
                   .value_or(arg_location);
           let const base_position =
               segment_location.length == segment.text.count()
@@ -845,8 +845,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           {
             has_split_eligible_variable = true;
             split_eligible_location = expansion_location_with_sigil(
-                actx, segment.get_source_location(arg_location.filename)
-                          .value_or(arg_location));
+                actx,
+                segment.get_source_location(arg_location.source_name_index)
+                    .value_or(arg_location));
           }
           if (should_check_array_reads && bare_array_name.is_empty() &&
               actx.array_valued_names.contains(referenced))

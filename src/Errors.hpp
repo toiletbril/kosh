@@ -31,6 +31,13 @@ pure inline fn get_error_severity_word(error_severity severity) wontthrow
   unreachable("invalid error severity %d", ENUM(severity));
 }
 
+/* One row per distinct source name, so a location holds a four-byte index where
+   it held a twenty-four byte view. The table owns its copies, and a row is
+   never released, because the row count is the number of distinct script paths
+   one run touches. Index zero is the source with no name. */
+fn intern_source_name(StringView name) throws -> u32;
+pure fn source_name_at(u32 source_name_index) wontthrow -> Maybe<StringView>;
+
 /* The offsets are 32-bit because one shell source is far below four gigabytes,
    and every token and every syntax node carries one of these. The constructor
    accepts usize so the many call sites that compute an offset need no cast. */
@@ -38,16 +45,27 @@ struct SourceLocation
 {
   u32 position{0};
   u32 length{0};
-  Maybe<StringView> filename{};
+  u32 source_name_index{0};
 
   SourceLocation() = default;
 
   SourceLocation(usize position, usize length,
-                 Maybe<StringView> filename = {}) wontthrow
+                 u32 source_name_index = 0) wontthrow
       : position{static_cast<u32>(position)},
         length{static_cast<u32>(length)},
-        filename{steal(filename)}
+        source_name_index{source_name_index}
   {}
+
+  pure fn get_filename() const wontthrow -> Maybe<StringView>
+  {
+    return source_name_at(source_name_index);
+  }
+
+  pure fn has_same_source_as(const SourceLocation &other) const wontthrow
+      -> bool
+  {
+    return source_name_index == other.source_name_index;
+  }
 
   pure fn get_source_text(StringView source) const wontthrow
       -> Maybe<StringView>
@@ -63,7 +81,7 @@ struct SourceLocation
     ASSERT(relative_position <= length);
     ASSERT(relative_length <= length - relative_position);
     return SourceLocation{position + relative_position, relative_length,
-                          filename};
+                          source_name_index};
   }
 
   pure fn subspan_for_view(StringView source, StringView part,

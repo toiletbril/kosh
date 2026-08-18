@@ -489,7 +489,8 @@ fn fold_constant_arithmetic_in_word(
       actx.optimizer_eliminated_count++;
       if (actx.should_report_optimizer_diagnostics) {
         let const folded = String::from(*result, heap_allocator());
-        let const segment_location = segment.get_source_location(None);
+        let const segment_location =
+            segment.get_source_location(fallback_location.source_name_index);
         actx.report_diagnostic(diagnostic_id::optimizer_folded_arithmetic,
                                segment_location.has_value() ? *segment_location
                                                             : fallback_location,

@@ -220,11 +220,11 @@ public:
     source_length = static_cast<u32>(length);
   }
 
-  pure fn get_source_location(Maybe<StringView> filename) const wontthrow
+  pure fn get_source_location(u32 source_name_index) const wontthrow
       -> Maybe<SourceLocation>
   {
     if (source_length == 0) return None;
-    return SourceLocation{source_position, source_length, steal(filename)};
+    return SourceLocation{source_position, source_length, source_name_index};
   }
 
   pure fn has_glob_metacharacter() const wontthrow -> bool;

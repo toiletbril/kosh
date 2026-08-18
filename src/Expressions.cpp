@@ -126,13 +126,15 @@ fn AnalysisContext::flush_warnings() throws -> void
   for (let const &warning : pending_warnings) {
     if (diagnostic_sink != nullptr) {
       let source_name = String{heap_allocator()};
-      if (warning.location.filename.has_value())
-        source_name = String{*warning.location.filename};
+      if (let const name = warning.location.get_filename(); name.has_value())
+        source_name = String{*name};
       let related_source_name = String{heap_allocator()};
-      if (warning.related_location.has_value() &&
-          warning.related_location->filename.has_value())
-      {
-        related_source_name = String{*warning.related_location->filename};
+      if (warning.related_location.has_value()) {
+        if (let const related_name = warning.related_location->get_filename();
+            related_name.has_value())
+        {
+          related_source_name = String{*related_name};
+        }
       }
       diagnostic_sink->push(source_diagnostic{
           warning.id, error_severity::Warning, warning.location,
@@ -336,11 +338,15 @@ fn AnalysisContext::fail(diagnostic_id id, const SourceLocation &location,
 
   if (diagnostic_sink != nullptr) {
     let source_name = String{heap_allocator()};
-    if (location.filename.has_value()) source_name = String{*location.filename};
+    if (let const name = location.get_filename(); name.has_value())
+      source_name = String{*name};
     let related_source_name = String{heap_allocator()};
-    if (related_location.has_value() && related_location->filename.has_value())
-    {
-      related_source_name = String{*related_location->filename};
+    if (related_location.has_value()) {
+      if (let const related_name = related_location->get_filename();
+          related_name.has_value())
+      {
+        related_source_name = String{*related_name};
+      }
     }
     diagnostic_sink->push(source_diagnostic{
         id, error_severity::Error, location, steal(source_name),
@@ -532,7 +538,7 @@ fn window_function_body_error(EvalContext &cxt,
   let rebased = error.location();
   rebased.position =
       static_cast<u32>(resolved.to_render_position(rebased.position));
-  rebased.filename = resolved.filename_or_none();
+  rebased.source_name_index = resolved.source_name_index;
   if (rebased.position > resolved.text->count()) return None;
 
   error.set_location(rebased);
@@ -1163,7 +1169,7 @@ pure fn expansion_location_with_sigil(const AnalysisContext &actx,
     return location;
   }
 
-  return SourceLocation{start, length, location.filename};
+  return SourceLocation{start, length, location.source_name_index};
 }
 
 pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow
@@ -1175,7 +1181,7 @@ pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow
 
   return SourceLocation{first.position,
                         last.position + last.length - first.position,
-                        first.filename};
+                        first.source_name_index};
 }
 
 pure fn analysis_source_span(const AnalysisContext &actx,
