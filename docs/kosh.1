@@ -195,7 +195,17 @@ reports the assignment nearest above the cursor together with its folded value.
 A name that carries no folded value is described by what bound it, such as a
 loop word, a field read from input, or the result of an arithmetic expression.
 The earlier assignments in the same document are listed below it, and an
-assignment that does not run on every path is marked. Hover over a function shows the
+assignment that does not run on every path is marked. A name the shell itself
+defines is described from the builtin variable catalog. The description names a
+value the shell recomputes on each read, a list, a read-only name, an exported
+name, a name this shell does not maintain, and a name that bash defines and
+POSIX does not. A special parameter such as
+.B $?
+is described the same way, and a
+.B KOSH_ANSI_
+color name is answered by its prefix. When the document also assigns such a
+name, the assignment is reported first and the catalog description follows it.
+Hover over a function shows the
 definition body in the form
 .B declare \-f
 prints. Hover over a command the document does not define reports the external

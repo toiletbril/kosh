@@ -1,4 +1,5 @@
 #include "LanguageServerProtocol.hpp"
+#include "ShellVariables.hpp"
 
 namespace koshka::language_server {
 
@@ -93,6 +94,12 @@ private:
   fn variable_hover_text(
       const Document &document,
       const ArrayList<const variable_assignment_record *> &reaching) throws
+      -> String;
+  fn append_shell_variable_facts(
+      String &output, const shell_variable_description &description) throws
+      -> void;
+  fn shell_variable_hover_text(
+      StringView name, const shell_variable_description &description) throws
       -> String;
   fn function_hover_text(const Document &document,
                          const function_body_record &record) throws -> String;
@@ -935,6 +942,20 @@ pure fn variable_name_of(StringView text) wontthrow -> StringView
   return text.substring_of_length(start, end - start);
 }
 
+pure fn hover_variable_name_of(StringView text) wontthrow -> StringView
+{
+  let const name = variable_name_of(text);
+  if (!name.is_empty()) return name;
+
+  if (text.length == 2 && text[0] == '$') return text.substring(1);
+
+  if (text.length == 4 && text[0] == '$' && text[1] == '{' && text[3] == '}') {
+    return text.substring_of_length(2, 1);
+  }
+
+  return StringView{};
+}
+
 fn Server::definition_of(const Document &document,
                          const document_symbol &symbol) throws
     -> Maybe<document_symbol>
@@ -1471,6 +1492,59 @@ fn Server::variable_hover_text(
   return text;
 }
 
+fn Server::append_shell_variable_facts(
+    String &output, const shell_variable_description &description) throws
+    -> void
+{
+  output.append(description.summary);
+
+  if (has_shell_variable_fact(description.facts, shell_variable_fact::Dynamic))
+    output.append("\nThe shell computes the value on each read.");
+
+  if (has_shell_variable_fact(description.facts, shell_variable_fact::Array))
+    output.append("\nThe value is a list.");
+
+  if (has_shell_variable_fact(description.facts, shell_variable_fact::ReadOnly))
+    output.append("\nThe name is read-only.");
+
+  if (has_shell_variable_fact(description.facts, shell_variable_fact::Exported))
+    output.append("\nThe name is exported to a child process.");
+
+  if (has_shell_variable_fact(description.facts,
+                              shell_variable_fact::Unmaintained))
+    output.append("\nThis shell does not maintain the name.");
+
+  if (has_shell_variable_fact(description.facts, shell_variable_fact::BashOnly))
+  {
+    output.append(m_context.mood() == mimic_mood::Posix
+                      ? "\nThe sh mood is active, so the name is unavailable."
+                      : "\nThe name is unavailable in the sh mood.");
+    return;
+  }
+
+  if (has_shell_variable_fact(description.facts, shell_variable_fact::NotPosix))
+    output.append("\nThe name is defined by bash and not by POSIX.");
+}
+
+fn Server::shell_variable_hover_text(
+    StringView name, const shell_variable_description &description) throws
+    -> String
+{
+  let const is_special_parameter = name.length == 1;
+
+  let headline = String{heap_allocator()};
+  if (is_special_parameter) headline.push('$');
+  headline.append(name);
+
+  let text = String{heap_allocator()};
+  append_hover_block(text, headline.view(), m_supports_markdown_hover,
+                     StringView{"shell"});
+  text.push('\n');
+  append_shell_variable_facts(text, description);
+
+  return text;
+}
+
 fn Server::function_hover_text(const Document &document,
                                const function_body_record &record) throws
     -> String
@@ -1531,11 +1605,24 @@ fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
   if (!symbol.has_value()) return send_result(id, "null");
 
   if (role_reads_variable(symbol->role)) {
+    let const name = hover_variable_name_of(symbol->text.view());
+    let const described = describe_shell_variable(name);
     let const reaching = assignments_reaching(*document, *symbol);
-    if (reaching.is_empty()) return send_result(id, "null");
 
-    return send_hover(id, *document, *symbol,
-                      variable_hover_text(*document, reaching).view());
+    if (reaching.is_empty()) {
+      if (!described.has_value()) return send_result(id, "null");
+
+      return send_hover(id, *document, *symbol,
+                        shell_variable_hover_text(name, *described).view());
+    }
+
+    let text = variable_hover_text(*document, reaching);
+    if (described.has_value()) {
+      text.append("\n\nThe shell also defines the name.\n");
+      append_shell_variable_facts(text, *described);
+    }
+
+    return send_hover(id, *document, *symbol, text.view());
   }
 
   if (role_reads_function(symbol->role)) {

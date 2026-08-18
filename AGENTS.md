@@ -323,6 +323,17 @@ bare operand. An arithmetic target is recorded only when its computed span reads
 back as that name, so a caller that cannot place its copy of the expression
 records nothing.
 
+`src/ShellVariables.hpp` owns the catalog of every variable this shell defines
+or reads. A row carries one summary and a fact set covering a value the shell
+recomputes on each read, a list, a read-only name, an exported name, a bash-only
+name, a name POSIX does not define, and a name this shell does not maintain. The
+`KOSH_ANSI_` color names are answered by a prefix rule and hold no row of their
+own. A one-byte key is a special parameter, and its hover headline carries the
+dollar sign. A variable hover answer appends the catalog description, and a
+document that assigns the name reports the assignment first. The bash-only
+sentence reads the document mood, so the sh mood is named as the reason the name
+is unavailable.
+
 The document outline is built from the same records. An entry is sorted by its
 start position, with the wider span first when two entries open together, and a
 scope stack turns an entry contained by a function body into a child of that
