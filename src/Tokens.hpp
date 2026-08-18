@@ -138,8 +138,8 @@ public:
     return *this;
   }
 
-  /* The small fields lead so they fill the padding a sixty-four byte String
-     would otherwise leave. The segment is eighty-eight bytes. */
+  /* The small fields lead so they fill the padding the String would otherwise
+     leave. The segment is eighty bytes. */
   Kind kind;
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
@@ -348,7 +348,7 @@ private:
   mutable bool m_has_cached_plain_kind{false};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(Word) == 48);
+static_assert(sizeof(usize) != 8 || sizeof(Word) == 40);
 
 struct word_assignment_split
 {

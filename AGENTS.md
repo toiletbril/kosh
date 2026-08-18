@@ -498,13 +498,16 @@ outside the heap kind returns at once. Every Allocator is built by
 word.
 
 ArrayList allocates nothing during default construction and grows
-geometrically. String has a small inline buffer, and its first heap block is
-sized to the exact request while every later block grows geometrically. A
-scratch arena uses mark and release lifetime within one scope.
+geometrically. Its length and capacity are 32-bit, so the header is
+twenty-four bytes beside an eight-byte pointer and an eight-byte allocator. The
+accessors still answer in usize, and `reserve` throws `std::bad_alloc` for a
+request past `MAXIMUM_ELEMENT_COUNT`. String has a small inline buffer, and its
+first heap block is sized to the exact request while every later block grows
+geometrically. A scratch arena uses mark and release lifetime within one scope.
 
 `SparseList` is the member form for a list that is empty on almost every
-instance. An empty one is a null pointer, and the forty-byte ArrayList is
-allocated and shrunk to fit only when `fill` carries elements. Its read
+instance. An empty one is a null pointer, and the list is allocated and shrunk
+to fit only when `fill` carries elements. Its read
 interface matches ArrayList, so a reader needs no change. The prefix
 assignments of a command and the array-builtin assignments of a simple command
 are held this way.

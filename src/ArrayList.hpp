@@ -13,6 +13,12 @@ class ArrayList
 public:
   static_assert(std::is_nothrow_destructible_v<T>);
 
+  /* The length and the capacity are 32-bit, so the header is twenty-four bytes
+     on a machine whose pointer is eight. The evaluator holds millions of these
+     as members, and no list it builds approaches four billion elements. */
+  static constexpr usize MAXIMUM_ELEMENT_COUNT =
+      static_cast<usize>(~static_cast<u32>(0));
+
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 
   ArrayList(std::initializer_list<T> elements) : ArrayList(heap_allocator())
@@ -191,6 +197,9 @@ public:
   cold fn reserve(usize needed) throws -> void
   {
     if (needed <= m_capacity) return;
+    if (needed > MAXIMUM_ELEMENT_COUNT) [[unlikely]]
+      throw std::bad_alloc{};
+
     constexpr usize INITIAL_ALLOCATION_BYTES = 256;
     constexpr usize MAXIMUM_INITIAL_ELEMENT_COUNT = 16;
     constexpr usize INITIAL_ELEMENT_COUNT =
@@ -204,16 +213,20 @@ public:
     if (m_capacity != 0) {
       let const growth =
           m_capacity < 64 ? static_cast<usize>(4) : static_cast<usize>(2);
-      new_capacity =
-          m_capacity > SIZE_MAX / growth ? needed : m_capacity * growth;
+      new_capacity = m_capacity > MAXIMUM_ELEMENT_COUNT / growth
+                         ? needed
+                         : static_cast<usize>(m_capacity) * growth;
     }
     while (new_capacity < needed) {
-      if (new_capacity > SIZE_MAX / 2) {
+      if (new_capacity > MAXIMUM_ELEMENT_COUNT / 2) {
         new_capacity = needed;
         break;
       }
       new_capacity *= 2;
     }
+    if (new_capacity > MAXIMUM_ELEMENT_COUNT)
+      new_capacity = MAXIMUM_ELEMENT_COUNT;
+
     let const fresh = m_allocator.alloc_array<T>(new_capacity);
     try {
       relocate_to(fresh);
@@ -223,7 +236,7 @@ public:
     }
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
     m_data = fresh;
-    m_capacity = new_capacity;
+    m_capacity = static_cast<u32>(new_capacity);
   }
 
   /* The exact-size move to another allocator. A list is built on the heap where
@@ -396,12 +409,14 @@ private:
 
   Allocator m_allocator;
   T *m_data{nullptr};
-  usize m_length{0};
-  usize m_capacity{0};
+  u32 m_length{0};
+  u32 m_capacity{0};
 };
 
+static_assert(sizeof(usize) != 8 || sizeof(ArrayList<int>) == 24);
+
 /* A list that is empty on almost every instance it is a member of. An empty one
-   is one pointer, and the forty-byte list is allocated only when a fill carries
+   is one pointer, and the list itself is allocated only when a fill carries
    elements. The read interface matches ArrayList, so a member can be swapped
    over without touching its readers. */
 template <class T>
