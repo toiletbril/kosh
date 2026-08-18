@@ -182,6 +182,15 @@ or
 .B readonly
 is a variable assignment too, and the operand may be quoted, as in
 .BR "export \(dqname=value\(dq" .
+A bare name such as
+.B "declare \-a rows"
+is a declaration that carries no value, and it is recorded the same way. A
+.BR \-f ,
+.BR \-F ,
+or
+.B \-p
+operand asks the builtin to report a name, so that command line declares
+nothing.
 A name bound by
 .BR for ,
 .BR select ,

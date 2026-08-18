@@ -320,10 +320,14 @@ literal segments the quoting produced. Word expansion does not read that split,
 so the SC2086 and SC2046 exemptions are unaffected. The outline selects the
 whole entry when the recorded name is not a slice of the source.
 
+A bare name operand of an assignment builtin is recorded as a declaration that
+carries no value. A `-f`, `-F`, or `-p` operand marks the command line a
+reporting form, and nothing on it is recorded.
+
 Each record carries the binder that produced it. The binders are an ordinary
 assignment, a `for` word, a `select` word, an arithmetic assignment, a `read`
-field, a `mapfile` or `readarray` line list, a `getopts` option letter, and
-`printf -v` formatted text. A record with no folded literal is described by its
+field, a `mapfile` or `readarray` line list, a `getopts` option letter,
+`printf -v` formatted text, and a valueless declaration. A record with no folded literal is described by its
 binder in the hover answer. The `read`, `mapfile`, and `readarray` walks skip
 the operand behind a value-carrying option, and the `getopts` name is the second
 bare operand. An arithmetic target is recorded only when its computed span reads

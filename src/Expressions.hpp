@@ -103,6 +103,7 @@ enum class assignment_binder : u8
   MappedLines,
   ParsedOption,
   FormattedText,
+  Declaration,
 };
 
 /* One assignment a reader may ask about. The name and the folded value are

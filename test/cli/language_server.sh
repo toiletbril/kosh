@@ -133,6 +133,10 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":104,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/shell-variable.sh"},"position":{"line":3,"character":8}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/shell-variable-posix.sh","languageId":"sh","version":1,"text":"#!/bin/sh\necho \"$RANDOM\"\n"}}}'
   frame '{"jsonrpc":"2.0","id":105,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/shell-variable-posix.sh"},"position":{"line":1,"character":9}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/valueless-declaration.sh","languageId":"bash","version":1,"text":"#!/bin/bash\nexport SHIPPED\ndeclare -a rows\ndeclare -f myfunc\ndeclare -p PATH\ntypeset -i counted\necho \"$SHIPPED\"\n"}}}'
+  frame '{"jsonrpc":"2.0","id":106,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///tmp/valueless-declaration.sh"}}}'
+  frame '{"jsonrpc":"2.0","id":107,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/valueless-declaration.sh"},"position":{"line":1,"character":9}}}'
+  frame '{"jsonrpc":"2.0","id":108,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/valueless-declaration.sh"},"position":{"line":6,"character":9}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -224,6 +228,9 @@ check_contains hover-unmaintained-variable '"id":102,"result":{"contents":{"kind
 check_contains hover-special-parameter '"id":103,"result":{"contents":{"kind":"plaintext","value":"$?\nThe value is the exit status of the last command.\nThe shell computes the value on each read."}'
 check_contains hover-assigned-shell-variable '"id":104,"result":{"contents":{"kind":"plaintext","value":"HOME=/tmp\nValue: /tmp\n\nThe shell also defines the name.\nThe value is the home directory used by tilde expansion and by a bare cd."}'
 check_contains hover-posix-mood-variable '"id":105,"result":{"contents":{"kind":"plaintext","value":"RANDOM\nEach read supplies a new random number between 0 and 32767.\nThe shell computes the value on each read.\nThe sh mood is active, so the name is unavailable."}'
+check_contains valueless-declaration-outline '"id":106,"result":[{"name":"SHIPPED","kind":13,"range":{"start":{"line":1,"character":7},"end":{"line":1,"character":14}},"selectionRange":{"start":{"line":1,"character":7},"end":{"line":1,"character":14}}},{"name":"rows","kind":13,"range":{"start":{"line":2,"character":11},"end":{"line":2,"character":15}},"selectionRange":{"start":{"line":2,"character":11},"end":{"line":2,"character":15}}},{"name":"counted","kind":13,"range":{"start":{"line":5,"character":11},"end":{"line":5,"character":18}},"selectionRange":{"start":{"line":5,"character":11},"end":{"line":5,"character":18}}}]'
+check_contains hover-valueless-declaration '"id":107,"result":{"contents":{"kind":"plaintext","value":"export SHIPPED\nThe name is declared and carries no value here."}'
+check_contains hover-reaches-declaration '"id":108,"result":{"contents":{"kind":"plaintext","value":"export SHIPPED\nThe name is declared and carries no value here."}'
 check_contains method-error '"id":9,"error":{"code":-32601'
 check_contains auxiliary-uri "\"uri\":\"file://$directory/disk-source.sh\""
 check_contains auxiliary-diagnostic disk_aux

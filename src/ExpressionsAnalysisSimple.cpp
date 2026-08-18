@@ -515,6 +515,25 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   if (command_is_assignment_builtin && !is_command_shadowed &&
       actx.symbol_records != nullptr)
   {
+    /* A -f, -F, or -p operand asks the builtin to report a name, so nothing on
+       that command line is declared. */
+    let is_reporting_form = false;
+    for (usize i = 1; i < m_args.count(); i++) {
+      let flag_storage = String{heap_allocator()};
+      let const flag_text = borrowed_token_text(m_args[i], flag_storage);
+      if (flag_text.length < 2 || flag_text[0] != '-') continue;
+
+      if (flag_text == "--") break;
+
+      if (flag_text.find_character('f').has_value() ||
+          flag_text.find_character('F').has_value() ||
+          flag_text.find_character('p').has_value())
+      {
+        is_reporting_form = true;
+        break;
+      }
+    }
+
     for (usize i = 1; i < m_args.count(); i++) {
       let split = Maybe<word_assignment_split>{None};
       StringView recorded_name;
@@ -533,7 +552,21 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
         split = word.get_assignment_split();
         if (!split.has_value()) split = word.get_quoted_assignment_split();
-        if (!split.has_value()) continue;
+
+        if (!split.has_value()) {
+          if (is_reporting_form) continue;
+
+          let const declared = optimizer::literal_word_value(word);
+          if (!declared.has_value()) continue;
+          if (!optimizer::is_plain_variable_name(declared->view())) continue;
+
+          actx.note_variable_binding_record(
+              declared->view(), m_args[i]->source_location(),
+              assignment_binder::Declaration,
+              !is_unconditional || actx.has_seen_runtime_definer);
+
+          continue;
+        }
 
         recorded_name = split->name.view();
         recorded_value = &split->value;

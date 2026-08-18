@@ -1262,9 +1262,10 @@ static constexpr const char *BINDER_DESCRIPTIONS[] = {
     "The value is a list of lines read from input.",
     "The value is the option letter the parse reached.",
     "The value is the formatted text.",
+    "The name is declared and carries no value here.",
 };
 static_assert(countof(BINDER_DESCRIPTIONS) ==
-              static_cast<usize>(assignment_binder::FormattedText) + 1);
+              static_cast<usize>(assignment_binder::Declaration) + 1);
 
 pure fn binder_description(assignment_binder binder) wontthrow -> StringView
 {
