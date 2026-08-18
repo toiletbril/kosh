@@ -255,6 +255,19 @@ benchmark_pair() {
 require_executable "$DASH"
 require_executable "$BASHP"
 
+BASH_SKIP_REASON=
+for BASH_REFERENCE_INPUT in "$BENCH_BASH" "$BENCH_KOSH" "$PRIMES"; do
+  if ! "$BASHP" -O extglob -n "$BASH_REFERENCE_INPUT" 2>/dev/null; then
+    BASH_VERSION_TEXT=$("$BASHP" -c 'printf "%s" "$BASH_VERSION"' 2>/dev/null)
+    BASH_SKIP_REASON="$BASHP is bash ${BASH_VERSION_TEXT:-unknown}, too old"
+    break
+  fi
+done
+
+skip_bash_reference() {
+  printf "  %-16s%s\n" "$(basename "$BASHP")" "skipped, $BASH_SKIP_REASON"
+}
+
 case "$BENCH_WARMUP_COUNT:$BENCH_SAMPLE_COUNT" in
   *[!0-9:]*|:*|*:)
     echo "benchmark sample counts must be nonnegative integers" >&2
@@ -297,15 +310,27 @@ run_timed "$(basename "$BIN")+analysis" "$S" "$BIN" --mood sh -W "$BENCH"
 compare_outputs "$D" "$S" "dash with analysis"
 
 echo "configure.bash, wall-clock seconds at SCALE=$SCALE, lower is better:"
-benchmark_pair bash
+if [ -z "$BASH_SKIP_REASON" ]; then
+  benchmark_pair bash
+else
+  skip_bash_reference
+fi
 run_timed "$(basename "$BIN")+analysis" "$SB" \
   "$BIN" --mood bash -W "$BENCH_BASH"
-compare_outputs "$BB" "$SB" "bash with analysis"
+if [ -z "$BASH_SKIP_REASON" ]; then
+  compare_outputs "$BB" "$SB" "bash with analysis"
+fi
 
 echo "configure.kosh, wall-clock seconds at SCALE=$SCALE, lower is better:"
-run_timed "$(basename "$BASHP")" "$ZB" "$BASHP" "$BENCH_KOSH"
+if [ -z "$BASH_SKIP_REASON" ]; then
+  run_timed "$(basename "$BASHP")" "$ZB" "$BASHP" "$BENCH_KOSH"
+else
+  skip_bash_reference
+fi
 run_timed "$(basename "$BIN")+analysis" "$ZS" "$BIN" "$BENCH_KOSH"
-compare_outputs "$ZB" "$ZS" "bash with analysis"
+if [ -z "$BASH_SKIP_REASON" ]; then
+  compare_outputs "$ZB" "$ZS" "bash with analysis"
+fi
 
 echo "primes.bash, wall-clock seconds up to LIMIT=$PRIMES_LIMIT, lower is better:"
 if command -v "$PYTHON" >/dev/null 2>&1; then
@@ -315,13 +340,25 @@ else
   printf "  %-16s%s\n" "$(basename "$PYTHON")" \
     "skipped, executable was not found"
 fi
-run_timed "$(basename "$BASHP")" "$PB" "$BASHP" "$PRIMES" "$PRIMES_LIMIT"
+if [ -z "$BASH_SKIP_REASON" ]; then
+  run_timed "$(basename "$BASHP")" "$PB" "$BASHP" "$PRIMES" "$PRIMES_LIMIT"
+else
+  skip_bash_reference
+fi
 run_timed "$(basename "$BIN")" "$PS" \
   "$BIN" --mood bash --no-diagnostics "$PRIMES" "$PRIMES_LIMIT"
-compare_outputs "$PB" "$PS" "bash"
+if [ -z "$BASH_SKIP_REASON" ]; then
+  compare_outputs "$PB" "$PS" "bash"
+fi
 run_timed "$(basename "$BIN")+analysis" "$PS" \
   "$BIN" --mood bash -W "$PRIMES" "$PRIMES_LIMIT"
-compare_outputs "$PB" "$PS" "bash with analysis"
+if [ -z "$BASH_SKIP_REASON" ]; then
+  compare_outputs "$PB" "$PS" "bash with analysis"
+fi
 if command -v "$PYTHON" >/dev/null 2>&1; then
-  compare_outputs "$PB" "$PP" "python"
+  if [ -z "$BASH_SKIP_REASON" ]; then
+    compare_outputs "$PB" "$PP" "python"
+  else
+    compare_outputs "$PS" "$PP" "python"
+  fi
 fi

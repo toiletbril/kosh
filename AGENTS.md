@@ -85,6 +85,11 @@ The bashdiff and mimicrydiff comparisons require Bash 5.3 or newer. Both scripts
 report a skipped comparison when BASHP names an older Bash. The macOS system
 /bin/bash is Bash 3.2. Pass a modern Bash through BASHP on macOS.
 
+The benchmark parses each Bash reference input with `-O extglob -n` before it
+measures anything. A rejected input marks every Bash reference as skipped, and
+the kosh timings and the Python comparison still run. The Bash speed gate is
+reached only when the reference ran.
+
 ## Code conventions
 
 ### Declarations and names
