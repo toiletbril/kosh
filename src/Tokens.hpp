@@ -381,7 +381,6 @@ public:
 
     /* Values */
     Word,
-    Redirection,
     Assignment,
 
     /* Operators */
@@ -567,22 +566,6 @@ TOKEN_STRUCT(LeftParen);
 TOKEN_STRUCT(RightParen);
 TOKEN_STRUCT(LeftBracket);
 TOKEN_STRUCT(RightBracket);
-
-class Redirection : public Token
-{
-public:
-  Redirection(SourceLocation location, StringView what_fd, StringView to_file);
-
-  fn kind() const wontthrow -> Kind override;
-  fn flags() const wontthrow -> Flags override;
-
-  pure fn from_fd() const wontthrow -> const String &;
-  pure fn to_file() const wontthrow -> const String &;
-
-protected:
-  String m_from_fd{heap_allocator()};
-  String m_to_file{heap_allocator()};
-};
 
 class Assignment : public Token
 {

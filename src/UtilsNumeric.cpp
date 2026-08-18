@@ -243,12 +243,24 @@ public:
     m_source_length = source.count();
     m_newline_offsets.clear();
 
+    /* An offset is 32-bit, matching every other source offset the shell
+       carries, so a source beyond four gigabytes is indexed up to that point
+       and everything past it reads as the last line. */
+    let const indexable_length =
+        source.count() < UINT32_MAX ? source.count() : usize{UINT32_MAX};
+    let const indexable = source.substring_of_length(0, indexable_length);
+
+    /* The count pass is one memchr sweep and it makes the offset table an
+       exact allocation, where geometric growth would leave up to half the
+       block unused on a source with hundreds of thousands of lines. */
+    m_newline_offsets.reserve(count_newlines(indexable));
+
     usize scan_position = 0;
-    while (scan_position < source.count()) {
-      let const remaining = source.substring(scan_position);
+    while (scan_position < indexable_length) {
+      let const remaining = indexable.substring(scan_position);
       let const newline = remaining.find_character('\n');
       if (!newline.has_value()) break;
-      m_newline_offsets.push(scan_position + *newline);
+      m_newline_offsets.push(static_cast<u32>(scan_position + *newline));
       scan_position += *newline + 1;
     }
   }
@@ -257,7 +269,7 @@ public:
   {
     m_source_data = nullptr;
     m_source_length = 0;
-    m_newline_offsets.clear();
+    m_newline_offsets.release();
   }
 
   pure fn locate(usize position) const wontthrow -> source_line_position
@@ -280,9 +292,23 @@ public:
   }
 
 private:
+  static pure fn count_newlines(StringView text) wontthrow -> usize
+  {
+    usize newline_count = 0;
+    usize scan_position = 0;
+    while (scan_position < text.count()) {
+      let const newline = text.substring(scan_position).find_character('\n');
+      if (!newline.has_value()) break;
+      newline_count++;
+      scan_position += *newline + 1;
+    }
+
+    return newline_count;
+  }
+
   const char *m_source_data{nullptr};
   usize m_source_length{0};
-  ArrayList<usize> m_newline_offsets;
+  ArrayList<u32> m_newline_offsets;
 };
 
 static thread_local LineNumberCache LINE_NUMBER_CACHE{};

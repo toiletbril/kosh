@@ -162,6 +162,10 @@ public:
     m_length = 0;
   }
 
+  /* Destroy every element and give the storage back, where clear keeps the
+     capacity for the next fill. */
+  fn release() wontthrow -> void { destroy_all(); }
+
   hot mustuse pure fn back() wontthrow -> T &
   {
     ASSERT(m_length > 0, "back() on an empty list");

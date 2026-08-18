@@ -613,31 +613,6 @@ fn create_word_token(BumpArena &arena, SourceLocation location,
   return arena.create<ExpandedWordToken>(steal(location), steal(word));
 }
 
-Redirection::Redirection(SourceLocation location, StringView what_fd,
-                         StringView to_file)
-    : Token(steal(location)), m_from_fd(what_fd), m_to_file(to_file)
-{}
-
-fn Redirection::kind() const wontthrow -> Token::Kind
-{
-  return Token::Kind::Redirection;
-}
-
-fn Redirection::flags() const wontthrow -> Token::Flags
-{
-  return Token::Flag::Special;
-}
-
-pure fn Redirection::from_fd() const wontthrow -> const String &
-{
-  return m_from_fd;
-}
-
-pure fn Redirection::to_file() const wontthrow -> const String &
-{
-  return m_to_file;
-}
-
 Operator::Operator(SourceLocation location) : Token(steal(location)) {}
 
 fn Operator::left_precedence() const wontthrow -> u8 { return 0; }
