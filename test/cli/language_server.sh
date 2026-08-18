@@ -263,7 +263,7 @@ KOSH_FLAGS=--language-server "$BIN" -c 'echo environment-filtered'
 "$BIN" --language-server script.sh > "$directory/conflict-out" 2>&1
 conflict_status=$?
 printf 'conflict-status=%s\n' "$conflict_status"
-case $(< "$directory/conflict-out") in
+case $(cat "$directory/conflict-out") in
 *"does not accept"*) printf 'conflict-message=ok\n' ;;
 *) printf 'conflict-message=missing\n' ;;
 esac
