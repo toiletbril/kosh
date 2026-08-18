@@ -365,8 +365,7 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
 fn SimpleCommand::set_array_args(
     ArrayList<array_builtin_assignment> &&array_args) throws -> void
 {
-  m_array_args = steal(array_args);
-  m_array_args.shrink_to_fit();
+  m_array_args.fill(steal(array_args));
 }
 
 namespace {

@@ -121,7 +121,7 @@ struct command_lint_input
 {
   const ArrayList<const Token *> &args;
   const ArrayList<Redirection> &redirections;
-  const ArrayList<prefix_assignment> &local_vars;
+  const SparseList<prefix_assignment> &local_vars;
   SourceLocation command_source_location;
   StringView command_literal;
   analysis_command_info command_info;

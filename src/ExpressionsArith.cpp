@@ -1115,10 +1115,9 @@ fn RedirectedCommand::analyze(AnalysisContext &actx,
   if (m_redirections.is_empty()) return;
 
   /* The lint input borrows its lists. This node has no command word and no
-     prefix assignment, and an empty ArrayList allocates nothing. */
+     prefix assignment, and an empty list allocates nothing. */
   let const no_args = ArrayList<const Token *>{heap_allocator()};
-  let const no_prefix_assignments =
-      ArrayList<prefix_assignment>{heap_allocator()};
+  let const no_prefix_assignments = SparseList<prefix_assignment>{};
   let const lint_input = command_lint_input{no_args,
                                             m_redirections,
                                             no_prefix_assignments,

@@ -494,6 +494,13 @@ geometrically. String has a small inline buffer, and its first heap block is
 sized to the exact request while every later block grows geometrically. A
 scratch arena uses mark and release lifetime within one scope.
 
+`SparseList` is the member form for a list that is empty on almost every
+instance. An empty one is a null pointer, and the forty-byte ArrayList is
+allocated and shrunk to fit only when `fill` carries elements. Its read
+interface matches ArrayList, so a reader needs no change. The prefix
+assignments of a command and the array-builtin assignments of a simple command
+are held this way.
+
 A bump arena registers one destructor per non-trivially-destructible object it
 creates. The registry is a list of 64 KiB chunks, so a script with two million
 such objects appends a chunk and never copies the entries already registered. A

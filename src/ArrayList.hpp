@@ -400,4 +400,86 @@ private:
   usize m_capacity{0};
 };
 
+/* A list that is empty on almost every instance it is a member of. An empty one
+   is one pointer, and the forty-byte list is allocated only when a fill carries
+   elements. The read interface matches ArrayList, so a member can be swapped
+   over without touching its readers. */
+template <class T>
+class SparseList
+{
+public:
+  SparseList() = default;
+  ~SparseList() { release(); }
+
+  SparseList(const SparseList &) = delete;
+  SparseList &operator=(const SparseList &) = delete;
+
+  SparseList(SparseList &&other) noexcept : m_list(other.m_list)
+  {
+    other.m_list = nullptr;
+  }
+
+  fn operator=(SparseList &&other) wontthrow->SparseList &
+  {
+    if (this != &other) {
+      release();
+      m_list = other.m_list;
+      other.m_list = nullptr;
+    }
+    return *this;
+  }
+
+  /* An empty fill leaves the instance at one null pointer. */
+  fn fill(ArrayList<T> &&filled) throws -> void
+  {
+    if (filled.is_empty()) {
+      release();
+      return;
+    }
+
+    if (m_list == nullptr) {
+      let const block = heap_allocator().alloc_array<ArrayList<T>>(1);
+      m_list = new (block) ArrayList<T>{heap_allocator()};
+    }
+
+    *m_list = steal(filled);
+    m_list->shrink_to_fit();
+  }
+
+  hot mustuse pure fn is_empty() const wontthrow -> bool
+  {
+    return m_list == nullptr;
+  }
+  hot mustuse pure fn count() const wontthrow -> usize
+  {
+    return m_list == nullptr ? 0 : m_list->count();
+  }
+  hot mustuse pure fn operator[](usize i) const wontthrow->const T &
+  {
+    ASSERT(m_list != nullptr, "array index is past the end");
+    return (*m_list)[i];
+  }
+
+  hot mustuse pure fn begin() const wontthrow -> const T *
+  {
+    return m_list == nullptr ? nullptr : m_list->begin();
+  }
+  hot mustuse pure fn end() const wontthrow -> const T *
+  {
+    return m_list == nullptr ? nullptr : m_list->end();
+  }
+
+private:
+  fn release() wontthrow -> void
+  {
+    if (m_list == nullptr) return;
+
+    m_list->~ArrayList<T>();
+    heap_allocator().free_array(m_list, 1);
+    m_list = nullptr;
+  }
+
+  ArrayList<T> *m_list{nullptr};
+};
+
 } /* namespace koshka */

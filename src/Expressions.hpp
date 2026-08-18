@@ -626,7 +626,7 @@ public:
   pure fn is_async() const wontthrow -> bool;
   fn set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void;
 
-  pure fn local_vars() const wontthrow -> const ArrayList<prefix_assignment> &;
+  pure fn local_vars() const wontthrow -> const SparseList<prefix_assignment> &;
 
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
@@ -650,7 +650,7 @@ protected:
   bool m_is_timed{false};
   bool m_is_time_posix_format{false};
   SourceLocation m_time_location{};
-  ArrayList<prefix_assignment> m_local_vars{heap_allocator()};
+  SparseList<prefix_assignment> m_local_vars{};
 };
 
 class AssignCommand : public Command
@@ -793,7 +793,7 @@ protected:
   mutable Maybe<bool> m_command_word_is_glob{};
 
   ArrayList<Redirection> m_redirections{heap_allocator()};
-  ArrayList<array_builtin_assignment> m_array_args{heap_allocator()};
+  SparseList<array_builtin_assignment> m_array_args{};
 };
 
 class CompoundListCondition : public Expression

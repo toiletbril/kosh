@@ -1301,12 +1301,11 @@ pure fn Command::time_uses_posix_format() const wontthrow -> bool
 
 fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
 {
-  m_local_vars = steal(vars);
-  m_local_vars.shrink_to_fit();
+  m_local_vars.fill(steal(vars));
 }
 
 pure fn Command::local_vars() const wontthrow
-    -> const ArrayList<prefix_assignment> &
+    -> const SparseList<prefix_assignment> &
 {
   return m_local_vars;
 }
