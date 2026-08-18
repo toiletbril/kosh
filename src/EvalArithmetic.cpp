@@ -1087,16 +1087,15 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
   }
 
   let const generation = cache_arena->reset_generation();
-  if (segment.cached_arith == nullptr ||
-      segment.cached_arena_generation != generation)
-  {
-    segment.cached_arith = cache_arena->create<arith_token_cache>();
-    segment.cached_arena_generation = generation;
+  let &cache = segment.get_eval_cache();
+  if (cache.arith == nullptr || cache.arena_generation != generation) {
+    cache.arith = cache_arena->create<arith_token_cache>();
+    cache.arena_generation = generation;
   }
 
   return evaluate_arithmetic_cached_clause(
-      segment.text.view(), segment.cached_arith->tokens,
-      segment.cached_arith->is_tokenized, segment.cached_arith->is_simple,
+      segment.text.view(), cache.arith->tokens, cache.arith->is_tokenized,
+      cache.arith->is_simple,
       source_location.has_value() ? &*source_location : nullptr);
 }
 

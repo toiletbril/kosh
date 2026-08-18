@@ -36,6 +36,24 @@ struct arith_token_cache
   bool is_simple{false};
 };
 
+/* The evaluation state of one segment. A literal segment never reaches
+   evaluation and never carries this block, so a large script holds one null
+   pointer per segment.
+
+   Both caches live in AST_ARENA, and a function-body segment puts them in
+   FUNCTION_ARENA, so the generation the cache was filled in is recorded and a
+   hit from an earlier generation is treated as stale and refilled. An
+   arithmetic segment is never a substitution segment, so the two caches never
+   share one segment and one generation stamp answers for both. */
+struct segment_eval_cache
+{
+  const Expression *substitution_ast{nullptr};
+  arith_token_cache *arith{nullptr};
+  usize arena_generation{0};
+  i64 folded_arithmetic_result{0};
+  bool has_folded_arithmetic_result{false};
+};
+
 class WordSegment
 {
 public:
@@ -55,31 +73,93 @@ public:
 
   WordSegment(Kind kind, String text, bool is_in_double_quotes = false,
               bool is_greedy_name = false)
-      : kind{kind}, text{steal(text)}, is_in_double_quotes{is_in_double_quotes},
-        is_greedy_name{is_greedy_name}
+      : kind{kind}, is_in_double_quotes{is_in_double_quotes},
+        is_greedy_name{is_greedy_name}, text{steal(text)}
   {}
 
+  ~WordSegment() { release_eval_cache(); }
+
+  cold WordSegment(const WordSegment &other) throws
+      : kind{other.kind},
+        is_in_double_quotes{other.is_in_double_quotes},
+        is_greedy_name{other.is_greedy_name},
+        was_ansi_c_quoted{other.was_ansi_c_quoted},
+        is_substitution_cache_in_function_arena{
+            other.is_substitution_cache_in_function_arena},
+        source_position{other.source_position},
+        source_length{other.source_length},
+        text{other.text}
+  {
+    if (other.m_eval_cache != nullptr) get_eval_cache() = *other.m_eval_cache;
+  }
+
+  WordSegment(WordSegment &&other) wontthrow
+      : kind{other.kind},
+        is_in_double_quotes{other.is_in_double_quotes},
+        is_greedy_name{other.is_greedy_name},
+        was_ansi_c_quoted{other.was_ansi_c_quoted},
+        is_substitution_cache_in_function_arena{
+            other.is_substitution_cache_in_function_arena},
+        source_position{other.source_position},
+        source_length{other.source_length},
+        text{steal(other.text)},
+        m_eval_cache{other.m_eval_cache}
+  {
+    other.m_eval_cache = nullptr;
+  }
+
+  cold fn operator=(const WordSegment &other) throws->WordSegment &
+  {
+    if (this == &other) return *this;
+
+    let copy = WordSegment{other};
+    *this = steal(copy);
+
+    return *this;
+  }
+
+  fn operator=(WordSegment &&other) wontthrow->WordSegment &
+  {
+    if (this == &other) return *this;
+
+    release_eval_cache();
+    kind = other.kind;
+    text = steal(other.text);
+    is_in_double_quotes = other.is_in_double_quotes;
+    is_greedy_name = other.is_greedy_name;
+    was_ansi_c_quoted = other.was_ansi_c_quoted;
+    is_substitution_cache_in_function_arena =
+        other.is_substitution_cache_in_function_arena;
+    source_position = other.source_position;
+    source_length = other.source_length;
+    m_eval_cache = other.m_eval_cache;
+    other.m_eval_cache = nullptr;
+
+    return *this;
+  }
+
+  /* The small fields lead so they fill the padding a sixty-four byte String
+     would otherwise leave. The segment is eighty-eight bytes. */
   Kind kind;
-  String text;
   bool is_in_double_quotes{false};
   bool is_greedy_name{false};
   bool was_ansi_c_quoted{false};
   bool is_substitution_cache_in_function_arena{false};
-  mutable bool has_folded_arithmetic_result{false};
-
-  mutable i64 folded_arithmetic_result{0};
-
-  /* Both caches live in AST_ARENA, and a function-body segment puts them in
-     FUNCTION_ARENA, so each records the arena generation it was filled in and a
-     hit from an earlier generation is treated as stale and refilled. An
-     arithmetic segment is never a substitution segment, so the two caches never
-     share one segment and one generation stamp answers for both. */
-  mutable const Expression *cached_substitution_ast{nullptr};
-  mutable arith_token_cache *cached_arith{nullptr};
-  mutable usize cached_arena_generation{0};
 
   mutable u32 source_position{0};
   mutable u32 source_length{0};
+
+  String text;
+
+  fn get_eval_cache() const throws -> segment_eval_cache &
+  {
+    if (m_eval_cache == nullptr) {
+      let const block = heap_allocator().alloc_array<segment_eval_cache>(1);
+      m_eval_cache = new (block) segment_eval_cache{};
+    }
+
+    return *m_eval_cache;
+  }
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
@@ -95,12 +175,9 @@ public:
     copy.was_ansi_c_quoted = was_ansi_c_quoted;
     copy.is_substitution_cache_in_function_arena =
         is_substitution_cache_in_function_arena;
-    if (has_folded_arithmetic_result)
-      copy.set_folded_arithmetic_result(get_folded_arithmetic_result());
     if (source_length > 0) copy.set_source_span(source_position, source_length);
-    copy.cached_substitution_ast = cached_substitution_ast;
-    copy.cached_arith = cached_arith;
-    copy.cached_arena_generation = cached_arena_generation;
+    if (m_eval_cache != nullptr) copy.get_eval_cache() = *m_eval_cache;
+
     return copy;
   }
 
@@ -109,16 +186,23 @@ public:
     return clone(text.allocator());
   }
 
-  pure fn get_folded_arithmetic_result() const wontthrow -> i64
+  hot pure fn has_folded_arithmetic_result() const wontthrow -> bool
   {
-    ASSERT(has_folded_arithmetic_result);
-    return folded_arithmetic_result;
+    return m_eval_cache != nullptr &&
+           m_eval_cache->has_folded_arithmetic_result;
   }
 
-  fn set_folded_arithmetic_result(i64 result) const wontthrow -> void
+  pure fn get_folded_arithmetic_result() const wontthrow -> i64
   {
-    folded_arithmetic_result = result;
-    has_folded_arithmetic_result = true;
+    ASSERT(has_folded_arithmetic_result());
+    return m_eval_cache->folded_arithmetic_result;
+  }
+
+  fn set_folded_arithmetic_result(i64 result) const throws -> void
+  {
+    let &cache = get_eval_cache();
+    cache.folded_arithmetic_result = result;
+    cache.has_folded_arithmetic_result = true;
   }
 
   /* A source beyond four gigabytes has no representable span here, so the
@@ -144,9 +228,20 @@ public:
   }
 
   pure fn has_glob_metacharacter() const wontthrow -> bool;
+
+private:
+  fn release_eval_cache() wontthrow -> void
+  {
+    if (m_eval_cache == nullptr) return;
+
+    heap_allocator().free_array(m_eval_cache, 1);
+    m_eval_cache = nullptr;
+  }
+
+  mutable segment_eval_cache *m_eval_cache{nullptr};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 120);
+static_assert(sizeof(usize) != 8 || sizeof(WordSegment) == 88);
 
 class Word
 {

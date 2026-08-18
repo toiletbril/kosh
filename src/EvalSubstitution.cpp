@@ -374,8 +374,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   {
     if (did_push_source_frame) m_source_frames.pop_back();
   };
-  if (segment.cached_substitution_ast == nullptr ||
-      segment.cached_arena_generation != generation)
+  let &cache = segment.get_eval_cache();
+  if (cache.substitution_ast == nullptr || cache.arena_generation != generation)
   {
     LOG(Debug,
         "command substitution ast cache miss for generation %zu, reparsing",
@@ -384,7 +384,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
         Lexer{segment.text.view(), *cache_arena, false, None, mood()}
     };
     try {
-      segment.cached_substitution_ast = parser.construct_ast();
+      cache.substitution_ast = parser.construct_ast();
     } catch (ErrorWithLocation &error) {
       render_contained_substitution_error(std::current_exception(),
                                           segment.text.view());
@@ -395,12 +395,11 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
                                           segment.text.view());
       throw;
     }
-    segment.cached_arena_generation = generation;
+    cache.arena_generation = generation;
   }
-  ASSERT(segment.cached_substitution_ast != nullptr);
+  ASSERT(cache.substitution_ast != nullptr);
 
-  return run_captured_substitution(segment.cached_substitution_ast,
-                                   segment.text);
+  return run_captured_substitution(cache.substitution_ast, segment.text);
 }
 
 fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
@@ -667,8 +666,8 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   {
     if (did_push_source_frame) m_source_frames.pop_back();
   };
-  if (segment.cached_substitution_ast == nullptr ||
-      segment.cached_arena_generation != generation)
+  let &cache = segment.get_eval_cache();
+  if (cache.substitution_ast == nullptr || cache.arena_generation != generation)
   {
     LOG(Debug,
         "function substitution ast cache miss for generation %zu, reparsing",
@@ -677,17 +676,17 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
         Lexer{segment.text.view(), *cache_arena, false, None, mood()}
     };
     try {
-      segment.cached_substitution_ast = parser.construct_ast();
+      cache.substitution_ast = parser.construct_ast();
     } catch (...) {
       render_contained_substitution_error(std::current_exception(),
                                           segment.text.view());
       throw;
     }
-    segment.cached_arena_generation = generation;
+    cache.arena_generation = generation;
   }
-  ASSERT(segment.cached_substitution_ast != nullptr);
+  ASSERT(cache.substitution_ast != nullptr);
 
-  let const ast = segment.cached_substitution_ast;
+  let const ast = cache.substitution_ast;
   const String &source = segment.text;
   LOG(Debug, "running a function substitution body of %zu bytes",
       source.count());

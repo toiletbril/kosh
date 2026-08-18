@@ -470,7 +470,7 @@ fn fold_constant_arithmetic_in_word(
   bool did_fold = false;
   for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
-    if (segment.has_folded_arithmetic_result) continue;
+    if (segment.has_folded_arithmetic_result()) continue;
 
     if (arithmetic_has_side_effect(segment.text.view())) {
       actx.constant_variables.clear();

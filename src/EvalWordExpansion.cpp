@@ -709,9 +709,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const can_use_folded_result = segment.has_folded_arithmetic_result &&
-                                        !has_debug_trap() &&
-                                        !should_echo_expanded();
+      let const can_use_folded_result =
+          segment.has_folded_arithmetic_result() && !has_debug_trap() &&
+          !should_echo_expanded();
       let const result = can_use_folded_result
                              ? segment.get_folded_arithmetic_result()
                              : evaluate_arithmetic_cached(segment);
@@ -781,9 +781,9 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
       result += capture_function_substitution(segment);
       break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const can_use_folded_result = segment.has_folded_arithmetic_result &&
-                                        !has_debug_trap() &&
-                                        !should_echo_expanded();
+      let const can_use_folded_result =
+          segment.has_folded_arithmetic_result() && !has_debug_trap() &&
+          !should_echo_expanded();
       let const number = can_use_folded_result
                              ? segment.get_folded_arithmetic_result()
                              : evaluate_arithmetic_cached(segment);
@@ -850,9 +850,9 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(path.view(), false);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const can_use_folded_result = segment.has_folded_arithmetic_result &&
-                                        !has_debug_trap() &&
-                                        !should_echo_expanded();
+      let const can_use_folded_result =
+          segment.has_folded_arithmetic_result() && !has_debug_trap() &&
+          !should_echo_expanded();
       let const number = can_use_folded_result
                              ? segment.get_folded_arithmetic_result()
                              : evaluate_arithmetic_cached(segment);

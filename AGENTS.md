@@ -487,13 +487,15 @@ ArrayList allocates nothing during default construction and grows
 geometrically. String has a small inline buffer and grows geometrically. A
 scratch arena uses mark and release lifetime within one scope.
 
-WordSegment retains its source position beside a folded arithmetic result. A
-DEBUG trap or xtrace reevaluates the original expression. The source span is a
-pair of 32-bit offsets, and a source beyond four gigabytes reports no span at
-all. The arithmetic token cache is allocated from the arena on first evaluation
-and is reached through one pointer. An arithmetic segment is never a
-substitution segment, so one arena generation stamp guards both caches. The
-64-bit layout is 120 bytes.
+WordSegment retains its source position beside one pointer to a
+segment_eval_cache. A DEBUG trap or xtrace reevaluates the original expression.
+The source span is a pair of 32-bit offsets, and a source beyond four gigabytes
+reports no span at all. The cache holds the substitution tree, the arithmetic
+token cache, the folded arithmetic result, and the arena generation, and it is
+allocated on the heap on first use. A literal segment never reaches evaluation,
+so its pointer stays null. An arithmetic segment is never a substitution
+segment, so one arena generation stamp guards both caches. The 64-bit layout is
+88 bytes.
 
 ## Logging
 
