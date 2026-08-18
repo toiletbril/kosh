@@ -51,6 +51,10 @@ fn scan_balanced_shell_region(StringView source, usize position,
 fn unquote_heredoc_delimiter(StringView word, Allocator allocator) throws
     -> String;
 
+/* Owned shell source is normalized before lexing, so a heredoc body line is
+   matched against the delimiter without its CRLF carriage return. */
+pure fn heredoc_line_content(StringView line) wontthrow -> StringView;
+
 /* A special shell parameter named by a single punctuation byte, $? $! $# $$ $*
    $@ $- , distinct from a positional digit or an ordinary name. */
 pure fn is_special_parameter_char(char ch) wontthrow -> bool;

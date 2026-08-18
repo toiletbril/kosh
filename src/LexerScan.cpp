@@ -48,6 +48,14 @@ fn unquote_heredoc_delimiter(StringView word, Allocator allocator) throws
   return delimiter;
 }
 
+pure fn heredoc_line_content(StringView line) wontthrow -> StringView
+{
+  if (!line.is_empty() && line[line.length - 1] == '\r')
+    return line.substring_of_length(0, line.length - 1);
+
+  return line;
+}
+
 pure fn balanced_scan_delimiter_end(StringView source, usize position) wontthrow
     -> usize
 {
@@ -89,7 +97,8 @@ fn skip_balanced_scan_heredoc_bodies(
       let const line_start = position;
       while (position < source.length && source[position] != '\n')
         position++;
-      let line = source.substring_of_length(line_start, position - line_start);
+      let line = heredoc_line_content(
+          source.substring_of_length(line_start, position - line_start));
       if (heredoc.should_strip_tabs)
         while (!line.is_empty() && line[0] == '\t')
           line = line.substring(1);

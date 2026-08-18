@@ -15,7 +15,7 @@ static fn make_shell_highlight_theme() wontthrow -> highlight_theme
   theme.set_style(highlight_role::operator_, ansi::BOLD_MAGENTA);
   theme.set_style(highlight_role::string, ansi::BRIGHT_GREEN);
   theme.set_style(highlight_role::heredoc, ansi::BRIGHT_GREEN);
-  theme.set_style(highlight_role::heredoc_delimiter, ansi::BOLD_GREEN);
+  theme.set_style(highlight_role::heredoc_delimiter, ansi::BOLD_BRIGHT_GREEN);
   theme.set_style(highlight_role::variable, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::assignment_name, ansi::BRIGHT_CYAN);
   theme.set_style(highlight_role::unset_variable,

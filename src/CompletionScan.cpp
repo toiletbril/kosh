@@ -1134,8 +1134,8 @@ fn advance_shell_lexical_state(StringView source, usize end,
       if (heredoc.should_strip_tabs)
         while (content_start < line_end && source[content_start] == '\t')
           content_start++;
-      let const content =
-          source.substring_of_length(content_start, line_end - content_start);
+      let const content = lexer::heredoc_line_content(
+          source.substring_of_length(content_start, line_end - content_start));
       if (content == heredoc.delimiter.view()) {
         state.active_heredoc_index++;
         if (state.active_heredoc_index == state.pending_heredocs.count()) {

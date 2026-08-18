@@ -24,6 +24,9 @@ with tempfile.NamedTemporaryFile(delete=False) as source:
         b'finish() { :; }\r\n'
         b'finish\r\n'
         b'missing_command\r\n'
+        b'cat <<_ACEOF ignored_argument\r\n'
+        b'heredoc body\r\n'
+        b'_ACEOF\r\n'
         b'ech'
     )
     source_path = source.name
@@ -87,6 +90,12 @@ syntax_forms_use_requested_palette = {
     "or": b"\x1b[1;35m||\x1b[0m" in output,
     "redirection": b"\x1b[1;35m>\x1b[0m" in output,
 }
+heredoc_forms_are_separated = {
+    "opener-and-closer": output.count(b"\x1b[1;92m_ACEOF\x1b[0m") == 2,
+    "opener-argument-is-plain": b"\x1b[1;92m_ACEOF\x1b[0m ignored_argument"
+    in output,
+    "body": b"\x1b[92mheredoc body" in output,
+}
 has_no_underline = b"4:3" not in output
 passed = (
     child_exited_cleanly
@@ -94,12 +103,14 @@ passed = (
     and all(command_forms_are_resolved.values())
     and all(variable_forms_are_resolved.values())
     and all(syntax_forms_use_requested_palette.values())
+    and all(heredoc_forms_are_separated.values())
     and has_no_underline
 )
 print("CHILD_EXITED_CLEANLY:", child_exited_cleanly)
 print("COMMAND_FORMS_RESOLVED:", command_forms_are_resolved)
 print("VARIABLE_FORMS_RESOLVED:", variable_forms_are_resolved)
 print("SYNTAX_FORMS_USE_REQUESTED_PALETTE:", syntax_forms_use_requested_palette)
+print("HEREDOC_FORMS_SEPARATED:", heredoc_forms_are_separated)
 print("NO_UNDERLINE:", has_no_underline)
 print("TERMINAL_HIGHLIGHTING:", passed)
 sys.exit(0 if passed else 1)

@@ -30,8 +30,37 @@ static fn highlight_line_with_lexical_state(
   let spans = ArrayList<highlight_span>{arena};
   let line_variable_names = HashSet{arena};
   if (lexical_state != nullptr && lexical_state->is_in_heredoc) {
-    if (!line.is_empty())
+    if (line.is_empty()) return spans;
+
+    usize line_end = 0;
+    while (line_end < line.length && line[line_end] != '\n')
+      line_end++;
+
+    usize content_start = 0;
+    const shell_pending_heredoc *terminator = nullptr;
+    if (lexical_state->active_heredoc_index <
+        lexical_state->pending_heredocs.count())
+    {
+      terminator =
+          &lexical_state->pending_heredocs[lexical_state->active_heredoc_index];
+      if (terminator->should_strip_tabs) {
+        while (content_start < line_end && line[content_start] == '\t')
+          content_start++;
+      }
+    }
+
+    let const content = lexer::heredoc_line_content(
+        line.substring_of_length(content_start, line_end - content_start));
+    if (terminator == nullptr || content != terminator->delimiter.view()) {
       spans.push(highlight_span{0, line.length, highlight_role::heredoc});
+      return spans;
+    }
+
+    if (content_start > 0)
+      spans.push(highlight_span{0, content_start, highlight_role::heredoc});
+    spans.push(highlight_span{content_start, content_start + content.length,
+                              highlight_role::heredoc_delimiter});
+
     return spans;
   }
 

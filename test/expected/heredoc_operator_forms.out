@@ -5,3 +5,5 @@ EOF	heredoc-delimiter
 EOF	heredoc-delimiter
 	heredoc
 echo	resolved-command
+2
+echo	resolved-command

@@ -24,3 +24,8 @@ echo after')
 printf '%s\n' "$result" | grep -Fx "EOF${tab}heredoc-delimiter"
 printf '%s\n' "$result" | grep -E "${tab}heredoc$"
 printf '%s\n' "$result" | grep -E "^echo${tab}resolved-command$"
+
+crlf_source=$(printf 'cat <<_ACEOF arg\r\nbody\r\n_ACEOF\r\necho after')
+result=$("$BIN" --debug-highlight-at "$crlf_source")
+printf '%s\n' "$result" | grep -c "^_ACEOF${tab}heredoc-delimiter$"
+printf '%s\n' "$result" | grep -E "^echo${tab}resolved-command$"
