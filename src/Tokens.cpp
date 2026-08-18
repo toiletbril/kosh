@@ -93,12 +93,28 @@ pure fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
 fn Word::constant_value() const throws -> StringView
 {
   if (segments.count() == 1) return segments[0].text.view();
-  if (!m_has_constant_value) {
+
+  if (m_constant_value_data == nullptr) {
+    usize total_length = 0;
     for (let const &segment : segments)
-      m_constant_value.append(segment.text.view());
-    m_has_constant_value = true;
+      total_length += segment.text.count();
+
+    if (total_length == 0) return StringView{};
+    if (total_length > ~static_cast<u32>(0)) throw std::bad_alloc{};
+
+    let buffer = heap_allocator().alloc_array<char>(total_length);
+    usize write_position = 0;
+    for (let const &segment : segments) {
+      let const view = segment.text.view();
+      __builtin_memcpy(buffer + write_position, view.data, view.length);
+      write_position += view.length;
+    }
+
+    m_constant_value_data = buffer;
+    m_constant_value_length = static_cast<u32>(total_length);
   }
-  return m_constant_value.view();
+
+  return StringView{m_constant_value_data, m_constant_value_length};
 }
 
 pure fn Word::is_all_ascii_digits() const wontthrow -> bool

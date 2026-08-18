@@ -153,6 +153,52 @@ class Word
 public:
   ArrayList<WordSegment> segments{heap_allocator()};
 
+  Word() = default;
+  ~Word() { release_constant_value(); }
+
+  /* A copy carries the segments alone. The flattened text is a cache, and it is
+     rebuilt on the copy when something asks for it. */
+  cold Word(const Word &other) throws : segments(other.segments) {}
+
+  Word(Word &&other) wontthrow
+      : segments(steal(other.segments)),
+        m_constant_value_data(other.m_constant_value_data),
+        m_constant_value_length(other.m_constant_value_length),
+        m_cached_plain_kind(other.m_cached_plain_kind),
+        m_has_cached_plain_kind(other.m_has_cached_plain_kind)
+  {
+    other.m_constant_value_data = nullptr;
+    other.m_constant_value_length = 0;
+  }
+
+  cold fn operator=(const Word &other) throws->Word &
+  {
+    if (this == &other) return *this;
+
+    segments = other.segments;
+    release_constant_value();
+    m_cached_plain_kind = PlainLiteral::NotPlain;
+    m_has_cached_plain_kind = false;
+
+    return *this;
+  }
+
+  fn operator=(Word &&other) wontthrow->Word &
+  {
+    if (this == &other) return *this;
+
+    segments = steal(other.segments);
+    release_constant_value();
+    m_constant_value_data = other.m_constant_value_data;
+    m_constant_value_length = other.m_constant_value_length;
+    m_cached_plain_kind = other.m_cached_plain_kind;
+    m_has_cached_plain_kind = other.m_has_cached_plain_kind;
+    other.m_constant_value_data = nullptr;
+    other.m_constant_value_length = 0;
+
+    return *this;
+  }
+
   pure fn is_empty() const wontthrow -> bool;
   fn to_literal_string() const throws -> String;
   fn to_pretty_string() const throws -> String;
@@ -184,11 +230,24 @@ public:
   fn constant_value() const throws -> StringView;
 
 private:
+  fn release_constant_value() wontthrow -> void
+  {
+    if (m_constant_value_data == nullptr) return;
+
+    heap_allocator().free_array(m_constant_value_data, m_constant_value_length);
+    m_constant_value_data = nullptr;
+    m_constant_value_length = 0;
+  }
+
+  /* Almost every word is one segment and answers from that segment directly, so
+     the flattened text is a bare buffer and not a String. */
+  mutable char *m_constant_value_data{nullptr};
+  mutable u32 m_constant_value_length{0};
   mutable PlainLiteral m_cached_plain_kind{PlainLiteral::NotPlain};
   mutable bool m_has_cached_plain_kind{false};
-  mutable String m_constant_value{heap_allocator()};
-  mutable bool m_has_constant_value{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(Word) == 56);
 
 struct word_assignment_split
 {
