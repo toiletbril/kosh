@@ -246,3 +246,19 @@ fi
 apply-conflicts=2,2,2 unchanged=yes
 nonregular-status=1
 environment-options-filtered
+adjacent-status=0
+(
+  (
+    a
+  )
+)
+(
+  (
+    [ a = b ]
+  ) || (
+    [ a != b ]
+  )
+)
+((a))
+(( a = 1 ))
+adjacent-idempotent=yes

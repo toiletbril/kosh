@@ -251,9 +251,6 @@ fn scan_format_operator_end(StringView source, usize position) wontthrow
   case '(':
     if (next == '(') length = 2;
     break;
-  case ')':
-    if (next == ')') length = 2;
-    break;
   default: break;
   }
 

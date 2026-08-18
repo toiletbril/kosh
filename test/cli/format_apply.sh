@@ -325,3 +325,16 @@ printf 'apply-conflicts=%s,%s,%s unchanged=%s\n' \
 "$BIN" --format --apply "$root" >/dev/null 2>&1
 printf 'nonregular-status=%s\n' "$?"
 KOSH_FLAGS='--format --apply' "$BIN" -c 'printf environment-options-filtered\\n'
+
+cat > "$root/adjacent-parens.sh" <<'EOF'
+( (a))
+( (test a = b) || (test a != b))
+((a))
+(( a = 1 ))
+EOF
+adjacent=$("$BIN" --format "$root/adjacent-parens.sh")
+printf 'adjacent-status=%s\n' "$?"
+printf '%s\n' "$adjacent"
+adjacent_second=$(printf '%s\n' "$adjacent" | "$BIN" --format)
+printf 'adjacent-idempotent=%s\n' \
+  "$([ "$adjacent" = "$adjacent_second" ] && printf yes)"
