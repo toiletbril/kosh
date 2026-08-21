@@ -317,7 +317,8 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   let result = String{"{\"capabilities\":{\"positionEncoding\":"};
   append_json_string(result, encoding);
   result.append(",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
-                "\"completionProvider\":{\"resolveProvider\":true},"
+                "\"completionProvider\":{\"resolveProvider\":true,"
+                "\"triggerCharacters\":[\" \",\"-\"]},"
                 "\"definitionProvider\":true,\"hoverProvider\":true,"
                 "\"documentFormattingProvider\":true,"
                 "\"documentSymbolProvider\":true,"

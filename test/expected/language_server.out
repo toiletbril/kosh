@@ -5,6 +5,7 @@ formatting-capability=ok
 diagnostics=ok
 completion-builtin=ok
 completion-resolve-capability=ok
+completion-trigger-capability=ok
 completion-path-command=ok
 completion-resolve-help=ok
 completion-resolve-passthrough=ok
