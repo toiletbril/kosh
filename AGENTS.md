@@ -206,15 +206,15 @@ Avoid repeating a read after the harness reports that the file is unchanged.
 Check that an edit replacement differs before calling the edit tool. Complete a
 type migration across every use before compiling it. Print the required change
 table after each edit batch. Use the dedicated edit tool when the shell has no
-approved patch command. Background agent results arrive through completion
-notifications and `SendMessage`. Do not
-pass agent identifiers to `TaskOutput`, even after a lookup fails. A continuation
+approved patch command. Background agent results and progress arrive through
+completion notifications and `SendMessage`. Never pass agent identifiers to
+`TaskOutput`, including while an agent is running. A continuation
 must offer parallel read-only agents before restarting repository research. Do not
 retry an invalid task lookup after the notification has reported the result.
 Broad searches must use existing paths or directory globs. Do not inspect code
 covered by an active read only agent. Teammate replies require a concrete
-reachable agent name or identifier. Performance comparisons use the release
-binary explicitly.
+reachable agent name or identifier. Agent launches use a type listed by the
+current session. Performance comparisons use the release binary explicitly.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect
