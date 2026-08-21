@@ -130,6 +130,9 @@ dynamic-command-information=ok
 open-source-precedence=ok
 disk-fix-data=ok
 diagnostic-clears=ok
+path-refresh-before=ok
+path-refresh-after=ok
+path-refresh-status=0
 environment-filtered
 conflict-status=2
 conflict-message=ok

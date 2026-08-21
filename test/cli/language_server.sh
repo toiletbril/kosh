@@ -7,6 +7,18 @@ frame()
   printf 'Content-Length: %s\r\n\r\n%s' "${#body}" "$body"
 }
 
+read_server_frame()
+{
+  local header
+  local separator
+
+  IFS= read -r header || return 1
+  header=${header%"$carriage_return"}
+  server_frame_length=${header#Content-Length: }
+  IFS= read -r separator || return 1
+  server_frame_body=$(dd bs=1 count="$server_frame_length" 2>/dev/null)
+}
+
 check_contains()
 {
   local label=$1
@@ -359,6 +371,44 @@ if [ "$after_first_clear" != "$output" ] &&
 else
   printf 'diagnostic-clears=missing\n'
 fi
+
+path_refresh_bin=$directory/path-refresh-bin
+path_refresh_ready=$directory/path-refresh-ready
+mkdir "$path_refresh_bin"
+carriage_return=$(printf '\r')
+{
+  frame '{"jsonrpc":"2.0","id":200,"method":"initialize","params":{"capabilities":{}}}'
+  frame '{"jsonrpc":"2.0","method":"initialized","params":{}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/path-refresh.sh","languageId":"sh","version":1,"text":"path-fre\n"}}}'
+  frame '{"jsonrpc":"2.0","id":201,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/path-refresh.sh"},"position":{"line":0,"character":8}}}'
+  while [ ! -e "$path_refresh_ready" ]; do
+    sleep 0.01
+  done
+  frame '{"jsonrpc":"2.0","id":202,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/path-refresh.sh"},"position":{"line":0,"character":8}}}'
+  frame '{"jsonrpc":"2.0","id":203,"method":"shutdown","params":null}'
+  frame '{"jsonrpc":"2.0","method":"exit"}'
+} | PATH="$path_refresh_bin:$PATH" "$BIN" --language-server | {
+  while read_server_frame; do
+    case $server_frame_body in
+    *'"id":201,'*)
+      case $server_frame_body in
+      *'"label":"path-fresh"'*) printf 'path-refresh-before=present\n' ;;
+      *) printf 'path-refresh-before=ok\n' ;;
+      esac
+      printf '#!/bin/sh\nexit 0\n' > "$path_refresh_bin/path-fresh"
+      chmod +x "$path_refresh_bin/path-fresh"
+      : > "$path_refresh_ready"
+      ;;
+    *'"id":202,'*)
+      case $server_frame_body in
+      *'"label":"path-fresh","kind":17'*) printf 'path-refresh-after=ok\n' ;;
+      *) printf 'path-refresh-after=missing\n' ;;
+      esac
+      ;;
+    *'"id":203,'*) printf 'path-refresh-status=0\n' ;;
+    esac
+  done
+}
 
 KOSH_FLAGS=--language-server "$BIN" -c 'echo environment-filtered'
 
