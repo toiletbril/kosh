@@ -1311,29 +1311,6 @@ cold fn ConstantNumber::to_string() const throws -> String
   return String::from(m_value, heap_allocator());
 }
 
-ConstantString::ConstantString(SourceLocation location, StringView value)
-    : Expression(steal(location)), m_value(value)
-{}
-
-ConstantString::~ConstantString() = default;
-
-fn ConstantString::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  unused(cxt);
-  unreachable("a constant string was evaluated as an arithmetic number");
-}
-
-cold fn ConstantString::to_ast_string(usize layer) const throws -> String
-{
-  let s = String{heap_allocator()};
-  let const pad = indent_for_layer(layer);
-
-  s += pad + "[String \"" + to_string() + "\"]";
-  return s;
-}
-
-cold fn ConstantString::to_string() const throws -> String { return m_value; }
-
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \
   e::e(SourceLocation location, const Expression *rhs)                         \
       : UnaryExpression(steal(location), rhs)                                  \

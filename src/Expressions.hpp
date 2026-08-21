@@ -1341,21 +1341,6 @@ protected:
   const i64 m_value;
 };
 
-class ConstantString : public Expression
-{
-public:
-  ConstantString(SourceLocation location, StringView value);
-  ~ConstantString() override;
-
-  fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn to_string() const throws -> String override;
-
-protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-
-  const String m_value;
-};
-
 class UnaryExpression : public Expression
 {
 public:

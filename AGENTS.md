@@ -612,6 +612,8 @@ The executable logging and optimizer flags are documented in docs/kosh.1.
 
 ## Finishing a change
 
+Project workflow mistakes are recorded in [MISTAKES.md](MISTAKES.md).
+
 Format the changed files with the project tools that own their format. Run the
 focused tests that cover the changed behavior. Read every regenerated golden.
 Run `git diff --check` and inspect the complete diff.
