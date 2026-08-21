@@ -1296,6 +1296,28 @@ fn SimpleCommand::append_presence_tested_command_names(
   {
     return;
   }
+  if (*name == "test" && m_args.count() == 3) {
+    let const option = static_command_name(m_args[1]);
+    bool is_zsh_presence_operand = false;
+    if (m_args[2]->kind() == Token::Kind::Word) {
+      let const &operand =
+          static_cast<const tokens::WordToken *>(m_args[2])->word();
+      let const operand_source =
+          analysis_source_text(actx, m_args[2]->source_location());
+      is_zsh_presence_operand =
+          operand.segments.count() == 1 &&
+          operand.segments[0].kind == WordSegment::Kind::VariableReference &&
+          (operand_source == "${ZSH_VERSION+set}" ||
+           operand_source == "\"${ZSH_VERSION+set}\"");
+    }
+    if (option.has_value() && *option == "-n" && is_zsh_presence_operand) {
+      names.add("emulate");
+      names.add("setopt");
+      names.add("zmodload");
+
+      return;
+    }
+  }
 
   let const is_command_test = *name == "command";
   let const is_type_or_hash = *name == "type" || *name == "hash";
