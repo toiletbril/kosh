@@ -255,6 +255,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   }
 
   let const original = GetStdHandle(*slot);
+  result.original = original;
   result.was_open = original != nullptr && original != INVALID_HANDLE_VALUE;
   if (result.was_open &&
       DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(),
@@ -292,6 +293,10 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
   let const replaced = GetStdHandle(*slot);
+  if (saved.was_open && replaced == saved.original) {
+    CloseHandle(saved.saved);
+    return;
+  }
   if (SetStdHandle(*slot, saved.was_open ? saved.saved
                                          : INVALID_HANDLE_VALUE) == FALSE)
     return;
@@ -314,6 +319,7 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
     return result;
   }
   let const original = GetStdHandle(*slot);
+  result.original = original;
   result.was_open = original != nullptr && original != INVALID_HANDLE_VALUE;
   if (result.was_open &&
       DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(),
@@ -787,16 +793,7 @@ fn get_current_process_id() wontthrow -> i64
 
 fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }
 
-fn initialize_platform_runtime() wontthrow -> void
-{
-  for (i32 shell_fd = 0; shell_fd <= 2; shell_fd++) {
-    let const runtime_handle = descriptor_from_fd_number(shell_fd);
-    if (runtime_handle == nullptr || runtime_handle == INVALID_HANDLE_VALUE)
-      continue;
-    if (descriptor_for_shell_fd(shell_fd) == runtime_handle) continue;
-    unused(replace_descriptor(shell_fd, runtime_handle));
-  }
-}
+fn initialize_platform_runtime() wontthrow -> void {}
 
 } /* namespace os */
 } /* namespace koshka */

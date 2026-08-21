@@ -574,6 +574,7 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void;
 struct saved_descriptor
 {
   i32 shell_fd{-1};
+  descriptor original{KOSH_INVALID_FD};
   /* A copy of the original descriptor, valid only when was_open is true. */
   descriptor saved{KOSH_INVALID_FD};
   /* False when shell_fd was not open before the redirection, so restore closes
