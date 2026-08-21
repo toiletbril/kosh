@@ -153,9 +153,9 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let saved_tested_command_names = actx.tested_command_names.clone();
   let condition_failure_names = saved_tested_command_names.clone();
   let merged_occurrence_assignments =
-      actx.variable_occurrence_assignments.clone();
+      StringMap<variable_occurrence_state>{heap_allocator()};
   let merged_inherited_occurrence_assignments =
-      actx.inherited_variable_occurrence_assignments.clone();
+      StringMap<variable_occurrence_state>{heap_allocator()};
   let has_merged_occurrence_exit = false;
   let is_first_branch = true;
   for (usize i = 0; i < m_branches.count(); i++) {
@@ -187,9 +187,9 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     if (!is_dead_branch) {
       if (!has_merged_occurrence_exit) {
         merged_occurrence_assignments =
-            actx.variable_occurrence_assignments.clone();
+            steal(actx.variable_occurrence_assignments);
         merged_inherited_occurrence_assignments =
-            actx.inherited_variable_occurrence_assignments.clone();
+            steal(actx.inherited_variable_occurrence_assignments);
         has_merged_occurrence_exit = true;
       } else {
         merge_variable_occurrence_states(merged_occurrence_assignments,
@@ -224,9 +224,9 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   if (!else_is_dead) {
     if (!has_merged_occurrence_exit) {
       merged_occurrence_assignments =
-          actx.variable_occurrence_assignments.clone();
+          steal(actx.variable_occurrence_assignments);
       merged_inherited_occurrence_assignments =
-          actx.inherited_variable_occurrence_assignments.clone();
+          steal(actx.inherited_variable_occurrence_assignments);
     } else {
       merge_variable_occurrence_states(merged_occurrence_assignments,
                                        actx.variable_occurrence_assignments);
