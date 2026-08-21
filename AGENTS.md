@@ -223,7 +223,8 @@ reachable agent name or identifier. Agent launches use a type listed by the
 current session. Performance comparisons use the release binary explicitly.
 Locate a focused test target before invoking it from the repository root.
 Check active agent ownership before a test edit. Never poll a running agent
-through `TaskOutput`.
+through `TaskOutput`. Read the exact local segment before editing an unverified
+file area.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

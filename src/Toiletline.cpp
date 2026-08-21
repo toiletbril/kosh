@@ -44,14 +44,17 @@ fn tl_block_capacity(opaque *payload) -> usize &
 
 fn tl_arena_malloc(usize length) -> opaque *
 {
-  if (length > static_cast<usize>(-1) - TL_ALLOC_HEADER) throw std::bad_alloc{};
+  if (length > static_cast<usize>(-1) - TL_ALLOC_HEADER) return nullptr;
 
   let const allocation_length = length + TL_ALLOC_HEADER;
   let const base =
       koshka::heap_allocator().alloc_array<char>(allocation_length);
-  *reinterpret_cast<usize *>(base) = length;
+  if (base != NULL) {
+    *reinterpret_cast<usize *>(base) = length;
+    return base + TL_ALLOC_HEADER;
+  }
 
-  return base + TL_ALLOC_HEADER;
+  return NULL;
 }
 
 fn tl_arena_free(opaque *pointer) -> void
@@ -996,6 +999,13 @@ fn emit_newlines(StringView buffer) -> void
   if (::tl_emit_newlines(buffer.data) != TL_SUCCESS)
     throw koshka::Error{"Toiletline: could not write to the terminal: " +
                         koshka::os::last_system_error_message()};
+}
+
+fn debug_allocation_failure() -> bool
+{
+  let const allocation = tl_arena_malloc(static_cast<usize>(-1));
+  if (allocation != NULL) return false;
+  return true;
 }
 
 static constexpr usize PROMPT_PWD_LENGTH = 24;

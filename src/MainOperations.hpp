@@ -63,6 +63,15 @@ static fn run_debug_highlight_driver(StringView driver_line,
   return 0;
 }
 
+static fn run_debug_toiletline_allocation_driver() throws -> i32
+{
+  print("allocation-failure=" +
+        String::from(toiletline::debug_allocation_failure(), heap_allocator()) +
+        "\n");
+  flush();
+  return 0;
+}
+
 static fn run_debug_arena_lifetime_driver() throws -> i32
 {
   let arena = BumpArena{};

@@ -120,6 +120,8 @@ fn exit_raw_mode() -> void {}
 
 fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 
+fn debug_allocation_failure() -> bool { return true; }
+
 fn default_prompt_template() -> String
 {
   let template_string = String{};
