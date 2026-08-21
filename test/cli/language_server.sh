@@ -60,6 +60,7 @@ if [ "${OS-}" = Windows_NT ]; then
     'echo COMMANDS' \
     'echo   sync  synchronize state' > "$act_program"
   printf '@exit /b 0\r\n' > "$directory/bin/path-only.bat"
+  printf '@exit /b 0\r\n' > "$directory/bin/ls.bat"
   printf '@exit /b 0\r\n' > "$directory/bin/formatted-command.bat"
   printf '@exit /b 0\r\n' > "$directory/bin/manprobe.bat"
   printf '%s\r\n' \
@@ -84,6 +85,7 @@ else
     '  printf "%s\\n" "allowed command help" "COMMANDS" "  sync  synchronize state"' \
     'fi' > "$act_program"
   printf '#!/bin/sh\nexit 0\n' > "$directory/bin/path-only"
+  printf '#!/bin/sh\nexit 0\n' > "$directory/bin/ls"
   printf '#!/bin/sh\nexit 0\n' > "$directory/bin/formatted-command"
   printf '#!/bin/sh\nexit 0\n' > "$directory/bin/manprobe"
   printf '%s\n' '#!/bin/sh' \
@@ -107,6 +109,7 @@ fi
 chmod +x "$act_program" "$man_program" \
   "$directory/bin/act$program_suffix" \
   "$directory/bin/path-only$program_suffix" \
+  "$directory/bin/ls$program_suffix" \
   "$directory/bin/formatted-command$program_suffix" \
   "$directory/bin/manprobe$program_suffix" \
   "$directory/bin/man$program_suffix"
