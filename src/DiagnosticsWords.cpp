@@ -100,52 +100,6 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
       target, name_location, assignment_binder::Arithmetic, is_conditional);
 }
 
-pure fn arithmetic_assignment_end(StringView expression,
-                                  usize value_position) wontthrow -> usize
-{
-  usize parenthesis_depth = 0;
-  usize bracket_depth = 0;
-  usize ternary_depth = 0;
-
-  for (usize position = value_position; position < expression.length;
-       position++)
-  {
-    switch (expression[position]) {
-    case '(': parenthesis_depth++; break;
-
-    case ')':
-      if (parenthesis_depth == 0 && bracket_depth == 0) return position;
-      if (parenthesis_depth > 0) parenthesis_depth--;
-      break;
-
-    case '[': bracket_depth++; break;
-
-    case ']':
-      if (bracket_depth > 0) bracket_depth--;
-      break;
-
-    case '?':
-      if (parenthesis_depth == 0 && bracket_depth == 0) ternary_depth++;
-      break;
-
-    case ':':
-      if (parenthesis_depth != 0 || bracket_depth != 0) break;
-      if (ternary_depth == 0) return position;
-      ternary_depth--;
-      break;
-
-    case ',':
-      if (parenthesis_depth == 0 && bracket_depth == 0 && ternary_depth == 0)
-        return position;
-      break;
-
-    default: break;
-    }
-  }
-
-  return expression.length;
-}
-
 fn check_arithmetic_expression_lints(AnalysisContext &actx,
                                      StringView expression,
                                      const SourceLocation &location,
@@ -166,24 +120,46 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
   {
     StringView name;
     usize end_position;
+    usize parenthesis_depth;
+    usize bracket_depth;
+    usize ternary_depth;
     bool is_append;
+    bool has_fixed_end;
   };
   let pending_writes = ArrayList<arithmetic_write>{heap_allocator()};
-  let const do_apply_writes = [&](usize end_position) throws -> void {
-    while (!pending_writes.is_empty() &&
+  usize parenthesis_depth = 0;
+  usize bracket_depth = 0;
+  usize ternary_depth = 0;
+  let const do_apply_write = [&]() throws -> void {
+    let const write = pending_writes.back();
+    pending_writes.pop_back();
+    actx.note_variable_assignment(write.name, location);
+    note_arithmetic_target_record(actx, expression, write.name, location,
+                                  expression_base_position, is_conditional,
+                                  write.is_append);
+  };
+  let const do_apply_fixed_writes = [&](usize end_position) throws -> void {
+    while (!pending_writes.is_empty() && pending_writes.back().has_fixed_end &&
            pending_writes.back().end_position <= end_position)
     {
-      let const write = pending_writes.back();
-      pending_writes.pop_back();
-      actx.note_variable_assignment(write.name, location);
-      note_arithmetic_target_record(actx, expression, write.name, location,
-                                    expression_base_position, is_conditional,
-                                    write.is_append);
+      do_apply_write();
+    }
+  };
+  let const do_apply_boundary_writes = [&]() throws -> void {
+    while (!pending_writes.is_empty()) {
+      let const &write = pending_writes.back();
+      if (write.has_fixed_end || write.parenthesis_depth != parenthesis_depth ||
+          write.bracket_depth != bracket_depth ||
+          write.ternary_depth != ternary_depth)
+      {
+        break;
+      }
+      do_apply_write();
     }
   };
 
   for (usize position = 0; position < expression.length; position++) {
-    do_apply_writes(position);
+    do_apply_fixed_writes(position);
 
     switch (expression[position]) {
     case '/':
@@ -229,13 +205,42 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
       break;
     }
 
-    case '+':
     case '(':
+      parenthesis_depth++;
+      has_pending_division = false;
+      break;
+
     case ')':
-    case ',':
-    case ';':
+      do_apply_boundary_writes();
+      if (parenthesis_depth > 0) parenthesis_depth--;
+      has_pending_division = false;
+      break;
+
+    case '[': bracket_depth++; break;
+
+    case ']':
+      do_apply_boundary_writes();
+      if (bracket_depth > 0) bracket_depth--;
+      break;
+
     case '?':
+      ternary_depth++;
+      has_pending_division = false;
+      break;
+
     case ':':
+      do_apply_boundary_writes();
+      if (ternary_depth > 0) ternary_depth--;
+      has_pending_division = false;
+      break;
+
+    case ',':
+      do_apply_boundary_writes();
+      has_pending_division = false;
+      break;
+
+    case '+':
+    case ';':
     case '|':
     case '&':
     case '^':
@@ -424,11 +429,9 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
             }
           }
           pending_writes.push(arithmetic_write{
-              word,
-              is_step_target || is_prefix_step_target
-                  ? operator_end
-                  : arithmetic_assignment_end(expression, operator_end),
-              is_compound_assignment});
+              word, operator_end, parenthesis_depth, bracket_depth,
+              ternary_depth, is_compound_assignment,
+              is_step_target || is_prefix_step_target});
         }
         break;
       }
@@ -453,7 +456,8 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     }
   }
 
-  do_apply_writes(expression.length);
+  while (!pending_writes.is_empty())
+    do_apply_write();
 
   if (has_redundant_dollar)
     actx.report_diagnostic(diagnostic_id::sc2004, location);

@@ -570,6 +570,14 @@ fn AnalysisContext::apply_called_function(
 
   let &definition = function_definitions[*selected_definition_index];
   definition.has_been_called = true;
+  if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION) {
+    let &active_definition =
+        function_definitions[active_function_definition_index];
+    definition.affected_names.for_each([&](StringView affected_name) {
+      if (!definition.local_names.contains(affected_name))
+        active_definition.affected_names.add(affected_name);
+    });
+  }
 
   for (usize occurrence_index = definition.occurrence_start;
        occurrence_index < definition.occurrence_end; occurrence_index++)
@@ -579,6 +587,10 @@ fn AnalysisContext::apply_called_function(
         occurrence.function_definition_index != *selected_definition_index ||
         !occurrence.has_inherited_function_path)
     {
+      continue;
+    }
+    if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION) {
+      occurrence.function_definition_index = active_function_definition_index;
       continue;
     }
 
@@ -623,38 +635,43 @@ fn AnalysisContext::apply_called_function(
     }
 
     let merged_state = *caller_state;
-    let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
-    merged_assignment_indices.reserve(merged_state.assignment_indices.count() +
-                                      exit_state->assignment_indices.count());
-    usize caller_index = 0;
-    usize exit_index = 0;
-    while (caller_index < merged_state.assignment_indices.count() ||
-           exit_index < exit_state->assignment_indices.count())
-    {
-      let const has_caller_index =
-          caller_index < merged_state.assignment_indices.count();
-      let const has_exit_index =
-          exit_index < exit_state->assignment_indices.count();
-      usize assignment_index;
-      if (!has_exit_index ||
-          (has_caller_index && merged_state.assignment_indices[caller_index] <
-                                   exit_state->assignment_indices[exit_index]))
+    if (merged_state.assignment_indices.is_empty()) {
+      merged_state.assignment_indices = exit_state->assignment_indices.clone();
+    } else if (!exit_state->assignment_indices.is_empty()) {
+      let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
+      merged_assignment_indices.reserve(
+          merged_state.assignment_indices.count() +
+          exit_state->assignment_indices.count());
+      usize caller_index = 0;
+      usize exit_index = 0;
+      while (caller_index < merged_state.assignment_indices.count() ||
+             exit_index < exit_state->assignment_indices.count())
       {
-        assignment_index = merged_state.assignment_indices[caller_index++];
-      } else if (!has_caller_index ||
-                 exit_state->assignment_indices[exit_index] <
-                     merged_state.assignment_indices[caller_index])
-      {
-        assignment_index = exit_state->assignment_indices[exit_index++];
-      } else {
-        assignment_index = merged_state.assignment_indices[caller_index++];
-        exit_index++;
+        let const has_caller_index =
+            caller_index < merged_state.assignment_indices.count();
+        let const has_exit_index =
+            exit_index < exit_state->assignment_indices.count();
+        usize assignment_index;
+        if (!has_exit_index || (has_caller_index &&
+                                merged_state.assignment_indices[caller_index] <
+                                    exit_state->assignment_indices[exit_index]))
+        {
+          assignment_index = merged_state.assignment_indices[caller_index++];
+        } else if (!has_caller_index ||
+                   exit_state->assignment_indices[exit_index] <
+                       merged_state.assignment_indices[caller_index])
+        {
+          assignment_index = exit_state->assignment_indices[exit_index++];
+        } else {
+          assignment_index = merged_state.assignment_indices[caller_index++];
+          exit_index++;
+        }
+        if (merged_assignment_indices.is_empty() ||
+            merged_assignment_indices.back() != assignment_index)
+          merged_assignment_indices.push(assignment_index);
       }
-      if (merged_assignment_indices.is_empty() ||
-          merged_assignment_indices.back() != assignment_index)
-        merged_assignment_indices.push(assignment_index);
+      merged_state.assignment_indices = steal(merged_assignment_indices);
     }
-    merged_state.assignment_indices = steal(merged_assignment_indices);
     merged_state.is_definitely_set =
         merged_state.is_definitely_set && exit_state->is_definitely_set;
     merged_state.is_definitely_unset = false;
@@ -668,21 +685,14 @@ fn AnalysisContext::apply_called_function(
 }
 
 static fn resolve_function_occurrence_states(
-    analysis_symbol_records &symbol_records,
-    const ArrayList<function_definition_record> &function_definitions) throws
-    -> void
+    analysis_symbol_records &symbol_records) wontthrow -> void
 {
-  for (let const &definition : function_definitions) {
-    for (usize occurrence_index = definition.occurrence_start;
-         occurrence_index < definition.occurrence_end; occurrence_index++)
-    {
-      let &occurrence = symbol_records.variable_occurrences[occurrence_index];
-      if (occurrence.kind != variable_occurrence_kind::Reference) continue;
-      if (!occurrence.has_inherited_function_path) continue;
+  for (let &occurrence : symbol_records.variable_occurrences) {
+    if (occurrence.kind != variable_occurrence_kind::Reference) continue;
+    if (!occurrence.has_inherited_function_path) continue;
 
-      occurrence.is_unresolved = occurrence.has_unresolved_function_path ||
-                                 !occurrence.has_resolved_function_path;
-    }
+    occurrence.is_unresolved = occurrence.has_unresolved_function_path ||
+                               !occurrence.has_resolved_function_path;
   }
 }
 
@@ -1357,8 +1367,7 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_unassigned_variable_reads(actx);
   expressions::check_function_argument_dataflow(actx);
   if (symbol_records != nullptr)
-    resolve_function_occurrence_states(*symbol_records,
-                                       actx.function_definitions);
+    resolve_function_occurrence_states(*symbol_records);
 
   actx.flush_warnings();
 
@@ -1468,11 +1477,11 @@ fn merge_variable_occurrence_states(
         let const *exit_state = exit_states.find(name);
         if (exit_state == nullptr) {
           state.is_definitely_set = false;
+          state.is_definitely_unset = false;
           state.has_unset_path = true;
+          state.has_inherited_path = true;
           return;
         }
-
-        state.has_inherited_path = true;
       });
   exit_states.for_each([&](StringView name,
                            const variable_occurrence_state &exit_state) {
@@ -1480,42 +1489,48 @@ fn merge_variable_occurrence_states(
     if (state == nullptr) {
       let merged_state = exit_state;
       merged_state.is_definitely_set = false;
+      merged_state.is_definitely_unset = false;
       merged_state.has_inherited_path = true;
       merged_states.set(name, steal(merged_state));
       return;
     }
 
-    let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
-    merged_assignment_indices.reserve(state->assignment_indices.count() +
-                                      exit_state.assignment_indices.count());
-    usize state_index = 0;
-    usize exit_index = 0;
-    while (state_index < state->assignment_indices.count() ||
-           exit_index < exit_state.assignment_indices.count())
-    {
-      let const has_state_index =
-          state_index < state->assignment_indices.count();
-      let const has_exit_index =
-          exit_index < exit_state.assignment_indices.count();
-      usize assignment_index;
-      if (!has_exit_index ||
-          (has_state_index && state->assignment_indices[state_index] <
-                                  exit_state.assignment_indices[exit_index]))
+    if (state->assignment_indices.is_empty()) {
+      state->assignment_indices = exit_state.assignment_indices.clone();
+    } else if (!exit_state.assignment_indices.is_empty()) {
+      let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
+      merged_assignment_indices.reserve(state->assignment_indices.count() +
+                                        exit_state.assignment_indices.count());
+      usize state_index = 0;
+      usize exit_index = 0;
+      while (state_index < state->assignment_indices.count() ||
+             exit_index < exit_state.assignment_indices.count())
       {
-        assignment_index = state->assignment_indices[state_index++];
-      } else if (!has_state_index || exit_state.assignment_indices[exit_index] <
-                                         state->assignment_indices[state_index])
-      {
-        assignment_index = exit_state.assignment_indices[exit_index++];
-      } else {
-        assignment_index = state->assignment_indices[state_index++];
-        exit_index++;
+        let const has_state_index =
+            state_index < state->assignment_indices.count();
+        let const has_exit_index =
+            exit_index < exit_state.assignment_indices.count();
+        usize assignment_index;
+        if (!has_exit_index ||
+            (has_state_index && state->assignment_indices[state_index] <
+                                    exit_state.assignment_indices[exit_index]))
+        {
+          assignment_index = state->assignment_indices[state_index++];
+        } else if (!has_state_index ||
+                   exit_state.assignment_indices[exit_index] <
+                       state->assignment_indices[state_index])
+        {
+          assignment_index = exit_state.assignment_indices[exit_index++];
+        } else {
+          assignment_index = state->assignment_indices[state_index++];
+          exit_index++;
+        }
+        if (merged_assignment_indices.is_empty() ||
+            merged_assignment_indices.back() != assignment_index)
+          merged_assignment_indices.push(assignment_index);
       }
-      if (merged_assignment_indices.is_empty() ||
-          merged_assignment_indices.back() != assignment_index)
-        merged_assignment_indices.push(assignment_index);
+      state->assignment_indices = steal(merged_assignment_indices);
     }
-    state->assignment_indices = steal(merged_assignment_indices);
     state->is_definitely_set =
         state->is_definitely_set && exit_state.is_definitely_set;
     state->is_definitely_unset =
