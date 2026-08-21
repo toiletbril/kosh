@@ -17,6 +17,26 @@ public:
   cold StringMap(const StringMap &other) : StringMap(other.m_allocator)
   {
     if (other.m_count == 0) return;
+    if (other.m_tombstones == 0) {
+      let const fresh_slots = m_allocator.alloc_array<slot>(other.m_capacity);
+      usize constructed_count = 0;
+      try {
+        for (; constructed_count < other.m_capacity; constructed_count++)
+          new (&fresh_slots[constructed_count])
+              slot{other.m_slots[constructed_count]};
+      } catch (...) {
+        for (usize i = 0; i < constructed_count; i++)
+          fresh_slots[i].~slot();
+        m_allocator.free_array(fresh_slots, other.m_capacity);
+        throw;
+      }
+
+      m_slots = fresh_slots;
+      m_capacity = other.m_capacity;
+      m_count = other.m_count;
+      return;
+    }
+
     rehash(other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
       if (other.m_slots[i].state == slot::Occupied)

@@ -262,6 +262,17 @@ complete emitter group. Asynchronous workload wrappers must capture and print
 the status after `wait`. Cwd-sensitive test scripts must run through their
 owning harness or from their declared working directory. Serial submake probes
 must clear inherited jobserver flags before they set their own job count.
+Sampling reports must use a validated regular output file and capture the target
+status separately. Long workload probes must use an operating-system timeout
+because tool yielding does not stop them. Profiling harnesses must use the exact
+resolved interpreter path. Protocol profilers must syntax and scope check every
+reporting path on a small payload before the full input. A macOS workload binary
+must be force signed after every release relink.
+Container migrations must verify which overload each const member actually
+selects before compiling.
+Profiler report cleanup must validate a nonempty exact path and use the system
+removal command without force.
+Commit subject length must be checked before creating the commit.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect
