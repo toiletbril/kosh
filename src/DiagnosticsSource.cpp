@@ -1026,6 +1026,44 @@ struct resembling_assignment
   assignment_binder binder{assignment_binder::Assignment};
 };
 
+fn suggest_shell_maintained_variable_name(
+    const HashSet &shell_maintained_variable_names, StringView name) throws
+    -> Maybe<String>
+{
+  let suggestion = utils::NameSuggestion{name};
+  shell_maintained_variable_names.for_each(
+      [&](StringView candidate) throws { suggestion.consider(candidate); });
+
+  return suggestion.take_suggestion();
+}
+
+fn collect_shell_provided_variable_names(const AnalysisContext &actx,
+                                         HashSet &out_names) throws -> void
+{
+  static constexpr PackedStringKey FIXED_VARIABLE_KEYS[] = {
+      SSK("KOSH"),    SSK("KOSH_VERSION"),    SSK("KOSH_COMMIT"),
+      SSK("KOSH_OS"), SSK("KOSH_BUILD_MODE"), SSK("OPTIND")};
+  for (let const &key : FIXED_VARIABLE_KEYS) {
+    let name = key.to_string();
+    out_names.add(name.view());
+  }
+
+  if (actx.eval_context == nullptr) return;
+  if (actx.eval_context->mood() != mimic_mood::Posix) {
+    static constexpr PackedStringKey BASH_IDENTITY_KEYS[] = {
+        SSK("BASH"), SSK("BASH_VERSION"), SSK("BASH_VERSINFO")};
+    for (let const &key : BASH_IDENTITY_KEYS) {
+      let name = key.to_string();
+      out_names.add(name.view());
+    }
+  }
+
+  let dynamic_names = ArrayList<StringView>{heap_allocator()};
+  actx.eval_context->append_dynamic_variable_names(dynamic_names);
+  for (let const name : dynamic_names)
+    out_names.add(name);
+}
+
 pure fn fold_name_byte(char byte) wontthrow -> char
 {
   return byte >= 'a' && byte <= 'z' ? static_cast<char>(byte - ('a' - 'A'))
@@ -1100,6 +1138,9 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
     return left.location.position < right.location.position;
   });
 
+  let shell_maintained_variable_names = HashSet{heap_allocator()};
+  collect_shell_provided_variable_names(actx, shell_maintained_variable_names);
+
   for (let const &read : reads) {
     resembling_assignment resembled{};
     resembling_assignment misspelled{};
@@ -1140,12 +1181,12 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
 
     if (resembled.name.is_empty()) resembled = misspelled;
 
-    if (resembled.name.is_empty() && actx.eval_context != nullptr) {
-      let const suggestion =
-          actx.eval_context->suggest_similar_variable_name(read.name);
-      if (suggestion.has_value() &&
-          actx.eval_context->is_exported(suggestion->view()))
-      {
+    if (resembled.name.is_empty()) {
+      let maintained = suggest_shell_maintained_variable_name(
+          shell_maintained_variable_names, read.name);
+      if (maintained.has_value()) {
+        actx.report_diagnostic(diagnostic_id::sc2153_builtin, read.location,
+                               {read.name, maintained->view()});
         continue;
       }
     }

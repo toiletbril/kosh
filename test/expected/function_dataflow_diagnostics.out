@@ -58,6 +58,34 @@ note: Pass the arguments at the call.
        |                ^~ the body reads $@ here.
 note: Pass the values 'walk' expects, or forward `"$@"`.
 Encountered 2 warnings.
+== a positional star read names its exact expansion:
+2:18: warning: The function 'join' reads arguments, and no call passes any. (SC2120)
+     2 |    printf "%s\n" "$*"
+       |                   ^~
+note: Pass the arguments at the call.
+4:1: warning: The function 'join' reads arguments, and this call passes none. (SC2119)
+     4 |  join
+       |  ^~~~
+2:18: details:
+     2 |    printf "%s\n" "$*"
+       |                   ^~ the body reads $* here.
+note: Pass the values 'join' expects, or forward `"$@"`.
+Encountered 2 warnings.
+== the first reading definition remains authoritative:
+2:9: warning: The function 'choice' reads arguments, and no call passes any. (SC2120)
+     2 |    echo "$1"
+       |          ^~
+note: Pass the arguments at the call.
+7:1: warning: The function 'choice' reads arguments, and this call passes none. (SC2119)
+     7 |  choice
+       |  ^~~~~~
+2:9: details:
+     2 |    echo "$1"
+       |          ^~ the body reads $1 here.
+note: Pass the values 'choice' expects, or forward `"$@"`.
+Encountered 2 warnings.
+== a later reading definition does not replace the first summary:
+rc=0
 == a call runs before the definition:
 1:1: warning: The definition of 'later_helper' runs later in the file. (SC2218)
      1 |  later_helper foo

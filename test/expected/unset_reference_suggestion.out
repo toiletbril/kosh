@@ -44,6 +44,10 @@ note: Replace it with ${zzzzzzzzzzzzzz-} if empty expansion is desired.
 note: Correct the spelling or assign 'configuration_rot'.
 rc=1
 == an exported name is a candidate:
+1:7: warning: The variable 'KOSH_TEST_EXPORTE' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$KOSH_TEST_EXPORTE"
+       |        ^~~~~~~~~~~~~~~~~~
+note: Assign 'KOSH_TEST_EXPORTE' before it is read, or set it in the environment.
 1:7: warning: The variable 'KOSH_TEST_EXPORTE' is not set, it expands to empty.
      1 |  echo "$KOSH_TEST_EXPORTE"
        |        ^~~~~~~~~~~~~~~~~~

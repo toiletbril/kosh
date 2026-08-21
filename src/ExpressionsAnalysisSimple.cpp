@@ -1361,7 +1361,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   let const is_top_level_unconditional =
       actx.function_scope_depth == 0 && is_unconditional;
   if (!is_command_shadowed &&
-      command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET))
+      command_info.is_in_group(COMMAND_GROUP_VARIABLE_TARGET) &&
+      !command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN))
   {
     note_variable_target_operands(
         actx, command_id, m_args, is_top_level_unconditional,

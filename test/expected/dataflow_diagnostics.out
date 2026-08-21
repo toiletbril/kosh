@@ -50,26 +50,150 @@ note: Correct the spelling or assign 'configuratoin_rot'.
 note: Assign 'temporary_buffer' before it is read, or set it in the environment.
 == an assignment before the read stays quiet:
 rc=0
+== an if-only assignment remains conditional:
+2:7: warning: The variable 'if_value' is read before any assignment gives it a value. (SC2154)
+     2 |  echo "$if_value"
+       |        ^~~~~~~~~
+note: Assign 'if_value' before it is read, or set it in the environment.
+== an assignment on every if exit stays quiet:
+rc=0
+== loop-only assignments remain conditional:
+3:7: warning: The variable 'for_value' is read before any assignment gives it a value. (SC2154)
+     3 |  echo "$for_value $while_value"
+       |        ^~~~~~~~~~
+note: Assign 'for_value' before it is read, or set it in the environment.
+3:18: warning: The variable 'while_value' is read before any assignment gives it a value. (SC2154)
+     3 |  echo "$for_value $while_value"
+       |                   ^~~~~~~~~~~~
+note: Assign 'while_value' before it is read, or set it in the environment.
+Encountered 2 warnings.
+== short-circuit assignments remain conditional:
+3:7: warning: The variable 'and_value' is read before any assignment gives it a value. (SC2154)
+     3 |  echo "$and_value $or_value"
+       |        ^~~~~~~~~~
+note: Assign 'and_value' before it is read, or set it in the environment.
+3:18: warning: The variable 'or_value' is read before any assignment gives it a value. (SC2154)
+     3 |  echo "$and_value $or_value"
+       |                   ^~~~~~~~~
+note: Assign 'or_value' before it is read, or set it in the environment.
+Encountered 2 warnings.
 == a prefix assignment counts as an assignment:
 rc=0
 == the shell maintains these names itself:
 rc=0
+== an exact environment value stays quiet:
+rc=0
+== an environment typo remains unresolved:
+1:7: warning: The variable 'DATAFLOW_EXPORTED_VLAUE' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$DATAFLOW_EXPORTED_VLAUE"
+       |        ^~~~~~~~~~~~~~~~~~~~~~~~
+note: Assign 'DATAFLOW_EXPORTED_VLAUE' before it is read, or set it in the environment.
 == a KOSH_ name is maintained by the shell:
 rc=0
 == misspelled KOSH and ANSI names are unresolved:
-1:7: warning: The variable 'KOSH_GIT_BRNACH' is read before any assignment gives it a value. (SC2154)
-     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
+1:7: warning: The variable 'KOSH_GIT_BRNACH' is never assigned, and the shell provides 'KOSH_GIT_BRANCH'. (SC2153)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN $OPTNID"
        |        ^~~~~~~~~~~~~~~~
-note: Assign 'KOSH_GIT_BRNACH' before it is read, or set it in the environment.
-1:24: warning: The variable 'KOSH_ANSI_REDD' is read before any assignment gives it a value. (SC2154)
-     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
+note: Correct the spelling or assign 'KOSH_GIT_BRNACH'.
+1:24: warning: The variable 'KOSH_ANSI_REDD' is never assigned, and the shell provides 'KOSH_ANSI_RED'. (SC2153)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN $OPTNID"
        |                         ^~~~~~~~~~~~~~~
-note: Assign 'KOSH_ANSI_REDD' before it is read, or set it in the environment.
-1:40: warning: The variable 'KOSH_VERSOIN' is read before any assignment gives it a value. (SC2154)
-     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN"
+note: Correct the spelling or assign 'KOSH_ANSI_REDD'.
+1:40: warning: The variable 'KOSH_VERSOIN' is never assigned, and the shell provides 'KOSH_VERSION'. (SC2153)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN $OPTNID"
        |                                         ^~~~~~~~~~~~~
-note: Assign 'KOSH_VERSOIN' before it is read, or set it in the environment.
-Encountered 3 warnings.
+note: Correct the spelling or assign 'KOSH_VERSOIN'.
+1:54: warning: The variable 'OPTNID' is never assigned, and the shell provides 'OPTIND'. (SC2153)
+     1 |  echo "$KOSH_GIT_BRNACH $KOSH_ANSI_REDD $KOSH_VERSOIN $OPTNID"
+       |                                                       ^~~~~~~
+note: Correct the spelling or assign 'OPTNID'.
+Encountered 4 warnings.
+== sh mood does not suggest a Bash-only variable:
+1:7: warning: The variable 'BASH_VERSOIN' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$BASH_VERSOIN"
+       |        ^~~~~~~~~~~~~
+note: Assign 'BASH_VERSOIN' before it is read, or set it in the environment.
+== unavailable catalog names are not suggested:
+1:7: warning: The variable 'BASHOPTZ' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$BASHOPTZ"
+       |        ^~~~~~~~~
+note: Assign 'BASHOPTZ' before it is read, or set it in the environment.
+1:7: warning: The variable 'GLOBIGNROE' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$GLOBIGNROE"
+       |        ^~~~~~~~~~~
+note: Assign 'GLOBIGNROE' before it is read, or set it in the environment.
+== every assignment binder describes its target:
+11:7: warning: The variable 'loop_entyr' is never assigned, and 'loop_entry' is assigned. (SC2153)
+    11 |  echo "$loop_entyr"
+       |        ^~~~~~~~~~~
+1:5: details:
+     1 |  for loop_entry in "$@"; do :; done
+       |      ^~~~~~~~~~ The name takes each word of the loop list in turn.
+note: Correct the spelling or assign 'loop_entyr'.
+12:7: warning: The variable 'menu_choiec' is never assigned, and 'menu_choice' is assigned. (SC2153)
+    12 |  echo "$menu_choiec"
+       |        ^~~~~~~~~~~~
+2:8: details:
+     2 |  select menu_choice in one; do break; done
+       |         ^~~~~~~~~~~ The name takes the menu entry the reader selects.
+note: Correct the spelling or assign 'menu_choiec'.
+13:7: warning: The variable 'arithmetic_vlaue' is never assigned, and 'arithmetic_value' is assigned. (SC2153)
+    13 |  echo "$arithmetic_vlaue"
+       |        ^~~~~~~~~~~~~~~~~
+3:4: details:
+     3 |  (( arithmetic_value = 1 ))
+       |     ^~~~~~~~~~~~~~~~ The value is the result of an arithmetic expression.
+note: Correct the spelling or assign 'arithmetic_vlaue'.
+14:7: warning: The variable 'read_feild' is never assigned, and 'read_field' is assigned. (SC2153)
+    14 |  echo "$read_feild"
+       |        ^~~~~~~~~~~
+4:9: details:
+     4 |  read -r read_field
+       |          ^~~~~~~~~~ The value is a field read from input.
+note: Correct the spelling or assign 'read_feild'.
+15:7: warning: The variable 'mapped_riws' is never assigned, and 'mapped_rows' is assigned. (SC2153)
+    15 |  echo "$mapped_riws"
+       |        ^~~~~~~~~~~~
+5:12: details:
+     5 |  mapfile -t mapped_rows
+       |             ^~~~~~~~~~~ The value is a list of lines read from input.
+note: Correct the spelling or assign 'mapped_riws'.
+16:7: warning: The variable 'option_leter' is never assigned, and 'option_letter' is assigned. (SC2153)
+    16 |  echo "$option_leter"
+       |        ^~~~~~~~~~~~~
+6:13: details:
+     6 |  getopts "a" option_letter
+       |              ^~~~~~~~~~~~~ The value is the option letter the parse reached.
+note: Correct the spelling or assign 'option_leter'.
+17:7: warning: The variable 'formated_text' is never assigned, and 'formatted_text' is assigned. (SC2153)
+    17 |  echo "$formated_text"
+       |        ^~~~~~~~~~~~~~
+7:11: details:
+     7 |  printf -v formatted_text "%s" value
+       |            ^~~~~~~~~~~~~~ The value is the formatted text.
+note: Correct the spelling or assign 'formated_text'.
+18:7: warning: The variable 'declraed_name' is never assigned, and 'declared_name' is assigned. (SC2153)
+    18 |  echo "$declraed_name"
+       |        ^~~~~~~~~~~~~~
+8:9: details:
+     8 |  declare declared_name
+       |          ^~~~~~~~~~~~~ The name is declared and carries no value here.
+note: Correct the spelling or assign 'declraed_name'.
+19:7: warning: The variable 'exported_nmae' is never assigned, and 'exported_name' is assigned. (SC2153)
+    19 |  echo "$exported_nmae"
+       |        ^~~~~~~~~~~~~~
+9:8: details:
+     9 |  export exported_name
+       |         ^~~~~~~~~~~~~ The name is declared and carries no value here.
+note: Correct the spelling or assign 'exported_nmae'.
+20:7: warning: The variable 'readonly_nmae' is never assigned, and 'readonly_name' is assigned. (SC2153)
+    20 |  echo "$readonly_nmae"
+       |        ^~~~~~~~~~~~~~
+10:10: details:
+    10 |  readonly readonly_name
+       |           ^~~~~~~~~~~~~ The name is declared and carries no value here.
+note: Correct the spelling or assign 'readonly_nmae'.
+Encountered 10 warnings.
 == an arithmetic assignment assigns its target:
 rc=0
 == a compound arithmetic assignment assigns its target:
@@ -103,6 +227,13 @@ rc=0
      2 |  echo "$default_target"
        |        ^~~~~~~~~~~~~~~
 note: Assign 'default_target' before it is read, or set it in the environment.
+== a read before a runtime definer is still reported:
+1:7: warning: The variable 'before_eval' is read before any assignment gives it a value. (SC2154)
+     1 |  echo "$before_eval"
+       |        ^~~~~~~~~~~~
+note: Assign 'before_eval' before it is read, or set it in the environment.
+== a read after a runtime definer stays quiet:
+rc=0
 == a prefix on an ordinary command does not outlive it:
 2:7: warning: The variable 'temporary_name' is read before any assignment gives it a value. (SC2154)
      2 |  echo "$temporary_name"

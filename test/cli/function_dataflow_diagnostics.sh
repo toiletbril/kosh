@@ -54,6 +54,31 @@ echo '== a positional read in a for loop word counts:'
 }
 walk' 2>&1
 
+echo '== a positional star read names its exact expansion:'
+"$BIN" -n -WWW -c 'join() {
+  printf "%s\n" "$*"
+}
+join' 2>&1
+
+echo '== the first reading definition remains authoritative:'
+"$BIN" -n -WWW -c 'choice() {
+  echo "$1"
+}
+choice() {
+  echo plain
+}
+choice' 2>&1
+
+echo '== a later reading definition does not replace the first summary:'
+"$BIN" -n -WWW -c 'choice() {
+  echo plain
+}
+choice() {
+  echo "$1"
+}
+choice' 2>&1
+echo "rc=$?"
+
 echo '== a call runs before the definition:'
 "$BIN" -n -WWW -c 'later_helper foo
 later_helper() {
