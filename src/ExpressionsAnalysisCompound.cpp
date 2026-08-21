@@ -586,31 +586,6 @@ fn CompoundList::analyze(AnalysisContext &actx,
   let conditional_chain_entry_inherited_assignments =
       actx.inherited_variable_occurrence_assignments.clone();
   let has_conditional_chain = false;
-  let do_merge_occurrence_states = [](auto &merged_states,
-                                      const auto &exit_states) throws -> void {
-    merged_states.for_each(
-        [&](StringView name, variable_occurrence_state &state) {
-          if (exit_states.find(name) == nullptr)
-            state.is_definitely_set = false;
-        });
-    exit_states.for_each(
-        [&](StringView name, const variable_occurrence_state &exit_state) {
-          let *state = merged_states.find(name);
-          if (state == nullptr) {
-            let merged_state = exit_state;
-            merged_state.is_definitely_set = false;
-            merged_states.set(name, steal(merged_state));
-            return;
-          }
-
-          for (let const assignment_index : exit_state.assignment_indices) {
-            if (!state->assignment_indices.find(assignment_index).has_value())
-              state->assignment_indices.push(assignment_index);
-          }
-          state->is_definitely_set =
-              state->is_definitely_set && exit_state.is_definitely_set;
-        });
-  };
   const CompoundListCondition *previous_node = nullptr;
   for (usize i = 0; i < m_nodes.count(); i++) {
     let const node = m_nodes[i];
@@ -618,9 +593,9 @@ fn CompoundList::analyze(AnalysisContext &actx,
 
     if (node->kind() == CompoundListCondition::Kind::None) {
       if (has_conditional_chain) {
-        do_merge_occurrence_states(actx.variable_occurrence_assignments,
-                                   conditional_chain_entry_assignments);
-        do_merge_occurrence_states(
+        merge_variable_occurrence_states(actx.variable_occurrence_assignments,
+                                         conditional_chain_entry_assignments);
+        merge_variable_occurrence_states(
             actx.inherited_variable_occurrence_assignments,
             conditional_chain_entry_inherited_assignments);
       }
@@ -632,9 +607,9 @@ fn CompoundList::analyze(AnalysisContext &actx,
           actx.inherited_variable_occurrence_assignments.clone();
       has_conditional_chain = true;
     } else {
-      do_merge_occurrence_states(actx.variable_occurrence_assignments,
-                                 conditional_chain_entry_assignments);
-      do_merge_occurrence_states(
+      merge_variable_occurrence_states(actx.variable_occurrence_assignments,
+                                       conditional_chain_entry_assignments);
+      merge_variable_occurrence_states(
           actx.inherited_variable_occurrence_assignments,
           conditional_chain_entry_inherited_assignments);
     }
@@ -718,10 +693,11 @@ fn CompoundList::analyze(AnalysisContext &actx,
     previous_node = node;
   }
   if (has_conditional_chain) {
-    do_merge_occurrence_states(actx.variable_occurrence_assignments,
-                               conditional_chain_entry_assignments);
-    do_merge_occurrence_states(actx.inherited_variable_occurrence_assignments,
-                               conditional_chain_entry_inherited_assignments);
+    merge_variable_occurrence_states(actx.variable_occurrence_assignments,
+                                     conditional_chain_entry_assignments);
+    merge_variable_occurrence_states(
+        actx.inherited_variable_occurrence_assignments,
+        conditional_chain_entry_inherited_assignments);
   }
   if (!actx.should_retain_tested_command_names)
     actx.tested_command_names = steal(saved_tested_command_names);
@@ -767,34 +743,10 @@ fn IfStatement::analyze(AnalysisContext &actx,
   actx.inherited_variable_occurrence_assignments = steal(before_then_inherited);
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
 
-  let do_merge_occurrence_states = [](auto &merged_states,
-                                      const auto &then_states) throws -> void {
-    merged_states.for_each(
-        [&](StringView name, variable_occurrence_state &state) {
-          if (then_states.find(name) == nullptr)
-            state.is_definitely_set = false;
-        });
-    then_states.for_each(
-        [&](StringView name, const variable_occurrence_state &then_state) {
-          let *state = merged_states.find(name);
-          if (state == nullptr) {
-            let merged_state = then_state;
-            merged_state.is_definitely_set = false;
-            merged_states.set(name, steal(merged_state));
-            return;
-          }
-
-          for (let const assignment_index : then_state.assignment_indices) {
-            if (!state->assignment_indices.find(assignment_index).has_value())
-              state->assignment_indices.push(assignment_index);
-          }
-          state->is_definitely_set =
-              state->is_definitely_set && then_state.is_definitely_set;
-        });
-  };
-  do_merge_occurrence_states(actx.variable_occurrence_assignments, after_then);
-  do_merge_occurrence_states(actx.inherited_variable_occurrence_assignments,
-                             after_then_inherited);
+  merge_variable_occurrence_states(actx.variable_occurrence_assignments,
+                                   after_then);
+  merge_variable_occurrence_states(
+      actx.inherited_variable_occurrence_assignments, after_then_inherited);
 
   actx.constant_variables.clear();
 }

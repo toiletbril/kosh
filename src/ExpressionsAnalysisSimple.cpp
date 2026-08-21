@@ -373,6 +373,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       let has_unquoted_substitution = false;
       let has_unquoted_reference = false;
       for (let const &segment : word.segments) {
+        if (segment.kind == WordSegment::Kind::VariableReference) {
+          note_variable_reference(actx, segment, element->source_location());
+        }
+
         if (segment.is_in_double_quotes) continue;
 
         switch (segment.kind) {
@@ -498,11 +502,13 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                   actx.known_aliases.contains(command_literal);
 
   if (command_is_defined_function) {
+    let const call_location = m_args[0]->source_location();
     actx.function_calls.push(function_call_record{
         String{heap_allocator(), command_literal},
-        m_args[0]->source_location(),
+        call_location,
         m_args.count() > 1, actx.function_scope_depth != 0
     });
+    actx.apply_called_function(command_literal, call_location);
   }
 
   let const command_info = get_analysis_command_info(command_literal);
@@ -515,6 +521,29 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   }
   let const command_is_assignment_builtin =
       command_info.is_in_group(COMMAND_GROUP_ASSIGNMENT_BUILTIN);
+
+  if (actx.function_scope_depth > 0 && name.has_value() &&
+      command_info.is_in_group(COMMAND_GROUP_DECLARATION_BUILTIN))
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      let const word = m_args[i]->kind() == Token::Kind::Word
+                           ? static_cast<const tokens::WordToken *>(m_args[i])
+                                 ->word()
+                                 .to_literal_string()
+                           : m_args[i]->raw_string();
+      let const target_name = operand_target_name(word.view());
+      if (target_name.is_empty()) continue;
+
+      actx.function_local_names.set(target_name, m_args[i]->source_location());
+      if (actx.active_function_definition_index !=
+          AnalysisContext::NO_ACTIVE_FUNCTION_DEFINITION)
+      {
+        actx.function_definitions[actx.active_function_definition_index]
+            .local_names.add(target_name);
+      }
+    }
+  }
+
   let const lint_input =
       command_lint_input{m_args,
                          m_redirections,
@@ -608,15 +637,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         for (let const &segment : recorded_value->segments) {
           if (segment.kind != WordSegment::Kind::VariableReference) continue;
 
-          let const segment_location =
-              segment
-                  .get_source_location(
-                      m_args[i]->source_location().source_name_index)
-                  .value_or(m_args[i]->source_location());
-          actx.note_variable_occurrence(
-              segment.text.view(),
-              expansion_location_with_sigil(actx, segment_location),
-              variable_occurrence_kind::Reference);
+          note_variable_reference(actx, segment, m_args[i]->source_location());
         }
       }
 
@@ -853,15 +874,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         case WordSegment::Kind::VariableReference: {
           quote_sandwich_state = 0;
           let const referenced = segment.text.view();
-          let const segment_location =
-              segment.get_source_location(arg_location.source_name_index)
-                  .value_or(arg_location);
-          if (!is_assignment_builtin_operand) {
-            actx.note_variable_occurrence(
-                referenced,
-                expansion_location_with_sigil(actx, segment_location),
-                variable_occurrence_kind::Reference);
-          }
+          if (!is_assignment_builtin_operand)
+            note_variable_reference(actx, segment, arg_location);
           actx.note_positional_reference(referenced);
           if (!is_operand) break;
 
@@ -1062,26 +1076,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     {
       actx.report_diagnostic(diagnostic_id::sc2091,
                              m_args[0]->source_location());
-    }
-  }
-
-  /* local, declare, and typeset name variables that stay inside the function,
-     so their names are recorded and the leak warning stays quiet for a later
-     assignment. */
-  if (actx.function_scope_depth > 0 && name.has_value() &&
-      command_info.is_in_group(COMMAND_GROUP_DECLARATION_BUILTIN))
-  {
-    for (usize i = 1; i < m_args.count(); i++) {
-      let const word = m_args[i]->kind() == Token::Kind::Word
-                           ? static_cast<const tokens::WordToken *>(m_args[i])
-                                 ->word()
-                                 .to_literal_string()
-                           : m_args[i]->raw_string();
-      let const target_name = operand_target_name(word.view());
-      if (!target_name.is_empty()) {
-        actx.function_local_names.set(target_name,
-                                      m_args[i]->source_location());
-      }
     }
   }
 

@@ -157,31 +157,6 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let merged_inherited_occurrence_assignments =
       actx.inherited_variable_occurrence_assignments.clone();
   let has_merged_occurrence_exit = false;
-  let do_merge_occurrence_states = [](auto &merged_states,
-                                      const auto &exit_states) throws -> void {
-    merged_states.for_each(
-        [&](StringView name, variable_occurrence_state &state) {
-          if (exit_states.find(name) == nullptr)
-            state.is_definitely_set = false;
-        });
-    exit_states.for_each(
-        [&](StringView name, const variable_occurrence_state &exit_state) {
-          let *state = merged_states.find(name);
-          if (state == nullptr) {
-            let merged_state = exit_state;
-            merged_state.is_definitely_set = false;
-            merged_states.set(name, steal(merged_state));
-            return;
-          }
-
-          for (let const assignment_index : exit_state.assignment_indices) {
-            if (!state->assignment_indices.find(assignment_index).has_value())
-              state->assignment_indices.push(assignment_index);
-          }
-          state->is_definitely_set =
-              state->is_definitely_set && exit_state.is_definitely_set;
-        });
-  };
   let is_first_branch = true;
   for (usize i = 0; i < m_branches.count(); i++) {
     let const & [ condition, body ] = m_branches[i];
@@ -217,9 +192,9 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
             actx.inherited_variable_occurrence_assignments.clone();
         has_merged_occurrence_exit = true;
       } else {
-        do_merge_occurrence_states(merged_occurrence_assignments,
-                                   actx.variable_occurrence_assignments);
-        do_merge_occurrence_states(
+        merge_variable_occurrence_states(merged_occurrence_assignments,
+                                         actx.variable_occurrence_assignments);
+        merge_variable_occurrence_states(
             merged_inherited_occurrence_assignments,
             actx.inherited_variable_occurrence_assignments);
       }
@@ -253,9 +228,9 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       merged_inherited_occurrence_assignments =
           actx.inherited_variable_occurrence_assignments.clone();
     } else {
-      do_merge_occurrence_states(merged_occurrence_assignments,
-                                 actx.variable_occurrence_assignments);
-      do_merge_occurrence_states(
+      merge_variable_occurrence_states(merged_occurrence_assignments,
+                                       actx.variable_occurrence_assignments);
+      merge_variable_occurrence_states(
           merged_inherited_occurrence_assignments,
           actx.inherited_variable_occurrence_assignments);
     }
@@ -446,6 +421,10 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         actx, actx.tested_command_names, false);
   }
 
+  let condition_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let condition_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
   let const was_silenced = actx.should_silence_unresolved_commands;
   let const was_inside_read_loop = actx.is_inside_read_loop;
   if (has_input_reading_loop_condition) actx.is_inside_read_loop = true;
@@ -453,6 +432,16 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.loop_body_depth++;
   m_body->analyze(actx, false);
   actx.loop_body_depth--;
+
+  merge_variable_occurrence_states(condition_occurrence_assignments,
+                                   actx.variable_occurrence_assignments);
+  merge_variable_occurrence_states(
+      condition_inherited_occurrence_assignments,
+      actx.inherited_variable_occurrence_assignments);
+  actx.variable_occurrence_assignments =
+      steal(condition_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(condition_inherited_occurrence_assignments);
   actx.is_inside_read_loop = was_inside_read_loop;
   actx.should_silence_unresolved_commands = was_silenced;
   actx.tested_command_names = steal(saved_tested_command_names);
@@ -671,14 +660,10 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 {
   ASSERT(m_body != nullptr);
 
-  actx.note_variable_occurrence(m_variable_name, m_variable_location,
-                                variable_occurrence_kind::Assignment,
-                                !is_unconditional ||
-                                    actx.has_seen_runtime_definer ||
-                                    (m_has_in_clause && m_words.is_empty()));
-  actx.note_variable_binding_record(
-      m_variable_name, m_variable_location, assignment_binder::ForLoop,
-      !is_unconditional || actx.has_seen_runtime_definer);
+  let loop_entry_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let loop_entry_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
 
   let const outer_loop_location =
       actx.active_loop_variables.find(m_variable_name);
@@ -756,11 +741,13 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         break;
       }
 
-      case WordSegment::Kind::VariableReference:
+      case WordSegment::Kind::VariableReference: {
+        note_variable_reference(actx, segment, t->source_location());
         actx.note_positional_reference(segment.text.view());
         word_is_literal = false;
         if (!segment.is_in_double_quotes) has_unquoted_expansion = true;
         break;
+      }
 
       case WordSegment::Kind::ArithmeticExpansion:
         word_is_literal = false;
@@ -790,6 +777,15 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     }
   }
 
+  let const is_conditional = !is_unconditional ||
+                             actx.has_seen_runtime_definer ||
+                             (m_has_in_clause && m_words.is_empty());
+  actx.note_variable_occurrence(m_variable_name, m_variable_location,
+                                variable_occurrence_kind::Assignment,
+                                is_conditional);
+  actx.note_variable_binding_record(m_variable_name, m_variable_location,
+                                    assignment_binder::ForLoop, is_conditional);
+
   /* The rule reads the word list while unchanged, so optimize runs before the
      constant table is cleared for the body. */
   optimizer::optimize_node(this, actx);
@@ -800,6 +796,16 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.loop_body_depth++;
   m_body->analyze(actx, false);
   actx.loop_body_depth--;
+
+  merge_variable_occurrence_states(loop_entry_occurrence_assignments,
+                                   actx.variable_occurrence_assignments);
+  merge_variable_occurrence_states(
+      loop_entry_inherited_occurrence_assignments,
+      actx.inherited_variable_occurrence_assignments);
+  actx.variable_occurrence_assignments =
+      steal(loop_entry_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(loop_entry_inherited_occurrence_assignments);
 }
 
 fn ForLoop::as_for_loop() const wontthrow -> const ForLoop * { return this; }
@@ -959,36 +965,20 @@ fn CaseClause::analyze(AnalysisContext &actx,
   let merged_occurrence_assignments = common_occurrence_assignments.clone();
   let merged_inherited_occurrence_assignments =
       common_inherited_occurrence_assignments.clone();
-  let continued_occurrence_assignments =
-      common_occurrence_assignments.clone();
+  let continued_occurrence_assignments = common_occurrence_assignments.clone();
   let continued_inherited_occurrence_assignments =
       common_inherited_occurrence_assignments.clone();
   let has_continued_occurrence_path = false;
-  let do_merge_occurrence_states = [](auto &merged_states,
-                                      const auto &exit_states) throws -> void {
-    merged_states.for_each(
-        [&](StringView name, variable_occurrence_state &state) {
-          if (exit_states.find(name) == nullptr)
-            state.is_definitely_set = false;
-        });
-    exit_states.for_each(
-        [&](StringView name, const variable_occurrence_state &exit_state) {
-          let *state = merged_states.find(name);
-          if (state == nullptr) {
-            let merged_state = exit_state;
-            merged_state.is_definitely_set = false;
-            merged_states.set(name, steal(merged_state));
-            return;
-          }
 
-          for (let const assignment_index : exit_state.assignment_indices) {
-            if (!state->assignment_indices.find(assignment_index).has_value())
-              state->assignment_indices.push(assignment_index);
-          }
-          state->is_definitely_set =
-              state->is_definitely_set && exit_state.is_definitely_set;
-        });
-  };
+  ASSERT(m_word != nullptr);
+  if (m_word->kind() == Token::Kind::Word) {
+    let const &case_word =
+        static_cast<const tokens::WordToken *>(m_word)->word();
+    for (let const &segment : case_word.segments) {
+      if (segment.kind != WordSegment::Kind::VariableReference) continue;
+      note_variable_reference(actx, segment, m_word->source_location());
+    }
+  }
 
   for (usize i = 0; i < m_items.count(); i++) {
     let const &item = m_items[i];
@@ -999,20 +989,30 @@ fn CaseClause::analyze(AnalysisContext &actx,
     actx.inherited_variable_occurrence_assignments =
         common_inherited_occurrence_assignments.clone();
     if (has_continued_occurrence_path) {
-      do_merge_occurrence_states(actx.variable_occurrence_assignments,
-                                 continued_occurrence_assignments);
-      do_merge_occurrence_states(
+      merge_variable_occurrence_states(actx.variable_occurrence_assignments,
+                                       continued_occurrence_assignments);
+      merge_variable_occurrence_states(
           actx.inherited_variable_occurrence_assignments,
           continued_inherited_occurrence_assignments);
+    }
+
+    for (let const pattern : item.patterns) {
+      if (pattern->kind() != Token::Kind::Word) continue;
+      let const &pattern_word =
+          static_cast<const tokens::WordToken *>(pattern)->word();
+      for (let const &segment : pattern_word.segments) {
+        if (segment.kind != WordSegment::Kind::VariableReference) continue;
+        note_variable_reference(actx, segment, pattern->source_location());
+      }
     }
 
     item.body->analyze(actx, false);
 
     let const has_later_item = i + 1 < m_items.count();
     if (item.terminator != case_terminator::FallThrough || !has_later_item) {
-      do_merge_occurrence_states(merged_occurrence_assignments,
-                                 actx.variable_occurrence_assignments);
-      do_merge_occurrence_states(
+      merge_variable_occurrence_states(merged_occurrence_assignments,
+                                       actx.variable_occurrence_assignments);
+      merge_variable_occurrence_states(
           merged_inherited_occurrence_assignments,
           actx.inherited_variable_occurrence_assignments);
     }
@@ -1030,8 +1030,6 @@ fn CaseClause::analyze(AnalysisContext &actx,
   actx.variable_occurrence_assignments = steal(merged_occurrence_assignments);
   actx.inherited_variable_occurrence_assignments =
       steal(merged_inherited_occurrence_assignments);
-
-  ASSERT(m_word != nullptr);
 
   let case_input = case_lint_input{};
   case_input.case_location = m_word->source_location();

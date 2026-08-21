@@ -203,15 +203,19 @@ files and output only. Offer parallel read-only agents before repository
 research. Read the matching guidance file before an implementation or prose
 edit. Confirm that an edit changes its target before calling the edit tool.
 Avoid repeating a read after the harness reports that the file is unchanged.
-Check that an edit replacement differs before calling the edit tool. Complete a
+Compare the complete source and replacement text before calling the edit tool.
+Search for the smallest unique exact segment before editing a long golden.
+Validate a shell probe encoder with a small payload before sending a large
+source file. Interactive probes use an available bounded runner. Complete a
 type migration across every use before compiling it. Print the required change
 table after each edit batch. Use the dedicated edit tool when the shell has no
 approved patch command. Background agent results and progress arrive through
 completion notifications and `SendMessage`. Never pass agent identifiers to
-`TaskOutput`, including while an agent is running. A continuation
-must offer parallel read-only agents before restarting repository research. Do not
-retry an invalid task lookup after the notification has reported the result.
-Broad searches must use existing paths or directory globs. Do not inspect code
+`TaskOutput`, including while an agent is running. A continuation must reread
+the matching guidance before its first edit and offer parallel read-only agents
+before restarting repository research. Do not retry an invalid task lookup
+after the notification has reported the result. Broad searches must use
+existing paths or directory globs. Do not inspect code
 covered by an active read only agent. Do not inspect tests covered by an active
 read only agent. Teammate replies require a concrete
 reachable agent name or identifier. Agent launches use a type listed by the

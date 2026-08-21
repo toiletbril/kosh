@@ -319,6 +319,12 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       let const shape = classify_test_operand(operand_word);
       if (shape.has_positional_reference) actx.mark_positional_reference();
 
+      for (let const &segment : operand_word.segments) {
+        if (segment.kind != WordSegment::Kind::VariableReference) continue;
+
+        note_variable_reference(actx, segment, element.word->source_location());
+      }
+
       if (shape.has_array_spread || shape.has_brace_expansion ||
           shape.has_unquoted_glob)
       {
@@ -564,18 +570,47 @@ fn SelectLoop::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
 
+  let loop_entry_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let loop_entry_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
+
+  for (let const t : m_words) {
+    if (t->kind() != Token::Kind::Word) continue;
+
+    let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    for (let const &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::VariableReference) continue;
+
+      note_variable_reference(actx, segment, t->source_location());
+      actx.note_positional_reference(segment.text.view());
+    }
+  }
+
+  let const is_conditional = !is_unconditional ||
+                             actx.has_seen_runtime_definer ||
+                             (m_has_in_clause && m_words.is_empty());
   actx.note_variable_occurrence(m_variable_name, m_variable_location,
                                 variable_occurrence_kind::Assignment,
-                                !is_unconditional ||
-                                    actx.has_seen_runtime_definer);
-  actx.note_variable_binding_record(
-      m_variable_name, m_variable_location, assignment_binder::SelectLoop,
-      !is_unconditional || actx.has_seen_runtime_definer);
+                                is_conditional);
+  actx.note_variable_binding_record(m_variable_name, m_variable_location,
+                                    assignment_binder::SelectLoop,
+                                    is_conditional);
 
   actx.constant_variables.clear();
   actx.loop_body_depth++;
   m_body->analyze(actx, false);
   actx.loop_body_depth--;
+
+  merge_variable_occurrence_states(loop_entry_occurrence_assignments,
+                                   actx.variable_occurrence_assignments);
+  merge_variable_occurrence_states(
+      loop_entry_inherited_occurrence_assignments,
+      actx.inherited_variable_occurrence_assignments);
+  actx.variable_occurrence_assignments =
+      steal(loop_entry_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(loop_entry_inherited_occurrence_assignments);
 }
 
 CStyleForLoop::CStyleForLoop(SourceLocation location, usize header_position,
@@ -683,29 +718,54 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
 
-  /* The folding rule reads the three clauses while unchanged, so the optimizer
-     runs before the constant table is cleared for the body. */
   optimizer::optimize_node(this, actx);
 
   let const is_conditional = !is_unconditional || actx.has_seen_runtime_definer;
-  let clause_base_position = m_header_position;
+  let const init_position = m_header_position;
+  let const condition_position = init_position + m_init.length + 1;
+  let const step_position = condition_position + m_condition.length + 1;
+  let const location = source_location();
 
-  for (let const clause : {m_init, m_condition, m_step}) {
-    if (!clause.is_empty()) {
-      check_arithmetic_expression_lints(actx, clause, source_location(),
-                                        clause_base_position, is_conditional);
-
-      if (actx.is_posix_sh_shebang)
-        check_posix_arithmetic_operators(actx, clause, source_location());
-    }
-
-    clause_base_position += clause.length + 1;
+  if (!m_init.is_empty()) {
+    check_arithmetic_expression_lints(actx, m_init, location, init_position,
+                                      is_conditional);
+    if (actx.is_posix_sh_shebang)
+      check_posix_arithmetic_operators(actx, m_init, location);
   }
+
+  if (!m_condition.is_empty()) {
+    check_arithmetic_expression_lints(actx, m_condition, location,
+                                      condition_position, is_conditional);
+    if (actx.is_posix_sh_shebang)
+      check_posix_arithmetic_operators(actx, m_condition, location);
+  }
+
+  let condition_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let condition_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
 
   actx.constant_variables.clear();
   actx.loop_body_depth++;
   m_body->analyze(actx, false);
   actx.loop_body_depth--;
+
+  if (!m_step.is_empty()) {
+    check_arithmetic_expression_lints(actx, m_step, location, step_position,
+                                      is_conditional);
+    if (actx.is_posix_sh_shebang)
+      check_posix_arithmetic_operators(actx, m_step, location);
+  }
+
+  merge_variable_occurrence_states(condition_occurrence_assignments,
+                                   actx.variable_occurrence_assignments);
+  merge_variable_occurrence_states(
+      condition_inherited_occurrence_assignments,
+      actx.inherited_variable_occurrence_assignments);
+  actx.variable_occurrence_assignments =
+      steal(condition_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(condition_inherited_occurrence_assignments);
 }
 
 pure fn CStyleForLoop::condition_clause() const wontthrow -> StringView
@@ -942,6 +1002,8 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       actx.variable_occurrence_assignments.clone();
   let saved_inherited_occurrence_assignments =
       actx.inherited_variable_occurrence_assignments.clone();
+  let saved_latest_function_definition_indices =
+      actx.latest_function_definition_indices.clone();
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
@@ -976,6 +1038,8 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.variable_occurrence_assignments = steal(saved_occurrence_assignments);
   actx.inherited_variable_occurrence_assignments =
       steal(saved_inherited_occurrence_assignments);
+  actx.latest_function_definition_indices =
+      steal(saved_latest_function_definition_indices);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
   actx.is_analyzing_condition = was_analyzing_condition;
@@ -1081,6 +1145,8 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
       actx.variable_occurrence_assignments.clone();
   let saved_inherited_occurrence_assignments =
       actx.inherited_variable_occurrence_assignments.clone();
+  let saved_latest_function_definition_indices =
+      actx.latest_function_definition_indices.clone();
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
@@ -1093,7 +1159,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = StringMap<SourceLocation>{heap_allocator()};
   actx.inherited_variable_occurrence_assignments =
-      steal(actx.variable_occurrence_assignments);
+      StringMap<variable_occurrence_state>{heap_allocator()};
   actx.variable_occurrence_assignments =
       StringMap<variable_occurrence_state>{heap_allocator()};
   actx.apply_scope_definitions(m_analysis_scope_definitions);
@@ -1105,13 +1171,27 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
       String{heap_allocator(), m_name.view()},
       source_location()
   });
-  /* Both syntactic forms take their node location from the name token. The body
-     span is the one that slices to valid shell. */
+  let const function_definition_index = actx.active_function_definition_index;
+  actx.function_definitions[function_definition_index].occurrence_start =
+      actx.symbol_records != nullptr
+          ? actx.symbol_records->variable_occurrences.count()
+          : 0;
   actx.note_function_body_record(m_name.view(), source_location().position,
                                  m_body->source_location().position,
                                  m_body->source_end_position());
   actx.function_scope_depth++;
   m_body->analyze(actx, false);
+  let &function_definition =
+      actx.function_definitions[function_definition_index];
+  function_definition.occurrence_end =
+      actx.symbol_records != nullptr
+          ? actx.symbol_records->variable_occurrences.count()
+          : 0;
+  function_definition.exit_states =
+      actx.variable_occurrence_assignments.clone();
+  function_definition.is_analysis_complete = true;
+  actx.latest_function_definition_indices.set(m_name.view(),
+                                              function_definition_index);
   actx.current_source_effects = saved_source_effects;
   actx.function_scope_depth--;
   actx.active_function_definition_index = saved_active_function;
@@ -1125,6 +1205,10 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.variable_occurrence_assignments = steal(saved_occurrence_assignments);
   actx.inherited_variable_occurrence_assignments =
       steal(saved_inherited_occurrence_assignments);
+  actx.latest_function_definition_indices =
+      steal(saved_latest_function_definition_indices);
+  actx.latest_function_definition_indices.set(m_name.view(),
+                                              function_definition_index);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
 }

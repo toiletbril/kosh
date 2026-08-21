@@ -1932,7 +1932,6 @@ fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
               modifiers &= ~SEMANTIC_UNRESOLVED;
             }
           }
-          break;
         }
       }
 

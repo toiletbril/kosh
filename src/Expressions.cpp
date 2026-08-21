@@ -466,9 +466,24 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
     name = expressions::operand_target_name(name);
   if (name.is_empty()) return;
 
-  let occurrence = variable_occurrence_record{
-      String{name}, location.position, location.length,
-      kind,         is_unresolved,     false};
+  let const function_definition_index = active_function_definition_index;
+  let const *current_state = kind == variable_occurrence_kind::Reference
+                                 ? variable_occurrence_assignments.find(name)
+                                 : nullptr;
+  let const has_inherited_function_path =
+      function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION &&
+      kind == variable_occurrence_kind::Reference &&
+      (current_state == nullptr || current_state->has_inherited_path);
+  let occurrence = variable_occurrence_record{String{name},
+                                              location.position,
+                                              location.length,
+                                              kind,
+                                              is_unresolved,
+                                              false,
+                                              function_definition_index,
+                                              false,
+                                              false,
+                                              has_inherited_function_path};
 
   if (kind == variable_occurrence_kind::Assignment) {
     if (is_append) {
@@ -485,8 +500,12 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
     let state = variable_occurrence_state{};
     state.assignment_indices.push(symbol_records->variable_occurrences.count());
     state.is_definitely_set = true;
+    state.is_definitely_unset = false;
+    state.has_inherited_path = false;
     variable_occurrence_assignments.set(name, steal(state));
     occurrence.is_unused = true;
+    if (function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION)
+      function_definitions[function_definition_index].affected_names.add(name);
   } else if (kind == variable_occurrence_kind::Reference) {
     let const *state = variable_occurrence_assignments.find(name);
     if (state != nullptr) {
@@ -512,11 +531,159 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
     if (state == nullptr)
       state = inherited_variable_occurrence_assignments.find(name);
     occurrence.is_unresolved = state == nullptr || !state->is_definitely_set;
-    variable_occurrence_assignments.erase(name);
+
+    let unset_state = variable_occurrence_state{};
+    unset_state.is_definitely_unset = true;
+    unset_state.has_unset_path = true;
+    variable_occurrence_assignments.set(name, steal(unset_state));
     inherited_variable_occurrence_assignments.erase(name);
+    if (function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION)
+      function_definitions[function_definition_index].affected_names.add(name);
   }
 
   symbol_records->variable_occurrences.push(steal(occurrence));
+}
+
+fn AnalysisContext::apply_called_function(
+    StringView name, const SourceLocation &call_location) throws -> void
+{
+  if (symbol_records == nullptr) return;
+
+  if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION &&
+      function_definitions[active_function_definition_index].name.view() ==
+          name)
+  {
+    return;
+  }
+
+  let const *selected_definition_index =
+      latest_function_definition_indices.find(name);
+  if (selected_definition_index == nullptr) return;
+
+  let const &selected_definition =
+      function_definitions[*selected_definition_index];
+  if (!selected_definition.is_analysis_complete ||
+      selected_definition.location.position > call_location.position)
+  {
+    return;
+  }
+
+  let &definition = function_definitions[*selected_definition_index];
+  definition.has_been_called = true;
+
+  for (usize occurrence_index = definition.occurrence_start;
+       occurrence_index < definition.occurrence_end; occurrence_index++)
+  {
+    let &occurrence = symbol_records->variable_occurrences[occurrence_index];
+    if (occurrence.kind != variable_occurrence_kind::Reference ||
+        occurrence.function_definition_index != *selected_definition_index ||
+        !occurrence.has_inherited_function_path)
+    {
+      continue;
+    }
+
+    let const *state =
+        variable_occurrence_assignments.find(occurrence.name.view());
+    if (state == nullptr)
+      state = inherited_variable_occurrence_assignments.find(
+          occurrence.name.view());
+    if (state != nullptr && state->is_definitely_set) {
+      occurrence.has_resolved_function_path = true;
+      for (let const assignment_index : state->assignment_indices)
+        symbol_records->variable_occurrences[assignment_index].is_unused =
+            false;
+    } else {
+      occurrence.has_unresolved_function_path = true;
+    }
+  }
+
+  definition.affected_names.for_each([&](StringView affected_name) {
+    if (definition.local_names.contains(affected_name)) return;
+
+    let const *exit_state = definition.exit_states.find(affected_name);
+    if (exit_state == nullptr) return;
+
+    if (exit_state->is_definitely_set || exit_state->is_definitely_unset) {
+      variable_occurrence_assignments.set(affected_name, *exit_state);
+      inherited_variable_occurrence_assignments.erase(affected_name);
+      return;
+    }
+
+    let const *caller_state =
+        variable_occurrence_assignments.find(affected_name);
+    if (caller_state == nullptr) {
+      caller_state =
+          inherited_variable_occurrence_assignments.find(affected_name);
+    }
+
+    if (caller_state == nullptr) {
+      variable_occurrence_assignments.set(affected_name, *exit_state);
+      inherited_variable_occurrence_assignments.erase(affected_name);
+      return;
+    }
+
+    let merged_state = *caller_state;
+    let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
+    merged_assignment_indices.reserve(merged_state.assignment_indices.count() +
+                                      exit_state->assignment_indices.count());
+    usize caller_index = 0;
+    usize exit_index = 0;
+    while (caller_index < merged_state.assignment_indices.count() ||
+           exit_index < exit_state->assignment_indices.count())
+    {
+      let const has_caller_index =
+          caller_index < merged_state.assignment_indices.count();
+      let const has_exit_index =
+          exit_index < exit_state->assignment_indices.count();
+      usize assignment_index;
+      if (!has_exit_index ||
+          (has_caller_index && merged_state.assignment_indices[caller_index] <
+                                   exit_state->assignment_indices[exit_index]))
+      {
+        assignment_index = merged_state.assignment_indices[caller_index++];
+      } else if (!has_caller_index ||
+                 exit_state->assignment_indices[exit_index] <
+                     merged_state.assignment_indices[caller_index])
+      {
+        assignment_index = exit_state->assignment_indices[exit_index++];
+      } else {
+        assignment_index = merged_state.assignment_indices[caller_index++];
+        exit_index++;
+      }
+      if (merged_assignment_indices.is_empty() ||
+          merged_assignment_indices.back() != assignment_index)
+        merged_assignment_indices.push(assignment_index);
+    }
+    merged_state.assignment_indices = steal(merged_assignment_indices);
+    merged_state.is_definitely_set =
+        merged_state.is_definitely_set && exit_state->is_definitely_set;
+    merged_state.is_definitely_unset = false;
+    merged_state.has_unset_path =
+        merged_state.has_unset_path || exit_state->has_unset_path;
+    merged_state.has_inherited_path =
+        merged_state.has_inherited_path || exit_state->has_inherited_path;
+    variable_occurrence_assignments.set(affected_name, steal(merged_state));
+    inherited_variable_occurrence_assignments.erase(affected_name);
+  });
+}
+
+static fn resolve_function_occurrence_states(
+    analysis_symbol_records &symbol_records,
+    const ArrayList<function_definition_record> &function_definitions) throws
+    -> void
+{
+  for (let const &definition : function_definitions) {
+    for (usize occurrence_index = definition.occurrence_start;
+         occurrence_index < definition.occurrence_end; occurrence_index++)
+    {
+      let &occurrence = symbol_records.variable_occurrences[occurrence_index];
+      if (occurrence.kind != variable_occurrence_kind::Reference) continue;
+      if (!occurrence.has_inherited_function_path) continue;
+
+      occurrence.is_unresolved = occurrence.has_unresolved_function_path ||
+                                 !occurrence.has_resolved_function_path;
+    }
+  }
 }
 
 fn AnalysisContext::note_function_body_record(StringView name,
@@ -1189,6 +1356,9 @@ fn analyze_ast(const Expression *root, StringView source,
   expressions::check_command_name_assignments(actx);
   expressions::check_unassigned_variable_reads(actx);
   expressions::check_function_argument_dataflow(actx);
+  if (symbol_records != nullptr)
+    resolve_function_occurrence_states(*symbol_records,
+                                       actx.function_definitions);
 
   actx.flush_warnings();
 
@@ -1275,6 +1445,85 @@ pure fn expansion_location_with_sigil(const AnalysisContext &actx,
   }
 
   return SourceLocation{start, length, location.source_name_index};
+}
+
+fn note_variable_reference(AnalysisContext &actx, const WordSegment &segment,
+                           SourceLocation fallback_location) throws -> void
+{
+  let const segment_location =
+      segment.get_source_location(fallback_location.source_name_index)
+          .value_or(fallback_location);
+  actx.note_variable_occurrence(
+      segment.text.view(),
+      expansion_location_with_sigil(actx, segment_location),
+      variable_occurrence_kind::Reference);
+}
+
+fn merge_variable_occurrence_states(
+    StringMap<variable_occurrence_state> &merged_states,
+    const StringMap<variable_occurrence_state> &exit_states) throws -> void
+{
+  merged_states.for_each(
+      [&](StringView name, variable_occurrence_state &state) {
+        let const *exit_state = exit_states.find(name);
+        if (exit_state == nullptr) {
+          state.is_definitely_set = false;
+          state.has_unset_path = true;
+          return;
+        }
+
+        state.has_inherited_path = true;
+      });
+  exit_states.for_each([&](StringView name,
+                           const variable_occurrence_state &exit_state) {
+    let *state = merged_states.find(name);
+    if (state == nullptr) {
+      let merged_state = exit_state;
+      merged_state.is_definitely_set = false;
+      merged_state.has_inherited_path = true;
+      merged_states.set(name, steal(merged_state));
+      return;
+    }
+
+    let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
+    merged_assignment_indices.reserve(state->assignment_indices.count() +
+                                      exit_state.assignment_indices.count());
+    usize state_index = 0;
+    usize exit_index = 0;
+    while (state_index < state->assignment_indices.count() ||
+           exit_index < exit_state.assignment_indices.count())
+    {
+      let const has_state_index =
+          state_index < state->assignment_indices.count();
+      let const has_exit_index =
+          exit_index < exit_state.assignment_indices.count();
+      usize assignment_index;
+      if (!has_exit_index ||
+          (has_state_index && state->assignment_indices[state_index] <
+                                  exit_state.assignment_indices[exit_index]))
+      {
+        assignment_index = state->assignment_indices[state_index++];
+      } else if (!has_state_index || exit_state.assignment_indices[exit_index] <
+                                         state->assignment_indices[state_index])
+      {
+        assignment_index = exit_state.assignment_indices[exit_index++];
+      } else {
+        assignment_index = state->assignment_indices[state_index++];
+        exit_index++;
+      }
+      if (merged_assignment_indices.is_empty() ||
+          merged_assignment_indices.back() != assignment_index)
+        merged_assignment_indices.push(assignment_index);
+    }
+    state->assignment_indices = steal(merged_assignment_indices);
+    state->is_definitely_set =
+        state->is_definitely_set && exit_state.is_definitely_set;
+    state->is_definitely_unset =
+        state->is_definitely_unset && exit_state.is_definitely_unset;
+    state->has_unset_path = state->has_unset_path || exit_state.has_unset_path;
+    state->has_inherited_path =
+        state->has_inherited_path || exit_state.has_inherited_path;
+  });
 }
 
 pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow

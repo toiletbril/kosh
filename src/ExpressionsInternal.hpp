@@ -65,6 +65,11 @@ pure fn analysis_source_span(const AnalysisContext &actx,
 pure fn expansion_location_with_sigil(const AnalysisContext &actx,
                                       SourceLocation location) wontthrow
     -> SourceLocation;
+fn note_variable_reference(AnalysisContext &actx, const WordSegment &segment,
+                           SourceLocation fallback_location) throws -> void;
+fn merge_variable_occurrence_states(
+    StringMap<variable_occurrence_state> &merged_states,
+    const StringMap<variable_occurrence_state> &exit_states) throws -> void;
 
 /* One span reaching from the start of the first location to the end of the
    last. An empty location contributes nothing. */

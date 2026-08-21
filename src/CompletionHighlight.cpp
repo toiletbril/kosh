@@ -232,7 +232,7 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar,
         if (depth == 0) break;
       }
     }
-    return i;
+    return i <= line.length ? i : line.length;
   }
   if (c >= '0' && c <= '9') {
     while (i < end && line[i] >= '0' && line[i] <= '9')
@@ -987,10 +987,8 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
   let decoded_command_word =
       utils::decoded_shell_word{bump_allocator(HIGHLIGHT_ARENA)};
   let is_in_array_value = false;
-  let is_in_arithmetic = false;
   usize parenthesis_depth = 0;
   usize array_value_parenthesis_depth = 0;
-  usize arithmetic_parenthesis_depth = 0;
 
   let const do_color_backtick =
       [&](usize backtick_position, ArrayList<highlight_span> &word_spans)
@@ -1046,17 +1044,16 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       continue;
     }
 
-    /* Inside `((...))` a `<<` is a shift, so the here-document scan stays out
-       until the arithmetic closes. */
-    if (!is_in_arithmetic && is_command_position && c == '(' && i + 1 < end &&
-        line[i + 1] == '(')
-    {
-      is_in_arithmetic = true;
-      arithmetic_parenthesis_depth = parenthesis_depth;
+    if (is_command_position && c == '(' && i + 1 < end && line[i + 1] == '(') {
+      spans.push(highlight_span{i, i + 2, highlight_role::operator_});
+      i = color_arithmetic(line, i + 2, end, context, spans,
+                           line_variable_names, known_function_names, true);
+      is_command_position = false;
+      continue;
     }
 
     /* <<< is a one-line here-string and falls through to the operator scan. */
-    if (!is_in_arithmetic && c == '<' && i + 1 < end && line[i + 1] == '<' &&
+    if (c == '<' && i + 1 < end && line[i + 1] == '<' &&
         !(i + 2 < end && line[i + 2] == '<'))
     {
       let const operator_start = i;
@@ -1145,11 +1142,6 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       {
         is_in_array_value = false;
       }
-      if (is_in_arithmetic && parenthesis_depth <= arithmetic_parenthesis_depth)
-      {
-        is_in_arithmetic = false;
-      }
-
       if (has_separator && operator_start + 1 < i &&
           line[operator_start] == ';' &&
           (line[operator_start + 1] == ';' ||

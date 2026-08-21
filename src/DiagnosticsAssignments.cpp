@@ -833,13 +833,7 @@ fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
     }
 
     if (segment.kind == WordSegment::Kind::VariableReference) {
-      let const segment_location =
-          segment.get_source_location(location.source_name_index)
-              .value_or(location);
-      actx.note_variable_occurrence(
-          segment.text.view(),
-          expansion_location_with_sigil(actx, segment_location),
-          variable_occurrence_kind::Reference);
+      note_variable_reference(actx, segment, location);
 
       if (segment.text.view() == "@" && !has_reported_array_collapse) {
         actx.report_diagnostic(diagnostic_id::sc2124, location);

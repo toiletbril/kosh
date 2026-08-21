@@ -82,7 +82,8 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
                                  StringView target,
                                  const SourceLocation &location,
                                  Maybe<usize> expression_base_position,
-                                 bool is_conditional) throws -> void
+                                 bool is_conditional, bool is_append) throws
+    -> void
 {
   if (actx.symbol_records == nullptr) return;
   if (!expression_base_position.has_value()) return;
@@ -93,10 +94,56 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
   if (analysis_source_text(actx, name_location) != target) return;
 
   actx.note_variable_occurrence(target, name_location,
-                                variable_occurrence_kind::Assignment,
-                                is_conditional);
+                                variable_occurrence_kind::Assignment, false,
+                                is_append);
   actx.note_variable_binding_record(
       target, name_location, assignment_binder::Arithmetic, is_conditional);
+}
+
+pure fn arithmetic_assignment_end(StringView expression,
+                                  usize value_position) wontthrow -> usize
+{
+  usize parenthesis_depth = 0;
+  usize bracket_depth = 0;
+  usize ternary_depth = 0;
+
+  for (usize position = value_position; position < expression.length;
+       position++)
+  {
+    switch (expression[position]) {
+    case '(': parenthesis_depth++; break;
+
+    case ')':
+      if (parenthesis_depth == 0 && bracket_depth == 0) return position;
+      if (parenthesis_depth > 0) parenthesis_depth--;
+      break;
+
+    case '[': bracket_depth++; break;
+
+    case ']':
+      if (bracket_depth > 0) bracket_depth--;
+      break;
+
+    case '?':
+      if (parenthesis_depth == 0 && bracket_depth == 0) ternary_depth++;
+      break;
+
+    case ':':
+      if (parenthesis_depth != 0 || bracket_depth != 0) break;
+      if (ternary_depth == 0) return position;
+      ternary_depth--;
+      break;
+
+    case ',':
+      if (parenthesis_depth == 0 && bracket_depth == 0 && ternary_depth == 0)
+        return position;
+      break;
+
+    default: break;
+    }
+  }
+
+  return expression.length;
 }
 
 fn check_arithmetic_expression_lints(AnalysisContext &actx,
@@ -115,7 +162,29 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
      that ends the term clears the flag. */
   let has_pending_division = false;
 
+  struct arithmetic_write
+  {
+    StringView name;
+    usize end_position;
+    bool is_append;
+  };
+  let pending_writes = ArrayList<arithmetic_write>{heap_allocator()};
+  let const do_apply_writes = [&](usize end_position) throws -> void {
+    while (!pending_writes.is_empty() &&
+           pending_writes.back().end_position <= end_position)
+    {
+      let const write = pending_writes.back();
+      pending_writes.pop_back();
+      actx.note_variable_assignment(write.name, location);
+      note_arithmetic_target_record(actx, expression, write.name, location,
+                                    expression_base_position, is_conditional,
+                                    write.is_append);
+    }
+  };
+
   for (usize position = 0; position < expression.length; position++) {
+    do_apply_writes(position);
+
     switch (expression[position]) {
     case '/':
       if (position + 1 < expression.length &&
@@ -174,17 +243,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     case '>':
     case '%': has_pending_division = false; break;
 
-    case '=': {
-      has_pending_division = false;
-
-      let const target = arithmetic_assignment_target(expression, position);
-      if (target.is_empty()) break;
-
-      actx.note_variable_assignment(target, location);
-      note_arithmetic_target_record(actx, expression, target, location,
-                                    expression_base_position, is_conditional);
-      break;
-    }
+    case '=': has_pending_division = false; break;
 
     /* An arithmetic expression is never quoted, so a $ here introduces a real
        expansion and a positional name behind it is a positional read. */
@@ -278,7 +337,18 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
         }
 
         let is_assignment_target = false;
-        if (after_name < expression.length) {
+        let is_compound_assignment = false;
+        let is_step_target = false;
+        let is_prefix_step_target = false;
+        usize operator_end = after_name;
+        if (start >= 2 &&
+            (expression[start - 1] == '+' || expression[start - 1] == '-') &&
+            expression[start - 2] == expression[start - 1])
+        {
+          is_assignment_target = true;
+          is_compound_assignment = true;
+          is_prefix_step_target = true;
+        } else if (after_name < expression.length) {
           switch (expression[after_name]) {
           case '=':
             is_assignment_target =
@@ -298,6 +368,15 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
             {
               is_assignment_target = arithmetic_assignment_target(
                                          expression, after_name + 1) == word;
+              is_compound_assignment = is_assignment_target;
+            } else if (after_name + 1 < expression.length &&
+                       (expression[after_name] == '+' ||
+                        expression[after_name] == '-') &&
+                       expression[after_name + 1] == expression[after_name])
+            {
+              is_assignment_target = true;
+              is_compound_assignment = true;
+              is_step_target = true;
             }
             break;
 
@@ -309,6 +388,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
             {
               is_assignment_target = arithmetic_assignment_target(
                                          expression, after_name + 2) == word;
+              is_compound_assignment = is_assignment_target;
             }
             break;
 
@@ -316,12 +396,39 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
           }
         }
 
-        if (!is_assignment_target && expression_base_position.has_value()) {
-          actx.note_variable_occurrence(
-              word,
+        if (expression_base_position.has_value()) {
+          let const name_location =
               SourceLocation{*expression_base_position + start, word.length,
-                             location.source_name_index},
-              variable_occurrence_kind::Reference);
+                             location.source_name_index};
+          if (!is_assignment_target || is_compound_assignment) {
+            actx.note_variable_occurrence(word, name_location,
+                                          variable_occurrence_kind::Reference);
+          }
+        }
+
+        if (is_assignment_target) {
+          if (is_prefix_step_target) {
+            operator_end = after_name;
+          } else {
+            operator_end = after_name + 1;
+            if (is_compound_assignment) {
+              operator_end++;
+              if (!is_step_target &&
+                  (expression[after_name] == '<' ||
+                   expression[after_name] == '>') &&
+                  after_name + 1 < expression.length &&
+                  expression[after_name + 1] == expression[after_name])
+              {
+                operator_end++;
+              }
+            }
+          }
+          pending_writes.push(arithmetic_write{
+              word,
+              is_step_target || is_prefix_step_target
+                  ? operator_end
+                  : arithmetic_assignment_end(expression, operator_end),
+              is_compound_assignment});
         }
         break;
       }
@@ -345,6 +452,8 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     }
     }
   }
+
+  do_apply_writes(expression.length);
 
   if (has_redundant_dollar)
     actx.report_diagnostic(diagnostic_id::sc2004, location);

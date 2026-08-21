@@ -76,15 +76,6 @@ struct active_getopts_call
   SourceLocation location;
 };
 
-/* One function this script defines. The whole-script sweep reads these after
-   the walk, so the name is owned and never a slice of the syntax tree. */
-struct function_definition_record
-{
-  String name;
-  SourceLocation location;
-  bool has_positional_reads{false};
-};
-
 /* One call of a name this script defines as a function. The name is owned for
    the same reason the definition name is. */
 struct function_call_record
@@ -149,12 +140,35 @@ struct variable_occurrence_record
   variable_occurrence_kind kind{variable_occurrence_kind::Reference};
   bool is_unresolved{false};
   bool is_unused{false};
+  usize function_definition_index{~usize{0}};
+  bool has_resolved_function_path{false};
+  bool has_unresolved_function_path{false};
+  bool has_inherited_function_path{false};
 };
 
 struct variable_occurrence_state
 {
   ArrayList<usize> assignment_indices{heap_allocator()};
   bool is_definitely_set{false};
+  bool is_definitely_unset{false};
+  bool has_unset_path{false};
+  bool has_inherited_path{false};
+};
+
+/* One function this script defines. The whole-script sweep reads these after
+   the walk, so the name is owned and never a slice of the syntax tree. */
+struct function_definition_record
+{
+  String name;
+  SourceLocation location;
+  usize occurrence_start{0};
+  usize occurrence_end{0};
+  HashSet affected_names{heap_allocator()};
+  HashSet local_names{heap_allocator()};
+  StringMap<variable_occurrence_state> exit_states{heap_allocator()};
+  bool has_positional_reads{false};
+  bool has_been_called{false};
+  bool is_analysis_complete{false};
 };
 
 /* One function definition a reader may ask about. The body span is recovered
@@ -302,6 +316,7 @@ public:
   /* Every function the script defines and every call of one, gathered during
      the walk and swept once it ends. */
   ArrayList<function_definition_record> function_definitions{heap_allocator()};
+  StringMap<usize> latest_function_definition_indices{heap_allocator()};
   ArrayList<function_call_record> function_calls{heap_allocator()};
 
   static constexpr usize NO_ACTIVE_FUNCTION_DEFINITION = ~usize{0};
@@ -489,6 +504,8 @@ public:
                               variable_occurrence_kind kind,
                               bool is_unresolved = false,
                               bool is_append = false) throws -> void;
+  fn apply_called_function(StringView name,
+                           const SourceLocation &call_location) throws -> void;
   fn note_function_body_record(StringView name, usize name_position,
                                usize body_position,
                                usize body_end_position) throws -> void;
