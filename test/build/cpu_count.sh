@@ -86,3 +86,48 @@ case "$default_targets" in
     *'Launching tests'*) echo default-make-launched-tests ;;
     *) echo default-make-builds-shell ;;
 esac
+
+commit_hash_dir=$d/commit-hash
+commit_hash_log=$commit_hash_dir/compile.log
+fake_cxx=$commit_hash_dir/fake-cxx
+mkdir -p "$commit_hash_dir"
+printf '%s\n' \
+  '#!/bin/sh' \
+  'output=' \
+  'while [ "$#" -gt 0 ]; do' \
+  '  if [ "$1" = -o ]; then' \
+  '    shift' \
+  '    output=$1' \
+  '    break' \
+  '  fi' \
+  '  shift' \
+  'done' \
+  '[ -n "$output" ] || exit 0' \
+  'printf "%s\n" "$output" >> "$FAKE_CXX_LOG"' \
+  ': > "$output"' \
+  > "$fake_cxx"
+chmod +x "$fake_cxx"
+
+commit_hash_cli_object=$commit_hash_dir/o/Cli.o
+commit_hash_main_object=$commit_hash_dir/o/Main.o
+commit_hash_control_object=$commit_hash_dir/o/Colors.o
+FAKE_CXX_LOG=$commit_hash_log make -C ../src --no-print-directory \
+  -j1 MODE=dbg OBJ_DIR="$commit_hash_dir/o" CXX="$fake_cxx" COMMIT_HASH=first \
+  "$commit_hash_cli_object" "$commit_hash_main_object" \
+  "$commit_hash_control_object" >/dev/null
+printf 'commit-hash-first=%s\n' "$(wc -l < "$commit_hash_log" | tr -d ' ')"
+
+FAKE_CXX_LOG=$commit_hash_log make -C ../src --no-print-directory \
+  -j1 MODE=dbg OBJ_DIR="$commit_hash_dir/o" CXX="$fake_cxx" COMMIT_HASH=first \
+  "$commit_hash_cli_object" "$commit_hash_main_object" \
+  "$commit_hash_control_object" >/dev/null
+printf 'commit-hash-same=%s\n' "$(wc -l < "$commit_hash_log" | tr -d ' ')"
+
+FAKE_CXX_LOG=$commit_hash_log make -C ../src --no-print-directory \
+  -j1 MODE=dbg OBJ_DIR="$commit_hash_dir/o" CXX="$fake_cxx" COMMIT_HASH=second \
+  "$commit_hash_cli_object" "$commit_hash_main_object" \
+  "$commit_hash_control_object" >/dev/null
+printf 'commit-hash-changed=%s\n' "$(wc -l < "$commit_hash_log" | tr -d ' ')"
+tail -2 "$commit_hash_log" | while IFS= read -r rebuilt_object; do
+  printf 'commit-hash-rebuilt=%s\n' "${rebuilt_object##*/}"
+done

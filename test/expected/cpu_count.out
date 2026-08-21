@@ -12,3 +12,8 @@ windows-make-uses-all
 windows-invalid-count-clean
 windows-dry-run-clean
 default-make-builds-shell
+commit-hash-first=3
+commit-hash-same=3
+commit-hash-changed=5
+commit-hash-rebuilt=Cli.o
+commit-hash-rebuilt=Main.o

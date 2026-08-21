@@ -364,6 +364,28 @@ endif
 # object the rules below would otherwise name as the default goal.
 .DEFAULT_GOAL := kosh
 
+COMMIT_HASH_STAMP := $(OBJ_DIR)/.commit-hash
+COMMIT_HASH_OBJECTS := \
+	$(OBJ_DIR)/Cli.o \
+	$(OBJ_DIR)/Main.o
+STORED_COMMIT_HASH := $(shell cat $(COMMIT_HASH_STAMP) 2>/dev/null)
+
+force_commit_hash:
+
+force_commit_hash_objects:
+
+ifneq ($(STORED_COMMIT_HASH),$(COMMIT_HASH))
+$(COMMIT_HASH_OBJECTS): force_commit_hash_objects
+endif
+
+$(COMMIT_HASH_STAMP): force_commit_hash | dirs
+	current_commit_hash='$(COMMIT_HASH)'; \
+	if test ! -f $@ || test "$$(cat $@)" != "$$current_commit_hash"; then \
+		printf '%s\n' "$$current_commit_hash" > $@; \
+	fi
+
+$(COMMIT_HASH_OBJECTS): $(COMMIT_HASH_STAMP)
+
 # Every object is built into $(OBJ_DIR), so its directory tree must exist first.
 # The order-only prerequisite creates it before any compile, so a plain
 # `make MODE=rel` from a clean tree works without first running the kosh target.
@@ -453,6 +475,6 @@ clean:
 	rm -rf ../zig-out
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
-.PHONY: dirs kosh install uninstall tidy fmt clean
+.PHONY: dirs force_commit_hash force_commit_hash_objects kosh install uninstall tidy fmt clean
 
 -include $(DEPS)
