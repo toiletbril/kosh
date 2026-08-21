@@ -2,10 +2,23 @@
 --marker-option
 == and was forked:
 forked
-== a command not on the allowlist is never forked, even when trusted:
+== a generic command in a trusted directory offers its --help options:
+--marker-option
+== and was forked:
+forked
+== a generic command offers parsed subcommands:
+sync
+== a generic subcommand offers its own flags:
+--force
+== a writable command in a trusted directory is never forked:
 == and was never forked:
 not forked
+== oversized help output is rejected before trailing flags:
+attempted once
 == an allowlisted command in a world-writable directory is never forked:
+== and was never forked:
+not forked
+== a generic command in a world-writable directory is never forked:
 == and was never forked:
 not forked
 == a timed out help command is attempted once:

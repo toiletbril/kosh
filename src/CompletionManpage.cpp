@@ -24,6 +24,16 @@ struct help_entry
   String description;
 };
 
+static fn parse_help_subcommands(StringView text, StringView command) throws
+    -> ArrayList<help_entry>;
+static fn manpage_subcommands_for(StringView page_name, StringView command,
+                                  EvalContext &context) throws
+    -> const ArrayList<help_entry> &;
+static fn is_known_help_subcommand(ProgramResolver &resolver,
+                                   StringView command,
+                                   StringView subcommand_prefix,
+                                   StringView word) throws -> bool;
+
 static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
                                     StringView token,
                                     StringMap<String> &descriptions) throws
@@ -41,6 +51,8 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
 
 /* An empty list is cached too, so a command with no manpage is not retried. */
 static StringMap<ArrayList<help_entry>> MANPAGE_OPTION_CACHE{heap_allocator()};
+static StringMap<ArrayList<help_entry>> MANPAGE_SUBCOMMAND_CACHE{
+    heap_allocator()};
 
 static fn manpage_name_for(StringView command) throws -> String
 {
@@ -61,12 +73,14 @@ static bool is_man_subcommand_index_built = false;
 /* A fork that runs past this budget is killed and caches the empty string, so
    the prompt never freezes and the command is not forked again this session. */
 static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
+static constexpr usize HELP_OUTPUT_LIMIT = 4 * 1024 * 1024;
 
 static fn
 capture_completion_program_output(const ArrayList<String> &arguments) wontthrow
     -> Maybe<String>
 {
-  return os::capture_program_output(arguments, HELP_FORK_TIMEOUT_NANOS);
+  return os::capture_program_output(arguments, HELP_FORK_TIMEOUT_NANOS,
+                                    HELP_OUTPUT_LIMIT);
 }
 
 /* An empty $MANPATH segment stands for the system defaults at that position,
@@ -392,7 +406,8 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
    keystroke never scans a directory or reads a page. */
 fn complete_from_man_subcommands(StringView line, StringView token,
                                  usize token_start, completion_mode mode,
-                                 EvalContext &context) throws
+                                 EvalContext &context,
+                                 StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -414,17 +429,43 @@ fn complete_from_man_subcommands(StringView line, StringView token,
     build_man_subcommand_index(context.get_program_resolver());
   }
 
-  let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
-  if (subcommands == nullptr || subcommands->is_empty()) return None;
+  if (!for_listing) {
+    let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
+    if (subcommands == nullptr) return None;
+    let matches = ArrayList<String>{heap_allocator()};
+    for (let const &subcommand : *subcommands)
+      if (subcommand.view().starts_with(token) &&
+          man_subcommand_page_is_valid(command, subcommand.view(), false))
+        matches.push(String{subcommand.view()});
+    if (matches.is_empty()) return None;
+    return matches;
+  }
 
-  /* Only the token matches are validated, so a typo reads no page. */
   let matches = ArrayList<String>{heap_allocator()};
-  for (let const &subcommand : *subcommands)
-    if (subcommand.view().starts_with(token) &&
-        man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
-    {
-      matches.push(String{subcommand.view()});
-    }
+  let seen = HashSet{heap_allocator()};
+  if (let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
+      subcommands != nullptr)
+    for (let const &subcommand : *subcommands)
+      if (subcommand.view().starts_with(token) &&
+          man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
+      {
+        matches.push(String{subcommand.view()});
+        seen.add(subcommand.view());
+      }
+
+  let const page_name = manpage_name_for(command);
+  if (MAN_PAGE_FILE_PATHS.find(page_name.view()) != nullptr) {
+    let const &subcommands =
+        manpage_subcommands_for(page_name.view(), command, context);
+    for (let const &subcommand : subcommands)
+      if (subcommand.name.view().starts_with(token)) {
+        if (seen.add(subcommand.name.view()))
+          matches.push(String{subcommand.name.view()});
+        if (!subcommand.description.is_empty())
+          descriptions.set(subcommand.name.view(),
+                           String{subcommand.description.view()});
+      }
+  }
   LOG(Debug, "%zu subcommands of '%.*s' match token '%.*s'", matches.count(),
       static_cast<int>(command.length), command.data,
       static_cast<int>(token.length), token.data);
@@ -564,7 +605,7 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
   return argument.has_value() && StringView{*argument} != StringView{"--help"};
 }
 
-static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
+static fn command_path_is_trusted(StringView absolute_path) throws -> bool;
 
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
@@ -572,29 +613,24 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   if (let const cached = MANPAGE_OPTION_CACHE.find(page_name);
       cached != nullptr)
     return *cached;
-  let parsed_options = ArrayList<help_entry>{heap_allocator()};
-  /* man forks only when it resolves into a trusted directory, so an alias or a
-     planted man is never run. The resolved absolute path runs in place of the
-     bare name so PATH cannot reresolve it. */
-  let const man_paths = context.get_program_resolver().search(
-      "man", ProgramResolver::SearchMode::First,
-      ProgramResolver::Requirement::Runnable,
-      ProgramResolver::CachePolicy::Bypass);
-  if (man_paths.is_empty() ||
-      !command_directory_is_trusted(man_paths[0].text().view()))
-  {
-    LOG(Debug,
-        "skipping the man fork for '%.*s' because man is absent or untrusted",
-        static_cast<int>(page_name.length), page_name.data);
-    return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
-  }
-  let argv = ArrayList<String>{heap_allocator()};
-  argv.push(String{man_paths[0].text().view()});
-  argv.push(String{page_name});
-  if (Maybe<String> page = capture_completion_program_output(argv);
-      page.has_value())
-    parsed_options = parse_manpage_option_entries(page->view());
+  let const text = manpage_text_for(page_name, context);
+  let parsed_options = parse_manpage_option_entries(text);
   return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
+}
+
+static fn manpage_subcommands_for(StringView page_name, StringView command,
+                                  EvalContext &context) throws
+    -> const ArrayList<help_entry> &
+{
+  let key = String{page_name};
+  key += "\n";
+  key += command;
+  if (let const cached = MANPAGE_SUBCOMMAND_CACHE.find(key.view());
+      cached != nullptr)
+    return *cached;
+  let const text = manpage_text_for(page_name, context);
+  let parsed_subcommands = parse_help_subcommands(text, command);
+  return *MANPAGE_SUBCOMMAND_CACHE.set(key.view(), steal(parsed_subcommands));
 }
 
 /* An empty entry records a page that is absent or untrusted, so the fork
@@ -613,7 +649,7 @@ fn manpage_text_for(StringView page_name, EvalContext &context) throws
       ProgramResolver::Requirement::Runnable,
       ProgramResolver::CachePolicy::Bypass);
   if (man_paths.is_empty() ||
-      !command_directory_is_trusted(man_paths[0].text().view()))
+      !command_path_is_trusted(man_paths[0].text().view()))
   {
     LOG(Debug,
         "skipping the man fork for '%.*s' because man is absent or untrusted",
@@ -685,8 +721,21 @@ fn complete_from_manpage(StringView line, StringView token,
     let combined = String{command};
     combined.push('-');
     combined.append(*subcommand_word);
-    if (MAN_PAGE_FILE_PATHS.find(combined.view()) != nullptr)
+    if (MAN_PAGE_FILE_PATHS.find(combined.view()) != nullptr) {
       page_name = steal(combined);
+    } else {
+      let is_known_man_subcommand = false;
+      for (let const &entry :
+           manpage_subcommands_for(page_name.view(), command, context))
+        if (entry.name.view() == *subcommand_word) {
+          is_known_man_subcommand = true;
+          break;
+        }
+      if (is_known_man_subcommand ||
+          is_known_help_subcommand(context.get_program_resolver(), command, {},
+                                   *subcommand_word))
+        return None;
+    }
   }
 
   let const &options = manpage_options_for(page_name.view(), context);
@@ -706,28 +755,40 @@ static HashSet HELP_PARSED{heap_allocator()};
 
 /* The check is permission-based, so a user tool directory like ~/.cargo/bin is
    trusted while a world-writable one like /tmp is not. */
-static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
+static fn command_path_is_trusted(StringView absolute_path) throws -> bool
 {
-  return os::directory_is_trusted_for_exec(Path{absolute_path}.parent());
+  if (!os::directory_is_trusted_for_exec(Path{absolute_path}.parent()))
+    return false;
+#if !defined _WIN32
+  os::file_status status;
+  if (!os::stat_path_following(absolute_path, status)) return false;
+  let const is_owner_trusted =
+      status.owner_id == 0 ||
+      status.owner_id == static_cast<u32>(os::get_effective_user_id());
+  if (!is_owner_trusted || (status.mode & 0022u) != 0) return false;
+#endif
+  return true;
 }
 
-/* The fork passes two gates, the command is on the allowlist and resolves into
-   a trusted directory. The resolved absolute path runs as the only argv entry,
-   not through a shell, so no alias shadows it. */
 static fn help_text_for(ProgramResolver &resolver, StringView command,
-                        StringView subcommand = {}) throws -> String
+                        StringView subcommand = {},
+                        bool should_use_default_argument = false) throws
+    -> String
 {
   let text = String{heap_allocator()};
-  let help_argument = HELP_ALLOWLIST.find(command);
+  let help_argument = StringView{};
+  if (let const configured_argument = HELP_ALLOWLIST.find(command);
+      configured_argument.has_value())
+    help_argument = StringView{*configured_argument};
+  else if (should_use_default_argument)
+    help_argument = StringView{"--help"};
+  if (help_argument.is_empty()) return text;
+
   let const paths = resolver.search(command, ProgramResolver::SearchMode::First,
                                     ProgramResolver::Requirement::Runnable,
                                     ProgramResolver::CachePolicy::Bypass);
-  if (help_argument.has_value() && !paths.is_empty() &&
-      command_directory_is_trusted(paths[0].text().view()))
-  {
-    LOG(Debug,
-        "the help allowlist lists '%.*s' and the directory is trusted, "
-        "preparing the --help fork",
+  if (!paths.is_empty() && command_path_is_trusted(paths[0].text().view())) {
+    LOG(Debug, "the directory for '%.*s' is trusted, preparing the help fork",
         static_cast<int>(command.length), command.data);
     /* argv is the absolute path, then the subcommand chain split on spaces,
        then the help argument split on spaces, so git remote add runs as path,
@@ -736,7 +797,7 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
     argv.push(String{paths[0].text().view()});
     subcommand.for_each_ascii_whitespace_word(
         [&](StringView word) throws { argv.push(String{word}); });
-    StringView{*help_argument}.for_each_ascii_whitespace_word(
+    help_argument.for_each_ascii_whitespace_word(
         [&](StringView word) throws { argv.push(String{word}); });
     LOG(Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
@@ -750,18 +811,16 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
       LOG(Debug, "the --help fork for '%.*s' produced no output",
           static_cast<int>(command.length), command.data);
     }
-  } else if (help_argument.has_value() && paths.is_empty()) {
-    LOG(Debug,
-        "the help allowlist lists '%.*s' but the program is not on the "
-        "path, skipping the --help fork",
+  } else if (paths.is_empty()) {
+    LOG(Debug, "the program '%.*s' is not on the path, skipping the help fork",
         static_cast<int>(command.length), command.data);
-  } else if (help_argument.has_value()) {
+  } else {
     LOG(Debug,
-        "the help allowlist lists '%.*s' but the directory '%.*s' is "
-        "not trusted, skipping the --help fork",
-        static_cast<int>(command.length), command.data,
+        "the directory '%.*s' for '%.*s' is not trusted, skipping the help "
+        "fork",
         static_cast<int>(paths[0].text().view().length),
-        paths[0].text().view().data);
+        paths[0].text().view().data, static_cast<int>(command.length),
+        command.data);
   }
   return text;
 }
@@ -808,30 +867,37 @@ static fn parse_help_option_entries(StringView text) throws
   return entries;
 }
 
-static fn parse_help_subcommands(StringView text, StringView command) throws
-    -> ArrayList<help_entry>;
-
-static fn help_cache_key(StringView command, StringView subcommand) throws
-    -> String
+static fn help_cache_key(ProgramResolver &resolver, StringView command,
+                         StringView subcommand) throws -> String
 {
-  if (subcommand.is_empty()) return String{command};
   let key = String{command};
-  key += " ";
-  key += subcommand;
+  if (!subcommand.is_empty()) {
+    key += " ";
+    key += subcommand;
+  }
+  let const paths = resolver.search(command, ProgramResolver::SearchMode::First,
+                                    ProgramResolver::Requirement::Runnable,
+                                    ProgramResolver::CachePolicy::Bypass);
+  if (!paths.is_empty()) {
+    key += "\n";
+    key += paths[0].text().view();
+  }
   return key;
 }
 
 /* HELP_PARSED gates the fork so a second tab reads the parsed caches. */
 static fn ensure_help_parsed(ProgramResolver &resolver, StringView command,
-                             StringView subcommand = {}) throws -> void
+                             StringView subcommand = {}) throws -> String
 {
-  let const key = help_cache_key(command, subcommand);
-  if (HELP_PARSED.contains(key.view())) return;
-  let const text = help_text_for(resolver, command, subcommand);
-  HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(text.view()));
-  HELP_SUBCOMMAND_CACHE.set(key.view(),
-                            parse_help_subcommands(text.view(), command));
-  HELP_PARSED.add(key.view());
+  let const key = help_cache_key(resolver, command, subcommand);
+  if (!HELP_PARSED.contains(key.view())) {
+    let const text = help_text_for(resolver, command, subcommand, true);
+    HELP_OPTION_CACHE.set(key.view(), parse_help_option_entries(text.view()));
+    HELP_SUBCOMMAND_CACHE.set(key.view(),
+                              parse_help_subcommands(text.view(), command));
+    HELP_PARSED.add(key.view());
+  }
+  return key;
 }
 
 static fn help_entries_for(StringMap<ArrayList<help_entry>> &cache,
@@ -839,8 +905,8 @@ static fn help_entries_for(StringMap<ArrayList<help_entry>> &cache,
                            StringView subcommand = {}) throws
     -> const ArrayList<help_entry> &
 {
-  ensure_help_parsed(resolver, command, subcommand);
-  return *cache.find(help_cache_key(command, subcommand).view());
+  let const key = ensure_help_parsed(resolver, command, subcommand);
+  return *cache.find(key.view());
 }
 
 static fn help_options_for(ProgramResolver &resolver, StringView command,

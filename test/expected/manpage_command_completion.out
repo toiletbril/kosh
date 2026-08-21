@@ -1,0 +1,11 @@
+== root flags from the command manpage:
+--alpha
+== subcommands from the command manpage:
+sync
+== flags from the subcommand manpage:
+--force
+--format
+== subcommand flag prefix filtering:
+--force
+== a subcommand without a manpage falls through to its own help:
+--force-status

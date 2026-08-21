@@ -102,7 +102,8 @@ fn manpage_text_for(StringView page_name, EvalContext &context) throws
 fn help_text_of(StringView command, EvalContext &context) throws -> StringView;
 fn complete_from_man_subcommands(StringView line, StringView token,
                                  usize token_start, completion_mode mode,
-                                 EvalContext &context) throws
+                                 EvalContext &context,
+                                 StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_manpage(StringView line, StringView token,
                          completion_mode mode, EvalContext &context,

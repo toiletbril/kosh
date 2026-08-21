@@ -258,8 +258,9 @@ fn shell_has_controlling_terminal() wontthrow -> bool
   return isatty(STDIN_FILENO) == 1;
 }
 
-fn capture_program_output(const ArrayList<String> &argv,
-                          u64 timeout_nanos) wontthrow -> Maybe<String>
+fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos,
+                          usize maximum_output_length) wontthrow
+    -> Maybe<String>
 {
   if (argv.is_empty()) return None;
 
@@ -313,6 +314,7 @@ fn capture_program_output(const ArrayList<String> &argv,
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
   bool was_timed_out = false;
+  bool was_output_rejected = false;
   loop
   {
     const u64 now_nanos = monotonic_nanos();
@@ -345,15 +347,21 @@ fn capture_program_output(const ArrayList<String> &argv,
       break;
     }
     if (read_count == 0) break;
+    if (static_cast<usize>(read_count) >
+        maximum_output_length - captured.length())
+    {
+      was_output_rejected = true;
+      break;
+    }
     captured.append(StringView{buffer, static_cast<usize>(read_count)});
   }
   close(read_end);
 
-  if (was_timed_out) signal_process(child_pid, SIGKILL);
+  if (was_timed_out || was_output_rejected) signal_process(child_pid, SIGKILL);
   int wait_status = 0;
   waitpid(child_pid, &wait_status, 0);
 
-  if (was_timed_out) return None;
+  if (was_timed_out || was_output_rejected) return None;
   return captured;
 }
 
