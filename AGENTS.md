@@ -196,105 +196,59 @@ reuse.
 
 ## Finishing a change
 
-Project workflow mistakes are recorded in [MISTAKES.md](MISTAKES.md). Every
-mistake recorded there must have a prevention rule here.
-
-Source changes use the approved patch or edit tool. Shell text commands inspect
-files and output only. Offer parallel read-only agents before repository
-research. Read the matching guidance file before an implementation or prose
-edit. Confirm that an edit changes its target before calling the edit tool.
-Avoid repeating a read after the harness reports that the file is unchanged.
-Reuse current guidance file results while they remain available in the conversation.
-Compare the complete source and replacement text before calling the edit tool.
-Search for the smallest unique exact segment before editing a long golden.
-Validate a shell probe encoder with a small payload before sending a large
-source file. Interactive probes use an available bounded runner. Complete a
-type migration across every use before compiling it. Print the required change
-table after each edit batch. Use the dedicated edit tool when the shell has no
-approved patch command. Background agent results and progress arrive through
-completion notifications and `SendMessage`. Never pass agent identifiers to
-`TaskOutput`, including while an agent is running. A continuation must reread
-the matching guidance before its first edit and offer parallel read-only agents
-before restarting repository research. Do not retry an invalid task lookup
-after the notification has reported the result. Broad searches must use
-existing paths or directory globs. Do not inspect or edit code
-covered by an active read only agent. Do not inspect or edit tests covered by an
-active read only agent. Teammate replies require a concrete
-reachable agent name or identifier. Agent launches use a type listed by the
-current session. Performance comparisons use the release binary explicitly.
-Locate a focused test target before invoking it from the repository root.
-Identify the input type before selecting its focused test target.
-Use a bounded temporary path and verify cleanup before a workload probe.
-Check active agent ownership before a test edit. Never poll a running agent
-through `TaskOutput`. Read the exact local segment before editing an unverified
-file area. Independent probes run as separate commands after their paths are
-resolved. Read only shell probes use the simplest command form that preserves
-the input. Command options precede the path separator. Read only reviews stream
-inspection output without creating files. Large patches use a raw template
-string or separate small edit calls. Patch wrappers avoid delimiter characters
-contained in the patch text.
-Compile migrations must check every constructor input and conditional result
-type before the build. Mixed file patches must use separately verified exact
-anchors.
-Every borrowed view must retain its owning local for the complete use span.
-Multi-file patches must be split when a deletion-only hunk ends a file change.
-Static proof helpers must match the exact evidence level required by the
-behavior.
-Control-flow changes must verify operator ownership in the printed AST. Every
-failed mixed patch must be followed only by single-file patches.
-Transcript probes must limit both matched records and output bytes before
-reading content. Active review ownership must be resolved before any
-overlapping inspection.
-Every SourceLocation subspan must prove both offset and length bounds.
-Control-flow merge probes must use a nonconstant condition when they need
-branch uncertainty. Exact patch anchors must be copied from the latest
-inspection.
-Language server probes must complete initialize before any document request.
-Shell search patterns containing command syntax must use single quotes.
-Catalog availability checks must use established behavior predicates.
-Fallback executable probes must print the selected path.
-Guidance probes must resolve available paths before reading several files.
-Content-driven build invalidation must have an explicit dependency when equal
-timestamps are possible. Platform timing probes must verify the host tool
-interface before a long run. Build verification must compare embedded version
-metadata with the current commit. Protocol workload probes must redirect the
-complete emitter group. Asynchronous workload wrappers must capture and print
-the status after `wait`. Cwd-sensitive test scripts must run through their
-owning harness or from their declared working directory. Serial submake probes
-must clear inherited jobserver flags before they set their own job count.
-Sampling reports must use a validated regular output file and capture the target
-status separately. Long workload probes must use an operating-system timeout
-because tool yielding does not stop them. Profiling harnesses must use the exact
-resolved interpreter path. Protocol profilers must syntax and scope check every
-reporting path on a small payload before the full input. A macOS workload binary
-must be force signed after every release relink.
-Container migrations must verify which overload each const member actually
-selects before compiling.
-Profiler report cleanup must validate a nonempty exact path and use the system
-removal command without force.
-Commit subject length must be checked before creating the commit.
-Golden paths must be resolved from the owning test name before inspection.
-Rejected temporary cleanup must move the validated exact path recoverably to
-Trash.
-An optional tool path must be checked with an explicit branch before
-invocation.
-Regression fixtures must keep diagnostic control names distinct from the names
-under test.
-Logging edits must count every format placeholder and argument before the patch
-is applied.
-Adapter tasks must trace the current shared call path before changing the shared
-owner.
-Debug-only driver probes must verify the debug artifact before invocation.
-Object-shape changes must update every exact capability assertion before a
-golden refill.
-Language server configuration changes must verify that the resolved command is
-executable and that the client attaches.
-Debug process traces must run to completion before their output is narrowed.
-Completion tests after source edits must rebuild the debug binary first.
-LeakSanitizer probes must verify host support before invocation.
-
-Format the changed files with the owning project tool. Run focused tests after a
-meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect
-the complete diff. Confirm that README.md remains untouched without explicit
-approval. Commit completed work and never push or create a pull request or issue
-without an explicit request.
+- Record workflow mistakes in [MISTAKES.md](MISTAKES.md). Add one durable
+  prevention rule here for each distinct cause.
+- Offer parallel read-only agents before repository research. Reapply this gate
+  after a continuation.
+- Read and state the matching guidance before each planning, editing, review,
+  or commit phase. Reuse a current reading until its contents may have changed.
+- Use the approved edit tool for source and text changes. Shell commands may
+  inspect files and output only.
+- Resolve files, guidance, tools, interpreters, and test targets before using
+  them. Optional tools require an explicit availability branch.
+- Use the simplest bounded probe that preserves the input. Quote command syntax
+  safely, place options before path separators, and run independent probes
+  independently.
+- Limit transcript searches by record count and output bytes. Read-only reviews
+  must stream results without creating artifacts.
+- Confirm that each replacement differs, and copy exact anchors from the latest
+  inspection. Split large, mixed, or previously failed patches into small
+  verified edits.
+- Print the required change table after each edit batch.
+- Complete type and container migrations across every use before compiling.
+  Verify overloads, constructor inputs, conditional result types, and old API
+  references.
+- Keep borrowed views within the lifetime of their owners. Prove source spans,
+  offsets, lengths, and static evidence at the contract required by the code.
+- Inspect the printed syntax tree before changing control-flow ownership. Use
+  nonconstant fixtures when testing uncertain branches.
+- Search for an existing shared path before changing a shared owner. Adapter
+  changes must trace their current delegate first.
+- Keep agent scopes disjoint. Do not inspect or edit a scope under active
+  review, and use only the current session's supported coordination methods.
+- Locate the owning runner and input type before running a focused test. Run
+  cwd-sensitive scripts through that runner.
+- Rebuild the required debug, release, or coverage artifact before testing it.
+  Verify its mode and embedded revision when build invalidation matters.
+- Regenerate only the owning goldens, read every changed line, and update exact
+  shape assertions with the behavior they cover.
+- Use distinct fixture names that cannot trigger unrelated diagnostics. Check
+  every logging placeholder against its argument.
+- Validate protocol encoders and profilers on a small payload. Language server
+  probes must initialize first, redirect the complete emitter, drain output,
+  and preserve the final process status.
+- Bound interactive and long-running workloads with an operating-system
+  timeout. Validate report paths and all final reporting branches before an
+  expensive run.
+- Verify platform tool interfaces and sanitizer support before invoking them.
+  Force-sign every relinked macOS workload binary.
+- Use a bounded temporary directory. Validate every cleanup target, use the
+  system removal command without force, and move rejected cleanup targets to
+  Trash.
+- Use the release binary for performance comparisons. Clear inherited jobserver
+  flags before forcing serial submakes.
+- Check commit subject length and the active git identity before committing.
+- Format changed files, run focused and full tests, inspect regenerated goldens
+  and the complete diff, run `git diff --check`, and confirm that README.md is
+  untouched. Commit completed work, and never push or create external artifacts
+  without an explicit request.
