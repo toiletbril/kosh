@@ -1424,11 +1424,6 @@ smart-case and subsequence matches. An empty command position includes
 keywords, builtins, functions, aliases, koshkit utilities, and programs from
 PATH. An exact prefix ranks before a subsequence match.
 .PP
-An explicit Tab reads flags and subcommands from trusted command help output
-and section-one manual pages. A recognized subcommand uses its own help output
-or manual page when available. Help programs run with a one-second limit, and
-output beyond 4 MiB is rejected.
-.PP
 Completion handles quoted separators, command substitutions, and here-document
 bodies when it selects the command segment at the cursor. Quoted, escaped,
 variable, and tilde directory prefixes retain their typed form. An explicit Tab

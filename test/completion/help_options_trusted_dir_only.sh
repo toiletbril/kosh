@@ -1,5 +1,11 @@
+# Option completion from a command's --help text passes two gates. The command
+# is on kosh's allowlist of commands safe to fork, and it resolves into a
+# directory the current user or root owns that is not writable by group or
+# other. A fake binary named for an allowlisted command (act) drives the
+# probe deterministically. The same binary under a name kosh does not recognize,
+# or in a world-writable directory, is never forked.
 workspace=$(mktemp -d) || exit 1
-trap 'test -n "$workspace" && /bin/rm -rf "$workspace"' EXIT
+trap 'test -n "$workspace" && rm -rf "$workspace"' EXIT
 trusted=$workspace/trusted
 untrusted=$workspace/untrusted
 marker=$workspace/marker
@@ -11,33 +17,13 @@ write_probe() {
   cat > "$1" <<'SH'
 #!/bin/sh
 echo forked >> "$KOSH_HELP_MARKER"
-if [ "$1" = "sync" ] && [ "$2" = "--help" ]; then
-  echo "  --force   force synchronization"
-  exit
-fi
-if [ "$1" != "--help" ]; then exit; fi
-cat <<'HELP'
-COMMANDS
-  sync   synchronize state
-
-OPTIONS
-  --marker-option   a probe option
-HELP
+echo "  --marker-option   a probe option"
 SH
   chmod +x "$1"
 }
 write_probe "$trusted/act"
 write_probe "$trusted/helpprobe"
-write_probe "$trusted/writableprobe"
 write_probe "$untrusted/act"
-write_probe "$untrusted/helpprobe"
-chmod 777 "$trusted/writableprobe"
-printf '%s\n' \
-  '#!/bin/sh' \
-  'echo attempted >> "$KOSH_HELP_MARKER"' \
-  'dd if=/dev/zero bs=1048576 count=5 2>/dev/null' \
-  'echo "  --late-option  must not be parsed"' > "$trusted/noisyprobe"
-chmod +x "$trusted/noisyprobe"
 
 rm -f "$marker"
 echo "== allowlisted command in a trusted directory offers its --help options:"
@@ -46,36 +32,14 @@ echo "== and was forked:"
 if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 
 rm -f "$marker"
-echo "== a generic command in a trusted directory offers its --help options:"
+echo "== a command not on the allowlist is never forked, even when trusted:"
 PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'helpprobe --mark' </dev/null
-echo "== and was forked:"
-if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
-
-echo "== a generic command offers parsed subcommands:"
-PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'helpprobe sy' </dev/null
-echo "== a generic subcommand offers its own flags:"
-PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'helpprobe sync --for' </dev/null
-
-rm -f "$marker"
-echo "== a writable command in a trusted directory is never forked:"
-PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'writableprobe --mark' </dev/null
 echo "== and was never forked:"
 if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
-
-rm -f "$marker"
-echo "== oversized help output is rejected before trailing flags:"
-PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'noisyprobe --late' </dev/null
-test "$(wc -l < "$marker")" -eq 1 && echo "attempted once"
 
 rm -f "$marker"
 echo "== an allowlisted command in a world-writable directory is never forked:"
 PATH="$untrusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'act --mark' </dev/null
-echo "== and was never forked:"
-if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
-
-rm -f "$marker"
-echo "== a generic command in a world-writable directory is never forked:"
-PATH="$untrusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'helpprobe --mark' </dev/null
 echo "== and was never forked:"
 if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
 

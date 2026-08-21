@@ -167,8 +167,7 @@ WINDOWS_SKIPPED_COMPLETION_NAMES := \
 	completion_help_options_trusted_dir_only \
 	completion_help_subcommand_second_level \
 	completion_help_subcommand_third_level \
-	completion_help_subcommands_no_colon \
-	completion_manpage_command_completion
+	completion_help_subcommands_no_colon
 
 $(WINDOWS_SKIPPED_COMPLETION_NAMES):
 	@printf "	%-64s skipped, needs a POSIX helper executable\n" "$@"

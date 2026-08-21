@@ -1078,8 +1078,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
         from_stage = complete_from_tools_with_targets(
             line, stage_token, token_start, mode, context);
       if (!from_stage.has_value())
-        from_stage = complete_from_man_subcommands(
-            line, stage_token, token_start, mode, context, descriptions);
+        from_stage = complete_from_man_subcommands(line, stage_token,
+                                                   token_start, mode, context);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, stage_token, mode, context,
                                            descriptions);

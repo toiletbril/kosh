@@ -946,9 +946,8 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
    bits. */
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool;
 
-fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos,
-                          usize maximum_output_length = SIZE_MAX) wontthrow
-    -> Maybe<String>;
+fn capture_program_output(const ArrayList<String> &argv,
+                          u64 timeout_nanos) wontthrow -> Maybe<String>;
 
 /* Ignores SIGTTOU across the change. A no-op without a controlling terminal. */
 fn give_controlling_terminal_to(process p) wontthrow -> void;

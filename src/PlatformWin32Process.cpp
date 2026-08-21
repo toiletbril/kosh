@@ -24,9 +24,8 @@ namespace koshka {
 
 namespace os {
 
-fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos,
-                          usize maximum_output_length) wontthrow
-    -> Maybe<String>
+fn capture_program_output(const ArrayList<String> &argv,
+                          u64 timeout_nanos) wontthrow -> Maybe<String>
 {
   if (argv.is_empty()) return None;
 
@@ -68,7 +67,6 @@ fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos,
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
   bool was_timed_out = false;
-  bool was_output_rejected = false;
   loop
   {
     DWORD available_byte_count = 0;
@@ -91,12 +89,6 @@ fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos,
       {
         return None;
       }
-      if (static_cast<usize>(read_count) >
-          maximum_output_length - captured.length())
-      {
-        was_output_rejected = true;
-        break;
-      }
       captured.append(StringView{buffer, static_cast<usize>(read_count)});
       continue;
     }
@@ -113,7 +105,7 @@ fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos,
     Sleep(1);
   }
 
-  if (was_timed_out || was_output_rejected) {
+  if (was_timed_out) {
     TerminateProcess(process_info.hProcess, 1);
     WaitForSingleObject(process_info.hProcess, INFINITE);
     return None;
