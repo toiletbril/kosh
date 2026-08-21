@@ -245,7 +245,8 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
 } > "$directory/input"
 
 output=$(MANROOT="$directory/man" MANPATH="$directory/man" \
-  PATH="$directory/bin:$PATH" "$BIN" --language-server < "$directory/input")
+  env "$TEST_PATH_ENVIRONMENT_NAME=$directory/bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+  "$BIN" --language-server < "$directory/input")
 status=$?
 printf 'status=%s\n' "$status"
 check_contains initialize '"positionEncoding":"utf-8"'
@@ -423,7 +424,8 @@ carriage_return=$(printf '\r')
   frame '{"jsonrpc":"2.0","id":202,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/path-refresh.sh"},"position":{"line":0,"character":8}}}'
   frame '{"jsonrpc":"2.0","id":203,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
-} | PATH="$path_refresh_bin:$PATH" "$BIN" --language-server | {
+} | env "$TEST_PATH_ENVIRONMENT_NAME=$path_refresh_bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
+  "$BIN" --language-server | {
   while read_server_frame; do
     case $server_frame_body in
     *'"id":201,'*)

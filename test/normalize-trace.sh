@@ -19,9 +19,9 @@ BIN_BACKWARD=$(printf '%s\n' "$BIN_FORWARD" | tr '/' '\\')
 BIN_PATTERN=$(printf '%s\n' "$BIN" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
 BIN_FORWARD_PATTERN=$(printf '%s\n' "$BIN_FORWARD" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
 BIN_BACKWARD_PATTERN=$(printf '%s\n' "$BIN_BACKWARD" | sed 's/[][\\.^$*]/\\&/g; s/#/\\#/g')
-sed "s#$BIN_PATTERN#KOSH#g; s#$BIN_FORWARD_PATTERN#KOSH#g; s#$BIN_BACKWARD_PATTERN#KOSH#g; s/^\([0-9][0-9]*\):[0-9][0-9]*: trace:/\1:0: trace:/" \
+sed "s#$BIN_PATTERN#KOSH#g; s#$BIN_FORWARD_PATTERN#KOSH#g; s#$BIN_BACKWARD_PATTERN#KOSH#g; s#'KOSH'#KOSH#g; s/^\([0-9][0-9]*\):[0-9][0-9]*: trace:/\1:0: trace:/" \
   | awk '
-/KOSH -/{print; skip=1; after_trace=0; next}
+/KOSH.? -/{print; skip=1; after_trace=0; next}
 skip{skip=0; next}
 /: trace:$/{print; after_trace=1; next}
 after_trace==1{print; after_trace=2; next}

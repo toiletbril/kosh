@@ -583,10 +583,6 @@ struct saved_descriptor
      closed in a duplication like >&5 with fd 5 closed. The caller throws a
      located error and the restore puts shell_fd back unchanged. */
   bool is_dup2_ok{true};
-  /* On Windows, the handle this redirection installed in the standard-handle
-     slot, so restore closes that exact handle rather than whatever the slot
-     holds at restore time. Unused on POSIX, which restores by dup2. */
-  descriptor replacement{KOSH_INVALID_FD};
 };
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow

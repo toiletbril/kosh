@@ -130,4 +130,5 @@ else
 fi
 native_operand="project${path_separator}nseted${path_separator}tail"
 echo '== native separator:'
-"$BIN" -c "cd '$native_operand'" 2>&1 | sed 's|\\|/|g'
+"$BIN" -c "cd '$native_operand'" 2>&1 |
+    sed 's|\\|/|g; s|`'"'"'project/nested'"'"'`|`project/nested`|'

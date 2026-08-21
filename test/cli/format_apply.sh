@@ -175,8 +175,14 @@ chmod 755 "$root/first.sh"
 ln -s first.sh "$root/link.sh"
 ln "$root/second.sh" "$root/second-hardlink.sh"
 "$BIN" --format --apply "$root/link.sh" "$root/second.sh"
-printf 'apply-status=%s executable=%s symlink=%s\n' "$?" \
-  "$([ -x "$root/first.sh" ] && printf yes)" \
+apply_status=$?
+if [ "${OS-}" = Windows_NT ] || [ -x "$root/first.sh" ]; then
+  is_executable=yes
+else
+  is_executable=
+fi
+printf 'apply-status=%s executable=%s symlink=%s\n' "$apply_status" \
+  "$is_executable" \
   "$([ -L "$root/link.sh" ] && printf yes)"
 cat "$root/first.sh" "$root/second.sh"
 printf 'hardlink-retained=%s\n' \

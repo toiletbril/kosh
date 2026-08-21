@@ -220,6 +220,15 @@ static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
   }
 }
 
+static fn standard_handle_is_referenced(os::descriptor handle) wontthrow -> bool
+{
+  static constexpr DWORD STANDARD_HANDLE_SLOTS[] = {
+      STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+  for (let const slot : STANDARD_HANDLE_SLOTS)
+    if (GetStdHandle(slot) == handle) return true;
+  return false;
+}
+
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor
 {
@@ -237,9 +246,15 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     return result;
   }
 
-  result.saved = GetStdHandle(*slot);
-  result.was_open =
-      result.saved != nullptr && result.saved != INVALID_HANDLE_VALUE;
+  let const original = GetStdHandle(*slot);
+  result.was_open = original != nullptr && original != INVALID_HANDLE_VALUE;
+  if (result.was_open &&
+      DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(),
+                      &result.saved, 0, FALSE, DUPLICATE_SAME_ACCESS) == 0)
+  {
+    result.is_dup2_ok = false;
+    return result;
+  }
 
   /* SetStdHandle does not copy, so the target is duplicated here and the dup
      stays valid until restore_descriptor closes it. */
@@ -247,15 +262,18 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   if (DuplicateHandle(GetCurrentProcess(), target, GetCurrentProcess(),
                       &duplicate, 0, TRUE, DUPLICATE_SAME_ACCESS) == 0)
   {
+    if (result.was_open) CloseHandle(result.saved);
     result.is_dup2_ok = false;
     return result;
   }
   if (SetStdHandle(*slot, duplicate) == FALSE) {
     CloseHandle(duplicate);
+    if (result.was_open) CloseHandle(result.saved);
     result.is_dup2_ok = false;
     return result;
   }
-  result.replacement = duplicate;
+  if (result.was_open && !standard_handle_is_referenced(original))
+    CloseHandle(original);
   result.is_dup2_ok = true;
   note_descriptor_rebound();
 
@@ -264,19 +282,19 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
 
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
+  if (!saved.is_dup2_ok) return;
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
+  let const replaced = GetStdHandle(*slot);
   if (SetStdHandle(*slot, saved.was_open ? saved.saved
                                          : INVALID_HANDLE_VALUE) == FALSE)
     return;
 
   note_descriptor_rebound();
 
-  if (saved.is_dup2_ok && saved.replacement != nullptr &&
-      saved.replacement != INVALID_HANDLE_VALUE)
-  {
-    CloseHandle(saved.replacement);
-  }
+  if (replaced != nullptr && replaced != INVALID_HANDLE_VALUE &&
+      !standard_handle_is_referenced(replaced))
+    CloseHandle(replaced);
 }
 
 fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
@@ -288,10 +306,15 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
     result.is_dup2_ok = false;
     return result;
   }
-  result.saved = GetStdHandle(*slot);
-  result.was_open =
-      result.saved != nullptr && result.saved != INVALID_HANDLE_VALUE;
-  result.replacement = INVALID_HANDLE_VALUE;
+  let const original = GetStdHandle(*slot);
+  result.was_open = original != nullptr && original != INVALID_HANDLE_VALUE;
+  if (result.was_open &&
+      DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(),
+                      &result.saved, 0, FALSE, DUPLICATE_SAME_ACCESS) == 0)
+  {
+    result.is_dup2_ok = false;
+    return result;
+  }
   result.is_dup2_ok = true;
   return result;
 }
@@ -321,15 +344,6 @@ fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
 {
   return reinterpret_cast<os::descriptor>(
       _get_osfhandle(static_cast<int>(fd_number)));
-}
-
-static fn standard_handle_is_referenced(os::descriptor handle) wontthrow -> bool
-{
-  static constexpr DWORD STANDARD_HANDLE_SLOTS[] = {
-      STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
-  for (let const slot : STANDARD_HANDLE_SLOTS)
-    if (GetStdHandle(slot) == handle) return true;
-  return false;
 }
 
 fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
