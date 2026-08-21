@@ -260,7 +260,8 @@ interface before a long run. Build verification must compare embedded version
 metadata with the current commit. Protocol workload probes must redirect the
 complete emitter group. Asynchronous workload wrappers must capture and print
 the status after `wait`. Cwd-sensitive test scripts must run through their
-owning harness or from their declared working directory.
+owning harness or from their declared working directory. Serial submake probes
+must clear inherited jobserver flags before they set their own job count.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect
