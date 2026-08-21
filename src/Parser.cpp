@@ -1429,22 +1429,32 @@ fn Parser::finish_function_body(const SourceLocation &location,
   record_analysis_scope_definition(name, false);
   let const scope_mark = open_analysis_scope();
 
-  /* The body is parsed into the persistent function arena so it outlives the
-     per-command arena reset. */
+  let body_storage = FunctionBodyHandle::create();
   BumpArena &per_command_arena = m_lexer.arena();
-  if (FUNCTION_ARENA != nullptr) m_lexer.set_arena(*FUNCTION_ARENA);
-  Command *body = parse_simple_command();
+  BumpArena *previous_function_arena = FUNCTION_ARENA;
+  m_lexer.set_arena(*body_storage.get_arena());
+  FUNCTION_ARENA = body_storage.get_arena();
+  Command *body = nullptr;
+  try {
+    body = parse_simple_command();
+  } catch (...) {
+    FUNCTION_ARENA = previous_function_arena;
+    m_lexer.set_arena(per_command_arena);
+    throw;
+  }
+  FUNCTION_ARENA = previous_function_arena;
   m_lexer.set_arena(per_command_arena);
 
   if (body == nullptr) {
     throw ErrorWithLocation{location,
                             "Expected a compound command as the function body"};
   }
+  body_storage.set_body(body);
 
   /* The span ends where the body ends so declare -f can print the definition
      text from the source. */
-  let definition =
-      m_lexer.arena().create<FunctionDefinition>(location, name, body);
+  let definition = m_lexer.arena().create<FunctionDefinition>(
+      location, name, steal(body_storage));
   definition->set_analysis_scope_definitions(close_analysis_scope(scope_mark));
   definition->set_source_end_position(body->source_end_position());
   return definition;

@@ -245,6 +245,69 @@ struct function_definition_info
   RuntimeState defining_runtime;
 };
 
+struct function_arena_stats
+{
+  usize bytes_used{0};
+  usize bytes_capacity{0};
+  usize block_count{0};
+  usize destructor_count{0};
+  usize destructor_capacity{0};
+};
+
+struct function_body_storage
+{
+  explicit function_body_storage(BumpArena *arena);
+  ~function_body_storage();
+
+  BumpArena *arena{nullptr};
+  const Expression *body{nullptr};
+  String source{heap_allocator()};
+  function_definition_info definition_info;
+  u32 reference_count{1};
+  function_body_storage *previous_live{nullptr};
+  function_body_storage *next_live{nullptr};
+};
+
+pure fn live_function_storage_stats() wontthrow -> function_arena_stats;
+
+class FunctionBodyHandle
+{
+public:
+  FunctionBodyHandle() = default;
+  FunctionBodyHandle(const FunctionBodyHandle &other);
+  FunctionBodyHandle(FunctionBodyHandle &&other) noexcept;
+  ~FunctionBodyHandle();
+
+  fn operator=(const FunctionBodyHandle &other)->FunctionBodyHandle &;
+  fn operator=(FunctionBodyHandle &&other) noexcept -> FunctionBodyHandle &;
+
+  static fn create() throws -> FunctionBodyHandle;
+
+  pure fn has_value() const wontthrow -> bool { return m_storage != nullptr; }
+  pure fn get_arena() const wontthrow -> BumpArena *;
+  pure fn get_body() const wontthrow -> const Expression *;
+  pure fn get_source() const wontthrow -> const String *;
+  pure fn get_definition_info() const wontthrow
+      -> const function_definition_info *;
+  fn set_body(const Expression *body) wontthrow -> void;
+  fn set_definition(StringView source,
+                    function_definition_info definition_info) const throws
+      -> void;
+  pure fn get_stats() const wontthrow -> function_arena_stats;
+
+private:
+  explicit FunctionBodyHandle(function_body_storage *storage)
+      : m_storage(storage)
+  {}
+
+  fn retain() wontthrow -> void;
+  fn release() wontthrow -> void;
+
+  function_body_storage *m_storage{nullptr};
+
+  friend struct function_body_storage;
+};
+
 struct shell_option_mutations
 {
   u64 revision{0};

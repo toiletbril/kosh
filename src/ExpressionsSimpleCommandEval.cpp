@@ -180,10 +180,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* A bare exec, exec with no further argument, applies its redirections to the
      shell's own descriptors for good. A function named exec shadows it. */
+  FunctionBodyHandle command_function_storage{};
+  if (!program_args.is_empty() && cxt.has_functions()) {
+    if (let const *storage = cxt.find_function_storage(program_args[0].view());
+        storage != nullptr)
+    {
+      command_function_storage = *storage;
+    }
+  }
   const Expression *command_word_function =
-      (!program_args.is_empty() && cxt.has_functions())
-          ? cxt.find_function(program_args[0])
-          : nullptr;
+      command_function_storage.has_value() ? command_function_storage.get_body()
+                                           : nullptr;
 
   let const is_bare_exec = program_args.count() == 1 &&
                            program_args[0] == "exec" &&
@@ -660,7 +667,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     defer { cxt.scratch_release(call_mark); };
 
     cxt.enter_function_scope();
-    cxt.push_function_call_name(program_name.view());
+    cxt.push_function_call_name(program_name.view(), command_function_storage);
     defer
     {
       cxt.pop_function_call_name();
@@ -678,7 +685,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        --mood. The swap only happens when the defining state differs from the
        live state. */
     let const *const definition_info =
-        cxt.function_definition_info_of(program_name.view());
+        command_function_storage.get_definition_info();
     let const needs_state_swap =
         definition_info != nullptr &&
         (definition_info->defining_runtime.mood != cxt.mood() ||
@@ -705,6 +712,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        rebases the position onto the definition copy. The error is marked
        rendered so the top-level handler keeps the status without printing it
        twice. */
+    let const previous_function_arena = FUNCTION_ARENA;
+    if (command_function_storage.has_value())
+      FUNCTION_ARENA = command_function_storage.get_arena();
+    defer { FUNCTION_ARENA = previous_function_arena; };
+
     i64 function_ret = 0;
     try {
       function_ret = function_body->evaluate(cxt);

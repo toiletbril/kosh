@@ -1364,7 +1364,7 @@ class FunctionDefinition : public CompoundCommand
 {
 public:
   FunctionDefinition(SourceLocation location, StringView name,
-                     const Expression *body);
+                     FunctionBodyHandle body);
   ~FunctionDefinition() override;
 
   pure fn name() const wontthrow -> const String &;
@@ -1385,6 +1385,7 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   String m_name;
+  FunctionBodyHandle m_body_storage;
   const Expression *m_body;
   SparseList<analysis_scope_definition> m_analysis_scope_definitions{};
 };

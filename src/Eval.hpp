@@ -287,7 +287,7 @@ public:
     return m_runtime.option_is_enabled(shell_option_id::Emacs);
   }
 
-  fn register_function(StringView name, const Expression *body,
+  fn register_function(StringView name, const FunctionBodyHandle &body_storage,
                        StringView definition_text, usize body_start_position,
                        SourceLocation definition_location) throws -> void;
   fn find_function_source(StringView name) const wontthrow -> const String *;
@@ -313,7 +313,10 @@ public:
       -> resolved_render_source;
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
+  pure fn find_function_storage(StringView name) const wontthrow
+      -> const FunctionBodyHandle *;
   pure fn has_functions() const wontthrow -> bool;
+  pure fn function_storage_stats() const wontthrow -> function_arena_stats;
   pure fn has_aliases() const wontthrow -> bool;
   fn unset_function(StringView name) throws -> void;
   fn clear_functions() wontthrow -> void;
@@ -322,10 +325,11 @@ public:
   template <typename Callback>
   fn for_each_function_name(Callback callback) const throws -> void
   {
-    m_functions.for_each([&](StringView name, const Expression *body) throws {
-      unused(body);
-      callback(name);
-    });
+    m_functions.for_each([&](StringView name, const FunctionBodyHandle &storage)
+                             throws {
+                               unused(storage);
+                               callback(name);
+                             });
   }
 
   fn register_completion_spec(StringView command, completion_spec spec) throws
@@ -394,7 +398,9 @@ public:
 
   fn enter_function_scope() throws -> void;
   fn leave_function_scope() throws -> void;
-  fn push_function_call_name(StringView name) throws -> void;
+  fn push_function_call_name(StringView name,
+                             const FunctionBodyHandle &body_storage) throws
+      -> void;
   fn pop_function_call_name() wontthrow -> void;
   /* The FUNCNAME frame list bash exposes, the function calls innermost first,
      one "source" per sourced file, and "main" at the bottom of a script run. */
@@ -1288,14 +1294,7 @@ protected:
    */
   ArrayList<String> m_directory_stack{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
-  StringMap<const Expression *> m_functions{heap_allocator()};
-  /* The definition text of each function, kept on the heap since a function
-     outlives the command it was parsed from. */
-  StringMap<String> m_function_sources{heap_allocator()};
-  /* The position mapping for each stored definition, read by
-     resolve_render_source when a diagnostic fires inside a call. */
-  StringMap<function_definition_info> m_function_definition_infos{
-      heap_allocator()};
+  StringMap<FunctionBodyHandle> m_functions{heap_allocator()};
   usize m_subshell_depth{0};
   /* The descriptors bare execs moved inside live in-process subshells, kept
      as a stack so leave_subshell unwinds its own depth's entries in reverse. */
@@ -1418,6 +1417,7 @@ protected:
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
   usize m_local_scope_depth{0};
   ArrayList<String> m_function_call_names{heap_allocator()};
+  ArrayList<FunctionBodyHandle> m_function_call_storages{heap_allocator()};
   /* The call-site location of each active function call, parallel to
      m_function_call_names, read by BASH_LINENO. */
   ArrayList<SourceLocation> m_function_call_locations{heap_allocator()};

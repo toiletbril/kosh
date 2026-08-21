@@ -707,9 +707,15 @@ fn EvalContext::leave_function_scope() throws -> void
   }
 }
 
-fn EvalContext::push_function_call_name(StringView name) throws -> void
+fn EvalContext::push_function_call_name(
+    StringView name, const FunctionBodyHandle &body_storage) throws -> void
 {
-  m_function_call_names.push(String{heap_allocator(), name});
+  let owned_name = String{heap_allocator(), name};
+  m_function_call_names.reserve(m_function_call_names.count() + 1);
+  m_function_call_storages.reserve(m_function_call_storages.count() + 1);
+  m_function_call_locations.reserve(m_function_call_locations.count() + 1);
+  m_function_call_names.push(steal(owned_name));
+  m_function_call_storages.push(body_storage);
   m_function_call_locations.push(m_current_location);
 }
 
@@ -717,6 +723,7 @@ fn EvalContext::pop_function_call_name() wontthrow -> void
 {
   if (!m_function_call_names.is_empty()) {
     m_function_call_names.remove(m_function_call_names.count() - 1);
+    m_function_call_storages.remove(m_function_call_storages.count() - 1);
     m_function_call_locations.remove(m_function_call_locations.count() - 1);
   }
 }
@@ -772,8 +779,10 @@ pure fn EvalContext::funcname_source_at(usize index) const wontthrow
       return m_source_frames[source_index - index].source_path.view();
   }
   if (index < m_function_call_names.count()) {
-    let const frame_name = funcname_frame_at(index);
-    let const *info = m_function_definition_infos.find(frame_name);
+    let const call_count = m_function_call_names.count();
+    let const storage_index = call_count - 1 - index;
+    let const *info =
+        m_function_call_storages[storage_index].get_definition_info();
     if (info != nullptr) {
       if (let const name = source_name_at(info->source_name_index);
           name.has_value())
@@ -789,8 +798,10 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
     -> StringView
 {
   if (index < m_function_call_names.count()) {
+    let const call_count = m_function_call_names.count();
+    let const storage_index = call_count - 1 - index;
     let const *info =
-        m_function_definition_infos.find(funcname_frame_at(index));
+        m_function_call_storages[storage_index].get_definition_info();
     if (info != nullptr) {
       if (let const name = source_name_at(info->source_name_index);
           name.has_value())

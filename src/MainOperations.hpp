@@ -375,11 +375,16 @@ static fn run_script_contents(
         run_analysis && precompiled_ast == nullptr && context.no_exec() &&
         out_ast == nullptr && !context.show_ast() &&
         !context.show_lexed_words();
+    let const should_stream_execution =
+        precompiled_ast == nullptr && !context.no_exec() &&
+        out_ast == nullptr && !context.show_ast() &&
+        !context.show_lexed_words();
 
     /* A function body parsed into the function arena would outlive the unit
        that defined it, and that arena is never reset. */
     BumpArena *const previous_function_arena = FUNCTION_ARENA;
-    if (should_stream_units) FUNCTION_ARENA = nullptr;
+    if (should_stream_units || should_stream_execution)
+      FUNCTION_ARENA = nullptr;
     defer { FUNCTION_ARENA = previous_function_arena; };
 
     /* A file with any parse error must not run, so every error is collected
@@ -399,6 +404,7 @@ static fn run_script_contents(
 
     /* A precompiled tree lives in a caller-owned arena that outlives this call.
      */
+    let const preflight_mark = ast_arena.mark();
     Expression *ast = precompiled_ast;
     if (should_stream_units) {
       LOG(Debug, "scanning a chunk of %zu bytes for analysis scopes",
@@ -551,7 +557,41 @@ static fn run_script_contents(
       };
       context.set_current_source(&script_contents, "the script");
       let const command_start_nanos = koshka::os::monotonic_nanos();
-      exit_code = static_cast<int>(ast->evaluate(context));
+      if (should_stream_execution) {
+        ast_arena.release(preflight_mark);
+        ast = nullptr;
+        let execution_parser = Parser{
+            Lexer{script_contents.view(), ast_arena, false, filename,
+                  context.mood()}
+        };
+        FUNCTION_ARENA = previous_function_arena;
+        let const was_terminal_exec_allowed = context.terminal_exec_allowed();
+        defer { context.set_terminal_exec_allowed(was_terminal_exec_allowed); };
+
+        loop
+        {
+          let const unit_mark = ast_arena.mark();
+          let const *unit = execution_parser.construct_next_top_level_ast();
+          if (unit == nullptr) {
+            ast_arena.release(unit_mark);
+            break;
+          }
+          defer
+          {
+            context.clear_retained_sources();
+            context.set_current_source(&script_contents, "the script");
+            execution_parser.drop_lexer_peek_cache();
+            ast_arena.release(unit_mark);
+          };
+
+          context.set_terminal_exec_allowed(was_terminal_exec_allowed &&
+                                            execution_parser.is_at_end());
+          exit_code = static_cast<int>(unit->evaluate(context));
+          if (context.has_pending_control_flow()) break;
+        }
+      } else {
+        exit_code = static_cast<int>(ast->evaluate(context));
+      }
       context.set_last_command_duration_nanos(koshka::os::monotonic_nanos() -
                                               command_start_nanos);
       LOG(Debug, "the chunk finished with exit code %d", exit_code);

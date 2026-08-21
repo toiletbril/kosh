@@ -45,8 +45,16 @@ fn EvalContext::run_completion_function(StringView function_name,
                                         i32 *out_exit_status) throws
     -> ArrayList<String>
 {
+  FunctionBodyHandle body_storage{};
+  if (has_functions()) {
+    if (let const *storage = find_function_storage(function_name);
+        storage != nullptr)
+    {
+      body_storage = *storage;
+    }
+  }
   const Expression *body =
-      has_functions() ? find_function(function_name) : nullptr;
+      body_storage.has_value() ? body_storage.get_body() : nullptr;
   if (body == nullptr) return ArrayList<String>{heap_allocator()};
 
   LOG(Info,
@@ -58,7 +66,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   defer { set_completion_function_running(false); };
 
   let defining_runtime = RuntimeState::capture(*this);
-  if (let const *definition_info = function_definition_info_of(function_name);
+  if (let const *definition_info = body_storage.get_definition_info();
       definition_info != nullptr)
     defining_runtime = definition_info->defining_runtime;
   else
@@ -111,7 +119,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_loop_depth(0);
   defer { set_loop_depth(saved_loop_depth); };
   enter_function_scope();
-  push_function_call_name(function_name);
+  push_function_call_name(function_name, body_storage);
   defer
   {
     pop_function_call_name();
@@ -120,6 +128,10 @@ fn EvalContext::run_completion_function(StringView function_name,
   let const saved_terminal_exec = terminal_exec_allowed();
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
+
+  let const previous_function_arena = FUNCTION_ARENA;
+  FUNCTION_ARENA = body_storage.get_arena();
+  defer { FUNCTION_ARENA = previous_function_arena; };
 
   /* A completion function that errors must not abort the prompt, so any error
      is swallowed and a stray break or return is consumed. */

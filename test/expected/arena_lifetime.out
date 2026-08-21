@@ -5,3 +5,5 @@ old-incarnation=0
 new-incarnation=1
 reset-retained=0
 reset-reused=0
+function-redefinition=bounded
+function-unset=released

@@ -26,9 +26,7 @@ struct eval_state_snapshot
   StringMap<String> sparse_array_values;
   HashSet sparse_array_names;
   StringMap<bool> shopt_options;
-  StringMap<const Expression *> functions;
-  StringMap<String> function_sources;
-  StringMap<function_definition_info> function_definition_infos;
+  StringMap<FunctionBodyHandle> functions;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
   String last_argument;

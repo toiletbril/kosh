@@ -1,2 +1,37 @@
 #!/bin/env kosh
 greet() { echo hi; }; greet
+
+printf '== active body ==\n'
+lifetime_fn() {
+  printf 'old-start\n'
+  lifetime_fn() { printf 'new-body\n'; }
+  lifetime_fn
+  unset -f lifetime_fn
+  printf 'old-end=%s:%s:%s\n' "${FUNCNAME[0]}" "${BASH_SOURCE[0]}" "${BASH_LINENO[0]}"
+}
+lifetime_fn
+
+printf '== snapshot body ==\n'
+snapshot_fn() { printf 'parent-body\n'; }
+(
+  snapshot_fn() { printf 'child-body\n'; }
+  snapshot_fn
+)
+snapshot_fn
+
+printf '== substitution body ==\n'
+substitution_output=$(substitution_fn() { printf 'substitution-body\n'; }; substitution_fn)
+printf 'substitution=%s' "$substitution_output"
+printf '\n'
+
+printf '== nested definitions ==\n'
+outer_fn() {
+  nested_fn() {
+    printf 'nested-old\n'
+    nested_fn() { printf 'nested-new\n'; }
+    nested_fn
+    printf 'nested-old-end\n'
+  }
+  nested_fn
+}
+outer_fn

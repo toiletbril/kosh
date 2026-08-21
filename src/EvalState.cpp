@@ -615,12 +615,7 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
   return assignments;
 }
 
-fn EvalContext::clear_functions() wontthrow -> void
-{
-  m_functions.clear();
-  m_function_sources.clear();
-  m_function_definition_infos.clear();
-}
+fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
@@ -636,8 +631,6 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_sparse_array_names,
                              m_shopt_options,
                              m_functions,
-                             m_function_sources,
-                             m_function_definition_infos,
                              m_aliases,
                              m_positional_params,
                              m_last_argument,
@@ -673,8 +666,6 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_sparse_array_names = steal(snapshot.sparse_array_names);
   m_shopt_options = steal(snapshot.shopt_options);
   m_functions = steal(snapshot.functions);
-  m_function_sources = steal(snapshot.function_sources);
-  m_function_definition_infos = steal(snapshot.function_definition_infos);
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
   m_last_argument = steal(snapshot.last_argument);

@@ -15,16 +15,15 @@ constexpr const char *RESTRICTED_READONLY_NAMES[] = {
 
 }
 
-fn EvalContext::register_function(StringView name, const Expression *body,
+fn EvalContext::register_function(StringView name,
+                                  const FunctionBodyHandle &body_storage,
                                   StringView definition_text,
                                   usize body_start_position,
                                   SourceLocation definition_location) throws
     -> void
 {
-  LOG(Info, "registering function '%.*s' with a %zu byte definition",
-      static_cast<int>(name.length), name.data, definition_text.length);
-  m_functions.set(name, body);
-  m_function_sources.set(name, definition_text);
+  ASSERT(body_storage.has_value());
+  ASSERT(body_storage.get_body() != nullptr);
 
   let info = function_definition_info{};
   info.body_start_position = body_start_position;
@@ -36,13 +35,18 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   }
   info.source_name_index = definition_location.source_name_index;
   info.defining_runtime = RuntimeState::capture(*this);
-  m_function_definition_infos.set(name, steal(info));
+  body_storage.set_definition(definition_text, info);
+
+  LOG(Info, "registering function '%.*s' with a %zu byte definition",
+      static_cast<int>(name.length), name.data, definition_text.length);
+  m_functions.set(name, body_storage);
 }
 
 fn EvalContext::function_definition_info_of(StringView name) const wontthrow
     -> const function_definition_info *
 {
-  return m_function_definition_infos.find(name);
+  let const *storage = m_functions.find(name);
+  return storage != nullptr ? storage->get_definition_info() : nullptr;
 }
 
 pure fn EvalContext::resolve_render_source(
@@ -52,14 +56,13 @@ pure fn EvalContext::resolve_render_source(
   resolved_source.text = m_current_source;
 
   if (m_function_call_names.is_empty()) return resolved_source;
-  let const innermost = funcname_frame_at(0);
-  let const *info = m_function_definition_infos.find(innermost);
-  /* The body span check below decides whether to window, not the defining
-     source pointer. A freed defining source can have its address reused by the
-     current source, so a pointer compare would falsely read the body as
-     belonging to the current source and drop the function's filename. */
+  let const *storage = m_function_call_storages.is_empty()
+                           ? nullptr
+                           : &m_function_call_storages.back();
+  let const *info =
+      storage != nullptr ? storage->get_definition_info() : nullptr;
   if (info == nullptr) return resolved_source;
-  let const *copy = m_function_sources.find(innermost);
+  let const *copy = storage->get_source();
   if (copy == nullptr || copy->count() <= info->header_length) {
     return resolved_source;
   }
@@ -82,15 +85,17 @@ pure fn EvalContext::resolve_render_source(
 fn EvalContext::find_function_source(StringView name) const wontthrow
     -> const String *
 {
-  return m_function_sources.find(name);
+  let const *storage = m_functions.find(name);
+  return storage != nullptr ? storage->get_source() : nullptr;
 }
 
 fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
   out.reserve(m_functions.count());
-  m_functions.for_each(
-      [&](StringView name, const Expression *) { out.push_managed(name); });
+  m_functions.for_each([&](StringView name, const FunctionBodyHandle &) {
+    out.push_managed(name);
+  });
   out.sort();
   return out;
 }
@@ -98,9 +103,14 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 fn EvalContext::find_function(StringView name) const wontthrow
     -> const Expression *
 {
-  if (let const *const *slot = m_functions.find(name); slot != nullptr)
-    return *slot;
-  return nullptr;
+  let const *storage = m_functions.find(name);
+  return storage != nullptr ? storage->get_body() : nullptr;
+}
+
+pure fn EvalContext::find_function_storage(StringView name) const wontthrow
+    -> const FunctionBodyHandle *
+{
+  return m_functions.find(name);
 }
 
 pure fn EvalContext::has_functions() const wontthrow -> bool
@@ -108,20 +118,24 @@ pure fn EvalContext::has_functions() const wontthrow -> bool
   return m_functions.count() != 0;
 }
 
+pure fn EvalContext::function_storage_stats() const wontthrow
+    -> function_arena_stats
+{
+  return live_function_storage_stats();
+}
+
 fn EvalContext::unset_function(StringView name) throws -> void
 {
   LOG(Info, "unsetting function '%.*s'", static_cast<int>(name.length),
       name.data);
   m_functions.erase(name);
-  m_function_sources.erase(name);
-  m_function_definition_infos.erase(name);
 }
 
 fn EvalContext::function_names() const throws -> HashSet
 {
   let names = HashSet{heap_allocator()};
-  m_functions.for_each([&](StringView name, const Expression *body) {
-    unused(body);
+  m_functions.for_each([&](StringView name, const FunctionBodyHandle &storage) {
+    unused(storage);
     names.add(name);
   });
   return names;

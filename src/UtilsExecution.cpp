@@ -617,14 +617,14 @@ cold fn print_memory_report() wontthrow -> void
                  AST_ARENA->bytes_used(), AST_ARENA->bytes_capacity(),
                  AST_ARENA->block_count(), AST_ARENA->destructor_count(),
                  AST_ARENA->destructor_capacity());
-  if (FUNCTION_ARENA != nullptr)
+  if (QUIT_CONTEXT != nullptr) {
+    let const stats = QUIT_CONTEXT->function_storage_stats();
     std::fprintf(stderr,
-                 "Function arena: used %zu, reserved %zu, blocks %zu, "
+                 "Function arenas: used %zu, reserved %zu, blocks %zu, "
                  "destructors %zu of %zu\n",
-                 FUNCTION_ARENA->bytes_used(), FUNCTION_ARENA->bytes_capacity(),
-                 FUNCTION_ARENA->block_count(),
-                 FUNCTION_ARENA->destructor_count(),
-                 FUNCTION_ARENA->destructor_capacity());
+                 stats.bytes_used, stats.bytes_capacity, stats.block_count,
+                 stats.destructor_count, stats.destructor_capacity);
+  }
   os::malloc_heap_stats heap_stats{};
   if (os::read_malloc_heap_stats(heap_stats))
     std::fprintf(stderr,

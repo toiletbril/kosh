@@ -7,6 +7,83 @@
             [SimpleCommand "echo" "hi"]
   [CompoundListCondition, None]
     [SimpleCommand "greet"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "== active body ==\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lifetime_fn"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "old-start\n"]
+          [CompoundListCondition, None]
+            [FunctionDefinition "lifetime_fn"]
+              [BraceGroup]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "printf" "new-body\n"]
+          [CompoundListCondition, None]
+            [SimpleCommand "lifetime_fn"]
+          [CompoundListCondition, None]
+            [SimpleCommand "unset" "-f" "lifetime_fn"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "old-end=%s:%s:%s\n" "$FUNCNAME[0]" "$BASH_SOURCE[0]" "$BASH_LINENO[0]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "lifetime_fn"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "== snapshot body ==\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "snapshot_fn"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "parent-body\n"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [FunctionDefinition "snapshot_fn"]
+            [BraceGroup]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "child-body\n"]
+        [CompoundListCondition, None]
+          [SimpleCommand "snapshot_fn"]
+  [CompoundListCondition, None]
+    [SimpleCommand "snapshot_fn"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "== substitution body ==\n"]
+  [CompoundListCondition, None]
+    [Assign substitution_output=$(substitution_fn() { printf 'substitution-body\n'; }; substitution_fn)]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "substitution=%s" "$substitution_output"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "== nested definitions ==\n"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "outer_fn"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [FunctionDefinition "nested_fn"]
+              [BraceGroup]
+                [CompoundList]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "printf" "nested-old\n"]
+                  [CompoundListCondition, None]
+                    [FunctionDefinition "nested_fn"]
+                      [BraceGroup]
+                        [CompoundList]
+                          [CompoundListCondition, None]
+                            [SimpleCommand "printf" "nested-new\n"]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "nested_fn"]
+                  [CompoundListCondition, None]
+                    [SimpleCommand "printf" "nested-old-end\n"]
+          [CompoundListCondition, None]
+            [SimpleCommand "nested_fn"]
+  [CompoundListCondition, None]
+    [SimpleCommand "outer_fn"]
 [Word
   Unquoted "greet"
 ]
@@ -25,5 +102,211 @@
 [Word
   Unquoted "greet"
 ]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "== active body ==\n"
+]
+[Word
+  Unquoted "lifetime_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "old-start\n"
+]
+[Word
+  Unquoted "lifetime_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "new-body\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "lifetime_fn"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "lifetime_fn"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "old-end=%s:%s:%s\n"
+]
+[Word
+  Variable "FUNCNAME[0]"
+]
+[Word
+  Variable "BASH_SOURCE[0]"
+]
+[Word
+  Variable "BASH_LINENO[0]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "lifetime_fn"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "== snapshot body ==\n"
+]
+[Word
+  Unquoted "snapshot_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "parent-body\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "snapshot_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "child-body\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "snapshot_fn"
+]
+[Word
+  Unquoted "snapshot_fn"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "== substitution body ==\n"
+]
+[Word
+  Unquoted "substitution_output="
+  CommandSubstitution "substitution_fn() { printf 'substitution-body\n'; }; substitution_fn"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "substitution=%s"
+]
+[Word
+  Variable "substitution_output"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "== nested definitions ==\n"
+]
+[Word
+  Unquoted "outer_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "nested_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "nested-old\n"
+]
+[Word
+  Unquoted "nested_fn"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "nested-new\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "nested_fn"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "nested-old-end\n"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "nested_fn"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "outer_fn"
+]
 hi
+== active body ==
+old-start
+new-body
+old-end=lifetime_fn:-:12
+== snapshot body ==
+child-body
+parent-body
+== substitution body ==
+substitution=substitution-body
+== nested definitions ==
+nested-old
+nested-new
+nested-old-end
 [Code 0]

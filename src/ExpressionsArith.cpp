@@ -1046,11 +1046,11 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 }
 
 FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
-                                       const Expression *body)
-    : CompoundCommand(steal(location)), m_name(name), m_body(body)
+                                       FunctionBodyHandle body)
+    : CompoundCommand(steal(location)), m_name(name),
+      m_body_storage(steal(body)), m_body(m_body_storage.get_body())
 {}
 
-/* The body is owned by the function table, not this node. */
 FunctionDefinition::~FunctionDefinition() = default;
 
 pure fn FunctionDefinition::name() const wontthrow -> const String &
@@ -1101,7 +1101,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
   LOG(Info, "registering the function '%s'%s", m_name.c_str(),
       definition_text.is_empty() ? " without recorded definition text" : "");
-  cxt.register_function(m_name, m_body, definition_text.view(),
+  cxt.register_function(m_name, m_body_storage, definition_text.view(),
                         m_body->source_location().position, source_location());
   cxt.publish_single_pipe_status(0);
   SET_AND_RETURN_EXIT_STATUS(cxt, 0);
