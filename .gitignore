@@ -22,6 +22,7 @@ perf*
 flamegraph.svg
 *.trace
 *.log
+MISTAKES.md
 
 garbage/
 src/o
