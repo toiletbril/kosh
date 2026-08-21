@@ -280,6 +280,8 @@ An optional tool path must be checked with an explicit branch before
 invocation.
 Regression fixtures must keep diagnostic control names distinct from the names
 under test.
+Logging edits must count every format placeholder and argument before the patch
+is applied.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect
