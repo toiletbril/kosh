@@ -48,9 +48,8 @@
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
 #endif
-#if defined __SANITIZE_ADDRESS__
+#if defined KOSH_HAS_ADDRESS_SANITIZER
 extern "C" void __lsan_disable(void);
-#define KOSH_HAS_ADDRESS_SANITIZER 1
 #endif
 #if defined __COSMOPOLITAN__
 #include <libc/dce.h>

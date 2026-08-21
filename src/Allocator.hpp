@@ -119,7 +119,11 @@ hot inline fn heap_alloc(usize length, usize alignment) wontthrow -> opaque *
     let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
     return os::allocate_aligned(rounded_length, alignment);
   }
+#if defined KOSH_HAS_ADDRESS_SANITIZER
+  return std::malloc(length);
+#else
   return heap_pool_instance().take(length);
+#endif
 }
 hot inline fn heap_free(opaque *pointer, usize length,
                         usize alignment) wontthrow -> void
@@ -130,7 +134,12 @@ hot inline fn heap_free(opaque *pointer, usize length,
     os::free_aligned(pointer);
     return;
   }
+#if defined KOSH_HAS_ADDRESS_SANITIZER
+  unused(length);
+  std::free(pointer);
+#else
   heap_pool_instance().give(pointer, length);
+#endif
 }
 
 } /* namespace allocators */

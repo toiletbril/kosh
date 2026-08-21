@@ -291,6 +291,7 @@ Language server configuration changes must verify that the resolved command is
 executable and that the client attaches.
 Debug process traces must run to completion before their output is narrowed.
 Completion tests after source edits must rebuild the debug binary first.
+LeakSanitizer probes must verify host support before invocation.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

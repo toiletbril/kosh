@@ -1,5 +1,13 @@
 #pragma once
 
+#if defined __SANITIZE_ADDRESS__
+#define KOSH_HAS_ADDRESS_SANITIZER 1
+#elif defined __has_feature
+#if __has_feature(address_sanitizer)
+#define KOSH_HAS_ADDRESS_SANITIZER 1
+#endif
+#endif
+
 /* Timestamp the build. */
 
 #if !defined KOSH_ENVCXXFLAGS

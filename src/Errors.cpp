@@ -14,8 +14,20 @@ namespace koshka {
 
 struct interned_source_name
 {
-  const char *data;
+  char *data;
   u32 length;
+
+  interned_source_name(char *data, u32 length) : data{data}, length{length} {}
+  interned_source_name(const interned_source_name &) = delete;
+  interned_source_name(interned_source_name &&other) noexcept
+      : data{other.data}, length{other.length}
+  {
+    other.data = nullptr;
+  }
+  ~interned_source_name()
+  {
+    heap_allocator().free_array(data, static_cast<usize>(length) + 1);
+  }
 };
 
 /* The table outlives every location that indexes it, and a fork keeps its rows
