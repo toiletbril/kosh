@@ -92,6 +92,9 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
                                      target.length, location.source_name_index};
   if (analysis_source_text(actx, name_location) != target) return;
 
+  actx.note_variable_occurrence(target, name_location,
+                                variable_occurrence_kind::Assignment,
+                                is_conditional);
   actx.note_variable_binding_record(
       target, name_location, assignment_binder::Arithmetic, is_conditional);
 }
@@ -236,8 +239,18 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
         has_redundant_dollar = true;
       }
 
-      actx.note_positional_reference(
-          expression.substring_of_length(name_start, name_end - name_start));
+      let const referenced =
+          expression.substring_of_length(name_start, name_end - name_start);
+      if (!referenced.is_empty() && expression_base_position.has_value()) {
+        let const occurrence_start = dollar_position;
+        let const occurrence_length = expansion_end - occurrence_start;
+        actx.note_variable_occurrence(
+            referenced,
+            SourceLocation{*expression_base_position + occurrence_start,
+                           occurrence_length, location.source_name_index},
+            variable_occurrence_kind::Reference);
+      }
+      actx.note_positional_reference(referenced);
       break;
     }
 
@@ -256,7 +269,62 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
 
       let const word =
           expression.substring_of_length(start, position + 1 - start);
-      if (!lexer::is_number(word[0])) break;
+      if (!lexer::is_number(word[0])) {
+        usize after_name = position + 1;
+        while (after_name < expression.length &&
+               lexer::is_whitespace(expression[after_name]))
+        {
+          after_name++;
+        }
+
+        let is_assignment_target = false;
+        if (after_name < expression.length) {
+          switch (expression[after_name]) {
+          case '=':
+            is_assignment_target =
+                arithmetic_assignment_target(expression, after_name) == word;
+            break;
+
+          case '+':
+          case '-':
+          case '*':
+          case '/':
+          case '%':
+          case '&':
+          case '|':
+          case '^':
+            if (after_name + 1 < expression.length &&
+                expression[after_name + 1] == '=')
+            {
+              is_assignment_target = arithmetic_assignment_target(
+                                         expression, after_name + 1) == word;
+            }
+            break;
+
+          case '<':
+          case '>':
+            if (after_name + 2 < expression.length &&
+                expression[after_name + 1] == expression[after_name] &&
+                expression[after_name + 2] == '=')
+            {
+              is_assignment_target = arithmetic_assignment_target(
+                                         expression, after_name + 2) == word;
+            }
+            break;
+
+          default: break;
+          }
+        }
+
+        if (!is_assignment_target && expression_base_position.has_value()) {
+          actx.note_variable_occurrence(
+              word,
+              SourceLocation{*expression_base_position + start, word.length,
+                             location.source_name_index},
+              variable_occurrence_kind::Reference);
+        }
+        break;
+      }
 
       let const dot = word.find_character('.');
       if (dot.has_value() && *dot + 1 < word.length &&
@@ -940,6 +1008,16 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
     for (usize i = 1; i < args.count(); i++) {
       if (args[i]->kind() != Token::Kind::Word) continue;
       let const raw = args[i]->raw_string();
+      let const target = operand_target_name(raw.view());
+      if (!target.is_empty()) {
+        let const name_location =
+            raw.count() == target.length
+                ? args[i]->source_location().subspan(0, target.length)
+                : args[i]->source_location();
+        actx.note_variable_occurrence(target, name_location,
+                                      variable_occurrence_kind::Unset);
+      }
+
       let const source_text =
           analysis_source_text(actx, args[i]->source_location());
       if (raw.view().find_character('[').has_value() &&

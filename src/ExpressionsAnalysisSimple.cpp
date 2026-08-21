@@ -293,6 +293,9 @@ fn note_variable_target_operands(AnalysisContext &actx,
             ? args[i]->source_location().subspan(0, target.length)
             : args[i]->source_location();
 
+    actx.note_variable_occurrence(target, name_location,
+                                  variable_occurrence_kind::Assignment,
+                                  is_conditional);
     actx.note_variable_binding_record(target, name_location, binder,
                                       is_conditional);
   }
@@ -318,30 +321,43 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     /* A PATH=... prefix leaves the runtime search path unknown to the prepass,
        so the not-found check for the prefixed command and everything after it
        stays quiet. */
-    if (var.name.view() == "PATH") actx.mark_path_unknown(true);
-    if (is_source_location_variable(var.name.view()))
+    if (var.get_name() == "PATH") actx.mark_path_unknown(true);
+    if (is_source_location_variable(var.get_name()))
       actx.mark_working_directory_unknown();
 
-    if (prefix_outlives_command) {
-      actx.note_variable_assignment(var.name.view(), var.location);
-      actx.note_variable_assignment_record(
-          var.name.view(), &var.value, var.location,
-          !is_unconditional || actx.has_seen_runtime_definer, var.is_append);
+    if (actx.is_posix_sh_shebang && var.is_append()) {
+      actx.report_diagnostic(diagnostic_id::sc3024, var.get_location(),
+                             {var.get_name()});
     }
 
-    if (actx.is_posix_sh_shebang && var.is_append) {
-      actx.report_diagnostic(diagnostic_id::sc3024, var.location,
-                             {var.name.view()});
-    }
-
-    let const shape = scan_assignment_value(actx, var.value, var.location);
+    let const shape =
+        scan_assignment_value(actx, var.get_value(), var.get_location());
     check_assignment_value_shape(
-        actx, assignment_lint_input{
-                  var.name.view(), analysis_source_text(actx, var.location),
-                  var.location, var.is_append, is_command_prefix, shape});
+        actx,
+        assignment_lint_input{
+            var.get_name(), analysis_source_text(actx, var.get_location()),
+            var.get_location(), var.is_append(), is_command_prefix, shape});
+
+    if (prefix_outlives_command) {
+      let const name_location =
+          var.get_location().subspan(0, var.get_name().length);
+      actx.note_variable_occurrence(
+          var.get_name(), name_location, variable_occurrence_kind::Assignment,
+          !is_unconditional || actx.has_seen_runtime_definer, var.is_append());
+      actx.note_variable_assignment(var.get_name(), var.get_location());
+      actx.note_variable_assignment_record(
+          var.get_name(), &var.get_value(), var.get_location(),
+          !is_unconditional || actx.has_seen_runtime_definer, var.is_append());
+    }
   }
 
   for (let const &assignment : m_array_args) {
+    let const name_location =
+        assignment.location.subspan(0, assignment.name.count());
+    actx.note_variable_occurrence(assignment.name.view(), name_location,
+                                  variable_occurrence_kind::Assignment,
+                                  !is_unconditional ||
+                                      actx.has_seen_runtime_definer);
     actx.note_variable_assignment(assignment.name.view(), assignment.location);
     actx.note_variable_assignment_record(
         assignment.name.view(), nullptr, assignment.location,
@@ -559,6 +575,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           if (!declared.has_value()) continue;
           if (!lexer::word_is_variable_name(declared->view())) continue;
 
+          actx.note_variable_occurrence(
+              declared->view(), m_args[i]->source_location(),
+              variable_occurrence_kind::Assignment,
+              !is_unconditional || actx.has_seen_runtime_definer);
           actx.note_variable_binding_record(
               declared->view(), m_args[i]->source_location(),
               assignment_binder::Declaration,
@@ -582,6 +602,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         recorded_value = nullptr;
       }
 
+      let const name_location =
+          m_args[i]->source_location().subspan(0, recorded_name.length);
+      actx.note_variable_occurrence(
+          recorded_name, name_location, variable_occurrence_kind::Assignment,
+          !is_unconditional || actx.has_seen_runtime_definer, is_append);
       actx.note_variable_assignment_record(
           recorded_name, recorded_value, m_args[i]->source_location(),
           !is_unconditional || actx.has_seen_runtime_definer, is_append);
@@ -806,6 +831,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         case WordSegment::Kind::VariableReference: {
           quote_sandwich_state = 0;
           let const referenced = segment.text.view();
+          let const segment_location =
+              segment.get_source_location(arg_location.source_name_index)
+                  .value_or(arg_location);
+          actx.note_variable_occurrence(
+              referenced, expansion_location_with_sigil(actx, segment_location),
+              variable_occurrence_kind::Reference);
           actx.note_positional_reference(referenced);
           if (!is_operand) break;
 
@@ -1217,7 +1248,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
          the prefix check, which names that shape exactly. */
       let is_read_of_own_prefix = false;
       for (let const &var : m_local_vars) {
-        if (var.name.view() != segment.text.view()) continue;
+        if (var.get_name() != segment.text.view()) continue;
 
         is_read_of_own_prefix = true;
         break;

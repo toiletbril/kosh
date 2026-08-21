@@ -164,12 +164,15 @@ private:
   bool m_supports_markdown_hover{false};
 };
 
+static constexpr u32 SEMANTIC_DECLARATION = 1u << 0;
+static constexpr u32 SEMANTIC_UNRESOLVED = 1u << 3;
+static constexpr u32 SEMANTIC_SET = 1u << 9;
+static constexpr u32 SEMANTIC_UNUSED = 1u << 10;
+
 pure fn semantic_style(highlight_role role) wontthrow -> std::pair<u32, u32>
 {
-  static constexpr u32 DECLARATION = 1u << 0;
   static constexpr u32 READONLY = 1u << 1;
   static constexpr u32 INVALID = 1u << 2;
-  static constexpr u32 UNRESOLVED = 1u << 3;
   static constexpr u32 PARTIAL = 1u << 4;
   static constexpr u32 PATH = 1u << 5;
   static constexpr u32 COMMAND = 1u << 6;
@@ -177,26 +180,26 @@ pure fn semantic_style(highlight_role role) wontthrow -> std::pair<u32, u32>
   static constexpr u32 URL = 1u << 8;
 
   static constexpr std::pair<u32, u32> STYLES[] = {
-      {0, 0                   },
-      {1, 0                   },
-      {2, 0                   },
-      {2, HEREDOC             },
-      {8, HEREDOC             },
-      {3, 0                   },
-      {3, DECLARATION         },
-      {3, UNRESOLVED          },
-      {4, READONLY            },
-      {5, 0                   },
-      {1, INVALID             },
-      {6, DECLARATION         },
-      {6, COMMAND             },
-      {6, COMMAND | PARTIAL   },
-      {6, COMMAND | UNRESOLVED},
-      {2, PATH                },
-      {2, PATH | PARTIAL      },
-      {2, PATH | INVALID      },
-      {2, URL                 },
-      {7, 0                   },
+      {0, 0                            },
+      {1, 0                            },
+      {2, 0                            },
+      {2, HEREDOC                      },
+      {8, HEREDOC                      },
+      {3, 0                            },
+      {3, SEMANTIC_DECLARATION         },
+      {3, SEMANTIC_UNRESOLVED          },
+      {4, READONLY                     },
+      {5, 0                            },
+      {1, INVALID                      },
+      {6, SEMANTIC_DECLARATION         },
+      {6, COMMAND                      },
+      {6, COMMAND | PARTIAL            },
+      {6, COMMAND | SEMANTIC_UNRESOLVED},
+      {2, PATH                         },
+      {2, PATH | PARTIAL               },
+      {2, PATH | INVALID               },
+      {2, URL                          },
+      {7, 0                            },
   };
   static_assert(countof(STYLES) == static_cast<usize>(highlight_role::count));
   if (role == highlight_role::count) return {1, 0};
@@ -323,7 +326,8 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
       "\"keyword\",\"function\",\"regexp\",\"heredocDelimiter\"],"
       "\"tokenModifiers\":["
       "\"declaration\",\"readonly\",\"invalid\",\"unresolved\","
-      "\"partial\",\"path\",\"command\",\"heredoc\",\"url\"]},"
+      "\"partial\",\"path\",\"command\",\"heredoc\",\"url\","
+      "\"set\",\"unused\"]},"
       "\"full\":true,\"range\":false}},\"serverInfo\":{\"name\":"
       "\"kosh\"}}");
 
@@ -341,6 +345,7 @@ fn Server::open_document(const JsonValue *params) throws -> Document *
   if (!uri.has_value() || !language_id.has_value() || !text.has_value())
     return nullptr;
   let const document_version = version.value_or(0);
+  m_highlight_cache = completion::shell_highlight_cache{};
   if (let *existing = find_document(*uri); existing != nullptr) {
     existing->language_id = String{*language_id};
     existing->replace_source(*text, document_version);
@@ -372,6 +377,7 @@ fn Server::change_document(const JsonValue *params) throws -> Document *
   if (document == nullptr) return nullptr;
   let const text = string_field(changes->array.back(), "text");
   if (!text.has_value()) return nullptr;
+  m_highlight_cache = completion::shell_highlight_cache{};
   document->replace_source(*text, version.value_or(document->version + 1));
   document->mood = mood_for(*document);
 
@@ -507,6 +513,13 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
                 document.path.has_value(), false, &followed_paths,
                 &source_effects, nullptr, nullptr, true, true, nullptr,
                 &diagnostics, this, &symbol_records);
+    symbol_records.variable_occurrences.sort(
+        [](const variable_occurrence_record &left,
+           const variable_occurrence_record &right) {
+          if (left.position != right.position)
+            return left.position < right.position;
+          return left.length < right.length;
+        });
   }
 
   let root_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
@@ -1860,6 +1873,7 @@ fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
   usize previous_line = 0;
   usize previous_character = 0;
   bool is_first = true;
+  usize occurrence_index = 0;
 
   for (usize line = 0; line < document->line_starts.count(); line++) {
     let const[line_start, line_end] = document->get_line_bounds(line);
@@ -1877,7 +1891,51 @@ fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
       let const length =
           document->encoded_length(absolute_start, absolute_end, m_encoding);
       if (length == 0) continue;
-      let const[type, modifiers] = semantic_style(span.role);
+      let const[type, base_modifiers] = semantic_style(span.role);
+      let modifiers = base_modifiers;
+      while (occurrence_index <
+                 document->symbol_records.variable_occurrences.count() &&
+             document->symbol_records.variable_occurrences[occurrence_index]
+                         .position +
+                     document->symbol_records
+                         .variable_occurrences[occurrence_index]
+                         .length <=
+                 absolute_start)
+      {
+        occurrence_index++;
+      }
+
+      if (span.role == highlight_role::variable ||
+          span.role == highlight_role::assignment_name ||
+          span.role == highlight_role::unset_variable)
+      {
+        for (usize index = occurrence_index;
+             index < document->symbol_records.variable_occurrences.count();
+             index++)
+        {
+          let const &occurrence =
+              document->symbol_records.variable_occurrences[index];
+          if (occurrence.position > absolute_start) break;
+          if (occurrence.position != absolute_start ||
+              occurrence.length != absolute_end - absolute_start)
+            continue;
+
+          if (occurrence.kind == variable_occurrence_kind::Assignment) {
+            modifiers |= SEMANTIC_DECLARATION;
+            if (occurrence.is_unused) modifiers |= SEMANTIC_UNUSED;
+          } else {
+            if (occurrence.is_unresolved) {
+              modifiers |= SEMANTIC_UNRESOLVED;
+              modifiers &= ~SEMANTIC_SET;
+            } else {
+              modifiers |= SEMANTIC_SET;
+              modifiers &= ~SEMANTIC_UNRESOLVED;
+            }
+          }
+          break;
+        }
+      }
+
       if (!is_first) response.push(',');
       is_first = false;
       append_json_integer(response, static_cast<u64>(delta_line));

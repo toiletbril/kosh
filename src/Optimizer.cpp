@@ -520,7 +520,7 @@ fn rule_fold_constant_arithmetic(const Expression *node,
       if (fold_constant_arithmetic_in_token(t, actx)) did_fold = true;
     }
     for (let const &var : cmd->local_vars()) {
-      if (fold_constant_arithmetic_in_word(var.value, actx,
+      if (fold_constant_arithmetic_in_word(var.get_value(), actx,
                                            node->source_location()))
         did_fold = true;
     }

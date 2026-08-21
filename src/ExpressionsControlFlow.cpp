@@ -597,6 +597,11 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 {
   ASSERT(m_body != nullptr);
 
+  actx.note_variable_occurrence(m_variable_name, m_variable_location,
+                                variable_occurrence_kind::Assignment,
+                                !is_unconditional ||
+                                    actx.has_seen_runtime_definer ||
+                                    (m_has_in_clause && m_words.is_empty()));
   actx.note_variable_binding_record(
       m_variable_name, m_variable_location, assignment_binder::ForLoop,
       !is_unconditional || actx.has_seen_runtime_definer);

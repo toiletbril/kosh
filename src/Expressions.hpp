@@ -134,6 +134,29 @@ struct variable_assignment_record
   assignment_binder binder{assignment_binder::Assignment};
 };
 
+enum class variable_occurrence_kind : u8
+{
+  Assignment,
+  Reference,
+  Unset,
+};
+
+struct variable_occurrence_record
+{
+  String name;
+  usize position{0};
+  usize length{0};
+  variable_occurrence_kind kind{variable_occurrence_kind::Reference};
+  bool is_unresolved{false};
+  bool is_unused{false};
+};
+
+struct variable_occurrence_state
+{
+  ArrayList<usize> assignment_indices{heap_allocator()};
+  bool is_definitely_set{false};
+};
+
 /* One function definition a reader may ask about. The body span is recovered
    from the document source, in the shape declare -f prints. */
 struct function_body_record
@@ -147,11 +170,13 @@ struct function_body_record
 struct analysis_symbol_records
 {
   ArrayList<variable_assignment_record> assignments{heap_allocator()};
+  ArrayList<variable_occurrence_record> variable_occurrences{heap_allocator()};
   ArrayList<function_body_record> functions{heap_allocator()};
 
   fn clear() wontthrow -> void
   {
     assignments.clear();
+    variable_occurrences.clear();
     functions.clear();
   }
 };
@@ -251,6 +276,11 @@ public:
      name carries the assignment that recorded it, read by the diagnostic that
      names a near miss. */
   StringMap<SourceLocation> function_local_names{heap_allocator()};
+
+  StringMap<variable_occurrence_state> variable_occurrence_assignments{
+      heap_allocator()};
+  StringMap<variable_occurrence_state>
+      inherited_variable_occurrence_assignments{heap_allocator()};
 
   /* An assignment inside a function to one of these updates an existing global
      rather than leaking a new binding, so the no-local warning stays quiet. */
@@ -455,6 +485,10 @@ public:
                                   const SourceLocation &location,
                                   assignment_binder binder,
                                   bool is_conditional) throws -> void;
+  fn note_variable_occurrence(StringView name, const SourceLocation &location,
+                              variable_occurrence_kind kind,
+                              bool is_unresolved = false,
+                              bool is_append = false) throws -> void;
   fn note_function_body_record(StringView name, usize name_position,
                                usize body_position,
                                usize body_end_position) throws -> void;
@@ -637,12 +671,24 @@ protected:
 };
 
 /* Kept as an ordered list, so a repeated name accumulates. */
-struct prefix_assignment
+class PrefixAssignment
 {
-  String name;
-  Word value;
-  SourceLocation location;
-  bool is_append;
+public:
+  const Assignment *token;
+
+  pure fn get_name() const wontthrow -> StringView
+  {
+    return token->key().view();
+  }
+  pure fn get_value() const wontthrow -> const Word &
+  {
+    return token->value_word();
+  }
+  pure fn get_location() const wontthrow -> SourceLocation
+  {
+    return token->source_location();
+  }
+  pure fn is_append() const wontthrow -> bool { return token->is_append(); }
 };
 
 struct array_builtin_assignment
@@ -676,9 +722,9 @@ public:
 
   fn make_async() wontthrow -> void;
   pure fn is_async() const wontthrow -> bool;
-  fn set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void;
+  fn set_local_vars(ArrayList<PrefixAssignment> &&vars) throws -> void;
 
-  pure fn local_vars() const wontthrow -> const SparseList<prefix_assignment> &;
+  pure fn local_vars() const wontthrow -> const SparseList<PrefixAssignment> &;
 
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
@@ -705,7 +751,7 @@ protected:
      is stamped with, so the length and the source name are recovered and only
      the position is retained. */
   u32 m_time_position{0};
-  SparseList<prefix_assignment> m_local_vars{};
+  SparseList<PrefixAssignment> m_local_vars{};
 };
 
 class AssignCommand : public Command

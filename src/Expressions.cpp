@@ -452,6 +452,72 @@ fn AnalysisContext::note_variable_binding_record(StringView name,
       location.length, binder});
 }
 
+fn AnalysisContext::note_variable_occurrence(StringView name,
+                                             const SourceLocation &location,
+                                             variable_occurrence_kind kind,
+                                             bool is_unresolved,
+                                             bool is_append) throws -> void
+{
+  if (symbol_records == nullptr) return;
+  if (name.is_empty() || location.length == 0) return;
+
+  if (name.length > 1 && name[0] == '#') name = name.substring(1);
+  if (!lexer::word_is_variable_name(name) && !reference_names_positional(name))
+    return;
+
+  let occurrence = variable_occurrence_record{
+      String{name}, location.position, location.length,
+      kind,         is_unresolved,     false};
+
+  if (kind == variable_occurrence_kind::Assignment) {
+    if (is_append) {
+      let const *prior_state = variable_occurrence_assignments.find(name);
+      if (prior_state == nullptr)
+        prior_state = inherited_variable_occurrence_assignments.find(name);
+      if (prior_state != nullptr) {
+        for (let const assignment_index : prior_state->assignment_indices)
+          symbol_records->variable_occurrences[assignment_index].is_unused =
+              false;
+      }
+    }
+
+    let state = variable_occurrence_state{};
+    state.assignment_indices.push(symbol_records->variable_occurrences.count());
+    state.is_definitely_set = true;
+    variable_occurrence_assignments.set(name, steal(state));
+    occurrence.is_unused = true;
+  } else if (kind == variable_occurrence_kind::Reference) {
+    let const *state = variable_occurrence_assignments.find(name);
+    if (state != nullptr) {
+      for (let const assignment_index : state->assignment_indices)
+        symbol_records->variable_occurrences[assignment_index].is_unused =
+            false;
+    } else {
+      state = inherited_variable_occurrence_assignments.find(name);
+      if (state != nullptr) {
+        for (let const assignment_index : state->assignment_indices)
+          symbol_records->variable_occurrences[assignment_index].is_unused =
+              false;
+      }
+    }
+
+    occurrence.is_unresolved =
+        is_unresolved || (state != nullptr && !state->is_definitely_set) ||
+        (state == nullptr && !expressions::is_shell_maintained_variable(name) &&
+         !(eval_context != nullptr && eval_context->has_variable_name(name)) &&
+         !os::get_environment_variable(name).has_value());
+  } else {
+    let const *state = variable_occurrence_assignments.find(name);
+    if (state == nullptr)
+      state = inherited_variable_occurrence_assignments.find(name);
+    occurrence.is_unresolved = state == nullptr || !state->is_definitely_set;
+    variable_occurrence_assignments.erase(name);
+    inherited_variable_occurrence_assignments.erase(name);
+  }
+
+  symbol_records->variable_occurrences.push(steal(occurrence));
+}
+
 fn AnalysisContext::note_function_body_record(StringView name,
                                               usize name_position,
                                               usize body_position,
@@ -1340,13 +1406,13 @@ pure fn Command::time_uses_posix_format() const wontthrow -> bool
   return m_is_time_posix_format;
 }
 
-fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
+fn Command::set_local_vars(ArrayList<PrefixAssignment> &&vars) throws -> void
 {
   m_local_vars.fill(steal(vars));
 }
 
 pure fn Command::local_vars() const wontthrow
-    -> const SparseList<prefix_assignment> &
+    -> const SparseList<PrefixAssignment> &
 {
   return m_local_vars;
 }

@@ -154,6 +154,10 @@ fn AssignCommand::analyze(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::external_array_subscript,
                                source_location());
     }
+    let const name_location = source_location().subspan(0, base.length);
+    actx.note_variable_occurrence(
+        base, name_location, variable_occurrence_kind::Assignment,
+        !is_unconditional || actx.has_seen_runtime_definer);
     actx.note_variable_assignment(base, source_location());
     actx.note_variable_assignment_record(base, nullptr, source_location(),
                                          !is_unconditional ||
@@ -168,6 +172,11 @@ fn AssignCommand::analyze(AnalysisContext &actx,
     return;
   }
 
+  let const name_location = source_location().subspan(0, name.count());
+  actx.note_variable_occurrence(
+      name.view(), name_location, variable_occurrence_kind::Assignment,
+      !is_unconditional || actx.has_seen_runtime_definer,
+      m_assignment->is_append());
   actx.note_variable_assignment(name.view(), source_location());
   /* The record is taken before the constant table gives up on this name. A
      conditional or appending assignment stays answerable. */
@@ -303,8 +312,6 @@ SimpleCommand::SimpleCommand(SourceLocation location,
                              ArrayList<const Token *> &&args)
     : Command(steal(location)), m_args(steal(args))
 {
-  m_args.shrink_to_fit();
-
   /* The location spans from the first word to the end of the last, so a caret
      covers the whole command and not only the command word. */
   if (!m_args.is_empty()) {

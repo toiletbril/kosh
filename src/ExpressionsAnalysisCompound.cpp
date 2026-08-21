@@ -77,6 +77,10 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     let saved_inherited_global_assigned_names =
         actx.inherited_global_assigned_names.clone();
     let saved_array_valued_names = actx.array_valued_names.clone();
+    let saved_occurrence_assignments =
+        actx.variable_occurrence_assignments.clone();
+    let saved_inherited_occurrence_assignments =
+        actx.inherited_variable_occurrence_assignments.clone();
     let *saved_source_effects = actx.current_source_effects;
     actx.current_source_effects = nullptr;
 
@@ -93,6 +97,9 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     actx.inherited_global_assigned_names =
         steal(saved_inherited_global_assigned_names);
     actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
+    actx.variable_occurrence_assignments = steal(saved_occurrence_assignments);
+    actx.inherited_variable_occurrence_assignments =
+        steal(saved_inherited_occurrence_assignments);
     actx.rollback_defined_functions(defined_function_insertion_count);
     actx.rollback_known_aliases(known_alias_insertion_count);
   }
@@ -118,8 +125,8 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
                !first_stage->local_vars().is_empty())
     {
       actx.report_diagnostic(diagnostic_id::sc2036,
-                             first_stage->local_vars()[0].location,
-                             {first_stage->local_vars()[0].name.view()});
+                             first_stage->local_vars()[0].get_location(),
+                             {first_stage->local_vars()[0].get_name()});
     }
 
     if (first_stage != nullptr) {
@@ -688,13 +695,48 @@ fn IfStatement::analyze(AnalysisContext &actx,
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
 
-  /* The condition always runs to decide the branch. The branches do not. */
   m_condition->analyze(actx, is_unconditional);
+  let before_then = actx.variable_occurrence_assignments.clone();
+  let before_then_inherited =
+      actx.inherited_variable_occurrence_assignments.clone();
   m_then->analyze(actx, false);
+  let const after_then = actx.variable_occurrence_assignments.clone();
+  let const after_then_inherited =
+      actx.inherited_variable_occurrence_assignments.clone();
+
+  actx.variable_occurrence_assignments = steal(before_then);
+  actx.inherited_variable_occurrence_assignments = steal(before_then_inherited);
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
 
-  /* A branch may have reassigned a name, so a value recorded before this if is
-     no longer proven in the block after it. */
+  let do_merge_occurrence_states = [](auto &merged_states,
+                                      const auto &then_states) throws -> void {
+    merged_states.for_each(
+        [&](StringView name, variable_occurrence_state &state) {
+          if (then_states.find(name) == nullptr)
+            state.is_definitely_set = false;
+        });
+    then_states.for_each(
+        [&](StringView name, const variable_occurrence_state &then_state) {
+          let *state = merged_states.find(name);
+          if (state == nullptr) {
+            let merged_state = then_state;
+            merged_state.is_definitely_set = false;
+            merged_states.set(name, steal(merged_state));
+            return;
+          }
+
+          for (let const assignment_index : then_state.assignment_indices) {
+            if (!state->assignment_indices.find(assignment_index).has_value())
+              state->assignment_indices.push(assignment_index);
+          }
+          state->is_definitely_set =
+              state->is_definitely_set && then_state.is_definitely_set;
+        });
+  };
+  do_merge_occurrence_states(actx.variable_occurrence_assignments, after_then);
+  do_merge_occurrence_states(actx.inherited_variable_occurrence_assignments,
+                             after_then_inherited);
+
   actx.constant_variables.clear();
 }
 

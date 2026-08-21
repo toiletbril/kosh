@@ -1166,8 +1166,9 @@ static constexpr auto COMMAND_POSITION_WORDS = command_position_words();
 hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
+  let const arena_allocator = bump_allocator(m_lexer.arena());
   ArrayList<const Token *> args_accumulator{heap_allocator()};
-  let local_vars = ArrayList<prefix_assignment>{heap_allocator()};
+  let local_vars = ArrayList<PrefixAssignment>{heap_allocator()};
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
 
@@ -1175,6 +1176,11 @@ hot fn Parser::parse_simple_command() throws -> Command *
     if (!source_location) return nullptr;
 
     record_analysis_alias_definitions(args_accumulator);
+
+    args_accumulator.move_to_allocator(arena_allocator);
+    local_vars.move_to_allocator(arena_allocator);
+    array_args.move_to_allocator(arena_allocator);
+    redirections.move_to_allocator(arena_allocator);
 
     SimpleCommand *c = m_lexer.arena().create<SimpleCommand>(
         *source_location, steal(args_accumulator));
@@ -1372,9 +1378,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       } else {
         /* Kept in source order so a later assignment sees an earlier one and a
            repeated name accumulates, which a map would lose. */
-        local_vars.push(
-            prefix_assignment{a->key().clone(), Word{a->value_word()},
-                              a->source_location(), a->is_append()});
+        local_vars.push(PrefixAssignment{a});
       }
     } break;
 

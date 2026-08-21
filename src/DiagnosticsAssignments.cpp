@@ -632,15 +632,15 @@ constexpr StaticStringSet COMMAND_VALUED_VARIABLES{
 
 /* A prefix such as `BIN="$BIN"` hands the outer value to the command, so a
    reference to the name among the operands reads those same bytes. */
-pure fn prefix_value_is_own_name(const prefix_assignment &var) wontthrow -> bool
+pure fn prefix_value_is_own_name(const PrefixAssignment &var) wontthrow -> bool
 {
   /* A quoted value carries an empty text segment for the quote itself, which
      contributes no bytes to the value. */
   let has_matching_reference = false;
-  for (let const &segment : var.value.segments) {
+  for (let const &segment : var.get_value().segments) {
     if (segment.kind == WordSegment::Kind::VariableReference) {
       if (has_matching_reference) return false;
-      if (segment.text.view() != var.name.view()) return false;
+      if (segment.text.view() != var.get_name()) return false;
 
       has_matching_reference = true;
       continue;
@@ -668,21 +668,21 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
      the command name, shellcheck SC2037. A variable that holds a command name
      by convention keeps its ordinary use. */
   if (input.local_vars.count() == 1 && !input.command_literal.is_empty()) {
-    let const &value = input.local_vars[0].value;
+    let const &value = input.local_vars[0].get_value();
     let const value_is_bare_word =
         value.segments.count() == 1 &&
         (value.segments[0].kind == WordSegment::Kind::UnquotedText ||
          value.segments[0].kind == WordSegment::Kind::LiteralText);
     if (value_is_bare_word) {
       let const assigned = value.segments[0].text.view();
-      let const name = input.local_vars[0].name.view();
+      let const name = input.local_vars[0].get_name();
       let const value_names_a_command =
           !COMMAND_VALUED_VARIABLES.contains(name) &&
           get_analysis_command_info(assigned).id != command_name_id::Unknown &&
           input.command_id() == command_name_id::Unknown;
       if (input.command_literal[0] == '-' || value_names_a_command) {
         actx.report_diagnostic(diagnostic_id::sc2037,
-                               input.local_vars[0].location,
+                               input.local_vars[0].get_location(),
                                {name, input.command_literal});
         has_explained_resolution_failure = true;
       }
@@ -697,7 +697,7 @@ fn check_prefix_assignment_reads(AnalysisContext &actx,
       const StringView referenced{segment.text.data(), segment.text.count()};
       bool has_name_prefix = false;
       for (let const &var : input.local_vars) {
-        if (var.name.view() != referenced) continue;
+        if (var.get_name() != referenced) continue;
 
         has_name_prefix = !prefix_value_is_own_name(var);
         break;
@@ -805,6 +805,7 @@ fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
     -> assignment_value_shape
 {
   assignment_value_shape shape{};
+  let has_reported_array_collapse = false;
 
   for (let const &segment : value_word.segments) {
     if (segment.kind != WordSegment::Kind::UnquotedText)
@@ -831,11 +832,19 @@ fn scan_assignment_value(AnalysisContext &actx, const Word &value_word,
       shape.has_unquoted_pattern = true;
     }
 
-    if (segment.kind == WordSegment::Kind::VariableReference &&
-        segment.text.view() == "@")
-    {
-      actx.report_diagnostic(diagnostic_id::sc2124, location);
-      break;
+    if (segment.kind == WordSegment::Kind::VariableReference) {
+      let const segment_location =
+          segment.get_source_location(location.source_name_index)
+              .value_or(location);
+      actx.note_variable_occurrence(
+          segment.text.view(),
+          expansion_location_with_sigil(actx, segment_location),
+          variable_occurrence_kind::Reference);
+
+      if (segment.text.view() == "@" && !has_reported_array_collapse) {
+        actx.report_diagnostic(diagnostic_id::sc2124, location);
+        has_reported_array_collapse = true;
+      }
     }
   }
 

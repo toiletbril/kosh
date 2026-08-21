@@ -469,9 +469,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      assignments, which persist in the current shell. */
   if (program_args.is_empty()) {
     for (let const &var : m_local_vars) {
-      let const name = var.name.view();
-      let value = cxt.expand_word_for_assignment(var.value);
-      if (var.is_append) do_apply_append(name, value);
+      let const name = var.get_name();
+      let value = cxt.expand_word_for_assignment(var.get_value());
+      if (var.is_append()) do_apply_append(name, value);
       cxt.set_shell_variable(name, value);
       if (cxt.export_all()) {
         cxt.record_environment_change(name);
@@ -504,7 +504,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (let const token : m_args)
       ran_substitution = ran_substitution || do_token_ran_substitution(token);
     for (let const &var : m_local_vars)
-      ran_substitution = ran_substitution || var.value.runs_substitution();
+      ran_substitution =
+          ran_substitution || var.get_value().runs_substitution();
     for (let const &assignment : m_array_args)
       for (let const token : assignment.elements)
         ran_substitution = ran_substitution || do_token_ran_substitution(token);
@@ -532,7 +533,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The assignments apply left to right, each committed before the next is
      expanded, so a later value reads an earlier same-line one. */
   for (let const &var : m_local_vars) {
-    let const name = var.name.view();
+    let const name = var.get_name();
     if (cxt.is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
     const bool is_read_field_separator =
@@ -542,13 +543,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (!is_read_field_separator) previous = os::get_environment_variable(name);
     let expanded_value = String{cxt.scratch_allocator()};
     try {
-      expanded_value = cxt.expand_word_for_assignment(var.value);
+      expanded_value = cxt.expand_word_for_assignment(var.get_value());
     } catch (const ErrorWithLocation &) {
       throw;
     } catch (const Error &e) {
       relocate_error(e, source_location());
     }
-    if (var.is_append) do_apply_append(name, expanded_value);
+    if (var.is_append()) do_apply_append(name, expanded_value);
 
     /* A special builtin keeps the assignment outside the bash mood, so it
        commits to the store. The bash mood drops it after the command, so it

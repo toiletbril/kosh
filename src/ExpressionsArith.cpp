@@ -564,6 +564,10 @@ fn SelectLoop::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
 
+  actx.note_variable_occurrence(m_variable_name, m_variable_location,
+                                variable_occurrence_kind::Assignment,
+                                !is_unconditional ||
+                                    actx.has_seen_runtime_definer);
   actx.note_variable_binding_record(
       m_variable_name, m_variable_location, assignment_binder::SelectLoop,
       !is_unconditional || actx.has_seen_runtime_definer);
@@ -934,6 +938,10 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
      starts from an empty table and the outer constants are restored after. */
   let saved_constants = steal(actx.constant_variables);
   actx.constant_variables = StringMap<String>{heap_allocator()};
+  let saved_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let saved_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
@@ -965,6 +973,9 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
       steal(saved_inherited_global_assigned_names);
   actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
   actx.constant_variables = steal(saved_constants);
+  actx.variable_occurrence_assignments = steal(saved_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(saved_inherited_occurrence_assignments);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
   actx.is_analyzing_condition = was_analyzing_condition;
@@ -1066,6 +1077,10 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
      directory, and runtime-definer effects outlive the body. */
   let saved_constants = steal(actx.constant_variables);
   actx.constant_variables = StringMap<String>{heap_allocator()};
+  let saved_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let saved_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
   let const defined_function_insertion_count =
       actx.defined_function_insertions.count();
   let const known_alias_insertion_count = actx.known_alias_insertions.count();
@@ -1077,6 +1092,10 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.current_source_effects = nullptr;
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = StringMap<SourceLocation>{heap_allocator()};
+  actx.inherited_variable_occurrence_assignments =
+      steal(actx.variable_occurrence_assignments);
+  actx.variable_occurrence_assignments =
+      StringMap<variable_occurrence_state>{heap_allocator()};
   actx.apply_scope_definitions(m_analysis_scope_definitions);
   let const saved_loop_body_depth = actx.loop_body_depth;
   actx.loop_body_depth = 0;
@@ -1103,6 +1122,9 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.inherited_assigned_names = steal(saved_inherited_assigned_names);
   actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
+  actx.variable_occurrence_assignments = steal(saved_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(saved_inherited_occurrence_assignments);
   actx.rollback_defined_functions(defined_function_insertion_count);
   actx.rollback_known_aliases(known_alias_insertion_count);
 }
@@ -1143,7 +1165,7 @@ fn RedirectedCommand::analyze(AnalysisContext &actx,
   /* The lint input borrows its lists. This node has no command word and no
      prefix assignment, and an empty list allocates nothing. */
   let const no_args = ArrayList<const Token *>{heap_allocator()};
-  let const no_prefix_assignments = SparseList<prefix_assignment>{};
+  let const no_prefix_assignments = SparseList<PrefixAssignment>{};
   let const lint_input = command_lint_input{no_args,
                                             m_redirections,
                                             no_prefix_assignments,
