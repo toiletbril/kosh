@@ -40,7 +40,7 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","method":"initialized","params":{}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/server-test.shit","languageId":"shellscript","version":1,"text":"if\n"}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/server-test.shit","version":2},"contentChanges":[{"text":"#!/bin/sh\nvalue=one\nshow() { echo \"$value\"; }\nshow\nprintf ok\nls\nact\npath-only\nlater\nlater() { :; }\nformatted-command\necho \"$future\"\nfuture=one\nfuture=two\necho \"$future\"\nrepeat() { :; }\nrepeat() { :; }\nrepeat\nnever-defined\n[ x == y ]\n"}]}}'
-  frame '{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"position":{"line":4,"character":2}}}'
+  frame '{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"position":{"line":4,"character":6}}}'
   frame '{"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/variable-state.sh","languageId":"bash","version":1,"text":"used=one\necho \"$used\"\nunused=two\necho \"$missing\"\nunset used\necho \"$used\"\n"}}}'
   frame '{"jsonrpc":"2.0","id":121,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/variable-state.sh"}}}'
@@ -169,14 +169,17 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":108,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/valueless-declaration.sh"},"position":{"line":6,"character":9}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/path-completion.sh","languageId":"sh","version":1,"text":"path-onl\n"}}}'
   frame '{"jsonrpc":"2.0","id":109,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/path-completion.sh"},"position":{"line":0,"character":8}}}'
-  frame '{"jsonrpc":"2.0","id":110,"method":"completionItem/resolve","params":{"label":"act","kind":3,"data":{"command":"act"}}}'
+  frame '{"jsonrpc":"2.0","id":110,"method":"completionItem/resolve","params":{"label":"act","kind":17,"data":{"command":"act"}}}'
   frame '{"jsonrpc":"2.0","id":111,"method":"completionItem/resolve","params":{"label":"plain-item","kind":17}}'
+  frame '{"jsonrpc":"2.0","id":139,"method":"completionItem/resolve","params":{"label":"printf","kind":3,"data":{"command":"printf"}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/koshkit-only.shit","languageId":"shit","version":1,"text":"calc 1 + 1\n"}}}'
   frame '{"jsonrpc":"2.0","id":112,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/koshkit-only.shit"},"position":{"line":0,"character":1}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/koshkit-posix.sh","languageId":"sh","version":1,"text":"calc 1 + 1\n"}}}'
   frame '{"jsonrpc":"2.0","id":120,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/koshkit-posix.sh"},"position":{"line":0,"character":1}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/keyword-completion.sh","languageId":"sh","version":1,"text":"esa\n"}}}'
   frame '{"jsonrpc":"2.0","id":113,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/keyword-completion.sh"},"position":{"line":0,"character":3}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit","languageId":"shit","version":1,"text":"koshkit ca\n"}}}'
+  frame '{"jsonrpc":"2.0","id":140,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit"},"position":{"line":0,"character":10}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh","languageId":"sh","version":1,"text":"name=first\nalias gs=\"git status\"\ngreet() { echo \"$name\"; }\ngs\ngreet\n"}}}'
   frame '{"jsonrpc":"2.0","id":114,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":2,"character":18}}}'
   frame '{"jsonrpc":"2.0","id":115,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":2,"character":18},"newName":"renamed"}}'
@@ -184,6 +187,10 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":117,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":4,"character":2},"newName":"hello"}}'
   frame '{"jsonrpc":"2.0","id":118,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":2,"character":11},"newName":"speak"}}'
   frame '{"jsonrpc":"2.0","id":119,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":0,"character":1},"newName":"9bad"}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/formatting.sh","languageId":"sh","version":1,"text":"if true; then echo dash; fi\n"}}}'
+  frame '{"jsonrpc":"2.0","id":137,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/formatting.sh"},"options":{"tabSize":2,"insertSpaces":true}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/formatting.sh","version":2},"contentChanges":[{"text":"if true\nthen\n  echo dash\nfi\n"}]}}'
+  frame '{"jsonrpc":"2.0","id":138,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/formatting.sh"},"options":{"tabSize":8,"insertSpaces":false}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -194,13 +201,18 @@ status=$?
 printf 'status=%s\n' "$status"
 check_contains initialize '"positionEncoding":"utf-8"'
 check_contains code-action-capability '"codeActionKinds":["quickfix","source.fixAll.kosh"]'
+check_contains formatting-capability '"documentFormattingProvider":true'
 check_contains diagnostics '"severity":1'
-check_contains completion '"label":"printf"'
+check_contains completion-builtin '"id":2,"result":[{"label":"printf","kind":3,"data":{"command":"printf"}'
 check_contains completion-resolve-capability '"completionProvider":{"resolveProvider":true}'
-check_contains completion-path-command '"label":"path-only","kind":3,"data":{"command":"path-only"}'
-check_contains completion-resolve-help '"id":110,"result":{"label":"act","kind":3,"data":{"command":"act"},"documentation":"allowed command help'
+check_contains completion-path-command '"label":"path-only","kind":17,"data":{"command":"path-only"}'
+check_contains completion-resolve-help '"id":110,"result":{"label":"act","kind":17,"data":{"command":"act"},"documentation":"allowed command help'
 check_contains completion-resolve-passthrough '"id":111,"result":{"label":"plain-item","kind":17}'
+check_contains completion-builtin-help '"id":139,"result":{"label":"printf","kind":3,"data":{"command":"printf"},"documentation":"DESCRIPTION\n  The printf builtin'
 check_contains completion-keyword '"id":113,"result":[{"label":"esac","kind":14,"data":{"command":"esac"}'
+check_contains completion-subcommand '"label":"cat","textEdit":{"range":{"start":{"line":0,"character":8},"end":{"line":0,"character":10}},"newText":"cat"}'
+check_contains document-formatting '"id":137,"result":[{"range":{"start":{"line":0,"character":0},"end":{"line":1,"character":0}},"newText":"if true\nthen\n  echo dash\nfi\n"}]'
+check_contains unchanged-formatting '"id":138,"result":[]'
 check_contains rename-capability '"renameProvider":{"prepareProvider":true}'
 check_contains prepare-rename '"id":114,"result":{"range":{"start":{"line":2,"character":17},"end":{"line":2,"character":21}},"placeholder":"name"}'
 check_contains rename-variable '"id":115,"result":{"changes":{"file:///tmp/rename-target.sh":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":4}},"newText":"renamed"},{"range":{"start":{"line":2,"character":17},"end":{"line":2,"character":21}},"newText":"renamed"}]}}}'
@@ -485,10 +497,11 @@ esac
 unterminated_output=$(
   {
     frame '{"jsonrpc":"2.0","id":60,"method":"initialize","params":{"capabilities":{}}}'
-    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh","languageId":"bash","version":1,"text":"x=1\nfunction f { printf '\''oops ; }\n"}}}'
+    frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh","languageId":"bash","version":1,"text":"x=1\nfunction f { printf '\''oops ; }\nif\n"}}}'
     frame '{"jsonrpc":"2.0","id":61,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh"},"position":{"line":1,"character":10}}}'
     frame '{"jsonrpc":"2.0","id":62,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh"}}}'
-    frame '{"jsonrpc":"2.0","id":63,"method":"shutdown","params":null}'
+    frame '{"jsonrpc":"2.0","id":63,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh"},"options":{"tabSize":2,"insertSpaces":true}}}'
+    frame '{"jsonrpc":"2.0","id":64,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
   } | "$BIN" --language-server
 )
@@ -499,6 +512,12 @@ case $unterminated_output in
   printf 'unterminated-survives=ok\n'
   ;;
 *) printf 'unterminated-survives=missing\n' ;;
+esac
+case $unterminated_output in
+*'"id":63,"error":{"code":-32803,'*)
+  printf 'unterminated-formatting=ok\n'
+  ;;
+*) printf 'unterminated-formatting=missing\n' ;;
 esac
 
 shift_output=$(

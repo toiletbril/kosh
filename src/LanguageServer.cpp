@@ -1,4 +1,5 @@
 #include "CompletionInternal.hpp"
+#include "Formatter.hpp"
 #include "LanguageServerProtocol.hpp"
 #include "ShellVariables.hpp"
 
@@ -30,6 +31,7 @@ enum class request_method : u8
   Completion,
   ResolveCompletion,
   CodeAction,
+  Formatting,
   Definition,
   Hover,
   SemanticTokens,
@@ -49,6 +51,7 @@ constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
     {SSK("textDocument/completion"),          request_method::Completion       },
     {SSK("completionItem/resolve"),           request_method::ResolveCompletion},
     {SSK("textDocument/codeAction"),          request_method::CodeAction       },
+    {SSK("textDocument/formatting"),          request_method::Formatting       },
     {SSK("textDocument/definition"),          request_method::Definition       },
     {SSK("textDocument/hover"),               request_method::Hover            },
     {SSK("textDocument/semanticTokens/full"), request_method::SemanticTokens   },
@@ -57,6 +60,7 @@ constexpr static_string_entry<request_method> REQUEST_METHOD_ENTRIES[] = {
     {SSK("textDocument/rename"),              request_method::Rename           },
 };
 constexpr StaticStringMap REQUEST_METHODS{REQUEST_METHOD_ENTRIES};
+constexpr i64 REQUEST_FAILED_ERROR = -32803;
 
 enum class rename_kind : u8
 {
@@ -84,6 +88,8 @@ private:
   fn close_document(const JsonValue *params) throws -> void;
   fn complete(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn resolve_completion(const JsonValue *id, const JsonValue *params) throws
+      -> bool;
+  fn format_document(const JsonValue *id, const JsonValue *params) throws
       -> bool;
   fn definition(const JsonValue *id, const JsonValue *params) throws -> bool;
   fn hover(const JsonValue *id, const JsonValue *params) throws -> bool;
@@ -311,6 +317,7 @@ fn Server::initialize(const JsonValue *id, const JsonValue *params) throws
   result.append(",\"textDocumentSync\":{\"openClose\":true,\"change\":1},"
                 "\"completionProvider\":{\"resolveProvider\":true},"
                 "\"definitionProvider\":true,\"hoverProvider\":true,"
+                "\"documentFormattingProvider\":true,"
                 "\"documentSymbolProvider\":true,"
                 "\"renameProvider\":{\"prepareProvider\":true},");
   if (m_supports_quick_fixes || m_supports_fix_all) {
@@ -669,12 +676,15 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
     if (result.is_command_position &&
         !os::has_directory_separator(candidate.view()))
     {
-      /* 14 is CompletionItemKind.Keyword and 3 is
-         CompletionItemKind.Function. */
-      if (KEYWORDS.find(candidate.view()).has_value())
+      if (KEYWORDS.find(candidate.view()).has_value()) {
         response.append(",\"kind\":14,\"data\":{\"command\":");
-      else
+      } else if (search_builtin(candidate.view()).has_value() ||
+                 m_context.find_function(candidate.view()) != nullptr)
+      {
         response.append(",\"kind\":3,\"data\":{\"command\":");
+      } else {
+        response.append(",\"kind\":17,\"data\":{\"command\":");
+      }
       append_json_string(response, candidate.view());
       response.push('}');
     }
@@ -730,6 +740,33 @@ fn Server::append_text_edit(String &output, const Document &document,
   output.append(",\"newText\":");
   append_json_string(output, replacement);
   output.push('}');
+}
+
+fn Server::format_document(const JsonValue *id, const JsonValue *params) throws
+    -> bool
+{
+  let *document = request_document(params);
+  if (document == nullptr) return send_result(id, "[]");
+  select_document_mood(*document);
+  let const arena_mark = m_ast_arena.mark();
+  defer { m_ast_arena.release(arena_mark); };
+  let errors = ArrayList<String>{heap_allocator()};
+  let formatted = format_shell_source(document->normalized_source.view(),
+                                      document->mood, m_ast_arena, errors);
+  if (!formatted.has_value()) {
+    let const message =
+        errors.is_empty() ? StringView{"Formatting failed."} : errors[0].view();
+    return send_error(id, REQUEST_FAILED_ERROR, message);
+  }
+  if (formatted->view() == document->normalized_source.view())
+    return send_result(id, "[]");
+
+  let response = String{"["};
+  append_text_edit(response, *document, 0, document->normalized_source.count(),
+                   formatted->view());
+  response.push(']');
+
+  return send_result(id, response.view());
 }
 
 fn Server::open_workspace_edit(String &output, const Document &document) throws
@@ -1093,9 +1130,6 @@ fn Server::definition(const JsonValue *id, const JsonValue *params) throws
 
   return send_result(id, response.view());
 }
-
-/* The protocol code for a request the server understood and refused. */
-constexpr i64 REQUEST_FAILED_ERROR = -32803;
 
 /* A word that only prefixes a PATH entry still sits in command position, and it
    is renamed with the rest once the document defines the name. */
@@ -1993,6 +2027,7 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
   case request_method::Completion: return complete(id, params);
   case request_method::ResolveCompletion: return resolve_completion(id, params);
   case request_method::CodeAction: return code_actions(id, params);
+  case request_method::Formatting: return format_document(id, params);
   case request_method::Definition: return definition(id, params);
   case request_method::Hover: return hover(id, params);
   case request_method::SemanticTokens: return semantic_tokens(id, params);
