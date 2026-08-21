@@ -152,6 +152,36 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
      bodies are conditional. */
   let saved_tested_command_names = actx.tested_command_names.clone();
   let condition_failure_names = saved_tested_command_names.clone();
+  let merged_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let merged_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
+  let has_merged_occurrence_exit = false;
+  let do_merge_occurrence_states = [](auto &merged_states,
+                                      const auto &exit_states) throws -> void {
+    merged_states.for_each(
+        [&](StringView name, variable_occurrence_state &state) {
+          if (exit_states.find(name) == nullptr)
+            state.is_definitely_set = false;
+        });
+    exit_states.for_each(
+        [&](StringView name, const variable_occurrence_state &exit_state) {
+          let *state = merged_states.find(name);
+          if (state == nullptr) {
+            let merged_state = exit_state;
+            merged_state.is_definitely_set = false;
+            merged_states.set(name, steal(merged_state));
+            return;
+          }
+
+          for (let const assignment_index : exit_state.assignment_indices) {
+            if (!state->assignment_indices.find(assignment_index).has_value())
+              state->assignment_indices.push(assignment_index);
+          }
+          state->is_definitely_set =
+              state->is_definitely_set && exit_state.is_definitely_set;
+        });
+  };
   let is_first_branch = true;
   for (usize i = 0; i < m_branches.count(); i++) {
     let const & [ condition, body ] = m_branches[i];
@@ -170,10 +200,35 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         was_retaining_tested_command_names;
     let const is_dead_branch =
         has_folded_branch() && folded_branch_index() != i;
+    let condition_failure_occurrence_assignments =
+        actx.variable_occurrence_assignments.clone();
+    let condition_failure_inherited_occurrence_assignments =
+        actx.inherited_variable_occurrence_assignments.clone();
     let const was_silenced = actx.should_silence_unresolved_commands;
     if (is_dead_branch) actx.should_silence_unresolved_commands = true;
     body->analyze(actx, false);
     actx.should_silence_unresolved_commands = was_silenced;
+
+    if (!is_dead_branch) {
+      if (!has_merged_occurrence_exit) {
+        merged_occurrence_assignments =
+            actx.variable_occurrence_assignments.clone();
+        merged_inherited_occurrence_assignments =
+            actx.inherited_variable_occurrence_assignments.clone();
+        has_merged_occurrence_exit = true;
+      } else {
+        do_merge_occurrence_states(merged_occurrence_assignments,
+                                   actx.variable_occurrence_assignments);
+        do_merge_occurrence_states(
+            merged_inherited_occurrence_assignments,
+            actx.inherited_variable_occurrence_assignments);
+      }
+    }
+
+    actx.variable_occurrence_assignments =
+        steal(condition_failure_occurrence_assignments);
+    actx.inherited_variable_occurrence_assignments =
+        steal(condition_failure_inherited_occurrence_assignments);
 
     actx.tested_command_names = condition_failure_names.clone();
     condition->append_presence_tested_command_names(
@@ -190,6 +245,25 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
   actx.should_silence_unresolved_commands = was_else_silenced;
   actx.tested_command_names = steal(saved_tested_command_names);
+
+  if (!else_is_dead) {
+    if (!has_merged_occurrence_exit) {
+      merged_occurrence_assignments =
+          actx.variable_occurrence_assignments.clone();
+      merged_inherited_occurrence_assignments =
+          actx.inherited_variable_occurrence_assignments.clone();
+    } else {
+      do_merge_occurrence_states(merged_occurrence_assignments,
+                                 actx.variable_occurrence_assignments);
+      do_merge_occurrence_states(
+          merged_inherited_occurrence_assignments,
+          actx.inherited_variable_occurrence_assignments);
+    }
+  }
+
+  actx.variable_occurrence_assignments = steal(merged_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(merged_inherited_occurrence_assignments);
 
   /* A branch ran conditionally and may have reassigned a name, so a value
      recorded before this if is no longer proven after it. */
@@ -878,10 +952,84 @@ fn CaseClause::analyze(AnalysisContext &actx,
                        bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
-  for (let const &item : m_items) {
+  let const common_occurrence_assignments =
+      actx.variable_occurrence_assignments.clone();
+  let const common_inherited_occurrence_assignments =
+      actx.inherited_variable_occurrence_assignments.clone();
+  let merged_occurrence_assignments = common_occurrence_assignments.clone();
+  let merged_inherited_occurrence_assignments =
+      common_inherited_occurrence_assignments.clone();
+  let continued_occurrence_assignments =
+      common_occurrence_assignments.clone();
+  let continued_inherited_occurrence_assignments =
+      common_inherited_occurrence_assignments.clone();
+  let has_continued_occurrence_path = false;
+  let do_merge_occurrence_states = [](auto &merged_states,
+                                      const auto &exit_states) throws -> void {
+    merged_states.for_each(
+        [&](StringView name, variable_occurrence_state &state) {
+          if (exit_states.find(name) == nullptr)
+            state.is_definitely_set = false;
+        });
+    exit_states.for_each(
+        [&](StringView name, const variable_occurrence_state &exit_state) {
+          let *state = merged_states.find(name);
+          if (state == nullptr) {
+            let merged_state = exit_state;
+            merged_state.is_definitely_set = false;
+            merged_states.set(name, steal(merged_state));
+            return;
+          }
+
+          for (let const assignment_index : exit_state.assignment_indices) {
+            if (!state->assignment_indices.find(assignment_index).has_value())
+              state->assignment_indices.push(assignment_index);
+          }
+          state->is_definitely_set =
+              state->is_definitely_set && exit_state.is_definitely_set;
+        });
+  };
+
+  for (usize i = 0; i < m_items.count(); i++) {
+    let const &item = m_items[i];
     ASSERT(item.body != nullptr);
+
+    actx.variable_occurrence_assignments =
+        common_occurrence_assignments.clone();
+    actx.inherited_variable_occurrence_assignments =
+        common_inherited_occurrence_assignments.clone();
+    if (has_continued_occurrence_path) {
+      do_merge_occurrence_states(actx.variable_occurrence_assignments,
+                                 continued_occurrence_assignments);
+      do_merge_occurrence_states(
+          actx.inherited_variable_occurrence_assignments,
+          continued_inherited_occurrence_assignments);
+    }
+
     item.body->analyze(actx, false);
+
+    let const has_later_item = i + 1 < m_items.count();
+    if (item.terminator != case_terminator::FallThrough || !has_later_item) {
+      do_merge_occurrence_states(merged_occurrence_assignments,
+                                 actx.variable_occurrence_assignments);
+      do_merge_occurrence_states(
+          merged_inherited_occurrence_assignments,
+          actx.inherited_variable_occurrence_assignments);
+    }
+
+    has_continued_occurrence_path =
+        has_later_item && item.terminator != case_terminator::Break;
+    if (has_continued_occurrence_path) {
+      continued_occurrence_assignments =
+          actx.variable_occurrence_assignments.clone();
+      continued_inherited_occurrence_assignments =
+          actx.inherited_variable_occurrence_assignments.clone();
+    }
   }
+
+  actx.variable_occurrence_assignments = steal(merged_occurrence_assignments);
+  actx.inherited_variable_occurrence_assignments =
+      steal(merged_inherited_occurrence_assignments);
 
   ASSERT(m_word != nullptr);
 

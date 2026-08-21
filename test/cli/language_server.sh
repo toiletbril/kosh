@@ -46,6 +46,8 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":121,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/variable-state.sh"}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/variable-state.sh","version":2},"contentChanges":[{"text":"used=one\necho \"plain\"\nunused=two\necho \"$missing\"\nunset used\necho \"$used\"\n"}]}}'
   frame '{"jsonrpc":"2.0","id":122,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/variable-state.sh"}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/variable-control-flow.sh","languageId":"bash","version":1,"text":"if test \"$1\"; then\n  if_value=one\nfi\necho \"$if_value\"\ntest \"$1\" && and_value=one\necho \"$and_value\"\ntest \"$1\" || or_value=one\necho \"$or_value\"\ncase $1 in\na) case_value=one ;;&\nb) case_value=two ;;\nesac\necho \"$case_value\"\n"}}}'
+  frame '{"jsonrpc":"2.0","id":123,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":"file:///tmp/variable-control-flow.sh"}}}'
   frame '{"jsonrpc":"2.0","id":10,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"position":{"line":2,"character":17}}}'
   frame '{"jsonrpc":"2.0","id":11,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"position":{"line":3,"character":1}}}'
   frame '{"jsonrpc":"2.0","id":12,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"},"position":{"line":4,"character":1}}}'
