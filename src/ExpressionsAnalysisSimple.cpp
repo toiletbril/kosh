@@ -604,6 +604,22 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
       let const name_location =
           m_args[i]->source_location().subspan(0, recorded_name.length);
+      if (recorded_value != nullptr) {
+        for (let const &segment : recorded_value->segments) {
+          if (segment.kind != WordSegment::Kind::VariableReference) continue;
+
+          let const segment_location =
+              segment
+                  .get_source_location(
+                      m_args[i]->source_location().source_name_index)
+                  .value_or(m_args[i]->source_location());
+          actx.note_variable_occurrence(
+              segment.text.view(),
+              expansion_location_with_sigil(actx, segment_location),
+              variable_occurrence_kind::Reference);
+        }
+      }
+
       actx.note_variable_occurrence(
           recorded_name, name_location, variable_occurrence_kind::Assignment,
           !is_unconditional || actx.has_seen_runtime_definer, is_append);
@@ -687,6 +703,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         arg->kind() == Token::Kind::Word
             ? &static_cast<const tokens::WordToken *>(arg)->word()
             : nullptr;
+    let is_assignment_builtin_operand = false;
+    if (is_operand && command_is_assignment_builtin && word != nullptr) {
+      is_assignment_builtin_operand =
+          word->get_assignment_split().has_value() ||
+          word->get_quoted_assignment_split().has_value();
+    }
 
     bool has_dollar_bracket = false;
     bool has_multi_digit_positional = false;
@@ -834,9 +856,12 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           let const segment_location =
               segment.get_source_location(arg_location.source_name_index)
                   .value_or(arg_location);
-          actx.note_variable_occurrence(
-              referenced, expansion_location_with_sigil(actx, segment_location),
-              variable_occurrence_kind::Reference);
+          if (!is_assignment_builtin_operand) {
+            actx.note_variable_occurrence(
+                referenced,
+                expansion_location_with_sigil(actx, segment_location),
+                variable_occurrence_kind::Reference);
+          }
           actx.note_positional_reference(referenced);
           if (!is_operand) break;
 

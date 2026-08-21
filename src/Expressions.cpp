@@ -463,7 +463,8 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
 
   if (name.length > 1 && name[0] == '#') name = name.substring(1);
   if (!lexer::word_is_variable_name(name) && !reference_names_positional(name))
-    return;
+    name = expressions::operand_target_name(name);
+  if (name.is_empty()) return;
 
   let occurrence = variable_occurrence_record{
       String{name}, location.position, location.length,

@@ -1004,12 +1004,39 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
     break;
   }
 
-  case command_name_id::Unset:
+  case command_name_id::Unset: {
+    let is_function_mode = false;
+    let has_ended_options = false;
     for (usize i = 1; i < args.count(); i++) {
       if (args[i]->kind() != Token::Kind::Word) continue;
       let const raw = args[i]->raw_string();
-      let const target = operand_target_name(raw.view());
-      if (!target.is_empty()) {
+      let const raw_view = raw.view();
+      if (!has_ended_options && raw_view == "--") {
+        has_ended_options = true;
+      } else if (!has_ended_options && raw_view.length > 1 &&
+                 raw_view[0] == '-' && raw_view.find_character('f').has_value())
+      {
+        is_function_mode = true;
+      }
+    }
+
+    has_ended_options = false;
+    for (usize i = 1; i < args.count(); i++) {
+      if (args[i]->kind() != Token::Kind::Word) continue;
+      let const raw = args[i]->raw_string();
+      let const raw_view = raw.view();
+      if (!has_ended_options && raw_view == "--") {
+        has_ended_options = true;
+        continue;
+      }
+      if (!has_ended_options && raw_view.length > 1 && raw_view[0] == '-') {
+        continue;
+      }
+
+      let const target = operand_target_name(raw_view);
+      if (!is_function_mode && !target.is_empty() &&
+          !raw_view.find_character('[').has_value())
+      {
         let const name_location =
             raw.count() == target.length
                 ? args[i]->source_location().subspan(0, target.length)
@@ -1028,6 +1055,7 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
                                args[i]->source_location());
     }
     break;
+  }
 
   case command_name_id::Find:
     for (usize i = 1; i + 1 < args.count(); i++) {
