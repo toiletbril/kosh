@@ -246,6 +246,20 @@ Transcript probes must limit both matched records and output bytes before
 reading content. Active review ownership must be resolved before any
 overlapping inspection.
 Every SourceLocation subspan must prove both offset and length bounds.
+Control-flow merge probes must use a nonconstant condition when they need
+branch uncertainty. Exact patch anchors must be copied from the latest
+inspection.
+Language server probes must complete initialize before any document request.
+Shell search patterns containing command syntax must use single quotes.
+Catalog availability checks must use established behavior predicates.
+Fallback executable probes must print the selected path.
+Guidance probes must resolve available paths before reading several files.
+Content-driven build invalidation must have an explicit dependency when equal
+timestamps are possible. Platform timing probes must verify the host tool
+interface before a long run. Build verification must compare embedded version
+metadata with the current commit. Protocol workload probes must redirect the
+complete emitter group. Asynchronous workload wrappers must capture and print
+the status after `wait`.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

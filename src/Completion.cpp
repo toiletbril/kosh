@@ -279,9 +279,11 @@ private:
 };
 
 template <typename Collector>
-static fn collect_command_names(StringView token, command_match_mode match_mode,
-                                EvalContext &context,
-                                Collector &collector) throws -> void
+static fn
+collect_command_names(StringView token, command_match_mode match_mode,
+                      EvalContext &context, Collector &collector,
+                      const ArrayList<StringView> *extra_command_names) throws
+    -> void
 {
   let const token_is_glob = match_mode == command_match_mode::Glob;
   let const is_case_sensitive = utils::token_has_uppercase(token);
@@ -321,6 +323,11 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
       do_add(util_name.view());
   }
 
+  if (extra_command_names != nullptr) {
+    for (let const name : *extra_command_names)
+      do_add(name);
+  }
+
   context.for_each_function_name(do_add);
   context.for_each_alias_name(do_add);
 
@@ -347,13 +354,14 @@ static fn collect_command_names(StringView token, command_match_mode match_mode,
   }
 }
 
-static fn complete_command_name_prefix(StringView token,
-                                       command_match_mode match_mode,
-                                       EvalContext &context) throws
+static fn complete_command_name_prefix(
+    StringView token, command_match_mode match_mode, EvalContext &context,
+    const ArrayList<StringView> *extra_command_names) throws
     -> GhostPrefixCollector
 {
   let collector = GhostPrefixCollector{};
-  collect_command_names(token, match_mode, context, collector);
+  collect_command_names(token, match_mode, context, collector,
+                        extra_command_names);
   return collector;
 }
 
@@ -374,15 +382,18 @@ static fn compute_longest_common_prefix(const ArrayList<String> &candidates,
                 first.substring_of_length(0, prefix_length)};
 }
 
-fn complete_command_names(StringView token, command_match_mode match_mode,
-                          EvalContext &context) throws -> ArrayList<String>
+fn complete_command_names(
+    StringView token, command_match_mode match_mode, EvalContext &context,
+    const ArrayList<StringView> *extra_command_names) throws
+    -> ArrayList<String>
 {
   let collector = CommandListCollector{};
 
   LOG(Debug, "completing command position for token '%.*s'",
       static_cast<int>(token.length), token.data);
 
-  collect_command_names(token, match_mode, context, collector);
+  collect_command_names(token, match_mode, context, collector,
+                        extra_command_names);
   return collector.take();
 }
 
@@ -870,7 +881,8 @@ static fn keep_hinted_extension(ArrayList<String> candidates,
 }
 
 fn complete(StringView line, usize cursor, EvalContext &context,
-            const Path &base_directory, completion_mode mode) throws
+            const Path &base_directory, completion_mode mode,
+            const ArrayList<StringView> *extra_command_names) throws
     -> completion_result
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1015,7 +1027,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       candidates = complete_command_names(
           stage_token,
           token_is_glob ? command_match_mode::Glob : command_match_mode::Prefix,
-          context);
+          context, extra_command_names);
     }
   } else if (is_command && !token_has_path_separator) {
     /* An empty command token would enumerate every PATH command on each
@@ -1030,13 +1042,13 @@ fn complete(StringView line, usize cursor, EvalContext &context,
             complete_command_names(stage_token,
                                    token_is_glob ? command_match_mode::Glob
                                                  : command_match_mode::Prefix,
-                                   context);
+                                   context, extra_command_names);
       } else {
         let collector = complete_command_name_prefix(
             stage_token,
             token_is_glob ? command_match_mode::Glob
                           : command_match_mode::Prefix,
-            context);
+            context, extra_command_names);
         ghost_candidate_count = collector.count();
         source_candidate_scan_count = collector.source_scans();
         materialized_candidate_count = collector.materialized();

@@ -180,6 +180,10 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":113,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/keyword-completion.sh"},"position":{"line":0,"character":3}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit","languageId":"shit","version":1,"text":"koshkit ca\n"}}}'
   frame '{"jsonrpc":"2.0","id":140,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit"},"position":{"line":0,"character":10}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/document-function.sh","languageId":"sh","version":1,"text":"document_before() { :; }\ndocument_\ndocument_after() { :; }\n"}}}'
+  frame '{"jsonrpc":"2.0","id":141,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/document-function.sh"},"position":{"line":1,"character":9}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/bare-koshkit.shit","languageId":"shit","version":1,"text":"cal\n"}}}'
+  frame '{"jsonrpc":"2.0","id":142,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/bare-koshkit.shit"},"position":{"line":0,"character":3}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh","languageId":"sh","version":1,"text":"name=first\nalias gs=\"git status\"\ngreet() { echo \"$name\"; }\ngs\ngreet\n"}}}'
   frame '{"jsonrpc":"2.0","id":114,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":2,"character":18}}}'
   frame '{"jsonrpc":"2.0","id":115,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/rename-target.sh"},"position":{"line":2,"character":18},"newName":"renamed"}}'
@@ -191,6 +195,8 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":137,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/formatting.sh"},"options":{"tabSize":2,"insertSpaces":true}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/formatting.sh","version":2},"contentChanges":[{"text":"if true\nthen\n  echo dash\nfi\n"}]}}'
   frame '{"jsonrpc":"2.0","id":138,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/formatting.sh"},"options":{"tabSize":8,"insertSpaces":false}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/formatting.sh","version":3},"contentChanges":[{"text":"if true\nthen\n  echo dash\nfi\n"}]}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///tmp/not-open.sh","version":1},"contentChanges":[{"text":":\n"}]}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///tmp/server-test.shit"}}}'
   frame '{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
@@ -211,8 +217,16 @@ check_contains completion-resolve-passthrough '"id":111,"result":{"label":"plain
 check_contains completion-builtin-help '"id":139,"result":{"label":"printf","kind":3,"data":{"command":"printf"},"documentation":"DESCRIPTION\n  The printf builtin'
 check_contains completion-keyword '"id":113,"result":[{"label":"esac","kind":14,"data":{"command":"esac"}'
 check_contains completion-subcommand '"label":"cat","textEdit":{"range":{"start":{"line":0,"character":8},"end":{"line":0,"character":10}},"newText":"cat"}'
+check_contains completion-document-function-after '"id":141,"result":[{"label":"document_after","kind":3,"data":{"command":"document_after"}'
+check_contains completion-document-function-before '"label":"document_before","kind":3,"data":{"command":"document_before"}'
+check_contains completion-bare-koshkit '"label":"calc","kind":3,"data":{"command":"calc"}'
 check_contains document-formatting '"id":137,"result":[{"range":{"start":{"line":0,"character":0},"end":{"line":1,"character":0}},"newText":"if true\nthen\n  echo dash\nfi\n"}]'
 check_contains unchanged-formatting '"id":138,"result":[]'
+formatting_diagnostic_count=$(printf '%s\n' "$output" | grep -o '"method":"textDocument/publishDiagnostics","params":{"uri":"file:///tmp/formatting.sh"' | wc -l | tr -d ' ')
+case $formatting_diagnostic_count in
+3) printf 'unchanged-change-skips-analysis=ok\n' ;;
+*) printf 'unchanged-change-skips-analysis=missing\n' ;;
+esac
 check_contains rename-capability '"renameProvider":{"prepareProvider":true}'
 check_contains prepare-rename '"id":114,"result":{"range":{"start":{"line":2,"character":17},"end":{"line":2,"character":21}},"placeholder":"name"}'
 check_contains rename-variable '"id":115,"result":{"changes":{"file:///tmp/rename-target.sh":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":4}},"newText":"renamed"},{"range":{"start":{"line":2,"character":17},"end":{"line":2,"character":21}},"newText":"renamed"}]}}}'

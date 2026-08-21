@@ -663,14 +663,21 @@ public:
     rebuild_lines();
   }
 
-  fn replace_source(StringView source, i64 document_version) throws -> void
+  fn replace_source(StringView source, i64 document_version) throws -> bool
   {
-    normalized_source = String{source};
-    normalized_source.normalize_crlf_line_endings();
     version = document_version;
+    if (source == normalized_source.view()) return false;
+
+    let replacement = String{source};
+    replacement.normalize_crlf_line_endings();
+    if (replacement.view() == normalized_source.view()) return false;
+
+    normalized_source = steal(replacement);
     /* A recorded position belongs to one revision. */
     symbol_records.clear();
     rebuild_lines();
+
+    return true;
   }
 
   pure fn get_line_bounds(usize line) const wontthrow -> line_bounds

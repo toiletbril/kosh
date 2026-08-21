@@ -43,11 +43,14 @@ struct completion_result
 
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory,
-            completion_mode mode = completion_mode::Ghost) throws
+            completion_mode mode = completion_mode::Ghost,
+            const ArrayList<StringView> *extra_command_names = nullptr) throws
     -> completion_result;
 
-fn complete_command_names(StringView token, command_match_mode match_mode,
-                          EvalContext &context) throws -> ArrayList<String>;
+fn complete_command_names(
+    StringView token, command_match_mode match_mode, EvalContext &context,
+    const ArrayList<StringView> *extra_command_names = nullptr) throws
+    -> ArrayList<String>;
 fn complete_filesystem_names(StringView token, EvalContext &context,
                              const Path &base_directory) throws
     -> ArrayList<String>;

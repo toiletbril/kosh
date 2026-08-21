@@ -1,5 +1,6 @@
 #include "CompletionInternal.hpp"
 #include "Formatter.hpp"
+#include "Koshkit.hpp"
 #include "LanguageServerProtocol.hpp"
 #include "ShellVariables.hpp"
 
@@ -156,6 +157,7 @@ private:
       heap_allocator()};
   ArrayList<String> m_published_auxiliary_uris{heap_allocator()};
   ArrayList<String> m_current_auxiliary_uris{heap_allocator()};
+  StringMap<String> m_builtin_information_cache{heap_allocator()};
   completion::shell_highlight_cache m_highlight_cache;
   Path m_workspace_root;
   position_encoding m_encoding{position_encoding::Utf16};
@@ -384,8 +386,11 @@ fn Server::change_document(const JsonValue *params) throws -> Document *
   if (document == nullptr) return nullptr;
   let const text = string_field(changes->array.back(), "text");
   if (!text.has_value()) return nullptr;
+  let const did_change =
+      document->replace_source(*text, version.value_or(document->version + 1));
+  if (!did_change) return nullptr;
+
   m_highlight_cache = completion::shell_highlight_cache{};
-  document->replace_source(*text, version.value_or(document->version + 1));
   document->mood = mood_for(*document);
 
   return document;
@@ -653,13 +658,17 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   select_document_mood(*document);
   let base_directory = m_workspace_root;
   if (document->path.has_value()) base_directory = document->path->parent();
+  let document_function_names = ArrayList<StringView>{heap_allocator()};
+  document_function_names.reserve(document->symbol_records.functions.count());
+  for (let const &function : document->symbol_records.functions)
+    document_function_names.push(function.name.view());
+
   let &resolver = m_context.get_program_resolver();
-  resolver.begin_explicit_completion(
-      ProgramResolver::CompletionRefresh::Cached);
+  resolver.begin_explicit_completion(ProgramResolver::CompletionRefresh::Fresh);
   defer { resolver.end_explicit_completion(); };
-  let result = completion::complete(document->normalized_source.view(), *cursor,
-                                    m_context, base_directory,
-                                    completion::completion_mode::Listing);
+  let result = completion::complete(
+      document->normalized_source.view(), *cursor, m_context, base_directory,
+      completion::completion_mode::Listing, &document_function_names);
   let response = String{"["};
 
   for (usize index = 0; index < result.candidates.count(); index++) {
@@ -679,7 +688,12 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
       if (KEYWORDS.find(candidate.view()).has_value()) {
         response.append(",\"kind\":14,\"data\":{\"command\":");
       } else if (search_builtin(candidate.view()).has_value() ||
-                 m_context.find_function(candidate.view()) != nullptr)
+                 m_context.find_function(candidate.view()) != nullptr ||
+                 document_function_names.find(candidate.view()).has_value() ||
+                 (m_context.koshkit_utilities_are_reachable() &&
+                  koshkit::find_util(candidate.view()).has_value() &&
+                  resolver.get_status(candidate.view()) !=
+                      ProgramResolver::Status::Runnable))
       {
         response.append(",\"kind\":3,\"data\":{\"command\":");
       } else {
@@ -1433,10 +1447,17 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
   };
 
   if (search_builtin(command).has_value()) {
+    if (let const *cached = m_builtin_information_cache.find(command);
+        cached != nullptr)
+      return String{cached->view()};
+
     let source = String{"help "};
     source.append(command);
+    let information = do_run_shell_help(steal(source));
+    if (!information.has_value()) return None;
+    m_builtin_information_cache.set(command, information->view());
 
-    return do_run_shell_help(steal(source));
+    return information;
   }
 
   let const paths = m_context.get_program_resolver().search(
@@ -1998,8 +2019,14 @@ fn Server::dispatch(const JsonValue &message) throws -> bool
     return true;
   }
   switch (*request) {
-  case request_method::DidOpen: return validate_all(open_document(params));
-  case request_method::DidChange: return validate_all(change_document(params));
+  case request_method::DidOpen: {
+    let *document = open_document(params);
+    return document == nullptr ? true : validate_all(document);
+  }
+  case request_method::DidChange: {
+    let *document = change_document(params);
+    return document == nullptr ? true : validate_all(document);
+  }
   case request_method::DidClose: close_document(params); return validate_all();
   case request_method::Completion: return complete(id, params);
   case request_method::ResolveCompletion: return resolve_completion(id, params);
