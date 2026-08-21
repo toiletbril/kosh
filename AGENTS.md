@@ -252,3 +252,5 @@ reuse.
   and the complete diff, run `git diff --check`, and confirm that README.md is
   untouched. Commit completed work, and never push or create external artifacts
   without an explicit request.
+- A full suite passes only after every shard finishes and no partial failure
+  artifact remains.
