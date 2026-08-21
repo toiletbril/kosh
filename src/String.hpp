@@ -33,6 +33,8 @@ public:
 
   mustuse fn clone() const throws -> String { return String{*this}; }
 
+  fn move_to_allocator(Allocator allocator) throws -> void;
+
   static fn from_in_base(u64 magnitude, bool is_negative, int_base base,
                          Allocator allocator) throws -> String
   {

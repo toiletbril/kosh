@@ -70,6 +70,14 @@ fn String::operator=(String &&other) wontthrow -> String &
   return *this;
 }
 
+fn String::move_to_allocator(Allocator allocator) throws -> void
+{
+  if (m_allocator == allocator) return;
+
+  let moved = String{allocator, view()};
+  *this = steal(moved);
+}
+
 fn String::clear() wontthrow -> void
 {
   m_length = 0;

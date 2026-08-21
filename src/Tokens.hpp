@@ -223,6 +223,22 @@ public:
   fn append(char byte) throws -> void { append(StringView{&byte, 1}); }
   fn push(char byte) throws -> void { append(StringView{&byte, 1}); }
 
+  fn move_to_allocator(Allocator allocator) throws -> void
+  {
+    if (allocator.get_kind() == Allocator::Kind::Heap || m_length == 0 ||
+        allocator.owns(m_data))
+    {
+      return;
+    }
+
+    let const bytes = allocator.alloc_array<char>(m_length);
+    std::memcpy(bytes, m_data, m_length);
+    if (m_capacity != 0)
+      heap_allocator().free_array(const_cast<char *>(m_data), m_capacity);
+    m_data = bytes;
+    m_capacity = 0;
+  }
+
 private:
   static constexpr usize MAXIMUM_TEXT_LENGTH =
       static_cast<usize>(~static_cast<u32>(0));
@@ -286,7 +302,10 @@ public:
             other.is_substitution_cache_in_function_arena},
         text{other.text}
   {
-    if (other.m_eval_cache != nullptr) get_eval_cache() = *other.m_eval_cache;
+    if (other.m_eval_cache != nullptr) {
+      let const block = heap_allocator().alloc_array<segment_eval_cache>(1);
+      m_eval_cache = new (block) segment_eval_cache{*other.m_eval_cache};
+    }
   }
 
   WordSegment(WordSegment &&other) wontthrow
@@ -298,10 +317,12 @@ public:
         was_ansi_c_quoted{other.was_ansi_c_quoted},
         is_substitution_cache_in_function_arena{
             other.is_substitution_cache_in_function_arena},
+        is_eval_cache_in_arena{other.is_eval_cache_in_arena},
         text{steal(other.text)},
         m_eval_cache{other.m_eval_cache}
   {
     other.m_eval_cache = nullptr;
+    other.is_eval_cache_in_arena = false;
   }
 
   cold fn operator=(const WordSegment &other) throws->WordSegment &
@@ -326,10 +347,12 @@ public:
     was_ansi_c_quoted = other.was_ansi_c_quoted;
     is_substitution_cache_in_function_arena =
         other.is_substitution_cache_in_function_arena;
+    is_eval_cache_in_arena = other.is_eval_cache_in_arena;
     source_position = other.source_position;
     source_length = other.source_length;
     m_eval_cache = other.m_eval_cache;
     other.m_eval_cache = nullptr;
+    other.is_eval_cache_in_arena = false;
 
     return *this;
   }
@@ -346,18 +369,11 @@ public:
   u32 is_greedy_name : 1 {false};
   u32 was_ansi_c_quoted : 1 {false};
   u32 is_substitution_cache_in_function_arena : 1 {false};
+  mutable u32 is_eval_cache_in_arena : 1 {false};
 
   SegmentText text;
 
-  fn get_eval_cache() const throws -> segment_eval_cache &
-  {
-    if (m_eval_cache == nullptr) {
-      let const block = heap_allocator().alloc_array<segment_eval_cache>(1);
-      m_eval_cache = new (block) segment_eval_cache{};
-    }
-
-    return *m_eval_cache;
-  }
+  fn get_eval_cache() const throws -> segment_eval_cache &;
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
@@ -374,7 +390,12 @@ public:
     copy.is_substitution_cache_in_function_arena =
         is_substitution_cache_in_function_arena;
     if (source_length > 0) copy.set_source_span(source_position, source_length);
-    if (m_eval_cache != nullptr) copy.get_eval_cache() = *m_eval_cache;
+    if (m_eval_cache != nullptr) {
+      let const block = allocator.alloc_array<segment_eval_cache>(1);
+      copy.m_eval_cache = new (block) segment_eval_cache{*m_eval_cache};
+      copy.is_eval_cache_in_arena =
+          allocator.get_kind() == Allocator::Kind::Bump;
+    }
 
     return copy;
   }
@@ -397,6 +418,8 @@ public:
     cache.folded_arithmetic_result = result;
     cache.has_folded_arithmetic_result = true;
   }
+
+  fn move_resources_to_arena(BumpArena &arena) throws -> void;
 
   /* A position beyond four gigabytes or a span beyond sixteen megabytes has no
      representable form here, so the segment reports no location instead of a
@@ -425,13 +448,7 @@ public:
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 
 private:
-  fn release_eval_cache() wontthrow -> void
-  {
-    if (m_eval_cache == nullptr) return;
-
-    heap_allocator().free_array(m_eval_cache, 1);
-    m_eval_cache = nullptr;
-  }
+  fn release_eval_cache() wontthrow -> void;
 
   mutable segment_eval_cache *m_eval_cache{nullptr};
 };
@@ -447,8 +464,7 @@ public:
   ~Word() { release_constant_value(); }
 
   /* A copy carries the segments alone. The flattened text is a cache, and it is
-     rebuilt on the copy when something asks for it. The copy is held on the
-     heap, because the original may sit in an arena the copy has to outlive. */
+     rebuilt on the copy when something asks for it. */
   cold Word(const Word &other) throws : segments(heap_allocator())
   {
     segments.reserve(other.segments.count());
@@ -483,8 +499,8 @@ public:
   {
     if (this == &other) return *this;
 
-    segments = steal(other.segments);
     release_constant_value();
+    segments = steal(other.segments);
     m_constant_value_data = other.m_constant_value_data;
     m_constant_value_length = other.m_constant_value_length;
     m_cached_plain_kind = other.m_cached_plain_kind;
@@ -525,12 +541,16 @@ public:
 
   fn constant_value() const throws -> StringView;
 
+  fn move_resources_to_arena(BumpArena &arena) throws -> void;
+
 private:
   fn release_constant_value() wontthrow -> void
   {
     if (m_constant_value_data == nullptr) return;
 
-    heap_allocator().free_array(m_constant_value_data, m_constant_value_length);
+    if (!is_arena_pointer(m_constant_value_data))
+      heap_allocator().free_array(m_constant_value_data,
+                                  m_constant_value_length);
     m_constant_value_data = nullptr;
     m_constant_value_length = 0;
   }
@@ -767,8 +787,9 @@ TOKEN_STRUCT(RightBracket);
 class Assignment : public Token
 {
 public:
-  Assignment(SourceLocation location, StringView key, Word value,
-             bool is_append);
+  static constexpr bool is_arena_destructor_noop = true;
+
+  Assignment(SourceLocation location, String key, Word value, bool is_append);
 
   fn kind() const wontthrow -> Kind override;
   fn flags() const wontthrow -> Flags override;
@@ -789,6 +810,8 @@ protected:
 class WordToken : public Token
 {
 public:
+  static constexpr bool is_arena_destructor_noop = true;
+
   WordToken(SourceLocation location, Word word);
 
   fn kind() const wontthrow -> Kind override;
@@ -810,6 +833,8 @@ protected:
 class ExpandedWordToken : public WordToken
 {
 public:
+  static constexpr bool is_arena_destructor_noop = true;
+
   ExpandedWordToken(SourceLocation location, Word word);
   ~ExpandedWordToken() override;
 

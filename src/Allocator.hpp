@@ -10,6 +10,8 @@ namespace koshka {
 class BumpArena;
 fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
     -> opaque *;
+fn bump_arena_owns(const BumpArena *arena, const opaque *pointer) wontthrow
+    -> bool;
 
 namespace os {
 fn allocate_aligned(usize length, usize alignment) wontthrow -> opaque *;
@@ -155,6 +157,22 @@ public:
   pure fn get_kind() const wontthrow -> Kind
   {
     return static_cast<Kind>(tagged & KIND_MASK);
+  }
+
+  pure fn operator==(Allocator other) const wontthrow->bool
+  {
+    return tagged == other.tagged;
+  }
+
+  pure fn owns(const opaque *pointer) const wontthrow -> bool
+  {
+    switch (get_kind()) {
+    case Kind::Heap: return false;
+    case Kind::Bump: return bump_arena_owns(get_arena(), pointer);
+    case Kind::Fake: return false;
+    }
+
+    unreachable("the allocator carries no known kind");
   }
 
   hot flatten fn raw_alloc(usize length, usize alignment) const throws

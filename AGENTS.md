@@ -548,9 +548,9 @@ An Allocator is one tagged word. The kinds are the pooled heap, a bump arena,
 and the fake allocator a container carries while it holds no storage. An arena
 address leaves the two low bits clear, so those bits carry the kind and the rest
 carries the address. Allocation dispatches on a switch over the kind, and a free
-outside the heap kind returns at once. Every Allocator is built by
-`heap_allocator`, `bump_allocator`, or `fake_allocator`, and no caller reads the
-word.
+outside the heap kind returns at once. The ownership query identifies storage
+held by a specific bump arena. Every Allocator is built by `heap_allocator`,
+`bump_allocator`, or `fake_allocator`, and no caller reads the word.
 
 ArrayList allocates nothing during default construction and grows
 geometrically. Its length and capacity are 32-bit, so the header is
@@ -568,10 +568,13 @@ assignments of a command and the array-builtin assignments of a simple command
 are held this way.
 
 A bump arena registers one destructor per non-trivially-destructible object it
-creates. The registry is a list of 64 KiB chunks, so a script with two million
-such objects appends a chunk and never copies the entries already registered. A
-reset keeps the first chunk and hands the rest back to the heap pool. The
-memory report names the live count and the chunked capacity of each arena.
+creates, unless the type declares `is_arena_destructor_noop`. The marker is used
+only after every resource reachable from the object has arena lifetime or needs
+no cleanup. The registry is a list of 64 KiB chunks, so a script with two million
+registered objects appends a chunk and never copies the entries already
+registered. A reset keeps the first chunk and hands the rest back to the heap
+pool. The memory report names the live count and the chunked capacity of each
+arena.
 
 WordSegment retains its source position beside one pointer to a
 segment_eval_cache. A DEBUG trap or xtrace reevaluates the original expression.
@@ -580,27 +583,31 @@ beyond four gigabytes or a span beyond sixteen megabytes reports no span at all.
 The segment kind and the four flag bits share the four-byte unit the length
 opens, so the group costs nothing beside the position. The cache holds the
 substitution tree, the arithmetic token cache, the folded arithmetic result, and
-the arena generation, and it is allocated on the heap on first use. A literal
-segment never reaches evaluation, so its pointer stays null. An arithmetic
-segment is never a substitution segment, so one arena generation stamp guards
-both caches. The 64-bit layout is 32 bytes.
+the arena generation. Parsed caches use the syntax or function arena, and
+runtime-built copies use the heap. A literal segment never reaches evaluation,
+so its pointer stays null. An arithmetic segment is never a substitution
+segment, so one arena generation stamp guards both caches. The 64-bit layout is
+32 bytes.
 
 The segment text is a SegmentText, which is a pointer, a 32-bit length, and a
 32-bit capacity. A zero capacity means the bytes are borrowed and the destructor
-frees nothing. A parsed segment borrows its bytes from the arena that holds the
-segment, and a segment built during evaluation owns its bytes on the heap. A
-character-at-a-time segment is owned from the start, because the first append
-would copy an arena slice to the heap anyway. An append on a borrowed text
-copies to the heap first, and the source view is rebound when it aliases the
-buffer that moved.
+frees nothing. Parsed text is copied into the token arena when its current bytes
+belong elsewhere. A segment built during evaluation owns its bytes on the heap.
+A character-at-a-time segment is owned from the start, because the first append
+would copy an arena slice to the heap anyway. An append on borrowed text copies
+to the heap first, and the source view is rebound when it aliases the buffer that
+moved.
 
 A word with one borrowable segment becomes a WordToken and lends that segment's
-text. Every other word becomes an ExpandedWordToken, which owns the flattened
-text. The flattened text is built on the first read, because analysis walks the
-segments and most tokens are never asked for a flattened form. An empty result
-marks the text as not yet built, and a word whose flattened text is empty
-rebuilds it at no cost. A build that runs out of memory answers `raw_view` as an
-unavailable view, the same answer a word with no borrowable segment gives.
+text. Every other word becomes an ExpandedWordToken, whose flattened text uses
+the word allocator. The flattened text is built on the first read, because
+analysis walks the segments and most tokens are never asked for a flattened
+form. An empty result marks the text as not yet built, and a word whose flattened
+text is empty rebuilds it at no cost. A build that runs out of memory answers
+`raw_view` as an unavailable view, the same answer a word with no borrowable
+segment gives. Parsed word tokens move their segment text, cache metadata,
+flattened values, and segment lists into the token arena before construction.
+Their destructors therefore need no registration.
 
 ## Logging
 
@@ -613,6 +620,12 @@ The executable logging and optimizer flags are documented in docs/kosh.1.
 ## Finishing a change
 
 Project workflow mistakes are recorded in [MISTAKES.md](MISTAKES.md).
+
+Source changes use the approved patch or edit tool. Shell text commands are used
+only to inspect files and command output. Parallel read-only agents are offered
+before repository research begins. The matching guidance file is read before an
+implementation or documentation edit. An edit request is checked to ensure that
+its source and replacement differ before the tool is called.
 
 Format the changed files with the project tools that own their format. Run the
 focused tests that cover the changed behavior. Read every regenerated golden.

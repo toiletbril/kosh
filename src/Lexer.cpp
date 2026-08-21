@@ -1257,10 +1257,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   if (let assignment_split = word.get_assignment_split();
       assignment_split.has_value())
   {
-    assignment_split->value.segments.move_to_allocator(
-        bump_allocator(*m_arena));
+    let const arena_allocator = bump_allocator(*m_arena);
+    assignment_split->name.move_to_allocator(arena_allocator);
+    assignment_split->value.move_resources_to_arena(*m_arena);
     token = m_arena->create<tokens::Assignment>(
-        here(actual_cursor_position, byte_count), assignment_split->name,
+        here(actual_cursor_position, byte_count), steal(assignment_split->name),
         steal(assignment_split->value), assignment_split->is_append);
   } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)

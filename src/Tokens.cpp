@@ -61,6 +61,65 @@ pure fn WordSegment::has_glob_metacharacter() const wontthrow -> bool
   return optimizer::word_segment_has_glob_metacharacter(*this);
 }
 
+fn WordSegment::get_eval_cache() const throws -> segment_eval_cache &
+{
+  if (m_eval_cache == nullptr) {
+    let const arena =
+        is_substitution_cache_in_function_arena ? FUNCTION_ARENA : AST_ARENA;
+    if (arena != nullptr) {
+      m_eval_cache = arena->create<segment_eval_cache>();
+      is_eval_cache_in_arena = true;
+    } else {
+      let const block = heap_allocator().alloc_array<segment_eval_cache>(1);
+      m_eval_cache = new (block) segment_eval_cache{};
+    }
+  }
+
+  return *m_eval_cache;
+}
+
+fn WordSegment::release_eval_cache() wontthrow -> void
+{
+  if (m_eval_cache == nullptr) return;
+  if (!is_eval_cache_in_arena) heap_allocator().free_array(m_eval_cache, 1);
+  m_eval_cache = nullptr;
+  is_eval_cache_in_arena = false;
+}
+
+fn WordSegment::move_resources_to_arena(BumpArena &arena) throws -> void
+{
+  let const allocator = bump_allocator(arena);
+  text.move_to_allocator(allocator);
+  if (m_eval_cache == nullptr || allocator.owns(m_eval_cache)) return;
+
+  let const cache = arena.create<segment_eval_cache>(*m_eval_cache);
+  if (!is_eval_cache_in_arena) heap_allocator().free_array(m_eval_cache, 1);
+  m_eval_cache = cache;
+  is_eval_cache_in_arena = true;
+}
+
+fn Word::move_resources_to_arena(BumpArena &arena) throws -> void
+{
+  let const allocator = bump_allocator(arena);
+
+  for (let &segment : segments)
+    segment.move_resources_to_arena(arena);
+
+  if (m_constant_value_data != nullptr &&
+      !allocator.owns(m_constant_value_data))
+  {
+    let const moved_value =
+        allocator.alloc_array<char>(m_constant_value_length);
+    __builtin_memcpy(moved_value, m_constant_value_data,
+                     m_constant_value_length);
+    segments.allocator().free_array(m_constant_value_data,
+                                    m_constant_value_length);
+    m_constant_value_data = moved_value;
+  }
+
+  segments.move_to_allocator(allocator);
+}
+
 pure fn Word::is_empty() const wontthrow -> bool { return segments.is_empty(); }
 
 hot fn Word::to_literal_string() const throws -> String
@@ -115,7 +174,7 @@ fn Word::constant_value() const throws -> StringView
     if (total_length == 0) return StringView{};
     if (total_length > ~static_cast<u32>(0)) throw std::bad_alloc{};
 
-    let buffer = heap_allocator().alloc_array<char>(total_length);
+    let buffer = segments.allocator().alloc_array<char>(total_length);
     usize write_position = 0;
     for (let const &segment : segments) {
       let const view = segment.text.view();
@@ -572,9 +631,9 @@ SENTINEL_TOKEN_DECLS(RightParen, ")");
 SENTINEL_TOKEN_DECLS(LeftBracket, "{");
 SENTINEL_TOKEN_DECLS(RightBracket, "}");
 
-Assignment::Assignment(SourceLocation location, StringView key, Word value,
+Assignment::Assignment(SourceLocation location, String key, Word value,
                        bool is_append)
-    : Token(steal(location)), m_key(key), m_value(steal(value)),
+    : Token(steal(location)), m_key(steal(key)), m_value(steal(value)),
       m_is_append(is_append)
 {}
 
@@ -663,7 +722,7 @@ ExpandedWordToken::ExpandedWordToken(SourceLocation location, Word word)
 
 ExpandedWordToken::~ExpandedWordToken()
 {
-  if (m_literal_data == nullptr) return;
+  if (m_literal_data == nullptr || is_arena_pointer(m_literal_data)) return;
 
   heap_allocator().free_array(m_literal_data, m_literal_length);
 }
@@ -681,7 +740,7 @@ fn ExpandedWordToken::fill_literal() const throws -> void
   if (view.length == 0) return;
   if (view.length > ~static_cast<u32>(0)) throw std::bad_alloc{};
 
-  let buffer = heap_allocator().alloc_array<char>(view.length);
+  let buffer = m_word.segments.allocator().alloc_array<char>(view.length);
   __builtin_memcpy(buffer, view.data, view.length);
 
   m_literal_data = buffer;
@@ -717,9 +776,7 @@ fn ExpandedWordToken::raw_string() const throws -> String
 fn create_word_token(BumpArena &arena, SourceLocation location,
                      Word word) throws -> WordToken *
 {
-  /* The list is grown on the heap and parked here, so the token and its
-     segments share one arena block run and one lifetime. */
-  word.segments.move_to_allocator(bump_allocator(arena));
+  word.move_resources_to_arena(arena);
 
   if (borrowed_word_literal(word).has_value())
     return arena.create<WordToken>(steal(location), steal(word));

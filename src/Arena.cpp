@@ -21,6 +21,12 @@ hot fn bump_arena_allocate(BumpArena *arena, usize length,
   return arena->allocate(length, alignment);
 }
 
+fn bump_arena_owns(const BumpArena *arena, const opaque *pointer) wontthrow
+    -> bool
+{
+  return arena != nullptr && arena->owns(pointer);
+}
+
 BumpArena::BumpArena() = default;
 
 BumpArena::~BumpArena()
@@ -52,7 +58,7 @@ fn BumpArena::push_destructor(pending_destructor pending) throws -> void
   m_destructor_count++;
 }
 
-cold fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
+fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
 {
   while (m_destructor_count > first) {
     m_destructor_count--;

@@ -77,6 +77,9 @@ public:
     }
 
     if constexpr (!std::is_trivially_destructible_v<T>) {
+      if constexpr (requires { T::is_arena_destructor_noop; }) {
+        if constexpr (T::is_arena_destructor_noop) return object;
+      }
       try {
         push_destructor(
             pending_destructor{object, [](opaque *pointer) noexcept {
