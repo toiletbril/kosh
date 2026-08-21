@@ -1086,11 +1086,12 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
                                                         : nullptr);
   }
 
-  let const generation = cache_arena->reset_generation();
   let &cache = segment.get_eval_cache();
-  if (cache.arith == nullptr || cache.arena_generation != generation) {
+  if (cache.arith == nullptr ||
+      !cache_arena->is_lifetime_valid(cache.arithmetic_lifetime))
+  {
     cache.arith = cache_arena->create<arith_token_cache>();
-    cache.arena_generation = generation;
+    cache.arithmetic_lifetime = cache_arena->register_lifetime();
   }
 
   return evaluate_arithmetic_cached_clause(

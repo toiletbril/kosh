@@ -190,8 +190,9 @@ copies retain heap ownership. Parsed word token destructors therefore need no
 registration.
 
 A segment evaluation cache holds substitution, arithmetic, folded result, and
-generation state. Parsed caches use the syntax or function arena. Runtime copies
-use the heap. Generation checks reject stale cache contents after arena reuse.
+lifetime identities. Parsed caches use the syntax or function arena. Runtime
+copies use the heap. Lifetime checks reject stale cache contents after arena
+reuse.
 
 ## Finishing a change
 
@@ -220,6 +221,9 @@ covered by an active read only agent. Do not inspect or edit tests covered by an
 active read only agent. Teammate replies require a concrete
 reachable agent name or identifier. Agent launches use a type listed by the
 current session. Performance comparisons use the release binary explicitly.
+Locate a focused test target before invoking it from the repository root.
+Check active agent ownership before a test edit. Never poll a running agent
+through `TaskOutput`.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

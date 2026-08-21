@@ -93,6 +93,10 @@ fn WordSegment::move_resources_to_arena(BumpArena &arena) throws -> void
   if (m_eval_cache == nullptr || allocator.owns(m_eval_cache)) return;
 
   let const cache = arena.create<segment_eval_cache>(*m_eval_cache);
+  cache->substitution_ast = nullptr;
+  cache->arith = nullptr;
+  cache->substitution_lifetime = {};
+  cache->arithmetic_lifetime = {};
   if (!is_eval_cache_in_arena) heap_allocator().free_array(m_eval_cache, 1);
   m_eval_cache = cache;
   is_eval_cache_in_arena = true;

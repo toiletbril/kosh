@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Arena.hpp"
 #include "Common.hpp"
 #include "Containers.hpp"
 #include "Eval.hpp"
@@ -38,18 +39,13 @@ struct arith_token_cache
 
 /* The evaluation state of one segment. A literal segment never reaches
    evaluation and never carries this block, so a large script holds one null
-   pointer per segment.
-
-   Both caches live in AST_ARENA, and a function-body segment puts them in
-   FUNCTION_ARENA, so the generation the cache was filled in is recorded and a
-   hit from an earlier generation is treated as stale and refilled. An
-   arithmetic segment is never a substitution segment, so the two caches never
-   share one segment and one generation stamp answers for both. */
+   pointer per segment. */
 struct segment_eval_cache
 {
   const Expression *substitution_ast{nullptr};
   arith_token_cache *arith{nullptr};
-  usize arena_generation{0};
+  BumpArena::LifetimeIdentity substitution_lifetime{};
+  BumpArena::LifetimeIdentity arithmetic_lifetime{};
   i64 folded_arithmetic_result{0};
   bool has_folded_arithmetic_result{false};
 };
@@ -305,6 +301,10 @@ public:
     if (other.m_eval_cache != nullptr) {
       let const block = heap_allocator().alloc_array<segment_eval_cache>(1);
       m_eval_cache = new (block) segment_eval_cache{*other.m_eval_cache};
+      m_eval_cache->substitution_ast = nullptr;
+      m_eval_cache->arith = nullptr;
+      m_eval_cache->substitution_lifetime = {};
+      m_eval_cache->arithmetic_lifetime = {};
     }
   }
 
@@ -393,6 +393,10 @@ public:
     if (m_eval_cache != nullptr) {
       let const block = allocator.alloc_array<segment_eval_cache>(1);
       copy.m_eval_cache = new (block) segment_eval_cache{*m_eval_cache};
+      copy.m_eval_cache->substitution_ast = nullptr;
+      copy.m_eval_cache->arith = nullptr;
+      copy.m_eval_cache->substitution_lifetime = {};
+      copy.m_eval_cache->arithmetic_lifetime = {};
       copy.is_eval_cache_in_arena =
           allocator.get_kind() == Allocator::Kind::Bump;
     }

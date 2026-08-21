@@ -361,13 +361,10 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   enter_substitution();
   defer { leave_substitution(); };
 
-  /* A cached tree from an earlier arena generation points into reclaimed
-     storage, so it is reparsed when the generation no longer matches. */
   let cache_arena = segment.is_substitution_cache_in_function_arena
                         ? FUNCTION_ARENA
                         : AST_ARENA;
   ASSERT(cache_arena != nullptr);
-  let const generation = cache_arena->reset_generation();
   let const did_push_source_frame = push_substitution_source_frame(
       segment, StringView{"command substitution"});
   defer
@@ -375,11 +372,10 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
     if (did_push_source_frame) m_source_frames.pop_back();
   };
   let &cache = segment.get_eval_cache();
-  if (cache.substitution_ast == nullptr || cache.arena_generation != generation)
+  if (cache.substitution_ast == nullptr ||
+      !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
-    LOG(Debug,
-        "command substitution ast cache miss for generation %zu, reparsing",
-        generation);
+    LOG(Debug, "command substitution ast cache miss, reparsing");
     let parser = Parser{
         Lexer{segment.text.view(), *cache_arena, false, None, mood()}
     };
@@ -395,7 +391,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
                                           segment.text.view());
       throw;
     }
-    cache.arena_generation = generation;
+    cache.substitution_lifetime = cache_arena->register_lifetime();
   }
   ASSERT(cache.substitution_ast != nullptr);
 
@@ -661,7 +657,6 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
                         ? FUNCTION_ARENA
                         : AST_ARENA;
   ASSERT(cache_arena != nullptr);
-  let const generation = cache_arena->reset_generation();
   let const did_push_source_frame = push_substitution_source_frame(
       segment, StringView{"function substitution"});
   defer
@@ -669,11 +664,10 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     if (did_push_source_frame) m_source_frames.pop_back();
   };
   let &cache = segment.get_eval_cache();
-  if (cache.substitution_ast == nullptr || cache.arena_generation != generation)
+  if (cache.substitution_ast == nullptr ||
+      !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
-    LOG(Debug,
-        "function substitution ast cache miss for generation %zu, reparsing",
-        generation);
+    LOG(Debug, "function substitution ast cache miss, reparsing");
     let parser = Parser{
         Lexer{segment.text.view(), *cache_arena, false, None, mood()}
     };
@@ -684,7 +678,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
                                           segment.text.view());
       throw;
     }
-    cache.arena_generation = generation;
+    cache.substitution_lifetime = cache_arena->register_lifetime();
   }
   ASSERT(cache.substitution_ast != nullptr);
 

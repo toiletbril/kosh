@@ -20,13 +20,27 @@ public:
   fn owns(const opaque *pointer) const wontthrow -> bool;
   cold fn reset() wontthrow -> void;
 
-  /* Counts how many times the arena has been reset. A cache that holds a
-     pointer into this arena stores the generation it was filled in, so a hit
-     after a reset is recognised as stale and refilled. */
+  struct Mark
+  {
+    usize block_index;
+    usize used_in_block;
+    usize destructor_count;
+  };
+
+  struct LifetimeIdentity
+  {
+    u32 arena_incarnation{0};
+    u32 slot_position{UINT32_MAX};
+    u32 slot_incarnation{0};
+  };
+
   pure fn reset_generation() const wontthrow -> usize
   {
     return m_reset_generation;
   }
+
+  fn register_lifetime() throws -> LifetimeIdentity;
+  pure fn is_lifetime_valid(LifetimeIdentity identity) const wontthrow -> bool;
 
   fn bytes_used() const wontthrow -> usize;
 
@@ -46,12 +60,6 @@ public:
 
   /* A saved bump position, so a scope can reclaim everything it allocated above
      the mark while leaving earlier allocations alone. The marks nest. */
-  struct Mark
-  {
-    usize block_index;
-    usize used_in_block;
-    usize destructor_count;
-  };
   fn mark() const wontthrow -> Mark;
   fn release(Mark saved) wontthrow -> void;
 
@@ -102,6 +110,14 @@ private:
     usize used;
   };
 
+  struct lifetime_slot
+  {
+    Mark payload_end;
+    u32 incarnation{0};
+    u32 next_free_position{UINT32_MAX};
+    bool is_active{false};
+  };
+
   struct pending_destructor
   {
     opaque *object;
@@ -122,8 +138,12 @@ private:
   uintptr m_lowest_address{UINTPTR_MAX};
   uintptr m_highest_address{0};
   ArrayList<pending_destructor *> m_destructor_chunks{heap_allocator()};
+  ArrayList<lifetime_slot> m_lifetime_slots{heap_allocator()};
+  ArrayList<u32> m_active_lifetime_slots{heap_allocator()};
   usize m_destructor_count{0};
   usize m_reset_generation{0};
+  u32 m_arena_incarnation{0};
+  u32 m_first_free_lifetime_slot{UINT32_MAX};
   /* Every block above this index is empty, so a release rewinds the index and
      the blocks it reclaimed are handed out again. */
   usize m_current_index{0};

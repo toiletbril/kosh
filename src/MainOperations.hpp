@@ -63,6 +63,51 @@ static fn run_debug_highlight_driver(StringView driver_line,
   return 0;
 }
 
+static fn run_debug_arena_lifetime_driver() throws -> i32
+{
+  let arena = BumpArena{};
+
+  unused(arena.allocate(1, 1));
+  let const retained_lifetime = arena.register_lifetime();
+  let const release_mark = arena.mark();
+  unused(arena.allocate(1, 1));
+  let const released_lifetime = arena.register_lifetime();
+  arena.release(release_mark);
+
+  print("retained=" +
+        String::from(arena.is_lifetime_valid(retained_lifetime),
+                     heap_allocator()) +
+        "\nreleased=" +
+        String::from(arena.is_lifetime_valid(released_lifetime),
+                     heap_allocator()) +
+        "\n");
+
+  unused(arena.allocate(1, 1));
+  let const reused_lifetime = arena.register_lifetime();
+  print(
+      "reused-slot=" +
+      String::from(reused_lifetime.slot_position ==
+                       released_lifetime.slot_position,
+                   heap_allocator()) +
+      "\nold-incarnation=" +
+      String::from(arena.is_lifetime_valid(released_lifetime),
+                   heap_allocator()) +
+      "\nnew-incarnation=" +
+      String::from(arena.is_lifetime_valid(reused_lifetime), heap_allocator()) +
+      "\n");
+
+  arena.reset();
+  print(
+      "reset-retained=" +
+      String::from(arena.is_lifetime_valid(retained_lifetime),
+                   heap_allocator()) +
+      "\nreset-reused=" +
+      String::from(arena.is_lifetime_valid(reused_lifetime), heap_allocator()) +
+      "\n");
+  flush();
+  return 0;
+}
+
 static fn run_debug_ghost_driver(StringView driver_line,
                                  EvalContext &context) throws -> i32
 {

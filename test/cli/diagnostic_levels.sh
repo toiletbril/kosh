@@ -171,9 +171,9 @@ uncertain_slash_output=$(
   "$BIN" -WW -c "builtin eval 'function dynamic/name { :; }'; dynamic/name" 2>&1
 )
 echo "uncertain-slash-full-name=$(printf '%s\n' "$uncertain_slash_output" |
-  grep -c "The command 'dynamic/name' was not found")"
+  grep -c "The command 'dynamic/name' could not be verified after runtime code")"
 echo "uncertain-slash-prefix=$(printf '%s\n' "$uncertain_slash_output" |
-  grep -c "The command 'dynamic' was not found")"
+  grep -c "The command 'dynamic' could not be verified after runtime code")"
 
 send_runtime_input()
 {

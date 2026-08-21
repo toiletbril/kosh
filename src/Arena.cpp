@@ -8,6 +8,7 @@ namespace koshka {
 
 BumpArena *AST_ARENA = nullptr;
 BumpArena *FUNCTION_ARENA = nullptr;
+static u32 NEXT_ARENA_INCARNATION = 1;
 
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool
 {
@@ -27,7 +28,7 @@ fn bump_arena_owns(const BumpArena *arena, const opaque *pointer) wontthrow
   return arena != nullptr && arena->owns(pointer);
 }
 
-BumpArena::BumpArena() = default;
+BumpArena::BumpArena() : m_arena_incarnation{NEXT_ARENA_INCARNATION++} {}
 
 BumpArena::~BumpArena()
 {
@@ -165,16 +166,58 @@ fn BumpArena::mark() const wontthrow -> BumpArena::Mark
               m_destructor_count};
 }
 
+fn BumpArena::register_lifetime() throws -> LifetimeIdentity
+{
+  u32 slot_position = m_first_free_lifetime_slot;
+  if (slot_position == UINT32_MAX) {
+    slot_position = static_cast<u32>(m_lifetime_slots.count());
+    m_lifetime_slots.push(lifetime_slot{});
+  } else {
+    m_first_free_lifetime_slot =
+        m_lifetime_slots[slot_position].next_free_position;
+  }
+
+  let &slot = m_lifetime_slots[slot_position];
+  slot.payload_end = mark();
+  slot.next_free_position = UINT32_MAX;
+  slot.is_active = true;
+  slot.incarnation++;
+  m_active_lifetime_slots.push(slot_position);
+  return LifetimeIdentity{m_arena_incarnation, slot_position, slot.incarnation};
+}
+
+pure fn BumpArena::is_lifetime_valid(LifetimeIdentity identity) const wontthrow
+    -> bool
+{
+  if (identity.arena_incarnation != m_arena_incarnation ||
+      identity.slot_position >= m_lifetime_slots.count())
+    return false;
+
+  let const &slot = m_lifetime_slots[identity.slot_position];
+  return slot.is_active && slot.incarnation == identity.slot_incarnation;
+}
+
 fn BumpArena::release(Mark saved) wontthrow -> void
 {
   ASSERT(saved.block_index <= m_current_index,
          "mark cannot name a block above the current one");
 
   run_destructors_down_to(saved.destructor_count);
-
-  /* The rewound span is handed out again, so a cache holding an address inside
-     it would read a later object. */
   m_reset_generation++;
+
+  while (!m_active_lifetime_slots.is_empty()) {
+    let const slot_position = m_active_lifetime_slots.back();
+    let &slot = m_lifetime_slots[slot_position];
+    if (slot.payload_end.block_index < saved.block_index ||
+        (slot.payload_end.block_index == saved.block_index &&
+         slot.payload_end.used_in_block <= saved.used_in_block))
+      break;
+
+    slot.is_active = false;
+    slot.next_free_position = m_first_free_lifetime_slot;
+    m_first_free_lifetime_slot = slot_position;
+    m_active_lifetime_slots.pop_back();
+  }
 
   for (usize i = saved.block_index + 1; i < m_blocks.count(); i++)
     m_blocks[i].used = 0;
@@ -194,9 +237,15 @@ cold fn BumpArena::reset() wontthrow -> void
 
   run_destructors_down_to(0);
   release_destructor_chunks(1);
-
-  /* Bumping the generation invalidates any cache keyed on an earlier one. */
   m_reset_generation++;
+
+  for (let const slot_position : m_active_lifetime_slots) {
+    let &slot = m_lifetime_slots[slot_position];
+    slot.is_active = false;
+    slot.next_free_position = m_first_free_lifetime_slot;
+    m_first_free_lifetime_slot = slot_position;
+  }
+  m_active_lifetime_slots.clear();
 
   for (usize i = 1; i < m_blocks.count(); i++)
     std::free(m_blocks[i].base);

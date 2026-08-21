@@ -20,7 +20,7 @@
 [Word
   Unquoted "after"
 ]
-3:1: warning: The command 'zzqqxxnonexist_command_4242' was not found.
+3:1: warning: The command 'zzqqxxnonexist_command_4242' could not be verified after runtime code.
      3 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 3:1: error: The command 'zzqqxxnonexist_command_4242' was not found.
