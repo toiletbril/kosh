@@ -284,6 +284,7 @@ Logging edits must count every format placeholder and argument before the patch
 is applied.
 Adapter tasks must trace the current shared call path before changing the shared
 owner.
+Debug-only driver probes must verify the debug artifact before invocation.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

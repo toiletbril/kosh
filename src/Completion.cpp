@@ -882,7 +882,8 @@ static fn keep_hinted_extension(ArrayList<String> candidates,
 
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory, completion_mode mode,
-            const ArrayList<StringView> *extra_command_names) throws
+            const ArrayList<StringView> *extra_command_names,
+            bool should_complete_external_arguments_in_posix) throws
     -> completion_result
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1077,6 +1078,10 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       if (!from_stage.has_value())
         from_stage = complete_from_tools_with_targets(
             line, stage_token, token_start, mode, context);
+    }
+    if (!from_stage.has_value() &&
+        (!is_posix_completion || should_complete_external_arguments_in_posix))
+    {
       if (!from_stage.has_value())
         from_stage = complete_from_man_subcommands(line, stage_token,
                                                    token_start, mode, context);

@@ -668,7 +668,7 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   defer { resolver.end_explicit_completion(); };
   let result = completion::complete(
       document->normalized_source.view(), *cursor, m_context, base_directory,
-      completion::completion_mode::Listing, &document_function_names);
+      completion::completion_mode::Listing, &document_function_names, true);
   let response = String{"["};
 
   for (usize index = 0; index < result.candidates.count(); index++) {

@@ -44,7 +44,8 @@ struct completion_result
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory,
             completion_mode mode = completion_mode::Ghost,
-            const ArrayList<StringView> *extra_command_names = nullptr) throws
+            const ArrayList<StringView> *extra_command_names = nullptr,
+            bool should_complete_external_arguments_in_posix = false) throws
     -> completion_result;
 
 fn complete_command_names(
