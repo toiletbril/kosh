@@ -1,7 +1,7 @@
 /* The toiletline configuration macros are defined here, so Toiletline.hpp is
    not included. */
 
-#include "Arena.hpp"
+#include "Allocator.hpp"
 #include "Cli.hpp"
 #include "Colors.hpp"
 #include "Completion.hpp"
@@ -30,59 +30,50 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
 
 namespace {
 
-/* The bump arena cannot free a single block, so a free returns the block to a
-   free list the next allocation reuses. A header before each block records its
-   capacity for realloc and for sizing a reused block. */
-koshka::BumpArena TOILETLINE_ARENA{};
-
 constexpr usize TL_ALLOC_HEADER = 16;
 
-struct tl_free_block
+fn tl_block_base(opaque *payload) -> char *
 {
-  tl_free_block *next;
-};
-tl_free_block *TOILETLINE_FREE_LIST = nullptr;
+  return static_cast<char *>(payload) - TL_ALLOC_HEADER;
+}
 
 fn tl_block_capacity(opaque *payload) -> usize &
 {
-  return *reinterpret_cast<usize *>(static_cast<char *>(payload) -
-                                    TL_ALLOC_HEADER);
+  return *reinterpret_cast<usize *>(tl_block_base(payload));
 }
 
 fn tl_arena_malloc(usize length) -> opaque *
 {
-  for (tl_free_block **link = &TOILETLINE_FREE_LIST; *link != nullptr;
-       link = &(*link)->next)
-  {
-    opaque *payload = *link;
-    if (tl_block_capacity(payload) >= length) {
-      *link = (*link)->next;
-      return payload;
-    }
-  }
+  if (length > static_cast<usize>(-1) - TL_ALLOC_HEADER) throw std::bad_alloc{};
 
-  char *base = static_cast<char *>(
-      TOILETLINE_ARENA.allocate(length + TL_ALLOC_HEADER, TL_ALLOC_HEADER));
+  let const allocation_length = length + TL_ALLOC_HEADER;
+  let const base =
+      koshka::heap_allocator().alloc_array<char>(allocation_length);
   *reinterpret_cast<usize *>(base) = length;
+
   return base + TL_ALLOC_HEADER;
 }
 
 fn tl_arena_free(opaque *pointer) -> void
 {
   if (pointer == nullptr) return;
-  tl_free_block *block = static_cast<tl_free_block *>(pointer);
-  block->next = TOILETLINE_FREE_LIST;
-  TOILETLINE_FREE_LIST = block;
+
+  let const allocation_length = tl_block_capacity(pointer) + TL_ALLOC_HEADER;
+  koshka::heap_allocator().free_array(tl_block_base(pointer),
+                                      allocation_length);
 }
 
 fn tl_arena_realloc(opaque *pointer, usize length) -> opaque *
 {
   if (pointer == nullptr) return tl_arena_malloc(length);
-  usize old_capacity = tl_block_capacity(pointer);
+
+  let const old_capacity = tl_block_capacity(pointer);
   if (old_capacity >= length) return pointer;
-  opaque *fresh = tl_arena_malloc(length);
+
+  let const fresh = tl_arena_malloc(length);
   std::memcpy(fresh, pointer, old_capacity);
   tl_arena_free(pointer);
+
   return fresh;
 }
 
