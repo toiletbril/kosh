@@ -257,13 +257,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   let const original = GetStdHandle(*slot);
   result.original = original;
   result.was_open = original != nullptr && original != INVALID_HANDLE_VALUE;
-  if (result.was_open &&
-      DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(),
-                      &result.saved, 0, FALSE, DUPLICATE_SAME_ACCESS) == 0)
-  {
-    result.is_dup2_ok = false;
-    return result;
-  }
+  result.saved = original;
 
   /* SetStdHandle does not copy, so the target is duplicated here and the dup
      stays valid until restore_descriptor closes it. */
@@ -271,13 +265,11 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   if (DuplicateHandle(GetCurrentProcess(), target, GetCurrentProcess(),
                       &duplicate, 0, TRUE, DUPLICATE_SAME_ACCESS) == 0)
   {
-    if (result.was_open) CloseHandle(result.saved);
     result.is_dup2_ok = false;
     return result;
   }
   if (SetStdHandle(*slot, duplicate) == FALSE) {
     CloseHandle(duplicate);
-    if (result.was_open) CloseHandle(result.saved);
     result.is_dup2_ok = false;
     return result;
   }
