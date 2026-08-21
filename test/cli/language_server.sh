@@ -32,20 +32,42 @@ check_contains()
 printf 'echo $disk_only\n[ x == y ]\n' > "$directory/open-source.sh"
 printf 'echo $disk_aux\n[ x == y ]\n' > "$directory/disk-source.sh"
 mkdir "$directory/bin"
-printf '#!/bin/sh\nprintf "allowed command help\\n"\n' > "$directory/bin/act"
+mkdir -p "$directory/man/man1"
+printf '%s\n' \
+  '#!/bin/sh' \
+  'if [ "$1" = sync ] && [ "$2" = --help ]; then' \
+  '  printf "%s\\n" "OPTIONS" "  --force  force synchronization"' \
+  'elif [ "$1" = --help ]; then' \
+  '  printf "%s\\n" "allowed command help" "COMMANDS" "  sync  synchronize state"' \
+  'fi' > "$directory/bin/act"
 printf '#!/bin/sh\nexit 0\n' > "$directory/bin/path-only"
 printf '#!/bin/sh\nexit 0\n' > "$directory/bin/formatted-command"
+printf '#!/bin/sh\nexit 0\n' > "$directory/bin/manprobe"
+printf '%s\n' '.TH MANPROBE 1' '.SH SYNOPSIS' 'manprobe' \
+  > "$directory/man/man1/manprobe.1"
+printf '%s\n' '.TH MANPROBE-SYNC 1' '.SH SYNOPSIS' 'manprobe sync' \
+  > "$directory/man/man1/manprobe-sync.1"
 printf '%s\n' '#!/bin/sh' \
+  'if [ "$1" = --path ]; then' \
+  '  printf "%s\\n" "$MANROOT"' \
+  '  exit' \
+  'fi' \
   'if [ "$1" = -w ]; then' \
   '  case $2 in' \
   "  formatted-command) printf '/private/formatted-command.1\\n' ;;" \
+  '  manprobe|manprobe-sync) printf "%s/man1/%s.1\\n" "$MANROOT" "$2" ;;' \
   '  esac' \
   '  exit' \
   'fi' \
-  "case \$1 in formatted-command) printf 'B\\bBO\\bOL\\bLD\\bD\\n' ;; esac" \
+  'case $1 in' \
+  "  formatted-command) printf 'B\\bBO\\bOL\\bLD\\bD\\n' ;;" \
+  '  manprobe) printf "%s\\n" "OPTIONS" "  --alpha  root option" ;;' \
+  '  manprobe-sync) printf "%s\\n" "OPTIONS" "  --force  force from manual" ;;' \
+  'esac' \
   > "$directory/bin/man"
 chmod +x "$directory/bin/act" "$directory/bin/path-only" \
-  "$directory/bin/formatted-command" "$directory/bin/man"
+  "$directory/bin/formatted-command" "$directory/bin/manprobe" \
+  "$directory/bin/man"
 
 {
   frame '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"publishDiagnostics":{"dataSupport":true},"codeAction":{"isPreferredSupport":true,"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix","source.fixAll.kosh"]}}}}}}}'
@@ -192,6 +214,14 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":113,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/keyword-completion.sh"},"position":{"line":0,"character":3}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit","languageId":"shit","version":1,"text":"koshkit ca\n"}}}'
   frame '{"jsonrpc":"2.0","id":140,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit"},"position":{"line":0,"character":10}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-completion.shit","languageId":"shit","version":1,"text":"act sy\n"}}}'
+  frame '{"jsonrpc":"2.0","id":143,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-completion.shit"},"position":{"line":0,"character":6}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-flag-completion.shit","languageId":"shit","version":1,"text":"act sync --fo\n"}}}'
+  frame '{"jsonrpc":"2.0","id":144,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-flag-completion.shit"},"position":{"line":0,"character":13}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/man-subcommand-completion.shit","languageId":"shit","version":1,"text":"manprobe sy\n"}}}'
+  frame '{"jsonrpc":"2.0","id":145,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/man-subcommand-completion.shit"},"position":{"line":0,"character":11}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/man-subcommand-flag-completion.shit","languageId":"shit","version":1,"text":"manprobe sync --fo\n"}}}'
+  frame '{"jsonrpc":"2.0","id":146,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/man-subcommand-flag-completion.shit"},"position":{"line":0,"character":18}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/document-function.sh","languageId":"sh","version":1,"text":"document_before() { :; }\ndocument_\ndocument_after() { :; }\n"}}}'
   frame '{"jsonrpc":"2.0","id":141,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/document-function.sh"},"position":{"line":1,"character":9}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/bare-koshkit.shit","languageId":"shit","version":1,"text":"cal\n"}}}'
@@ -214,7 +244,8 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","method":"exit"}'
 } > "$directory/input"
 
-output=$(PATH="$directory/bin:$PATH" "$BIN" --language-server < "$directory/input")
+output=$(MANROOT="$directory/man" MANPATH="$directory/man" \
+  PATH="$directory/bin:$PATH" "$BIN" --language-server < "$directory/input")
 status=$?
 printf 'status=%s\n' "$status"
 check_contains initialize '"positionEncoding":"utf-8"'
@@ -229,6 +260,10 @@ check_contains completion-resolve-passthrough '"id":111,"result":{"label":"plain
 check_contains completion-builtin-help '"id":139,"result":{"label":"printf","kind":3,"data":{"command":"printf"},"documentation":"DESCRIPTION\n  The printf builtin'
 check_contains completion-keyword '"id":113,"result":[{"label":"esac","kind":14,"data":{"command":"esac"}'
 check_contains completion-subcommand '"label":"cat","textEdit":{"range":{"start":{"line":0,"character":8},"end":{"line":0,"character":10}},"newText":"cat"}'
+check_contains completion-help-subcommand '"id":143,"result":[{"label":"sync","detail":"synchronize state"'
+check_contains completion-help-subcommand-flag '"id":144,"result":[{"label":"--force","detail":"force synchronization"'
+check_contains completion-man-subcommand '"id":145,"result":[{"label":"sync","textEdit"'
+check_contains completion-man-subcommand-flag '"id":146,"result":[{"label":"--force","detail":"force from manual"'
 check_contains completion-document-function-after '"id":141,"result":[{"label":"document_after","kind":3,"data":{"command":"document_after"}'
 check_contains completion-document-function-before '"label":"document_before","kind":3,"data":{"command":"document_before"}'
 check_contains completion-bare-koshkit '"label":"calc","kind":3,"data":{"command":"calc"}'

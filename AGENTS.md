@@ -282,6 +282,8 @@ Regression fixtures must keep diagnostic control names distinct from the names
 under test.
 Logging edits must count every format placeholder and argument before the patch
 is applied.
+Adapter tasks must trace the current shared call path before changing the shared
+owner.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect
