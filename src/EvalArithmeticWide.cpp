@@ -130,7 +130,7 @@ public:
   /* The untaken arm of a ternary parses to advance the cursor but takes no
      side effect and raises no fault. */
   bool m_is_skipping{false};
-  static constexpr usize MAX_DEPTH = 512;
+  static constexpr usize MAX_DEPTH = 128;
 
   [[noreturn]] cold fn fail(StringView message, StringView note = {}) throws
       -> void

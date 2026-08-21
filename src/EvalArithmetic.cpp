@@ -152,7 +152,7 @@ public:
   usize pos;
 
   usize depth{0};
-  static constexpr usize MAX_DEPTH = 512;
+  static constexpr usize MAX_DEPTH = 128;
 
   /* The dead operand of a short-circuited || or && and the untaken ternary arm
      are parsed to consume their tokens, this flag makes their assignments skip
@@ -949,7 +949,7 @@ public:
   const ArrayList<arith_token> &toks;
   usize ti{0};
   usize depth{0};
-  static constexpr usize MAX_DEPTH = 512;
+  static constexpr usize MAX_DEPTH = 128;
 
   pure fn at_op(StringView s) wontthrow -> bool
   {
