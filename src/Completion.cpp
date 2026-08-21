@@ -949,6 +949,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       token.data == token_prefix.data && token.length == token_prefix.length
           ? steal(decoded_prefix)
           : utils::decode_shell_word(token, completion_allocator());
+  line = line.substring_of_length(0, replacement_token_end);
   let const has_open_quote = decoded_token.quote_character != 0;
   let const open_quote_content_token =
       has_open_quote ? decoded_token.text.view().substring(

@@ -214,7 +214,7 @@ chmod +x "$directory/bin/act" "$directory/bin/path-only" \
   frame '{"jsonrpc":"2.0","id":113,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/keyword-completion.sh"},"position":{"line":0,"character":3}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit","languageId":"shit","version":1,"text":"koshkit ca\n"}}}'
   frame '{"jsonrpc":"2.0","id":140,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/subcommand-completion.shit"},"position":{"line":0,"character":10}}}'
-  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-completion.sh","languageId":"sh","version":1,"text":"act sync-script\n"}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-completion.sh","languageId":"sh","version":1,"text":"act sync-script\nprintf later | trailing\n"}}}'
   frame '{"jsonrpc":"2.0","id":143,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-completion.sh"},"position":{"line":0,"character":6}}}'
   frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-flag-completion.sh","languageId":"sh","version":1,"text":"act sync --fo\n"}}}'
   frame '{"jsonrpc":"2.0","id":144,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/help-subcommand-flag-completion.sh"},"position":{"line":0,"character":13}}}'

@@ -287,6 +287,10 @@ owner.
 Debug-only driver probes must verify the debug artifact before invocation.
 Object-shape changes must update every exact capability assertion before a
 golden refill.
+Language server configuration changes must verify that the resolved command is
+executable and that the client attaches.
+Debug process traces must run to completion before their output is narrowed.
+Completion tests after source edits must rebuild the debug binary first.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

@@ -1,6 +1,8 @@
 == first-level subcommands:
 compose
 run
+== help fallback after a nonmatching man subcommand:
+run
 == second-level sub-subcommands from 'docker compose --help':
 config
 up

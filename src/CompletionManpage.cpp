@@ -1172,17 +1172,6 @@ fn complete_from_help_subcommands(StringView line, StringView token,
                  "argument");
       return None;
     }
-
-    /* A command the man index already lists never forks --help to relist them,
-       the fork is reserved for a tool like cargo with no man pages. */
-    if (is_man_subcommand_index_built) {
-      let const man_subcommands =
-          MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
-      if (man_subcommands != nullptr && !man_subcommands->is_empty()) {
-        LOG(Debug, "help subcommands bail because the man index lists them");
-        return None;
-      }
-    }
   }
 
   let const &subcommands = help_subcommands_for(

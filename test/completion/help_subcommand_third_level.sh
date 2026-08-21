@@ -25,8 +25,21 @@ else
 fi
 SH
 chmod +x "$dir/docker"
+mkdir -p "$dir/man/man1"
+cat > "$dir/man/man1/docker.1" <<'EOF'
+.TH DOCKER 1
+.SH SYNOPSIS
+\fBdocker\fR [OPTIONS] COMMAND
+EOF
+cat > "$dir/man/man1/docker-compose.1" <<'EOF'
+.TH DOCKER-COMPOSE 1
+.SH SYNOPSIS
+\fBdocker\fR \fBcompose\fR
+EOF
 echo "== first-level subcommands:"
 MANPATH= PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker ' </dev/null
+echo "== help fallback after a nonmatching man subcommand:"
+MANPATH="$dir/man" PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker r' </dev/null
 echo "== second-level sub-subcommands from 'docker compose --help':"
 MANPATH= PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose ' </dev/null
 echo "== third-level options from 'docker compose config --help':"
