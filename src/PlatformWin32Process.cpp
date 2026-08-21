@@ -49,11 +49,20 @@ fn capture_program_output(const ArrayList<String> &argv,
   defer { CloseHandle(null_input); };
 
   let application_path = argv[0].c_str();
+  let resolved_program_path_storage = String{heap_allocator()};
+  if (let resolved_program_path = canonical_path(Path{argv[0].view()})) {
+    resolved_program_path_storage = resolved_program_path->text().clone();
+    application_path = resolved_program_path_storage.c_str();
+  }
+
   let application_path_storage = String{heap_allocator()};
   let command_line = make_os_args(argv);
   if (is_batch_program(argv[0].view())) {
     let batch_command = String{heap_allocator()};
-    append_windows_quoted_arg(batch_command, argv[0].view());
+    append_windows_quoted_arg(batch_command,
+                              resolved_program_path_storage.is_empty()
+                                  ? argv[0].view()
+                                  : resolved_program_path_storage.view());
     for (usize argument_position = 1; argument_position < argv.count();
          argument_position++)
     {
@@ -73,6 +82,9 @@ fn capture_program_output(const ArrayList<String> &argv,
     processor_command_line += '"';
     command_line = steal(processor_command_line);
   }
+  LOG(Debug, "capturing output from '%s' with command line '%s'",
+      application_path, command_line.c_str());
+
   STARTUPINFOA startup_info{};
   startup_info.cb = sizeof(startup_info);
   startup_info.dwFlags = STARTF_USESTDHANDLES;

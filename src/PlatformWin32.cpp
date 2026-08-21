@@ -229,11 +229,12 @@ static fn standard_handle_is_referenced(os::descriptor handle) wontthrow -> bool
   return false;
 }
 
-static fn standard_handle_is_owned_by_runtime(i32 shell_fd,
-                                              os::descriptor handle) wontthrow
+static fn standard_handle_is_owned_by_runtime(os::descriptor handle) wontthrow
     -> bool
 {
-  return reinterpret_cast<os::descriptor>(_get_osfhandle(shell_fd)) == handle;
+  for (i32 shell_fd = 0; shell_fd <= 2; shell_fd++)
+    if (descriptor_from_fd_number(shell_fd) == handle) return true;
+  return false;
 }
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
@@ -299,7 +300,7 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 
   if (replaced != nullptr && replaced != INVALID_HANDLE_VALUE &&
       !standard_handle_is_referenced(replaced) &&
-      !standard_handle_is_owned_by_runtime(saved.shell_fd, replaced))
+      !standard_handle_is_owned_by_runtime(replaced))
     CloseHandle(replaced);
 }
 
@@ -372,7 +373,7 @@ fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 
   if (previous != nullptr && previous != INVALID_HANDLE_VALUE &&
       !standard_handle_is_referenced(previous) &&
-      !standard_handle_is_owned_by_runtime(shell_fd, previous))
+      !standard_handle_is_owned_by_runtime(previous))
     CloseHandle(previous);
 
   return true;
@@ -786,7 +787,16 @@ fn get_current_process_id() wontthrow -> i64
 
 fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }
 
-fn initialize_platform_runtime() wontthrow -> void {}
+fn initialize_platform_runtime() wontthrow -> void
+{
+  for (i32 shell_fd = 0; shell_fd <= 2; shell_fd++) {
+    let const runtime_handle = descriptor_from_fd_number(shell_fd);
+    if (runtime_handle == nullptr || runtime_handle == INVALID_HANDLE_VALUE)
+      continue;
+    if (descriptor_for_shell_fd(shell_fd) == runtime_handle) continue;
+    unused(replace_descriptor(shell_fd, runtime_handle));
+  }
+}
 
 } /* namespace os */
 } /* namespace koshka */
