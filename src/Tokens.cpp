@@ -516,7 +516,7 @@ cold fn Word::get_quoted_assignment_split() const throws
       carrier.kind,
       SegmentText{heap_allocator(),
                   carrier.text.substring(equals_position + 1)},
-      carrier.is_in_double_quotes
+      carrier.is_in_double_quotes != 0
   });
   for (usize i = equals_segment + 1; i < segments.count(); i++)
     value.segments.push(segments[i]);

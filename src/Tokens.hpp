@@ -381,11 +381,8 @@ public:
 
   cold fn clone(Allocator allocator) const throws -> WordSegment
   {
-    let copy = WordSegment{
-        kind, SegmentText{allocator, text.view()},
-         is_in_double_quotes,
-        is_greedy_name
-    };
+    let copy = WordSegment(kind, SegmentText{allocator, text.view()},
+                           is_in_double_quotes != 0, is_greedy_name != 0);
     copy.was_ansi_c_quoted = was_ansi_c_quoted;
     copy.is_substitution_cache_in_function_arena =
         is_substitution_cache_in_function_arena;
