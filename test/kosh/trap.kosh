@@ -14,7 +14,7 @@ trap
 echo set_by_number
 
 trap 'printf "quoted=<%s>\n" "a'\''b"' EXIT
-trap_file=/tmp/kosh-trap-replay-$$
+trap_file=$TEST_TEMP_DIRECTORY/kosh-trap-replay-$$
 trap -p EXIT > "$trap_file"
 trap - EXIT
 listed=$(koshkit cat "$trap_file")

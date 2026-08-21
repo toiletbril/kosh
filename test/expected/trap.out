@@ -24,7 +24,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "trap" "printf "quoted=<%s>\n" "a'b"" "EXIT"]
   [CompoundListCondition, None]
-    [Assign trap_file=/tmp/kosh-trap-replay-$$]
+    [Assign trap_file=$TEST_TEMP_DIRECTORY/kosh-trap-replay-$$]
   [CompoundListCondition, None]
     [SimpleCommand "trap" "-p" "EXIT"]
   [CompoundListCondition, None]
@@ -116,7 +116,9 @@
   Unquoted "EXIT"
 ]
 [Word
-  Unquoted "trap_file=/tmp/kosh-trap-replay-"
+  Unquoted "trap_file="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/kosh-trap-replay-"
   Variable "$"
 ]
 [Word
