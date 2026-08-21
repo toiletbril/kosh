@@ -61,6 +61,7 @@ fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow -> Maybe<usize>
 
 fn descriptor_is_seekable(os::descriptor fd) wontthrow -> bool
 {
+  if (GetFileType(fd) != FILE_TYPE_DISK) return false;
   LARGE_INTEGER distance{};
   return SetFilePointerEx(fd, distance, nullptr, FILE_CURRENT) != FALSE;
 }
