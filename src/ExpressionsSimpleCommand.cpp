@@ -158,7 +158,9 @@ fn AssignCommand::analyze(AnalysisContext &actx,
     actx.note_variable_occurrence(
         base, name_location, variable_occurrence_kind::Assignment,
         !is_unconditional || actx.has_seen_runtime_definer);
-    actx.note_variable_assignment(base, source_location());
+    actx.note_variable_assignment(base, source_location(),
+                                  is_unconditional &&
+                                      !actx.has_seen_runtime_definer);
     actx.note_variable_assignment_record(base, nullptr, source_location(),
                                          !is_unconditional ||
                                              actx.has_seen_runtime_definer,
@@ -177,7 +179,9 @@ fn AssignCommand::analyze(AnalysisContext &actx,
       name.view(), name_location, variable_occurrence_kind::Assignment,
       !is_unconditional || actx.has_seen_runtime_definer,
       m_assignment->is_append());
-  actx.note_variable_assignment(name.view(), source_location());
+  actx.note_variable_assignment(name.view(), source_location(),
+                                is_unconditional &&
+                                    !actx.has_seen_runtime_definer);
   /* The record is taken before the constant table gives up on this name. A
      conditional or appending assignment stays answerable. */
   actx.note_variable_assignment_record(

@@ -383,7 +383,7 @@ fn note_variable_target_operands(AnalysisContext &actx,
     if (target.is_empty()) continue;
 
     if (should_note_assignment)
-      actx.note_variable_assignment(target, args[i]->source_location());
+      actx.note_variable_assignment(target, args[i]->source_location(), true);
 
     /* The assignment builtin walk owns its operands and folds their values. */
     if (binder == assignment_binder::Assignment) continue;
@@ -444,7 +444,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.note_variable_occurrence(
           var.get_name(), name_location, variable_occurrence_kind::Assignment,
           !is_unconditional || actx.has_seen_runtime_definer, var.is_append());
-      actx.note_variable_assignment(var.get_name(), var.get_location());
+      actx.note_variable_assignment(var.get_name(), var.get_location(),
+                                    is_unconditional &&
+                                        !actx.has_seen_runtime_definer);
       actx.note_variable_assignment_record(
           var.get_name(), &var.get_value(), var.get_location(),
           !is_unconditional || actx.has_seen_runtime_definer, var.is_append());
@@ -458,7 +460,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                                   variable_occurrence_kind::Assignment,
                                   !is_unconditional ||
                                       actx.has_seen_runtime_definer);
-    actx.note_variable_assignment(assignment.name.view(), assignment.location);
+    actx.note_variable_assignment(assignment.name.view(), assignment.location,
+                                  is_unconditional &&
+                                      !actx.has_seen_runtime_definer);
     actx.note_variable_assignment_record(
         assignment.name.view(), nullptr, assignment.location,
         !is_unconditional || actx.has_seen_runtime_definer,
@@ -656,9 +660,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* A declare-family builtin writes its NAME=value operands, and those reach
      analysis as command arguments rather than as prefix assignments. */
-  if (command_is_assignment_builtin && !is_command_shadowed &&
-      actx.symbol_records != nullptr)
-  {
+  if (command_is_assignment_builtin && !is_command_shadowed) {
+    let const should_record_readonly_name =
+        command_id == command_name_id::Readonly && is_unconditional &&
+        !actx.has_seen_runtime_definer;
     /* A -f, -F, or -p operand asks the builtin to report a name, so nothing on
        that command line is declared. */
     let is_reporting_form = false;
@@ -712,6 +717,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
               declared->view(), m_args[i]->source_location(),
               assignment_binder::Declaration,
               !is_unconditional || actx.has_seen_runtime_definer);
+          if (should_record_readonly_name)
+            actx.readonly_assigned_names.add(declared->view());
 
           continue;
         }
@@ -747,6 +754,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.note_variable_assignment_record(
           recorded_name, recorded_value, m_args[i]->source_location(),
           !is_unconditional || actx.has_seen_runtime_definer, is_append);
+      if (should_record_readonly_name)
+        actx.readonly_assigned_names.add(recorded_name);
     }
   }
 
@@ -976,7 +985,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           let const referenced = segment.text.view();
           if (!is_assignment_builtin_operand)
             note_variable_reference(actx, segment, arg_location);
-          actx.note_positional_reference(referenced);
+          if (is_assignment_builtin_operand) {
+            let const segment_location =
+                segment.get_source_location(arg_location.source_name_index)
+                    .value_or(arg_location);
+            actx.note_positional_reference(
+                referenced,
+                expansion_location_with_sigil(actx, segment_location));
+          }
           if (!is_operand) break;
 
           /* An unquoted default assignment is split and globbed before it is
@@ -1378,8 +1394,15 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
       if (is_read_of_own_prefix) continue;
 
-      actx.note_variable_read(segment.text.view(), m_args[i]->source_location(),
-                              is_top_level_unconditional);
+      let const segment_location =
+          segment
+              .get_source_location(
+                  m_args[i]->source_location().source_name_index)
+              .value_or(m_args[i]->source_location());
+      actx.note_variable_read(
+          segment.text.view(),
+          expansion_location_with_sigil(actx, segment_location),
+          is_top_level_unconditional);
     }
   }
 }

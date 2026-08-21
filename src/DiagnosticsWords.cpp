@@ -85,7 +85,6 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
                                  bool is_conditional, bool is_append) throws
     -> void
 {
-  if (actx.symbol_records == nullptr) return;
   if (!expression_base_position.has_value()) return;
 
   let const target_offset = static_cast<usize>(target.data - expression.data);
@@ -94,8 +93,8 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
   if (analysis_source_text(actx, name_location) != target) return;
 
   actx.note_variable_occurrence(target, name_location,
-                                variable_occurrence_kind::Assignment, false,
-                                is_append);
+                                variable_occurrence_kind::Assignment,
+                                is_conditional, is_append);
   actx.note_variable_binding_record(
       target, name_location, assignment_binder::Arithmetic, is_conditional);
 }
@@ -133,7 +132,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
   let const do_apply_write = [&]() throws -> void {
     let const write = pending_writes.back();
     pending_writes.pop_back();
-    actx.note_variable_assignment(write.name, location);
+    actx.note_variable_assignment(write.name, location, !is_conditional);
     note_arithmetic_target_record(actx, expression, write.name, location,
                                   expression_base_position, is_conditional,
                                   write.is_append);
@@ -308,13 +307,13 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
       if (!referenced.is_empty() && expression_base_position.has_value()) {
         let const occurrence_start = dollar_position;
         let const occurrence_length = expansion_end - occurrence_start;
-        actx.note_variable_occurrence(
-            referenced,
+        let const occurrence_location =
             SourceLocation{*expression_base_position + occurrence_start,
-                           occurrence_length, location.source_name_index},
-            variable_occurrence_kind::Reference);
+                           occurrence_length, location.source_name_index};
+        actx.note_variable_occurrence(referenced, occurrence_location,
+                                      variable_occurrence_kind::Reference);
+        actx.note_positional_reference(referenced, occurrence_location);
       }
-      actx.note_positional_reference(referenced);
       break;
     }
 
@@ -930,8 +929,11 @@ fn note_formatted_target(AnalysisContext &actx, const command_lint_input &input,
   if (name.is_empty() || input.is_command_shadowed) return;
 
   if (!input.is_conditional && actx.function_scope_depth == 0)
-    actx.note_variable_assignment(name, location);
+    actx.note_variable_assignment(name, location, true);
 
+  actx.note_variable_occurrence(name, location,
+                                variable_occurrence_kind::Assignment,
+                                input.is_conditional);
   actx.note_variable_binding_record(
       name, location, assignment_binder::FormattedText, input.is_conditional);
 }
@@ -1148,7 +1150,8 @@ fn check_operand_lints_after_scan(AnalysisContext &actx,
 
       let const target = operand_target_name(raw_view);
       if (!is_function_mode && !target.is_empty() &&
-          !raw_view.find_character('[').has_value())
+          !raw_view.find_character('[').has_value() &&
+          !actx.readonly_assigned_names.contains(target))
       {
         let const name_location =
             raw.count() == target.length

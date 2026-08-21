@@ -1023,6 +1023,7 @@ struct resembling_assignment
 {
   StringView name;
   SourceLocation location;
+  assignment_binder binder{assignment_binder::Assignment};
 };
 
 pure fn fold_name_byte(char byte) wontthrow -> char
@@ -1104,25 +1105,38 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
     resembling_assignment misspelled{};
     let const do_match = [&read, &resembled, &misspelled](
                              StringView assigned,
-                             const SourceLocation &location) throws -> void {
+                             const SourceLocation &location,
+                             assignment_binder binder) throws -> void {
       if (!resembled.name.is_empty()) return;
       if (assigned == read.name) return;
 
       if (names_resemble_each_other(assigned, read.name)) {
-        resembled = resembling_assignment{assigned, location};
+        resembled = resembling_assignment{assigned, location, binder};
         return;
       }
 
       if (misspelled.name.is_empty() &&
           names_are_near_misspellings(assigned, read.name))
       {
-        misspelled = resembling_assignment{assigned, location};
+        misspelled = resembling_assignment{assigned, location, binder};
       }
     };
 
-    actx.assigned_names_so_far.for_each(do_match);
-    actx.global_assigned_names.for_each(do_match);
-    actx.function_local_names.for_each(do_match);
+    actx.diagnostic_assignment_traces.for_each(
+        [&](StringView assigned, const diagnostic_assignment_trace &trace)
+            throws { do_match(assigned, trace.location, trace.binder); });
+    actx.assigned_names_so_far.for_each(
+        [&](StringView assigned, const SourceLocation &location) throws {
+          do_match(assigned, location, assignment_binder::Assignment);
+        });
+    actx.global_assigned_names.for_each(
+        [&](StringView assigned, const SourceLocation &location) throws {
+          do_match(assigned, location, assignment_binder::Assignment);
+        });
+    actx.function_local_names.for_each(
+        [&](StringView assigned, const SourceLocation &location) throws {
+          do_match(assigned, location, assignment_binder::Declaration);
+        });
 
     if (resembled.name.is_empty()) resembled = misspelled;
 
@@ -1139,8 +1153,10 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void
     if (resembled.name.is_empty()) {
       actx.report_diagnostic(diagnostic_id::sc2154, read.location, {read.name});
     } else {
-      actx.report_diagnostic(diagnostic_id::sc2153, read.location,
-                             {read.name, resembled.name}, resembled.location);
+      actx.report_diagnostic(
+          diagnostic_id::sc2153, read.location,
+          {read.name, resembled.name, binder_description(resembled.binder)},
+          resembled.location);
     }
   }
 }
@@ -1199,14 +1215,17 @@ fn check_function_argument_use(AnalysisContext &actx,
     return;
   }
 
-  actx.report_diagnostic(diagnostic_id::sc2120, definition.location,
+  actx.report_diagnostic(diagnostic_id::sc2120,
+                         definition.first_positional_read_location,
                          {definition.name.view()});
 
   for (let const &call : actx.function_calls) {
     if (call.name != definition.name) continue;
 
-    actx.report_diagnostic(diagnostic_id::sc2119, call.location,
-                           {definition.name.view()}, definition.location);
+    actx.report_diagnostic(
+        diagnostic_id::sc2119, call.location,
+        {definition.name.view(), definition.first_positional_read.view()},
+        definition.first_positional_read_location);
   }
 }
 
@@ -1254,7 +1273,7 @@ fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
   if (should_check_argument_use) {
     for (usize index = 0; index < actx.function_definitions.count(); index++) {
       let const &definition = actx.function_definitions[index];
-      if (!definition.has_positional_reads) continue;
+      if (definition.first_positional_read.is_empty()) continue;
 
       /* A redefinition is judged by the first body the file gives the name. */
       let const summary = summaries.find(definition.name.view());

@@ -397,7 +397,6 @@ fn check_test_operand_lints(AnalysisContext &actx,
     if (i < operand_end) {
       let const &word = static_cast<const tokens::WordToken *>(args[i])->word();
       let const shape = classify_test_operand(word);
-      if (shape.has_positional_reference) actx.mark_positional_reference();
 
       let const written =
           analysis_source_text(actx, args[i]->source_location());

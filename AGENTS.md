@@ -204,6 +204,7 @@ files and output only. Offer parallel read-only agents before repository
 research. Read the matching guidance file before an implementation or prose
 edit. Confirm that an edit changes its target before calling the edit tool.
 Avoid repeating a read after the harness reports that the file is unchanged.
+Reuse current guidance file results while they remain available in the conversation.
 Compare the complete source and replacement text before calling the edit tool.
 Search for the smallest unique exact segment before editing a long golden.
 Validate a shell probe encoder with a small payload before sending a large
@@ -222,9 +223,29 @@ active read only agent. Teammate replies require a concrete
 reachable agent name or identifier. Agent launches use a type listed by the
 current session. Performance comparisons use the release binary explicitly.
 Locate a focused test target before invoking it from the repository root.
+Identify the input type before selecting its focused test target.
+Use a bounded temporary path and verify cleanup before a workload probe.
 Check active agent ownership before a test edit. Never poll a running agent
 through `TaskOutput`. Read the exact local segment before editing an unverified
-file area.
+file area. Independent probes run as separate commands after their paths are
+resolved. Read only shell probes use the simplest command form that preserves
+the input. Command options precede the path separator. Read only reviews stream
+inspection output without creating files. Large patches use a raw template
+string or separate small edit calls. Patch wrappers avoid delimiter characters
+contained in the patch text.
+Compile migrations must check every constructor input and conditional result
+type before the build. Mixed file patches must use separately verified exact
+anchors.
+Every borrowed view must retain its owning local for the complete use span.
+Multi-file patches must be split when a deletion-only hunk ends a file change.
+Static proof helpers must match the exact evidence level required by the
+behavior.
+Control-flow changes must verify operator ownership in the printed AST. Every
+failed mixed patch must be followed only by single-file patches.
+Transcript probes must limit both matched records and output bytes before
+reading content. Active review ownership must be resolved before any
+overlapping inspection.
+Every SourceLocation subspan must prove both offset and length bounds.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

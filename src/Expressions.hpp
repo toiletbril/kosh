@@ -110,6 +110,14 @@ enum class assignment_binder : u8
   Declaration,
 };
 
+pure fn binder_description(assignment_binder binder) wontthrow -> StringView;
+
+struct diagnostic_assignment_trace
+{
+  SourceLocation location;
+  assignment_binder binder{assignment_binder::Assignment};
+};
+
 /* One assignment a reader may ask about. The name and the folded value are
    owned, and the span is a plain byte range, since the language server releases
    the analysis arena before it answers. */
@@ -166,7 +174,8 @@ struct function_definition_record
   HashSet affected_names{heap_allocator()};
   HashSet local_names{heap_allocator()};
   StringMap<variable_occurrence_state> exit_states{heap_allocator()};
-  bool has_positional_reads{false};
+  String first_positional_read;
+  SourceLocation first_positional_read_location;
   bool has_been_called{false};
   bool is_analysis_complete{false};
 };
@@ -305,6 +314,9 @@ public:
   HashSet inherited_assigned_names{heap_allocator()};
 
   StringMap<SourceLocation> reads_before_assignment{heap_allocator()};
+  StringMap<diagnostic_assignment_trace> diagnostic_assignment_traces{
+      heap_allocator()};
+  HashSet readonly_assigned_names{heap_allocator()};
 
   /* An assignment holding a bare command name is only wrong when nothing runs
      that name, and the run may follow the assignment, so the finding waits for
@@ -488,8 +500,8 @@ public:
      check that costs more than a comparison asks first, and the reporting
      funnel asks before it formats anything. */
   pure fn should_report(diagnostic_id id) const wontthrow -> bool;
-  fn note_variable_assignment(StringView name,
-                              const SourceLocation &location) throws -> void;
+  fn note_variable_assignment(StringView name, const SourceLocation &location,
+                              bool is_proven_unconditional) throws -> void;
 
   /* A null value word means the assignment has no scalar word to fold, so an
      array element or a NAME=(...) list. */
@@ -513,26 +525,19 @@ public:
                                usize body_position,
                                usize body_end_position) throws -> void;
 
-  /* A positional read inside a function body means the body uses the arguments
-     its caller passes. */
-  fn mark_positional_reference() wontthrow -> void
-  {
-    if (active_function_definition_index == NO_ACTIVE_FUNCTION_DEFINITION)
-      return;
-
-    function_definitions[active_function_definition_index]
-        .has_positional_reads = true;
-  }
-
-  /* The sentinel check comes first, since the walk spends most of its time
-     outside every function body. */
-  fn note_positional_reference(StringView name) wontthrow -> void
+  fn note_positional_reference(StringView name,
+                               const SourceLocation &location) throws -> void
   {
     if (active_function_definition_index == NO_ACTIVE_FUNCTION_DEFINITION)
       return;
     if (!reference_names_positional(name)) return;
 
-    mark_positional_reference();
+    let &definition = function_definitions[active_function_definition_index];
+    if (!definition.first_positional_read.is_empty()) return;
+
+    let spelling = location.get_source_text(source).value_or(name);
+    definition.first_positional_read = String{spelling};
+    definition.first_positional_read_location = location;
   }
 
   fn note_variable_read(StringView name, const SourceLocation &location,

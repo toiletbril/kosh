@@ -1476,29 +1476,6 @@ static constexpr usize HOVER_EARLIER_ASSIGNMENT_LIMIT = 8;
 static constexpr usize HOVER_ASSIGNMENT_TEXT_LENGTH_LIMIT = 200;
 static constexpr usize HOVER_BODY_LINE_LIMIT = 40;
 
-/* What each binder puts in the name, in the order of the enum. */
-static constexpr StringView BINDER_DESCRIPTIONS[] = {
-    "",
-    "The name takes each word of the loop list in turn.",
-    "The name takes the menu entry the reader selects.",
-    "The value is the result of an arithmetic expression.",
-    "The value is a field read from input.",
-    "The value is a list of lines read from input.",
-    "The value is the option letter the parse reached.",
-    "The value is the formatted text.",
-    "The name is declared and carries no value here.",
-};
-static_assert(countof(BINDER_DESCRIPTIONS) ==
-              static_cast<usize>(assignment_binder::Declaration) + 1);
-
-pure fn binder_description(assignment_binder binder) wontthrow -> StringView
-{
-  let const index = static_cast<usize>(binder);
-  if (index >= countof(BINDER_DESCRIPTIONS)) return StringView{};
-
-  return BINDER_DESCRIPTIONS[index];
-}
-
 pure fn source_line_span(const Document &document, usize position) wontthrow
     -> StringView
 {

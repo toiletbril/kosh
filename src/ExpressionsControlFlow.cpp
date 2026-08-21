@@ -743,7 +743,6 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
       case WordSegment::Kind::VariableReference: {
         note_variable_reference(actx, segment, t->source_location());
-        actx.note_positional_reference(segment.text.view());
         word_is_literal = false;
         if (!segment.is_in_double_quotes) has_unquoted_expansion = true;
         break;
@@ -962,12 +961,30 @@ fn CaseClause::analyze(AnalysisContext &actx,
       actx.variable_occurrence_assignments.clone();
   let const common_inherited_occurrence_assignments =
       actx.inherited_variable_occurrence_assignments.clone();
+  let has_unquoted_default_pattern = false;
+  for (let const &item : m_items) {
+    for (let const pattern : item.patterns) {
+      if (pattern->kind() != Token::Kind::Word) continue;
+
+      let const &pattern_word =
+          static_cast<const tokens::WordToken *>(pattern)->word();
+      if (pattern_word.segments.count() != 1) continue;
+
+      let const &segment = pattern_word.segments[0];
+      if (segment.kind == WordSegment::Kind::UnquotedText &&
+          segment.text == "*")
+      {
+        has_unquoted_default_pattern = true;
+      }
+    }
+  }
   let merged_occurrence_assignments = common_occurrence_assignments.clone();
   let merged_inherited_occurrence_assignments =
       common_inherited_occurrence_assignments.clone();
   let continued_occurrence_assignments = common_occurrence_assignments.clone();
   let continued_inherited_occurrence_assignments =
       common_inherited_occurrence_assignments.clone();
+  let has_merged_occurrence_exit = !has_unquoted_default_pattern;
   let has_continued_occurrence_path = false;
 
   ASSERT(m_word != nullptr);
@@ -1010,11 +1027,19 @@ fn CaseClause::analyze(AnalysisContext &actx,
 
     let const has_later_item = i + 1 < m_items.count();
     if (item.terminator != case_terminator::FallThrough || !has_later_item) {
-      merge_variable_occurrence_states(merged_occurrence_assignments,
-                                       actx.variable_occurrence_assignments);
-      merge_variable_occurrence_states(
-          merged_inherited_occurrence_assignments,
-          actx.inherited_variable_occurrence_assignments);
+      if (!has_merged_occurrence_exit) {
+        merged_occurrence_assignments =
+            actx.variable_occurrence_assignments.clone();
+        merged_inherited_occurrence_assignments =
+            actx.inherited_variable_occurrence_assignments.clone();
+        has_merged_occurrence_exit = true;
+      } else {
+        merge_variable_occurrence_states(merged_occurrence_assignments,
+                                         actx.variable_occurrence_assignments);
+        merge_variable_occurrence_states(
+            merged_inherited_occurrence_assignments,
+            actx.inherited_variable_occurrence_assignments);
+      }
     }
 
     has_continued_occurrence_path =

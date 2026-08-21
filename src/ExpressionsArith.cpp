@@ -317,7 +317,6 @@ fn ConditionalCommand::analyze(AnalysisContext &actx,
       let const &operand_word =
           static_cast<const tokens::WordToken *>(element.word)->word();
       let const shape = classify_test_operand(operand_word);
-      if (shape.has_positional_reference) actx.mark_positional_reference();
 
       for (let const &segment : operand_word.segments) {
         if (segment.kind != WordSegment::Kind::VariableReference) continue;
@@ -583,7 +582,6 @@ fn SelectLoop::analyze(AnalysisContext &actx,
       if (segment.kind != WordSegment::Kind::VariableReference) continue;
 
       note_variable_reference(actx, segment, t->source_location());
-      actx.note_positional_reference(segment.text.view());
     }
   }
 
@@ -1169,7 +1167,13 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.active_function_definition_index = actx.function_definitions.count();
   actx.function_definitions.push(function_definition_record{
       String{heap_allocator(), m_name.view()},
-      source_location()
+      source_location(), 0, 0,
+      HashSet{heap_allocator()},
+      HashSet{heap_allocator()},
+      StringMap<variable_occurrence_state>{heap_allocator()},
+      String{heap_allocator()},
+      SourceLocation{},
+      false, false
   });
   let const function_definition_index = actx.active_function_definition_index;
   actx.function_definitions[function_definition_index].occurrence_start =

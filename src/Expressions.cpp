@@ -23,6 +23,28 @@
 
 namespace koshka {
 
+static constexpr StringView BINDER_DESCRIPTIONS[] = {
+    "The value is assigned here.",
+    "The name takes each word of the loop list in turn.",
+    "The name takes the menu entry the reader selects.",
+    "The value is the result of an arithmetic expression.",
+    "The value is a field read from input.",
+    "The value is a list of lines read from input.",
+    "The value is the option letter the parse reached.",
+    "The value is the formatted text.",
+    "The name is declared and carries no value here.",
+};
+static_assert(countof(BINDER_DESCRIPTIONS) ==
+              static_cast<usize>(assignment_binder::Declaration) + 1);
+
+pure fn binder_description(assignment_binder binder) wontthrow -> StringView
+{
+  let const index = static_cast<usize>(binder);
+  if (index >= countof(BINDER_DESCRIPTIONS)) return StringView{};
+
+  return BINDER_DESCRIPTIONS[index];
+}
+
 fn indent_for_layer(usize layer) throws -> String
 {
   let pad = String{heap_allocator()};
@@ -394,13 +416,21 @@ pure fn AnalysisContext::is_diagnostic_suppressed(
 }
 
 fn AnalysisContext::note_variable_assignment(
-    StringView name, const SourceLocation &location) throws -> void
+    StringView name, const SourceLocation &location,
+    bool is_proven_unconditional) throws -> void
 {
   if (name.is_empty()) return;
 
   assigned_names_so_far.set(name, location);
+  let const name_location = location.length >= name.length
+                                ? location.subspan(0, name.length)
+                                : location;
+  diagnostic_assignment_traces.set(
+      name, diagnostic_assignment_trace{name_location,
+                                        assignment_binder::Assignment});
   if (current_source_effects != nullptr)
     current_source_effects->assigned_names.add(name);
+  if (!is_proven_unconditional) return;
 
   if (const SourceLocation *read_location = reads_before_assignment.find(name);
       read_location != nullptr)
@@ -418,8 +448,15 @@ fn AnalysisContext::note_variable_assignment_record(
     StringView name, const Word *value_word, const SourceLocation &location,
     bool is_conditional, bool is_append) throws -> void
 {
-  if (symbol_records == nullptr) return;
   if (name.is_empty()) return;
+
+  let const name_location = location.length >= name.length
+                                ? location.subspan(0, name.length)
+                                : location;
+  diagnostic_assignment_traces.set(
+      name, diagnostic_assignment_trace{name_location,
+                                        assignment_binder::Assignment});
+  if (symbol_records == nullptr) return;
 
   let literal_value = Maybe<String>{None};
   if (value_word != nullptr) {
@@ -444,8 +481,11 @@ fn AnalysisContext::note_variable_binding_record(StringView name,
                                                  bool is_conditional) throws
     -> void
 {
-  if (symbol_records == nullptr) return;
   if (name.is_empty()) return;
+
+  diagnostic_assignment_traces.set(
+      name, diagnostic_assignment_trace{location, binder});
+  if (symbol_records == nullptr) return;
 
   symbol_records->assignments.push(variable_assignment_record{
       String{name}, None, is_conditional, false, false, location.position,
@@ -458,7 +498,6 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
                                              bool is_unresolved,
                                              bool is_append) throws -> void
 {
-  if (symbol_records == nullptr) return;
   if (name.is_empty() || location.length == 0) return;
 
   if (name.length > 1 && name[0] == '#') name = name.substring(1);
@@ -474,19 +513,14 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
       function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION &&
       kind == variable_occurrence_kind::Reference &&
       (current_state == nullptr || current_state->has_inherited_path);
-  let occurrence = variable_occurrence_record{String{name},
-                                              location.position,
-                                              location.length,
-                                              kind,
-                                              is_unresolved,
-                                              false,
-                                              function_definition_index,
-                                              false,
-                                              false,
-                                              has_inherited_function_path};
+  let occurrence_is_unresolved = is_unresolved;
+  let occurrence_is_unused = false;
+  let const occurrence_index =
+      symbol_records != nullptr ? symbol_records->variable_occurrences.count()
+                                : usize{0};
 
   if (kind == variable_occurrence_kind::Assignment) {
-    if (is_append) {
+    if (is_append && symbol_records != nullptr) {
       let const *prior_state = variable_occurrence_assignments.find(name);
       if (prior_state == nullptr)
         prior_state = inherited_variable_occurrence_assignments.find(name);
@@ -498,30 +532,31 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
     }
 
     let state = variable_occurrence_state{};
-    state.assignment_indices.push(symbol_records->variable_occurrences.count());
+    if (symbol_records != nullptr)
+      state.assignment_indices.push(occurrence_index);
     state.is_definitely_set = true;
     state.is_definitely_unset = false;
     state.has_inherited_path = false;
     variable_occurrence_assignments.set(name, steal(state));
-    occurrence.is_unused = true;
+    occurrence_is_unused = true;
     if (function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION)
       function_definitions[function_definition_index].affected_names.add(name);
   } else if (kind == variable_occurrence_kind::Reference) {
     let const *state = variable_occurrence_assignments.find(name);
-    if (state != nullptr) {
+    if (state != nullptr && symbol_records != nullptr) {
       for (let const assignment_index : state->assignment_indices)
         symbol_records->variable_occurrences[assignment_index].is_unused =
             false;
     } else {
       state = inherited_variable_occurrence_assignments.find(name);
-      if (state != nullptr) {
+      if (state != nullptr && symbol_records != nullptr) {
         for (let const assignment_index : state->assignment_indices)
           symbol_records->variable_occurrences[assignment_index].is_unused =
               false;
       }
     }
 
-    occurrence.is_unresolved =
+    occurrence_is_unresolved =
         is_unresolved || (state != nullptr && !state->is_definitely_set) ||
         (state == nullptr && !expressions::is_shell_maintained_variable(name) &&
          !(eval_context != nullptr && eval_context->has_variable_name(name)) &&
@@ -530,7 +565,7 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
     let const *state = variable_occurrence_assignments.find(name);
     if (state == nullptr)
       state = inherited_variable_occurrence_assignments.find(name);
-    occurrence.is_unresolved = state == nullptr || !state->is_definitely_set;
+    occurrence_is_unresolved = state == nullptr || !state->is_definitely_set;
 
     let unset_state = variable_occurrence_state{};
     unset_state.is_definitely_unset = true;
@@ -541,14 +576,17 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
       function_definitions[function_definition_index].affected_names.add(name);
   }
 
-  symbol_records->variable_occurrences.push(steal(occurrence));
+  if (symbol_records == nullptr) return;
+
+  symbol_records->variable_occurrences.push(variable_occurrence_record{
+      String{name}, location.position, location.length, kind,
+      occurrence_is_unresolved, occurrence_is_unused, function_definition_index,
+      false, false, has_inherited_function_path});
 }
 
 fn AnalysisContext::apply_called_function(
     StringView name, const SourceLocation &call_location) throws -> void
 {
-  if (symbol_records == nullptr) return;
-
   if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION &&
       function_definitions[active_function_definition_index].name.view() ==
           name)
@@ -579,33 +617,35 @@ fn AnalysisContext::apply_called_function(
     });
   }
 
-  for (usize occurrence_index = definition.occurrence_start;
-       occurrence_index < definition.occurrence_end; occurrence_index++)
-  {
-    let &occurrence = symbol_records->variable_occurrences[occurrence_index];
-    if (occurrence.kind != variable_occurrence_kind::Reference ||
-        occurrence.function_definition_index != *selected_definition_index ||
-        !occurrence.has_inherited_function_path)
+  if (symbol_records != nullptr) {
+    for (usize occurrence_index = definition.occurrence_start;
+         occurrence_index < definition.occurrence_end; occurrence_index++)
     {
-      continue;
-    }
-    if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION) {
-      occurrence.function_definition_index = active_function_definition_index;
-      continue;
-    }
+      let &occurrence = symbol_records->variable_occurrences[occurrence_index];
+      if (occurrence.kind != variable_occurrence_kind::Reference ||
+          occurrence.function_definition_index != *selected_definition_index ||
+          !occurrence.has_inherited_function_path)
+      {
+        continue;
+      }
+      if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION) {
+        occurrence.function_definition_index = active_function_definition_index;
+        continue;
+      }
 
-    let const *state =
-        variable_occurrence_assignments.find(occurrence.name.view());
-    if (state == nullptr)
-      state = inherited_variable_occurrence_assignments.find(
-          occurrence.name.view());
-    if (state != nullptr && state->is_definitely_set) {
-      occurrence.has_resolved_function_path = true;
-      for (let const assignment_index : state->assignment_indices)
-        symbol_records->variable_occurrences[assignment_index].is_unused =
-            false;
-    } else {
-      occurrence.has_unresolved_function_path = true;
+      let const *state =
+          variable_occurrence_assignments.find(occurrence.name.view());
+      if (state == nullptr)
+        state = inherited_variable_occurrence_assignments.find(
+            occurrence.name.view());
+      if (state != nullptr && state->is_definitely_set) {
+        occurrence.has_resolved_function_path = true;
+        for (let const assignment_index : state->assignment_indices)
+          symbol_records->variable_occurrences[assignment_index].is_unused =
+              false;
+      } else {
+        occurrence.has_unresolved_function_path = true;
+      }
     }
   }
 
@@ -738,12 +778,22 @@ fn AnalysisContext::note_variable_read(StringView name,
 
   if (!lexer::word_is_variable_name(name)) {
     let const assigned = assign_form_target_name(name);
-    if (!assigned.is_empty()) note_variable_assignment(assigned, location);
+    if (!assigned.is_empty()) {
+      let state = variable_occurrence_state{};
+      state.is_definitely_set = true;
+      variable_occurrence_assignments.set(assigned, steal(state));
+      inherited_variable_occurrence_assignments.erase(assigned);
+      note_variable_assignment(assigned, location, true);
+    }
 
     return;
   }
 
-  if (assigned_names_so_far.find(name) != nullptr) return;
+  let const *assignment_state = variable_occurrence_assignments.find(name);
+  if (assignment_state == nullptr)
+    assignment_state = inherited_variable_occurrence_assignments.find(name);
+  if (assignment_state != nullptr && assignment_state->is_definitely_set)
+    return;
   if (inherited_assigned_names.contains(name)) return;
   if (function_local_names.find(name) != nullptr) return;
   if (global_assigned_names.find(name) != nullptr) return;
@@ -1482,10 +1532,11 @@ fn note_variable_reference(AnalysisContext &actx, const WordSegment &segment,
   let const segment_location =
       segment.get_source_location(fallback_location.source_name_index)
           .value_or(fallback_location);
-  actx.note_variable_occurrence(
-      segment.text.view(),
-      expansion_location_with_sigil(actx, segment_location),
-      variable_occurrence_kind::Reference);
+  let const expansion_location =
+      expansion_location_with_sigil(actx, segment_location);
+  actx.note_variable_occurrence(segment.text.view(), expansion_location,
+                                variable_occurrence_kind::Reference);
+  actx.note_positional_reference(segment.text.view(), expansion_location);
 }
 
 fn merge_variable_occurrence_states(

@@ -37,6 +37,7 @@ fn format_diagnostic_template(
     switch (text[position + 1]) {
     case '0': argument_index = 0; break;
     case '1': argument_index = 1; break;
+    case '2': argument_index = 2; break;
     default: result += text[position]; continue;
     }
 
