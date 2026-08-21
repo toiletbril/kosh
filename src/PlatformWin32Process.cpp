@@ -24,6 +24,10 @@ namespace koshka {
 
 namespace os {
 
+static fn append_windows_quoted_arg(String &out, StringView arg) throws -> void;
+
+static pure fn is_batch_program(StringView path) wontthrow -> bool;
+
 fn capture_program_output(const ArrayList<String> &argv,
                           u64 timeout_nanos) wontthrow -> Maybe<String>
 {
@@ -44,7 +48,31 @@ fn capture_program_output(const ArrayList<String> &argv,
   if (null_input == INVALID_HANDLE_VALUE) return None;
   defer { CloseHandle(null_input); };
 
+  let application_path = argv[0].c_str();
+  let application_path_storage = String{heap_allocator()};
   let command_line = make_os_args(argv);
+  if (is_batch_program(argv[0].view())) {
+    let batch_command = String{heap_allocator()};
+    append_windows_quoted_arg(batch_command, argv[0].view());
+    for (usize argument_position = 1; argument_position < argv.count();
+         argument_position++)
+    {
+      batch_command += ' ';
+      append_windows_quoted_arg(batch_command, argv[argument_position].view());
+    }
+
+    let const command_processor = std::getenv("COMSPEC");
+    application_path_storage =
+        String{command_processor != nullptr ? command_processor : "cmd.exe"};
+    application_path = application_path_storage.c_str();
+    let processor_command_line = String{heap_allocator()};
+    append_windows_quoted_arg(processor_command_line,
+                              application_path_storage.view());
+    processor_command_line += " /d /s /c \"";
+    processor_command_line += batch_command;
+    processor_command_line += '"';
+    command_line = steal(processor_command_line);
+  }
   STARTUPINFOA startup_info{};
   startup_info.cb = sizeof(startup_info);
   startup_info.dwFlags = STARTF_USESTDHANDLES;
@@ -53,7 +81,7 @@ fn capture_program_output(const ArrayList<String> &argv,
   startup_info.hStdError = write_end;
 
   PROCESS_INFORMATION process_info{};
-  if (CreateProcessA(argv[0].c_str(), const_cast<LPSTR>(command_line.data()),
+  if (CreateProcessA(application_path, const_cast<LPSTR>(command_line.data()),
                      nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr,
                      &startup_info, &process_info) == FALSE)
   {
@@ -110,6 +138,7 @@ fn capture_program_output(const ArrayList<String> &argv,
     WaitForSingleObject(process_info.hProcess, INFINITE);
     return None;
   }
+  captured.normalize_crlf_line_endings();
   return captured;
 }
 static pure fn process_is_pid_reference(process p) wontthrow -> bool
@@ -269,8 +298,6 @@ static fn attach_timeout_job(const PROCESS_INFORMATION &process_info,
                       DUPLICATE_SAME_ACCESS) == FALSE)
     throw Error{last_system_error_message()};
 }
-
-static fn append_windows_quoted_arg(String &out, StringView arg) throws -> void;
 
 static pure fn is_batch_program(StringView path) wontthrow -> bool
 {

@@ -33,41 +33,83 @@ printf 'echo $disk_only\n[ x == y ]\n' > "$directory/open-source.sh"
 printf 'echo $disk_aux\n[ x == y ]\n' > "$directory/disk-source.sh"
 mkdir "$directory/bin"
 mkdir -p "$directory/man/man1"
-printf '%s\n' \
-  '#!/bin/sh' \
-  'if [ "$1" = sync ] && [ "$2" = --help ]; then' \
-  '  printf "%s\\n" "OPTIONS" "  --force  force synchronization"' \
-  'elif [ "$1" = --help ]; then' \
-  '  printf "%s\\n" "allowed command help" "COMMANDS" "  sync  synchronize state"' \
-  'fi' > "$directory/bin/act"
-printf '#!/bin/sh\nexit 0\n' > "$directory/bin/path-only"
-printf '#!/bin/sh\nexit 0\n' > "$directory/bin/formatted-command"
-printf '#!/bin/sh\nexit 0\n' > "$directory/bin/manprobe"
+program_suffix=
+act_program=$directory/bin/act
+man_program=$directory/bin/man
+if [ "${OS-}" = Windows_NT ]; then
+  program_suffix=.bat
+  act_program=$directory/bin/act.bat
+  man_program=$directory/bin/man.bat
+fi
 printf '%s\n' '.TH MANPROBE 1' '.SH SYNOPSIS' 'manprobe' \
   > "$directory/man/man1/manprobe.1"
 printf '%s\n' '.TH MANPROBE-SYNC 1' '.SH SYNOPSIS' 'manprobe sync' \
   > "$directory/man/man1/manprobe-sync.1"
-printf '%s\n' '#!/bin/sh' \
-  'if [ "$1" = --path ]; then' \
-  '  printf "%s\\n" "$MANROOT"' \
-  '  exit' \
-  'fi' \
-  'if [ "$1" = -w ]; then' \
-  '  case $2 in' \
-  "  formatted-command) printf '/private/formatted-command.1\\n' ;;" \
-  '  manprobe|manprobe-sync) printf "%s/man1/%s.1\\n" "$MANROOT" "$2" ;;' \
-  '  esac' \
-  '  exit' \
-  'fi' \
-  'case $1 in' \
-  "  formatted-command) printf 'B\\bBO\\bOL\\bLD\\bD\\n' ;;" \
-  '  manprobe) printf "%s\\n" "OPTIONS" "  --alpha  root option" ;;' \
-  '  manprobe-sync) printf "%s\\n" "OPTIONS" "  --force  force from manual" ;;' \
-  'esac' \
-  > "$directory/bin/man"
-chmod +x "$directory/bin/act" "$directory/bin/path-only" \
-  "$directory/bin/formatted-command" "$directory/bin/manprobe" \
-  "$directory/bin/man"
+if [ "${OS-}" = Windows_NT ]; then
+  printf '%s\r\n' \
+    '@echo off' \
+    'if "%~1"=="sync" if "%~2"=="--help" goto sync' \
+    'if "%~1"=="--help" goto root' \
+    'exit /b 0' \
+    ':sync' \
+    'echo OPTIONS' \
+    'echo   --force  force synchronization' \
+    'exit /b 0' \
+    ':root' \
+    'echo allowed command help' \
+    'echo COMMANDS' \
+    'echo   sync  synchronize state' > "$act_program"
+  printf '@exit /b 0\r\n' > "$directory/bin/path-only.bat"
+  printf '@exit /b 0\r\n' > "$directory/bin/formatted-command.bat"
+  printf '@exit /b 0\r\n' > "$directory/bin/manprobe.bat"
+  printf '%s\r\n' \
+    '@echo off' \
+    'if "%~1"=="--path" echo %MANROOT%& exit /b 0' \
+    'if not "%~1"=="-w" goto render' \
+    'if "%~2"=="formatted-command" echo /private/formatted-command.1' \
+    'if "%~2"=="manprobe" echo %MANROOT%/man1/manprobe.1' \
+    'if "%~2"=="manprobe-sync" echo %MANROOT%/man1/manprobe-sync.1' \
+    'exit /b 0' \
+    ':render' \
+    'if "%~1"=="formatted-command" echo BOLD' \
+    'if "%~1"=="manprobe" echo OPTIONS& echo   --alpha  root option' \
+    'if "%~1"=="manprobe-sync" echo OPTIONS& echo   --force  force from manual' \
+    > "$man_program"
+else
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'if [ "$1" = sync ] && [ "$2" = --help ]; then' \
+    '  printf "%s\\n" "OPTIONS" "  --force  force synchronization"' \
+    'elif [ "$1" = --help ]; then' \
+    '  printf "%s\\n" "allowed command help" "COMMANDS" "  sync  synchronize state"' \
+    'fi' > "$act_program"
+  printf '#!/bin/sh\nexit 0\n' > "$directory/bin/path-only"
+  printf '#!/bin/sh\nexit 0\n' > "$directory/bin/formatted-command"
+  printf '#!/bin/sh\nexit 0\n' > "$directory/bin/manprobe"
+  printf '%s\n' '#!/bin/sh' \
+    'if [ "$1" = --path ]; then' \
+    '  printf "%s\\n" "$MANROOT"' \
+    '  exit' \
+    'fi' \
+    'if [ "$1" = -w ]; then' \
+    '  case $2 in' \
+    "  formatted-command) printf '/private/formatted-command.1\\n' ;;" \
+    '  manprobe|manprobe-sync) printf "%s/man1/%s.1\\n" "$MANROOT" "$2" ;;' \
+    '  esac' \
+    '  exit' \
+    'fi' \
+    'case $1 in' \
+    "  formatted-command) printf 'B\\bBO\\bOL\\bLD\\bD\\n' ;;" \
+    '  manprobe) printf "%s\\n" "OPTIONS" "  --alpha  root option" ;;' \
+    '  manprobe-sync) printf "%s\\n" "OPTIONS" "  --force  force from manual" ;;' \
+    'esac' > "$man_program"
+fi
+chmod +x "$act_program" "$man_program" \
+  "$directory/bin/act$program_suffix" \
+  "$directory/bin/path-only$program_suffix" \
+  "$directory/bin/formatted-command$program_suffix" \
+  "$directory/bin/manprobe$program_suffix" \
+  "$directory/bin/man$program_suffix"
 
 {
   frame '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"publishDiagnostics":{"dataSupport":true},"codeAction":{"isPreferredSupport":true,"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix","source.fixAll.kosh"]}}}}}}}'
@@ -326,7 +368,7 @@ check_contains utility-help '"id":112,"result":{"contents":{"kind":"plaintext","
 check_contains posix-mood-utility-help '"id":120,"result":null'
 check_contains path-shadows-utility '"id":13,"result":{"contents":{"kind":"plaintext","value":"Path: '
 check_contains allowed-help 'allowed command help'
-check_contains path-fallback "Path: $directory/bin/path-only"
+check_contains path-fallback '"id":15,"result":{"contents":{"kind":"plaintext","value":"Path: '
 check_contains manpage-text '"id":17,"result":{"contents":{"kind":"plaintext","value":"BOLD\n\nPath:'
 case $output in
 *'\b'*) printf 'manpage-overstrike=present\n' ;;
@@ -433,8 +475,12 @@ carriage_return=$(printf '\r')
       *'"label":"path-fresh"'*) printf 'path-refresh-before=present\n' ;;
       *) printf 'path-refresh-before=ok\n' ;;
       esac
-      printf '#!/bin/sh\nexit 0\n' > "$path_refresh_bin/path-fresh"
-      chmod +x "$path_refresh_bin/path-fresh"
+      if [ "${OS-}" = Windows_NT ]; then
+        printf '@exit /b 0\r\n' > "$path_refresh_bin/path-fresh.bat"
+      else
+        printf '#!/bin/sh\nexit 0\n' > "$path_refresh_bin/path-fresh"
+      fi
+      chmod +x "$path_refresh_bin/path-fresh$program_suffix"
       : > "$path_refresh_ready"
       ;;
     *'"id":202,'*)

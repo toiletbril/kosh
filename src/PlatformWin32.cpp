@@ -229,6 +229,13 @@ static fn standard_handle_is_referenced(os::descriptor handle) wontthrow -> bool
   return false;
 }
 
+static fn standard_handle_is_owned_by_runtime(i32 shell_fd,
+                                              os::descriptor handle) wontthrow
+    -> bool
+{
+  return reinterpret_cast<os::descriptor>(_get_osfhandle(shell_fd)) == handle;
+}
+
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor
 {
@@ -272,7 +279,8 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     result.is_dup2_ok = false;
     return result;
   }
-  if (result.was_open && !standard_handle_is_referenced(original))
+  if (result.was_open && !standard_handle_is_referenced(original) &&
+      !standard_handle_is_owned_by_runtime(shell_fd, original))
     CloseHandle(original);
   result.is_dup2_ok = true;
   note_descriptor_rebound();
@@ -293,7 +301,8 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
   note_descriptor_rebound();
 
   if (replaced != nullptr && replaced != INVALID_HANDLE_VALUE &&
-      !standard_handle_is_referenced(replaced))
+      !standard_handle_is_referenced(replaced) &&
+      !standard_handle_is_owned_by_runtime(saved.shell_fd, replaced))
     CloseHandle(replaced);
 }
 
@@ -365,7 +374,8 @@ fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
   note_descriptor_rebound();
 
   if (previous != nullptr && previous != INVALID_HANDLE_VALUE &&
-      !standard_handle_is_referenced(previous))
+      !standard_handle_is_referenced(previous) &&
+      !standard_handle_is_owned_by_runtime(shell_fd, previous))
     CloseHandle(previous);
 
   return true;
