@@ -279,9 +279,6 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     result.is_dup2_ok = false;
     return result;
   }
-  if (result.was_open && !standard_handle_is_referenced(original) &&
-      !standard_handle_is_owned_by_runtime(shell_fd, original))
-    CloseHandle(original);
   result.is_dup2_ok = true;
   note_descriptor_rebound();
 
