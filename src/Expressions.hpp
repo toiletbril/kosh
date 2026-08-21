@@ -154,9 +154,42 @@ struct variable_occurrence_record
   bool has_inherited_function_path{false};
 };
 
+struct assignment_index_storage;
+
+class AssignmentIndexSet
+{
+public:
+  AssignmentIndexSet() = default;
+  AssignmentIndexSet(const AssignmentIndexSet &other) wontthrow;
+  AssignmentIndexSet(AssignmentIndexSet &&other) noexcept;
+  ~AssignmentIndexSet();
+
+  fn operator=(const AssignmentIndexSet &other) wontthrow->AssignmentIndexSet &;
+  fn operator=(AssignmentIndexSet &&other) noexcept -> AssignmentIndexSet &;
+
+  static fn singleton(usize index) throws -> AssignmentIndexSet;
+  fn merge(const AssignmentIndexSet &other) throws -> void;
+
+  pure fn count() const wontthrow -> usize;
+  pure fn is_empty() const wontthrow -> bool;
+  pure fn operator[](usize index) const wontthrow->usize;
+  pure fn begin() const wontthrow -> const usize *;
+  pure fn end() const wontthrow -> const usize *;
+
+private:
+  explicit AssignmentIndexSet(assignment_index_storage *storage)
+      : m_storage(storage)
+  {}
+
+  fn retain() wontthrow -> void;
+  fn release() wontthrow -> void;
+
+  assignment_index_storage *m_storage{nullptr};
+};
+
 struct variable_occurrence_state
 {
-  ArrayList<usize> assignment_indices{heap_allocator()};
+  AssignmentIndexSet assignment_indices;
   bool is_definitely_set{false};
   bool is_definitely_unset{false};
   bool has_unset_path{false};

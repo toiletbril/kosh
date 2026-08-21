@@ -45,6 +45,173 @@ pure fn binder_description(assignment_binder binder) wontthrow -> StringView
   return BINDER_DESCRIPTIONS[index];
 }
 
+struct assignment_index_storage
+{
+  usize reference_count{1};
+  usize element_count{0};
+  usize allocation_count{0};
+};
+
+static fn assignment_index_storage_length(usize count) throws -> usize
+{
+  if (count > (SIZE_MAX - sizeof(assignment_index_storage)) / sizeof(usize))
+    throw std::bad_alloc{};
+
+  return sizeof(assignment_index_storage) + count * sizeof(usize);
+}
+
+static pure fn
+assignment_index_data(assignment_index_storage *storage) wontthrow -> usize *
+{
+  return reinterpret_cast<usize *>(storage + 1);
+}
+
+static fn allocate_assignment_index_storage(usize count) throws
+    -> assignment_index_storage *
+{
+  let const allocation_length = assignment_index_storage_length(count);
+  let *storage =
+      static_cast<assignment_index_storage *>(heap_allocator().raw_alloc(
+          allocation_length, alignof(assignment_index_storage)));
+  new (storage) assignment_index_storage{};
+  storage->allocation_count = count;
+  return storage;
+}
+
+AssignmentIndexSet::AssignmentIndexSet(
+    const AssignmentIndexSet &other) wontthrow : m_storage(other.m_storage)
+{
+  retain();
+}
+
+AssignmentIndexSet::AssignmentIndexSet(AssignmentIndexSet &&other) noexcept
+    : m_storage(other.m_storage)
+{
+  other.m_storage = nullptr;
+}
+
+AssignmentIndexSet::~AssignmentIndexSet() { release(); }
+
+fn AssignmentIndexSet::operator=(const AssignmentIndexSet &other) wontthrow
+    -> AssignmentIndexSet &
+{
+  if (this == &other) return *this;
+
+  release();
+  m_storage = other.m_storage;
+  retain();
+  return *this;
+}
+
+fn AssignmentIndexSet::operator=(AssignmentIndexSet &&other) noexcept
+    -> AssignmentIndexSet &
+{
+  if (this == &other) return *this;
+
+  release();
+  m_storage = other.m_storage;
+  other.m_storage = nullptr;
+  return *this;
+}
+
+fn AssignmentIndexSet::singleton(usize index) throws -> AssignmentIndexSet
+{
+  let *storage = allocate_assignment_index_storage(1);
+  storage->element_count = 1;
+  assignment_index_data(storage)[0] = index;
+  return AssignmentIndexSet{storage};
+}
+
+fn AssignmentIndexSet::merge(const AssignmentIndexSet &other) throws -> void
+{
+  if (other.is_empty() || m_storage == other.m_storage) return;
+  if (is_empty()) {
+    *this = other;
+    return;
+  }
+
+  if (count() > SIZE_MAX - other.count()) throw std::bad_alloc{};
+
+  let *merged_storage =
+      allocate_assignment_index_storage(count() + other.count());
+  let *merged_indices = assignment_index_data(merged_storage);
+  usize left_index = 0;
+  usize right_index = 0;
+  usize merged_count = 0;
+
+  while (left_index < count() || right_index < other.count()) {
+    usize assignment_index;
+    if (right_index >= other.count() ||
+        (left_index < count() && (*this)[left_index] < other[right_index]))
+    {
+      assignment_index = (*this)[left_index++];
+    } else if (left_index >= count() ||
+               other[right_index] < (*this)[left_index])
+    {
+      assignment_index = other[right_index++];
+    } else {
+      assignment_index = (*this)[left_index++];
+      right_index++;
+    }
+
+    if (merged_count == 0 ||
+        merged_indices[merged_count - 1] != assignment_index)
+      merged_indices[merged_count++] = assignment_index;
+  }
+
+  merged_storage->element_count = merged_count;
+  release();
+  m_storage = merged_storage;
+}
+
+pure fn AssignmentIndexSet::count() const wontthrow -> usize
+{
+  return m_storage != nullptr ? m_storage->element_count : 0;
+}
+
+pure fn AssignmentIndexSet::is_empty() const wontthrow -> bool
+{
+  return m_storage == nullptr || m_storage->element_count == 0;
+}
+
+pure fn AssignmentIndexSet::operator[](usize index) const wontthrow -> usize
+{
+  ASSERT(index < count());
+  return assignment_index_data(m_storage)[index];
+}
+
+pure fn AssignmentIndexSet::begin() const wontthrow -> const usize *
+{
+  return m_storage != nullptr ? assignment_index_data(m_storage) : nullptr;
+}
+
+pure fn AssignmentIndexSet::end() const wontthrow -> const usize *
+{
+  return m_storage != nullptr ? assignment_index_data(m_storage) + count()
+                              : nullptr;
+}
+
+fn AssignmentIndexSet::retain() wontthrow -> void
+{
+  if (m_storage != nullptr) m_storage->reference_count++;
+}
+
+fn AssignmentIndexSet::release() wontthrow -> void
+{
+  if (m_storage == nullptr) return;
+
+  ASSERT(m_storage->reference_count > 0);
+  m_storage->reference_count--;
+  if (m_storage->reference_count == 0) {
+    let const allocation_length = sizeof(assignment_index_storage) +
+                                  m_storage->allocation_count * sizeof(usize);
+    m_storage->~assignment_index_storage();
+    heap_allocator().raw_free(m_storage, allocation_length,
+                              alignof(assignment_index_storage));
+  }
+  m_storage = nullptr;
+}
+
 fn indent_for_layer(usize layer) throws -> String
 {
   let pad = String{heap_allocator()};
@@ -533,7 +700,8 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
 
     let state = variable_occurrence_state{};
     if (symbol_records != nullptr)
-      state.assignment_indices.push(occurrence_index);
+      state.assignment_indices =
+          AssignmentIndexSet::singleton(occurrence_index);
     state.is_definitely_set = true;
     state.is_definitely_unset = false;
     state.has_inherited_path = false;
@@ -675,43 +843,7 @@ fn AnalysisContext::apply_called_function(
     }
 
     let merged_state = *caller_state;
-    if (merged_state.assignment_indices.is_empty()) {
-      merged_state.assignment_indices = exit_state->assignment_indices.clone();
-    } else if (!exit_state->assignment_indices.is_empty()) {
-      let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
-      merged_assignment_indices.reserve(
-          merged_state.assignment_indices.count() +
-          exit_state->assignment_indices.count());
-      usize caller_index = 0;
-      usize exit_index = 0;
-      while (caller_index < merged_state.assignment_indices.count() ||
-             exit_index < exit_state->assignment_indices.count())
-      {
-        let const has_caller_index =
-            caller_index < merged_state.assignment_indices.count();
-        let const has_exit_index =
-            exit_index < exit_state->assignment_indices.count();
-        usize assignment_index;
-        if (!has_exit_index || (has_caller_index &&
-                                merged_state.assignment_indices[caller_index] <
-                                    exit_state->assignment_indices[exit_index]))
-        {
-          assignment_index = merged_state.assignment_indices[caller_index++];
-        } else if (!has_caller_index ||
-                   exit_state->assignment_indices[exit_index] <
-                       merged_state.assignment_indices[caller_index])
-        {
-          assignment_index = exit_state->assignment_indices[exit_index++];
-        } else {
-          assignment_index = merged_state.assignment_indices[caller_index++];
-          exit_index++;
-        }
-        if (merged_assignment_indices.is_empty() ||
-            merged_assignment_indices.back() != assignment_index)
-          merged_assignment_indices.push(assignment_index);
-      }
-      merged_state.assignment_indices = steal(merged_assignment_indices);
-    }
+    merged_state.assignment_indices.merge(exit_state->assignment_indices);
     merged_state.is_definitely_set =
         merged_state.is_definitely_set && exit_state->is_definitely_set;
     merged_state.is_definitely_unset = false;
@@ -1566,42 +1698,7 @@ fn merge_variable_occurrence_states(
       return;
     }
 
-    if (state->assignment_indices.is_empty()) {
-      state->assignment_indices = exit_state.assignment_indices.clone();
-    } else if (!exit_state.assignment_indices.is_empty()) {
-      let merged_assignment_indices = ArrayList<usize>{heap_allocator()};
-      merged_assignment_indices.reserve(state->assignment_indices.count() +
-                                        exit_state.assignment_indices.count());
-      usize state_index = 0;
-      usize exit_index = 0;
-      while (state_index < state->assignment_indices.count() ||
-             exit_index < exit_state.assignment_indices.count())
-      {
-        let const has_state_index =
-            state_index < state->assignment_indices.count();
-        let const has_exit_index =
-            exit_index < exit_state.assignment_indices.count();
-        usize assignment_index;
-        if (!has_exit_index ||
-            (has_state_index && state->assignment_indices[state_index] <
-                                    exit_state.assignment_indices[exit_index]))
-        {
-          assignment_index = state->assignment_indices[state_index++];
-        } else if (!has_state_index ||
-                   exit_state.assignment_indices[exit_index] <
-                       state->assignment_indices[state_index])
-        {
-          assignment_index = exit_state.assignment_indices[exit_index++];
-        } else {
-          assignment_index = state->assignment_indices[state_index++];
-          exit_index++;
-        }
-        if (merged_assignment_indices.is_empty() ||
-            merged_assignment_indices.back() != assignment_index)
-          merged_assignment_indices.push(assignment_index);
-      }
-      state->assignment_indices = steal(merged_assignment_indices);
-    }
+    state->assignment_indices.merge(exit_state.assignment_indices);
     state->is_definitely_set =
         state->is_definitely_set && exit_state.is_definitely_set;
     state->is_definitely_unset =
