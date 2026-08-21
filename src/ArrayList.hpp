@@ -452,13 +452,15 @@ public:
       return;
     }
 
+    let const allocator = filled.allocator();
+    if (m_list != nullptr && !(m_list->allocator() == allocator)) release();
     if (m_list == nullptr) {
-      let const block = heap_allocator().alloc_array<ArrayList<T>>(1);
-      m_list = new (block) ArrayList<T>{heap_allocator()};
+      let const block = allocator.template alloc_array<ArrayList<T>>(1);
+      m_list = new (block) ArrayList<T>{allocator};
     }
 
     *m_list = steal(filled);
-    m_list->shrink_to_fit();
+    if (allocator.get_kind() == Allocator::Kind::Heap) m_list->shrink_to_fit();
   }
 
   hot mustuse pure fn is_empty() const wontthrow -> bool
@@ -489,8 +491,9 @@ private:
   {
     if (m_list == nullptr) return;
 
+    let const allocator = m_list->allocator();
     m_list->~ArrayList<T>();
-    heap_allocator().free_array(m_list, 1);
+    allocator.free_array(m_list, 1);
     m_list = nullptr;
   }
 
