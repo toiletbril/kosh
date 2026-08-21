@@ -984,6 +984,8 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
   let function_name_pending = false;
   let is_case_pattern_expected = false;
   let line_functions = HashSet{bump_allocator(HIGHLIGHT_ARENA)};
+  let decoded_command_word =
+      utils::decoded_shell_word{bump_allocator(HIGHLIGHT_ARENA)};
   let is_in_array_value = false;
   let is_in_arithmetic = false;
   usize parenthesis_depth = 0;
@@ -1494,11 +1496,12 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
     if (is_command_position && word_spans.is_empty() && word_has_shell_syntax &&
         !is_assignment)
     {
-      let const decoded =
+      decoded_command_word =
           utils::decode_shell_word(word, bump_allocator(HIGHLIGHT_ARENA));
-      highlight_command_word = decoded.text.view();
+      highlight_command_word = decoded_command_word.text.view();
       pending_assignment_names.clear();
-      do_push(word_start, word_end, do_command_role(decoded.text.view()));
+      do_push(word_start, word_end,
+              do_command_role(decoded_command_word.text.view()));
       is_command_position = false;
       continue;
     }
