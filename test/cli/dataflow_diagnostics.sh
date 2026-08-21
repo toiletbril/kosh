@@ -43,6 +43,47 @@ echo '== an assignment on every if exit stays quiet:'
 echo "$branch_value"' 2>&1
 echo "rc=$?"
 
+echo '== compacted divergent branches preserve uncertainty:'
+"$BIN" -n -WWW -c 'seed_001=1 seed_002=1 seed_003=1 seed_004=1 seed_005=1 seed_006=1 seed_007=1 seed_008=1
+seed_009=1 seed_010=1 seed_011=1 seed_012=1 seed_013=1 seed_014=1 seed_015=1 seed_016=1
+seed_017=1 seed_018=1 seed_019=1 seed_020=1 seed_021=1 seed_022=1 seed_023=1 seed_024=1
+seed_025=1 seed_026=1 seed_027=1 seed_028=1 seed_029=1 seed_030=1 seed_031=1 seed_032=1
+seed_033=1 seed_034=1 seed_035=1 seed_036=1 seed_037=1 seed_038=1 seed_039=1 seed_040=1
+seed_041=1 seed_042=1 seed_043=1 seed_044=1 seed_045=1 seed_046=1 seed_047=1 seed_048=1
+seed_049=1 seed_050=1 seed_051=1 seed_052=1 seed_053=1 seed_054=1 seed_055=1 seed_056=1
+seed_057=1 seed_058=1 seed_059=1 seed_060=1 seed_061=1 seed_062=1 seed_063=1 seed_064=1
+seed_065=1 seed_066=1 seed_067=1 seed_068=1 seed_069=1 seed_070=1 seed_071=1 seed_072=1
+seed_073=1 seed_074=1 seed_075=1 seed_076=1 seed_077=1 seed_078=1 seed_079=1 seed_080=1
+seed_081=1 seed_082=1 seed_083=1 seed_084=1 seed_085=1 seed_086=1 seed_087=1 seed_088=1
+seed_089=1 seed_090=1 seed_091=1 seed_092=1 seed_093=1 seed_094=1 seed_095=1 seed_096=1
+seed_097=1 seed_098=1 seed_099=1 seed_100=1 seed_101=1 seed_102=1 seed_103=1 seed_104=1
+seed_105=1 seed_106=1 seed_107=1 seed_108=1 seed_109=1 seed_110=1 seed_111=1 seed_112=1
+seed_113=1 seed_114=1 seed_115=1 seed_116=1 seed_117=1 seed_118=1 seed_119=1 seed_120=1
+seed_121=1 seed_122=1 seed_123=1 seed_124=1 seed_125=1 seed_126=1 seed_127=1 seed_128=1
+removed_marker=1
+if test -n "$1"; then
+  unset removed_marker
+  branch_special=1
+  filler_001=1 filler_002=1 filler_003=1 filler_004=1 filler_005=1 filler_006=1 filler_007=1 filler_008=1
+  filler_009=1 filler_010=1 filler_011=1 filler_012=1 filler_013=1 filler_014=1 filler_015=1 filler_016=1
+  filler_017=1 filler_018=1 filler_019=1 filler_020=1 filler_021=1 filler_022=1 filler_023=1 filler_024=1
+  filler_025=1 filler_026=1 filler_027=1 filler_028=1 filler_029=1 filler_030=1 filler_031=1 filler_032=1
+  filler_033=1 filler_034=1 filler_035=1 filler_036=1 filler_037=1 filler_038=1 filler_039=1 filler_040=1
+  filler_041=1 filler_042=1 filler_043=1 filler_044=1 filler_045=1 filler_046=1 filler_047=1 filler_048=1
+  filler_049=1 filler_050=1 filler_051=1 filler_052=1 filler_053=1 filler_054=1 filler_055=1 filler_056=1
+  filler_057=1 filler_058=1 filler_059=1 filler_060=1 filler_061=1 filler_062=1 filler_063=1 filler_064=1
+  filler_065=1 filler_066=1 filler_067=1 filler_068=1 filler_069=1 filler_070=1 filler_071=1 filler_072=1
+  filler_073=1 filler_074=1 filler_075=1 filler_076=1 filler_077=1 filler_078=1 filler_079=1 filler_080=1
+  filler_081=1 filler_082=1 filler_083=1 filler_084=1 filler_085=1 filler_086=1 filler_087=1 filler_088=1
+  filler_089=1 filler_090=1 filler_091=1 filler_092=1 filler_093=1 filler_094=1 filler_095=1 filler_096=1
+  filler_097=1 filler_098=1 filler_099=1 filler_100=1 filler_101=1 filler_102=1 filler_103=1 filler_104=1
+  filler_105=1 filler_106=1 filler_107=1 filler_108=1 filler_109=1 filler_110=1 filler_111=1 filler_112=1
+  filler_113=1 filler_114=1 filler_115=1 filler_116=1 filler_117=1 filler_118=1 filler_119=1 filler_120=1
+  filler_121=1 filler_122=1 filler_123=1 filler_124=1 filler_125=1 filler_126=1 filler_127=1 filler_128=1
+  if test -n "$2"; then nested_value=one; else nested_value=two; fi
+fi
+echo "$removed_marker $seed_128 $branch_special $nested_value"' 2>&1
+
 echo '== loop-only assignments remain conditional:'
 "$BIN" -n -WWW -c 'for entry in "$@"; do for_value=1; done
 while test -e /; do while_value=1; break; done

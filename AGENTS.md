@@ -273,6 +273,13 @@ selects before compiling.
 Profiler report cleanup must validate a nonempty exact path and use the system
 removal command without force.
 Commit subject length must be checked before creating the commit.
+Golden paths must be resolved from the owning test name before inspection.
+Rejected temporary cleanup must move the validated exact path recoverably to
+Trash.
+An optional tool path must be checked with an explicit branch before
+invocation.
+Regression fixtures must keep diagnostic control names distinct from the names
+under test.
 
 Format the changed files with the owning project tool. Run focused tests after a
 meaningful batch. Read regenerated goldens. Run `git diff --check` and inspect

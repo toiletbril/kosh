@@ -196,6 +196,46 @@ struct variable_occurrence_state
   bool has_inherited_path{false};
 };
 
+struct variable_occurrence_map_entry
+{
+  variable_occurrence_state state;
+  bool is_present{false};
+};
+
+struct variable_occurrence_map_storage;
+
+class VariableOccurrenceStateMap
+{
+public:
+  VariableOccurrenceStateMap() = default;
+  VariableOccurrenceStateMap(const VariableOccurrenceStateMap &other);
+  VariableOccurrenceStateMap(VariableOccurrenceStateMap &&other) noexcept;
+  ~VariableOccurrenceStateMap();
+
+  fn operator=(const VariableOccurrenceStateMap &other) throws
+      ->VariableOccurrenceStateMap &;
+  fn operator=(VariableOccurrenceStateMap &&other) noexcept
+      -> VariableOccurrenceStateMap &;
+
+  fn snapshot() throws -> VariableOccurrenceStateMap;
+  pure fn find(StringView name) const wontthrow
+      -> const variable_occurrence_state *;
+  fn set(StringView name, variable_occurrence_state state) throws -> void;
+  fn erase(StringView name) throws -> void;
+  fn clear() wontthrow -> void;
+  fn merge(const VariableOccurrenceStateMap &other) throws -> void;
+
+private:
+  static constexpr usize CHANGE_COMPACTION_THRESHOLD = 128;
+
+  fn compact() throws -> void;
+  fn retain_base() wontthrow -> void;
+  fn release_base() wontthrow -> void;
+
+  StringMap<variable_occurrence_map_entry> m_changes{heap_allocator()};
+  variable_occurrence_map_storage *m_base{nullptr};
+};
+
 /* One function this script defines. The whole-script sweep reads these after
    the walk, so the name is owned and never a slice of the syntax tree. */
 struct function_definition_record
@@ -206,7 +246,7 @@ struct function_definition_record
   usize occurrence_end{0};
   HashSet affected_names{heap_allocator()};
   HashSet local_names{heap_allocator()};
-  StringMap<variable_occurrence_state> exit_states{heap_allocator()};
+  VariableOccurrenceStateMap exit_states;
   String first_positional_read;
   SourceLocation first_positional_read_location;
   bool has_been_called{false};
@@ -333,10 +373,8 @@ public:
      names a near miss. */
   StringMap<SourceLocation> function_local_names{heap_allocator()};
 
-  StringMap<variable_occurrence_state> variable_occurrence_assignments{
-      heap_allocator()};
-  StringMap<variable_occurrence_state>
-      inherited_variable_occurrence_assignments{heap_allocator()};
+  VariableOccurrenceStateMap variable_occurrence_assignments;
+  VariableOccurrenceStateMap inherited_variable_occurrence_assignments;
 
   /* An assignment inside a function to one of these updates an existing global
      rather than leaking a new binding, so the no-local warning stays quiet. */

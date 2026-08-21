@@ -570,9 +570,9 @@ fn SelectLoop::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
 
   let loop_entry_occurrence_assignments =
-      actx.variable_occurrence_assignments.clone();
+      actx.variable_occurrence_assignments.snapshot();
   let loop_entry_inherited_occurrence_assignments =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
 
   for (let const t : m_words) {
     if (t->kind() != Token::Kind::Word) continue;
@@ -739,9 +739,9 @@ fn CStyleForLoop::analyze(AnalysisContext &actx,
   }
 
   let condition_occurrence_assignments =
-      actx.variable_occurrence_assignments.clone();
+      actx.variable_occurrence_assignments.snapshot();
   let condition_inherited_occurrence_assignments =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
 
   actx.constant_variables.clear();
   actx.loop_body_depth++;
@@ -997,9 +997,9 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   let saved_constants = steal(actx.constant_variables);
   actx.constant_variables = StringMap<String>{heap_allocator()};
   let saved_occurrence_assignments =
-      actx.variable_occurrence_assignments.clone();
+      actx.variable_occurrence_assignments.snapshot();
   let saved_inherited_occurrence_assignments =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
   let saved_latest_function_definition_indices =
       actx.latest_function_definition_indices.clone();
   let const defined_function_insertion_count =
@@ -1140,9 +1140,9 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   let saved_constants = steal(actx.constant_variables);
   actx.constant_variables = StringMap<String>{heap_allocator()};
   let saved_occurrence_assignments =
-      actx.variable_occurrence_assignments.clone();
+      actx.variable_occurrence_assignments.snapshot();
   let saved_inherited_occurrence_assignments =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
   let saved_latest_function_definition_indices =
       actx.latest_function_definition_indices.clone();
   let const defined_function_insertion_count =
@@ -1156,10 +1156,8 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   actx.current_source_effects = nullptr;
   let saved_locals = steal(actx.function_local_names);
   actx.function_local_names = StringMap<SourceLocation>{heap_allocator()};
-  actx.inherited_variable_occurrence_assignments =
-      StringMap<variable_occurrence_state>{heap_allocator()};
-  actx.variable_occurrence_assignments =
-      StringMap<variable_occurrence_state>{heap_allocator()};
+  actx.inherited_variable_occurrence_assignments = VariableOccurrenceStateMap{};
+  actx.variable_occurrence_assignments = VariableOccurrenceStateMap{};
   actx.apply_scope_definitions(m_analysis_scope_definitions);
   let const saved_loop_body_depth = actx.loop_body_depth;
   actx.loop_body_depth = 0;
@@ -1170,7 +1168,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
       source_location(), 0, 0,
       HashSet{heap_allocator()},
       HashSet{heap_allocator()},
-      StringMap<variable_occurrence_state>{heap_allocator()},
+      VariableOccurrenceStateMap{},
       String{heap_allocator()},
       SourceLocation{},
       false, false
@@ -1192,7 +1190,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
           ? actx.symbol_records->variable_occurrences.count()
           : 0;
   function_definition.exit_states =
-      actx.variable_occurrence_assignments.clone();
+      actx.variable_occurrence_assignments.snapshot();
   function_definition.is_analysis_complete = true;
   actx.latest_function_definition_indices.set(m_name.view(),
                                               function_definition_index);

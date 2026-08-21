@@ -78,9 +78,9 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
         actx.inherited_global_assigned_names.clone();
     let saved_array_valued_names = actx.array_valued_names.clone();
     let saved_occurrence_assignments =
-        actx.variable_occurrence_assignments.clone();
+        actx.variable_occurrence_assignments.snapshot();
     let saved_inherited_occurrence_assignments =
-        actx.inherited_variable_occurrence_assignments.clone();
+        actx.inherited_variable_occurrence_assignments.snapshot();
     let *saved_source_effects = actx.current_source_effects;
     actx.current_source_effects = nullptr;
 
@@ -582,9 +582,9 @@ fn CompoundList::analyze(AnalysisContext &actx,
 
   let saved_tested_command_names = actx.tested_command_names.clone();
   let conditional_chain_entry_assignments =
-      actx.variable_occurrence_assignments.clone();
+      actx.variable_occurrence_assignments.snapshot();
   let conditional_chain_entry_inherited_assignments =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
   let conditional_chain_entry_generated_paths =
       actx.generated_relative_executable_paths.clone();
   let has_conditional_chain = false;
@@ -614,9 +614,9 @@ fn CompoundList::analyze(AnalysisContext &actx,
       has_conditional_chain = false;
     } else if (!has_conditional_chain) {
       conditional_chain_entry_assignments =
-          actx.variable_occurrence_assignments.clone();
+          actx.variable_occurrence_assignments.snapshot();
       conditional_chain_entry_inherited_assignments =
-          actx.inherited_variable_occurrence_assignments.clone();
+          actx.inherited_variable_occurrence_assignments.snapshot();
       has_conditional_chain = true;
     } else {
       merge_variable_occurrence_states(actx.variable_occurrence_assignments,
@@ -747,13 +747,13 @@ fn IfStatement::analyze(AnalysisContext &actx,
   ASSERT(m_then != nullptr);
 
   m_condition->analyze(actx, is_unconditional);
-  let before_then = actx.variable_occurrence_assignments.clone();
+  let before_then = actx.variable_occurrence_assignments.snapshot();
   let before_then_inherited =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
   m_then->analyze(actx, false);
-  let const after_then = actx.variable_occurrence_assignments.clone();
+  let const after_then = actx.variable_occurrence_assignments.snapshot();
   let const after_then_inherited =
-      actx.inherited_variable_occurrence_assignments.clone();
+      actx.inherited_variable_occurrence_assignments.snapshot();
 
   actx.variable_occurrence_assignments = steal(before_then);
   actx.inherited_variable_occurrence_assignments = steal(before_then_inherited);

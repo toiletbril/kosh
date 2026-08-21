@@ -212,6 +212,234 @@ fn AssignmentIndexSet::release() wontthrow -> void
   m_storage = nullptr;
 }
 
+struct variable_occurrence_map_storage
+{
+  explicit variable_occurrence_map_storage(
+      StringMap<variable_occurrence_state> states)
+      : states(steal(states))
+  {}
+
+  usize reference_count{1};
+  StringMap<variable_occurrence_state> states;
+};
+
+static fn create_variable_occurrence_map_storage(
+    StringMap<variable_occurrence_state> states) throws
+    -> variable_occurrence_map_storage *
+{
+  let *storage =
+      heap_allocator().alloc_array<variable_occurrence_map_storage>(1);
+  try {
+    new (storage) variable_occurrence_map_storage{steal(states)};
+  } catch (...) {
+    heap_allocator().free_array(storage, 1);
+    throw;
+  }
+  return storage;
+}
+
+VariableOccurrenceStateMap::VariableOccurrenceStateMap(
+    const VariableOccurrenceStateMap &other)
+    : m_changes(other.m_changes), m_base(other.m_base)
+{
+  retain_base();
+}
+
+VariableOccurrenceStateMap::VariableOccurrenceStateMap(
+    VariableOccurrenceStateMap &&other) noexcept
+    : m_changes(steal(other.m_changes)), m_base(other.m_base)
+{
+  other.m_base = nullptr;
+}
+
+VariableOccurrenceStateMap::~VariableOccurrenceStateMap() { release_base(); }
+
+fn VariableOccurrenceStateMap::operator=(
+    const VariableOccurrenceStateMap &other) throws
+    -> VariableOccurrenceStateMap &
+{
+  if (this == &other) return *this;
+
+  let copy = VariableOccurrenceStateMap{other};
+  *this = steal(copy);
+  return *this;
+}
+
+fn VariableOccurrenceStateMap::operator=(
+    VariableOccurrenceStateMap &&other) noexcept -> VariableOccurrenceStateMap &
+{
+  if (this == &other) return *this;
+
+  release_base();
+  m_changes = steal(other.m_changes);
+  m_base = other.m_base;
+  other.m_base = nullptr;
+  return *this;
+}
+
+fn VariableOccurrenceStateMap::snapshot() throws -> VariableOccurrenceStateMap
+{
+  if (m_changes.count() >= CHANGE_COMPACTION_THRESHOLD) compact();
+  return VariableOccurrenceStateMap{*this};
+}
+
+pure fn VariableOccurrenceStateMap::find(StringView name) const wontthrow
+    -> const variable_occurrence_state *
+{
+  let const *change = m_changes.find(name);
+  if (change != nullptr) return change->is_present ? &change->state : nullptr;
+  return m_base != nullptr ? m_base->states.find(name) : nullptr;
+}
+
+fn VariableOccurrenceStateMap::set(StringView name,
+                                   variable_occurrence_state state) throws
+    -> void
+{
+  m_changes.set(name, variable_occurrence_map_entry{steal(state), true});
+}
+
+fn VariableOccurrenceStateMap::erase(StringView name) throws -> void
+{
+  if (find(name) == nullptr) return;
+  m_changes.set(name, variable_occurrence_map_entry{});
+}
+
+fn VariableOccurrenceStateMap::clear() wontthrow -> void
+{
+  m_changes.clear();
+  release_base();
+}
+
+fn VariableOccurrenceStateMap::compact() throws -> void
+{
+  let states = StringMap<variable_occurrence_state>{heap_allocator()};
+  if (m_base != nullptr) states = m_base->states.clone();
+  m_changes.for_each(
+      [&](StringView name, const variable_occurrence_map_entry &change) {
+        if (change.is_present)
+          states.set(name, change.state);
+        else
+          states.erase(name);
+      });
+
+  let *fresh_base = create_variable_occurrence_map_storage(steal(states));
+  release_base();
+  m_base = fresh_base;
+  m_changes.clear();
+}
+
+fn VariableOccurrenceStateMap::merge(
+    const VariableOccurrenceStateMap &other) throws -> void
+{
+  if (this == &other) return;
+
+  let do_merge_name = [&](VariableOccurrenceStateMap &result, StringView name) {
+    let const *left_state = find(name);
+    let const *right_state = other.find(name);
+    if (left_state == nullptr && right_state == nullptr) {
+      result.erase(name);
+      return;
+    }
+
+    let merged_state = left_state != nullptr ? *left_state : *right_state;
+    if (left_state == nullptr) {
+      merged_state.is_definitely_set = false;
+      merged_state.is_definitely_unset = false;
+      merged_state.has_inherited_path = true;
+    } else if (right_state == nullptr) {
+      merged_state.is_definitely_set = false;
+      merged_state.is_definitely_unset = false;
+      merged_state.has_unset_path = true;
+      merged_state.has_inherited_path = true;
+    } else {
+      merged_state.assignment_indices.merge(right_state->assignment_indices);
+      merged_state.is_definitely_set =
+          merged_state.is_definitely_set && right_state->is_definitely_set;
+      merged_state.is_definitely_unset =
+          merged_state.is_definitely_unset && right_state->is_definitely_unset;
+      merged_state.has_unset_path =
+          merged_state.has_unset_path || right_state->has_unset_path;
+      merged_state.has_inherited_path =
+          merged_state.has_inherited_path || right_state->has_inherited_path;
+    }
+    result.set(name, steal(merged_state));
+  };
+
+  if (m_base == other.m_base) {
+    let result = VariableOccurrenceStateMap{*this};
+    m_changes.for_each(
+        [&](StringView name, const variable_occurrence_map_entry &) {
+          do_merge_name(result, name);
+        });
+    other.m_changes.for_each(
+        [&](StringView name, const variable_occurrence_map_entry &) {
+          if (m_changes.find(name) == nullptr) do_merge_name(result, name);
+        });
+    *this = steal(result);
+    return;
+  }
+
+  let do_for_each_logical = [](const VariableOccurrenceStateMap &map,
+                               auto callback) {
+    if (map.m_base != nullptr) {
+      map.m_base->states.for_each(
+          [&](StringView name, const variable_occurrence_state &base_state) {
+            let const *change = map.m_changes.find(name);
+            if (change == nullptr)
+              callback(name, base_state);
+            else if (change->is_present)
+              callback(name, change->state);
+          });
+    }
+    map.m_changes.for_each([&](StringView name,
+                               const variable_occurrence_map_entry &change) {
+      if (!change.is_present) return;
+      if (map.m_base != nullptr && map.m_base->states.find(name) != nullptr) {
+        return;
+      }
+      callback(name, change.state);
+    });
+  };
+
+  let result = VariableOccurrenceStateMap{};
+  do_for_each_logical(*this,
+                      [&](StringView name, const variable_occurrence_state &) {
+                        do_merge_name(result, name);
+                      });
+  do_for_each_logical(
+      other, [&](StringView name, const variable_occurrence_state &state) {
+        if (find(name) != nullptr) return;
+        let merged_state = state;
+        merged_state.is_definitely_set = false;
+        merged_state.is_definitely_unset = false;
+        merged_state.has_inherited_path = true;
+        result.set(name, steal(merged_state));
+      });
+  result.compact();
+  *this = steal(result);
+}
+
+fn VariableOccurrenceStateMap::retain_base() wontthrow -> void
+{
+  if (m_base == nullptr) return;
+
+  ASSERT(m_base->reference_count < SIZE_MAX);
+  m_base->reference_count++;
+}
+
+fn VariableOccurrenceStateMap::release_base() wontthrow -> void
+{
+  if (m_base == nullptr) return;
+
+  ASSERT(m_base->reference_count > 0);
+  m_base->reference_count--;
+  if (m_base->reference_count == 0) {
+    m_base->~variable_occurrence_map_storage();
+    heap_allocator().free_array(m_base, 1);
+  }
+  m_base = nullptr;
+}
+
 fn indent_for_layer(usize layer) throws -> String
 {
   let pad = String{heap_allocator()};
@@ -1672,41 +1900,10 @@ fn note_variable_reference(AnalysisContext &actx, const WordSegment &segment,
 }
 
 fn merge_variable_occurrence_states(
-    StringMap<variable_occurrence_state> &merged_states,
-    const StringMap<variable_occurrence_state> &exit_states) throws -> void
+    VariableOccurrenceStateMap &merged_states,
+    const VariableOccurrenceStateMap &exit_states) throws -> void
 {
-  merged_states.for_each(
-      [&](StringView name, variable_occurrence_state &state) {
-        let const *exit_state = exit_states.find(name);
-        if (exit_state == nullptr) {
-          state.is_definitely_set = false;
-          state.is_definitely_unset = false;
-          state.has_unset_path = true;
-          state.has_inherited_path = true;
-          return;
-        }
-      });
-  exit_states.for_each([&](StringView name,
-                           const variable_occurrence_state &exit_state) {
-    let *state = merged_states.find(name);
-    if (state == nullptr) {
-      let merged_state = exit_state;
-      merged_state.is_definitely_set = false;
-      merged_state.is_definitely_unset = false;
-      merged_state.has_inherited_path = true;
-      merged_states.set(name, steal(merged_state));
-      return;
-    }
-
-    state->assignment_indices.merge(exit_state.assignment_indices);
-    state->is_definitely_set =
-        state->is_definitely_set && exit_state.is_definitely_set;
-    state->is_definitely_unset =
-        state->is_definitely_unset && exit_state.is_definitely_unset;
-    state->has_unset_path = state->has_unset_path || exit_state.has_unset_path;
-    state->has_inherited_path =
-        state->has_inherited_path || exit_state.has_inherited_path;
-  });
+  merged_states.merge(exit_states);
 }
 
 pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow

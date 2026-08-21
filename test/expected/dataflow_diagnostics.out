@@ -57,6 +57,16 @@ rc=0
 note: Assign 'if_value' before it is read, or set it in the environment.
 == an assignment on every if exit stays quiet:
 rc=0
+== compacted divergent branches preserve uncertainty:
+39:33: warning: The variable 'branch_special' is read before any assignment gives it a value. (SC2154)
+    39 |  echo "$removed_marker $seed_128 $branch_special $nested_value"
+       |                                  ^~~~~~~~~~~~~~~
+note: Assign 'branch_special' before it is read, or set it in the environment.
+39:49: warning: The variable 'nested_value' is read before any assignment gives it a value. (SC2154)
+    39 |  echo "$removed_marker $seed_128 $branch_special $nested_value"
+       |                                                  ^~~~~~~~~~~~~
+note: Assign 'nested_value' before it is read, or set it in the environment.
+Encountered 2 warnings.
 == loop-only assignments remain conditional:
 3:7: warning: The variable 'for_value' is read before any assignment gives it a value. (SC2154)
      3 |  echo "$for_value $while_value"
