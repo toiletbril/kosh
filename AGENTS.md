@@ -212,7 +212,8 @@ completion notifications and `SendMessage`. Never pass agent identifiers to
 must offer parallel read-only agents before restarting repository research. Do not
 retry an invalid task lookup after the notification has reported the result.
 Broad searches must use existing paths or directory globs. Do not inspect code
-covered by an active read only agent. Teammate replies require a concrete
+covered by an active read only agent. Do not inspect tests covered by an active
+read only agent. Teammate replies require a concrete
 reachable agent name or identifier. Agent launches use a type listed by the
 current session. Performance comparisons use the release binary explicitly.
 
