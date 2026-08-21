@@ -585,11 +585,21 @@ fn CompoundList::analyze(AnalysisContext &actx,
       actx.variable_occurrence_assignments.clone();
   let conditional_chain_entry_inherited_assignments =
       actx.inherited_variable_occurrence_assignments.clone();
+  let conditional_chain_entry_generated_paths =
+      actx.generated_relative_executable_paths.clone();
   let has_conditional_chain = false;
   const CompoundListCondition *previous_node = nullptr;
   for (usize i = 0; i < m_nodes.count(); i++) {
     let const node = m_nodes[i];
     ASSERT(node != nullptr);
+
+    if (node->kind() == CompoundListCondition::Kind::None &&
+        i + 1 < m_nodes.count() &&
+        m_nodes[i + 1]->kind() != CompoundListCondition::Kind::None)
+    {
+      conditional_chain_entry_generated_paths =
+          actx.generated_relative_executable_paths.clone();
+    }
 
     if (node->kind() == CompoundListCondition::Kind::None) {
       if (has_conditional_chain) {
@@ -598,6 +608,8 @@ fn CompoundList::analyze(AnalysisContext &actx,
         merge_variable_occurrence_states(
             actx.inherited_variable_occurrence_assignments,
             conditional_chain_entry_inherited_assignments);
+        actx.generated_relative_executable_paths =
+            conditional_chain_entry_generated_paths.clone();
       }
       has_conditional_chain = false;
     } else if (!has_conditional_chain) {
@@ -633,6 +645,8 @@ fn CompoundList::analyze(AnalysisContext &actx,
       if (node->kind() == CompoundListCondition::Kind::Or &&
           previous_node != nullptr)
       {
+        actx.generated_relative_executable_paths =
+            conditional_chain_entry_generated_paths.clone();
         previous_node->append_presence_tested_command_names(
             actx, actx.tested_command_names, false);
 
@@ -698,6 +712,8 @@ fn CompoundList::analyze(AnalysisContext &actx,
     merge_variable_occurrence_states(
         actx.inherited_variable_occurrence_assignments,
         conditional_chain_entry_inherited_assignments);
+    actx.generated_relative_executable_paths =
+        steal(conditional_chain_entry_generated_paths);
   }
   if (!actx.should_retain_tested_command_names)
     actx.tested_command_names = steal(saved_tested_command_names);

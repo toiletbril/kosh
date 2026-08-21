@@ -27,6 +27,7 @@ fn window_function_body_error(EvalContext &cxt,
     -> Maybe<StringView>;
 
 fn static_command_name(const Token *token) throws -> Maybe<StringView>;
+fn normalized_relative_executable_path(StringView path) throws -> Maybe<String>;
 
 /* The token's raw text without a copy when the token owns its bytes. A token
    that composes its text on demand writes into storage, which the caller keeps

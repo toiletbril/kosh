@@ -890,6 +890,19 @@ fn static_command_name(const Token *token) throws -> Maybe<StringView>
   return word.constant_value();
 }
 
+fn normalized_relative_executable_path(StringView path) throws -> Maybe<String>
+{
+  if (path.is_empty()) return None;
+
+  let const typed_path = Path{path};
+  if (!typed_path.is_relative()) return None;
+
+  let normalized = typed_path.normalized().text();
+  if (normalized == ".") return None;
+
+  return normalized;
+}
+
 fn borrowed_token_text(const Token *token, String &storage) throws -> StringView
 {
   ASSERT(token != nullptr);
@@ -1166,6 +1179,13 @@ fn command_resolves(
     return true;
   }
   if (os::has_directory_separator(name)) {
+    if (let normalized = normalized_relative_executable_path(name);
+        normalized.has_value() &&
+        actx.generated_relative_executable_paths.contains(normalized->view()))
+    {
+      return true;
+    }
+
     let const expanded = expanded_command_path(name, heap_allocator());
     let const typed_path = Path{expanded.view()};
     let const was_resolved =

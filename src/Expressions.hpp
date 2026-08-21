@@ -359,6 +359,8 @@ public:
   bool has_unknown_working_directory{false};
   bool is_inside_subshell_analysis{false};
 
+  HashSet generated_relative_executable_paths{heap_allocator()};
+
   HashSet tested_command_names{heap_allocator()};
   bool should_retain_tested_command_names{false};
   bool is_analyzing_condition{false};
@@ -430,6 +432,7 @@ public:
   fn mark_working_directory_unknown() wontthrow -> void
   {
     has_unknown_working_directory = true;
+    generated_relative_executable_paths = HashSet{heap_allocator()};
     if (current_source_effects != nullptr)
       current_source_effects->has_unknown_working_directory = true;
   }

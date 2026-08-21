@@ -3,6 +3,70 @@
     [SimpleCommand "zzqqxxnonexist_command_4242"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "after"]
+  [CompoundListCondition, None]
+    [SimpleCommand "exit" "0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$FC" "-o" "generated_fortran_4242" "missing.f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./generated_fortran_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cc" "-o" "generated_cc_4242" "missing.c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./generated_cc_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cp" "missing_source_4242" "generated_copy_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./generated_copy_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "ln" "missing_source_4242" "generated_link_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./generated_link_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "mv" "missing_source_4242" "generated_move_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./generated_move_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "-o" "not_generated_option_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./not_generated_option_4242"]
+  [CompoundListCondition, None]
+    [Assign generated_output_4242=dynamic_generated_4242]
+  [CompoundListCondition, None]
+    [SimpleCommand "cc" "-o" "$generated_output_4242" "missing.c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./dynamic_generated_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cc" "-o" "removed_generated_4242" "missing.c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "removed_generated_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./removed_generated_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cc" "-o" "cwd_generated_4242" "missing.c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "."]
+  [CompoundListCondition, None]
+    [SimpleCommand "./cwd_generated_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cc" "-o" "and_generated_4242" "missing.c"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "./and_generated_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cc" "-o" "or_generated_4242" "missing.c"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "./or_generated_4242"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "cc" "-o" "branch_generated_4242" "missing.c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./branch_generated_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "./never_generated_4242"]
 [Word
   Unquoted "zzqqxxnonexist_command_4242"
 ]
@@ -12,11 +76,236 @@
 [Word
   Unquoted "after"
 ]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Variable "FC"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "generated_fortran_4242"
+]
+[Word
+  Unquoted "missing.f"
+]
+[Word
+  Unquoted "./generated_fortran_4242"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "generated_cc_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "./generated_cc_4242"
+]
+[Word
+  Unquoted "cp"
+]
+[Word
+  Unquoted "missing_source_4242"
+]
+[Word
+  Unquoted "generated_copy_4242"
+]
+[Word
+  Unquoted "./generated_copy_4242"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "missing_source_4242"
+]
+[Word
+  Unquoted "generated_link_4242"
+]
+[Word
+  Unquoted "./generated_link_4242"
+]
+[Word
+  Unquoted "mv"
+]
+[Word
+  Unquoted "missing_source_4242"
+]
+[Word
+  Unquoted "generated_move_4242"
+]
+[Word
+  Unquoted "./generated_move_4242"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "not_generated_option_4242"
+]
+[Word
+  Unquoted "./not_generated_option_4242"
+]
+[Word
+  Unquoted "generated_output_4242=dynamic_generated_4242"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Variable "generated_output_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "./dynamic_generated_4242"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "removed_generated_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "removed_generated_4242"
+]
+[Word
+  Unquoted "./removed_generated_4242"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "cwd_generated_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "./cwd_generated_4242"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "and_generated_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "./and_generated_4242"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "or_generated_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "./or_generated_4242"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "cc"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "branch_generated_4242"
+]
+[Word
+  Unquoted "missing.c"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "./branch_generated_4242"
+]
+[Word
+  Unquoted "./never_generated_4242"
+]
 2:1: warning: The command 'zzqqxxnonexist_command_4242' was not found.
      2 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+18:3: warning: The command './not_generated_option_4242' was not found.
+    18 |  ./not_generated_option_4242
+       |    ^~~~~~~~~~~~~~~~~~~~~~~~~
+21:3: warning: The command './dynamic_generated_4242' was not found.
+    21 |  ./dynamic_generated_4242
+       |    ^~~~~~~~~~~~~~~~~~~~~~
+24:3: warning: The command './removed_generated_4242' was not found.
+    24 |  ./removed_generated_4242
+       |    ^~~~~~~~~~~~~~~~~~~~~~
+27:3: warning: The command './cwd_generated_4242' was not found.
+    27 |  ./cwd_generated_4242
+       |    ^~~~~~~~~~~~~~~~~~
+29:40: warning: The command './or_generated_4242' was not found.
+    29 |  cc -o or_generated_4242 missing.c || ./or_generated_4242
+       |                                         ^~~~~~~~~~~~~~~~~
+31:3: warning: The command './branch_generated_4242' was not found.
+    31 |  ./branch_generated_4242
+       |    ^~~~~~~~~~~~~~~~~~~~~
+32:3: warning: The command './never_generated_4242' was not found.
+    32 |  ./never_generated_4242
+       |    ^~~~~~~~~~~~~~~~~~~~
+Encountered 8 warnings.
 2:1: error: The command 'zzqqxxnonexist_command_4242' was not found.
      2 |  zzqqxxnonexist_command_4242
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 after
-[Code 0]

@@ -1,3 +1,32 @@
 #!/bin/env kosh
 zzqqxxnonexist_command_4242
 echo after
+exit 0
+
+$FC -o generated_fortran_4242 missing.f
+./generated_fortran_4242
+cc -o generated_cc_4242 missing.c
+./generated_cc_4242
+cp missing_source_4242 generated_copy_4242
+./generated_copy_4242
+ln missing_source_4242 generated_link_4242
+./generated_link_4242
+mv missing_source_4242 generated_move_4242
+./generated_move_4242
+
+echo -o not_generated_option_4242
+./not_generated_option_4242
+generated_output_4242=dynamic_generated_4242
+cc -o "$generated_output_4242" missing.c
+./dynamic_generated_4242
+cc -o removed_generated_4242 missing.c
+rm removed_generated_4242
+./removed_generated_4242
+cc -o cwd_generated_4242 missing.c
+cd .
+./cwd_generated_4242
+cc -o and_generated_4242 missing.c && ./and_generated_4242
+cc -o or_generated_4242 missing.c || ./or_generated_4242
+if true; then cc -o branch_generated_4242 missing.c; fi
+./branch_generated_4242
+./never_generated_4242

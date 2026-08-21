@@ -24,6 +24,106 @@ namespace koshka {
 
 namespace expressions {
 
+namespace {
+
+constexpr PackedStringKey GENERATED_EXECUTABLE_DRIVER_KEYS[] = {
+    SSK("c++"), SSK("cc"),  SSK("clang"), SSK("clang++"),
+    SSK("g++"), SSK("gcc"), SSK("ld"),    SSK("ld.lld"),
+};
+constexpr StaticStringSet GENERATED_EXECUTABLE_DRIVERS{
+    GENERATED_EXECUTABLE_DRIVER_KEYS};
+
+constexpr PackedStringKey GENERATED_EXECUTABLE_DRIVER_VARIABLE_KEYS[] = {
+    SSK("CC"), SSK("CXX"), SSK("F77"), SSK("FC"), SSK("LD"),
+};
+constexpr StaticStringSet GENERATED_EXECUTABLE_DRIVER_VARIABLES{
+    GENERATED_EXECUTABLE_DRIVER_VARIABLE_KEYS};
+
+fn literal_generated_path(const Token *token, const AnalysisContext &) throws
+    -> Maybe<String>
+{
+  let literal = optimizer::literal_word_value(token);
+  if (!literal.has_value()) return None;
+
+  return normalized_relative_executable_path(literal->view());
+}
+
+fn update_generated_executable_paths(AnalysisContext &actx,
+                                     const ArrayList<const Token *> &args,
+                                     Maybe<StringView> command_name,
+                                     command_name_id command_id,
+                                     bool is_command_shadowed,
+                                     bool is_unconditional) throws -> void
+{
+  if (is_command_shadowed || !is_unconditional || args.is_empty()) return;
+
+  let is_driver = false;
+  if (command_name.has_value()) {
+    let const command_path = Path{*command_name};
+    let const filename = command_path.filename();
+    is_driver = GENERATED_EXECUTABLE_DRIVERS.contains(filename);
+  } else if (let variable_name =
+                 optimizer::plain_variable_reference_name(args[0]);
+             variable_name.has_value())
+  {
+    is_driver = GENERATED_EXECUTABLE_DRIVER_VARIABLES.contains(*variable_name);
+  }
+
+  if (is_driver) {
+    for (usize i = 1; i < args.count(); i++) {
+      let literal = optimizer::literal_word_value(args[i]);
+      if (!literal.has_value()) continue;
+
+      let output = Maybe<String>{};
+      if (*literal == "-o" && i + 1 < args.count()) {
+        output = literal_generated_path(args[i + 1], actx);
+      } else if (literal->view().starts_with("-o") && literal->count() > 2) {
+        output =
+            normalized_relative_executable_path(literal->view().substring(2));
+      }
+      if (!output.has_value()) continue;
+
+      actx.generated_relative_executable_paths.add(output->view());
+      break;
+    }
+    return;
+  }
+
+  if ((command_id == command_name_id::Cp || command_id == command_name_id::Ln ||
+       command_id == command_name_id::Mv) &&
+      args.count() == 3)
+  {
+    let destination = literal_generated_path(args[2], actx);
+    if (destination.has_value())
+      actx.generated_relative_executable_paths.add(destination->view());
+
+    if (command_id == command_name_id::Mv) {
+      let source = literal_generated_path(args[1], actx);
+      if (source.has_value())
+        actx.generated_relative_executable_paths.remove(source->view());
+    }
+    return;
+  }
+
+  if (command_id == command_name_id::Rm ||
+      command_id == command_name_id::Unlink)
+  {
+    if (args.count() != 2) {
+      actx.generated_relative_executable_paths = HashSet{heap_allocator()};
+      return;
+    }
+
+    let target = literal_generated_path(args[1], actx);
+    if (target.has_value()) {
+      actx.generated_relative_executable_paths.remove(target->view());
+    } else {
+      actx.generated_relative_executable_paths = HashSet{heap_allocator()};
+    }
+  }
+}
+
+} // namespace
+
 pure fn is_split_exempt_variable_name(StringView name) wontthrow -> bool
 {
   if (name.length != 1) return false;
@@ -1214,6 +1314,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
                              {reported_name});
     }
   }
+
+  update_generated_executable_paths(actx, m_args, name, command_id,
+                                    is_command_shadowed, is_unconditional);
 
   /* A recorded constant survives only across an environment-neutral command
      that writes no variable and runs no unseen code. Every other command
