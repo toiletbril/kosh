@@ -19,7 +19,7 @@ process_is_alive()
     if [ "$host_system" = Linux ]; then
         process_stat_path=/proc/$process_id/stat
         [ -r "$process_stat_path" ] || return 1
-        IFS= read -r process_stat < "$process_stat_path" || return 1
+        IFS= read -r process_stat 2>/dev/null < "$process_stat_path" || return 1
         process_fields=${process_stat##*) }
         set -- $process_fields
         [ "$#" -ge 1 ] || return 1

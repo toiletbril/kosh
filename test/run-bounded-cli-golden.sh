@@ -20,7 +20,7 @@ list_golden_session_processes()
   if [ "$HOST_SYSTEM" = Linux ]; then
     for PROCESS_STAT_PATH in /proc/[0-9]*/stat; do
       [ -r "$PROCESS_STAT_PATH" ] || continue
-      IFS= read -r PROCESS_STAT < "$PROCESS_STAT_PATH" || continue
+      IFS= read -r PROCESS_STAT 2>/dev/null < "$PROCESS_STAT_PATH" || continue
       PROCESS_FIELDS=${PROCESS_STAT##*) }
       set -- $PROCESS_FIELDS
       [ "$#" -ge 4 ] || continue
