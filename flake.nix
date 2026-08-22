@@ -2,14 +2,11 @@
   description = "Koshka - the fastest cross-platform Bash and POSIX-compatible shell";
 
   inputs = {
+    self.submodules = true;
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    toiletline = {
-      url = "github:toiletbril/toiletline/staging";
-      flake = false;
-    };
   };
 
-  outputs = { self, nixpkgs, toiletline }:
+  outputs = { self, nixpkgs }:
     let
       supportedSystems = [
         "x86_64-linux"
@@ -18,11 +15,32 @@
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      versionLines = nixpkgs.lib.splitString "\n" (builtins.readFile ./src/Common.hpp);
+      versionValue = name:
+        let
+          matches = builtins.filter
+            (line: builtins.match "#define[[:space:]]+${name}[[:space:]]+.*" line != null)
+            versionLines;
+          line = if matches == [] then
+            throw "Missing ${name} in src/Common.hpp"
+          else
+            builtins.head matches;
+        in
+        builtins.elemAt
+          (builtins.match "#define[[:space:]]+${name}[[:space:]]+(.+)" line)
+          0;
+      versionExtra = nixpkgs.lib.removeSuffix "\""
+        (nixpkgs.lib.removePrefix "\"" (versionValue "KOSH_VER_EXTRA"));
+      packageVersion = nixpkgs.lib.concatStringsSep "." [
+        (versionValue "KOSH_VER_MAJOR")
+        (versionValue "KOSH_VER_MINOR")
+        (versionValue "KOSH_VER_PATCH")
+      ] + nixpkgs.lib.optionalString (versionExtra != "") "-${versionExtra}";
 
       mkPackage = { pkgs, mode ? "rel" }:
         pkgs.stdenv.mkDerivation {
           pname = "kosh";
-          version = "0.1.0";
+          version = packageVersion;
 
           src = self;
 
@@ -32,13 +50,9 @@
             git
           ];
 
-          preBuild = ''
-            if [ ! -f src/toiletline/toiletline.h ]; then
-              echo "providing toiletline submodule from flake input"
-              rm -rf src/toiletline
-              cp -r ${toiletline} src/toiletline
-            fi
-          '';
+          buildInputs = nixpkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.glibc.static
+          ];
 
           buildPhase = ''
             runHook preBuild

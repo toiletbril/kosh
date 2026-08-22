@@ -205,7 +205,11 @@ reuse.
 - Use the approved edit tool for source and text changes. Shell commands may
   inspect files and output only.
 - Resolve files, guidance, tools, interpreters, and test targets before using
-  them. Optional tools require an explicit availability branch.
+  them. Optional tools require explicit executable and service readiness checks.
+- Match a container build target to the container architecture before fetching
+  its toolchain.
+- Keep one bounded container or cache volume across repeated package validation
+  commands, then remove the exact verified resource.
 - Use the simplest bounded probe that preserves the input. Quote command syntax
   safely, place options before path separators, and run independent probes
   independently.

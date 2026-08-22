@@ -18,25 +18,7 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
-        "toiletline": "toiletline"
-      }
-    },
-    "toiletline": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1782561202,
-        "narHash": "sha256-pRTKeQIwrPUacm2i076sXuuzxUQUxSOL6TNimHVTcA0=",
-        "owner": "toiletbril",
-        "repo": "toiletline",
-        "rev": "6d56ef5c77626fd94c8a1de50dd7939edab0c218",
-        "type": "github"
-      },
-      "original": {
-        "owner": "toiletbril",
-        "ref": "staging",
-        "repo": "toiletline",
-        "type": "github"
+        "nixpkgs": "nixpkgs"
       }
     }
   },
