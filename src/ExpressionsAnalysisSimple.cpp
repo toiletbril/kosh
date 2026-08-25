@@ -1416,14 +1416,24 @@ fn SimpleCommand::append_presence_tested_command_names(
     return;
   }
 
-  let const name = static_command_name(m_args[0]);
-  if (!name.has_value()) return;
+  let name = static_command_name(m_args[0]);
+  if (!name.has_value()) {
+    let const raw_name = m_args[0]->raw_view();
+    if (!raw_name.has_value() || *raw_name != "[") return;
+    name = *raw_name;
+  }
   if (actx.defined_functions.contains(*name) ||
       actx.known_aliases.contains(*name))
   {
     return;
   }
-  if (*name == "test" && m_args.count() == 3) {
+  let const is_test_presence_form = *name == "test" && m_args.count() == 3;
+  bool is_bracket_presence_form = false;
+  if (*name == "[" && m_args.count() == 4) {
+    let const closing = static_command_name(m_args[3]);
+    is_bracket_presence_form = closing.has_value() && *closing == "]";
+  }
+  if (is_test_presence_form || is_bracket_presence_form) {
     let const option = static_command_name(m_args[1]);
     bool is_zsh_presence_operand = false;
     if (m_args[2]->kind() == Token::Kind::Word) {
