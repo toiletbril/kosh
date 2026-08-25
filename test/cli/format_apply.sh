@@ -100,6 +100,18 @@ printf 'compound-redirect-equivalent=%s captured=%s\n' \
   "$([ "$compound_original" = "$compound_formatted" ] && printf yes)" \
   "$(cmp -s "$root/compound-one.txt" "$root/compound-two.txt" && printf yes)"
 
+cat > "$root/process-substitutions.sh" <<'EOF'
+exec > >(tee -a capture.log) 2>&1
+mapfile -t child_pids < <(printf '%s\n' 10 20)
+EOF
+process_substitutions=$("$BIN" --format "$root/process-substitutions.sh")
+printf '%s\n' "$process_substitutions"
+process_substitutions_second=$(printf '%s\n' "$process_substitutions" |
+  "$BIN" --format)
+printf 'process-substitutions-idempotent=%s\n' \
+  "$([ "$process_substitutions" = "$process_substitutions_second" ] && \
+    printf yes)"
+
 printf 'set -- foo\\\nbar\nprintf "<%%s> count=%%s\\n" "\0441" "\044#"\n' \
   > "$root/continuation.sh"
 "$BIN" --format "$root/continuation.sh" > "$root/continuation-formatted.sh"

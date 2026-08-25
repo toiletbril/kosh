@@ -241,6 +241,8 @@ reuse.
 - Validate protocol encoders and profilers on a small payload. Language server
   probes must initialize first, redirect the complete emitter, drain output,
   and preserve the final process status.
+- Poll every long-running command until the response contains its final exit
+  code. Missing displayed session metadata does not prove completion.
 - Bound interactive and long-running workloads with an operating-system
   timeout. Validate report paths and all final reporting branches before an
   expensive run.

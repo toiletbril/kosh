@@ -912,7 +912,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       }
       if (should_attach_heredoc_delimiter || should_attach_redirection_operand)
       {
-        writer.append_attached(text);
+        let const is_separated_process_substitution_operand =
+            should_attach_redirection_operand && index > 0 &&
+            pieces[index - 1].source_position + pieces[index - 1].text.count() <
+                piece.source_position &&
+            (text.starts_with("<(") || text.starts_with(">("));
+        if (is_separated_process_substitution_operand)
+          writer.append_token(text);
+        else
+          writer.append_attached(text);
         should_attach_heredoc_delimiter = false;
         should_attach_redirection_operand = false;
         is_command_start = should_command_start_after_redirection;
