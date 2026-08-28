@@ -76,6 +76,13 @@ constexpr static_string_entry<u8> FORMATTER_KEYWORD_ENTRIES[] = {
 };
 constexpr StaticStringMap FORMATTER_KEYWORDS{FORMATTER_KEYWORD_ENTRIES};
 
+constexpr PackedStringKey FORMATTER_COMPOUND_OPENER_KEYS[] = {
+    SSK("case"),   SSK("for"),   SSK("if"),
+    SSK("select"), SSK("until"), SSK("while"),
+};
+constexpr StaticStringSet FORMATTER_COMPOUND_OPENERS{
+    FORMATTER_COMPOUND_OPENER_KEYS};
+
 enum class format_operator : u8
 {
   Other,
@@ -579,6 +586,16 @@ public:
     m_column = 0;
   }
 
+  fn ensure_blank_line() throws -> void
+  {
+    finish_line();
+    if (!m_output.is_empty() &&
+        (m_output.count() < 2 || m_output[m_output.count() - 2] != '\n'))
+    {
+      m_output.push('\n');
+    }
+  }
+
   fn take() throws -> String
   {
     while (!m_output.is_empty() && m_output[m_output.count() - 1] == '\n')
@@ -850,6 +867,13 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   bool should_attach_redirection_operand = false;
   bool should_attach_case_pattern = false;
   bool should_command_start_after_redirection = false;
+  bool has_pending_declaration_separator = false;
+  bool has_pending_structural_separator = false;
+  bool has_completed_structural_statement = false;
+  bool has_continued_declaration_statement = false;
+  bool is_waiting_for_continued_statement = false;
+  bool is_current_statement_declaration = false;
+  bool has_classified_current_statement = false;
   usize subshell_depth = 0;
   usize conditional_depth = 0;
   usize indent = initial_indent;
@@ -860,11 +884,95 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       has_closed_test = true;
     }
   };
+  let const do_is_declaration_command = [&](usize start_index) throws -> bool {
+    bool has_assignment = false;
+    bool has_command = false;
+    bool is_declaration_builtin = false;
+    bool has_operand = false;
+    bool has_reporting_option = false;
+    bool is_scanning_options = true;
+    bool should_skip_redirection_operand = false;
+
+    for (usize index = start_index; index < pieces.count(); index++) {
+      let const &piece = pieces[index];
+      if (piece.kind == format_piece_kind::Comment) continue;
+      if (piece.kind == format_piece_kind::Newline ||
+          piece.kind == format_piece_kind::Raw)
+      {
+        break;
+      }
+      if (piece.kind == format_piece_kind::Operator) {
+        let const operator_kind =
+            FORMAT_OPERATORS.find(piece.text).value_or(format_operator::Other);
+        if (operator_kind == format_operator::CommandEnd ||
+            operator_kind == format_operator::Pipe ||
+            operator_kind == format_operator::Continuation)
+        {
+          break;
+        }
+        if (is_redirection_operator(piece.text))
+          should_skip_redirection_operand = true;
+        continue;
+      }
+      if (should_skip_redirection_operand) {
+        should_skip_redirection_operand = false;
+        continue;
+      }
+      if (piece_begins_redirection(pieces, index)) continue;
+      if (!has_command && lexer::word_looks_like_assignment(piece.text)) {
+        has_assignment = true;
+        continue;
+      }
+      if (!has_command) {
+        has_command = true;
+        is_declaration_builtin =
+            get_analysis_command_info(piece.text)
+                .is_in_group(COMMAND_GROUP_DECLARATION_BUILTIN) ||
+            piece.text == "export" || piece.text == "readonly";
+        if (!is_declaration_builtin) return false;
+        continue;
+      }
+      if (is_scanning_options && piece.text == "--") {
+        is_scanning_options = false;
+        continue;
+      }
+      if (is_scanning_options && piece.text.starts_with("-")) {
+        if (piece.text.find_character('f').has_value() ||
+            piece.text.find_character('F').has_value() ||
+            piece.text.find_character('p').has_value())
+        {
+          has_reporting_option = true;
+        }
+        continue;
+      }
+      is_scanning_options = false;
+      has_operand = true;
+    }
+
+    return (!has_command && has_assignment) ||
+           (is_declaration_builtin && has_operand && !has_reporting_option);
+  };
+  let const do_begin_statement = [&](bool is_declaration, bool is_structural)
+                                     throws -> void {
+    if (!has_pending_declaration_separator && !has_pending_structural_separator)
+    {
+      return;
+    }
+
+    if (!is_structural && (!is_declaration || has_pending_structural_separator))
+    {
+      writer.ensure_blank_line();
+    }
+    has_pending_declaration_separator = false;
+    has_pending_structural_separator = false;
+  };
   let const do_finish_command = [&]() throws {
     do_close_test();
     is_command_start = true;
     is_test_command = false;
     has_closed_test = false;
+    is_current_statement_declaration = false;
+    has_classified_current_statement = false;
   };
 
   for (usize index = 0; index < pieces.count(); index++) {
@@ -876,10 +984,47 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     }
     if (piece.kind == format_piece_kind::Comment) {
       do_close_test();
+      if (piece.is_at_line_start && (has_pending_declaration_separator ||
+                                     has_pending_structural_separator))
+      {
+        bool has_following_statement = false;
+
+        for (usize following_index = index + 1;
+             following_index < pieces.count(); following_index++)
+        {
+          let const kind = pieces[following_index].kind;
+          if (kind == format_piece_kind::Newline ||
+              kind == format_piece_kind::Comment)
+          {
+            continue;
+          }
+          if (kind != format_piece_kind::Raw) has_following_statement = true;
+          break;
+        }
+
+        if (has_following_statement) {
+          writer.ensure_blank_line();
+          has_pending_declaration_separator = false;
+          has_pending_structural_separator = false;
+        }
+      }
       writer.append_comment(text, piece.is_at_line_start);
+      if (piece.source_position == 0 && text.starts_with("#!"))
+        writer.ensure_blank_line();
       continue;
     }
     if (piece.kind == format_piece_kind::Newline) {
+      if (!is_waiting_for_continued_statement) {
+        if (is_current_statement_declaration ||
+            has_continued_declaration_statement)
+        {
+          has_pending_declaration_separator = true;
+        }
+        if (has_completed_structural_statement)
+          has_pending_structural_separator = true;
+        has_completed_structural_statement = false;
+        has_continued_declaration_statement = false;
+      }
       do_finish_command();
       writer.finish_line();
       continue;
@@ -931,6 +1076,12 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
           format_word_substitutions(text, indent, recursion_depth);
       let const rendered_text =
           formatted_word.has_value() ? formatted_word->view() : text;
+      if (is_command_start) is_waiting_for_continued_statement = false;
+      if (has_completed_structural_statement && is_command_start &&
+          FORMATTER_COMPOUND_OPENERS.contains(rendered_text))
+      {
+        has_completed_structural_statement = false;
+      }
       if (rendered_text == "[[")
         conditional_depth++;
       else if (rendered_text == "]]" && conditional_depth > 0)
@@ -958,6 +1109,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         writer.set_indent(indent);
       }
       if ((keyword_flags & formatter_keyword_vertical) != 0 || is_case_in) {
+        do_begin_statement(false, true);
         if (!is_case_in) {
           do_finish_command();
           writer.finish_line();
@@ -973,6 +1125,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         let const is_compound_terminator =
             (keyword_flags & formatter_keyword_closes) != 0 &&
             (keyword_flags & formatter_keyword_indents) == 0;
+        if (is_compound_terminator) has_completed_structural_statement = true;
         if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
             !(is_compound_terminator && is_followed_by_redirection))
         {
@@ -990,6 +1143,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         continue;
       }
       if ((keyword_flags & formatter_keyword_elif) != 0) {
+        do_begin_statement(false, true);
         writer.append_token(rendered_text);
         is_command_start = true;
         continue;
@@ -1002,6 +1156,11 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (should_rewrite_test && index + 1 < pieces.count() &&
           pieces[index + 1].text == "(")
         should_rewrite_test = false;
+      if (is_command_start && !has_classified_current_statement) {
+        is_current_statement_declaration = do_is_declaration_command(index);
+        has_classified_current_statement = true;
+        do_begin_statement(is_current_statement_declaration, false);
+      }
       if (should_rewrite_test) {
         writer.append_token("[");
         is_test_command = true;
@@ -1037,6 +1196,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         FORMAT_OPERATORS.find(text).value_or(format_operator::Other);
     switch (operator_kind) {
     case format_operator::OpenBrace:
+      is_waiting_for_continued_statement = false;
+      has_completed_structural_statement = false;
+      do_begin_statement(false, false);
       writer.finish_line();
       writer.append_token(text);
       if (!is_followed_by_inline_comment) writer.finish_line();
@@ -1055,6 +1217,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         continue;
       }
       if (!is_command_start) break;
+      is_waiting_for_continued_statement = false;
+      has_completed_structural_statement = false;
+      do_begin_statement(false, false);
       writer.append_token(text);
       if (!is_followed_by_inline_comment) writer.finish_line();
       indent += 2;
@@ -1063,11 +1228,13 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       do_finish_command();
       continue;
     case format_operator::CloseBrace:
+      do_begin_statement(false, true);
       do_finish_command();
       writer.finish_line();
       if (indent >= 2) indent -= 2;
       writer.set_indent(indent);
       writer.append_token(text);
+      has_completed_structural_statement = true;
       if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
           !is_followed_by_redirection)
       {
@@ -1076,6 +1243,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 
       continue;
     case format_operator::CaseTerminator:
+      do_begin_statement(false, true);
       do_finish_command();
       writer.finish_line();
       if (indent >= 2) indent -= 2;
@@ -1093,11 +1261,28 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     case format_operator::Continuation:
       do_close_test();
       writer.append_token(text);
+      if (is_current_statement_declaration)
+        has_continued_declaration_statement = true;
+      if (has_completed_structural_statement ||
+          has_continued_declaration_statement)
+      {
+        is_waiting_for_continued_statement = true;
+      }
       do_finish_command();
       continue;
     case format_operator::CommandEnd:
       do_close_test();
       if (text == "&") writer.append_token(text);
+      if (is_current_statement_declaration ||
+          has_continued_declaration_statement)
+      {
+        has_pending_declaration_separator = true;
+      }
+      if (has_completed_structural_statement)
+        has_pending_structural_separator = true;
+      has_completed_structural_statement = false;
+      has_continued_declaration_statement = false;
+      is_waiting_for_continued_statement = false;
       if (!is_followed_by_inline_comment) writer.finish_line();
       do_finish_command();
       continue;
@@ -1117,12 +1302,14 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         should_attach_case_pattern = false;
         is_command_start = true;
       } else if (subshell_depth > 0) {
+        do_begin_statement(false, true);
         do_finish_command();
         writer.finish_line();
         if (indent >= 2) indent -= 2;
         subshell_depth--;
         writer.set_indent(indent);
         writer.append_token(text);
+        has_completed_structural_statement = true;
       } else {
         writer.append_attached(text);
       }

@@ -7,6 +7,7 @@ else
   echo no
 fi
 #!/bin/sh
+
 # keep this text without wrapping
 if true
 then
@@ -21,6 +22,7 @@ test ()
 {
   echo shadow
 }
+
 test -n "$x"
 command test -n "$x"
 value=$(if [ -n "$1" ]
@@ -42,10 +44,12 @@ ffmpeg first-positional second-positional \
 option-wrap-idempotent=yes
 echo {a,b}
 items=(one two)
+
 for ((i=0; i<2; i++))
 do
   echo "$i"
 done
+
 echo @(a|b)
 printf "%s\n" if test x = x
 printf "%s\n" ! test x = y
@@ -54,6 +58,7 @@ case x in
     echo yes
   ;;
 esac
+
 [ -n "$x" ] # keep
 [ -f x ] 2>/dev/null
 2>/dev/null [ -n x ]
@@ -92,6 +97,7 @@ if
 then
   :
 fi || false
+
 case x in
   x)
     :
@@ -101,6 +107,7 @@ case x in
   x)
     echo arm
 esac
+
 echo top
 if true
 then
@@ -109,26 +116,32 @@ fi
 {
   echo brace
 } >&2
+
 (
   echo sub
 ) >&2
+
 for i in 1
 do
   echo "$i"
 done >/dev/null
+
 while false
 do
   :
 done 2>/dev/null
+
 case x in
   x)
     :
   ;;
 esac >/dev/null 2>&1
+
 if true
 then
   echo cond
 fi >/dev/null
+
 {
   echo both
 } >/dev/null 2>&1
@@ -158,16 +171,19 @@ fixed-crlf-status=0 retained=yes
 lint-apply-status=1 contents=#!/bin/sh|[ "$1" = y ]|printf "%s\n" $1 $@|
 combined-status=1
 #!/bin/bash
+
 if [ -n "$1" ]
 then
   [ "$1" = y ]
 fi
+
 if [[ $1 > 0 ]]
 then
   echo positive
 fi
 warning-apply-status=1
 #!/bin/bash
+
 [[ 1 > 0 ]]
 safe-and-unsafe-status=1 contents=#!/bin/sh|[ "$1" = y ]|printf "%s\n" $1|
 summary-status=1
@@ -211,10 +227,12 @@ Encountered 2 warnings and 1 error.
 items=(one two three)
 flag=on left=right other=
 count=${#items[@]}
+
 if [[ $flag && ( $left == right || $other ) ]]
 then
   echo cond
 fi
+
 case $1 in
   (alpha)
     echo first
@@ -226,11 +244,89 @@ case $1 in
     echo "rest $count"
   ;;
 esac
+
 for name in one two
 do
   echo "${#name}"
 done
 shapes-equivalent=yes idempotent=yes
+first=one
+second=two 2>"$TEST_NULL_DEVICE"
+export third=three
+readonly fourth=four
+
+# The next command reads the declaration block.
+echo "$first $second $third $fourth"
+export -p >"$TEST_NULL_DEVICE"
+printf '%s\n' after-report
+prefix=value printf '%s\n' prefix
+chain_declaration=nine &&
+printf '%s\n' declaration-chain
+
+printf '%s\n' after-declaration-chain
+if true
+then
+  local_to_if=value
+
+  printf '%s\n' "$local_to_if"
+fi
+
+# The function prints its local value.
+print_local ()
+{
+  local local_value=five
+
+  printf '%s\n' "$local_value"
+}
+
+print_local
+if true
+then
+  printf '%s\n' chain-left
+fi && printf '%s\n' chain-right
+
+printf '%s\n' after-chain
+if true
+then
+  printf '%s\n' pipeline-left
+fi |
+cat
+
+printf '%s\n' after-pipeline
+if true
+then
+  printf '%s\n' inline-comment
+fi # The next command follows the completed conditional.
+
+printf '%s\n' after-inline-comment
+(
+  subshell_value=six
+
+  printf '%s\n' "$subshell_value"
+)
+
+printf '%s\n' after-subshell
+case word in
+  word)
+    printf '%s\n' case
+  ;;
+esac
+
+printf '%s\n' after-case
+for loop_value in seven
+do
+  printf '%s\n' "$loop_value"
+done
+
+{
+  group_value=eight
+
+  printf '%s\n' "$group_value"
+} >"$TEST_NULL_DEVICE"
+
+printf '%s\n' after-group
+eof_value=one
+statement-spacing-equivalent=yes idempotent=yes
 builtin eval \
         -- \
   "$(one/two/three.dump | four/five:six/seven.awk resolve 2>/dev/null)"
@@ -242,6 +338,7 @@ apply-alone-status=2
 multi-stdout-status=2
 lint-format-stdout-status=0
 #!/bin/sh
+
 if [ -n "$1" ]
 then
   [ "$1" = y ]
@@ -255,6 +352,7 @@ adjacent-status=0
     a
   )
 )
+
 (
   (
     [ a = b ]
@@ -262,6 +360,7 @@ adjacent-status=0
     [ a != b ]
   )
 )
+
 ((a))
 (( a = 1 ))
 adjacent-idempotent=yes

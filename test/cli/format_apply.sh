@@ -290,6 +290,74 @@ printf 'shapes-equivalent=%s idempotent=%s\n' \
   "$(cmp -s "$root/shapes-formatted.sh" "$root/shapes-second.sh" && \
       printf yes)"
 
+cat > "$root/statement-spacing.sh" <<'EOF'
+first=one
+second=two 2> "$TEST_NULL_DEVICE"
+export third=three
+readonly fourth=four
+# The next command reads the declaration block.
+echo "$first $second $third $fourth"
+export -p > "$TEST_NULL_DEVICE"
+printf '%s\n' after-report
+prefix=value printf '%s\n' prefix
+chain_declaration=nine &&
+printf '%s\n' declaration-chain
+printf '%s\n' after-declaration-chain
+if true; then
+local_to_if=value
+printf '%s\n' "$local_to_if"
+fi
+# The function prints its local value.
+print_local() {
+local local_value=five
+printf '%s\n' "$local_value"
+}
+print_local
+if true; then
+printf '%s\n' chain-left
+fi && printf '%s\n' chain-right
+printf '%s\n' after-chain
+if true; then
+printf '%s\n' pipeline-left
+fi |
+cat
+printf '%s\n' after-pipeline
+if true; then
+printf '%s\n' inline-comment
+fi # The next command follows the completed conditional.
+printf '%s\n' after-inline-comment
+(
+subshell_value=six
+printf '%s\n' "$subshell_value"
+)
+printf '%s\n' after-subshell
+case word in
+word) printf '%s\n' case ;;
+esac
+printf '%s\n' after-case
+for loop_value in seven; do
+printf '%s\n' "$loop_value"
+done
+{
+group_value=eight
+printf '%s\n' "$group_value"
+} > "$TEST_NULL_DEVICE"
+printf '%s\n' after-group
+eof_value=one
+EOF
+"$BIN" --format "$root/statement-spacing.sh" \
+  > "$root/statement-spacing-formatted.sh"
+cat "$root/statement-spacing-formatted.sh"
+"$BIN" --format "$root/statement-spacing-formatted.sh" \
+  > "$root/statement-spacing-second.sh"
+spacing_original=$("$BIN" --no-diagnostics "$root/statement-spacing.sh")
+spacing_formatted=$("$BIN" --no-diagnostics \
+  "$root/statement-spacing-formatted.sh")
+printf 'statement-spacing-equivalent=%s idempotent=%s\n' \
+  "$([ "$spacing_original" = "$spacing_formatted" ] && printf yes)" \
+  "$(cmp -s "$root/statement-spacing-formatted.sh" \
+      "$root/statement-spacing-second.sh" && printf yes)"
+
 printf 'builtin eval -- "\044(one/two/three.dump | four/five:six/seven.awk resolve 2>/dev/null)"\n' \
   > "$root/substitution-wrap.sh"
 "$BIN" --format "$root/substitution-wrap.sh" \
