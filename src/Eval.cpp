@@ -209,10 +209,9 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
   if (is_integer_variable(name)) [[unlikely]] {
-    let const result = value.length == 0 ? 0 : evaluate_arithmetic(value);
-    char result_text[24];
-    assign_variable(name, utils::int_to_text_into(result, result_text,
-                                                  sizeof(result_text)));
+    let const result = value.length == 0 ? String{scratch_allocator(), "0"}
+                                         : evaluate_arithmetic_text(value);
+    assign_variable(name, result.view());
     return;
   }
 

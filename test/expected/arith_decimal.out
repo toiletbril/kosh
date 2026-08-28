@@ -1,0 +1,284 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1.25 + 2.5))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1.20 + 2.3))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1.5 * 2.00))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((5 / 2.0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1.0 / 3))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((5.5 % 2))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1.5 ** 2))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((123456789012345678901234567890.123 + 0.877))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((999999999999999999999999999999.9 > 2.0))"]
+  [CompoundListCondition, None]
+    [Assign decimal_value=1.25]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "decimal_value += 2.50"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$decimal_value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "999999999999999999999999999999.9 * 10.0"]
+  [CompoundListCondition, None]
+    [Assign decimal_formula=999999999999999999999999999999.9]
+  [CompoundListCondition, None]
+    [FunctionDefinition "decimal_step"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "decimal_result"]
+          [CompoundListCondition, None]
+            [Assign decimal_result=$((decimal_formula + decimal_iteration + 0.1))]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [ArithmeticCommand "decimal_result != decimal_formula + decimal_iteration + 0.1"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Assign decimal_lifetime=bad]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [ArithmeticCommand "decimal_iteration == 255"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "decimal=%s:%s\n" "$#decimal_result" "$decimal_result: -20"]
+  [CompoundListCondition, None]
+    [Assign decimal_iteration=0]
+  [CompoundListCondition, None]
+    [Assign decimal_lifetime=ok]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ArithmeticCommand "decimal_iteration < 256"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "decimal_step"]
+        [CompoundListCondition, None]
+          [Assign decimal_iteration=$((decimal_iteration + 1))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "decimal_lifetime=$decimal_lifetime"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.25 + 2.5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.20 + 2.3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.5 * 2.00"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "5 / 2.0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.0 / 3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "5.5 % 2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.5 ** 2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "123456789012345678901234567890.123 + 0.877"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "999999999999999999999999999999.9 > 2.0"
+]
+[Word
+  Unquoted "decimal_value=1.25"
+]
+[Word
+  Unquoted "decimal_value"
+]
+[Word
+  Unquoted "+="
+]
+[Word
+  Unquoted "2.50"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "decimal_value"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "999999999999999999999999999999.9 * 10.0"
+]
+[Word
+  Unquoted "decimal_formula=999999999999999999999999999999.9"
+]
+[Word
+  Unquoted "decimal_step"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "decimal_result"
+]
+[Word
+  Unquoted "decimal_result="
+  ArithmeticExpansion "decimal_formula + decimal_iteration + 0.1"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "decimal_result"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "decimal_formula"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "decimal_iteration"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "0.1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "decimal_lifetime=bad"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "decimal_iteration"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "255"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "decimal=%s:%s\n"
+]
+[Word
+  Variable "#decimal_result"
+]
+[Word
+  Variable "decimal_result: -20"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "decimal_iteration=0"
+]
+[Word
+  Unquoted "decimal_lifetime=ok"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "decimal_iteration"
+]
+[Word
+  Unquoted "256"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "decimal_step"
+]
+[Word
+  Unquoted "decimal_iteration="
+  ArithmeticExpansion "decimal_iteration + 1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "decimal_lifetime="
+  Variable "decimal_lifetime"
+]
+3.75
+3.50
+3.000
+2.5
+0.3
+1.5
+2.25
+123456789012345678901234567891.000
+1
+3.75
+9999999999999999999999999999999.00
+decimal=33:000000000000000255.0
+decimal_lifetime=ok
+[Code 0]

@@ -709,18 +709,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const can_use_folded_result =
-          segment.has_folded_arithmetic_result() && !has_debug_trap() &&
-          !should_echo_expanded();
-      let const result = can_use_folded_result
-                             ? segment.get_folded_arithmetic_result()
-                             : evaluate_arithmetic_cached(segment);
-      char buffer[24];
-      let const value = utils::int_to_text_into(result, buffer, sizeof(buffer));
+      let const value = evaluate_arithmetic_cached_text(segment);
       if (segment.is_in_double_quotes)
-        do_append_run(value, false);
+        do_append_run(value.view(), false);
       else
-        do_append_split_run(value, false);
+        do_append_split_run(value.view(), false);
     } break;
     }
   }
@@ -781,14 +774,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
       result += capture_function_substitution(segment);
       break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const can_use_folded_result =
-          segment.has_folded_arithmetic_result() && !has_debug_trap() &&
-          !should_echo_expanded();
-      let const number = can_use_folded_result
-                             ? segment.get_folded_arithmetic_result()
-                             : evaluate_arithmetic_cached(segment);
-      char buffer[24];
-      result += utils::int_to_text_into(number, buffer, sizeof(buffer));
+      result += evaluate_arithmetic_cached_text(segment).view();
     } break;
     default: result += segment_text; break;
     }
@@ -850,15 +836,8 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(path.view(), false);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const can_use_folded_result =
-          segment.has_folded_arithmetic_result() && !has_debug_trap() &&
-          !should_echo_expanded();
-      let const number = can_use_folded_result
-                             ? segment.get_folded_arithmetic_result()
-                             : evaluate_arithmetic_cached(segment);
-      char buffer[24];
-      do_emit_run(utils::int_to_text_into(number, buffer, sizeof(buffer)),
-                  false);
+      let const number = evaluate_arithmetic_cached_text(segment);
+      do_emit_run(number.view(), false);
     } break;
     }
   }

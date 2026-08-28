@@ -260,22 +260,20 @@ struct conditional_evaluator
 
     /* The arithmetic comparison operands are full expressions, so 1+1 and a
        bare variable name evaluate. An empty operand reads as zero. */
-    let const do_to_number = [&](StringView operand) throws -> i64 {
+    let const do_normalize = [&](StringView operand) throws -> StringView {
       for (usize i = 0; i < operand.length; i++) {
-        if (operand[i] != ' ' && operand[i] != '\t') {
-          return cxt.evaluate_arithmetic(operand);
-        }
+        if (operand[i] != ' ' && operand[i] != '\t') return operand;
       }
-      return 0;
+      return "0";
     };
-    let const left_number = do_to_number(left);
-    let const right_number = do_to_number(right);
-    if (op == "-eq") return left_number == right_number;
-    if (op == "-ne") return left_number != right_number;
-    if (op == "-lt") return left_number < right_number;
-    if (op == "-le") return left_number <= right_number;
-    if (op == "-gt") return left_number > right_number;
-    return left_number >= right_number;
+    let const ordering =
+        cxt.compare_arithmetic(do_normalize(left), do_normalize(right));
+    if (op == "-eq") return ordering == 0;
+    if (op == "-ne") return ordering != 0;
+    if (op == "-lt") return ordering < 0;
+    if (op == "-le") return ordering <= 0;
+    if (op == "-gt") return ordering > 0;
+    return ordering >= 0;
   }
 
   fn eval_primary() throws -> bool

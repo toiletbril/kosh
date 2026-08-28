@@ -13,6 +13,9 @@ echo "=== parentheses and power ==="
 echo "=== 128-bit in the default mood ==="
 "$BIN" -c 'koshkit calc "2 ** 100"'
 
+echo "=== beyond 128-bit in the default mood ==="
+"$BIN" -c 'koshkit calc "2 ** 256"'
+
 echo "=== signed 128-bit minimum ==="
 "$BIN" -c 'koshkit calc -- "-170141183460469231731687303715884105728"'
 "$BIN" -c 'koshkit calc "(2 ** 127) / -1"'
@@ -60,7 +63,7 @@ unset KOSH_FLAGS
 # calc reports a located error with a caret under the offending token rather than
 # a flat message, and with -i it reads expressions interactively, evaluating each
 # piped line and continuing past a bad one.
-echo "== a located error carets the bad token:"
+echo "== a decimal divisor preserves decimal arithmetic:"
 "$BIN" -c 'koshkit calc 2312312 / 1323.0' 2>&1
 echo "== a valid expression prints the value:"
 "$BIN" -c "koshkit calc '2 + 3 * 4'" 2>&1

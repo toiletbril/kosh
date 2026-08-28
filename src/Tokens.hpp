@@ -33,8 +33,10 @@ struct arith_token
 struct arith_token_cache
 {
   ArrayList<arith_token> tokens{heap_allocator()};
+  String exact_constant_text{heap_allocator()};
   bool is_tokenized{false};
   bool is_simple{false};
+  bool has_exact_constant_text{false};
 };
 
 /* The evaluation state of one segment. A literal segment never reaches

@@ -1015,12 +1015,16 @@ public:
   fn evaluate_arithmetic(StringView expression,
                          const SourceLocation *expression_base = nullptr) throws
       -> i64;
-
-  /* Evaluate an expression for the calc builtin and return its decimal text,
-     setting out_nonzero for the exit status. In the default mood the value is
-     computed in 128 bits, while the bash and posix moods keep the 64-bit wrap
-     evaluate_arithmetic gives. */
-  fn evaluate_arithmetic_wide(StringView expression, bool &out_nonzero) throws
+  fn evaluate_arithmetic_text(
+      StringView expression,
+      const SourceLocation *expression_base = nullptr) throws -> String;
+  fn evaluate_calculator_arithmetic_text(StringView expression) throws
+      -> String;
+  fn evaluate_arithmetic_nonzero(
+      StringView expression,
+      const SourceLocation *expression_base = nullptr) throws -> bool;
+  fn compare_arithmetic(StringView left, StringView right) throws -> i32;
+  fn evaluate_arithmetic_cached_text(const WordSegment &segment) throws
       -> String;
 
   /* The same value as evaluate_arithmetic, but a substitution-free expression
@@ -1035,6 +1039,10 @@ public:
       StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
       bool &is_simple, const SourceLocation *source_location = nullptr) throws
       -> i64;
+  fn evaluate_arithmetic_cached_clause_nonzero(
+      StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
+      bool &is_simple, const SourceLocation *source_location = nullptr) throws
+      -> bool;
 
   /* Evaluate a [[ ]] conditional element list and report whether it is true.
      The operands expand without field splitting, == and != glob match their

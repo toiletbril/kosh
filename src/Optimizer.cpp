@@ -681,8 +681,14 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
 
   let const value = try_fold_constant_arithmetic(trimmed);
   if (!value.has_value()) return false;
+  bool is_exact_nonzero;
+  try {
+    is_exact_nonzero = evaluate_constant_arithmetic_nonzero(trimmed, true);
+  } catch (const Error &) {
+    return false;
+  }
 
-  loop_node->set_folded_condition(*value);
+  loop_node->set_folded_condition(*value, is_exact_nonzero);
   LOG(All, "folded the c-style for condition '%.*s' to %lld",
       static_cast<int>(trimmed.length), trimmed.data,
       static_cast<long long>(*value));
@@ -698,7 +704,7 @@ fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
      no-op. */
   let const init_is_blank =
       trim_arithmetic_whitespace(loop_node->init_clause()).length == 0;
-  if (*value == 0 && init_is_blank) {
+  if (*value == 0 && !is_exact_nonzero && init_is_blank) {
     loop_node->set_fully_eliminated();
     actx.optimizer_eliminated_count++;
     if (actx.should_report_optimizer_diagnostics)

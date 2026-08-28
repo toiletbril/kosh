@@ -1,9 +1,9 @@
+#include "ArbitraryArithmetic.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "ErrorOr.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
-#include "EvalArithmeticInternal.hpp"
 #include "Lexer.hpp"
 #include "Maybe.hpp"
 #include "Tokens.hpp"
@@ -13,6 +13,8 @@
 namespace koshka {
 
 namespace {
+
+using arithmetic_internal::ArithmeticValue;
 
 pure fn fold_leading_digits(StringView text, u32 radix) wontthrow -> u64
 {
@@ -137,19 +139,32 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
 }
 
 static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
+static fn lex_exact_arith_number(StringView from, ArithmeticValue *out_value,
+                                 Allocator allocator) throws -> usize;
 
-hot static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64;
+hot static fn arith_apply_binop(char kind, const ArithmeticValue &lhs,
+                                const ArithmeticValue &rhs, bool is_exact,
+                                Allocator allocator) throws -> ArithmeticValue;
 
 /* A recursive-descent evaluator for $((...)) following C operator precedence.
  */
 class ArithmeticParser
 {
 public:
+  ArithmeticParser(EvalContext *context_value, StringView source_value,
+                   bool is_exact_value, Allocator allocator_value,
+                   usize depth_value = 0, bool is_skipping = false)
+      : context{context_value}, source{source_value}, pos{0},
+        is_exact{is_exact_value}, depth{depth_value},
+        m_is_skipping{is_skipping}, allocator{allocator_value}
+  {}
+
   /* Null only on the analyze-time constant fold, where no variable read and no
      assignment path that dereferences the context is reached. */
   EvalContext *context;
   StringView source;
   usize pos;
+  bool is_exact{false};
 
   usize depth{0};
   static constexpr usize MAX_DEPTH = 128;
@@ -158,16 +173,19 @@ public:
      are parsed to consume their tokens, this flag makes their assignments skip
      the store. */
   bool m_is_skipping{false};
+  bool should_error_unset{false};
 
   Maybe<SourceLocation> precise_base{};
+  Allocator allocator;
 
   [[noreturn]] cold fn fail(StringView message, StringView note = {}) throws
       -> void
   {
     if (precise_base.has_value()) {
-      let const error_position = pos < source.length ? pos
-                                 : source.is_empty() ? 0
-                                                     : source.length - 1;
+      let const error_position = should_error_unset    ? pos
+                                 : pos < source.length ? pos
+                                 : source.is_empty()   ? 0
+                                                       : source.length - 1;
       const SourceLocation location{precise_base->position + error_position, 1,
                                     precise_base->source_name_index};
       if (note.is_empty()) throw ErrorWithLocation{location, message};
@@ -182,6 +200,8 @@ public:
                                  StringView message,
                                  StringView note = {}) throws -> void
   {
+    if (should_error_unset) fail(message, note);
+
     while (end_position > start_position && (source[end_position - 1] == ' ' ||
                                              source[end_position - 1] == '\t' ||
                                              source[end_position - 1] == '\n' ||
@@ -217,8 +237,11 @@ public:
     return arithmetic_internal::consume(source, pos, op);
   }
 
-  fn read_variable_value(StringView name) throws -> i64
+  fn read_variable_value(StringView name, usize name_position) throws
+      -> ArithmeticValue
   {
+    if (m_is_skipping) return ArithmeticValue{};
+
     ASSERT(context != nullptr);
     if (let const *stored = context->lookup_shell_variable(name);
         stored != nullptr)
@@ -228,26 +251,41 @@ public:
 
     let const value = context->get_variable_value(name);
     if (!value.has_value()) {
+      if (should_error_unset && !m_is_skipping) {
+        let const message = "The variable '" + String{name} + "' is not set";
+        if (precise_base.has_value()) {
+          throw ErrorWithLocation{
+              SourceLocation{precise_base->position + name_position,
+                             name.length, precise_base->source_name_index},
+              message.view()
+          };
+        }
+        throw Error{steal(message)};
+      }
       /* An unset name reports under the strict mood, a skipped ternary branch
          never does. */
       if (!m_is_skipping) context->report_unset_reference(name);
-      return 0;
+      return ArithmeticValue{};
     }
     return evaluate_operand_value(value->view());
   }
 
-  fn evaluate_operand_value(StringView value) throws -> i64
+  fn evaluate_operand_value(StringView value) throws -> ArithmeticValue
   {
-    if (value.is_empty()) return 0;
-    if (let const literal = try_parse_single_integer_literal(value);
-        literal.has_value())
-      return literal.value();
+    if (value.is_empty()) return ArithmeticValue{};
+    if (!is_exact) {
+      if (let const literal = try_parse_single_integer_literal(value);
+          literal.has_value())
+        return ArithmeticValue{literal.value()};
+    }
 
     if (depth >= MAX_DEPTH)
       fail("The variable value recurses too deeply",
            "A variable value refers back to itself");
 
-    ArithmeticParser nested{context, value, 0, depth + 1, m_is_skipping};
+    ArithmeticParser nested{context,   value,     is_exact,
+                            allocator, depth + 1, m_is_skipping};
+    nested.should_error_unset = should_error_unset;
     return nested.parse();
   }
 
@@ -263,19 +301,20 @@ public:
     return source.substring_of_length(name_start, pos - name_start);
   }
 
-  fn write_variable(StringView name, i64 value) const throws -> void
+  fn write_variable(StringView name, const ArithmeticValue &value) const throws
+      -> void
   {
     if (m_is_skipping) return;
     ASSERT(context != nullptr);
-    char buffer[24];
-    context->set_shell_variable(
-        name, utils::int_to_text_into(value, buffer, sizeof(buffer)));
+    let const text = value.to_string(context->scratch_allocator());
+    context->set_shell_variable(name, text.view());
   }
 
   struct lvalue
   {
     StringView name;
     Maybe<StringView> subscript;
+    usize name_position;
   };
 
   /* Nested brackets are balanced so a[b[0]] reads the whole inner expression.
@@ -307,62 +346,80 @@ public:
 
   fn read_lvalue() throws -> lvalue
   {
+    skip_spaces();
+    let const name_position = pos;
     let const name = read_lvalue_name();
-    if (name.is_empty()) return lvalue{name, None};
-    return lvalue{name, read_optional_subscript()};
+    if (name.is_empty()) return lvalue{name, None, name_position};
+    return lvalue{name, read_optional_subscript(), name_position};
   }
 
-  fn read_lvalue_value(const lvalue &target) throws -> i64
+  fn read_lvalue_value(const lvalue &target) throws -> ArithmeticValue
   {
+    if (m_is_skipping) return ArithmeticValue{};
+
     if (target.subscript.has_value()) {
       ASSERT(context != nullptr);
       let const value = context->read_array_element_arithmetic_text(
           target.name, *target.subscript);
       return evaluate_operand_value(value.view());
     }
-    return read_variable_value(target.name);
+    return read_variable_value(target.name, target.name_position);
   }
 
-  fn write_lvalue(const lvalue &target, i64 value) const throws -> void
+  fn write_lvalue(const lvalue &target,
+                  const ArithmeticValue &value) const throws -> void
   {
     if (m_is_skipping) return;
     if (target.subscript.has_value()) {
       ASSERT(context != nullptr);
-      char buffer[24];
-      context->assign_array_element(
-          target.name, *target.subscript,
-          utils::int_to_text_into(value, buffer, sizeof(buffer)), false);
+      let const text = value.to_string(context->scratch_allocator());
+      context->assign_array_element(target.name, *target.subscript, text.view(),
+                                    false);
       return;
     }
     write_variable(target.name, value);
   }
 
-  fn prefix_step(i64 delta, usize operator_position) throws -> i64
+  fn prefix_step(i64 delta, usize operator_position) throws -> ArithmeticValue
   {
     const lvalue target = read_lvalue();
     if (target.name.is_empty())
       fail_span(operator_position, operator_position + 2,
                 "Expected a variable after '++' or '--'",
                 "'++' and '--' step a variable, not a value");
-    const i64 updated = arithmetic_add(read_lvalue_value(target), delta);
+    let const updated =
+        arith_apply_binop('+', read_lvalue_value(target),
+                          ArithmeticValue{delta}, is_exact, allocator);
     write_lvalue(target, updated);
     return updated;
   }
 
-  fn postfix_step(const lvalue &target, i64 delta) throws -> i64
+  fn postfix_step(const lvalue &target, i64 delta) throws -> ArithmeticValue
   {
-    const i64 original = read_lvalue_value(target);
-    write_lvalue(target, arithmetic_add(original, delta));
+    let const original = read_lvalue_value(target);
+    write_lvalue(target,
+                 arith_apply_binop('+', original, ArithmeticValue{delta},
+                                   is_exact, allocator));
     return original;
   }
 
-  fn parse() throws -> i64
+  fn parse() throws -> ArithmeticValue
   {
     skip_spaces();
-    if (pos == source.length) return 0;
+    if (pos == source.length) return ArithmeticValue{};
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) {
+      if (should_error_unset && precise_base.has_value()) {
+        throw ErrorWithLocationAndDetails{
+            SourceLocation{precise_base->position + pos, source.length - pos,
+                           precise_base->source_name_index},
+            "Unexpected '" + String{source.substring(pos)}
+            +
+                "' after the expression",
+            "An operator is missing between two values"
+        };
+      }
       fail("Unexpected '" + String{source.substring(pos)} +
                "' after the expression",
            "An operator is missing between two values");
@@ -370,15 +427,15 @@ public:
     return result;
   }
 
-  fn parse_comma() throws -> i64
+  fn parse_comma() throws -> ArithmeticValue
   {
-    i64 result = parse_assignment();
+    let result = parse_assignment();
     while (consume(","))
       result = parse_assignment();
     return result;
   }
 
-  fn parse_assignment() throws -> i64
+  fn parse_assignment() throws -> ArithmeticValue
   {
     /* Try a bare name on the left and rewind when no assignment operator
        follows it. */
@@ -389,7 +446,7 @@ public:
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         pos++;
       let const name = source.substring_of_length(name_start, pos - name_start);
-      const lvalue target{name, read_optional_subscript()};
+      const lvalue target{name, read_optional_subscript(), name_start};
 
       struct compound_operator
       {
@@ -418,8 +475,8 @@ public:
         for (let const &[ op, kind ] : compound_operators) {
           if (consume(op)) {
             let const rhs = parse_assignment();
-            let const result =
-                arith_apply_binop(kind, read_lvalue_value(target), rhs);
+            let const result = arith_apply_binop(
+                kind, read_lvalue_value(target), rhs, is_exact, allocator);
             write_lvalue(target, result);
             return result;
           }
@@ -438,7 +495,8 @@ public:
 
   /* The flag is saved and restored so a nested skip inside an already-skipped
      region stays skipped. */
-  fn parse_skipped(i64 (ArithmeticParser::*parse_branch)()) throws -> i64
+  fn parse_skipped(ArithmeticValue (ArithmeticParser::*parse_branch)()) throws
+      -> ArithmeticValue
   {
     let const was_skipping = m_is_skipping;
     m_is_skipping = true;
@@ -446,11 +504,11 @@ public:
     return (this->*parse_branch)();
   }
 
-  fn parse_ternary() throws -> i64
+  fn parse_ternary() throws -> ArithmeticValue
   {
     let const condition = parse_binary(1);
     if (consume("?")) {
-      if (condition != 0) {
+      if (!condition.is_zero()) {
         let const if_true = parse_assignment();
         if (!consume(":"))
           fail("Expected ':' in a conditional", "A '?' needs a matching ':'");
@@ -537,7 +595,7 @@ public:
 
   /* One precedence-climbing loop, one frame for a whole run of operators. The
      nine cascade levels showed up whole in the profile. */
-  fn parse_binary(u8 min_precedence) throws -> i64
+  fn parse_binary(u8 min_precedence) throws -> ArithmeticValue
   {
     skip_spaces();
     let const lhs_start = pos;
@@ -549,8 +607,8 @@ public:
       pos += op.length;
 
       if (op.kind == 'A' || op.kind == 'O') {
-        let const lhs_decides = (op.kind == 'A') == (lhs == 0);
-        i64 rhs = 0;
+        let const lhs_decides = (op.kind == 'A') == lhs.is_zero();
+        let rhs = ArithmeticValue{};
         if (lhs_decides) {
           let const was_skipping = m_is_skipping;
           m_is_skipping = true;
@@ -559,54 +617,61 @@ public:
         } else {
           rhs = parse_binary(op.precedence + 1);
         }
-        lhs = op.kind == 'A' ? ((lhs != 0 && rhs != 0) ? 1 : 0)
-                             : ((lhs != 0 || rhs != 0) ? 1 : 0);
+        lhs = ArithmeticValue{
+            op.kind == 'A' ? ((!lhs.is_zero() && !rhs.is_zero()) ? 1 : 0)
+                           : ((!lhs.is_zero() || !rhs.is_zero()) ? 1 : 0)};
         continue;
       }
 
       /* ** is right-associative so it re-enters at its own precedence. */
       let const rhs =
           parse_binary(op.kind == 'P' ? op.precedence : op.precedence + 1);
+      if (m_is_skipping) {
+        lhs = ArithmeticValue{};
+        continue;
+      }
       switch (op.kind) {
       case 'P':
-        if (rhs < 0) {
+        if (rhs.is_negative()) {
           if (m_is_skipping) {
-            lhs = 0;
+            lhs = ArithmeticValue{};
             break;
           }
           fail_span(lhs_start, pos, "Exponent less than 0",
                     "'**' requires a non-negative exponent");
         }
-        lhs = arithmetic_power(lhs, rhs);
+        lhs = arith_apply_binop('P', lhs, rhs, is_exact, allocator);
         break;
       case '/':
-        if (rhs == 0) {
+        if (rhs.is_zero()) {
           if (m_is_skipping) {
-            lhs = 0;
+            lhs = ArithmeticValue{};
             break;
           }
           fail_span(lhs_start, pos, "Division by zero",
                     "The right operand evaluated to 0");
         }
-        lhs = arithmetic_divide(lhs, rhs);
+        lhs = arith_apply_binop('/', lhs, rhs, is_exact, allocator);
         break;
       case '%':
-        if (rhs == 0) {
+        if (rhs.is_zero()) {
           if (m_is_skipping) {
-            lhs = 0;
+            lhs = ArithmeticValue{};
             break;
           }
           fail_span(lhs_start, pos, "Division by zero",
                     "The right operand evaluated to 0");
         }
-        lhs = arithmetic_modulo(lhs, rhs);
+        lhs = arith_apply_binop('%', lhs, rhs, is_exact, allocator);
         break;
-      default: lhs = arith_apply_binop(op.kind, lhs, rhs); break;
+      default:
+        lhs = arith_apply_binop(op.kind, lhs, rhs, is_exact, allocator);
+        break;
       }
     }
   }
 
-  fn parse_unary() throws -> i64
+  fn parse_unary() throws -> ArithmeticValue
   {
     /* The doubled operators are checked before single + and - so a leading ++
        or -- is read as one prefix step. */
@@ -622,20 +687,23 @@ public:
       let const operator_position = pos;
       if (consume("--")) return prefix_step(-1, operator_position);
       pos++;
-      return arithmetic_subtract(0, parse_unary());
+      return arith_apply_binop('-', ArithmeticValue{}, parse_unary(), is_exact,
+                               allocator);
     }
     if (first == '!') {
       pos++;
-      return parse_unary() == 0 ? 1 : 0;
+      return ArithmeticValue{parse_unary().is_zero() ? 1 : 0};
     }
     if (first == '~') {
       pos++;
-      return ~parse_unary();
+      let const value = parse_unary();
+      return is_exact ? ArithmeticValue::bit_not(value, allocator)
+                      : ArithmeticValue{~value.wrapped_i64()};
     }
     return parse_primary();
   }
 
-  fn parse_primary() throws -> i64
+  fn parse_primary() throws -> ArithmeticValue
   {
     depth++;
     defer { depth--; };
@@ -650,9 +718,14 @@ public:
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
+      if (is_exact) {
+        let value = ArithmeticValue{};
+        pos += lex_exact_arith_number(source.substring(pos), &value, allocator);
+        return value;
+      }
       i64 value = 0;
       pos += lex_arith_number(source.substring(pos), &value);
-      return value;
+      return ArithmeticValue{value};
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
       const lvalue target = read_lvalue();
@@ -729,6 +802,76 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
   return consumed;
 }
 
+static fn lex_exact_arith_number(StringView from, ArithmeticValue *out_value,
+                                 Allocator allocator) throws -> usize
+{
+  let const do_count_digits = [](StringView text, u32 radix)
+                                  wontthrow -> usize {
+    usize digit_count = 0;
+
+    while (digit_count < text.length) {
+      let const byte = text[digit_count];
+      i32 digit = -1;
+      if (byte >= '0' && byte <= '9')
+        digit = byte - '0';
+      else if (byte >= 'a' && byte <= 'z')
+        digit = byte - 'a' + 10;
+      else if (byte >= 'A' && byte <= 'Z')
+        digit = radix <= 36 ? byte - 'A' + 10 : byte - 'A' + 36;
+      else if (byte == '@')
+        digit = 62;
+      else if (byte == '_')
+        digit = 63;
+      if (digit < 0 || static_cast<u32>(digit) >= radix) break;
+      digit_count++;
+    }
+
+    return digit_count;
+  };
+
+  if (let const base_length =
+          arithmetic_internal::count_leading_digits(from, 10);
+      base_length > 0 && base_length < from.length && from[base_length] == '#')
+  {
+    let const base =
+        parse_arithmetic_operand(from.substring_of_length(0, base_length));
+    if (base < 2 || base > 64) {
+      throw ErrorWithDetails{"The arithmetic base must be between 2 and 64",
+                             "Use `base#digits` with a base from 2 to 64"};
+    }
+
+    let const digit_count = do_count_digits(from.substring(base_length + 1),
+                                            static_cast<u32>(base));
+    let const consumed = base_length + 1 + digit_count;
+    *out_value = ArithmeticValue::parse(
+        from.substring_of_length(base_length + 1, digit_count),
+        static_cast<u32>(base), allocator);
+    return consumed;
+  }
+
+  let const decimal_integer_count =
+      arithmetic_internal::count_leading_digits(from, 10);
+  if (decimal_integer_count < from.length && from[decimal_integer_count] == '.')
+  {
+    let const fractional_count = arithmetic_internal::count_leading_digits(
+        from.substring(decimal_integer_count + 1), 10);
+    let const consumed = decimal_integer_count + 1 + fractional_count;
+    *out_value = ArithmeticValue::parse_decimal(
+        from.substring_of_length(0, consumed), allocator);
+    return consumed;
+  }
+
+  let const detected = arithmetic_internal::detect_radix_prefix(from);
+  let digit_count = arithmetic_internal::count_leading_digits(
+      from.substring(detected.prefix_length), detected.radix);
+  if (digit_count == 0 && detected.prefix_length == 0) digit_count = 1;
+  let const consumed = detected.prefix_length + digit_count;
+  *out_value = ArithmeticValue::parse(
+      from.substring_of_length(detected.prefix_length, digit_count),
+      detected.radix, allocator);
+  return consumed;
+}
+
 /* Longest first so the scan munches maximally, <<= before << before <. */
 static const StringView ARITH_OPERATORS[] = {
     "<<=", ">>=", "**", "<<", ">>", "<=", ">=", "==", "!=", "&&",
@@ -751,7 +894,12 @@ static fn tokenize_arithmetic(StringView src,
     }
     if (lexer::is_number(current_byte)) {
       i64 value = 0;
-      let const consumed = lex_arith_number(src.substring(i), &value);
+      let consumed = lex_arith_number(src.substring(i), &value);
+      if (i + consumed < src.length && src[i + consumed] == '.') {
+        consumed++;
+        consumed += arithmetic_internal::count_leading_digits(
+            src.substring(i + consumed), 10);
+      }
       out.push(arith_token{arith_token::kind::number, value,
                            src.substring_of_length(i, consumed)});
       i += consumed;
@@ -825,6 +973,9 @@ arith_tokens_are_simple(const ArrayList<arith_token> &toks) wontthrow -> bool
 {
   for (let const &t : toks) {
     if (t.k == arith_token::kind::subscript) return false;
+    if (t.k == arith_token::kind::number &&
+        t.text.find_character('.').has_value())
+      return false;
     if (t.k == arith_token::kind::op && arith_op_is_complex(t.text)) {
       return false;
     }
@@ -868,41 +1019,81 @@ static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
 
 /* Uses the same helpers as the char parser's ladder so the fast path and the
    full parser agree. */
-hot static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
+hot static fn arith_apply_binop(char kind, const ArithmeticValue &lhs,
+                                const ArithmeticValue &rhs, bool is_exact,
+                                Allocator allocator) throws -> ArithmeticValue
 {
+  if (!is_exact) {
+    let const left = lhs.wrapped_i64();
+    let const right = rhs.wrapped_i64();
+    switch (kind) {
+    case 'P':
+      if (right < 0) {
+        throw ErrorWithDetails{"Exponent less than 0",
+                               "'**' requires a non-negative exponent"};
+      }
+      return ArithmeticValue{arithmetic_power(left, right)};
+    case '*': return ArithmeticValue{arithmetic_multiply(left, right)};
+    case '/':
+      if (right == 0) {
+        throw ErrorWithDetails{"Division by zero",
+                               "The right operand evaluated to 0"};
+      }
+      return ArithmeticValue{arithmetic_divide(left, right)};
+    case '%':
+      if (right == 0) {
+        throw ErrorWithDetails{"Division by zero",
+                               "The right operand evaluated to 0"};
+      }
+      return ArithmeticValue{arithmetic_modulo(left, right)};
+    case '+': return ArithmeticValue{arithmetic_add(left, right)};
+    case '-': return ArithmeticValue{arithmetic_subtract(left, right)};
+    case 'L': return ArithmeticValue{arithmetic_shift_left(left, right)};
+    case 'R': return ArithmeticValue{arithmetic_shift_right(left, right)};
+    case '<': return ArithmeticValue{left < right ? 1 : 0};
+    case 'l': return ArithmeticValue{left <= right ? 1 : 0};
+    case '>': return ArithmeticValue{left > right ? 1 : 0};
+    case 'g': return ArithmeticValue{left >= right ? 1 : 0};
+    case 'e': return ArithmeticValue{left == right ? 1 : 0};
+    case 'n': return ArithmeticValue{left != right ? 1 : 0};
+    case '&': return ArithmeticValue{left & right};
+    case '^': return ArithmeticValue{left ^ right};
+    case '|': return ArithmeticValue{left | right};
+    default:
+      unreachable("the cached arithmetic evaluator received invalid binary "
+                  "operator '%c'",
+                  kind);
+    }
+  }
+
   switch (kind) {
-  case 'P':
-    if (rhs < 0) {
-      throw ErrorWithDetails{"Exponent less than 0",
-                             "'**' requires a non-negative exponent"};
-    }
-    return arithmetic_power(lhs, rhs);
-  case '*': return arithmetic_multiply(lhs, rhs);
+  case 'P': return ArithmeticValue::power(lhs, rhs, allocator);
+  case '*': return ArithmeticValue::multiply(lhs, rhs, allocator);
   case '/':
-    if (rhs == 0) {
+    if (rhs.is_zero()) {
       throw ErrorWithDetails{"Division by zero",
                              "The right operand evaluated to 0"};
     }
-    return arithmetic_divide(lhs, rhs);
+    return ArithmeticValue::divide(lhs, rhs, allocator);
   case '%':
-    if (rhs == 0) {
+    if (rhs.is_zero()) {
       throw ErrorWithDetails{"Division by zero",
                              "The right operand evaluated to 0"};
     }
-    return arithmetic_modulo(lhs, rhs);
-  case '+': return arithmetic_add(lhs, rhs);
-  case '-': return arithmetic_subtract(lhs, rhs);
-  case 'L': return arithmetic_shift_left(lhs, rhs);
-  case 'R': return arithmetic_shift_right(lhs, rhs);
-  case '<': return lhs < rhs ? 1 : 0;
-  case 'l': return lhs <= rhs ? 1 : 0;
-  case '>': return lhs > rhs ? 1 : 0;
-  case 'g': return lhs >= rhs ? 1 : 0;
-  case 'e': return lhs == rhs ? 1 : 0;
-  case 'n': return lhs != rhs ? 1 : 0;
-  case '&': return lhs & rhs;
-  case '^': return lhs ^ rhs;
-  case '|': return lhs | rhs;
+    return ArithmeticValue::modulo(lhs, rhs, allocator);
+  case '+': return ArithmeticValue::add(lhs, rhs, allocator);
+  case '-': return ArithmeticValue::subtract(lhs, rhs, allocator);
+  case 'L': return ArithmeticValue::shift_left(lhs, rhs, allocator);
+  case 'R': return ArithmeticValue::shift_right(lhs, rhs, allocator);
+  case '<': return ArithmeticValue{lhs.compare(rhs, allocator) < 0 ? 1 : 0};
+  case 'l': return ArithmeticValue{lhs.compare(rhs, allocator) <= 0 ? 1 : 0};
+  case '>': return ArithmeticValue{lhs.compare(rhs, allocator) > 0 ? 1 : 0};
+  case 'g': return ArithmeticValue{lhs.compare(rhs, allocator) >= 0 ? 1 : 0};
+  case 'e': return ArithmeticValue{lhs.compare(rhs, allocator) == 0 ? 1 : 0};
+  case 'n': return ArithmeticValue{lhs.compare(rhs, allocator) != 0 ? 1 : 0};
+  case '&': return ArithmeticValue::bit_and(lhs, rhs, allocator);
+  case '^': return ArithmeticValue::bit_xor(lhs, rhs, allocator);
+  case '|': return ArithmeticValue::bit_or(lhs, rhs, allocator);
   default:
     unreachable("the cached arithmetic evaluator received invalid binary "
                 "operator '%c'",
@@ -910,34 +1101,41 @@ hot static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
   }
 }
 
-static fn evaluate_named_value_operand(EvalContext *context,
-                                       StringView value) throws -> i64
+static fn evaluate_named_value_operand(EvalContext *context, StringView value,
+                                       bool is_exact,
+                                       Allocator allocator) throws
+    -> ArithmeticValue
 {
-  if (value.is_empty()) return 0;
-  if (let const literal = try_parse_single_integer_literal(value);
-      literal.has_value())
-    return literal.value();
+  if (value.is_empty()) return ArithmeticValue{};
+  if (!is_exact) {
+    if (let const literal = try_parse_single_integer_literal(value);
+        literal.has_value())
+      return ArithmeticValue{literal.value()};
+  }
 
-  ArithmeticParser nested{context, value, 0};
+  ArithmeticParser nested{context, value, is_exact, allocator};
   return nested.parse();
 }
 
-static fn arith_read_variable(EvalContext *context, StringView name) throws
-    -> i64
+static fn arith_read_variable(EvalContext *context, StringView name,
+                              bool is_exact, Allocator allocator) throws
+    -> ArithmeticValue
 {
   ASSERT(context != nullptr);
   if (let const *stored = context->lookup_shell_variable(name);
       stored != nullptr)
   {
-    return evaluate_named_value_operand(context, stored->view());
+    return evaluate_named_value_operand(context, stored->view(), is_exact,
+                                        allocator);
   }
   let const value = context->get_variable_value(name);
   if (!value.has_value()) {
     context->report_unset_reference(name);
-    return 0;
+    return ArithmeticValue{};
   }
 
-  return evaluate_named_value_operand(context, value->view());
+  return evaluate_named_value_operand(context, value->view(), is_exact,
+                                      allocator);
 }
 
 /* A precedence-climbing evaluator over the cached token stream for a simple
@@ -945,10 +1143,19 @@ static fn arith_read_variable(EvalContext *context, StringView name) throws
 class ArithmeticTokenEvaluator
 {
 public:
+  ArithmeticTokenEvaluator(EvalContext *context_value,
+                           const ArrayList<arith_token> &tokens_value,
+                           bool is_exact_value, Allocator allocator_value)
+      : context{context_value}, toks{tokens_value}, is_exact{is_exact_value},
+        allocator{allocator_value}
+  {}
+
   EvalContext *context;
   const ArrayList<arith_token> &toks;
   usize ti{0};
   usize depth{0};
+  bool is_exact{false};
+  Allocator allocator;
   static constexpr usize MAX_DEPTH = 128;
 
   pure fn at_op(StringView s) wontthrow -> bool
@@ -957,7 +1164,7 @@ public:
            toks[ti].text == s;
   }
 
-  hot flatten fn parse_operand() throws -> i64
+  hot flatten fn parse_operand() throws -> ArithmeticValue
   {
     depth++;
     defer { depth--; };
@@ -972,15 +1179,18 @@ public:
     }
     if (at_op("-")) {
       ti++;
-      return arithmetic_subtract(0, parse_operand());
+      return arith_apply_binop('-', ArithmeticValue{}, parse_operand(),
+                               is_exact, allocator);
     }
     if (at_op("!")) {
       ti++;
-      return parse_operand() == 0 ? 1 : 0;
+      return ArithmeticValue{parse_operand().is_zero() ? 1 : 0};
     }
     if (at_op("~")) {
       ti++;
-      return ~parse_operand();
+      let const value = parse_operand();
+      return is_exact ? ArithmeticValue::bit_not(value, allocator)
+                      : ArithmeticValue{~value.wrapped_i64()};
     }
     if (at_op("(")) {
       ti++;
@@ -992,14 +1202,15 @@ public:
       return value;
     }
     if (ti < toks.count() && toks[ti].k == arith_token::kind::number) {
-      let const value = toks[ti].value;
+      let value = ArithmeticValue{toks[ti].value};
+      if (is_exact) lex_exact_arith_number(toks[ti].text, &value, allocator);
       ti++;
       return value;
     }
     if (ti < toks.count() && toks[ti].k == arith_token::kind::name) {
       let const name = toks[ti].text;
       ti++;
-      return arith_read_variable(context, name);
+      return arith_read_variable(context, name, is_exact, allocator);
     }
     if (ti >= toks.count())
       throw ErrorWithDetails{"Unfinished expression", "An operand is missing"};
@@ -1007,7 +1218,7 @@ public:
                            "This is not a valid operator or operand"};
   }
 
-  fn parse_binary(u8 min_precedence) throws -> i64
+  fn parse_binary(u8 min_precedence) throws -> ArithmeticValue
   {
     let lhs = parse_operand();
     loop
@@ -1020,13 +1231,13 @@ public:
       ti++;
       let const rhs =
           parse_binary(op.kind == 'P' ? op.precedence : op.precedence + 1);
-      lhs = arith_apply_binop(op.kind, lhs, rhs);
+      lhs = arith_apply_binop(op.kind, lhs, rhs, is_exact, allocator);
     }
   }
 
-  fn run() throws -> i64
+  fn run() throws -> ArithmeticValue
   {
-    if (toks.is_empty()) return 0;
+    if (toks.is_empty()) return ArithmeticValue{};
     let const result = parse_binary(1);
     if (ti != toks.count()) {
       throw ErrorWithDetails{"Unexpected '" + String{toks[ti].text} +
@@ -1037,7 +1248,7 @@ public:
   }
 };
 
-} /* namespace */
+} // namespace
 
 fn EvalContext::read_array_element_arithmetic_text(StringView name,
                                                    StringView subscript) throws
@@ -1046,29 +1257,190 @@ fn EvalContext::read_array_element_arithmetic_text(StringView name,
   return apply_array_subscript(name, subscript);
 }
 
-fn EvalContext::evaluate_arithmetic(
-    StringView expression, const SourceLocation *expression_base) throws -> i64
+namespace {
+
+fn evaluate_arithmetic_value(EvalContext *context, StringView expression,
+                             const SourceLocation *expression_base,
+                             bool is_exact, Allocator allocator,
+                             bool should_error_unset = false) throws
+    -> ArithmeticValue
 {
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
 
-  /* A source with no parameter to expand, the d=$((d+1)) hot loop case, skips
-     the expansion copy and parses directly. */
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
-    let parser = ArithmeticParser{this, expression, 0};
+    let parser = ArithmeticParser{context, expression, is_exact, allocator};
+    parser.should_error_unset = should_error_unset;
     if (expression_base != nullptr) parser.precise_base = *expression_base;
     return parser.parse();
   }
 
-  /* The expanded word owns the bytes the parser views, so it outlives the
-     parser. */
   LOG(All, "expanding parameters inside the arithmetic before the parse");
   let const expanded_word =
-      expand_modifier_word(expression, true, true, expression_base);
-  let parser = ArithmeticParser{this, expanded_word.view(), 0};
+      context->expand_modifier_word(expression, true, true, expression_base);
+  let parser =
+      ArithmeticParser{context, expanded_word.view(), is_exact, allocator};
+  parser.should_error_unset = should_error_unset;
   return parser.parse();
+}
+
+} /* namespace */
+
+fn EvalContext::evaluate_arithmetic(
+    StringView expression, const SourceLocation *expression_base) throws -> i64
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  let const value = evaluate_arithmetic_value(this, expression, expression_base,
+                                              is_exact, scratch_allocator());
+  return is_exact ? value.checked_i64() : value.wrapped_i64();
+}
+
+fn EvalContext::evaluate_arithmetic_text(
+    StringView expression, const SourceLocation *expression_base) throws
+    -> String
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  let const value = evaluate_arithmetic_value(this, expression, expression_base,
+                                              is_exact, scratch_allocator());
+  return value.to_string(heap_allocator());
+}
+
+fn EvalContext::evaluate_calculator_arithmetic_text(
+    StringView expression) throws -> String
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  const SourceLocation expression_base{0, 0};
+  let const value = evaluate_arithmetic_value(
+      this, expression, &expression_base, is_exact, scratch_allocator(), true);
+  return value.to_string(heap_allocator());
+}
+
+fn EvalContext::evaluate_arithmetic_nonzero(
+    StringView expression, const SourceLocation *expression_base) throws -> bool
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  return !evaluate_arithmetic_value(this, expression, expression_base, is_exact,
+                                    scratch_allocator())
+              .is_zero();
+}
+
+fn EvalContext::compare_arithmetic(StringView left, StringView right) throws
+    -> i32
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  let const left_value = evaluate_arithmetic_value(
+      this, left, nullptr, is_exact, scratch_allocator());
+  let const right_value = evaluate_arithmetic_value(
+      this, right, nullptr, is_exact, scratch_allocator());
+  return left_value.compare(right_value, scratch_allocator());
+}
+
+namespace {
+
+fn evaluate_arithmetic_cached_value(EvalContext *context, StringView expression,
+                                    ArrayList<arith_token> &tokens,
+                                    bool &is_tokenized, bool &is_simple,
+                                    const SourceLocation *source_location,
+                                    bool is_exact, Allocator allocator) throws
+    -> ArithmeticValue
+{
+  if (!is_tokenized) {
+    if (expression.find_character('$').has_value() ||
+        expression.find_character('`').has_value())
+    {
+      return evaluate_arithmetic_value(context, expression, source_location,
+                                       is_exact, allocator);
+    }
+
+    tokens.clear();
+    try {
+      tokenize_arithmetic(expression, tokens);
+    } catch (...) {
+      tokens.clear();
+      is_tokenized = true;
+      is_simple = false;
+      return evaluate_arithmetic_value(context, expression, source_location,
+                                       is_exact, allocator);
+    }
+    is_tokenized = true;
+    is_simple = arith_tokens_are_simple(tokens);
+  }
+
+  if (!is_simple)
+    return evaluate_arithmetic_value(context, expression, source_location,
+                                     is_exact, allocator);
+
+  ArithmeticTokenEvaluator evaluator{context, tokens, is_exact, allocator};
+  return evaluator.run();
+}
+
+} /* namespace */
+
+fn EvalContext::evaluate_arithmetic_cached_text(
+    const WordSegment &segment) throws -> String
+{
+  let const source_location =
+      segment.get_source_location(m_current_location.source_name_index);
+  let cache_arena = segment.is_substitution_cache_in_function_arena
+                        ? FUNCTION_ARENA
+                        : AST_ARENA;
+  if (cache_arena == nullptr)
+    return evaluate_arithmetic_text(
+        segment.text.view(),
+        source_location.has_value() ? &*source_location : nullptr);
+
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let &cache = segment.get_eval_cache();
+  if (cache.arith == nullptr ||
+      !cache_arena->is_lifetime_valid(cache.arithmetic_lifetime))
+  {
+    cache.arith = cache_arena->create<arith_token_cache>();
+    cache.arithmetic_lifetime = cache_arena->register_lifetime();
+  }
+
+  let const is_exact = mood() == mimic_mood::Default;
+  if (is_exact && cache.arith->has_exact_constant_text) {
+    return String{heap_allocator(), cache.arith->exact_constant_text.view()};
+  }
+  let const value = evaluate_arithmetic_cached_value(
+      this, segment.text.view(), cache.arith->tokens, cache.arith->is_tokenized,
+      cache.arith->is_simple,
+      source_location.has_value() ? &*source_location : nullptr, is_exact,
+      scratch_allocator());
+  let result = value.to_string(heap_allocator());
+  if (is_exact && cache.arith->is_tokenized && cache.arith->is_simple) {
+    let is_constant = true;
+
+    for (let const &token : cache.arith->tokens) {
+      if (token.k == arith_token::kind::name ||
+          token.k == arith_token::kind::subscript)
+      {
+        is_constant = false;
+        break;
+      }
+    }
+
+    if (is_constant) {
+      cache.arith->exact_constant_text =
+          String{heap_allocator(), result.view()};
+      cache.arith->has_exact_constant_text = true;
+    }
+  }
+
+  return result;
 }
 
 fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
@@ -1104,38 +1476,60 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
     StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
     bool &is_simple, const SourceLocation *source_location) throws -> i64
 {
-  if (!is_tokenized) {
-    if (expression.find_character('$').has_value() ||
-        expression.find_character('`').has_value())
-    {
-      return evaluate_arithmetic(expression, source_location);
-    }
-
-    tokens.clear();
-    try {
-      tokenize_arithmetic(expression, tokens);
-    } catch (...) {
-      tokens.clear();
-      is_tokenized = true;
-      is_simple = false;
-      return evaluate_arithmetic(expression, source_location);
-    }
-    is_tokenized = true;
-    is_simple = arith_tokens_are_simple(tokens);
-  }
-
-  if (!is_simple) return evaluate_arithmetic(expression, source_location);
-
-  ArithmeticTokenEvaluator evaluator{this, tokens};
-  return evaluator.run();
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  let const value = evaluate_arithmetic_cached_value(
+      this, expression, tokens, is_tokenized, is_simple, source_location,
+      is_exact, scratch_allocator());
+  return is_exact ? value.checked_i64() : value.wrapped_i64();
 }
+
+fn EvalContext::evaluate_arithmetic_cached_clause_nonzero(
+    StringView expression, ArrayList<arith_token> &tokens, bool &is_tokenized,
+    bool &is_simple, const SourceLocation *source_location) throws -> bool
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  let const is_exact = mood() == mimic_mood::Default;
+  return !evaluate_arithmetic_cached_value(
+              this, expression, tokens, is_tokenized, is_simple,
+              source_location, is_exact, scratch_allocator())
+              .is_zero();
+}
+
+namespace {
+
+fn get_constant_arithmetic_arena() wontthrow -> BumpArena &
+{
+  static thread_local BumpArena arena;
+
+  return arena;
+}
+
+} /* namespace */
 
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64
 {
   /* The optimizer has proven the expression holds no variable and no
      assignment, so a null context is never dereferenced. */
-  let parser = ArithmeticParser{nullptr, expression, 0};
-  return parser.parse();
+  let &arena = get_constant_arithmetic_arena();
+  let const scratch = arena.mark();
+  defer { arena.release(scratch); };
+  let parser =
+      ArithmeticParser{nullptr, expression, false, bump_allocator(arena)};
+  return parser.parse().wrapped_i64();
+}
+
+fn evaluate_constant_arithmetic_nonzero(StringView expression,
+                                        bool is_exact) throws -> bool
+{
+  let &arena = get_constant_arithmetic_arena();
+  let const scratch = arena.mark();
+  defer { arena.release(scratch); };
+  let parser =
+      ArithmeticParser{nullptr, expression, is_exact, bump_allocator(arena)};
+  return !parser.parse().is_zero();
 }
 
 } /* namespace koshka */

@@ -1090,10 +1090,6 @@ note: Quote the delimiter to send the body unexpanded.
     71 |    echo $((a / b * c))
        |            ^~~~~~~~~
 note: Write `a*c/b` to multiply first.
-73:11: warning: The decimal '1.5' is a syntax error in shell arithmetic. (SC2079)
-    73 |    echo $((1.5 + 2))
-       |            ^~~~~~~
-note: Compute the value with `bc` or `awk`.
 74:11: warning: The literal '010' begins with a zero and is read in base eight. (SC2080)
     74 |    echo $((010 + 1))
        |            ^~~~~~~
@@ -1177,5 +1173,5 @@ note: Write `swallowed=$(printf)` to store its output, or quote the name.
     42 |    pager=cat
        |    ^~~~~~~~~
 note: Write `pager=$(cat)` to store its output, or quote the name.
-Encountered 69 warnings.
+Encountered 68 warnings.
 [Code 0]

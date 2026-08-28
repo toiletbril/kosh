@@ -1,0 +1,278 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign value=$(( 2 ** 9999 ))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#value"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$value:0:20"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$value: -20"]
+  [CompoundListCondition, None]
+    [Assign formula=value]
+  [CompoundListCondition, None]
+    [FunctionDefinition "promoted_step"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "chosen" "previous" "combined"]
+          [CompoundListCondition, None]
+            [Assign chosen=$((1 ? formula + iteration + 1 : 0))]
+          [CompoundListCondition, None]
+            [Assign previous=$((chosen++))]
+          [CompoundListCondition, None]
+            [Assign combined=$((previous, chosen))]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [ArithmeticCommand "previous != formula + iteration + 1 ||
+      chosen != formula + iteration + 2 || combined != chosen"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Assign lifetime=bad]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [ArithmeticCommand "iteration == 255"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "previous=%s:%s\n" "$#previous" "$previous: -20"]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "chosen=%s:%s\n" "$#chosen" "$chosen: -20"]
+                [CompoundListCondition, None]
+                  [SimpleCommand "printf" "combined=%s:%s\n" "$#combined" "$combined: -20"]
+  [CompoundListCondition, None]
+    [Assign iteration=0]
+  [CompoundListCondition, None]
+    [Assign lifetime=ok]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ArithmeticCommand "iteration < 256"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "promoted_step"]
+        [CompoundListCondition, None]
+          [Assign iteration=$((iteration + 1))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lifetime=$lifetime"]
+[Word
+  Unquoted "value="
+  ArithmeticExpansion " 2 ** 9999 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#value"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "value:0:20"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "value: -20"
+]
+[Word
+  Unquoted "formula=value"
+]
+[Word
+  Unquoted "promoted_step"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "chosen"
+]
+[Word
+  Unquoted "previous"
+]
+[Word
+  Unquoted "combined"
+]
+[Word
+  Unquoted "chosen="
+  ArithmeticExpansion "1 ? formula + iteration + 1 : 0"
+]
+[Word
+  Unquoted "previous="
+  ArithmeticExpansion "chosen++"
+]
+[Word
+  Unquoted "combined="
+  ArithmeticExpansion "previous, chosen"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "previous"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "formula"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "iteration"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "chosen"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "formula"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "iteration"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "combined"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "chosen"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "lifetime=bad"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "iteration"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "255"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "previous=%s:%s\n"
+]
+[Word
+  Variable "#previous"
+]
+[Word
+  Variable "previous: -20"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "chosen=%s:%s\n"
+]
+[Word
+  Variable "#chosen"
+]
+[Word
+  Variable "chosen: -20"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "combined=%s:%s\n"
+]
+[Word
+  Variable "#combined"
+]
+[Word
+  Variable "combined: -20"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "iteration=0"
+]
+[Word
+  Unquoted "lifetime=ok"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "iteration"
+]
+[Word
+  Unquoted "256"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "promoted_step"
+]
+[Word
+  Unquoted "iteration="
+  ArithmeticExpansion "iteration + 1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "lifetime="
+  Variable "lifetime"
+]
+3010
+99753155844037919244
+40887152396298354688
+previous=3010:40887152396298354944
+chosen=3010:40887152396298354945
+combined=3010:40887152396298354945
+lifetime=ok
+[Code 0]

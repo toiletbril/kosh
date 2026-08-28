@@ -190,12 +190,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        receives the decimal result. */
     let const is_integer_name = cxt.is_integer_variable(name.view());
     if (has_new_value && is_integer_name) {
-      char result_text[24];
-      value = String{
-          cxt.scratch_allocator(),
-          utils::int_to_text_into(
-              value.is_empty() ? 0 : cxt.evaluate_arithmetic(value.view()),
-              result_text, sizeof(result_text))};
+      value = value.is_empty() ? String{cxt.scratch_allocator(), "0"}
+                               : cxt.evaluate_arithmetic_text(value.view());
     }
 
     /* The unset here is this move, not a user unset, so the integer mark it

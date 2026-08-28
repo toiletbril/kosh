@@ -1,0 +1,13 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 << -1))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 << -1"
+]
+3:6: error: Shift count is negative.
+     3 |  echo $((1 << -1))
+       |       ^~~~~~~~~~~~
+note: An exact shift requires a non-negative count.

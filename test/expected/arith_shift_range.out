@@ -6,6 +6,12 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$(( 1 >> 64 ))"]
   [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1267650600228229401496703205381 << 37 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1267650600228229401496703205381 >> 37 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "bash"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "$(( 1 << -1 ))"]
 [Word
   Unquoted "echo"
@@ -29,10 +35,33 @@
   Unquoted "echo"
 ]
 [Word
+  ArithmeticExpansion " 1267650600228229401496703205381 << 37 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1267650600228229401496703205381 >> 37 "
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "bash"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
   ArithmeticExpansion " 1 << -1 "
 ]
-1
-2
-1
+18446744073709551616
+36893488147419103232
+0
+174224571863520493293247799005752519032832
+9223372036854775808
 -9223372036854775808
 [Code 0]

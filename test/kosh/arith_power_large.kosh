@@ -1,0 +1,38 @@
+#!/bin/env kosh
+
+value=$(( 2 ** 9999 ))
+echo "${#value}"
+echo "${value:0:20}"
+echo "${value: -20}"
+
+formula=value
+
+promoted_step()
+{
+  local chosen previous combined
+
+  chosen=$((1 ? formula + iteration + 1 : 0))
+  previous=$((chosen++))
+  combined=$((previous, chosen))
+
+  if ((previous != formula + iteration + 1 ||
+      chosen != formula + iteration + 2 || combined != chosen)); then
+    lifetime=bad
+  fi
+
+  if ((iteration == 255)); then
+    printf 'previous=%s:%s\n' "${#previous}" "${previous: -20}"
+    printf 'chosen=%s:%s\n' "${#chosen}" "${chosen: -20}"
+    printf 'combined=%s:%s\n' "${#combined}" "${combined: -20}"
+  fi
+}
+
+iteration=0
+lifetime=ok
+
+while ((iteration < 256)); do
+  promoted_step
+  iteration=$((iteration + 1))
+done
+
+echo "lifetime=$lifetime"

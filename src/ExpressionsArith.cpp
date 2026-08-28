@@ -528,17 +528,17 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* A non-zero value is success and zero is failure, the opposite of the
      value-to-status convention elsewhere. */
-  i64 value;
+  bool is_nonzero;
   try {
     const SourceLocation body_base{source_location().position + 2, 0,
                                    source_location().source_name_index};
-    value = cxt.evaluate_arithmetic(m_expression, &body_base);
+    is_nonzero = cxt.evaluate_arithmetic_nonzero(m_expression, &body_base);
   } catch (const ErrorWithLocation &) {
     throw;
   } catch (const Error &e) {
     relocate_error(e, source_location());
   }
-  const i64 status = value != 0 ? 0 : 1;
+  const i64 status = is_nonzero ? 0 : 1;
   cxt.publish_single_pipe_status(static_cast<i32>(status));
   SET_AND_RETURN_EXIT_STATUS(cxt, status);
 }
@@ -675,7 +675,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       static_cast<int>(m_condition.length), m_condition.data,
       static_cast<int>(m_step.length), m_step.data);
 
-  if (!is_blank_clause(m_init)) cxt.evaluate_arithmetic(m_init);
+  if (!is_blank_clause(m_init)) cxt.evaluate_arithmetic_nonzero(m_init);
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
@@ -683,10 +683,10 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const condition_is_blank = is_blank_clause(m_condition);
   let const step_is_blank = is_blank_clause(m_step);
 
-  let const do_evaluate_condition = [&]() throws -> i64 {
+  let const do_evaluate_condition = [&]() throws -> bool {
     let &cache = get_clause_cache(m_condition_cache);
 
-    return cxt.evaluate_arithmetic_cached_clause(
+    return cxt.evaluate_arithmetic_cached_clause_nonzero(
         m_condition, cache.tokens, cache.is_tokenized, cache.is_simple);
   };
 
@@ -694,8 +694,10 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (condition_is_blank ||
          (m_folded_condition.has_value() && can_skip_condition_commands
-              ? (*m_folded_condition != 0)
-              : do_evaluate_condition() != 0))
+              ? (cxt.mood() == mimic_mood::Default
+                     ? m_is_exact_folded_condition_nonzero
+                     : *m_folded_condition != 0)
+              : do_evaluate_condition()))
   {
     ret = m_body->evaluate(cxt);
     if (cxt.no_exec()) break;
@@ -704,7 +706,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
        continue. */
     if (!step_is_blank) {
       let &cache = get_clause_cache(m_step_cache);
-      cxt.evaluate_arithmetic_cached_clause(
+      cxt.evaluate_arithmetic_cached_clause_nonzero(
           m_step, cache.tokens, cache.is_tokenized, cache.is_simple);
     }
   }
@@ -776,9 +778,12 @@ pure fn CStyleForLoop::init_clause() const wontthrow -> StringView
   return m_init;
 }
 
-fn CStyleForLoop::set_folded_condition(i64 value) const wontthrow -> void
+fn CStyleForLoop::set_folded_condition(i64 compatibility_value,
+                                       bool is_exact_nonzero) const wontthrow
+    -> void
 {
-  m_folded_condition = value;
+  m_folded_condition = compatibility_value;
+  m_is_exact_folded_condition_nonzero = is_exact_nonzero;
 }
 
 pure fn CStyleForLoop::has_folded_condition() const wontthrow -> bool

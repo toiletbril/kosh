@@ -236,6 +236,10 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "calc" "1 ? 5 : undefined_var"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "1 ? 5 : 1 << -1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "1 ? 5 : 2 ** 18446744073709551616"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "calc" "0 ? c=5 : 9"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "c=[$c-unset]"]
@@ -286,6 +290,23 @@
           [SimpleCommand "echo" "sub3"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "backoff=$?"]
+  [CompoundListCondition, None]
+    [ForLoop "arithmetic_mood"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "--mood" "$arithmetic_mood"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$((18446744073709551616 + 1))"]
+  [CompoundListCondition, None]
+    [Assign big=18446744073709551616]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "big += 5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$big"]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "big"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "big_status=$?"]
 [Word
   Unquoted "echo"
 ]
@@ -989,6 +1010,24 @@
   Unquoted "calc"
 ]
 [Word
+  Literal "1 ? 5 : 1 << -1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "1 ? 5 : 2 ** 18446744073709551616"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
   Literal "0 ? c=5 : 9"
 ]
 [Word
@@ -1123,6 +1162,76 @@
 ]
 [Word
   DoubleQuoted "backoff="
+  Variable "?"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "arithmetic_mood"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "default"
+]
+[Word
+  Unquoted "bash"
+]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "default"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Variable "arithmetic_mood"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "18446744073709551616 + 1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "big=18446744073709551616"
+]
+[Word
+  Unquoted "big"
+]
+[Word
+  Unquoted "+="
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "big"
+]
+[Word
+  Unquoted "big"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "big_status="
   Variable "?"
 ]
 31:23: warning: An unquoted variable can split into words and expand globs. (SC2086)
@@ -1276,6 +1385,8 @@ fact=120
 5
 7
 5
+5
+5
 9
 c=[0]
 ge=yes
@@ -1290,4 +1401,10 @@ sub1
 sub2
 sub3
 backoff=0
+18446744073709551617
+1
+1
+18446744073709551617
+18446744073709551621
+big_status=0
 [Code 0]

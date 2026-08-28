@@ -1,0 +1,42 @@
+#!/bin/env kosh
+
+echo $((1.25 + 2.5))
+echo $((1.20 + 2.3))
+echo $((1.5 * 2.00))
+echo $((5 / 2.0))
+echo $((1.0 / 3))
+echo $((5.5 % 2))
+echo $((1.5 ** 2))
+echo $((123456789012345678901234567890.123 + 0.877))
+echo $((999999999999999999999999999999.9 > 2.0))
+decimal_value=1.25
+((decimal_value += 2.50))
+echo "$decimal_value"
+koshkit calc '999999999999999999999999999999.9 * 10.0'
+
+decimal_formula=999999999999999999999999999999.9
+
+decimal_step()
+{
+  local decimal_result
+
+  decimal_result=$((decimal_formula + decimal_iteration + 0.1))
+
+  if ((decimal_result != decimal_formula + decimal_iteration + 0.1)); then
+    decimal_lifetime=bad
+  fi
+
+  if ((decimal_iteration == 255)); then
+    printf 'decimal=%s:%s\n' "${#decimal_result}" "${decimal_result: -20}"
+  fi
+}
+
+decimal_iteration=0
+decimal_lifetime=ok
+
+while ((decimal_iteration < 256)); do
+  decimal_step
+  decimal_iteration=$((decimal_iteration + 1))
+done
+
+echo "decimal_lifetime=$decimal_lifetime"

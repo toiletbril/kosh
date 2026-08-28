@@ -461,11 +461,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       appended.append(existing->view());
     if (cxt.is_integer_variable(name)) {
       cxt.append_integer_expression(appended, value_ref.view());
-      char decimal[24];
-      value_ref = String{
-          cxt.scratch_allocator(),
-          utils::int_to_text_into(cxt.evaluate_arithmetic(appended.view()),
-                                  decimal, sizeof(decimal))};
+      value_ref = cxt.evaluate_arithmetic_text(appended.view());
     } else {
       appended += value_ref;
       value_ref = steal(appended);

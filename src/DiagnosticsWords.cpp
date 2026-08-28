@@ -436,7 +436,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
       }
 
       let const dot = word.find_character('.');
-      if (dot.has_value() && *dot + 1 < word.length &&
+      if (!actx.is_default_mood && dot.has_value() && *dot + 1 < word.length &&
           lexer::is_number(word[*dot + 1]) && !has_reported_decimal)
       {
         actx.report_diagnostic(diagnostic_id::sc2079, location, {word});

@@ -7,6 +7,26 @@
     [SimpleCommand "echo" "$((10%3))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((1<<4))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((2 ** 256))"]
+  [CompoundListCondition, None]
+    [CStyleForLoop "; 2 ** 64;"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "exact-loop"]
+        [CompoundListCondition, None]
+          [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "bash"]
+  [CompoundListCondition, None]
+    [CStyleForLoop "; 2 ** 64;"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "wrapped-loop"]
+        [CompoundListCondition, None]
+          [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-loops"]
 [Word
   Unquoted "echo"
 ]
@@ -31,8 +51,86 @@
 [Word
   ArithmeticExpansion "1<<4"
 ]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "2 ** 256"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "**"
+]
+[Word
+  Unquoted "64"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "exact-loop"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "bash"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "**"
+]
+[Word
+  Unquoted "64"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "wrapped-loop"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-loops"
+]
 14
 15
 1
 16
+115792089237316195423570985008687907853269984665640564039457584007913129639936
+exact-loop
+after-loops
 [Code 0]

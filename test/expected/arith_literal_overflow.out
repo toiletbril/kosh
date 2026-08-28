@@ -13,6 +13,8 @@
     [SimpleCommand "echo" "$(( 020000000000000000000000 ))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$(( 99999999999999999999 + 1 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 0xffffffffffffffffffffffffffffffffffffffff ))"]
 [Word
   Unquoted "echo"
 ]
@@ -55,11 +57,18 @@
 [Word
   ArithmeticExpansion " 99999999999999999999 + 1 "
 ]
-0
-1
--9223372036854775808
--1
-5
-0
-7766279631452241920
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 0xffffffffffffffffffffffffffffffffffffffff "
+]
+18446744073709551616
+18446744073709551617
+9223372036854775808
+18446744073709551615
+18446744073709551621
+147573952589676412928
+100000000000000000000
+1461501637330902918203684832716283019655932542975
 [Code 0]

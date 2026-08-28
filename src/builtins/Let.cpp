@@ -38,7 +38,7 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Debug, "let evaluating %zu arithmetic expressions",
       ec.args().count() - 1);
 
-  i64 last_value = 0;
+  bool is_last_nonzero = false;
   for (usize i = 1; i < ec.args().count(); i++) {
     let expression_base = ec.arg_location_at(i);
     if (let const source = cxt.current_source(); source != nullptr) {
@@ -56,8 +56,8 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     try {
-      last_value =
-          cxt.evaluate_arithmetic(ec.args()[i].view(), &expression_base);
+      is_last_nonzero = cxt.evaluate_arithmetic_nonzero(ec.args()[i].view(),
+                                                        &expression_base);
     } catch (const ErrorWithLocation &error) {
       let const message = builtin_error_message(ec.program(), error.message());
       if (cxt.is_bash_compatible()) {
@@ -94,7 +94,7 @@ fn Let::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  return last_value != 0 ? 0 : 1;
+  return is_last_nonzero ? 0 : 1;
 }
 
 } /* namespace koshka */

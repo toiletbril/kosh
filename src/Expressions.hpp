@@ -1366,7 +1366,8 @@ public:
      zero, so the folding rule keeps the loop alive to run it. */
   pure fn init_clause() const wontthrow -> StringView;
 
-  fn set_folded_condition(i64 value) const wontthrow -> void;
+  fn set_folded_condition(i64 compatibility_value,
+                          bool is_exact_nonzero) const wontthrow -> void;
   pure fn has_folded_condition() const wontthrow -> bool;
 
   fn as_cstyle_for_loop() const wontthrow -> const CStyleForLoop * override;
@@ -1385,6 +1386,7 @@ protected:
   const Expression *m_body;
 
   mutable Maybe<i64> m_folded_condition{};
+  mutable bool m_is_exact_folded_condition_nonzero{false};
 
   /* A loop that is only analyzed never tokenizes a clause, so each cache is
      allocated on the first evaluation that needs it. */

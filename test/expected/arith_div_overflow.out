@@ -3,6 +3,18 @@
     [SimpleCommand "echo" "$(( (-9223372036854775807 - 1) / -1 ))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$(( (-9223372036854775807 - 1) % -1 ))"]
+  [CompoundListCondition, None]
+    [Assign n=1606938044258990275541962092341162602522202993782792835301375]
+  [CompoundListCondition, None]
+    [Assign d=1267650600228229401496703205379]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( n / d ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( n % d ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( -n / d ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( -n % d ))"]
 [Word
   Unquoted "echo"
 ]
@@ -15,6 +27,40 @@
 [Word
   ArithmeticExpansion " (-9223372036854775807 - 1) % -1 "
 ]
--9223372036854775808
+[Word
+  Unquoted "n=1606938044258990275541962092341162602522202993782792835301375"
+]
+[Word
+  Unquoted "d=1267650600228229401496703205379"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " n / d "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " n % d "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " -n / d "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " -n % d "
+]
+9223372036854775808
 0
+1267650600228229401496703205373
+8
+-1267650600228229401496703205373
+-8
 [Code 0]

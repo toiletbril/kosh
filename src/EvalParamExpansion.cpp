@@ -429,12 +429,11 @@ fn EvalContext::expand_modifier_word_worker(
       }
       let inner_location = SourceLocation{};
       let const inner_source = word.substring_of_length(i + 3, inner.count());
-      do_emit_run(String::from(evaluate_arithmetic(
-                                   inner, source_location_for_subview(
-                                              source_location, word,
-                                              inner_source, inner_location)),
-                               scratch_allocator()),
-                  false);
+      do_emit_run(
+          evaluate_arithmetic_text(
+              inner, source_location_for_subview(source_location, word,
+                                                 inner_source, inner_location)),
+          false);
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). A quote run

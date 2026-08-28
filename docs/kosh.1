@@ -728,6 +728,12 @@ octal, 0b binary, or a base prefix such as 16#ff. A variable value is
 re-evaluated as an arithmetic expression. Nested subscripts such as a[b[c]] are
 resolved from the inner expression outward. An empty (( )) command returns one.
 An empty $(( )) expansion produces zero.
+.PP
+The default mood evaluates integers with arbitrary precision. Compatibility
+moods use signed 64-bit arithmetic with wrapping operations. The default mood
+also accepts finite base-10 decimal literals. Addition and subtraction use the
+larger operand scale. Multiplication adds the operand scales. Division and
+remainder use the larger operand scale and truncate toward zero.
 .SS Command substitution
 The forms $(command) and `command` replace a command with its output. A command
 substitution restores runtime state, shell options, directory stack, working
@@ -1184,6 +1190,7 @@ Arithmetic operands are evaluated. The
 and
 .BR \-p ", " \-\-pipe
 options read expressions interactively or from a pipe.
+The active mood selects arbitrary precision or signed 64-bit arithmetic.
 .TP
 .B cat
 Files or standard input are concatenated. The

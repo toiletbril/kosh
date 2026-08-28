@@ -91,6 +91,8 @@ echo $(( 0 ? 1/0 : 7 ))
 koshkit calc '1 ? 5 : 1/0'
 koshkit calc '0 ? 1/0 : 7'
 koshkit calc '1 ? 5 : undefined_var'
+koshkit calc '1 ? 5 : 1 << -1'
+koshkit calc '1 ? 5 : 2 ** 18446744073709551616'
 koshkit calc '0 ? c=5 : 9'
 echo "c=[${c-unset}]"
 
@@ -106,3 +108,13 @@ echo "status_true=$?"
 ((0)); echo "status_false=$?"
 ((echo sub1; echo sub2;); echo sub3)
 echo "backoff=$?"
+
+for arithmetic_mood in default bash sh default; do
+  set --mood "$arithmetic_mood"
+  echo $((18446744073709551616 + 1))
+done
+big=18446744073709551616
+((big += 5))
+echo "$big"
+((big))
+echo "big_status=$?"

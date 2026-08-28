@@ -3,3 +3,14 @@ echo $((2+3*4))
 echo $(( ((2+3)) * (4-1) ))
 echo $((10%3))
 echo $((1<<4))
+echo $((2 ** 256))
+for ((; 2 ** 64;)); do
+  echo exact-loop
+  break
+done
+set --mood bash
+for ((; 2 ** 64;)); do
+  echo wrapped-loop
+  break
+done
+echo after-loops

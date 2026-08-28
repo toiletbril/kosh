@@ -40,9 +40,8 @@ namespace {
 fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
                 StringView expression) throws -> i32
 {
-  let is_nonzero = false;
   try {
-    let result = cxt.evaluate_arithmetic_wide(expression, is_nonzero);
+    let result = cxt.evaluate_calculator_arithmetic_text(expression);
     result += '\n';
     ec.print_to_stdout(result);
     return 0;
