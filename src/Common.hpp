@@ -53,7 +53,7 @@
 #define KOSH_VER_MAJOR 0
 #define KOSH_VER_MINOR 2
 #define KOSH_VER_PATCH 0
-#define KOSH_VER_EXTRA "rc1"
+#define KOSH_VER_EXTRA "rc2"
 
 #define KOSH_STRINGIFY_INNER(x) #x
 #define KOSH_STRINGIFY(x)       KOSH_STRINGIFY_INNER(x)
