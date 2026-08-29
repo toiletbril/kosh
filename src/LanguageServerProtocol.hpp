@@ -10,6 +10,7 @@
 #include "Lexer.hpp"
 #include "MimicMood.hpp"
 #include "Parser.hpp"
+#include "ParserFormats.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
@@ -654,12 +655,14 @@ public:
         language_id(document_language),
         normalized_source(source),
         version(document_version),
+        analysis_source(heap_allocator()),
         line_starts(heap_allocator()),
         diagnostics(heap_allocator()),
         auxiliary_diagnostics(heap_allocator()),
         followed_paths(heap_allocator())
   {
     normalized_source.normalize_crlf_line_endings();
+    rebuild_format();
     rebuild_lines();
   }
 
@@ -675,6 +678,7 @@ public:
     normalized_source = steal(replacement);
     /* A recorded position belongs to one revision. */
     symbol_records.clear();
+    rebuild_format();
     rebuild_lines();
 
     return true;
@@ -773,6 +777,8 @@ public:
   String language_id;
   String normalized_source;
   i64 version;
+  parsed_format_document format;
+  String analysis_source;
   mimic_mood mood{mimic_mood::Default};
   u64 diagnostic_revision{0};
   Maybe<Path> path;
@@ -782,6 +788,27 @@ public:
   ArrayList<source_diagnostic> auxiliary_diagnostics;
   HashSet followed_paths;
   analysis_symbol_records symbol_records;
+
+  fn rebuild_format() throws -> void
+  {
+    let path_view = Maybe<StringView>{};
+    if (path.has_value()) path_view = path->text().view();
+    format = parse_format_document(parser_format_input{
+        normalized_source.view(), path_view, language_id.view()});
+    analysis_source =
+        parser_format_analysis_source(format, normalized_source.view());
+  }
+
+  pure fn shell_source() const wontthrow -> StringView
+  {
+    return analysis_source.view();
+  }
+
+  pure fn fragment_at(usize position) const wontthrow -> Maybe<usize>
+  {
+    if (!format.is_host_format) return usize{0};
+    return parser_format_fragment_at(format, position);
+  }
 
 private:
   fn rebuild_lines() throws -> void

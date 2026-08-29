@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ParserFormats.hpp"
+
 namespace koshka {
 
 fn kosh_binary_flag_list() wontthrow -> const FlagList & { return FLAG_LIST; }
@@ -336,7 +338,8 @@ static fn run_script_contents(
     Maybe<StringView> filename = None, Expression *precompiled_ast = nullptr,
     Expression **out_ast = nullptr, Maybe<usize> history_event_number = None,
     analysis_diagnostic_totals *diagnostic_totals = nullptr,
-    ArrayList<source_diagnostic> *diagnostic_sink = nullptr) -> int
+    ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
+    bool should_require_shebang = true) -> int
 {
   i32 exit_code = EXIT_FAILURE;
 
@@ -507,7 +510,8 @@ static fn run_script_contents(
             context.mood() == mimic_mood::Default,
             context.annoying_diagnostics_enabled(), shellcheck_suppressions,
             analysis_scope_definitions, shellcheck_directive_spans,
-            heredoc_terminator_misses, filename.has_value(),
+            heredoc_terminator_misses,
+            should_require_shebang && filename.has_value(),
             FLAG_OPTIMIZER_DIAGNOSTICS.is_enabled(), &followed_source_paths,
             &source_effects_cache, nullptr, diagnostic_totals, true, true,
             nullptr, diagnostic_sink, nullptr, nullptr, units);
@@ -645,6 +649,64 @@ static fn run_script_contents(
   }
 
   return exit_code;
+}
+
+static fn run_lint_document_contents(
+    const String &source, EvalContext &context, BumpArena &ast_arena,
+    Maybe<StringView> filename,
+    analysis_diagnostic_totals *diagnostic_totals = nullptr,
+    ArrayList<source_diagnostic> *diagnostic_sink = nullptr) throws -> int
+{
+  let const document =
+      parse_format_document(parser_format_input{source.view(), filename, None});
+  if (!document.is_host_format)
+    return run_script_contents(source, context, ast_arena, filename, nullptr,
+                               nullptr, None, diagnostic_totals,
+                               diagnostic_sink);
+
+  let const saved_mood = context.mood();
+  let const saved_warning_level = context.warning_level();
+  defer
+  {
+    context.set_mood(saved_mood);
+    context.set_warning_level(saved_warning_level);
+  };
+
+  int status = EXIT_SUCCESS;
+  for (let const &fragment : document.fragments) {
+    context.set_mood(fragment.mood);
+    context.set_warning_level(fragment.mood == mimic_mood::Default ? 0 : 3);
+    let const fragment_status = run_script_contents(
+        fragment.analysis_source, context, ast_arena, filename, nullptr,
+        nullptr, None, diagnostic_totals, diagnostic_sink, false);
+    if (fragment_status != EXIT_SUCCESS) status = fragment_status;
+  }
+
+  return status;
+}
+
+static fn format_document_source(StringView source, Maybe<StringView> filename,
+                                 mimic_mood mood, BumpArena &ast_arena,
+                                 ArrayList<String> &errors) throws
+    -> Maybe<String>
+{
+  let const document =
+      parse_format_document(parser_format_input{source, filename, None});
+  if (!document.is_host_format)
+    return format_shell_source(source, mood, ast_arena, errors);
+
+  let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
+  for (let const &fragment : document.fragments) {
+    let const formatted = format_shell_source(fragment.shell_source.view(),
+                                              fragment.mood, ast_arena, errors);
+    if (!formatted.has_value()) return None;
+    let encoded = parser_format_encode(fragment, formatted->view());
+    if (!encoded.has_value()) return None;
+    replacements.push(parser_format_replacement{
+        fragment.host_start, fragment.host_end, encoded.take()});
+  }
+
+  return parser_format_apply_replacements(source, steal(replacements));
 }
 
 static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
@@ -1187,9 +1249,8 @@ static fn run_format_operation(const ArrayList<String> &file_names,
       let const source_name = file_names.is_empty()
                                   ? Maybe<StringView>{}
                                   : Maybe<StringView>{file_names[input_index]};
-      unused(run_script_contents(normalized_source, context, ast_arena,
-                                 source_name, nullptr, nullptr, None, nullptr,
-                                 &diagnostics));
+      unused(run_lint_document_contents(normalized_source, context, ast_arena,
+                                        source_name, nullptr, &diagnostics));
       let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
 
       for (let const &diagnostic : diagnostics) {
@@ -1220,7 +1281,11 @@ static fn run_format_operation(const ArrayList<String> &file_names,
     }
 
     let errors = ArrayList<String>{heap_allocator()};
-    let formatted = format_shell_source(source.view(), mood, ast_arena, errors);
+    let const source_name = file_names.is_empty()
+                                ? Maybe<StringView>{}
+                                : Maybe<StringView>{file_names[input_index]};
+    let formatted = format_document_source(source.view(), source_name, mood,
+                                           ast_arena, errors);
     if (!formatted.has_value()) {
       for (let const &error : errors)
         show_message(error.view());
@@ -1264,8 +1329,8 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let source = snapshot->contents.clone();
     source.normalize_crlf_line_endings();
     let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
-    unused(run_script_contents(source, context, ast_arena, file_name.view(),
-                               nullptr, nullptr, None, nullptr, &diagnostics));
+    unused(run_lint_document_contents(source, context, ast_arena,
+                                      file_name.view(), nullptr, &diagnostics));
     let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
     let reported_severities = ArrayList<applied_fix_tally>{heap_allocator()};
     for (let const &diagnostic : diagnostics) {
@@ -1302,8 +1367,9 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let final_source = fixed.take();
     if (should_format) {
       let errors = ArrayList<String>{heap_allocator()};
-      let formatted = format_shell_source(final_source.view(), context.mood(),
-                                          ast_arena, errors);
+      let formatted =
+          format_document_source(final_source.view(), file_name.view(),
+                                 context.mood(), ast_arena, errors);
       if (!formatted.has_value()) {
         for (let const &error : errors)
           show_message(error.view());
@@ -1315,9 +1381,9 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let validation_source = final_source.clone();
     validation_source.normalize_crlf_line_endings();
     let validation_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
-    unused(run_script_contents(validation_source, context, ast_arena,
-                               file_name.view(), nullptr, nullptr, None,
-                               nullptr, &validation_diagnostics));
+    unused(run_lint_document_contents(validation_source, context, ast_arena,
+                                      file_name.view(), nullptr,
+                                      &validation_diagnostics));
     bool has_parse_error = false;
     for (let const &diagnostic : validation_diagnostics) {
       if (diagnostic.id.has_value()) continue;
@@ -1349,9 +1415,8 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
 
     let analyzed_source = final_source.clone();
     analyzed_source.normalize_crlf_line_endings();
-    let const final_status = run_script_contents(
-        analyzed_source, context, ast_arena, file_name.view(), nullptr, nullptr,
-        None, &final_totals);
+    let const final_status = run_lint_document_contents(
+        analyzed_source, context, ast_arena, file_name.view(), &final_totals);
     if (final_status != EXIT_SUCCESS) did_fail = true;
   }
   print_applied_fix_summary(applied_tallies);

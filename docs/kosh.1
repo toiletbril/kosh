@@ -180,6 +180,12 @@ A keyword item is a keyword to the client and every other item is a function.
 A command item carries the name it completes, and the help text of that command
 is produced when the client resolves the item, so only the highlighted item
 costs a fork.
+.PP
+The server also recognizes embedded shell regions in the host formats described
+under
+.BR --lint .
+Every language feature is limited to those regions. Host syntax is left to the
+editor's host language service.
 The outline is a tree of
 the function definitions and the variable assignments in the document. An
 assignment inside a function body is a child of that function, and one name
@@ -396,6 +402,16 @@ and
 .B \-\-no\-annoying\-diagnostics
 is overridden. Every startup file is skipped, and the report is free of the
 aliases, functions, and search path of the invoking session.
+.PP
+A named input is detected from its path, extension, and recognizable content.
+Shell commands are extracted from GitHub Actions, Gitea Actions, Forgejo
+Actions, GitLab CI, Ansible, Dockerfile and Containerfile, Compose, Markdown,
+Makefile, Google Cloud Build, CircleCI, Azure Pipelines, Bitbucket Pipelines,
+Buildkite, Travis CI, Kubernetes, package.json scripts, Drone, Woodpecker,
+Taskfile, Justfile, RPM spec files, VSCode tasks, and Dev Container files. Only
+the extracted sh, bash, or kosh source is parsed and diagnosed. Other host text
+produces no shell diagnostic. Jenkinsfile, Terraform, Nix, and an unrecognized
+YAML, JSON, or Markdown host are not treated as whole shell files.
 .PP
 With
 .BR \-\-apply ,

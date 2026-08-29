@@ -1,0 +1,12 @@
+status=0
+embedded-diagnostic=ok
+host-diagnostic=none
+host-shebang=none
+outline=ok
+semantic-tokens=ok
+format-preserves-host=ok
+hover=ok
+definition=ok
+completion=ok
+rename=ok
+code-actions=ok

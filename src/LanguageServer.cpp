@@ -366,6 +366,7 @@ fn Server::open_document(const JsonValue *params) throws -> Document *
   document.path = decode_file_uri(*uri);
   if (document.path.has_value())
     document.canonical_path = os::canonical_path(*document.path);
+  document.rebuild_format();
   document.mood = mood_for(document);
   m_documents.push(steal(document));
 
@@ -492,13 +493,15 @@ fn Server::append_diagnostic(String &output, const Document &document,
 
 fn Server::publish_diagnostics(Document &document) throws -> bool
 {
+  if (document.format.is_host_format && !document.format.fragments.is_empty())
+    document.mood = document.format.fragments[0].mood;
   select_document_mood(document);
   let const arena_mark = m_ast_arena.mark();
   defer { m_ast_arena.release(arena_mark); };
   let const filename = document.path.has_value() ? document.path->text().view()
                                                  : document.uri.view();
   let parser = Parser{
-      Lexer{document.normalized_source.view(), m_ast_arena, false, filename,
+      Lexer{document.shell_source(), m_ast_arena, false, filename,
             m_context.mood()}
   };
   parser.set_should_collect_analysis_scopes(true);
@@ -520,12 +523,12 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
     let source_effects = StringMap<followed_source_effects>{heap_allocator()};
     if (document.canonical_path.has_value())
       followed_paths.add(document.canonical_path->text().view());
-    analyze_ast(ast, document.normalized_source.view(), functions, aliases,
-                &m_context, 3, false, m_context.mood() == mimic_mood::Default,
-                true, suppressions, scopes, directives, heredoc_misses,
-                document.path.has_value(), false, &followed_paths,
-                &source_effects, nullptr, nullptr, true, true, nullptr,
-                &diagnostics, this, &symbol_records);
+    analyze_ast(ast, document.shell_source(), functions, aliases, &m_context, 3,
+                false, m_context.mood() == mimic_mood::Default, true,
+                suppressions, scopes, directives, heredoc_misses,
+                document.path.has_value() && !document.format.is_host_format,
+                false, &followed_paths, &source_effects, nullptr, nullptr, true,
+                true, nullptr, &diagnostics, this, &symbol_records);
     symbol_records.variable_occurrences.sort(
         [](const variable_occurrence_record &left,
            const variable_occurrence_record &right) {
@@ -656,6 +659,10 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   let const cursor = document->byte_position(
       request->position.line, request->position.character, m_encoding);
   if (!cursor.has_value()) return send_result(id, "[]");
+  let const fragment_index = document->fragment_at(*cursor);
+  if (!fragment_index.has_value()) return send_result(id, "[]");
+  if (document->format.is_host_format)
+    document->mood = document->format.fragments[*fragment_index].mood;
   select_document_mood(*document);
   let base_directory = m_workspace_root;
   if (document->path.has_value()) base_directory = document->path->parent();
@@ -668,7 +675,7 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   resolver.begin_explicit_completion(ProgramResolver::CompletionRefresh::Fresh);
   defer { resolver.end_explicit_completion(); };
   let result = completion::complete(
-      document->normalized_source.view(), *cursor, m_context, base_directory,
+      document->shell_source(), *cursor, m_context, base_directory,
       completion::completion_mode::Listing, &document_function_names, true);
   let response = String{"["};
 
@@ -766,8 +773,25 @@ fn Server::format_document(const JsonValue *id, const JsonValue *params) throws
   let const arena_mark = m_ast_arena.mark();
   defer { m_ast_arena.release(arena_mark); };
   let errors = ArrayList<String>{heap_allocator()};
-  let formatted = format_shell_source(document->normalized_source.view(),
-                                      document->mood, m_ast_arena, errors);
+  let formatted = Maybe<String>{};
+  if (!document->format.is_host_format) {
+    formatted = format_shell_source(document->normalized_source.view(),
+                                    document->mood, m_ast_arena, errors);
+  } else {
+    let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
+    for (let const &fragment : document->format.fragments) {
+      let const formatted_fragment = format_shell_source(
+          fragment.shell_source.view(), fragment.mood, m_ast_arena, errors);
+      if (!formatted_fragment.has_value()) break;
+      let encoded = parser_format_encode(fragment, formatted_fragment->view());
+      if (!encoded.has_value()) break;
+      replacements.push(parser_format_replacement{
+          fragment.host_start, fragment.host_end, encoded.take()});
+    }
+    if (errors.is_empty())
+      formatted = parser_format_apply_replacements(
+          document->normalized_source.view(), steal(replacements));
+  }
   if (!formatted.has_value()) {
     let const message =
         errors.is_empty() ? StringView{"Formatting failed."} : errors[0].view();
@@ -1003,9 +1027,15 @@ fn Server::symbol_at(const Document &document,
   if (!byte_position.has_value() ||
       position.line >= document.line_starts.count())
     return None;
+  let const fragment_index = document.fragment_at(*byte_position);
+  if (!fragment_index.has_value()) return None;
+  if (document.format.is_host_format) {
+    m_context.set_mood(document.format.fragments[*fragment_index].mood);
+    m_context.apply_strictness_for_mood();
+  }
   let const[line_start, line_end] = document.get_line_bounds(position.line);
   let const *spans = m_highlight_cache.spans_for(
-      document.normalized_source.view(), line_start, line_end, m_context);
+      document.shell_source(), line_start, line_end, m_context);
 
   let touching = Maybe<document_symbol>{};
 
@@ -1094,7 +1124,7 @@ fn Server::definition_of(const Document &document,
   for (usize line = 0; line < document.line_starts.count(); line++) {
     let const[line_start, line_end] = document.get_line_bounds(line);
     let const *spans = m_highlight_cache.spans_for(
-        document.normalized_source.view(), line_start, line_end, m_context);
+        document.shell_source(), line_start, line_end, m_context);
 
     for (let const &span : *spans) {
       let const role_matches =
@@ -1911,7 +1941,7 @@ fn Server::semantic_tokens(const JsonValue *id, const JsonValue *params) throws
   for (usize line = 0; line < document->line_starts.count(); line++) {
     let const[line_start, line_end] = document->get_line_bounds(line);
     let const *spans = m_highlight_cache.spans_for(
-        document->normalized_source.view(), line_start, line_end, m_context);
+        document->shell_source(), line_start, line_end, m_context);
     for (let const &span : *spans) {
       let const absolute_start = line_start + span.start;
       let const absolute_end = line_start + span.end;

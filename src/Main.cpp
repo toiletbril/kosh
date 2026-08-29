@@ -1223,10 +1223,14 @@ fn main(int argc, char **argv) -> int
 
     if (should_analyze_input) {
       script_contents.normalize_crlf_line_endings();
-      exit_code = run_script_contents(
-          script_contents, context, ast_arena, source_filename, nullptr,
-          nullptr, history_event_number,
-          FLAG_LINT.is_enabled() ? &lint_diagnostic_totals : nullptr);
+      if (FLAG_LINT.is_enabled())
+        exit_code = run_lint_document_contents(script_contents, context,
+                                               ast_arena, source_filename,
+                                               &lint_diagnostic_totals);
+      else
+        exit_code = run_script_contents(script_contents, context, ast_arena,
+                                        source_filename, nullptr, nullptr,
+                                        history_event_number);
     } else {
       exit_code = EXIT_FAILURE;
     }
