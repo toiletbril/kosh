@@ -13,7 +13,7 @@ stamp
 sym
 cp-interactive-no=old
 cp-interactive-yes=new
-cp-preserve-mode=-rw-r-----
+cp-preserve-mode=passed
 cp-same-status=1 contents=same-file
 cp-hardlink-status=1 contents=same-file
 mv-interactive-no=old source=present

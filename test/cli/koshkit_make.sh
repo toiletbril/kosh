@@ -375,24 +375,44 @@ all:
 EOF
 INHERITED=fromenvironment \
   "$BIN" -c 'koshkit make COMMAND=fromcommand'
-cat > shell.mk <<EOF
-SHELL = $TEST_SYSTEM_PATH/echo
+cat > export.mk <<'EOF'
+EXPORTED = frommake
+UNEXPORTED = frommake
+export EXPORTED
+export ASSIGNED := assigned-value
+export UNEXPORTED
+unexport UNEXPORTED
 
 all:
-	@echo shell-selected
+	@echo "exported=$$EXPORTED assigned=$$ASSIGNED unexported=$${UNEXPORTED-unset}"
+EOF
+UNEXPORTED=fromenvironment "$BIN" -c 'koshkit make -f export.mk'
+cat > shell.mk <<'EOF'
+SHELL = $(BIN)
+
+all:
+	@let shell_selected=1; echo shell-selected
 EOF
 shell_result=$("$BIN" -c 'koshkit make -f shell.mk')
 case "$shell_result" in
-  (*'-c echo shell-selected') echo shell-selected=yes ;;
+  (shell-selected) echo shell-selected=yes ;;
   (*) echo "shell-selected=no [$shell_result]" ;;
 esac
 cat > shell-env.mk <<'EOF'
-SHELL = /bin/sh
+SHELL = $(BIN)
 
 all:
 	@echo "shell-env=$$SHELL"
 EOF
 SHELL=inherited-value "$BIN" -c 'koshkit make -f shell-env.mk'
+cat > shell-export.mk <<'EOF'
+SHELL = $(BIN)
+export SHELL
+
+all:
+	@if [ "$$SHELL" = "$$BIN" ]; then echo shell-exported=yes; else echo shell-exported=no; fi
+EOF
+"$BIN" -c 'koshkit make -f shell-export.mk'
 
 echo "--- POSIX graph and inference edge cases ---"
 cat > Makefile <<'EOF'

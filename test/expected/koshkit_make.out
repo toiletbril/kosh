@@ -117,8 +117,10 @@ archive=pkg/lib.a member=obj/member.o archive-dir=pkg archive-file=lib.a
 member-dir=obj member-file=member.o
 --- POSIX recipe environment and shell macro ---
 command=fromcommand inherited=fromfile local=
+exported=frommake assigned=assigned-value unexported=unset
 shell-selected=yes
 shell-env=inherited-value
+shell-exported=yes
 --- POSIX graph and inference edge cases ---
 nested-independent
 nested-keep=2

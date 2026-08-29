@@ -88,8 +88,8 @@ constexpr PackedStringKey CONDITIONAL_DIRECTIVE_KEYS[] = {
     SSK("ifeq"), SSK("ifneq"), SSK("ifdef"), SSK("ifndef")};
 constexpr StaticStringSet CONDITIONAL_DIRECTIVES{CONDITIONAL_DIRECTIVE_KEYS};
 
-constexpr PackedStringKey IGNORED_STATEMENT_KEYS[] = {
-    SSK("undefine"), SSK("unexport"), SSK("define")};
+constexpr PackedStringKey IGNORED_STATEMENT_KEYS[] = {SSK("undefine"),
+                                                      SSK("define")};
 constexpr StaticStringSet IGNORED_STATEMENTS{IGNORED_STATEMENT_KEYS};
 
 struct builtin_rule_entry
@@ -147,8 +147,10 @@ struct makefile
       : variables(allocator), rules(allocator), pattern_rules(allocator),
         default_goal(allocator), variable_index(allocator),
         rule_index(allocator), command_variable_names(allocator),
-        suffixes(allocator), precious_targets(allocator),
-        ignored_targets(allocator), silent_targets(allocator)
+        exported_variable_names(allocator),
+        unexported_variable_names(allocator), suffixes(allocator),
+        precious_targets(allocator), ignored_targets(allocator),
+        silent_targets(allocator)
   {}
   ArrayList<make_variable> variables;
   ArrayList<make_rule> rules;
@@ -160,6 +162,8 @@ struct makefile
   StringMap<usize> variable_index;
   StringMap<usize> rule_index;
   StringMap<bool> command_variable_names;
+  StringMap<bool> exported_variable_names;
+  StringMap<bool> unexported_variable_names;
   ArrayList<String> suffixes;
   StringMap<bool> precious_targets;
   StringMap<bool> ignored_targets;
@@ -1025,9 +1029,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
     }
 
     /* override re-asserts a value, so its prefix is stripped and the assignment
-       parses as usual. undefine, unexport, define, and a bare export are not
-       modelled, so they are skipped rather than read as a malformed rule. An
-       export that prefixes an assignment keeps the assignment. */
+       parses as usual. */
     let statement = trimmed;
     if (directive == "override")
       statement = trim(statement.substring(directive.length));
@@ -1038,12 +1040,38 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
       current_pattern_indices.clear();
       continue;
     }
+    if (statement_word == "unexport") {
+      let const names = trim(statement.substring(statement_word.length));
+      for (const String &name : split_words(names, cxt.scratch_allocator())) {
+        mk.exported_variable_names.erase(name.view());
+        mk.unexported_variable_names.set(name.view(), true);
+      }
+      current_rule_indices.clear();
+      current_pattern_indices.clear();
+      continue;
+    }
     if (statement_word == "export") {
       let const after_export = trim(statement.substring(statement_word.length));
       if (after_export.is_empty()) {
         current_rule_indices.clear();
         current_pattern_indices.clear();
         continue;
+      }
+      if (!after_export.find_character('=').has_value()) {
+        for (const String &name :
+             split_words(after_export, cxt.scratch_allocator()))
+        {
+          mk.exported_variable_names.set(name.view(), true);
+          mk.unexported_variable_names.erase(name.view());
+        }
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+      let const exported_name = assignment_variable_name(after_export);
+      if (!exported_name.is_empty()) {
+        mk.exported_variable_names.set(exported_name, true);
+        mk.unexported_variable_names.erase(exported_name);
       }
       statement = after_export;
     }
@@ -1920,27 +1948,6 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<saved_recipe_environment> saved_recipe_environment_values{
       cxt.scratch_allocator()};
-  for (const make_variable &variable : mk.variables) {
-    if (variable.name.view() == StringView{"MAKEFLAGS"} ||
-        variable.name.view() == StringView{"SHELL"})
-      continue;
-    let old_value = os::get_environment_variable(variable.name.view());
-    let const is_command_variable =
-        mk.command_variable_names.find(variable.name.view()) != nullptr;
-    let const is_command_line_variable =
-        command_line_variable_names.find(variable.name.view()) != NULL;
-    if (!is_command_line_variable && !old_value.has_value()) continue;
-    if (!is_command_variable && old_value.has_value() &&
-        mk.does_environment_override)
-      continue;
-
-    saved_recipe_environment_values.push(saved_recipe_environment{
-        variable.name.clone(), old_value.has_value()
-                                   ? Maybe<String>{old_value->clone()}
-                                   : Maybe<String>{}});
-    let const expanded_value = expand(cxt, mk, variable.value.view(), 0);
-    os::set_environment_variable(variable.name.view(), expanded_value.view());
-  }
   defer
   {
     for (usize environment_index = saved_recipe_environment_values.count();
@@ -1955,6 +1962,47 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
         os::unset_environment_variable(saved.name.view());
     }
   };
+  mk.unexported_variable_names.for_each(
+      [&](StringView name, bool is_unexported) throws {
+        unused(is_unexported);
+        let old_value = os::get_environment_variable(name);
+        if (!old_value.has_value()) return;
+        saved_recipe_environment_values.push(saved_recipe_environment{
+            String{cxt.scratch_allocator(), name},
+            Maybe<String>{old_value->clone()}
+        });
+        os::unset_environment_variable(name);
+      });
+  for (const make_variable &variable : mk.variables) {
+    if (variable.name.view() == StringView{"MAKEFLAGS"}) continue;
+    if (variable.name.view() == StringView{"SHELL"} &&
+        mk.exported_variable_names.find(variable.name.view()) == nullptr)
+    {
+      continue;
+    }
+    if (mk.unexported_variable_names.find(variable.name.view()) != nullptr)
+      continue;
+    let old_value = os::get_environment_variable(variable.name.view());
+    let const is_command_variable =
+        mk.command_variable_names.find(variable.name.view()) != nullptr;
+    let const is_command_line_variable =
+        command_line_variable_names.find(variable.name.view()) != NULL;
+    let const is_exported_variable =
+        mk.exported_variable_names.find(variable.name.view()) != nullptr;
+    if (!is_command_line_variable && !is_exported_variable &&
+        !old_value.has_value())
+      continue;
+    if (!is_command_variable && old_value.has_value() &&
+        mk.does_environment_override)
+      continue;
+
+    saved_recipe_environment_values.push(saved_recipe_environment{
+        variable.name.clone(), old_value.has_value()
+                                   ? Maybe<String>{old_value->clone()}
+                                   : Maybe<String>{}});
+    let const expanded_value = expand(cxt, mk, variable.value.view(), 0);
+    os::set_environment_variable(variable.name.view(), expanded_value.view());
+  }
 
   if (FLAG_MAKE_PRINT_DATABASE.is_enabled()) {
     let suffix_description = String{cxt.scratch_allocator(), ".SUFFIXES:"};

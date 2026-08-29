@@ -28,6 +28,7 @@ hot fn Parser::parse_if() throws -> Command *
 
   let branches = ArrayList<if_branch>{heap_allocator()};
   const Expression *otherwise = nullptr;
+  usize end_position = 0;
 
   loop
   {
@@ -59,8 +60,12 @@ hot fn Parser::parse_if() throws -> Command *
         throw_unterminated(location, "Unterminated if", m_lexer.source(), "fi",
                            fi_token->source_location());
       }
+      end_position = fi_token->source_location().position +
+                     fi_token->source_location().length;
       break;
     } else if (after->kind() == Token::Kind::Fi) {
+      end_position =
+          after->source_location().position + after->source_location().length;
       break;
     } else {
       throw_unterminated(location, "Unterminated if", m_lexer.source(), "fi",
@@ -68,7 +73,10 @@ hot fn Parser::parse_if() throws -> Command *
     }
   }
 
-  return m_lexer.arena().create<IfClause>(location, steal(branches), otherwise);
+  let node =
+      m_lexer.arena().create<IfClause>(location, steal(branches), otherwise);
+  node->set_source_end_position(end_position);
+  return node;
 }
 
 hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *

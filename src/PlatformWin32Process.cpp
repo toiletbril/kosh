@@ -975,6 +975,12 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool
     return false;
   }
 
+  if (process_is_pid_reference(p) &&
+      pid_from_reference(p) == GetCurrentProcessId() && signal_number == SIGINT)
+  {
+    return raise(SIGINT) == 0;
+  }
+
   if (!is_process_signal_supported(signal_number)) {
     SetLastError(ERROR_NOT_SUPPORTED);
     return false;

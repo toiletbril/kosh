@@ -75,9 +75,12 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
                                ? os::create_symlink(link_target, link.view())
                                : os::create_hard_link(link_target, link.view());
     if (!did_create) {
-      report_soft_koshkit_error(ec, cxt,
-                                "ln: cannot create link '" + link +
-                                    "': " + os::last_system_error_message());
+      let const reason =
+          os::last_system_error_is_missing_file()
+              ? String{cxt.scratch_allocator(), "No such file or directory"}
+              : os::last_system_error_message();
+      report_soft_koshkit_error(
+          ec, cxt, "ln: cannot create link '" + link + "': " + reason);
       status = 1;
     }
   }

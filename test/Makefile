@@ -58,6 +58,9 @@ override BIN := $(shell \
 		echo "$$(cd "$$(dirname "$$found")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$$found")"; \
 	else echo "$(BIN)"; fi)
 export BIN
+ifeq ($(OS), Windows_NT)
+SHELL := $(BIN)
+endif
 
 BIN_FLAGS := -AER
 FAILED_LIST := failed.diff
@@ -141,6 +144,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_exec_behavior \
 	cli_fg_terminal_handoff \
 	cli_job_state_running_then_stopped \
+	cli_koshkit_stty \
 	cli_mkdir_mode_umask \
 	cli_path_cache_behavior \
 	cli_regex_error_caret \

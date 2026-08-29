@@ -33,7 +33,17 @@ printf 'y\n' | "$BIN" -c 'koshkit cp -i cp-source.txt cp-target.txt' 2>/dev/null
 printf 'cp-interactive-yes=%s\n' "$(cat cp-target.txt)"
 chmod 640 cp-source.txt
 "$BIN" -c 'koshkit cp -p cp-source.txt cp-preserved.txt'
-printf 'cp-preserve-mode=%s\n' "$("$BIN" -c 'koshkit ls -l cp-preserved.txt' | cut -d ' ' -f 1)"
+cp_preserve_mode=$("$BIN" -c 'koshkit ls -l cp-preserved.txt' | cut -d ' ' -f 1)
+if [ "${OS-}" = Windows_NT ]; then
+  expected_cp_preserve_mode=-rw-rw-rw-
+else
+  expected_cp_preserve_mode=-rw-r-----
+fi
+if [ "$cp_preserve_mode" = "$expected_cp_preserve_mode" ]; then
+  echo cp-preserve-mode=passed
+else
+  echo "cp-preserve-mode=failed [$cp_preserve_mode]"
+fi
 printf 'same-file\n' > same.txt
 "$BIN" -c 'koshkit cp same.txt same.txt' 2>/dev/null
 printf 'cp-same-status=%s contents=%s\n' "$?" "$(cat same.txt)"
