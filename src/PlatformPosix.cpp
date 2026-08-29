@@ -1017,8 +1017,8 @@ fn apply_terminal_settings(descriptor terminal,
       continue;
     } else if (name == "ek") {
       if (is_disabled) return false;
-      state.c_cc[VERASE] = CERASE;
-      state.c_cc[VKILL] = CKILL;
+      state.c_cc[VERASE] = '\177';
+      state.c_cc[VKILL] = '\025';
       continue;
     } else if (name == "nl") {
       if (is_disabled)

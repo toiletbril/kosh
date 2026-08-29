@@ -9,7 +9,7 @@ HELP_SYNOPSIS_DECL("[-a|-m] | [-ck] [name ...]");
 
 HELP_DESCRIPTION_DECL("The locale utility writes locale information.");
 
-FLAG(LOCALE_ALL, Bool, 'a', "all-locales", "List available locales.");
+FLAG(LOCALE_ALL_LOCALES, Bool, 'a', "all-locales", "List available locales.");
 FLAG(LOCALE_CHARMAPS, Bool, 'm', "charmaps", "List available charmaps.");
 FLAG(LOCALE_CATEGORY, Bool, 'c', "category-name",
      "Write the category name for each selected keyword.");
@@ -41,9 +41,9 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (FLAG_LOCALE_ALL.is_enabled() && FLAG_LOCALE_CHARMAPS.is_enabled())
+  if (FLAG_LOCALE_ALL_LOCALES.is_enabled() && FLAG_LOCALE_CHARMAPS.is_enabled())
     return report_usage_error(ec, cxt, args[0].view());
-  if (FLAG_LOCALE_ALL.is_enabled()) {
+  if (FLAG_LOCALE_ALL_LOCALES.is_enabled()) {
     ec.print_to_stdout("C\nPOSIX\n");
     return 0;
   }
