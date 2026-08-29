@@ -26,6 +26,15 @@ vim.lsp.config("kosh", {
     "bash",
     "kosh",
     "shit",
+    "yaml",
+    "yaml.ansible",
+    "markdown",
+    "dockerfile",
+    "make",
+    "json",
+    "jsonc",
+    "just",
+    "spec",
   },
   root_dir = function(bufnr, on_dir)
     on_dir(vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd())
