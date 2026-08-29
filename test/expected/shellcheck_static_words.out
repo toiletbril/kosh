@@ -245,6 +245,53 @@
           [CompoundListCondition, ||]
             [SimpleCommand "echo" "fallback"]
           [CompoundListCondition, None]
+            [SimpleCommand "true"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "test" "-n" "$value"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "echo" "test-fallback"]
+          [CompoundListCondition, None]
+            [SimpleCommand "true"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "[" "-n" "$value" "]"]
+          [CompoundListCondition, ||]
+            [SimpleCommand "echo" "bracket-fallback"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "test" "-n" "$value"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "[" "-n" "$value" "]"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+          [CompoundListCondition, None]
+            [IfClause]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [Subshell]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "test" "-n" "$value"]
+                      [CompoundListCondition, &&]
+                        [SimpleCommand "test" "-n" "$other"]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand ":"]
+          [CompoundListCondition, None]
             [Pipeline]
               [SimpleCommand "echo" "one"]
               [SimpleCommand "read" "-r" "pipeline_value"]
@@ -1318,6 +1365,120 @@
   Unquoted "fallback"
 ]
 [Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "test-fallback"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket-fallback"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "value"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "other"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -2134,248 +2295,256 @@ note: Add the missing arguments, or remove format directives.
     93 |    command -v sudo >/dev/null 2>&1 && sudo echo protected > output
        |                                                             ^~~~~~
 note: Run a shell under `sudo` or pipe through `sudo tee`.
-97:22: warning: The `read` runs in the pipeline subshell. (SC2030)
-    97 |    echo one | read -r pipeline_value
+99:6: warning: The `( )` around the test starts a subshell and changes nothing else. (SC2234)
+    99 |    if (test -n "$value"); then :; fi
+       |       ^
+note: Remove the parentheses.
+100:6: warning: The `( )` around the test starts a subshell and changes nothing else. (SC2234)
+   100 |    if ([ -n "$value" ]); then :; fi
+       |       ^
+note: Remove the parentheses.
+102:22: warning: The `read` runs in the pipeline subshell. (SC2030)
+   102 |    echo one | read -r pipeline_value
        |                       ^~~~~~~~~~~~~~
 note: Feed the loop with a redirection or process substitution.
-98:8: warning: The variable was modified in the pipeline subshell. (SC2031)
-    98 |    echo "$pipeline_value"
+103:8: warning: The variable was modified in the pipeline subshell. (SC2031)
+   103 |    echo "$pipeline_value"
        |         ^~~~~~~~~~~~~~~~~
 note: Move the assignment outside the pipeline.
-99:9: warning: The `>` operator compares strings lexicographically. (SC2071)
-    99 |    [[ 10 > 7 ]]
+104:9: warning: The `>` operator compares strings lexicographically. (SC2071)
+   104 |    [[ 10 > 7 ]]
        |          ^
 note: Use an arithmetic command, or a numeric `-lt` or `-gt` operator.
-99:6: warning: Both operands of the `>` comparison are literal. (SC2050)
-    99 |    [[ 10 > 7 ]]
+104:6: warning: Both operands of the `>` comparison are literal. (SC2050)
+   104 |    [[ 10 > 7 ]]
        |       ^~~~~~
 note: Remove the constant condition or compare runtime data.
-100:6: warning: Both operands of the `<` comparison are literal. (SC2050)
-   100 |    [[ left < right ]]
+105:6: warning: Both operands of the `<` comparison are literal. (SC2050)
+   105 |    [[ left < right ]]
        |       ^~~~~~~~~~~~
 note: Remove the constant condition or compare runtime data.
-101:15: warning: A quoted regular expression is matched as literal text. (SC2076)
-   101 |    [[ value =~ 'v.*' ]]
+106:15: warning: A quoted regular expression is matched as literal text. (SC2076)
+   106 |    [[ value =~ 'v.*' ]]
        |                ^~~~~
 note: Store the expression in a variable or leave it unquoted.
-102:9: warning: A file test on a glob checks only one expanded path. (SC2144)
-   102 |    [[ -e *.txt ]]
+107:9: warning: A file test on a glob checks only one expanded path. (SC2144)
+   107 |    [[ -e *.txt ]]
        |          ^~~~~
 note: Expand the glob in a loop and test each path.
-103:6: warning: A conditional operator without surrounding spaces is read as part of one word. (SC2077)
-   103 |    [[ $left=$right ]]
+108:6: warning: A conditional operator without surrounding spaces is read as part of one word. (SC2077)
+   108 |    [[ $left=$right ]]
        |       ^~~~~~~~~~~~
 note: Place spaces around the comparison operator.
-104:9: warning: The string test has a literal operand. (SC2157)
-   104 |    [[ -n literal ]]
+109:9: warning: The string test has a literal operand. (SC2157)
+   109 |    [[ -n literal ]]
        |          ^~~~~~~
 note: Test a variable or drop the check.
-105:8: warning: Brace ranges are expanded before variables. (SC2051)
-   105 |    echo {1..$limit}
+110:8: warning: Brace ranges are expanded before variables. (SC2051)
+   110 |    echo {1..$limit}
        |         ^~~~~~~~~~~
 note: Use an arithmetic loop for a variable limit.
-105:12: warning: An unquoted variable can split into words and expand globs. (SC2086)
-   105 |    echo {1..$limit}
+110:12: warning: An unquoted variable can split into words and expand globs. (SC2086)
+   110 |    echo {1..$limit}
        |             ^~~~~~
 note: Quote the expansion to keep one argument.
-106:6: warning: The `[` and `]` are read as members of the `tr` set. (SC2021)
-   106 |    tr [A-Z] [a-z]
+111:6: warning: The `[` and `]` are read as members of the `tr` set. (SC2021)
+   111 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Use a quoted range without brackets.
-106:12: warning: The `[` and `]` are read as members of the `tr` set. (SC2021)
-   106 |    tr [A-Z] [a-z]
+111:12: warning: The `[` and `]` are read as members of the `tr` set. (SC2021)
+   111 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Use a quoted range without brackets.
-106:6: warning: The unquoted `tr` range can expand as a filename glob. (SC2060)
-   106 |    tr [A-Z] [a-z]
+111:6: warning: The unquoted `tr` range can expand as a filename glob. (SC2060)
+   111 |    tr [A-Z] [a-z]
        |       ^~~~~
 note: Quote the range.
-106:12: warning: The unquoted `tr` range can expand as a filename glob. (SC2060)
-   106 |    tr [A-Z] [a-z]
+111:12: warning: The unquoted `tr` range can expand as a filename glob. (SC2060)
+   111 |    tr [A-Z] [a-z]
        |             ^~~~~
 note: Quote the range.
-107:3: warning: This assignment to 'index' in a function has no `local`.
-   107 |    index=0
+112:3: warning: This assignment to 'index' in a function has no `local`.
+   112 |    index=0
        |    ^~~~~~~
 note: Declare it with `local` to keep it inside the function.
-108:21: warning: A redirection expansion can run in a child and lose its mutation. (SC2257)
-   108 |    echo redirected > "file$((index++))"
+113:21: warning: A redirection expansion can run in a child and lose its mutation. (SC2257)
+   113 |    echo redirected > "file$((index++))"
        |                      ^~~~~~~~~~~~~~~~~~
 note: Update the variable before forming the redirect path.
-109:8: warning: An unquoted variable can split into words and expand globs. (SC2086)
-   109 |    echo $value
+114:8: warning: An unquoted variable can split into words and expand globs. (SC2086)
+   114 |    echo $value
        |         ^~~~~~
 note: Quote the expansion to keep one argument.
-110:8: warning: A quoted tilde stays literal. (SC2088)
-   110 |    echo "~"
+115:8: warning: A quoted tilde stays literal. (SC2088)
+   115 |    echo "~"
        |         ^~~
 note: Leave the tilde unquoted, or use a quoted `$HOME` expansion.
-111:8: warning: Single quotes prevent the expansion written inside them. (SC2016)
-   111 |    echo '$value'
+116:8: warning: Single quotes prevent the expansion written inside them. (SC2016)
+   116 |    echo '$value'
        |         ^~~~~~~~
 note: Use double quotes if the value should expand.
-113:8: warning: A value from external input is evaluated as arithmetic code.
-   113 |    echo $((number + 1))
+118:8: warning: A value from external input is evaluated as arithmetic code.
+   118 |    echo $((number + 1))
        |         ^~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
-114:10: warning: An exported `CDPATH` can redirect `cd` commands in child scripts.
-   114 |    export CDPATH=.:~/project
+119:10: warning: An exported `CDPATH` can redirect `cd` commands in child scripts.
+   119 |    export CDPATH=.:~/project
        |           ^~~~~~~~~~~~~~~~~~
 note: Keep `CDPATH` unexported or clear it before running scripts.
-118:15: warning: Several commands append to the same file separately. (SC2129)
-   118 |    echo one >> style.log
+123:15: warning: Several commands append to the same file separately. (SC2129)
+   123 |    echo one >> style.log
        |                ^~~~~~~~~
-120:17: details:
-   120 |    echo three >> style.log
+125:17: details:
+   125 |    echo three >> style.log
        |                  ^~~~~~~~~ this later append belongs under the same redirection.
 note: Apply one append redirection to a grouped command.
-121:3: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
-   121 |    echo `date`
+126:3: warning: An `echo` of a command substitution prints what the command already prints. (SC2005)
+   126 |    echo `date`
        |    ^~~~
 note: Run the command on its own.
-121:8: warning: A backtick inside a backtick must be escaped with a backslash. (SC2006)
-   121 |    echo `date`
+126:8: warning: A backtick inside a backtick must be escaped with a backslash. (SC2006)
+   126 |    echo `date`
        |         ^~~~~~
 note: Use `$(...)` for command substitution.
-121:8: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
-   121 |    echo `date`
+126:8: warning: An unquoted command substitution splits its output into words and expands globs. (SC2046)
+   126 |    echo `date`
        |         ^~~~~~
 note: Quote it to keep one argument.
-122:11: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
-   122 |    echo $(($number + 1))
+127:11: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
+   127 |    echo $(($number + 1))
        |            ^~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
-122:8: warning: A value from external input is evaluated as arithmetic code.
-   122 |    echo $(($number + 1))
+127:8: warning: A value from external input is evaluated as arithmetic code.
+   127 |    echo $(($number + 1))
        |         ^~~~~~~~~~~~~~~~
 note: Validate the value as decimal digits before arithmetic.
-123:5: warning: The x-prefix test workaround is obsolete. (SC2268)
-   123 |    [ x"$value" = xvalue ]
+128:5: warning: The x-prefix test workaround is obsolete. (SC2268)
+   128 |    [ x"$value" = xvalue ]
        |      ^~~~~~~~~
 note: Quote the variable directly.
-124:3: warning: The `PS1` value holds a control escape without a `\[` and `\]` guard pair. (SC2025)
-   124 |    PS1='\e[31m> '
+129:3: warning: The `PS1` value holds a control escape without a `\[` and `\]` guard pair. (SC2025)
+   129 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
 note: Wrap nonprinting prompt escapes in `\[` and `\]`.
-124:3: warning: This assignment to 'PS1' in a function has no `local`.
-   124 |    PS1='\e[31m> '
+129:3: warning: This assignment to 'PS1' in a function has no `local`.
+   129 |    PS1='\e[31m> '
        |    ^~~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-128:10: warning: The `find -exec` action has no terminating `;` or `+`. (SC2067)
-   128 |    find . -exec echo {}
+133:10: warning: The `find -exec` action has no terminating `;` or `+`. (SC2067)
+   133 |    find . -exec echo {}
        |           ^~~~~
 note: Terminate the action with `\;` or `+`.
-129:11: warning: The `test` builtin does not support the `=~` regular expression operator. (SC2074)
-   129 |    [ value =~ expression ]
+134:11: warning: The `test` builtin does not support the `=~` regular expression operator. (SC2074)
+   134 |    [ value =~ expression ]
        |            ^~
 note: Use `[[ value =~ expression ]]`.
-130:60: warning: An `ssh` command in a while-read loop can consume the loop input. (SC2095)
-   130 |    while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
+135:60: warning: An `ssh` command in a while-read loop can consume the loop input. (SC2095)
+   135 |    while read -r host; do command -v ssh >/dev/null 2>&1 && ssh "$host" uptime; done
        |                                                             ^~~
 note: Redirect `ssh` input from `/dev/null`, or pass `-n`.
-131:9: warning: The `$1` in an alias body reads the positional arguments of the surrounding script. (SC2142)
-   131 |    alias archive='mv $1 /backup'
+136:9: warning: The `$1` in an alias body reads the positional arguments of the surrounding script. (SC2142)
+   136 |    alias archive='mv $1 /backup'
        |          ^~~~~~~~~~~~~~~~~~~~~~~
 note: Use a function when the wrapper needs arguments.
-132:24: warning: The `find` expression uses `-o` without grouping its actions. (SC2146)
-   132 |    find . -name '*.bak' -o -name '*~' -delete
+137:24: warning: The `find` expression uses `-o` without grouping its actions. (SC2146)
+   137 |    find . -name '*.bak' -o -name '*~' -delete
        |                         ^~
 note: Group each side with escaped parentheses.
-133:8: warning: `$10` expands positional parameter 1 followed by the digit '0'. (SC1037)
-   133 |    echo $10
+138:8: warning: `$10` expands positional parameter 1 followed by the digit '0'. (SC1037)
+   138 |    echo $10
        |         ^~~
 note: Write `${10}` to select positional parameter 10.
-133:8: warning: An unquoted variable can split into words and expand globs. (SC2086)
-   133 |    echo $10
+138:8: warning: An unquoted variable can split into words and expand globs. (SC2086)
+   138 |    echo $10
        |         ^~
 note: Quote the expansion to keep one argument.
-134:3: warning: The substitution output is run as a command. (SC2091)
-   134 |    $(printf command)
+139:3: warning: The substitution output is run as a command. (SC2091)
+   139 |    $(printf command)
        |    ^~~~~~~~~~~~~~~~~
 note: Run the command inside the substitution directly.
-135:3: warning: A scalar assignment from `$@` joins every argument into one string. (SC2124)
-   135 |    arguments="$@"
+140:3: warning: A scalar assignment from `$@` joins every argument into one string. (SC2124)
+   140 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
 note: Assign one value, or use an array.
-135:3: warning: This assignment to 'arguments' in a function has no `local`.
-   135 |    arguments="$@"
+140:3: warning: This assignment to 'arguments' in a function has no `local`.
+   140 |    arguments="$@"
        |    ^~~~~~~~~~~~~~
 note: Declare it with `local` to keep it inside the function.
-136:3: warning: A tilde inside `PATH` is not expanded. (SC2147)
-   136 |    PATH="$PATH:~/bin"
+141:3: warning: A tilde inside `PATH` is not expanded. (SC2147)
+   141 |    PATH="$PATH:~/bin"
        |    ^~~~~~~~~~~~~~~~~~
 note: Expand `HOME` before assigning `PATH`.
-137:8: warning: The `$[...]` spelling is not defined by POSIX. (SC2007)
-   137 |    echo $[1+2]
+142:8: warning: The `$[...]` spelling is not defined by POSIX. (SC2007)
+   142 |    echo $[1+2]
        |         ^~~~~~
 note: Use `$((...))` for arithmetic expansion.
-138:22: warning: The word list is the one constant word 'one'. (SC2043)
-   138 |    for outer_index in one; do
+143:22: warning: The word list is the one constant word 'one'. (SC2043)
+   143 |    for outer_index in one; do
        |                       ^~~
 note: Loop over a glob, a variable, or a command substitution.
-139:9: warning: The inner loop reuses the outer loop variable 'outer_index'. (SC2165)
-   139 |      for outer_index in two; do echo "$outer_index"; done
+144:9: warning: The inner loop reuses the outer loop variable 'outer_index'. (SC2165)
+   144 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~
-138:7: details:
-   138 |    for outer_index in one; do
+143:7: details:
+   143 |    for outer_index in one; do
        |        ^~~~~~~~~~~ the outer loop first binds 'outer_index' here.
 note: Use a distinct variable for the nested loop.
-138:7: warning: The outer loop variable 'outer_index' is overwritten by the inner loop. (SC2167)
-   138 |    for outer_index in one; do
+143:7: warning: The outer loop variable 'outer_index' is overwritten by the inner loop. (SC2167)
+   143 |    for outer_index in one; do
        |        ^~~~~~~~~~~
-139:9: details:
-   139 |      for outer_index in two; do echo "$outer_index"; done
+144:9: details:
+   144 |      for outer_index in two; do echo "$outer_index"; done
        |          ^~~~~~~~~~~ the inner loop binds 'outer_index' again here.
 note: Use a distinct variable for the nested loop.
-139:24: warning: The word list is the one constant word 'two'. (SC2043)
-   139 |      for outer_index in two; do echo "$outer_index"; done
+144:24: warning: The word list is the one constant word 'two'. (SC2043)
+   144 |      for outer_index in two; do echo "$outer_index"; done
        |                         ^~~
 note: Loop over a glob, a variable, or a command substitution.
-141:8: warning: The `case` word 'value' is constant. (SC2194)
-   141 |    case value in
+146:8: warning: The `case` word 'value' is constant. (SC2194)
+   146 |    case value in
        |         ^~~~~
 note: Add the missing `$`, or drop the `case`.
-142:3: warning: The pattern 'same' cannot match the `case` word 'value'. (SC2195)
-   142 |    same) : ;;
+147:3: warning: The pattern 'same' cannot match the `case` word 'value'. (SC2195)
+   147 |    same) : ;;
        |    ^~~~
-143:3: warning: An earlier `case` pattern matches everything this pattern matches. (SC2221)
-   143 |    same) : ;;
+148:3: warning: An earlier `case` pattern matches everything this pattern matches. (SC2221)
+   148 |    same) : ;;
        |    ^~~~
-142:3: details:
-   142 |    same) : ;;
+147:3: details:
+   147 |    same) : ;;
        |    ^~~~ this identical pattern matches first.
 note: Remove the duplicate pattern.
-143:3: warning: The pattern 'same' cannot match the `case` word 'value'. (SC2195)
-   143 |    same) : ;;
+148:3: warning: The pattern 'same' cannot match the `case` word 'value'. (SC2195)
+   148 |    same) : ;;
        |    ^~~~
-144:3: warning: The pattern ''*'' cannot match the `case` word 'value'. (SC2195)
-   144 |    '*') : ;;
+149:3: warning: The pattern ''*'' cannot match the `case` word 'value'. (SC2195)
+   149 |    '*') : ;;
        |    ^~~
-145:3: warning: The pattern 'literal-after-star' cannot match the `case` word 'value'. (SC2195)
-   145 |    literal-after-star) : ;;
+150:3: warning: The pattern 'literal-after-star' cannot match the `case` word 'value'. (SC2195)
+   150 |    literal-after-star) : ;;
        |    ^~~~~~~~~~~~~~~~~~
-147:3: warning: An earlier `case` pattern is broader. (SC2222)
-   147 |    prefix-value) : ;;
+152:3: warning: An earlier `case` pattern is broader. (SC2222)
+   152 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
-146:3: details:
-   146 |    prefix*) : ;;
+151:3: details:
+   151 |    prefix*) : ;;
        |    ^~~~~~~ this broader pattern shadows the later pattern.
 note: Move the specific pattern before the broader pattern.
-147:3: warning: The pattern 'prefix-value' cannot match the `case` word 'value'. (SC2195)
-   147 |    prefix-value) : ;;
+152:3: warning: The pattern 'prefix-value' cannot match the `case` word 'value'. (SC2195)
+   152 |    prefix-value) : ;;
        |    ^~~~~~~~~~~~
-141:8: warning: This `case` has no default `*)` branch. (SC2249)
-   141 |    case value in
+146:8: warning: This `case` has no default `*)` branch. (SC2249)
+   146 |    case value in
        |         ^~~~~
-158:3: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
-   158 |    ((total = $counter))
+163:3: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
+   163 |    ((total = $counter))
        |    ^~~~~~~~~~~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
-159:3: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
-   159 |    ((total = ${counter}))
+164:3: warning: A dollar sign expands the value before the arithmetic runs. (SC2004)
+   164 |    ((total = ${counter}))
        |    ^~~~~~~~~~~~~~~~~~~~~~
 note: Use the variable name directly inside arithmetic.
-Encountered 124 warnings.
+Encountered 126 warnings.
 done
 done
 done

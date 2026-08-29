@@ -7,6 +7,12 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
+#if defined __linux__
+#include <mntent.h>
+#elif defined __APPLE__ || defined BSD
+#include <sys/mount.h>
+#endif
+
 namespace koshka {
 
 namespace os {
@@ -495,6 +501,53 @@ fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
   return did_succeed;
 }
 
+fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
+                  bool should_follow_symlink) wontthrow -> bool
+{
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    let const owner =
+        owner_id < 0 ? static_cast<uid_t>(-1) : static_cast<uid_t>(owner_id);
+    let const group =
+        group_id < 0 ? static_cast<gid_t>(-1) : static_cast<gid_t>(group_id);
+    did_succeed = should_follow_symlink
+                      ? ::chown(path_string.c_str(), owner, group) == 0
+                      : ::lchown(path_string.c_str(), owner, group) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
+}
+
+fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool
+{
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String target_string{target};
+    const String link_string{link_path};
+    did_succeed = ::link(target_string.c_str(), link_string.c_str()) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
+}
+
+fn make_fifo(StringView path, u32 mode) wontthrow -> bool
+{
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    did_succeed = ::mkfifo(path_string.c_str(), static_cast<mode_t>(mode)) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
+}
+
 fn touch_file_times(StringView path) wontthrow -> bool
 {
   bool did_succeed;
@@ -583,6 +636,46 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
     if (capacity >= (1U << 20)) return koshka::None;
     capacity *= 2;
   }
+}
+
+fn stat_filesystem(StringView path, filesystem_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  struct statvfs info{};
+  if (::statvfs(path_string.c_str(), &info) != 0) return false;
+  status.block_size = info.f_frsize == 0 ? info.f_bsize : info.f_frsize;
+  status.total_blocks = info.f_blocks;
+  status.free_blocks = info.f_bfree;
+  status.available_blocks = info.f_bavail;
+  return true;
+}
+
+fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
+{
+  let result = ArrayList<mounted_filesystem>{heap_allocator()};
+#if defined __linux__
+  let *mount_file = setmntent("/proc/self/mounts", "r");
+  if (mount_file == nullptr) mount_file = setmntent("/etc/mtab", "r");
+  if (mount_file == nullptr) return result;
+  defer { endmntent(mount_file); };
+  mntent entry{};
+  char buffer[8192];
+
+  while (getmntent_r(mount_file, &entry, buffer, sizeof(buffer)) != nullptr)
+    result.push(
+        mounted_filesystem{String{entry.mnt_fsname}, String{entry.mnt_dir}});
+#elif defined __APPLE__ || defined BSD
+  struct statfs *entries = nullptr;
+  let const entry_count = getmntinfo(&entries, MNT_NOWAIT);
+
+  for (int index = 0; index < entry_count; index++)
+    result.push(mounted_filesystem{String{entries[index].f_mntfromname},
+                                   String{entries[index].f_mntonname}});
+#else
+  result.push(mounted_filesystem{String{"."}, String{"."}});
+#endif
+
+  return result;
 }
 
 static fn fill_file_status(const struct stat &info,

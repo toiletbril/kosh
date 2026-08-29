@@ -1,0 +1,90 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign current_user=$(koshkit whoami)]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "nonempty=yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "nonempty=no"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lines=$(koshkit whoami | koshkit wc -l)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "whoami" "--help"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "help=$?"]
+[Word
+  Unquoted "current_user="
+  CommandSubstitution "koshkit whoami"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "current_user"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "nonempty=yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "nonempty=no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "lines="
+  CommandSubstitution "koshkit whoami | koshkit wc -l"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "whoami"
+]
+[Word
+  Unquoted "--help"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "help="
+  Variable "?"
+]
+nonempty=yes
+lines=1
+help=0
+[Code 0]

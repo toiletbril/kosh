@@ -1,0 +1,139 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "hello\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\0abcde\0xy\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "empty" "text" "binary"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "strings" "binary"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "strings" "-n" "2" "-t" "d" "binary"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-An" "-tx1" "text"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-An" "-tc" "text"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "empty"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "hello\n"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\0abcde\0xy\n"
+]
+[Word
+  Unquoted "binary"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "empty"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "binary"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "strings"
+]
+[Word
+  Unquoted "binary"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "strings"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "binary"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-An"
+]
+[Word
+  Unquoted "-tx1"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-An"
+]
+[Word
+  Unquoted "-tc"
+]
+[Word
+  Unquoted "text"
+]
+empty: empty
+text: text
+binary: data
+abcde
+      1 abcde
+      7 xy
+        68 65 6c 6c 6f 0a
+          h   e   l   l   o  \n
+[Code 0]

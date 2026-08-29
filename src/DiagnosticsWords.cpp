@@ -109,6 +109,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
   let has_reported_decimal = false;
   let has_reported_octal = false;
   let has_reported_precision_loss = false;
+  let has_reported_xor_power = false;
   let has_redundant_dollar = false;
   /* A division truncates its result, so a multiplication that follows it in the
      same term multiplies the truncated value, shellcheck SC2017. Any operator
@@ -242,10 +243,51 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     case ';':
     case '|':
     case '&':
-    case '^':
     case '<':
     case '>':
     case '%': has_pending_division = false; break;
+
+    case '^': {
+      has_pending_division = false;
+      if (has_reported_xor_power ||
+          (position + 1 < expression.length && expression[position + 1] == '='))
+        break;
+
+      let left_end = position;
+      while (left_end > 0 && lexer::is_whitespace(expression[left_end - 1]))
+        left_end--;
+      let left_start = left_end;
+      while (left_start > 0 && lexer::is_number(expression[left_start - 1]))
+        left_start--;
+
+      let right_start = position + 1;
+      while (right_start < expression.length &&
+             lexer::is_whitespace(expression[right_start]))
+        right_start++;
+      let right_end = right_start;
+      while (right_end < expression.length &&
+             lexer::is_number(expression[right_end]))
+        right_end++;
+
+      let expression_start = left_start;
+      while (expression_start > 0 &&
+             lexer::is_whitespace(expression[expression_start - 1]))
+        expression_start--;
+      let expression_end = right_end;
+      while (expression_end < expression.length &&
+             lexer::is_whitespace(expression[expression_end]))
+        expression_end++;
+
+      let const has_literal_left =
+          left_start < left_end && expression_start == 0;
+      let const has_literal_right =
+          right_start < right_end && expression_end == expression.length;
+      if (has_literal_left && has_literal_right) {
+        actx.report_diagnostic(diagnostic_id::arithmetic_xor_power, location);
+        has_reported_xor_power = true;
+      }
+      break;
+    }
 
     case '=': has_pending_division = false; break;
 

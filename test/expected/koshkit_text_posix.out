@@ -1,0 +1,694 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "alpha:one\nbeta:two\ngamma:three\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\tb\n123456789\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\ntwo\nthree\nfour\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cut" "-d" ":" "-f" "2" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cut" "-b" "1-3,6" "records"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a\303\251z\n"]
+      [SimpleCommand "koshkit" "cut" "-c" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expand" "-t" "4" "spaced"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "koshkit" "unexpand" "-a" "-t" "4" "spaced"]
+      [SimpleCommand "koshkit" "expand" "-t" "4"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "fold" "-w" "4" "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "fold" "-s" "-w" "6"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "nl" "-ba" "-v" "3" "-i" "2" "-w" "2" "-s" ": " "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "paste" "-d" "," "records" "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "paste" "-s" "-d" "," "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "s/:/=/; 2d" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "-n" "2p" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "-n" "2,3p" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "-e" "1i\zero" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "-e" "2a\after" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "-e" "2,3c\replaced" "records"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "sed" "y/ot/OT/" "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "split" "-l" "2" "lines" "part"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cat" "partaa" "partab"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "lines" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "xx00" "xx01"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\nmark\nb\nmark\nc\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "piece" "repeated" "/mark/" "{1}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "piece00" "piece01" "piece02"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "offset" "repeated" "/mark/+1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "offset00" "offset01"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "-f" "rejected" "repeated" "3" "99"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "!" "-e" "rejected00"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-cleanup=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pr" "-t" "lines"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "alpha:one\nbeta:two\ngamma:three\n"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\tb\n123456789\n"
+]
+[Word
+  Unquoted "spaced"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\ntwo\nthree\nfour\n"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-b"
+]
+[Word
+  Unquoted "1-3,6"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\303\251z\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expand"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "spaced"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "unexpand"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "spaced"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expand"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "fold"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "fold"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "6"
+]
+[Word
+  Literal "one two three"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "nl"
+]
+[Word
+  Unquoted "-ba"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "-i"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Literal ": "
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "paste"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted ","
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "paste"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted ","
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Literal "s/:/=/; 2d"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Literal "2p"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Literal "2,3p"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Literal "1i\zero"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Literal "2a\after"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Literal "2,3c\replaced"
+]
+[Word
+  Unquoted "records"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Literal "y/ot/OT/"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "split"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "part"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "partaa"
+]
+[Word
+  Unquoted "partab"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "xx00"
+]
+[Word
+  Unquoted "xx01"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nmark\nb\nmark\nc\n"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "piece"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Literal "/mark/"
+]
+[Word
+  Literal "{1}"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "piece00"
+]
+[Word
+  Unquoted "piece01"
+]
+[Word
+  Unquoted "piece02"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "offset"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Literal "/mark/+1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "offset00"
+]
+[Word
+  Unquoted "offset01"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "rejected"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "99"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "rejected00"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-cleanup="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pr"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "lines"
+]
+one
+two
+three
+alp:
+bett
+gam:
+é
+a   b
+123456789
+a   b
+123456789
+one
+two
+thre
+e
+four
+one 
+two 
+three
+ 3: one
+ 5: two
+ 7: three
+ 9: four
+alpha:one,one
+beta:two,two
+gamma:three,three
+,four
+one,two,three,four
+alpha=one
+gamma=three
+beta:two
+beta:two
+gamma:three
+zero
+alpha:one
+beta:two
+gamma:three
+alpha:one
+beta:two
+after
+gamma:three
+alpha:one
+replaced
+One
+TwO
+Three
+fOur
+one
+two
+three
+four
+ 8 xx00
+11 xx01
+19 total
+ 2 piece00
+ 7 piece01
+ 7 piece02
+16 total
+ 7 offset00
+ 9 offset01
+16 total
+csplit-cleanup=0
+one
+two
+three
+four
+[Code 0]

@@ -1244,6 +1244,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       continue;
     case format_operator::CaseTerminator:
       do_begin_statement(false, true);
+      has_completed_structural_statement = false;
       do_finish_command();
       writer.finish_line();
       if (indent >= 2) indent -= 2;
@@ -1300,7 +1301,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         writer.set_indent(indent);
         case_pattern_states.back() = false;
         should_attach_case_pattern = false;
-        is_command_start = true;
+        do_finish_command();
       } else if (subshell_depth > 0) {
         do_begin_statement(false, true);
         do_finish_command();

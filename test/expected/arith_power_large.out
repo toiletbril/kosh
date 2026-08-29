@@ -8,6 +8,12 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$value: -20"]
   [CompoundListCondition, None]
+    [Assign negative=$((-(2 ** 9999)))]
+  [CompoundListCondition, None]
+    [Assign negative_copy=$((negative))]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "negative=%s:%s:%s\n" "$negative_copy:0:1" "$#negative_copy" "$negative_copy: -20"]
+  [CompoundListCondition, None]
     [Assign formula=value]
   [CompoundListCondition, None]
     [FunctionDefinition "promoted_step"]
@@ -79,6 +85,29 @@
 ]
 [Word
   Variable "value: -20"
+]
+[Word
+  Unquoted "negative="
+  ArithmeticExpansion "-(2 ** 9999)"
+]
+[Word
+  Unquoted "negative_copy="
+  ArithmeticExpansion "negative"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "negative=%s:%s:%s\n"
+]
+[Word
+  Variable "negative_copy:0:1"
+]
+[Word
+  Variable "#negative_copy"
+]
+[Word
+  Variable "negative_copy: -20"
 ]
 [Word
   Unquoted "formula=value"
@@ -271,6 +300,7 @@
 3010
 99753155844037919244
 40887152396298354688
+negative=-:3011:40887152396298354688
 previous=3010:40887152396298354944
 chosen=3010:40887152396298354945
 combined=3010:40887152396298354945

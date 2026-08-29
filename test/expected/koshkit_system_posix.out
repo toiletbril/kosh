@@ -1,0 +1,212 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cal" "2" "2024"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "date" "-u" "+%Y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "date=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "getconf" "ARG_MAX"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "getconf=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "id" "-u"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "id=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "locale" "charmap"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "locale=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "logname"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "logname=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "tty" "-s"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tty=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "uname" "-s"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "uname=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "who"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "who=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cal"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "2024"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "date"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "+%Y"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "date="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "getconf"
+]
+[Word
+  Unquoted "ARG_MAX"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "getconf="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "id"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "id="
+  Variable "?"
+]
+[Word
+  Unquoted "LC_ALL=C"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "locale"
+]
+[Word
+  Unquoted "charmap"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "locale="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "logname"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "logname="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tty"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tty="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "uname"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "uname="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "who"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "who="
+  Variable "?"
+]
+   February 2024
+Su Mo Tu We Th Fr Sa
+             1  2  3
+ 4  5  6  7  8  9 10
+11 12 13 14 15 16 17
+18 19 20 21 22 23 24
+25 26 27 28 29
+date=0
+getconf=0
+id=0
+locale=0
+logname=0
+tty=1
+uname=0
+who=0
+[Code 0]

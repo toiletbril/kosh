@@ -903,6 +903,31 @@ fn get_effective_user_id() wontthrow -> i64
 
 fn get_real_group_id() wontthrow -> i64 { return static_cast<i64>(getgid()); }
 
+fn get_effective_group_id() wontthrow -> i64
+{
+  return static_cast<i64>(getegid());
+}
+
+fn get_supplementary_group_ids(Allocator allocator) throws -> ArrayList<u32>
+{
+  let groups = ArrayList<u32>{allocator};
+  let const group_count = getgroups(0, nullptr);
+  if (group_count < 0) return groups;
+
+  let native_groups = ArrayList<gid_t>{allocator};
+  native_groups.reserve(static_cast<usize>(group_count));
+  for (int index = 0; index < group_count; index++)
+    native_groups.push(0);
+  let const read_count = getgroups(group_count, native_groups.begin());
+  if (read_count < 0) return groups;
+  for (int index = 0; index < read_count; index++)
+    groups.push(static_cast<u32>(native_groups[static_cast<usize>(index)]));
+
+  let const effective_group = static_cast<u32>(getegid());
+  if (!groups.find(effective_group).has_value()) groups.push(effective_group);
+  return groups;
+}
+
 fn child_max() wontthrow -> i64
 {
   return static_cast<i64>(sysconf(_SC_CHILD_MAX));
@@ -935,6 +960,20 @@ fn executable_system_name() throws -> String
       StringView{info.sysname, std::strlen(info.sysname)}
   };
 #endif
+}
+
+fn system_release_name() throws -> String
+{
+  struct utsname info{};
+  if (uname(&info) != 0) return String{"unknown"};
+  return String{info.release};
+}
+
+fn system_version_name() throws -> String
+{
+  struct utsname info{};
+  if (uname(&info) != 0) return String{"unknown"};
+  return String{info.version};
 }
 
 fn executable_machine_name() throws -> String
@@ -1157,6 +1196,111 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
         result.has_perf && perf_session.is_system_wide();
   }
   return result;
+}
+
+static pure fn native_priority_target(priority_target target) wontthrow -> int
+{
+  switch (target) {
+  case priority_target::Process: return PRIO_PROCESS;
+  case priority_target::ProcessGroup: return PRIO_PGRP;
+  case priority_target::User: return PRIO_USER;
+  }
+  unreachable();
+}
+
+fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
+{
+  errno = 0;
+  let const priority =
+      getpriority(native_priority_target(target), static_cast<id_t>(id));
+  if (priority == -1 && errno != 0) return None;
+  return priority;
+}
+
+fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool
+{
+  return setpriority(native_priority_target(target), static_cast<id_t>(id),
+                     priority) == 0;
+}
+
+fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
+{
+  if (argv.is_empty()) return None;
+  let const raw_argv = make_os_args(argv);
+  let const child = fork();
+  if (child == -1) return None;
+  if (child == 0) {
+    errno = 0;
+    let current = getpriority(PRIO_PROCESS, 0);
+    if (current == -1 && errno != 0) current = 0;
+    let target = static_cast<i64>(current) + increment;
+    if (target < -20) target = -20;
+    if (target > 19) target = 19;
+    unused(setpriority(PRIO_PROCESS, 0, static_cast<int>(target)));
+    execvp(raw_argv[0], const_cast<char *const *>(raw_argv.begin()));
+    _exit(errno == ENOENT ? 127 : 126);
+  }
+
+  int status = 0;
+  pid_t waited;
+  do {
+    waited = waitpid(child, &status, 0);
+  } while (waited == -1 && errno == EINTR);
+  if (waited != child) return None;
+  if (WIFEXITED(status)) return WEXITSTATUS(status);
+  if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+  return None;
+}
+
+fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
+             descriptor error, StringView home) throws -> Maybe<i32>
+{
+  if (argv.is_empty()) return None;
+  let const raw_argv = make_os_args(argv);
+  let home_output = String{heap_allocator(), home};
+  if (!home_output.is_empty() && home_output.back() != '/') home_output += '/';
+  home_output += "nohup.out";
+
+  let const child = fork();
+  if (child == -1) return None;
+  if (child == 0) {
+    signal(SIGHUP, SIG_IGN);
+    let child_input = input;
+    let child_output = output;
+    let child_error = error;
+    int null_input = -1;
+    int nohup_output = -1;
+    if (isatty(child_input)) {
+      null_input = open("/dev/null", O_RDONLY);
+      if (null_input != -1) child_input = null_input;
+    }
+    if (isatty(child_output)) {
+      nohup_output = open("nohup.out", O_WRONLY | O_APPEND | O_CREAT, 0600);
+      if (nohup_output == -1 && !home.is_empty())
+        nohup_output =
+            open(home_output.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
+      if (nohup_output == -1) _exit(127);
+      child_output = nohup_output;
+    }
+    if (isatty(child_error)) child_error = child_output;
+    if (child_input != STDIN_FILENO) dup2(child_input, STDIN_FILENO);
+    if (child_output != STDOUT_FILENO) dup2(child_output, STDOUT_FILENO);
+    if (child_error != STDERR_FILENO) dup2(child_error, STDERR_FILENO);
+    if (null_input > STDERR_FILENO) close(null_input);
+    if (nohup_output > STDERR_FILENO) close(nohup_output);
+    execvp(raw_argv[0], const_cast<char *const *>(raw_argv.begin()));
+    _exit(errno == ENOENT ? 127 : 126);
+  }
+
+  int status = 0;
+  pid_t waited;
+  do {
+    waited = waitpid(child, &status, 0);
+  } while (waited == -1 && errno == EINTR);
+  if (waited != child) return None;
+  if (WIFEXITED(status)) return WEXITSTATUS(status);
+  if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+  return None;
 }
 
 } /* namespace os */

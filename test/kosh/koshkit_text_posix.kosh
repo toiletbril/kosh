@@ -1,0 +1,43 @@
+root=$(mktemp -d)
+cd "$root"
+
+printf 'alpha:one\nbeta:two\ngamma:three\n' > records
+printf 'a\tb\n123456789\n' > spaced
+printf 'one\ntwo\nthree\nfour\n' > lines
+
+koshkit cut -d : -f 2 records
+koshkit cut -b 1-3,6 records
+printf 'a\303\251z\n' | koshkit cut -c 2
+
+koshkit expand -t 4 spaced
+koshkit unexpand -a -t 4 spaced | koshkit expand -t 4
+koshkit fold -w 4 lines
+koshkit fold -s -w 6 <<<'one two three'
+
+koshkit nl -ba -v 3 -i 2 -w 2 -s ': ' lines
+koshkit paste -d , records lines
+koshkit paste -s -d , lines
+
+koshkit sed 's/:/=/; 2d' records
+koshkit sed -n '2p' records
+koshkit sed -n '2,3p' records
+koshkit sed -e '1i\zero' records
+koshkit sed -e '2a\after' records
+koshkit sed -e '2,3c\replaced' records
+koshkit sed 'y/ot/OT/' lines
+
+koshkit split -l 2 lines part
+koshkit cat partaa partab
+
+koshkit csplit -s lines 3
+koshkit wc -c xx00 xx01
+printf 'a\nmark\nb\nmark\nc\n' > repeated
+koshkit csplit -s -f piece repeated '/mark/' '{1}'
+koshkit wc -c piece00 piece01 piece02
+koshkit csplit -s -f offset repeated '/mark/+1'
+koshkit wc -c offset00 offset01
+(koshkit csplit -s -f rejected repeated 3 99) 2> "$TEST_NULL_DEVICE"
+test ! -e rejected00
+echo "csplit-cleanup=$?"
+
+koshkit pr -t lines

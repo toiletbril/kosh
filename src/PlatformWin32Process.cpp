@@ -10,6 +10,41 @@
 namespace koshka {
 namespace os {
 
+fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
+{
+  unused(target);
+  unused(id);
+  return 0;
+}
+
+fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool
+{
+  unused(target);
+  unused(id);
+  unused(priority);
+  return true;
+}
+
+fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
+{
+  unused(increment);
+  let const result = run_measured(argv, measured_output::Inherit);
+  if (!result.has_value()) return None;
+  return static_cast<i32>(result->exit_status);
+}
+
+fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
+             descriptor error, StringView home) throws -> Maybe<i32>
+{
+  unused(input);
+  unused(output);
+  unused(error);
+  unused(home);
+  let const result = run_measured(argv, measured_output::Inherit);
+  if (!result.has_value()) return None;
+  return static_cast<i32>(result->exit_status);
+}
+
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
 volatile sig_atomic_t SIGNAL_PENDING = 0;
@@ -1259,11 +1294,24 @@ fn get_effective_user_id() wontthrow -> i64 { return 0; }
 
 fn get_real_group_id() wontthrow -> i64 { return 0; }
 
+fn get_effective_group_id() wontthrow -> i64 { return 0; }
+
+fn get_supplementary_group_ids(Allocator allocator) throws -> ArrayList<u32>
+{
+  let groups = ArrayList<u32>{allocator};
+  groups.push(0);
+  return groups;
+}
+
 fn child_max() wontthrow -> i64 { return 0; }
 
 fn machine_type() throws -> String { return String{"x86_64"}; }
 
 fn executable_system_name() throws -> String { return String{"Windows"}; }
+
+fn system_release_name() throws -> String { return String{"unknown"}; }
+
+fn system_version_name() throws -> String { return String{"unknown"}; }
 
 fn executable_machine_name() throws -> String
 {

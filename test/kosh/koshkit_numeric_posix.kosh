@@ -1,0 +1,25 @@
+printf 'scale=2; 1/8\n2^10\n' | koshkit bc
+echo "bc=$?"
+
+koshkit expr 2 + 3 '*' 4
+koshkit expr 7 '>' 3
+koshkit expr abc : 'a\(.*\)'
+koshkit expr 0 '|' hello
+koshkit expr 0 >/dev/null
+echo "expr-false=$?"
+
+koshkit calc 'abs(-12.50)'
+koshkit calc 'floor(-1.2)'
+koshkit calc 'ceil(1.2)'
+koshkit calc 'frac(-7.25)'
+koshkit calc 'cmp(999999999999999999999, 8)'
+koshkit calc 'gcd(84, 30, 18)'
+koshkit calc 'lcm(12, 18)'
+koshkit calc 'fact(30)'
+koshkit calc 'fib(100)'
+koshkit calc 'min(9.2, -4, 7)'
+koshkit calc 'max(9.2, -4, 7)'
+koshkit calc 'isint(1.00)'
+koshkit calc 'iseven(42)'
+koshkit calc 'isodd(42)'
+koshkit calc 'sgn(-0.01)'

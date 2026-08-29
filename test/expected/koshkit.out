@@ -1,6 +1,9 @@
 == koshkit utilities by prefix:
 make
+man
 mkdir
+mkfifo
+more
 mv
 == ls flags through koshkit:
 --help

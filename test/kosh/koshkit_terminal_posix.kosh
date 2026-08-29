@@ -1,0 +1,17 @@
+root=$(mktemp -d)
+cd "$root"
+
+koshkit mkdir -p man1
+printf 'LOCAL MANPAGE\n' >man1/topic.1
+export MANPATH=.
+koshkit man topic
+
+printf 'one\ntwo\n' | koshkit more
+
+koshkit tabs -8 >/dev/null
+echo "tabs=$?"
+
+koshkit tput clear | koshkit od -A n -t x1
+
+koshkit stty -a </dev/null
+echo "stty-notty=$?"

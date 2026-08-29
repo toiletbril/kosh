@@ -948,12 +948,13 @@ subshell_body_is_conditional_expression(StringView body) wontthrow -> bool
   return false;
 }
 
-cold static fn subshell_body_is_bracket_test(StringView body) wontthrow -> bool
+cold static fn subshell_body_is_bracket_test(const Expression *body) throws
+    -> bool
 {
-  if (body.starts_with(StringView{"test "})) return true;
+  let const compound_list = body->as_compound_list();
+  if (compound_list == nullptr) return false;
 
-  return body.length >= 3 && body.starts_with(StringView{"[ "}) &&
-         body[body.length - 1] == ']';
+  return compound_list->has_single_test_command();
 }
 
 fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
@@ -991,7 +992,7 @@ fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     } else if (was_analyzing_condition) {
       if (subshell_body_is_conditional_expression(body)) {
         actx.report_diagnostic(diagnostic_id::sc2233, source_location());
-      } else if (subshell_body_is_bracket_test(body)) {
+      } else if (subshell_body_is_bracket_test(m_body)) {
         actx.report_diagnostic(diagnostic_id::sc2234, source_location());
       }
     }

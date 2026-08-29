@@ -59,6 +59,53 @@ public:
     Nproc,
     Flock,
     Calc,
+    Chgrp,
+    Chmod,
+    Chown,
+    Df,
+    Link,
+    Mkfifo,
+    Pathchk,
+    Cksum,
+    Cmp,
+    Comm,
+    Tsort,
+    Csplit,
+    Cut,
+    Expand,
+    Fold,
+    Nl,
+    Paste,
+    Pr,
+    Sed,
+    Split,
+    Unexpand,
+    File,
+    Od,
+    Strings,
+    Cal,
+    Date,
+    Getconf,
+    Id,
+    Locale,
+    Logname,
+    Tty,
+    Uname,
+    Who,
+    Bc,
+    Expr,
+    Uuencode,
+    Uudecode,
+    Xargs,
+    Logger,
+    Nice,
+    Nohup,
+    Renice,
+    Man,
+    More,
+    Stty,
+    Tabs,
+    Tput,
   };
 
   pure virtual Kind kind() const wontthrow = 0;
@@ -111,12 +158,59 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("nproc"),    Utility::Kind::Nproc   },
     {SSK("flock"),    Utility::Kind::Flock   },
     {SSK("calc"),     Utility::Kind::Calc    },
+    {SSK("chgrp"),    Utility::Kind::Chgrp   },
+    {SSK("chmod"),    Utility::Kind::Chmod   },
+    {SSK("chown"),    Utility::Kind::Chown   },
+    {SSK("df"),       Utility::Kind::Df      },
+    {SSK("link"),     Utility::Kind::Link    },
+    {SSK("mkfifo"),   Utility::Kind::Mkfifo  },
+    {SSK("pathchk"),  Utility::Kind::Pathchk },
+    {SSK("cksum"),    Utility::Kind::Cksum   },
+    {SSK("cmp"),      Utility::Kind::Cmp     },
+    {SSK("comm"),     Utility::Kind::Comm    },
+    {SSK("tsort"),    Utility::Kind::Tsort   },
+    {SSK("csplit"),   Utility::Kind::Csplit  },
+    {SSK("cut"),      Utility::Kind::Cut     },
+    {SSK("expand"),   Utility::Kind::Expand  },
+    {SSK("fold"),     Utility::Kind::Fold    },
+    {SSK("nl"),       Utility::Kind::Nl      },
+    {SSK("paste"),    Utility::Kind::Paste   },
+    {SSK("pr"),       Utility::Kind::Pr      },
+    {SSK("sed"),      Utility::Kind::Sed     },
+    {SSK("split"),    Utility::Kind::Split   },
+    {SSK("unexpand"), Utility::Kind::Unexpand},
+    {SSK("file"),     Utility::Kind::File    },
+    {SSK("od"),       Utility::Kind::Od      },
+    {SSK("strings"),  Utility::Kind::Strings },
+    {SSK("cal"),      Utility::Kind::Cal     },
+    {SSK("date"),     Utility::Kind::Date    },
+    {SSK("getconf"),  Utility::Kind::Getconf },
+    {SSK("id"),       Utility::Kind::Id      },
+    {SSK("locale"),   Utility::Kind::Locale  },
+    {SSK("logname"),  Utility::Kind::Logname },
+    {SSK("tty"),      Utility::Kind::Tty     },
+    {SSK("uname"),    Utility::Kind::Uname   },
+    {SSK("who"),      Utility::Kind::Who     },
+    {SSK("bc"),       Utility::Kind::Bc      },
+    {SSK("expr"),     Utility::Kind::Expr    },
+    {SSK("uuencode"), Utility::Kind::Uuencode},
+    {SSK("uudecode"), Utility::Kind::Uudecode},
+    {SSK("xargs"),    Utility::Kind::Xargs   },
+    {SSK("logger"),   Utility::Kind::Logger  },
+    {SSK("nice"),     Utility::Kind::Nice    },
+    {SSK("nohup"),    Utility::Kind::Nohup   },
+    {SSK("renice"),   Utility::Kind::Renice  },
+    {SSK("man"),      Utility::Kind::Man     },
+    {SSK("more"),     Utility::Kind::More    },
+    {SSK("stty"),     Utility::Kind::Stty    },
+    {SSK("tabs"),     Utility::Kind::Tabs    },
+    {SSK("tput"),     Utility::Kind::Tput    },
 };
 
 inline constexpr StaticStringMap KOSHKIT_UTILS{KOSHKIT_ENTRIES};
 
 inline constexpr usize KOSHKIT_UTIL_COUNT =
-    static_cast<usize>(Utility::Kind::Calc) + 1;
+    static_cast<usize>(Utility::Kind::Tput) + 1;
 
 /* A utility with no registration reads back null. */
 fn register_koshkit_util_flags(Utility::Kind chosen,
@@ -217,7 +311,54 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Unlink);                                                              \
   U_CASE(Nproc);                                                               \
   U_CASE(Flock);                                                               \
-  U_CASE(Calc)
+  U_CASE(Calc);                                                                \
+  U_CASE(Chgrp);                                                               \
+  U_CASE(Chmod);                                                               \
+  U_CASE(Chown);                                                               \
+  U_CASE(Df);                                                                  \
+  U_CASE(Link);                                                                \
+  U_CASE(Mkfifo);                                                              \
+  U_CASE(Pathchk);                                                             \
+  U_CASE(Cksum);                                                               \
+  U_CASE(Cmp);                                                                 \
+  U_CASE(Comm);                                                                \
+  U_CASE(Tsort);                                                               \
+  U_CASE(Csplit);                                                              \
+  U_CASE(Cut);                                                                 \
+  U_CASE(Expand);                                                              \
+  U_CASE(Fold);                                                                \
+  U_CASE(Nl);                                                                  \
+  U_CASE(Paste);                                                               \
+  U_CASE(Pr);                                                                  \
+  U_CASE(Sed);                                                                 \
+  U_CASE(Split);                                                               \
+  U_CASE(Unexpand);                                                            \
+  U_CASE(File);                                                                \
+  U_CASE(Od);                                                                  \
+  U_CASE(Strings);                                                             \
+  U_CASE(Cal);                                                                 \
+  U_CASE(Date);                                                                \
+  U_CASE(Getconf);                                                             \
+  U_CASE(Id);                                                                  \
+  U_CASE(Locale);                                                              \
+  U_CASE(Logname);                                                             \
+  U_CASE(Tty);                                                                 \
+  U_CASE(Uname);                                                               \
+  U_CASE(Who);                                                                 \
+  U_CASE(Bc);                                                                  \
+  U_CASE(Expr);                                                                \
+  U_CASE(Uuencode);                                                            \
+  U_CASE(Uudecode);                                                            \
+  U_CASE(Xargs);                                                               \
+  U_CASE(Logger);                                                              \
+  U_CASE(Nice);                                                                \
+  U_CASE(Nohup);                                                               \
+  U_CASE(Renice);                                                              \
+  U_CASE(Man);                                                                 \
+  U_CASE(More);                                                                \
+  U_CASE(Stty);                                                                \
+  U_CASE(Tabs);                                                                \
+  U_CASE(Tput)
 
 #define UTILITY_STRUCT(u)                                                      \
   class u : public Utility                                                     \
@@ -269,6 +410,53 @@ UTILITY_STRUCT(Unlink);
 UTILITY_STRUCT(Nproc);
 UTILITY_STRUCT(Flock);
 UTILITY_STRUCT(Calc);
+UTILITY_STRUCT(Chgrp);
+UTILITY_STRUCT(Chmod);
+UTILITY_STRUCT(Chown);
+UTILITY_STRUCT(Df);
+UTILITY_STRUCT(Link);
+UTILITY_STRUCT(Mkfifo);
+UTILITY_STRUCT(Pathchk);
+UTILITY_STRUCT(Cksum);
+UTILITY_STRUCT(Cmp);
+UTILITY_STRUCT(Comm);
+UTILITY_STRUCT(Tsort);
+UTILITY_STRUCT(Csplit);
+UTILITY_STRUCT(Cut);
+UTILITY_STRUCT(Expand);
+UTILITY_STRUCT(Fold);
+UTILITY_STRUCT(Nl);
+UTILITY_STRUCT(Paste);
+UTILITY_STRUCT(Pr);
+UTILITY_STRUCT(Sed);
+UTILITY_STRUCT(Split);
+UTILITY_STRUCT(Unexpand);
+UTILITY_STRUCT(File);
+UTILITY_STRUCT(Od);
+UTILITY_STRUCT(Strings);
+UTILITY_STRUCT(Cal);
+UTILITY_STRUCT(Date);
+UTILITY_STRUCT(Getconf);
+UTILITY_STRUCT(Id);
+UTILITY_STRUCT(Locale);
+UTILITY_STRUCT(Logname);
+UTILITY_STRUCT(Tty);
+UTILITY_STRUCT(Uname);
+UTILITY_STRUCT(Who);
+UTILITY_STRUCT(Bc);
+UTILITY_STRUCT(Expr);
+UTILITY_STRUCT(Uuencode);
+UTILITY_STRUCT(Uudecode);
+UTILITY_STRUCT(Xargs);
+UTILITY_STRUCT(Logger);
+UTILITY_STRUCT(Nice);
+UTILITY_STRUCT(Nohup);
+UTILITY_STRUCT(Renice);
+UTILITY_STRUCT(Man);
+UTILITY_STRUCT(More);
+UTILITY_STRUCT(Stty);
+UTILITY_STRUCT(Tabs);
+UTILITY_STRUCT(Tput);
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;
 

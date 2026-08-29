@@ -2,3 +2,14 @@
 <a*star>
 release-debug-flags=0
 language-server=<--language-server>
+calc-flags=<-i --interactive -p --pipe>
+head-flags=<-n -c>
+killall-flags=<-s --signal -l --list>
+ls-flags=<-a -A -1 -l -h>
+make-flags=<-f --file -C --directory -B --always-make -k --keep-going -e --environment-overrides -i --ignore-errors -S --stop -n --just-print -p --print-data-base -q --question -r --no-builtin-rules -s --silent -t --touch>
+mkdir-flags=<-p -m>
+ps-flags=<-a -u -x -w>
+rm-flags=<-r -R -f --dry-run>
+tail-flags=<-n -c>
+which-flags=<-a --all -q --quiet>
+whoami-help=<--help>

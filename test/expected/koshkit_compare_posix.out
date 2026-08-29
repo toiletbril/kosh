@@ -1,0 +1,339 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "abc\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "abd\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\nc\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "b\nc\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cksum" "first" "empty"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cksum-status=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cmp" "first" "first"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cmp-equal=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cmp" "-s" "first" "second"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cmp-different=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cmp" "-l" "first" "second"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cmp-list=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "comm" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "comm" "-12" "left" "right"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "1\n\t2\n\t\t3\n4\n\t5\n\t\t6\n7\n\t8\n\t\t9\n"]
+      [SimpleCommand "koshkit" "comm" "-" "-"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a b\na c\nb d\nc d\n"]
+      [SimpleCommand "koshkit" "tsort"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tsort-status=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a b\n"]
+      [SimpleCommand "koshkit" "tsort" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tsort-dash=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a b c\n"]
+      [SimpleCommand "koshkit" "tsort" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tsort-odd=$?"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "abc\n"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "abd\n"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "empty"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nc\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "b\nc\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cksum"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "empty"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cksum-status="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cmp"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cmp-equal="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cmp"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cmp-different="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cmp"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cmp-list="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "comm"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "comm"
+]
+[Word
+  Unquoted "-12"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "1\n\t2\n\t\t3\n4\n\t5\n\t\t6\n7\n\t8\n\t\t9\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "comm"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a b\na c\nb d\nc d\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tsort"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tsort-status="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a b\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tsort"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tsort-dash="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a b c\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tsort"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tsort-odd="
+  Variable "?"
+]
+1112837078 4 first
+4294967295 0 empty
+cksum-status=0
+cmp-equal=0
+cmp-different=1
+     3 143 144
+cmp-list=1
+a
+	b
+		c
+c
+1
+	2
+		3
+4
+	5
+		6
+7
+	8
+		9
+a
+b
+c
+d
+tsort-status=0
+tsort-dash=0
+tsort-odd=1
+[Code 0]

@@ -1242,6 +1242,12 @@ fn Expression::as_simple_command() const wontthrow
   return nullptr;
 }
 
+fn Expression::as_compound_list() const wontthrow
+    -> const expressions::CompoundList *
+{
+  return nullptr;
+}
+
 fn Expression::as_for_loop() const wontthrow -> const expressions::ForLoop *
 {
   return nullptr;

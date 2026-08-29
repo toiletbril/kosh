@@ -1,0 +1,18 @@
+koshkit cal 2 2024
+
+koshkit date -u +%Y >/dev/null
+echo "date=$?"
+koshkit getconf ARG_MAX >/dev/null
+echo "getconf=$?"
+koshkit id -u >/dev/null
+echo "id=$?"
+LC_ALL=C koshkit locale charmap >/dev/null
+echo "locale=$?"
+koshkit logname >/dev/null
+echo "logname=$?"
+koshkit tty -s
+echo "tty=$?"
+koshkit uname -s >/dev/null
+echo "uname=$?"
+koshkit who >/dev/null
+echo "who=$?"

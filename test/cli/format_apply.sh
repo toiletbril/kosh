@@ -15,6 +15,20 @@ esac
 printf 'if test -f "\044x"; then echo yes; else echo no; fi\n' |
   "$BIN" --format
 
+printf '%s\n' 'ln a b && test ! -f c || result=fallback' \
+  > "$root/diagnostic-stability.sh"
+diagnostics_before=$("$BIN" --lint --no-traces \
+  "$root/diagnostic-stability.sh" 2>&1)
+diagnostics_before_status=$?
+"$BIN" --format "$root/diagnostic-stability.sh" \
+  > "$root/diagnostic-stability-formatted.sh"
+diagnostics_after=$("$BIN" --lint --no-traces \
+  "$root/diagnostic-stability-formatted.sh" 2>&1)
+diagnostics_after_status=$?
+printf 'format-diagnostics=%s,%s,%s\n' \
+  "$diagnostics_before_status" "$diagnostics_after_status" \
+  "$([ "$diagnostics_before" = "$diagnostics_after" ] && printf same)"
+
 cat > "$root/comments.sh" <<'EOF'
 #!/bin/sh
   # keep this text without wrapping
@@ -277,6 +291,14 @@ case $1 in
 (alpha) echo first ;;
 (beta|gamma) echo second ;;
 *) echo "rest $count" ;;
+esac
+case outer in
+outer)
+  case inner in
+  inner) nested_value=`printf nested`
+    echo "$nested_value" ;;
+  esac;;
+*) echo unreachable ;;
 esac
 for name in one two; do echo "${#name}"; done
 EOF

@@ -138,6 +138,18 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "$((0x1F + 1))"]
           [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((2 ^ 8))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((mask | 2 ^ 8))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((2 ^ mask))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((flags ^ 8))"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$((flags ^ mask))"]
+          [CompoundListCondition, None]
+            [ArithmeticCommand "flags ^= mask"]
+          [CompoundListCondition, None]
             [SimpleCommand "$((count + 1))"]
           [CompoundListCondition, None]
             [ArithmeticCommand " total / parts * scale "]
@@ -597,6 +609,45 @@
 ]
 [Word
   ArithmeticExpansion "0x1F + 1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "2 ^ 8"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "mask | 2 ^ 8"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "2 ^ mask"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "flags ^ 8"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "flags ^ mask"
+]
+[Word
+  Unquoted "flags"
+]
+[Word
+  Unquoted "^="
+]
+[Word
+  Unquoted "mask"
 ]
 [Word
   ArithmeticExpansion "count + 1"
@@ -1094,75 +1145,79 @@ note: Write `a*c/b` to multiply first.
     74 |    echo $((010 + 1))
        |            ^~~~~~~
 note: Drop the leading zero, or write `10#010` for base ten.
-76:3: warning: The number produced by the expansion is run as a command. (SC2084)
-    76 |    $((count + 1))
+76:11: warning: The `^` operator performs bitwise XOR in Bash arithmetic.
+    76 |    echo $((2 ^ 8))
+       |            ^~~~~
+note: Use `**`, the Bash power operator, if you meant exponentiation.
+82:3: warning: The number produced by the expansion is run as a command. (SC2084)
+    82 |    $((count + 1))
        |    ^~~~~~~~~~~~~~
 note: Drop the `$` for `(( ))`, or write `_=$(( ))` to keep the value.
-77:3: warning: The division truncates before the multiplication. (SC2017)
-    77 |    (( total / parts * scale ))
+83:3: warning: The division truncates before the multiplication. (SC2017)
+    83 |    (( total / parts * scale ))
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: Write `a*c/b` to multiply first.
-81:19: warning: The word list is the one constant word 'single'. (SC2043)
-    81 |    for one_word in single; do echo "$one_word"; done
+87:19: warning: The word list is the one constant word 'single'. (SC2043)
+    87 |    for one_word in single; do echo "$one_word"; done
        |                    ^~~~~~
 note: Loop over a glob, a variable, or a command substitution.
-82:16: warning: The expansion in '${directory}/*.txt' is unquoted. (SC2231)
-    82 |    for entry in ${directory}/*.txt; do echo "$entry"; done
+88:16: warning: The expansion in '${directory}/*.txt' is unquoted. (SC2231)
+    88 |    for entry in ${directory}/*.txt; do echo "$entry"; done
        |                 ^~~~~~~~~~~~~~~~~~
 note: Quote the expansion and leave the glob characters outside the quotes.
-84:29: warning: The `break` command leaves the pipeline subshell, and the loop keeps running. (SC2106)
-    84 |      echo hi | grep -q bye | break
+90:29: warning: The `break` command leaves the pipeline subshell, and the loop keeps running. (SC2106)
+    90 |      echo hi | grep -q bye | break
        |                              ^~~~~
 note: Write `||` in place of the pipe.
-89:8: warning: The `case` word 'constant' is constant. (SC2194)
-    89 |    case constant in
+95:8: warning: The `case` word 'constant' is constant. (SC2194)
+    95 |    case constant in
        |         ^~~~~~~~
 note: Add the missing `$`, or drop the `case`.
-94:3: warning: The pattern 'nomatch' cannot match the `case` word '"$prefix suffix"'. (SC2195)
-    94 |    nomatch) : ;;
+100:3: warning: The pattern 'nomatch' cannot match the `case` word '"$prefix suffix"'. (SC2195)
+   100 |    nomatch) : ;;
        |    ^~~~~~~
-98:3: warning: The expansion in the pattern '$expanded' is matched as a glob. (SC2254)
-    98 |    $expanded) : ;;
+104:3: warning: The expansion in the pattern '$expanded' is matched as a glob. (SC2254)
+   104 |    $expanded) : ;;
        |    ^~~~~~~~~
 note: Quote the expansion so the pattern matches literally.
-104:5: warning: The optstring does not declare 'z'. (SC2214)
-   104 |      z) : ;;
+110:5: warning: The optstring does not declare 'z'. (SC2214)
+   110 |      z) : ;;
        |      ^
-101:17: details:
-   101 |    while getopts "ab:" chosen_option; do
+107:17: details:
+   107 |    while getopts "ab:" chosen_option; do
        |                  ^~~~~ this optstring omits the option.
 note: Add the letter to the optstring, or remove the branch.
-102:10: warning: This `case` has no default `*)` branch. (SC2249)
-   102 |      case $chosen_option in
+108:10: warning: This `case` has no default `*)` branch. (SC2249)
+   108 |      case $chosen_option in
        |           ^~~~~~~~~~~~~~
-102:10: warning: The optstring declares 'b', and no branch of this `case` handles it. (SC2213)
-   102 |      case $chosen_option in
+108:10: warning: The optstring declares 'b', and no branch of this `case` handles it. (SC2213)
+   108 |      case $chosen_option in
        |           ^~~~~~~~~~~~~~
-101:17: details:
-   101 |    while getopts "ab:" chosen_option; do
+107:17: details:
+   107 |    while getopts "ab:" chosen_option; do
        |                  ^~~~~ this optstring declares the option.
 note: Add a `b)` branch, or drop the letter from the optstring.
-102:10: warning: `getopts` stores a question mark for an unknown option, and no branch handles it. (SC2220)
-   102 |      case $chosen_option in
+108:10: warning: `getopts` stores a question mark for an unknown option, and no branch handles it. (SC2220)
+   108 |      case $chosen_option in
        |           ^~~~~~~~~~~~~~
-101:17: details:
-   101 |    while getopts "ab:" chosen_option; do
+107:17: details:
+   107 |    while getopts "ab:" chosen_option; do
        |                  ^~~~~ this loop reads the options.
 note: Add a `*)` branch that prints the usage and exits.
-110:3: warning: The `( )` group starts a subshell and costs a process on every run. (SC2235)
-   110 |    ( echo first || echo second ) && echo third
+116:3: warning: The `( )` group starts a subshell and costs a process on every run. (SC2235)
+   116 |    ( echo first || echo second ) && echo third
        |    ^
 note: Write `{ ...; }` to group the commands in the current shell.
-111:5: warning: The `!` inhibits errexit whether the command succeeds or fails, and nothing reads the status. (SC2251)
-   111 |    ! false
+117:5: warning: The `!` inhibits errexit whether the command succeeds or fails, and nothing reads the status. (SC2251)
+   117 |    ! false
        |      ^~~~~
 note: Write `|| exit 1` after it, or check `$?`.
-115:10: warning: The `break` command stands outside any loop. (SC2105)
-   115 |  false && break
+121:10: warning: The `break` command stands outside any loop. (SC2105)
+   121 |  false && break
        |           ^~~~~
 note: Remove it, or move it into the loop it belongs to.
-116:10: warning: The `continue` command stands outside any loop. (SC2105)
-   116 |  false && continue
+122:10: warning: The `continue` command stands outside any loop. (SC2105)
+   122 |  false && continue
        |           ^~~~~~~~
 note: Remove it, or move it into the loop it belongs to.
 15:3: warning: The value of 'swallowed' is the command name 'printf'. (SC2209)
@@ -1173,5 +1228,5 @@ note: Write `swallowed=$(printf)` to store its output, or quote the name.
     42 |    pager=cat
        |    ^~~~~~~~~
 note: Write `pager=$(cat)` to store its output, or quote the name.
-Encountered 68 warnings.
+Encountered 69 warnings.
 [Code 0]

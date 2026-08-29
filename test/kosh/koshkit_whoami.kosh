@@ -1,0 +1,12 @@
+#!/bin/env kosh
+
+current_user=$(koshkit whoami)
+if [[ -n $current_user ]]; then
+  echo nonempty=yes
+else
+  echo nonempty=no
+fi
+
+echo "lines=$(koshkit whoami | koshkit wc -l)"
+koshkit whoami --help > "$TEST_NULL_DEVICE"
+echo "help=$?"

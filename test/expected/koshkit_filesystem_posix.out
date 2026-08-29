@@ -1,0 +1,694 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$root/tree/child"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chmod" "640" "$root/mode"]
+  [CompoundListCondition, None]
+    [Assign mode_fields=$(koshkit ls -l "$root/mode")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chmod-octal=$mode_fields%% *"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chmod" "u+x,g=u,o-r" "$root/mode"]
+  [CompoundListCondition, None]
+    [Assign mode_fields=$(koshkit ls -l "$root/mode")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chmod-symbolic=$mode_fields%% *"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chmod" "-R" "a+rX" "$root/tree"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [Assign directory_status=$?]
+  [CompoundListCondition, None]
+    [Assign plain_fields=$(koshkit ls -l "$root/tree/plain")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chmod-recursive=$directory_status $plain_fields%% *"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chmod" "444" "$root/omitted-who"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chmod" "+w" "$root/omitted-who"]
+  [CompoundListCondition, None]
+    [Assign omitted_fields=$(koshkit ls -l "$root/omitted-who")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chmod-umask=$omitted_fields%% *"]
+  [CompoundListCondition, None]
+    [Assign uid=$UID]
+  [CompoundListCondition, None]
+    [Assign gid=$GROUPS[0]]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "$uid:$gid" "$root/mode"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown=$?"]
+  [CompoundListCondition, None]
+    [Assign owner_name=$(koshkit whoami)]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "$owner_name:$gid" "$root/mode"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-name=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chgrp" "$gid" "$root/mode"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chgrp=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "link" "$root/mode" "$root/hard-link"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "link=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "link" "$root/mode" "$root/hard-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "link-existing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkfifo" "-m" "600" "$root/fifo"]
+  [CompoundListCondition, None]
+    [Assign fifo_fields=$(koshkit ls -l "$root/fifo")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "mkfifo=$fifo_fields%% *"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkfifo" "$root/fifo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "mkfifo-existing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkfifo" "-m" "a-w" "$root/read-only-fifo"]
+  [CompoundListCondition, None]
+    [Assign fifo_fields=$(koshkit ls -l "$root/read-only-fifo")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "mkfifo-symbolic=$fifo_fields%% *"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "df-fields=$(koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "df" "$root/missing"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "df-missing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "df"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "df-all=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-p" "a_b.c-d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-portable=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-p" "a b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-space=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-P" "--" "dir/-bad"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-hyphen=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-p" "abcdefghijklmno"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-name-length=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-P" ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-empty=$?"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/tree/child"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/tree/plain"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chmod"
+]
+[Word
+  Unquoted "640"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "mode_fields="
+  CommandSubstitution "koshkit ls -l "$root/mode""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chmod-octal="
+  Variable "mode_fields%% *"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chmod"
+]
+[Word
+  Unquoted "u+x,g=u,o-r"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "mode_fields="
+  CommandSubstitution "koshkit ls -l "$root/mode""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chmod-symbolic="
+  Variable "mode_fields%% *"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chmod"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "a+rX"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/tree"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-x"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/tree/child"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "directory_status="
+  Variable "?"
+]
+[Word
+  Unquoted "plain_fields="
+  CommandSubstitution "koshkit ls -l "$root/tree/plain""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chmod-recursive="
+  Variable "directory_status"
+  DoubleQuoted " "
+  Variable "plain_fields%% *"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/omitted-who"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chmod"
+]
+[Word
+  Unquoted "444"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/omitted-who"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chmod"
+]
+[Word
+  Unquoted "+w"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/omitted-who"
+]
+[Word
+  Unquoted "omitted_fields="
+  CommandSubstitution "koshkit ls -l "$root/omitted-who""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chmod-umask="
+  Variable "omitted_fields%% *"
+]
+[Word
+  Unquoted "uid="
+  Variable "UID"
+]
+[Word
+  Unquoted "gid="
+  Variable "GROUPS[0]"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown="
+  Variable "?"
+]
+[Word
+  Unquoted "owner_name="
+  CommandSubstitution "koshkit whoami"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Variable "owner_name"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-name="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chgrp"
+]
+[Word
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chgrp="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "link"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/hard-link"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/hard-link"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "link="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "link"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/hard-link"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "link-existing="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkfifo"
+]
+[Word
+  Unquoted "-m"
+]
+[Word
+  Unquoted "600"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/fifo"
+]
+[Word
+  Unquoted "fifo_fields="
+  CommandSubstitution "koshkit ls -l "$root/fifo""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "mkfifo="
+  Variable "fifo_fields%% *"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkfifo"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/fifo"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "mkfifo-existing="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkfifo"
+]
+[Word
+  Unquoted "-m"
+]
+[Word
+  Unquoted "a-w"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/read-only-fifo"
+]
+[Word
+  Unquoted "fifo_fields="
+  CommandSubstitution "koshkit ls -l "$root/read-only-fifo""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "mkfifo-symbolic="
+  Variable "fifo_fields%% *"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "df-fields="
+  CommandSubstitution "koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "df"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/missing"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "df-missing="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "df"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "df-all="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "a_b.c-d"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-portable="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Literal "a b"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-space="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "dir/-bad"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-hyphen="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "abcdefghijklmno"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-name-length="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Literal ""
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-empty="
+  Variable "?"
+]
+chmod-octal=-rw-r-----
+chmod-symbolic=-rwxrwx---
+chmod-recursive=0 -rw-r--r--
+chmod-umask=-rw-r--r--
+chown=0
+chown-name=0
+chgrp=0
+link=0
+link-existing=1
+mkfifo=prw-------
+mkfifo-existing=1
+mkfifo-symbolic=pr--r--r--
+df-fields=6
+df-missing=1
+df-all=0
+pathchk-portable=0
+pathchk-space=1
+pathchk-hyphen=1
+pathchk-name-length=1
+pathchk-empty=1
+[Code 0]

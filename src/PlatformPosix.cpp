@@ -7,8 +7,72 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
+#include <syslog.h>
+#include <utmpx.h>
+
 namespace koshka {
 namespace os {
+
+fn logged_in_users() throws -> ArrayList<user_session>
+{
+  let result = ArrayList<user_session>{heap_allocator()};
+  setutxent();
+  defer { endutxent(); };
+  const struct utmpx *entry;
+
+  while ((entry = getutxent()) != nullptr) {
+    if (entry->ut_type != USER_PROCESS || entry->ut_user[0] == '\0') continue;
+    let const user_length = strnlen(entry->ut_user, sizeof(entry->ut_user));
+    let const line_length = strnlen(entry->ut_line, sizeof(entry->ut_line));
+    result.push(user_session{
+        String{StringView{entry->ut_user, user_length}},
+        String{StringView{entry->ut_line, line_length}},
+        static_cast<i64>(entry->ut_tv.tv_sec),
+    });
+  }
+
+  return result;
+}
+
+static pure fn system_log_priority(StringView priority) wontthrow -> int
+{
+  struct named_priority
+  {
+    StringView name;
+    int value;
+  };
+  static constexpr named_priority PRIORITIES[] = {
+      {"emerg",   LOG_EMERG  },
+      {"alert",   LOG_ALERT  },
+      {"crit",    LOG_CRIT   },
+      {"err",     LOG_ERR    },
+      {"warning", LOG_WARNING},
+      {"notice",  LOG_NOTICE },
+      {"info",    LOG_INFO   },
+      {"debug",   LOG_DEBUG  },
+  };
+  let level = LOG_NOTICE;
+  let name = priority;
+  if (let const separator = priority.find_character('.'); separator.has_value())
+    name = priority.substring(*separator + 1);
+  for (let const &candidate : PRIORITIES)
+    if (candidate.name == name) return candidate.value;
+  return level;
+}
+
+fn write_system_log(StringView tag, StringView priority, StringView message,
+                    bool should_include_pid,
+                    bool should_copy_to_stderr) wontthrow -> bool
+{
+  let tag_text = String{heap_allocator(), tag};
+  let message_text = String{heap_allocator(), message};
+  let options = should_include_pid ? LOG_PID : 0;
+  if (should_copy_to_stderr) options |= LOG_PERROR;
+  openlog(tag_text.is_empty() ? nullptr : tag_text.c_str(), options, 0);
+  syslog(system_log_priority(priority), "%s", message_text.c_str());
+  closelog();
+  return true;
+}
 
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
@@ -363,6 +427,13 @@ fn is_stdout_a_tty() wontthrow -> bool { return isatty(KOSH_STDOUT); }
 fn is_stderr_a_tty() wontthrow -> bool { return isatty(KOSH_STDERR); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
 
+fn terminal_name(descriptor fd) throws -> Maybe<String>
+{
+  char buffer[1024];
+  if (ttyname_r(fd, buffer, sizeof(buffer)) != 0) return None;
+  return String{buffer};
+}
+
 terminal_echo_guard::terminal_echo_guard(descriptor input,
                                          bool should_disable) wontthrow
     : m_input(input)
@@ -413,6 +484,20 @@ fn compile_regex(StringView pattern, case_sensitivity sensitivity,
   let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   let const pattern_text = String{heap_allocator(), pattern};
   int compile_flags = REG_EXTENDED;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
+    return regex_compile_result::Invalid;
+
+  return regex_compile_result::Ok;
+}
+
+fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
+                       compiled_regex &out) throws -> regex_compile_result
+{
+  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
+  let const pattern_text = String{heap_allocator(), pattern};
+  int compile_flags = 0;
   if (is_case_insensitive) compile_flags |= REG_ICASE;
 
   if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
@@ -583,6 +668,213 @@ fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
   columns = window.ws_col;
   rows = window.ws_row;
   return true;
+}
+
+static pure fn terminal_speed_number(speed_t speed) wontthrow -> u32
+{
+  switch (speed) {
+  case B0: return 0;
+  case B50: return 50;
+  case B75: return 75;
+  case B110: return 110;
+  case B134: return 134;
+  case B150: return 150;
+  case B200: return 200;
+  case B300: return 300;
+  case B600: return 600;
+  case B1200: return 1200;
+  case B1800: return 1800;
+  case B2400: return 2400;
+  case B4800: return 4800;
+  case B9600: return 9600;
+  case B19200: return 19200;
+  case B38400: return 38400;
+#ifdef B57600
+  case B57600: return 57600;
+#endif
+#ifdef B115200
+  case B115200: return 115200;
+#endif
+  default: return 0;
+  }
+}
+
+static pure fn terminal_speed_value(StringView text) wontthrow -> speed_t
+{
+  struct terminal_speed
+  {
+    StringView name;
+    speed_t value;
+  };
+  static constexpr terminal_speed SPEEDS[] = {
+      {"0",      B0     },
+      {"50",     B50    },
+      {"75",     B75    },
+      {"110",    B110   },
+      {"134",    B134   },
+      {"150",    B150   },
+      {"200",    B200   },
+      {"300",    B300   },
+      {"600",    B600   },
+      {"1200",   B1200  },
+      {"1800",   B1800  },
+      {"2400",   B2400  },
+      {"4800",   B4800  },
+      {"9600",   B9600  },
+      {"19200",  B19200 },
+      {"38400",  B38400 },
+#ifdef B57600
+      {"57600",  B57600 },
+#endif
+#ifdef B115200
+      {"115200", B115200},
+#endif
+  };
+  for (let const &speed : SPEEDS)
+    if (speed.name == text) return speed.value;
+  return static_cast<speed_t>(~speed_t{0});
+}
+
+fn terminal_settings(descriptor terminal, bool should_encode,
+                     Allocator allocator) throws -> Maybe<String>
+{
+  termios state{};
+  if (tcgetattr(terminal, &state) != 0) return None;
+  let output = String{allocator};
+  if (should_encode) {
+    output +=
+        String::from_in_base(state.c_iflag, false, int_base::hex, allocator);
+    output += ':';
+    output +=
+        String::from_in_base(state.c_oflag, false, int_base::hex, allocator);
+    output += ':';
+    output +=
+        String::from_in_base(state.c_cflag, false, int_base::hex, allocator);
+    output += ':';
+    output +=
+        String::from_in_base(state.c_lflag, false, int_base::hex, allocator);
+    output += '\n';
+    return output;
+  }
+  output += "speed ";
+  output += String::from(terminal_speed_number(cfgetospeed(&state)), allocator);
+  output += " baud; ";
+  u32 columns = 0;
+  u32 rows = 0;
+  if (terminal_size(columns, rows, terminal)) {
+    output += "rows ";
+    output += String::from(rows, allocator);
+    output += "; columns ";
+    output += String::from(columns, allocator);
+    output += "; ";
+  }
+  struct terminal_flag
+  {
+    const char *name;
+    tcflag_t value;
+    tcflag_t termios::*member;
+  };
+  static constexpr terminal_flag FLAGS[] = {
+      {"echo",   ECHO,   &termios::c_lflag},
+      {"icanon", ICANON, &termios::c_lflag},
+      {"isig",   ISIG,   &termios::c_lflag},
+      {"iexten", IEXTEN, &termios::c_lflag},
+      {"opost",  OPOST,  &termios::c_oflag},
+      {"icrnl",  ICRNL,  &termios::c_iflag},
+#ifdef ONLCR
+      {"onlcr",  ONLCR,  &termios::c_oflag},
+#endif
+  };
+  for (let const &flag : FLAGS) {
+    if ((state.*(flag.member) & flag.value) == 0) output += '-';
+    output += flag.name;
+    output += ' ';
+  }
+  output += '\n';
+  return output;
+}
+
+fn apply_terminal_settings(descriptor terminal,
+                           const ArrayList<String> &settings) wontthrow -> bool
+{
+  termios state{};
+  if (tcgetattr(terminal, &state) != 0) return false;
+  winsize window{};
+  let has_window = ioctl(terminal, TIOCGWINSZ, &window) == 0;
+  for (usize index = 0; index < settings.count(); index++) {
+    let const setting = settings[index].view();
+    let const is_disabled = setting.length > 1 && setting[0] == '-';
+    let const name = is_disabled ? setting.substring(1) : setting;
+    tcflag_t *field = nullptr;
+    tcflag_t flag = 0;
+    if (name == "echo") {
+      field = &state.c_lflag;
+      flag = ECHO;
+    } else if (name == "icanon") {
+      field = &state.c_lflag;
+      flag = ICANON;
+    } else if (name == "isig") {
+      field = &state.c_lflag;
+      flag = ISIG;
+    } else if (name == "iexten") {
+      field = &state.c_lflag;
+      flag = IEXTEN;
+    } else if (name == "opost") {
+      field = &state.c_oflag;
+      flag = OPOST;
+    } else if (name == "icrnl") {
+      field = &state.c_iflag;
+      flag = ICRNL;
+#ifdef ONLCR
+    } else if (name == "onlcr") {
+      field = &state.c_oflag;
+      flag = ONLCR;
+#endif
+    } else if (name == "raw") {
+      if (!is_disabled) {
+        cfmakeraw(&state);
+      } else {
+        state.c_lflag |= ICANON | ISIG | ECHO;
+        state.c_iflag |= ICRNL;
+        state.c_oflag |= OPOST;
+      }
+      continue;
+    } else if (name == "sane") {
+      state.c_lflag |= ICANON | ISIG | ECHO | IEXTEN;
+      state.c_iflag |= ICRNL;
+      state.c_oflag |= OPOST;
+      continue;
+    } else if (name == "rows" || name == "cols" || name == "columns") {
+      if (++index == settings.count() || !has_window) return false;
+      let const parsed = utils::parse_decimal_u64(settings[index].view());
+      if (parsed.is_error() || parsed.value() > UINT16_MAX) return false;
+      if (name == "rows")
+        window.ws_row = static_cast<u16>(parsed.value());
+      else
+        window.ws_col = static_cast<u16>(parsed.value());
+      continue;
+    } else if (name == "min" || name == "time") {
+      if (++index == settings.count()) return false;
+      let const parsed = utils::parse_decimal_u64(settings[index].view());
+      if (parsed.is_error() || parsed.value() > UCHAR_MAX) return false;
+      state.c_cc[name == "min" ? VMIN : VTIME] =
+          static_cast<cc_t>(parsed.value());
+      continue;
+    } else {
+      let const speed = terminal_speed_value(name);
+      if (speed == static_cast<speed_t>(~speed_t{0}) || is_disabled)
+        return false;
+      if (cfsetispeed(&state, speed) != 0 || cfsetospeed(&state, speed) != 0)
+        return false;
+      continue;
+    }
+    if (is_disabled)
+      *field &= ~flag;
+    else
+      *field |= flag;
+  }
+  if (tcsetattr(terminal, TCSADRAIN, &state) != 0) return false;
+  return !has_window || ioctl(terminal, TIOCSWINSZ, &window) == 0;
 }
 
 fn make_fd_inheritable(descriptor fd) wontthrow -> void
@@ -815,6 +1107,20 @@ static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
   return koshka::None;
 }
 
+static fn lookup_id_by_name(StringView database_path, StringView wanted_name,
+                            usize id_field_index) throws -> Maybe<u32>
+{
+  let const contents = Path{database_path}.read_entire_file();
+  if (!contents) return koshka::None;
+  for (let const &line : utils::split_lines(contents->view())) {
+    if (passwd_field(line, 0) != wanted_name) continue;
+    let const id = passwd_field(line, id_field_index).to<i64>();
+    if (!id.is_error() && id.value() >= 0 && id.value() <= UINT32_MAX)
+      return static_cast<u32>(id.value());
+  }
+  return koshka::None;
+}
+
 fn uid_to_username(u32 uid) throws -> Maybe<String>
 {
   return lookup_name_by_id("/etc/passwd", uid, 2);
@@ -823,6 +1129,66 @@ fn uid_to_username(u32 uid) throws -> Maybe<String>
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>
 {
   return lookup_name_by_id("/etc/group", gid, 2);
+}
+
+fn username_to_uid(StringView username) throws -> Maybe<u32>
+{
+  if (let const current = get_current_user();
+      current.has_value() && current->view() == username)
+    return static_cast<u32>(get_real_user_id());
+  return lookup_id_by_name("/etc/passwd", username, 2);
+}
+
+fn groupname_to_gid(StringView groupname) throws -> Maybe<u32>
+{
+  return lookup_id_by_name("/etc/group", groupname, 2);
+}
+
+fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
+{
+  int native_key = 0;
+  switch (key) {
+  case system_configuration_key::ArgMax: native_key = _SC_ARG_MAX; break;
+  case system_configuration_key::ChildMax: native_key = _SC_CHILD_MAX; break;
+  case system_configuration_key::ClockTicks: native_key = _SC_CLK_TCK; break;
+  case system_configuration_key::GroupsMax: native_key = _SC_NGROUPS_MAX; break;
+  case system_configuration_key::OpenMax: native_key = _SC_OPEN_MAX; break;
+  case system_configuration_key::PageSize: native_key = _SC_PAGESIZE; break;
+  case system_configuration_key::StreamMax: native_key = _SC_STREAM_MAX; break;
+  case system_configuration_key::PosixVersion: native_key = _SC_VERSION; break;
+  }
+
+  errno = 0;
+  let const value = sysconf(native_key);
+  if (value == -1 && errno != 0) return None;
+  return static_cast<i64>(value);
+}
+
+fn path_configuration(StringView path, path_configuration_key key) wontthrow
+    -> Maybe<i64>
+{
+  int native_key = 0;
+  switch (key) {
+  case path_configuration_key::LinkMax: native_key = _PC_LINK_MAX; break;
+  case path_configuration_key::MaxCanonical: native_key = _PC_MAX_CANON; break;
+  case path_configuration_key::MaxInput: native_key = _PC_MAX_INPUT; break;
+  case path_configuration_key::NameMax: native_key = _PC_NAME_MAX; break;
+  case path_configuration_key::PathMax: native_key = _PC_PATH_MAX; break;
+  case path_configuration_key::PipeBuffer: native_key = _PC_PIPE_BUF; break;
+  case path_configuration_key::ChownRestricted:
+    native_key = _PC_CHOWN_RESTRICTED;
+    break;
+  case path_configuration_key::NoTrunc: native_key = _PC_NO_TRUNC; break;
+  case path_configuration_key::DisableCharacter:
+    native_key = _PC_VDISABLE;
+    break;
+  }
+
+  let const path_text = String{heap_allocator(), path};
+  errno = 0;
+  let const value = pathconf(path_text.c_str(), native_key);
+  if (value == -1 && errno != 0) return None;
+  return static_cast<i64>(value);
 }
 
 fn sleep_for_seconds(double seconds) wontthrow -> void

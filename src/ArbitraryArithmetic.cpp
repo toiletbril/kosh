@@ -436,7 +436,7 @@ fn ArithmeticValue::copy_magnitude(Allocator allocator) const throws
   return result;
 }
 
-fn ArithmeticValue::from_signed_128(i128 value, Allocator allocator) throws
+fn ArithmeticValue::from_signed_128(i128 value, BumpArena &arena) throws
     -> ArithmeticValue
 {
   let const bits = static_cast<u128>(value);
@@ -449,14 +449,12 @@ fn ArithmeticValue::from_signed_128(i128 value, Allocator allocator) throws
   let const magnitude = is_negative ? u128{0} - bits : bits;
   const u64 limbs[] = {static_cast<u64>(magnitude),
                        static_cast<u64>(magnitude >> 64u)};
-  return from_magnitude(limbs, limbs[1] == 0 ? 1 : 2, is_negative, 0,
-                        allocator);
+  return from_magnitude(limbs, limbs[1] == 0 ? 1 : 2, is_negative, 0, arena);
 }
 
 fn ArithmeticValue::from_magnitude(const u64 *limbs, usize count,
                                    bool is_negative, u32 decimal_scale,
-                                   Allocator allocator) throws
-    -> ArithmeticValue
+                                   BumpArena &arena) throws -> ArithmeticValue
 {
   static_assert(sizeof(Storage) == 8);
   static_assert(alignof(Storage) >= alignof(u64));
@@ -486,11 +484,9 @@ fn ArithmeticValue::from_magnitude(const u64 *limbs, usize count,
   if (count > static_cast<usize>(~u32{0}) ||
       count > (SIZE_MAX - sizeof(Storage)) / sizeof(u64))
     throw std::bad_alloc{};
-  if (allocator.get_kind() != Allocator::Kind::Bump) [[unlikely]]
-    TRAP("promoted arithmetic storage requires a bump allocator");
   let const allocation_length = sizeof(Storage) + count * sizeof(u64);
   let const storage = static_cast<Storage *>(
-      allocator.raw_alloc(allocation_length, alignof(Storage)));
+      bump_allocator(arena).raw_alloc(allocation_length, alignof(Storage)));
   if (storage == nullptr) throw std::bad_alloc{};
   new (storage) Storage{};
   storage->limb_count = static_cast<u32>(count);
@@ -506,9 +502,10 @@ fn ArithmeticValue::from_magnitude(const u64 *limbs, usize count,
   return result;
 }
 
-fn ArithmeticValue::parse(StringView text, u32 radix,
-                          Allocator allocator) throws -> ArithmeticValue
+fn ArithmeticValue::parse(StringView text, u32 radix, BumpArena &arena) throws
+    -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   let body = text;
   let is_negative = false;
   if (!body.is_empty() && (body[0] == '+' || body[0] == '-')) {
@@ -538,7 +535,7 @@ fn ArithmeticValue::parse(StringView text, u32 radix,
 
     trim_limbs(magnitude);
     return from_magnitude(magnitude.begin(), magnitude.count(), is_negative, 0,
-                          allocator);
+                          arena);
   }
 
   for (usize index = 0; index < body.length; index++) {
@@ -561,12 +558,13 @@ fn ArithmeticValue::parse(StringView text, u32 radix,
   trim_limbs(magnitude);
 
   return from_magnitude(magnitude.begin(), magnitude.count(), is_negative, 0,
-                        allocator);
+                        arena);
 }
 
-fn ArithmeticValue::parse_decimal(StringView text, Allocator allocator) throws
+fn ArithmeticValue::parse_decimal(StringView text, BumpArena &arena) throws
     -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   let body = text;
   let is_negative = false;
   if (!body.is_empty() && (body[0] == '+' || body[0] == '-')) {
@@ -593,7 +591,7 @@ fn ArithmeticValue::parse_decimal(StringView text, Allocator allocator) throws
 
   trim_limbs(magnitude);
   return from_magnitude(magnitude.begin(), magnitude.count(), is_negative,
-                        decimal_scale, allocator);
+                        decimal_scale, arena);
 }
 
 pure fn ArithmeticValue::is_zero() const wontthrow -> bool
@@ -721,14 +719,15 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
 }
 
 fn ArithmeticValue::add(const ArithmeticValue &left,
-                        const ArithmeticValue &right,
-                        Allocator allocator) throws -> ArithmeticValue
+                        const ArithmeticValue &right, BumpArena &arena) throws
+    -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!left.is_promoted() && !right.is_promoted()) {
     i128 result;
     if (!__builtin_add_overflow(left.inline_value(), right.inline_value(),
                                 &result))
-      return from_signed_128(result, allocator);
+      return from_signed_128(result, arena);
   }
 
   let const decimal_scale = left.get_decimal_scale() > right.get_decimal_scale()
@@ -757,37 +756,39 @@ fn ArithmeticValue::add(const ArithmeticValue &left,
   }
 
   return from_magnitude(result.begin(), result.count(), is_negative,
-                        decimal_scale, allocator);
+                        decimal_scale, arena);
 }
 
 fn ArithmeticValue::subtract(const ArithmeticValue &left,
                              const ArithmeticValue &right,
-                             Allocator allocator) throws -> ArithmeticValue
+                             BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!left.is_promoted() && !right.is_promoted()) {
     i128 result;
     if (!__builtin_sub_overflow(left.inline_value(), right.inline_value(),
                                 &result))
-      return from_signed_128(result, allocator);
+      return from_signed_128(result, arena);
   }
 
   let right_magnitude = right.copy_magnitude(allocator);
-  let const negated = from_magnitude(
-      right_magnitude.begin(), right_magnitude.count(), !right.is_negative(),
-      right.get_decimal_scale(), allocator);
-  return add(left, negated, allocator);
+  let const negated =
+      from_magnitude(right_magnitude.begin(), right_magnitude.count(),
+                     !right.is_negative(), right.get_decimal_scale(), arena);
+  return add(left, negated, arena);
 }
 
 fn ArithmeticValue::multiply(const ArithmeticValue &left,
                              const ArithmeticValue &right,
-                             Allocator allocator) throws -> ArithmeticValue
+                             BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (left.is_zero() || right.is_zero()) return ArithmeticValue{};
   if (!left.is_promoted() && !right.is_promoted()) {
     i128 result;
     if (!__builtin_mul_overflow(left.inline_value(), right.inline_value(),
                                 &result))
-      return from_signed_128(result, allocator);
+      return from_signed_128(result, arena);
   }
 
   let const left_magnitude = left.copy_magnitude(allocator);
@@ -797,13 +798,14 @@ fn ArithmeticValue::multiply(const ArithmeticValue &left,
     throw std::bad_alloc{};
   return from_magnitude(
       result.begin(), result.count(), left.is_negative() != right.is_negative(),
-      left.get_decimal_scale() + right.get_decimal_scale(), allocator);
+      left.get_decimal_scale() + right.get_decimal_scale(), arena);
 }
 
 fn ArithmeticValue::divide(const ArithmeticValue &left,
                            const ArithmeticValue &right,
-                           Allocator allocator) throws -> ArithmeticValue
+                           BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   ASSERT(!right.is_zero());
   if (!left.is_promoted() && !right.is_promoted()) {
     let const left_value = left.inline_value();
@@ -811,9 +813,9 @@ fn ArithmeticValue::divide(const ArithmeticValue &left,
     let const minimum = static_cast<i128>(u128{1} << 127u);
     if (left_value == minimum && right_value == -1) {
       const u64 magnitude[] = {0, u64{1} << 63u};
-      return from_magnitude(magnitude, 2, false, 0, allocator);
+      return from_magnitude(magnitude, 2, false, 0, arena);
     }
-    return from_signed_128(left_value / right_value, allocator);
+    return from_signed_128(left_value / right_value, arena);
   }
 
   let const decimal_scale = left.get_decimal_scale() > right.get_decimal_scale()
@@ -832,20 +834,21 @@ fn ArithmeticValue::divide(const ArithmeticValue &left,
                    allocator);
   return from_magnitude(quotient.begin(), quotient.count(),
                         left.is_negative() != right.is_negative(),
-                        decimal_scale, allocator);
+                        decimal_scale, arena);
 }
 
 fn ArithmeticValue::modulo(const ArithmeticValue &left,
                            const ArithmeticValue &right,
-                           Allocator allocator) throws -> ArithmeticValue
+                           BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   ASSERT(!right.is_zero());
   if (!left.is_promoted() && !right.is_promoted()) {
     let const left_value = left.inline_value();
     let const right_value = right.inline_value();
     let const minimum = static_cast<i128>(u128{1} << 127u);
     if (left_value == minimum && right_value == -1) return ArithmeticValue{};
-    return from_signed_128(left_value % right_value, allocator);
+    return from_signed_128(left_value % right_value, arena);
   }
 
   let const decimal_scale = left.get_decimal_scale() > right.get_decimal_scale()
@@ -860,30 +863,32 @@ fn ArithmeticValue::modulo(const ArithmeticValue &left,
   magnitude_divide(left_magnitude, right_magnitude, quotient, remainder,
                    allocator);
   return from_magnitude(remainder.begin(), remainder.count(),
-                        left.is_negative(), decimal_scale, allocator);
+                        left.is_negative(), decimal_scale, arena);
 }
 
 fn ArithmeticValue::power(const ArithmeticValue &base,
                           const ArithmeticValue &exponent,
-                          Allocator allocator) throws -> ArithmeticValue
+                          BumpArena &arena) throws -> ArithmeticValue
 {
-  if (!exponent.is_integer())
+  let const allocator = bump_allocator(arena);
+  if (!exponent.has_integer_value(arena))
     throw ErrorWithDetails{"Exponent is not an integer",
                            "'**' requires an integer exponent"};
-  if (exponent.is_negative())
+  let const integral_exponent = integer_part(exponent, arena);
+  if (integral_exponent.is_negative())
     throw ErrorWithDetails{"Exponent less than 0",
                            "'**' requires a non-negative exponent"};
-  if (exponent.is_zero()) return ArithmeticValue{1};
+  if (integral_exponent.is_zero()) return ArithmeticValue{1};
   if (base.is_zero()) return ArithmeticValue{};
   if (base.is_integer() && base.limb_count() == 1 && base.limb_at(0) == 1) {
     if (!base.is_negative()) return ArithmeticValue{1};
-    return ArithmeticValue{(exponent.limb_at(0) & 1u) != 0 ? -1 : 1};
+    return ArithmeticValue{(integral_exponent.limb_at(0) & 1u) != 0 ? -1 : 1};
   }
-  if (exponent.limb_count() > 1)
+  if (integral_exponent.limb_count() > 1)
     throw ErrorWithDetails{"Exponent is too large",
                            "The result cannot fit in addressable memory"};
 
-  let const exponent_value = exponent.limb_at(0);
+  let const exponent_value = integral_exponent.limb_at(0);
   if (base.is_integer() && base.limb_count() == 1 &&
       __builtin_popcountll(base.limb_at(0)) == 1)
   {
@@ -902,7 +907,7 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
     magnitude[result_limb_position] = u64{1} << (result_bit_position % 64);
     return from_magnitude(magnitude.begin(), magnitude.count(),
                           base.is_negative() && (exponent_value & 1u) != 0, 0,
-                          allocator);
+                          arena);
   }
 
   u64 remaining = exponent_value;
@@ -910,9 +915,9 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
   let factor = base;
 
   while (remaining > 0) {
-    if ((remaining & 1u) != 0) result = multiply(result, factor, allocator);
+    if ((remaining & 1u) != 0) result = multiply(result, factor, arena);
     remaining >>= 1u;
-    if (remaining != 0) factor = multiply(factor, factor, allocator);
+    if (remaining != 0) factor = multiply(factor, factor, arena);
   }
 
   return result;
@@ -920,8 +925,9 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
 
 fn ArithmeticValue::shift_left(const ArithmeticValue &value,
                                const ArithmeticValue &count,
-                               Allocator allocator) throws -> ArithmeticValue
+                               BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!value.is_integer() || !count.is_integer())
     throw ErrorWithDetails{"Shift operand is not an integer",
                            "Bit shifts require integer operands"};
@@ -939,13 +945,14 @@ fn ArithmeticValue::shift_left(const ArithmeticValue &value,
   let const magnitude = value.copy_magnitude(allocator);
   let result = shift_magnitude_left(magnitude, bit_count, allocator);
   return from_magnitude(result.begin(), result.count(), value.is_negative(), 0,
-                        allocator);
+                        arena);
 }
 
 fn ArithmeticValue::shift_right(const ArithmeticValue &value,
                                 const ArithmeticValue &count,
-                                Allocator allocator) throws -> ArithmeticValue
+                                BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!value.is_integer() || !count.is_integer())
     throw ErrorWithDetails{"Shift operand is not an integer",
                            "Bit shifts require integer operands"};
@@ -963,13 +970,14 @@ fn ArithmeticValue::shift_right(const ArithmeticValue &value,
   if (value.is_negative() && has_discarded_bits(magnitude, bit_count))
     add_small(result, 1);
   return from_magnitude(result.begin(), result.count(), value.is_negative(), 0,
-                        allocator);
+                        arena);
 }
 
 fn ArithmeticValue::bit_and(const ArithmeticValue &left,
                             const ArithmeticValue &right,
-                            Allocator allocator) throws -> ArithmeticValue
+                            BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!left.is_integer() || !right.is_integer())
     throw ErrorWithDetails{"Bitwise operand is not an integer",
                            "Bitwise operations require integer operands"};
@@ -989,13 +997,14 @@ fn ArithmeticValue::bit_and(const ArithmeticValue &left,
   }
   trim_limbs(left_bits);
   return from_magnitude(left_bits.begin(), left_bits.count(), is_negative, 0,
-                        allocator);
+                        arena);
 }
 
 fn ArithmeticValue::bit_or(const ArithmeticValue &left,
                            const ArithmeticValue &right,
-                           Allocator allocator) throws -> ArithmeticValue
+                           BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!left.is_integer() || !right.is_integer())
     throw ErrorWithDetails{"Bitwise operand is not an integer",
                            "Bitwise operations require integer operands"};
@@ -1015,13 +1024,14 @@ fn ArithmeticValue::bit_or(const ArithmeticValue &left,
   }
   trim_limbs(left_bits);
   return from_magnitude(left_bits.begin(), left_bits.count(), is_negative, 0,
-                        allocator);
+                        arena);
 }
 
 fn ArithmeticValue::bit_xor(const ArithmeticValue &left,
                             const ArithmeticValue &right,
-                            Allocator allocator) throws -> ArithmeticValue
+                            BumpArena &arena) throws -> ArithmeticValue
 {
+  let const allocator = bump_allocator(arena);
   if (!left.is_integer() || !right.is_integer())
     throw ErrorWithDetails{"Bitwise operand is not an integer",
                            "Bitwise operations require integer operands"};
@@ -1041,16 +1051,53 @@ fn ArithmeticValue::bit_xor(const ArithmeticValue &left,
   }
   trim_limbs(left_bits);
   return from_magnitude(left_bits.begin(), left_bits.count(), is_negative, 0,
-                        allocator);
+                        arena);
 }
 
 fn ArithmeticValue::bit_not(const ArithmeticValue &value,
-                            Allocator allocator) throws -> ArithmeticValue
+                            BumpArena &arena) throws -> ArithmeticValue
 {
   if (!value.is_integer())
     throw ErrorWithDetails{"Bitwise operand is not an integer",
                            "Bitwise operations require integer operands"};
-  return subtract(ArithmeticValue{-1}, value, allocator);
+  return subtract(ArithmeticValue{-1}, value, arena);
+}
+
+fn ArithmeticValue::absolute(const ArithmeticValue &value,
+                             BumpArena &arena) throws -> ArithmeticValue
+{
+  if (!value.is_negative()) return value;
+  let const magnitude = value.copy_magnitude(bump_allocator(arena));
+  return from_magnitude(magnitude.begin(), magnitude.count(), false,
+                        value.get_decimal_scale(), arena);
+}
+
+fn ArithmeticValue::integer_part(const ArithmeticValue &value,
+                                 BumpArena &arena) throws -> ArithmeticValue
+{
+  let decimal_count = value.get_decimal_scale();
+  if (decimal_count == 0) return value;
+
+  let magnitude = value.copy_magnitude(bump_allocator(arena));
+  constexpr u64 DECIMAL_CHUNK_BASE = 10000000000000000000ULL;
+  while (decimal_count >= 19) {
+    divide_small(magnitude, DECIMAL_CHUNK_BASE);
+    decimal_count -= 19;
+  }
+
+  u64 divisor = 1;
+  for (u32 index = 0; index < decimal_count; index++)
+    divisor *= 10;
+  divide_small(magnitude, divisor);
+  return from_magnitude(magnitude.begin(), magnitude.count(),
+                        value.is_negative(), 0, arena);
+}
+
+fn ArithmeticValue::has_integer_value(BumpArena &arena) const throws -> bool
+{
+  if (is_integer()) return true;
+  let const integer = integer_part(*this, arena);
+  return compare(integer, bump_allocator(arena)) == 0;
 }
 
 } /* namespace koshka::arithmetic_internal */

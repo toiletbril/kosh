@@ -1,0 +1,162 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkdir" "-p" "man1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "LOCAL MANPAGE\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "MANPATH=."]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "man" "topic"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "one\ntwo\n"]
+      [SimpleCommand "koshkit" "more"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "tabs" "-8"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tabs=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "koshkit" "tput" "clear"]
+      [SimpleCommand "koshkit" "od" "-A" "n" "-t" "x1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "stty" "-a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "stty-notty=$?"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "man1"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "LOCAL MANPAGE\n"
+]
+[Word
+  Unquoted "man1/topic.1"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "MANPATH=."
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "man"
+]
+[Word
+  Unquoted "topic"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\ntwo\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "more"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tabs"
+]
+[Word
+  Unquoted "-8"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tabs="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tput"
+]
+[Word
+  Unquoted "clear"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "x1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "stty"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "stty-notty="
+  Variable "?"
+]
+LOCAL MANPAGE
+one
+two
+tabs=0
+        1b 5b 48 1b 5b 32 4a
+16:1: error: stty: standard input is not a terminal.
+    16 |  koshkit stty -a </dev/null
+       |  ^~~~~~~~~~~~~~~
+stty-notty=1
+[Code 0]

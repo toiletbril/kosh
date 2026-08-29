@@ -10,6 +10,13 @@ hello from make
      1 |  koshkit make nope
        |  ^~~~~~~~~~~~~~~~~
 rc=2
+--- makefile selection and macro precedence ---
+value=command
+value=makefile
+value=environment
+first=second
+makeflags=yes
+grouped-file
 --- advanced features ---
 second recipe line ran after a forking command
 make=[koshkit make -j4]
@@ -17,14 +24,121 @@ src=[a.c b.c]
 obj=[a.o b.o]
 flags=[one  two]
 tag=[debug]
---- ignored flags -B and -k ---
-built
-rc=0
+--- freshness and query modes ---
+fresh=0
+fresh-query=0
+rebuilt
+forced=0
+stale-query=1
+rebuilt
+stale=0
+--- execution modes ---
+echo dry > dry-marker
+dry-created=no
+visible
+touch touched
+touched=yes
 --- failing recipe aborts ---
 1:1: error: The recipe for the target 'broken' failed with status 1.
      1 |  koshkit make broken
        |  ^~~~~~~~~~~~~~~~~~~
 rc=2
+this line must not run
+ignore=0
+independent
+keep-going=2
+stop=2
+independent
+keep-last=2
+compound=2
+compound-ignored
+compound-ignored=0
+--- special targets and suffix inference ---
+after-error
+finished
+default-fallback first=fallback
+echo "suffix item.src item.out"
+suffix item.src item.out
+echo compile -O9 -c builtin.c
+compile -O9 -c builtin.c
+no-builtins=2
+shell-rule=yes
+--- parsing automatic variables and cleanup ---
+target=one hash=value#tail
+target=two hash=value#tail
+joined=first second newer=second
+inline
+{one,two}
+failed-kept=no
+precious-kept=yes
+--- POSIX database stdin and target attributes ---
+1
+1
+1
+empty-database=0
+false
+ignored-continued
+quiet-result
+echo loud-result
+loud-result
+false
+target-ignore=2
+stdin-makefile
+--- inherited flags and forced dry-run recipes ---
+echo inherited-ran > inherited-marker
+inherited-dry=yes
+echo forced-ran > forced-marker
+echo ordinary-ran > ordinary-marker
+forced-ran=yes
+ordinary-ran=no
+--- forced query and touch recipes ---
+query-status=1
+query-ran=yes
+touch forced-touch
+touch ordinary-touch
+touch-ran=yes
+ordinary-touch-ran=no
+forced-touched=yes
+ordinary-touched=yes
+--- POSIX automatic macro forms ---
+target=dir/output.o dir=dir file=output.o
+first=dir/input.c dir=dir file=input.c
+newer=dir/input.c newer.h dirs=dir . files=input.c newer.h stem=dir/output
+archive=pkg/lib.a member=obj/member.o archive-dir=pkg archive-file=lib.a
+member-dir=obj member-file=member.o
+--- POSIX recipe environment and shell macro ---
+command=fromcommand inherited=fromfile local=
+shell-selected=yes
+--- POSIX graph and inference edge cases ---
+nested-independent
+nested-keep=2
+single-source=tool.src single-target=tool
+double-source=item.src double-target=item.out prerequisites=extra item.src
+--- POSIX macro and built-in database ---
+caret=first second
+plus=first second first
+paren=expanded-name brace=expanded-name short=expanded-name shell=/bin/sh
+command-flags=yes
+.SUFFIXES: .o .c .y .l .a .sh .f .c~ .y~ .l~ .sh~ .f~
+CC = c99
+CFLAGS = -O 1
+.c.a:
+.sh:
+.y.o:
+.l.o:
+.y.c:
+.l.c:
+.SUFFIXES:
+echo   -o program program.c
+-o program program.c
+--- POSIX includes and recipe continuation ---
+include=included nested
+<left\
+right>
+--- POSIX archive inference ---
+archive=library.a member=member.o source=member.src stem=member
+--- POSIX suffix precedence ---
+via-sh
 --- default goal builds both through the pattern ---
 echo cc foo.c -o foo.o
 cc foo.c -o foo.o

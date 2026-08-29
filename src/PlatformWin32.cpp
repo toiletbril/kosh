@@ -13,6 +13,32 @@ namespace koshka {
 
 namespace os {
 
+fn logged_in_users() throws -> ArrayList<user_session>
+{
+  let result = ArrayList<user_session>{heap_allocator()};
+  let const user = get_current_user();
+  let const terminal = terminal_name(KOSH_STDIN);
+  if (user.has_value() && terminal.has_value())
+    result.push(user_session{steal(*user), steal(*terminal), 0});
+  return result;
+}
+
+fn write_system_log(StringView tag, StringView priority, StringView message,
+                    bool should_include_pid,
+                    bool should_copy_to_stderr) wontthrow -> bool
+{
+  unused(priority);
+  unused(should_include_pid);
+  let output = String{heap_allocator(), tag};
+  if (!output.is_empty()) output += ": ";
+  output += message;
+  output += '\n';
+  OutputDebugStringA(output.c_str());
+  if (should_copy_to_stderr)
+    unused(write_fd(KOSH_STDERR, output.view().data, output.length()));
+  return true;
+}
+
 fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
     -> Maybe<usize>
 {
@@ -516,6 +542,12 @@ fn is_fd_a_tty(descriptor fd) wontthrow -> bool
   return GetConsoleMode(fd, &console_mode) != FALSE;
 }
 
+fn terminal_name(descriptor fd) throws -> Maybe<String>
+{
+  if (!is_fd_a_tty(fd)) return None;
+  return String{"console"};
+}
+
 terminal_echo_guard::terminal_echo_guard(descriptor input,
                                          bool should_disable) wontthrow
     : m_input(input)
@@ -558,6 +590,15 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
 
 fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result
+{
+  unused(pattern);
+  unused(sensitivity);
+  unused(out);
+  return regex_compile_result::Invalid;
+}
+
+fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
+                       compiled_regex &out) throws -> regex_compile_result
 {
   unused(pattern);
   unused(sensitivity);
@@ -629,6 +670,39 @@ fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
   return false;
 }
 
+fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
+{
+  switch (key) {
+  case system_configuration_key::ArgMax: return 32767;
+  case system_configuration_key::ChildMax: return 256;
+  case system_configuration_key::ClockTicks: return 100;
+  case system_configuration_key::GroupsMax: return 0;
+  case system_configuration_key::OpenMax: return 512;
+  case system_configuration_key::PageSize: return 4096;
+  case system_configuration_key::StreamMax: return 512;
+  case system_configuration_key::PosixVersion: return 200809;
+  }
+  return None;
+}
+
+fn path_configuration(StringView path, path_configuration_key key) wontthrow
+    -> Maybe<i64>
+{
+  unused(path);
+  switch (key) {
+  case path_configuration_key::LinkMax: return 1024;
+  case path_configuration_key::MaxCanonical: return 255;
+  case path_configuration_key::MaxInput: return 255;
+  case path_configuration_key::NameMax: return 255;
+  case path_configuration_key::PathMax: return 32767;
+  case path_configuration_key::PipeBuffer: return 4096;
+  case path_configuration_key::ChownRestricted: return 1;
+  case path_configuration_key::NoTrunc: return 1;
+  case path_configuration_key::DisableCharacter: return 0;
+  }
+  return None;
+}
+
 fn read_process_cpu_times() wontthrow -> cpu_times { return cpu_times{}; }
 
 fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
@@ -668,6 +742,21 @@ fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
   rows = static_cast<u32>(height);
 
   return true;
+}
+
+fn terminal_settings(descriptor terminal, bool should_encode,
+                     Allocator allocator) throws -> Maybe<String>
+{
+  unused(should_encode);
+  if (!is_fd_a_tty(terminal)) return None;
+  return String{allocator, "speed 0 baud; echo icanon isig\n"};
+}
+
+fn apply_terminal_settings(descriptor terminal,
+                           const ArrayList<String> &settings) wontthrow -> bool
+{
+  unused(settings);
+  return is_fd_a_tty(terminal);
 }
 
 fn get_environment_variable(StringView key) -> Maybe<String>

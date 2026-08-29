@@ -73,6 +73,12 @@ arithmetic_diagnostics() {
   echo $((1.5 + 2))
   echo $((010 + 1))
   echo $((0x1F + 1))
+  echo $((2 ^ 8))
+  echo $((mask | 2 ^ 8))
+  echo $((2 ^ mask))
+  echo $((flags ^ 8))
+  echo $((flags ^ mask))
+  ((flags ^= mask))
   $((count + 1))
   (( total / parts * scale ))
 }

@@ -21,6 +21,7 @@
 #include <sys/file.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>
@@ -140,6 +141,13 @@ enum class measured_output : u8
 {
   Inherit,
   Suppress,
+};
+
+enum class priority_target : u8
+{
+  Process,
+  ProcessGroup,
+  User,
 };
 
 enum class script_fallback_policy : u8
@@ -448,12 +456,34 @@ fn enumerate_processes(process_detail detail = process_detail::Basic) throws
 
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool;
+fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
+                  bool should_follow_symlink) wontthrow -> bool;
+fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool;
+fn make_fifo(StringView path, u32 mode) wontthrow -> bool;
 fn touch_file_times(StringView path) wontthrow -> bool;
 fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
 fn read_symlink(StringView path) wontthrow -> Maybe<String>;
+
+struct filesystem_status
+{
+  u64 block_size{0};
+  u64 total_blocks{0};
+  u64 free_blocks{0};
+  u64 available_blocks{0};
+};
+
+struct mounted_filesystem
+{
+  String source{heap_allocator()};
+  String target{heap_allocator()};
+};
+
+fn stat_filesystem(StringView path, filesystem_status &status) wontthrow
+    -> bool;
+fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>;
 
 fn current_executable_path() wontthrow -> Maybe<String>;
 
@@ -489,6 +519,37 @@ fn file_type_letter(u32 mode) wontthrow -> char;
    getpwuid and getgrgid. */
 fn uid_to_username(u32 uid) throws -> Maybe<String>;
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>;
+fn username_to_uid(StringView username) throws -> Maybe<u32>;
+fn groupname_to_gid(StringView groupname) throws -> Maybe<u32>;
+
+enum class system_configuration_key : u8
+{
+  ArgMax,
+  ChildMax,
+  ClockTicks,
+  GroupsMax,
+  OpenMax,
+  PageSize,
+  StreamMax,
+  PosixVersion,
+};
+
+enum class path_configuration_key : u8
+{
+  LinkMax,
+  MaxCanonical,
+  MaxInput,
+  NameMax,
+  PathMax,
+  PipeBuffer,
+  ChownRestricted,
+  NoTrunc,
+  DisableCharacter,
+};
+
+fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>;
+fn path_configuration(StringView path, path_configuration_key key) wontthrow
+    -> Maybe<i64>;
 
 fn sleep_for_seconds(double seconds) wontthrow -> void;
 
@@ -642,6 +703,8 @@ constexpr bool HAS_REGEX_ENGINE =
 
 fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result;
+fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
+                       compiled_regex &out) throws -> regex_compile_result;
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
                  ArrayList<regex_span> &spans, String &error_message,
@@ -762,12 +825,16 @@ fn get_parent_process_id() wontthrow -> i64;
 fn get_real_user_id() wontthrow -> i64;
 fn get_effective_user_id() wontthrow -> i64;
 fn get_real_group_id() wontthrow -> i64;
+fn get_effective_group_id() wontthrow -> i64;
+fn get_supplementary_group_ids(Allocator allocator) throws -> ArrayList<u32>;
 
 fn child_max() wontthrow -> i64;
 
 fn machine_type() throws -> String;
 fn executable_system_name() throws -> String;
 fn executable_machine_name() throws -> String;
+fn system_release_name() throws -> String;
+fn system_version_name() throws -> String;
 
 inline fn ostype_name() wontthrow -> StringView
 {
@@ -796,6 +863,7 @@ fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
 fn is_stderr_a_tty() wontthrow -> bool;
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool;
+fn terminal_name(descriptor fd) throws -> Maybe<String>;
 fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool;
 
 pure fn is_directory_separator(char c) wontthrow -> bool;
@@ -818,6 +886,15 @@ fn normalize_program_name(String &program_name) throws -> program_name_info;
 fn get_current_user() throws -> Maybe<String>;
 
 fn get_hostname() throws -> Maybe<String>;
+
+struct user_session
+{
+  String user{heap_allocator()};
+  String terminal{heap_allocator()};
+  i64 login_time{0};
+};
+
+fn logged_in_users() throws -> ArrayList<user_session>;
 
 struct processor_counts
 {
@@ -876,6 +953,10 @@ fn format_local_time(StringView format, i64 epoch) throws -> String;
 
 fn terminal_size(u32 &columns, u32 &rows,
                  descriptor output = KOSH_STDOUT) wontthrow -> bool;
+fn terminal_settings(descriptor terminal, bool should_encode,
+                     Allocator allocator) throws -> Maybe<String>;
+fn apply_terminal_settings(descriptor terminal,
+                           const ArrayList<String> &settings) wontthrow -> bool;
 
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. Windows has no equivalent and reports zero. */
@@ -916,6 +997,14 @@ struct measured_result
 fn run_measured(const ArrayList<String> &argv, measured_output output,
                 const Maybe<descriptor> &inherited_handle = {}) throws
     -> Maybe<measured_result>;
+fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>;
+fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool;
+fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>;
+fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
+             descriptor error, StringView home) throws -> Maybe<i32>;
+fn write_system_log(StringView tag, StringView priority, StringView message,
+                    bool should_include_pid,
+                    bool should_copy_to_stderr) wontthrow -> bool;
 
 /* Script fallback returns KOSH_INVALID_PROCESS when it is allowed and the file
    has no executable format. */

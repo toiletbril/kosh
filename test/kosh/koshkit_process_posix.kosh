@@ -1,0 +1,11 @@
+koshkit nice -n 1 printf 'nice-ok\n'
+echo "nice=$?"
+
+koshkit nohup printf 'nohup-ok\n'
+echo "nohup=$?"
+
+koshkit renice -n 0 -p "$$" >/dev/null
+echo "renice=$?"
+
+koshkit logger -t koshkit-test process-message
+echo "logger=$?"

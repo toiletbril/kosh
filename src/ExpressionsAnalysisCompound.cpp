@@ -316,6 +316,28 @@ fn Pipeline::as_simple_command() const wontthrow -> const SimpleCommand *
   return m_commands[0]->as_simple_command();
 }
 
+fn CompoundList::has_single_test_command() const throws -> bool
+{
+  if (m_nodes.count() != 1 || m_nodes[0] == nullptr) return false;
+
+  let const command = m_nodes[0]->command();
+  if (command == nullptr) return false;
+
+  let const simple = command->as_simple_command();
+  if (simple == nullptr || simple->args().is_empty()) return false;
+
+  let const name_token = simple->args()[0];
+  let const name = static_command_name(name_token);
+  if (name.has_value()) return *name == StringView{"test"};
+
+  return name_token->raw_view().value_or(StringView{}) == StringView{"["};
+}
+
+fn CompoundList::as_compound_list() const wontthrow -> const CompoundList *
+{
+  return this;
+}
+
 /* The opening [ of a bracket test the node leaves unclosed, null when the node
    holds anything else. */
 cold static fn
@@ -521,10 +543,15 @@ fn CompoundList::analyze(AnalysisContext &actx,
                                     : nullptr;
       let is_test_command = false;
       if (middle_simple != nullptr && !middle_simple->args().is_empty()) {
-        let const middle_name = static_command_name(middle_simple->args()[0]);
-        is_test_command =
-            middle_name.has_value() && get_analysis_command_info(*middle_name)
-                                           .is_in_group(COMMAND_GROUP_TEST);
+        let const middle_token = middle_simple->args()[0];
+        let const middle_name = static_command_name(middle_token);
+        if (middle_name.has_value()) {
+          is_test_command = get_analysis_command_info(*middle_name)
+                                .is_in_group(COMMAND_GROUP_TEST);
+        } else {
+          is_test_command = middle_token->raw_view().value_or(StringView{}) ==
+                            StringView{"["};
+        }
       }
       if (!is_test_command)
         actx.report_diagnostic(diagnostic_id::sc2015,

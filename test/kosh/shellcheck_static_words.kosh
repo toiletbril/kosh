@@ -94,6 +94,11 @@ new_diagnostics() {
   exec echo replaced; echo unreachable
   cd missing; echo wrong-directory
   true && false || echo fallback
+  true && test -n "$value" || echo test-fallback
+  true && [ -n "$value" ] || echo bracket-fallback
+  if (test -n "$value"); then :; fi
+  if ([ -n "$value" ]); then :; fi
+  if (test -n "$value" && test -n "$other"); then :; fi
   echo one | read -r pipeline_value
   echo "$pipeline_value"
   [[ 10 > 7 ]]

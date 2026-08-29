@@ -6,6 +6,7 @@ then
 else
   echo no
 fi
+format-diagnostics=0,0,same
 #!/bin/sh
 
 # keep this text without wrapping
@@ -242,6 +243,21 @@ case $1 in
   ;;
   *)
     echo "rest $count"
+  ;;
+esac
+
+case outer in
+  outer)
+    case inner in
+      inner)
+        nested_value=`printf nested`
+
+        echo "$nested_value"
+      ;;
+    esac
+  ;;
+  *)
+    echo unreachable
   ;;
 esac
 

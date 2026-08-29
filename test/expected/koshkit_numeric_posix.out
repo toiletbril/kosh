@@ -1,0 +1,312 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "scale=2; 1/8\n2^10\n"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "2" "+" "3" "*" "4"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "7" ">" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "abc" ":" "a\(.*\)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "0" "|" "hello"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "expr-false=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "abs(-12.50)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "floor(-1.2)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "ceil(1.2)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "frac(-7.25)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "cmp(999999999999999999999, 8)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "gcd(84, 30, 18)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "lcm(12, 18)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "fact(30)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "fib(100)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "min(9.2, -4, 7)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "max(9.2, -4, 7)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "isint(1.00)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "iseven(42)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "isodd(42)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "calc" "sgn(-0.01)"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "scale=2; 1/8\n2^10\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bc="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Literal "*"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "a\(.*\)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Literal "|"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "expr-false="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "abs(-12.50)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "floor(-1.2)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "ceil(1.2)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "frac(-7.25)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "cmp(999999999999999999999, 8)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "gcd(84, 30, 18)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "lcm(12, 18)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "fact(30)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "fib(100)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "min(9.2, -4, 7)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "max(9.2, -4, 7)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "isint(1.00)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "iseven(42)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "isodd(42)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "calc"
+]
+[Word
+  Literal "sgn(-0.01)"
+]
+.12
+1024
+bc=0
+14
+1
+bc
+hello
+expr-false=1
+12.50
+-2
+2
+-0.25
+1
+6
+36
+265252859812191058636308480000000
+354224848179261915075
+-4
+9.2
+1
+1
+0
+-1
+[Code 0]

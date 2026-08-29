@@ -694,6 +694,33 @@ fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
   return true;
 }
 
+fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
+                  bool should_follow_symlink) wontthrow -> bool
+{
+  unused(path);
+  unused(owner_id);
+  unused(group_id);
+  unused(should_follow_symlink);
+  SetLastError(ERROR_NOT_SUPPORTED);
+  return false;
+}
+
+fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool
+{
+  const String target_string{target};
+  const String link_string{link_path};
+  return CreateHardLinkA(link_string.c_str(), target_string.c_str(), nullptr) !=
+         0;
+}
+
+fn make_fifo(StringView path, u32 mode) wontthrow -> bool
+{
+  unused(path);
+  unused(mode);
+  SetLastError(ERROR_NOT_SUPPORTED);
+  return false;
+}
+
 fn touch_file_times(StringView path) wontthrow -> bool
 {
   const String path_string{path};
@@ -841,6 +868,39 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
   return String{
       StringView{utf8_target.begin(), static_cast<usize>(utf8_length)}
   };
+}
+
+fn stat_filesystem(StringView path, filesystem_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  ULARGE_INTEGER available{};
+  ULARGE_INTEGER total{};
+  ULARGE_INTEGER free{};
+  if (GetDiskFreeSpaceExA(path_string.c_str(), &available, &total, &free) == 0)
+    return false;
+  constexpr u64 block_size = 512;
+  status.block_size = block_size;
+  status.total_blocks = total.QuadPart / block_size;
+  status.free_blocks = free.QuadPart / block_size;
+  status.available_blocks = available.QuadPart / block_size;
+  return true;
+}
+
+fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
+{
+  let result = ArrayList<mounted_filesystem>{heap_allocator()};
+  char drives[512];
+  let const length = GetLogicalDriveStringsA(sizeof(drives), drives);
+  if (length == 0 || length >= sizeof(drives)) return result;
+  usize position = 0;
+
+  while (position < length && drives[position] != '\0') {
+    let const drive = StringView{drives + position};
+    result.push(mounted_filesystem{String{drive}, String{drive}});
+    position += drive.length + 1;
+  }
+
+  return result;
 }
 
 fn current_executable_path() wontthrow -> Maybe<String>
@@ -1000,6 +1060,18 @@ fn uid_to_username(u32 uid) throws -> Maybe<String>
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>
 {
   unused(gid);
+  return koshka::None;
+}
+
+fn username_to_uid(StringView username) throws -> Maybe<u32>
+{
+  unused(username);
+  return koshka::None;
+}
+
+fn groupname_to_gid(StringView groupname) throws -> Maybe<u32>
+{
+  unused(groupname);
   return koshka::None;
 }
 

@@ -1,0 +1,118 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "nice" "-n" "1" "printf" "nice-ok\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nice=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "nohup" "printf" "nohup-ok\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nohup=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "renice" "-n" "0" "-p" "$$"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "renice=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "logger" "-t" "koshkit-test" "process-message"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "logger=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "nice"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "nice-ok\n"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "nice="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "nohup"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "nohup-ok\n"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "nohup="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "renice"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "$"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "renice="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "logger"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "koshkit-test"
+]
+[Word
+  Unquoted "process-message"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "logger="
+  Variable "?"
+]
+nice-ok
+nice=0
+nohup-ok
+nohup=0
+renice=0
+logger=0
+[Code 0]

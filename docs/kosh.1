@@ -1176,6 +1176,15 @@ The
 .B koshkit \-\-list
 form prints the utility names one per line.
 .PP
+The bundled set contains basename, bc, cal, calc, cat, chgrp, chmod, chown,
+cksum, cmp, comm, cp, csplit, cut, date, df, dirname, du, env, expand, expr,
+file, find, flock, fold, getconf, grep, head, id, killall, link, ln, locale,
+logger, logname, ls, make, man, mkdir, mkfifo, more, mv, nice, nl, nohup, nproc,
+od, paste, pathchk, pkill, pr, ps, realpath, renice, rm, rmdir, sed, seq, sleep,
+sort, split, strings, stty, tabs, tail, tee, timeout, touch, tput, tr, tsort,
+tty, uname, unexpand, uniq, unlink, uudecode, uuencode, wc, which, who, whoami,
+xargs, and yes.
+.PP
 The command
 .BI "koshkit \-\-assimilate " DIR
 installs one symlink per utility into DIR. When direct koshkit lookup is
@@ -1190,7 +1199,10 @@ Arithmetic operands are evaluated. The
 and
 .BR \-p ", " \-\-pipe
 options read expressions interactively or from a pipe.
-The active mood selects arbitrary precision or signed 64-bit arithmetic.
+The default mood accepts arbitrary precision integers and finite decimal
+values. Compatibility moods use signed 64-bit arithmetic. The abs, ceil, cmp,
+fact, fib, floor, frac, gcd, int, iseven, isint, isodd, lcm, max, min, and sgn
+functions are available.
 .TP
 .B cat
 Files or standard input are concatenated. The
@@ -1298,9 +1310,9 @@ and
 .B \-\-directory
 options are supported. The unused
 .B \-B
-and
+option always rebuilds targets, and
 .B \-k
-options are accepted. The
+continues independent goals after an error. The
 .B \-j
 option is ignored.
 .TP

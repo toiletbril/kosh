@@ -333,6 +333,7 @@ enum class diagnostic_id : u16
   sc3057,
   sc3060,
   arith_assign,
+  arithmetic_xor_power,
   assignment_prefix_read,
   exported_cdpath,
   external_arithmetic_input,

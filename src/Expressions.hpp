@@ -62,6 +62,7 @@ class IfClause;
 class WhileLoop;
 class AssignCommand;
 class SimpleCommand;
+class CompoundList;
 class ForLoop;
 class CStyleForLoop;
 class Subshell;
@@ -693,6 +694,8 @@ public:
       -> const expressions::AssignCommand *;
   virtual fn as_simple_command() const wontthrow
       -> const expressions::SimpleCommand *;
+  virtual fn as_compound_list() const wontthrow
+      -> const expressions::CompoundList *;
   virtual fn as_for_loop() const wontthrow -> const expressions::ForLoop *;
   virtual fn as_cstyle_for_loop() const wontthrow
       -> const expressions::CStyleForLoop *;
@@ -1046,6 +1049,7 @@ public:
   ~CompoundList() override;
 
   pure fn is_empty() const wontthrow -> bool;
+  fn has_single_test_command() const throws -> bool;
   fn append_node(const CompoundListCondition *node) throws -> void;
 
   fn to_string() const throws -> String override;
@@ -1059,6 +1063,7 @@ public:
       -> void override;
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
+  fn as_compound_list() const wontthrow -> const CompoundList * override;
 
   fn can_evaluate_in_process_substitution(
       const EvalContext &cxt, HashSet &active_functions) const throws

@@ -1,0 +1,29 @@
+root=$(mktemp -d)
+cd "$root"
+
+printf 'abc\n' > first
+printf 'abd\n' > second
+: > empty
+printf 'a\nc\n' > left
+printf 'b\nc\n' > right
+
+koshkit cksum first empty
+echo "cksum-status=$?"
+
+koshkit cmp first first
+echo "cmp-equal=$?"
+koshkit cmp -s first second
+echo "cmp-different=$?"
+koshkit cmp -l first second
+echo "cmp-list=$?"
+
+koshkit comm left right
+koshkit comm -12 left right
+printf '1\n\t2\n\t\t3\n4\n\t5\n\t\t6\n7\n\t8\n\t\t9\n' | koshkit comm - -
+
+printf 'a b\na c\nb d\nc d\n' | koshkit tsort
+echo "tsort-status=$?"
+printf 'a b\n' | koshkit tsort - >/dev/null
+echo "tsort-dash=$?"
+printf 'a b c\n' | koshkit tsort - >/dev/null 2>&1
+echo "tsort-odd=$?"

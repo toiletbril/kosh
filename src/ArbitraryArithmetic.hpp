@@ -15,9 +15,9 @@ public:
   ArithmeticValue() = default;
   explicit ArithmeticValue(i64 value) wontthrow;
 
-  static fn parse(StringView text, u32 radix, Allocator allocator) throws
+  static fn parse(StringView text, u32 radix, BumpArena &arena) throws
       -> ArithmeticValue;
-  static fn parse_decimal(StringView text, Allocator allocator) throws
+  static fn parse_decimal(StringView text, BumpArena &arena) throws
       -> ArithmeticValue;
 
   pure fn is_zero() const wontthrow -> bool;
@@ -29,33 +29,38 @@ public:
       -> i32;
   pure fn get_decimal_scale() const wontthrow -> u32;
   pure fn is_integer() const wontthrow -> bool;
+  fn has_integer_value(BumpArena &arena) const throws -> bool;
   fn copy_magnitude(Allocator allocator) const throws -> ArrayList<u64>;
 
   static fn add(const ArithmeticValue &left, const ArithmeticValue &right,
-                Allocator allocator) throws -> ArithmeticValue;
+                BumpArena &arena) throws -> ArithmeticValue;
   static fn subtract(const ArithmeticValue &left, const ArithmeticValue &right,
-                     Allocator allocator) throws -> ArithmeticValue;
+                     BumpArena &arena) throws -> ArithmeticValue;
   static fn multiply(const ArithmeticValue &left, const ArithmeticValue &right,
-                     Allocator allocator) throws -> ArithmeticValue;
+                     BumpArena &arena) throws -> ArithmeticValue;
   static fn divide(const ArithmeticValue &left, const ArithmeticValue &right,
-                   Allocator allocator) throws -> ArithmeticValue;
+                   BumpArena &arena) throws -> ArithmeticValue;
   static fn modulo(const ArithmeticValue &left, const ArithmeticValue &right,
-                   Allocator allocator) throws -> ArithmeticValue;
+                   BumpArena &arena) throws -> ArithmeticValue;
   static fn power(const ArithmeticValue &base, const ArithmeticValue &exponent,
-                  Allocator allocator) throws -> ArithmeticValue;
+                  BumpArena &arena) throws -> ArithmeticValue;
   static fn shift_left(const ArithmeticValue &value,
-                       const ArithmeticValue &count, Allocator allocator) throws
+                       const ArithmeticValue &count, BumpArena &arena) throws
       -> ArithmeticValue;
   static fn shift_right(const ArithmeticValue &value,
-                        const ArithmeticValue &count,
-                        Allocator allocator) throws -> ArithmeticValue;
+                        const ArithmeticValue &count, BumpArena &arena) throws
+      -> ArithmeticValue;
   static fn bit_and(const ArithmeticValue &left, const ArithmeticValue &right,
-                    Allocator allocator) throws -> ArithmeticValue;
+                    BumpArena &arena) throws -> ArithmeticValue;
   static fn bit_or(const ArithmeticValue &left, const ArithmeticValue &right,
-                   Allocator allocator) throws -> ArithmeticValue;
+                   BumpArena &arena) throws -> ArithmeticValue;
   static fn bit_xor(const ArithmeticValue &left, const ArithmeticValue &right,
-                    Allocator allocator) throws -> ArithmeticValue;
-  static fn bit_not(const ArithmeticValue &value, Allocator allocator) throws
+                    BumpArena &arena) throws -> ArithmeticValue;
+  static fn bit_not(const ArithmeticValue &value, BumpArena &arena) throws
+      -> ArithmeticValue;
+  static fn absolute(const ArithmeticValue &value, BumpArena &arena) throws
+      -> ArithmeticValue;
+  static fn integer_part(const ArithmeticValue &value, BumpArena &arena) throws
       -> ArithmeticValue;
 
 private:
@@ -64,10 +69,10 @@ private:
   static constexpr u64 PROMOTED_MARKER = 0x7fffc0dec0dec0deULL;
   static constexpr uintptr NEGATIVE_STORAGE_FLAG = 1;
 
-  static fn from_signed_128(i128 value, Allocator allocator) throws
+  static fn from_signed_128(i128 value, BumpArena &arena) throws
       -> ArithmeticValue;
   static fn from_magnitude(const u64 *limbs, usize limb_count, bool is_negative,
-                           u32 decimal_scale, Allocator allocator) throws
+                           u32 decimal_scale, BumpArena &arena) throws
       -> ArithmeticValue;
 
   pure fn is_promoted() const wontthrow -> bool;

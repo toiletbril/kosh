@@ -1,0 +1,65 @@
+#!/bin/env kosh
+
+root=$(mktemp -d)
+koshkit mkdir -p "$root/tree/child"
+: > "$root/mode"
+: > "$root/tree/plain"
+
+koshkit chmod 640 "$root/mode"
+mode_fields=$(koshkit ls -l "$root/mode")
+echo "chmod-octal=${mode_fields%% *}"
+koshkit chmod u+x,g=u,o-r "$root/mode"
+mode_fields=$(koshkit ls -l "$root/mode")
+echo "chmod-symbolic=${mode_fields%% *}"
+koshkit chmod -R a+rX "$root/tree"
+[[ -x "$root/tree/child" ]]
+directory_status=$?
+plain_fields=$(koshkit ls -l "$root/tree/plain")
+echo "chmod-recursive=$directory_status ${plain_fields%% *}"
+: > "$root/omitted-who"
+koshkit chmod 444 "$root/omitted-who"
+koshkit chmod +w "$root/omitted-who"
+omitted_fields=$(koshkit ls -l "$root/omitted-who")
+echo "chmod-umask=${omitted_fields%% *}"
+
+uid=$UID
+gid=${GROUPS[0]}
+koshkit chown "$uid:$gid" "$root/mode"
+echo "chown=$?"
+owner_name=$(koshkit whoami)
+koshkit chown "$owner_name:$gid" "$root/mode"
+echo "chown-name=$?"
+koshkit chgrp "$gid" "$root/mode"
+echo "chgrp=$?"
+
+koshkit link "$root/mode" "$root/hard-link"
+[[ "$root/mode" -ef "$root/hard-link" ]]
+echo "link=$?"
+koshkit link "$root/mode" "$root/hard-link" 2> "$TEST_NULL_DEVICE"
+echo "link-existing=$?"
+
+koshkit mkfifo -m 600 "$root/fifo"
+fifo_fields=$(koshkit ls -l "$root/fifo")
+echo "mkfifo=${fifo_fields%% *}"
+koshkit mkfifo "$root/fifo" 2> "$TEST_NULL_DEVICE"
+echo "mkfifo-existing=$?"
+koshkit mkfifo -m a-w "$root/read-only-fifo"
+fifo_fields=$(koshkit ls -l "$root/read-only-fifo")
+echo "mkfifo-symbolic=${fifo_fields%% *}"
+
+echo "df-fields=$(koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w)"
+koshkit df "$root/missing" 2> "$TEST_NULL_DEVICE" > "$TEST_NULL_DEVICE"
+echo "df-missing=$?"
+koshkit df > "$TEST_NULL_DEVICE"
+echo "df-all=$?"
+
+koshkit pathchk -p a_b.c-d
+echo "pathchk-portable=$?"
+koshkit pathchk -p 'a b' 2> "$TEST_NULL_DEVICE"
+echo "pathchk-space=$?"
+koshkit pathchk -P -- dir/-bad 2> "$TEST_NULL_DEVICE"
+echo "pathchk-hyphen=$?"
+koshkit pathchk -p abcdefghijklmno 2> "$TEST_NULL_DEVICE"
+echo "pathchk-name-length=$?"
+koshkit pathchk -P '' 2> "$TEST_NULL_DEVICE"
+echo "pathchk-empty=$?"

@@ -1,0 +1,12 @@
+root=$(mktemp -d)
+cd "$root"
+
+: > empty
+printf 'hello\n' > text
+printf '\0abcde\0xy\n' > binary
+
+koshkit file empty text binary
+koshkit strings binary
+koshkit strings -n 2 -t d binary
+koshkit od -An -tx1 text
+koshkit od -An -tc text

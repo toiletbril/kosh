@@ -135,35 +135,40 @@ _kosh_fc_complete()
 
 complete -F _kosh_fc_complete fc
 
-_koshkit_utils="basename calc cat cp dirname du env find flock grep head killall ln \
-ls make mkdir mv nproc pkill ps realpath rm rmdir seq sleep sort tail tee timeout touch tr \
-uniq unlink wc which whoami yes"
+_koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date \
+df dirname du env expand expr file find flock fold getconf grep head id killall link ln locale \
+logger logname ls make man mkdir mkfifo more mv nice nl nohup nproc od paste pathchk pkill pr ps \
+realpath renice rm rmdir sed seq sleep sort split strings stty tabs tail tee timeout touch tput \
+tr tsort tty uname unexpand uniq unlink uudecode uuencode wc which who whoami xargs yes"
 
 _koshkit_util_flags()
 {
   case $1 in
-    ls)            echo "-a -1 -l -h" ;;
+    calc)          echo "-i --interactive -p --pipe" ;;
+    ls)            echo "-a -A -1 -l -h" ;;
     nproc)         echo "--all --ignore=" ;;
     ln)            echo "-s -f" ;;
-    rm)            echo "-r -R -f" ;;
-    mkdir)         echo "-p" ;;
+    rm)            echo "-r -R -f --dry-run" ;;
+    mkdir)         echo "-p -m" ;;
     cp)            echo "-r -R -v" ;;
     mv)            echo "-f -v" ;;
     cat)           echo "-n --syntax-highlighting" ;;
     tee)           echo "-a" ;;
     touch)         echo "-c" ;;
     du)            echo "-s -h" ;;
-    head|tail)     echo "-n" ;;
+    head|tail)     echo "-n -c" ;;
     wc)            echo "-l -w -c" ;;
     tr)            echo "-d" ;;
     grep)          echo "-i -v" ;;
     sort)          echo "-r" ;;
     uniq)          echo "-c" ;;
     timeout)       echo "-s --signal -k --kill-after -p --preserve-status" ;;
-    pkill|killall) echo "-s -l" ;;
-    make)          echo "-f" ;;
+    pkill|killall) echo "-s --signal -l --list" ;;
+    make)          echo "-f --file -C --directory -B --always-make -k --keep-going -e --environment-overrides -i --ignore-errors -S --stop -n --just-print -p --print-data-base -q --question -r --no-builtin-rules -s --silent -t --touch" ;;
     find)          echo "-name -type -maxdepth -mindepth -print" ;;
     flock)         echo "--transaction-held-lock" ;;
+    ps)            echo "-a -u -x -w" ;;
+    which)         echo "-a --all -q --quiet" ;;
     *)             echo "" ;;
   esac
 }
@@ -181,7 +186,7 @@ _koshkit_complete()
 
   local util=${COMP_WORDS[1]}
   if [[ $current_word == -* ]]; then
-    _kosh_compgen -W "$(_koshkit_util_flags "$util")" -- "$current_word"
+    _kosh_compgen -W "$(_koshkit_util_flags "$util") --help" -- "$current_word"
   else
     _kosh_compgen -f -- "$current_word"
   fi
