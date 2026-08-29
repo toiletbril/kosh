@@ -2,3 +2,11 @@
 advanced
 == touch -c still does not create a missing file:
 ghost-missing
+== touch -r copies both timestamps:
+copied
+== touch -a preserves the modification time:
+preserved
+== touch -m preserves the access time:
+preserved
+== touch -t sets the requested timestamp:
+set

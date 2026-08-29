@@ -3,6 +3,9 @@ rm: would remove 'link'
 == --dry-run prints without deleting a file:
 rm: would remove 'keep.txt'
 keep.txt still present
+== rm -i honors both answers under --dry-run:
+declined=empty
+accepted=rm: would remove 'keep.txt'
 == --dry-run -r lists a tree in removal order without deleting it:
 rm: would remove 'tree/sub/b'
 rm: would remove 'tree/sub'

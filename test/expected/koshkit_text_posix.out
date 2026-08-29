@@ -18,6 +18,22 @@
       [SimpleCommand "printf" "a\303\251z\n"]
       [SimpleCommand "koshkit" "cut" "-c" "2"]
   [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "abcdef\n"]
+      [SimpleCommand "koshkit" "cut" "-b" "1-2 4"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a\303\251z\n"]
+      [SimpleCommand "koshkit" "cut" "-b" "3" "-n"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a\303\251z\n"]
+      [SimpleCommand "koshkit" "cut" "-b" "1-2" "-n"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a\303\251z\n"]
+      [SimpleCommand "koshkit" "cut" "-b" "3-" "-n"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "expand" "-t" "4" "spaced"]
   [CompoundListCondition, None]
     [Pipeline]
@@ -77,6 +93,16 @@
     [SimpleCommand "echo" "csplit-cleanup=$?"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "pr" "-t" "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pr" "-t" "-w" "20" "-s" ":" "-2" "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pr" "-t" "-a" "-w" "20" "-s" ":" "-2" "lines"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "left-one\nleft-two\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "right-one\nright-two\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pr" "-t" "-m" "-w" "30" "-s" ":" "left" "right"]
 [Word
   Unquoted "root="
   CommandSubstitution "mktemp -d"
@@ -167,6 +193,87 @@
 ]
 [Word
   Unquoted "2"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "abcdef\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-b"
+]
+[Word
+  Literal "1-2 4"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\303\251z\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-b"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\303\251z\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-b"
+]
+[Word
+  Unquoted "1-2"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\303\251z\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cut"
+]
+[Word
+  Unquoted "-b"
+]
+[Word
+  Unquoted "3-"
+]
+[Word
+  Unquoted "-n"
 ]
 [Word
   Unquoted "koshkit"
@@ -625,6 +732,111 @@
 [Word
   Unquoted "lines"
 ]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pr"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "20"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "-2"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pr"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "20"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "-2"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "left-one\nleft-two\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "right-one\nright-two\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pr"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "-m"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "30"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
 one
 two
 three
@@ -632,6 +844,10 @@ alp:
 bett
 gam:
 é
+abd
+é
+a
+éz
 a   b
 123456789
 a   b
@@ -691,4 +907,10 @@ one
 two
 three
 four
+one:three
+two:four
+one:two
+three:four
+left-one:right-one
+left-two:right-two
 [Code 0]

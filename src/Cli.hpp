@@ -201,11 +201,12 @@ public:
   FlagManyStrings(char short_name, StringView long_name, flag_section section,
                   StringView description);
 
-  fn append(StringView v) throws -> void;
+  fn append(StringView v, usize position = 0) throws -> void;
   pure fn count() const wontthrow -> usize;
   pure fn is_empty() const wontthrow -> bool;
 
   pure fn get(usize i) const wontthrow -> StringView;
+  pure fn get_position(usize i) const wontthrow -> usize;
 
   fn next() throws -> StringView;
   pure fn at_end() const wontthrow -> bool;
@@ -215,6 +216,7 @@ public:
 
 private:
   ArrayList<String> m_values{heap_allocator()};
+  ArrayList<usize> m_positions{heap_allocator()};
   usize m_value_position{0};
 };
 
@@ -229,7 +231,9 @@ fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
                    const ArrayList<SourceLocation> *arg_locations = nullptr,
                    ArrayList<SourceLocation> *operand_locations = nullptr,
                    StringView program_name = StringView{},
-                   bool should_accept_negative_number_operand = false) throws
+                   bool should_accept_negative_number_operand = false,
+                   bool should_allow_options_after_operands = false,
+                   bool should_accept_unknown_flag_operand = false) throws
     -> ArrayList<String>;
 fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                usize base_position = 0,
@@ -237,7 +241,9 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                const ArrayList<SourceLocation> *arg_locations = nullptr,
                ArrayList<SourceLocation> *operand_locations = nullptr,
                StringView program_name = StringView{},
-               bool should_accept_negative_number_operand = false) throws
+               bool should_accept_negative_number_operand = false,
+               bool should_allow_options_after_operands = false,
+               bool should_accept_unknown_flag_operand = false) throws
     -> ArrayList<String>;
 
 fn join_command_line(int argc, const char *const *argv) throws -> String;

@@ -144,17 +144,30 @@ tr tsort tty uname unexpand uniq unlink uudecode uuencode wc which who whoami xa
 _koshkit_util_flags()
 {
   case $1 in
+    bc)            echo "-l --mathlib -q --quiet" ;;
     calc)          echo "-i --interactive -p --pipe" ;;
+    cp)            echo "-r -R -f -i -p -v" ;;
+    cut)           echo "-b --bytes -c --characters -f --fields -d --delimiter -n --no-split -s --only-delimited" ;;
+    file)          echo "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only" ;;
     ls)            echo "-a -A -1 -l -h" ;;
     nproc)         echo "--all --ignore=" ;;
-    ln)            echo "-s -f" ;;
-    rm)            echo "-r -R -f --dry-run" ;;
+    ln)            echo "-s -f -L -P" ;;
+    locale)        echo "-a --all-locales -m --charmaps -c --category-name -k --keyword-name" ;;
+    man)           echo "-k --keyword" ;;
+    more)          echo "-c --clear -e --exit -i --ignore-case -s --squeeze -u --plain -n --lines -p --command -t --tag" ;;
+    rm)            echo "-r -R -f -i --dry-run" ;;
+    rmdir)         echo "-p" ;;
     mkdir)         echo "-p -m" ;;
-    cp)            echo "-r -R -v" ;;
-    mv)            echo "-f -v" ;;
+    mv)            echo "-f -i -v" ;;
+    od)            echo "-A --address-radix -j --skip-bytes -N --read-bytes -t --format -v --output-duplicates" ;;
+    pr)            echo "-a --across -d --double-space -F -f -h --header -l --length -m --merge -n --number-lines -o --indent -r --no-file-warnings -t --omit-header -s --separator -w --width" ;;
+    stty)          echo "-a --all -g --save" ;;
     cat)           echo "-n --syntax-highlighting" ;;
     tee)           echo "-a" ;;
-    touch)         echo "-c" ;;
+    touch)         echo "-a -c -m -r -t" ;;
+    tput)          echo "-T --terminal" ;;
+    uudecode)      echo "-o --output" ;;
+    who)           echo "-a --all -b --boot -d --dead -H --heading -l --login -m --current -p --process -q --quick -r --runlevel -s --short -t --time -T --terminal-state -u --idle" ;;
     du)            echo "-s -h" ;;
     head|tail)     echo "-n -c" ;;
     wc)            echo "-l -w -c" ;;

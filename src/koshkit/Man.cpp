@@ -6,11 +6,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[section] name ...");
+HELP_SYNOPSIS_DECL("[-k keyword] | [section] name ...");
 
 HELP_DESCRIPTION_DECL(
     "The man utility displays manual pages found through MANPATH.");
 
+FLAG(MAN_KEYWORD, String, 'k', "keyword", "Search manual page descriptions.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Man);
@@ -80,6 +81,70 @@ fn Man::execute(const ExecContext &ec, EvalContext &cxt,
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
+  let const configured_paths = cxt.get_variable_value("MANPATH");
+  let const paths =
+      configured_paths.has_value() && !configured_paths->is_empty()
+          ? configured_paths->view()
+          : StringView{"/usr/share/man:/usr/local/share/man"};
+  if (FLAG_MAN_KEYWORD.is_set()) {
+    if (!operands.is_empty())
+      return report_usage_error(ec, cxt, args[0].view());
+    let keyword = String{cxt.scratch_allocator(), FLAG_MAN_KEYWORD.value()};
+    keyword.lowercase_ascii();
+    let output = String{cxt.scratch_allocator()};
+    usize path_start = 0;
+    while (path_start <= paths.length) {
+      let const remaining = paths.substring(path_start);
+      let const path_length =
+          remaining.find_character(':').value_or(remaining.length);
+      let const directory = path_length == 0
+                                ? StringView{"."}
+                                : remaining.substring_of_length(0, path_length);
+      for (u32 section_number = 1; section_number <= 9; section_number++) {
+        let manual_directory = String{cxt.scratch_allocator(), directory};
+        if (!manual_directory.is_empty() && manual_directory.back() != '/')
+          manual_directory += '/';
+        manual_directory += "man";
+        manual_directory += static_cast<char>('0' + section_number);
+        let entries = os::list_directory(manual_directory.view());
+        if (!entries.has_value()) continue;
+        entries->sort();
+        for (let const &entry : *entries) {
+          if (entry.length() < 3 || entry[entry.length() - 2] != '.' ||
+              entry[entry.length() - 1] !=
+                  static_cast<char>('0' + section_number))
+            continue;
+          let path = String{cxt.scratch_allocator(), manual_directory.view()};
+          path += '/';
+          path += entry.view();
+          let content = Path{path.view()}.read_entire_file();
+          if (!content.has_value()) continue;
+          let searchable = content->clone();
+          searchable.lowercase_ascii();
+          let name = entry.view().substring_of_length(0, entry.length() - 2);
+          let lowered_name = String{cxt.scratch_allocator(), name};
+          lowered_name.lowercase_ascii();
+          if (std::strstr(searchable.c_str(), keyword.c_str()) == NULL &&
+              std::strstr(lowered_name.c_str(), keyword.c_str()) == NULL)
+            continue;
+          let const newline = content->view().find_character('\n');
+          let const summary = content->view().substring_of_length(
+              0, newline.value_or(content->length()));
+          output += name;
+          output += " (";
+          output += static_cast<char>('0' + section_number);
+          output += ") - ";
+          output += summary;
+          output += '\n';
+        }
+      }
+      if (path_length == remaining.length) break;
+      path_start += path_length + 1;
+    }
+    ec.print_to_stdout(output);
+    return output.is_empty() ? 1 : 0;
+  }
+
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   usize name_position = 0;
   StringView section;
@@ -87,11 +152,6 @@ fn Man::execute(const ExecContext &ec, EvalContext &cxt,
     section = operands[0].view();
     name_position = 1;
   }
-  let const configured_paths = cxt.get_variable_value("MANPATH");
-  let const paths =
-      configured_paths.has_value() && !configured_paths->is_empty()
-          ? configured_paths->view()
-          : StringView{"/usr/share/man:/usr/local/share/man"};
   i32 status = 0;
   for (; name_position < operands.count(); name_position++) {
     let const page =

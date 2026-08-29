@@ -1203,7 +1203,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     ASSERT(token != nullptr);
 
     if (args_accumulator.is_empty() && local_vars.count() == 0 &&
-        array_args.is_empty())
+        array_args.is_empty() && redirections.is_empty())
     {
       let position_word = command_position_word::None;
       if (let const *text = get_unquoted_word_text(token); text != nullptr) {

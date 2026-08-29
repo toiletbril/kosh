@@ -91,6 +91,10 @@ without
 .B \-\-apply
 writes the fixed and formatted source to standard output.
 .PP
+Formatting separates a declaration block from the following command. It also
+separates a completed fi, done, esac, subshell, or brace group from the next
+independent command.
+.PP
 When both
 .B \-s
 and
@@ -734,6 +738,11 @@ moods use signed 64-bit arithmetic with wrapping operations. The default mood
 also accepts finite base-10 decimal literals. Addition and subtraction use the
 larger operand scale. Multiplication adds the operand scales. Division and
 remainder use the larger operand scale and truncate toward zero.
+.PP
+A standalone expression with decimal integer literals on both sides of ^ may
+report that ^ is bitwise XOR and suggest ** for exponentiation. Expressions
+that contain names, assignments, or another bitwise operator do not produce
+this suggestion.
 .SS Command substitution
 The forms $(command) and `command` replace a command with its output. A command
 substitution restores runtime state, shell options, directory stack, working
@@ -911,7 +920,8 @@ budget.
 .B z
 The current directory is changed to a directory selected from the frecency
 store. Operands form one case-insensitive substring query. Visit count and
-recency determine the ranking.
+recency determine the ranking. With no operand, the current directory is
+changed to the home directory.
 .SS Compatibility forms
 .TP
 .B set
@@ -1200,9 +1210,15 @@ and
 .BR \-p ", " \-\-pipe
 options read expressions interactively or from a pipe.
 The default mood accepts arbitrary precision integers and finite decimal
-values. Compatibility moods use signed 64-bit arithmetic. The abs, ceil, cmp,
-fact, fib, floor, frac, gcd, int, iseven, isint, isodd, lcm, max, min, and sgn
-functions are available.
+values. Compatibility moods use signed 64-bit arithmetic. The abs, atan, ceil,
+cmp, cos, exp, fact, fib, floor, frac, gcd, int, iseven, isint, isodd, length,
+lcm, ln, max, min, scale, sgn, sin, and sqrt functions are available.
+.TP
+.B bc
+Expressions, assignments, functions, arrays, control flow, input and output
+bases, and scale are supported. The
+.B \-l
+option enables atan, cos, exp, ln, and sin and selects a scale of 20.
 .TP
 .B cat
 Files or standard input are concatenated. The
@@ -1214,9 +1230,12 @@ file containing a null byte is written without highlighting. Line numbering
 continues across file and standard input boundaries.
 .TP
 .B cp
-Files and directory trees are copied with
+Files and directory trees are copied. The
 .BR \-r ,
 .BR \-R ,
+.BR \-f ,
+.BR \-i ,
+.BR \-p ,
 and
 .BR \-v .
 .TP
@@ -1287,10 +1306,13 @@ and
 .BR \-\-list .
 .TP
 .B ln
-Symbolic links are created with
-.B \-s
+Hard links are created by default. The
+.BR \-s ,
+.BR \-f ,
+.BR \-L ,
 and
-.BR \-f .
+.B \-P
+options select symbolic links, replacement, and source link handling.
 .TP
 .B ls
 Sorted entries are listed with
@@ -1308,13 +1330,22 @@ Compact make rules are run. The
 .BR \-C ,
 and
 .B \-\-directory
-options are supported. The unused
+options are supported. The
 .B \-B
 option always rebuilds targets, and
 .B \-k
 continues independent goals after an error. The
-.B \-j
-option is ignored.
+.BR \-e ,
+.BR \-i ,
+.BR \-S ,
+.BR \-n ,
+.BR \-p ,
+.BR \-q ,
+.BR \-r ,
+.BR \-s ,
+and
+.B \-t
+options provide the POSIX make execution modes.
 .TP
 .B mkdir
 Directories are created with
@@ -1325,7 +1356,8 @@ mode.
 .TP
 .B mv
 Sources are renamed with
-.B \-f
+.BR \-f ,
+.BR \-i ,
 and
 .BR \-v .
 .TP
@@ -1353,12 +1385,15 @@ Paths are removed with
 .BR \-r ,
 .BR \-R ,
 .BR \-f ,
+.BR \-i ,
 and
 .BR \-\-dry\-run .
 Root, dot, and dot-dot are refused.
 .TP
 .B rmdir
-Empty directories are removed.
+Empty directories are removed. The
+.B \-p
+option also removes empty parent directories.
 .TP
 .B seq
 Signed integer sequences are printed with a nonzero step.
@@ -1370,6 +1405,14 @@ Execution pauses for summed durations with optional s, m, h, or d suffixes.
 Input lines are sorted in byte order. The
 .B \-r
 option reverses the result.
+.TP
+.B stty
+Terminal settings are reported or changed. The
+.B \-a
+option reports all settings. The
+.B \-g
+option reports an encoded state that can be supplied later to restore the
+same state.
 .TP
 .B tee
 Standard input is copied to output files. The
@@ -1389,8 +1432,14 @@ options control signals and status handling.
 .TP
 .B touch
 File times are updated. The
-.B \-c
-option avoids creating a missing file.
+.BR \-a ,
+.BR \-c ,
+.BR \-m ,
+.BR \-r ,
+and
+.B \-t
+options select access times, creation, modification times, a reference file,
+and an explicit timestamp.
 .TP
 .B tr
 Input bytes are translated with ranges and character classes. The

@@ -17,6 +17,8 @@ value=environment
 first=second
 makeflags=yes
 grouped-file
+--- options after operands ---
+grouped-file
 --- advanced features ---
 second recipe line ran after a forking command
 make=[koshkit make -j4]
@@ -25,6 +27,7 @@ obj=[a.o b.o]
 flags=[one  two]
 tag=[debug]
 --- freshness and query modes ---
+make: No action was needed.
 fresh=0
 fresh-query=0
 rebuilt
@@ -53,6 +56,8 @@ keep-last=2
 compound=2
 compound-ignored
 compound-ignored=0
+interrupt=130
+interrupt-cleanup=yes
 --- special targets and suffix inference ---
 after-error
 finished
@@ -63,6 +68,8 @@ echo compile -O9 -c builtin.c
 compile -O9 -c builtin.c
 no-builtins=2
 shell-rule=yes
+echo -O 1 -c standalone.c
+-O 1 -c standalone.c
 --- parsing automatic variables and cleanup ---
 target=one hash=value#tail
 target=two hash=value#tail
@@ -91,6 +98,8 @@ echo forced-ran > forced-marker
 echo ordinary-ran > ordinary-marker
 forced-ran=yes
 ordinary-ran=no
+recursive-value=[one two]
+inherited-macro=fromflags inherited-environment=unset
 --- forced query and touch recipes ---
 query-status=1
 query-ran=yes
@@ -109,6 +118,7 @@ member-dir=obj member-file=member.o
 --- POSIX recipe environment and shell macro ---
 command=fromcommand inherited=fromfile local=
 shell-selected=yes
+shell-env=inherited-value
 --- POSIX graph and inference edge cases ---
 nested-independent
 nested-keep=2
@@ -128,6 +138,9 @@ CFLAGS = -O 1
 .l.o:
 .y.c:
 .l.c:
+1
+1
+1
 .SUFFIXES:
 echo   -o program program.c
 -o program program.c
@@ -137,8 +150,11 @@ include=included nested
 right>
 --- POSIX archive inference ---
 archive=library.a member=member.o source=member.src stem=member
+archive-member-stale
 --- POSIX suffix precedence ---
 via-sh
+second-inference
+dot-default
 --- default goal builds both through the pattern ---
 echo cc foo.c -o foo.o
 cc foo.c -o foo.o

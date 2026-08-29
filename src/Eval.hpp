@@ -1020,6 +1020,8 @@ public:
       const SourceLocation *expression_base = nullptr) throws -> String;
   fn evaluate_calculator_arithmetic_text(StringView expression) throws
       -> String;
+  fn evaluate_bc_arithmetic_text(StringView expression, u32 scale) throws
+      -> String;
   fn evaluate_arithmetic_nonzero(
       StringView expression,
       const SourceLocation *expression_base = nullptr) throws -> bool;

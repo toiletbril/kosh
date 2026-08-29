@@ -171,12 +171,15 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
 fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
                        const ArrayList<SourceLocation> *arg_locations,
                        ArrayList<SourceLocation> *operand_locations,
-                       bool should_accept_negative_number_operand) throws
+                       bool should_accept_negative_number_operand,
+                       bool should_allow_options_after_operands,
+                       bool should_accept_unknown_flag_operand) throws
     -> ArrayList<String>
 {
-  ArrayList<String> operands =
-      parse_flags_vec(flags, args, 0, nullptr, arg_locations, operand_locations,
-                      {}, should_accept_negative_number_operand);
+  ArrayList<String> operands = parse_flags_vec(
+      flags, args, 0, NULL, arg_locations, operand_locations, {},
+      should_accept_negative_number_operand,
+      should_allow_options_after_operands, should_accept_unknown_flag_operand);
   /* The first operand is the utility name, dropped to leave the real arguments.
    */
   if (!operands.is_empty()) operands.remove(0);
@@ -216,6 +219,28 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>
 {
   return os::read_fd_to_string(fd, heap_allocator());
+}
+
+fn confirm_koshkit_action(const ExecContext &ec, StringView prompt) throws
+    -> bool
+{
+  ec.print_to_stderr(prompt);
+
+  char first_byte = '\0';
+  bool is_first_byte = true;
+  loop
+  {
+    char byte = '\0';
+    let const read_count = os::read_fd(ec.in_fd.value_or(KOSH_STDIN), &byte, 1);
+    if (!read_count.has_value() || *read_count == 0) break;
+    if (is_first_byte) {
+      first_byte = byte;
+      is_first_byte = false;
+    }
+    if (byte == '\n') break;
+  }
+
+  return first_byte == 'y' || first_byte == 'Y';
 }
 
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws

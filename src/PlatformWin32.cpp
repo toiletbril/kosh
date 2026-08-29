@@ -745,9 +745,11 @@ fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
 }
 
 fn terminal_settings(descriptor terminal, bool should_encode,
-                     Allocator allocator) throws -> Maybe<String>
+                     bool should_report_all, Allocator allocator) throws
+    -> Maybe<String>
 {
   unused(should_encode);
+  unused(should_report_all);
   if (!is_fd_a_tty(terminal)) return None;
   return String{allocator, "speed 0 baud; echo icanon isig\n"};
 }

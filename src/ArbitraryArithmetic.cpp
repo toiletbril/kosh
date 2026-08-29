@@ -456,11 +456,9 @@ fn ArithmeticValue::from_magnitude(const u64 *limbs, usize count,
                                    bool is_negative, u32 decimal_scale,
                                    BumpArena &arena) throws -> ArithmeticValue
 {
-  static_assert(sizeof(Storage) == 8);
-  static_assert(alignof(Storage) >= alignof(u64));
-
   while (count > 0 && limbs[count - 1] == 0)
     count--;
+  if (count == 0) is_negative = false;
   if (count == 0 && decimal_scale == 0) return ArithmeticValue{};
 
   if (decimal_scale == 0 && count <= 2) {
@@ -481,23 +479,60 @@ fn ArithmeticValue::from_magnitude(const u64 *limbs, usize count,
     }
   }
 
-  if (count > static_cast<usize>(~u32{0}) ||
-      count > (SIZE_MAX - sizeof(Storage)) / sizeof(u64))
+  u64 *destination;
+  let result =
+      allocate_promoted(count, is_negative, decimal_scale, arena, destination);
+  if (count > 0) std::memcpy(destination, limbs, count * sizeof(u64));
+
+  return result;
+}
+
+fn ArithmeticValue::allocate_promoted(usize limb_count, bool is_negative,
+                                      u32 decimal_scale, BumpArena &arena,
+                                      u64 *&limbs) throws -> ArithmeticValue
+{
+  static_assert(sizeof(Storage) == 8);
+  static_assert(alignof(Storage) >= alignof(u64));
+
+  if (limb_count > static_cast<usize>(~u32{0}) ||
+      limb_count > (SIZE_MAX - sizeof(Storage)) / sizeof(u64))
     throw std::bad_alloc{};
-  let const allocation_length = sizeof(Storage) + count * sizeof(u64);
+  let const allocation_length = sizeof(Storage) + limb_count * sizeof(u64);
   let const storage = static_cast<Storage *>(
       bump_allocator(arena).raw_alloc(allocation_length, alignof(Storage)));
   if (storage == nullptr) throw std::bad_alloc{};
   new (storage) Storage{};
-  storage->limb_count = static_cast<u32>(count);
+  storage->limb_count = static_cast<u32>(limb_count);
   storage->decimal_scale = decimal_scale;
-
-  if (count > 0) std::memcpy(storage + 1, limbs, count * sizeof(u64));
+  limbs = reinterpret_cast<u64 *>(storage + 1);
 
   let result = ArithmeticValue{};
   result.m_low = static_cast<u64>(reinterpret_cast<uintptr>(storage) |
                                   (is_negative ? NEGATIVE_STORAGE_FLAG : 0));
   result.m_high = PROMOTED_MARKER;
+
+  return result;
+}
+
+fn ArithmeticValue::from_power_of_two(usize bit_position, bool is_negative,
+                                      BumpArena &arena) throws
+    -> ArithmeticValue
+{
+  if ((!is_negative && bit_position < 127) ||
+      (is_negative && bit_position <= 127))
+  {
+    let const magnitude = u128{1} << bit_position;
+    return from_signed_128(
+        static_cast<i128>(is_negative ? u128{0} - magnitude : magnitude),
+        arena);
+  }
+
+  let const limb_position = bit_position / 64;
+  let const limb_count = limb_position + 1;
+  u64 *limbs;
+  let result = allocate_promoted(limb_count, is_negative, 0, arena, limbs);
+  std::memset(limbs, 0, limb_count * sizeof(u64));
+  limbs[limb_position] = u64{1} << (bit_position % 64);
 
   return result;
 }
@@ -745,7 +780,8 @@ fn ArithmeticValue::add(const ArithmeticValue &left,
     is_negative = left.is_negative();
   } else {
     let const ordering = compare_limbs(left_magnitude, right_magnitude);
-    if (ordering == 0) return ArithmeticValue{};
+    if (ordering == 0)
+      return from_magnitude(NULL, 0, false, decimal_scale, arena);
     if (ordering > 0) {
       result = subtract_limbs(left_magnitude, right_magnitude, allocator);
       is_negative = left.is_negative();
@@ -783,7 +819,12 @@ fn ArithmeticValue::multiply(const ArithmeticValue &left,
                              BumpArena &arena) throws -> ArithmeticValue
 {
   let const allocator = bump_allocator(arena);
-  if (left.is_zero() || right.is_zero()) return ArithmeticValue{};
+  if (left.get_decimal_scale() > ~u32{0} - right.get_decimal_scale())
+    throw std::bad_alloc{};
+  let const decimal_scale =
+      left.get_decimal_scale() + right.get_decimal_scale();
+  if (left.is_zero() || right.is_zero())
+    return from_magnitude(NULL, 0, false, decimal_scale, arena);
   if (!left.is_promoted() && !right.is_promoted()) {
     i128 result;
     if (!__builtin_mul_overflow(left.inline_value(), right.inline_value(),
@@ -794,11 +835,9 @@ fn ArithmeticValue::multiply(const ArithmeticValue &left,
   let const left_magnitude = left.copy_magnitude(allocator);
   let const right_magnitude = right.copy_magnitude(allocator);
   let result = multiply_limbs(left_magnitude, right_magnitude, allocator);
-  if (left.get_decimal_scale() > ~u32{0} - right.get_decimal_scale())
-    throw std::bad_alloc{};
-  return from_magnitude(
-      result.begin(), result.count(), left.is_negative() != right.is_negative(),
-      left.get_decimal_scale() + right.get_decimal_scale(), arena);
+  return from_magnitude(result.begin(), result.count(),
+                        left.is_negative() != right.is_negative(),
+                        decimal_scale, arena);
 }
 
 fn ArithmeticValue::divide(const ArithmeticValue &left,
@@ -870,7 +909,6 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
                           const ArithmeticValue &exponent,
                           BumpArena &arena) throws -> ArithmeticValue
 {
-  let const allocator = bump_allocator(arena);
   if (!exponent.has_integer_value(arena))
     throw ErrorWithDetails{"Exponent is not an integer",
                            "'**' requires an integer exponent"};
@@ -879,7 +917,9 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
     throw ErrorWithDetails{"Exponent less than 0",
                            "'**' requires a non-negative exponent"};
   if (integral_exponent.is_zero()) return ArithmeticValue{1};
-  if (base.is_zero()) return ArithmeticValue{};
+  if (base.is_zero() && base.is_integer()) {
+    return ArithmeticValue{};
+  }
   if (base.is_integer() && base.limb_count() == 1 && base.limb_at(0) == 1) {
     if (!base.is_negative()) return ArithmeticValue{1};
     return ArithmeticValue{(integral_exponent.limb_at(0) & 1u) != 0 ? -1 : 1};
@@ -889,6 +929,14 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
                            "The result cannot fit in addressable memory"};
 
   let const exponent_value = integral_exponent.limb_at(0);
+  if (base.is_zero()) {
+    if (exponent_value > ~u32{0} / base.get_decimal_scale())
+      throw ErrorWithDetails{"Exponent is too large",
+                             "The result cannot fit in addressable memory"};
+    return from_magnitude(
+        NULL, 0, false,
+        static_cast<u32>(exponent_value) * base.get_decimal_scale(), arena);
+  }
   if (base.is_integer() && base.limb_count() == 1 &&
       __builtin_popcountll(base.limb_at(0)) == 1)
   {
@@ -903,11 +951,9 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
     if (result_limb_position >= ArrayList<u64>::MAXIMUM_ELEMENT_COUNT)
       throw ErrorWithDetails{"Exponent is too large",
                              "The result cannot fit in addressable memory"};
-    let magnitude = make_zero_limbs(result_limb_position + 1, allocator);
-    magnitude[result_limb_position] = u64{1} << (result_bit_position % 64);
-    return from_magnitude(magnitude.begin(), magnitude.count(),
-                          base.is_negative() && (exponent_value & 1u) != 0, 0,
-                          arena);
+    return from_power_of_two(result_bit_position,
+                             base.is_negative() && (exponent_value & 1u) != 0,
+                             arena);
   }
 
   u64 remaining = exponent_value;
@@ -921,6 +967,44 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
   }
 
   return result;
+}
+
+fn ArithmeticValue::square_root(const ArithmeticValue &value, u32 decimal_scale,
+                                BumpArena &arena) throws -> ArithmeticValue
+{
+  if (value.is_negative())
+    throw ErrorWithDetails{"Square root operand is negative",
+                           "sqrt requires a non-negative value"};
+  if (decimal_scale < value.get_decimal_scale())
+    decimal_scale = value.get_decimal_scale();
+  if (value.is_zero())
+    return from_magnitude(NULL, 0, false, decimal_scale, arena);
+  let const allocator = bump_allocator(arena);
+  let magnitude = value.copy_magnitude(allocator);
+  let const scale_growth_wide =
+      static_cast<u64>(decimal_scale) * 2 - value.get_decimal_scale();
+  if (scale_growth_wide > ~u32{0}) throw std::bad_alloc{};
+  let const scale_growth = static_cast<u32>(scale_growth_wide);
+  multiply_power_of_ten(magnitude, scale_growth);
+  let const scaled =
+      from_magnitude(magnitude.begin(), magnitude.count(), false, 0, arena);
+  let const highest_limb = scaled.limb_at(scaled.limb_count() - 1);
+  let const bit_count = (scaled.limb_count() - 1) * 64 + 64 -
+                        static_cast<usize>(__builtin_clzll(highest_limb));
+  let estimate = from_power_of_two((bit_count + 1) / 2, false, arena);
+
+  loop
+  {
+    let const quotient = divide(scaled, estimate, arena);
+    let const next =
+        divide(add(estimate, quotient, arena), ArithmeticValue{2}, arena);
+    if (next.compare(estimate, allocator) >= 0) break;
+    estimate = next;
+  }
+
+  let const result_magnitude = estimate.copy_magnitude(allocator);
+  return from_magnitude(result_magnitude.begin(), result_magnitude.count(),
+                        false, decimal_scale, arena);
 }
 
 fn ArithmeticValue::shift_left(const ArithmeticValue &value,
@@ -1091,6 +1175,30 @@ fn ArithmeticValue::integer_part(const ArithmeticValue &value,
   divide_small(magnitude, divisor);
   return from_magnitude(magnitude.begin(), magnitude.count(),
                         value.is_negative(), 0, arena);
+}
+
+fn ArithmeticValue::rescale(const ArithmeticValue &value, u32 decimal_scale,
+                            BumpArena &arena) throws -> ArithmeticValue
+{
+  let const current_scale = value.get_decimal_scale();
+  if (decimal_scale == current_scale) return value;
+  let magnitude = value.copy_magnitude(bump_allocator(arena));
+  if (decimal_scale > current_scale) {
+    multiply_power_of_ten(magnitude, decimal_scale - current_scale);
+  } else {
+    let decimal_count = current_scale - decimal_scale;
+    constexpr u64 DECIMAL_CHUNK_BASE = 10000000000000000000ULL;
+    while (decimal_count >= 19) {
+      divide_small(magnitude, DECIMAL_CHUNK_BASE);
+      decimal_count -= 19;
+    }
+    u64 divisor = 1;
+    for (u32 index = 0; index < decimal_count; index++)
+      divisor *= 10;
+    divide_small(magnitude, divisor);
+  }
+  return from_magnitude(magnitude.begin(), magnitude.count(),
+                        value.is_negative(), decimal_scale, arena);
 }
 
 fn ArithmeticValue::has_integer_value(BumpArena &arena) const throws -> bool

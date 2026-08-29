@@ -6,7 +6,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-rRf] [--dry-run] path ...");
+HELP_SYNOPSIS_DECL("[-fiRr] [--dry-run] path ...");
 
 HELP_DESCRIPTION_DECL("The rm utility removes each path.");
 
@@ -14,6 +14,7 @@ FLAG(RM_RECURSIVE_R, Bool, 'r', "", "Remove directories and their contents.");
 FLAG(RM_RECURSIVE_UPPER, Bool, 'R', "",
      "Remove directories and their contents.");
 FLAG(RM_FORCE, Bool, 'f', "", "Ignore a missing path and never prompt.");
+FLAG(RM_INTERACTIVE, Bool, 'i', "", "Ask before each removal.");
 FLAG(RM_DRY_RUN, Bool, '\0', "dry-run",
      "Print what would be removed without removing anything.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -40,9 +41,35 @@ fn remove_path(StringView path, removal_mode mode) throws -> bool
   return os::remove_file(path);
 }
 
+static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
+                                  removal_mode mode, bool should_prompt) throws
+    -> bool
+{
+  if (!should_prompt) return remove_path(path, mode);
+
+  let const is_recursive = mode == removal_mode::Recursive;
+  let const target = Path{path};
+  if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
+    Maybe<ArrayList<String>> names = Path::read_directory(target);
+    if (names.has_value())
+      for (const String &name : *names) {
+        let const child = PathBuilder{path}.append(name.view()).build();
+        if (!remove_path_with_prompt(ec, child.text().view(), mode,
+                                     should_prompt))
+          return false;
+      }
+    if (!confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
+      return true;
+    return os::remove_directory(path);
+  }
+  if (!confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
+    return true;
+  return os::remove_file(path);
+}
+
 static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
-                                 StringView path, removal_mode mode) throws
-    -> void
+                                 StringView path, removal_mode mode,
+                                 bool should_prompt) throws -> void
 {
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
@@ -52,10 +79,15 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
     {
       for (const String &name : *names) {
         let const child = PathBuilder{path}.append(name.view()).build();
-        report_dry_run_removal(ec, cxt, child.text().view(), mode);
+        report_dry_run_removal(ec, cxt, child.text().view(), mode,
+                               should_prompt);
       }
     }
   }
+
+  if (should_prompt &&
+      !confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
+    return;
 
   ec.print_to_stdout("rm: would remove '" +
                      String{cxt.scratch_allocator(), path} + "'\n");
@@ -102,6 +134,9 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   let const should_force = FLAG_RM_FORCE.is_enabled();
+  let const should_prompt = FLAG_RM_INTERACTIVE.is_enabled() &&
+                            (!should_force || FLAG_RM_INTERACTIVE.position() >
+                                                  FLAG_RM_FORCE.position());
   let const is_recursive =
       FLAG_RM_RECURSIVE_R.is_enabled() || FLAG_RM_RECURSIVE_UPPER.is_enabled();
   let const is_dry_run = FLAG_RM_DRY_RUN.is_enabled();
@@ -142,12 +177,15 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
     if (is_dry_run) {
       report_dry_run_removal(ec, cxt, operand.view(),
                              is_recursive ? removal_mode::Recursive
-                                          : removal_mode::SinglePath);
+                                          : removal_mode::SinglePath,
+                             should_prompt);
       continue;
     }
 
-    if (!remove_path(operand.view(), is_recursive ? removal_mode::Recursive
-                                                  : removal_mode::SinglePath))
+    if (!remove_path_with_prompt(ec, operand.view(),
+                                 is_recursive ? removal_mode::Recursive
+                                              : removal_mode::SinglePath,
+                                 should_prompt))
     {
       report_soft_koshkit_error(ec, cxt,
                                 "rm: cannot remove '" + operand +

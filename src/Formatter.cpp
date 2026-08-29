@@ -1330,6 +1330,11 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       should_attach_heredoc_delimiter = true;
 
     if (is_redirection) {
+      if (is_command_start && !has_classified_current_statement) {
+        is_current_statement_declaration = do_is_declaration_command(index);
+        has_classified_current_statement = true;
+        do_begin_statement(is_current_statement_declaration, false);
+      }
       should_command_start_after_redirection = is_command_start;
       if (index > 0 && pieces[index - 1].kind == format_piece_kind::Word &&
           pieces[index - 1].source_position + pieces[index - 1].text.count() ==

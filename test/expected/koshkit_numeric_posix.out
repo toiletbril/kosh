@@ -6,6 +6,54 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "bc=$?"]
   [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc-core"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "/* ignored */" "a=2" "b=3" "b" "a" "missing" "a+=5.47" "a"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" ""line string"" "scale(123.450)" "length(123.450)" "sqrt(2)" "scale=10" "sqrt(2)"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc-bases"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "ibase=2" "1011.01" "ibase=A" "obase=16" "255"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc-control"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "if(1) 2" "if(0) 3" "for(i=0;i<3;i++) i" "i=0" "while(i<3) ++i" "while(1) break" "if(0) quit" "9"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc-functions"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "define add(a,b) { return(a+b) }" "define local(a) { auto x; x=9; a=7; return(x+a) }" "g=5" "add(2,3)" "local(g)" "g" "arr[0]=4" "arr[1]=6" "define mutate(a[]) { a[0]; a[0]=8 }" "mutate(arr[])" "arr[0]"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "define x(x,y) { return(x-y+5) }" "define y(y,x) { return(x(y,x)+x(x,y)) }" "y(1,4)"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "10^70"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc-continuation"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "1\\\n2\n0.\\\n345\n"]
+      [SimpleCommand "koshkit" "bc"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bc-math"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "scale=12" "s(1)" "c(1)" "a(1)" "l(2)" "e(1)"]
+      [SimpleCommand "koshkit" "bc" "-l"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "expr" "2" "+" "3" "*" "4"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "expr" "7" ">" "3"]
@@ -17,36 +65,6 @@
     [SimpleCommand "koshkit" "expr" "0"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "expr-false=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "abs(-12.50)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "floor(-1.2)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "ceil(1.2)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "frac(-7.25)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "cmp(999999999999999999999, 8)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "gcd(84, 30, 18)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "lcm(12, 18)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "fact(30)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "fib(100)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "min(9.2, -4, 7)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "max(9.2, -4, 7)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "isint(1.00)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "iseven(42)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "isodd(42)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "calc" "sgn(-0.01)"]
 [Word
   Unquoted "printf"
 ]
@@ -65,6 +83,297 @@
 [Word
   DoubleQuoted "bc="
   Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bc-core"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "/* ignored */"
+]
+[Word
+  Literal "a=2"
+]
+[Word
+  Literal "b=3"
+]
+[Word
+  Literal "b"
+]
+[Word
+  Literal "a"
+]
+[Word
+  Literal "missing"
+]
+[Word
+  Literal "a+=5.47"
+]
+[Word
+  Literal "a"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal ""line string""
+]
+[Word
+  Literal "scale(123.450)"
+]
+[Word
+  Literal "length(123.450)"
+]
+[Word
+  Literal "sqrt(2)"
+]
+[Word
+  Literal "scale=10"
+]
+[Word
+  Literal "sqrt(2)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bc-bases"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "ibase=2"
+]
+[Word
+  Literal "1011.01"
+]
+[Word
+  Literal "ibase=A"
+]
+[Word
+  Literal "obase=16"
+]
+[Word
+  Literal "255"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bc-control"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "if(1) 2"
+]
+[Word
+  Literal "if(0) 3"
+]
+[Word
+  Literal "for(i=0;i<3;i++) i"
+]
+[Word
+  Literal "i=0"
+]
+[Word
+  Literal "while(i<3) ++i"
+]
+[Word
+  Literal "while(1) break"
+]
+[Word
+  Literal "if(0) quit"
+]
+[Word
+  Literal "9"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bc-functions"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "define add(a,b) { return(a+b) }"
+]
+[Word
+  Literal "define local(a) { auto x; x=9; a=7; return(x+a) }"
+]
+[Word
+  Literal "g=5"
+]
+[Word
+  Literal "add(2,3)"
+]
+[Word
+  Literal "local(g)"
+]
+[Word
+  Literal "g"
+]
+[Word
+  Literal "arr[0]=4"
+]
+[Word
+  Literal "arr[1]=6"
+]
+[Word
+  Literal "define mutate(a[]) { a[0]; a[0]=8 }"
+]
+[Word
+  Literal "mutate(arr[])"
+]
+[Word
+  Literal "arr[0]"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "define x(x,y) { return(x-y+5) }"
+]
+[Word
+  Literal "define y(y,x) { return(x(y,x)+x(x,y)) }"
+]
+[Word
+  Literal "y(1,4)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "10^70"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bc-continuation"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "1\\\n2\n0.\\\n345\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bc-math"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "scale=12"
+]
+[Word
+  Literal "s(1)"
+]
+[Word
+  Literal "c(1)"
+]
+[Word
+  Literal "a(1)"
+]
+[Word
+  Literal "l(2)"
+]
+[Word
+  Literal "e(1)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "bc"
+]
+[Word
+  Unquoted "-l"
 ]
 [Word
   Unquoted "koshkit"
@@ -151,162 +460,52 @@
   DoubleQuoted "expr-false="
   Variable "?"
 ]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "abs(-12.50)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "floor(-1.2)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "ceil(1.2)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "frac(-7.25)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "cmp(999999999999999999999, 8)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "gcd(84, 30, 18)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "lcm(12, 18)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "fact(30)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "fib(100)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "min(9.2, -4, 7)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "max(9.2, -4, 7)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "isint(1.00)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "iseven(42)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "isodd(42)"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "calc"
-]
-[Word
-  Literal "sgn(-0.01)"
-]
 .12
 1024
 bc=0
+bc-core
+3
+2
+0
+7.47
+line string3
+6
+1
+1.4142135623
+bc-bases
+11.25
+FF
+bc-control
+2
+0
+1
+2
+1
+2
+3
+9
+bc-functions
+5
+16
+5
+4
+0
+4
+10
+10000000000000000000000000000000000000000000000000000000000000000000\
+000
+bc-continuation
+12
+.345
+bc-math
+.841470984807
+.540302305868
+.785398163397
+.693147180559
+2.718281828459
 14
 1
 bc
 hello
 expr-false=1
-12.50
--2
-2
--0.25
-1
-6
-36
-265252859812191058636308480000000
-354224848179261915075
--4
-9.2
-1
-1
-0
--1
 [Code 0]

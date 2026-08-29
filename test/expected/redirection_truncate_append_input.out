@@ -11,6 +11,14 @@
     [SimpleCommand "cat"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "unlink" "$file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "no-diagnostics"]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" "(umask 077; >| "$file")"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "compact-redirection=$([[ -f $file ]] && echo preserved)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "unlink" "$file"]
 [Word
   Unquoted "file="
   Variable "TEST_TEMP_DIRECTORY"
@@ -61,6 +69,38 @@
 [Word
   Variable "file"
 ]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "no-diagnostics"
+]
+[Word
+  Unquoted "eval"
+]
+[Word
+  Literal "(umask 077; >| "$file")"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "compact-redirection="
+  CommandSubstitution "[[ -f $file ]] && echo preserved"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "unlink"
+]
+[Word
+  Variable "file"
+]
 first
 second
+compact-redirection=preserved
 [Code 0]

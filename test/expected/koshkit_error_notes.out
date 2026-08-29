@@ -9,10 +9,9 @@ note: Pass one name, e.g. `killall firefox`.
        |  ^~~~~~~~~~~~~~~~~~
 note: Give a non-zero step, e.g. `seq 1 2 10`.
 === ln without -s ===
-1:1: error: ln supports only symbolic links.
+1:1: error: ln: cannot create link 'b': No such file or directory.
      1 |  koshkit ln a b
        |  ^~~~~~~~~~~~~~
-note: Re-run with `-s` to make a symlink.
 === tr one set ===
 1:1: error: tr expects two sets unless -d is given.
      1 |  koshkit tr abc

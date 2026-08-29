@@ -6,7 +6,40 @@ printf 'hello\n' > text
 printf '\0abcde\0xy\n' > binary
 
 koshkit file empty text binary
+koshkit file -i empty text
+koshkit ln -s text text-link
+koshkit ln -s absent broken-link
+koshkit file text-link
+koshkit file -h text-link broken-link
+(koshkit file absent) 2> "$TEST_NULL_DEVICE"
+echo "file-missing=$?"
+printf '%s\n' '0 string \x97\x4A\x42\x32 image data' > magic-a
+printf '%s\n' '0 string \x97 fallback data' > magic-b
+printf '%s\n' '0 string no no-match' > magic-zero
+printf '\227JB2' > magic-data
+koshkit file -M magic-a magic-data
+koshkit file -M magic-a -m magic-b magic-data
+koshkit file -M magic-zero -m magic-b -M magic-a magic-data
+printf '%s\n' '0 uC <10 small' '0 uC >10 large' > magic-number
+printf '\005' > magic-low
+printf '\024' > magic-high
+koshkit file -M magic-number magic-low magic-high
+printf '%s\n' '0 uC&0x0f 5 masked' > magic-mask
+printf '\025' > magic-masked
+koshkit file -M magic-mask magic-masked
+printf '%s\n' '0 uC 5 value-is-%d' > magic-format
+koshkit file -M magic-format magic-low
+printf '%s\n' '0 uC 1 parent' '>1 uC &0x80 child' > magic-continuation
+printf '\001\200' > magic-child
+koshkit file -M magic-continuation magic-child
+printf '%s\n' 'invalid line' '0 string hello greeting' > magic-malformed
+printf hello > magic-hello
+koshkit file -M magic-malformed magic-hello
 koshkit strings binary
 koshkit strings -n 2 -t d binary
 koshkit od -An -tx1 text
 koshkit od -An -tc text
+printf '1234567890abcdef1234567890abcdef' > repeated
+koshkit od -A n -t x1 repeated
+koshkit od -v -A n -t x1 repeated
+koshkit od -A n -t c text +1

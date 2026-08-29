@@ -37,6 +37,12 @@ koshkit link "$root/mode" "$root/hard-link"
 echo "link=$?"
 koshkit link "$root/mode" "$root/hard-link" 2> "$TEST_NULL_DEVICE"
 echo "link-existing=$?"
+koshkit ln "$root/mode" "$root/ln-hard"
+[[ "$root/mode" -ef "$root/ln-hard" ]]
+echo "ln-hard=$?"
+koshkit ln -s "$root/mode" "$root/ln-symbolic"
+[[ -L "$root/ln-symbolic" ]]
+echo "ln-symbolic=$?"
 
 koshkit mkfifo -m 600 "$root/fifo"
 fifo_fields=$(koshkit ls -l "$root/fifo")

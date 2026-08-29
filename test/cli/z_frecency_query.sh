@@ -6,6 +6,10 @@ unset KOSH_FLAGS
 d=$(mktemp -d); store=$(mktemp)
 normalized_d=$(printf '%s\n' "$d" | tr '\\' '/')
 printf '%s\t5\t9999999999\n' "$d" > "$store"
+mkdir "$d/start"
+echo "== no query changes to HOME:"
+(cd "$d/start" && HOME="$d" KOSH_DIRECTORY_HISTORY="$store" "$BIN" -c 'z; pwd') |
+    tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"
 echo "== a query matches the seeded directory:"
 KOSH_DIRECTORY_HISTORY="$store" "$BIN" -c "z $(basename "$d")" |
     tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"

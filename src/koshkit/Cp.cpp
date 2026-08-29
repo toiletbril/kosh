@@ -6,12 +6,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-rRv] source ... destination");
+HELP_SYNOPSIS_DECL("[-fipRrv] source ... destination");
 
 HELP_DESCRIPTION_DECL("The cp utility copies each source to the destination.");
 
 FLAG(CP_RECURSIVE_R, Bool, 'r', "", "Copy directories and their contents.");
 FLAG(CP_RECURSIVE_UPPER, Bool, 'R', "", "Copy directories and their contents.");
+FLAG(CP_FORCE, Bool, 'f', "", "Remove a destination that cannot be opened.");
+FLAG(CP_INTERACTIVE, Bool, 'i', "", "Ask before overwriting a destination.");
+FLAG(CP_PRESERVE, Bool, 'p', "", "Preserve file mode and timestamps.");
 FLAG(CP_VERBOSE, Bool, 'v', "", "Print the name of each copy as it happens.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -22,7 +25,7 @@ namespace koshka {
 namespace koshkit {
 
 static fn copy_file(const ExecContext &ec, StringView source,
-                    StringView destination, bool is_verbose,
+                    StringView destination, bool should_force, bool is_verbose,
                     Allocator allocator) throws -> void
 {
   let const in_fd = os::open_file_descriptor(source, os::file_open_mode::Read);
@@ -34,8 +37,11 @@ static fn copy_file(const ExecContext &ec, StringView source,
     };
   defer { os::close_fd(*in_fd); };
 
-  let const out_fd =
+  let out_fd =
       os::open_file_descriptor(destination, os::file_open_mode::Truncate);
+  if (!out_fd.has_value() && should_force && os::remove_file(destination))
+    out_fd =
+        os::open_file_descriptor(destination, os::file_open_mode::Truncate);
   if (!out_fd.has_value())
     throw Error{
         "cp: unable to create '" + String{allocator, destination}
@@ -78,25 +84,17 @@ static fn copy_file(const ExecContext &ec, StringView source,
                        String{allocator, destination} + "'\n");
 }
 
-static fn source_permission_bits(const Path &source_path,
-                                 StringView source) throws -> Maybe<u32>
+static fn source_file_status(StringView source) throws -> Maybe<os::file_status>
 {
   os::file_status status{};
-  let stat_target = source;
+  if (!os::stat_path_following(source, status)) return {};
 
-  Maybe<Path> resolved;
-  if (source_path.is_symbolic_link()) {
-    resolved = os::canonical_path(source_path);
-    if (resolved.has_value()) stat_target = resolved->text().view();
-  }
-
-  if (!os::stat_path(stat_target, status)) return {};
-
-  return status.mode & 0777;
+  return status;
 }
 
 static fn copy_path(const ExecContext &ec, StringView source,
-                    StringView destination, bool is_recursive, bool is_verbose,
+                    StringView destination, bool is_recursive,
+                    bool should_force, bool should_preserve, bool is_verbose,
                     Allocator allocator) throws -> void
 {
   let const source_path = Path{source};
@@ -111,7 +109,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
           + "' are the same file"
     };
   }
-  let const source_mode = source_permission_bits(source_path, source);
+  let const source_status = source_file_status(source);
 
   if (source_path.is_symbolic_link() && is_recursive) {
     if (let const target = os::read_symlink(source)) {
@@ -183,12 +181,30 @@ static fn copy_path(const ExecContext &ec, StringView source,
       let const child_destination =
           PathBuilder{destination}.append(name.view()).build();
       copy_path(ec, child_source.text().view(), child_destination.text().view(),
-                is_recursive, is_verbose, allocator);
+                is_recursive, should_force, should_preserve, is_verbose,
+                allocator);
     }
 
-    if (source_mode.has_value() && !did_destination_exist) {
-      os::set_file_mode(destination,
-                        *source_mode & ~os::get_file_creation_mask());
+    if (source_status.has_value() &&
+        (should_preserve || !did_destination_exist))
+    {
+      os::set_file_mode(destination, should_preserve
+                                         ? source_status->mode & 0777
+                                         : source_status->mode & 0777 &
+                                               ~os::get_file_creation_mask());
+    }
+    if (source_status.has_value() && should_preserve &&
+        !os::set_file_times(destination, source_status->access_time,
+                            source_status->access_nanoseconds,
+                            source_status->modification_time,
+                            source_status->modification_nanoseconds))
+    {
+      throw Error{
+          "cp: unable to preserve timestamps for '" +
+          String{allocator, destination}
+          +
+          "': " + os::last_system_error_message()
+      };
     }
 
     return;
@@ -205,11 +221,27 @@ static fn copy_path(const ExecContext &ec, StringView source,
   }
 
   let const did_destination_exist = Path{destination}.exists();
-  copy_file(ec, source, destination, is_verbose, allocator);
+  copy_file(ec, source, destination, should_force, is_verbose, allocator);
 
-  if (source_mode.has_value() && !did_destination_exist) {
-    os::set_file_mode(destination,
-                      *source_mode & ~os::get_file_creation_mask());
+  if (source_status.has_value() && (should_preserve || !did_destination_exist))
+  {
+    os::set_file_mode(destination, should_preserve
+                                       ? source_status->mode & 0777
+                                       : source_status->mode & 0777 &
+                                             ~os::get_file_creation_mask());
+  }
+  if (source_status.has_value() && should_preserve &&
+      !os::set_file_times(destination, source_status->access_time,
+                          source_status->access_nanoseconds,
+                          source_status->modification_time,
+                          source_status->modification_nanoseconds))
+  {
+    throw Error{
+        "cp: unable to preserve timestamps for '" +
+        String{allocator, destination}
+        +
+        "': " + os::last_system_error_message()
+    };
   }
 }
 
@@ -231,6 +263,11 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const is_recursive =
       FLAG_CP_RECURSIVE_R.is_enabled() || FLAG_CP_RECURSIVE_UPPER.is_enabled();
+  let const should_force = FLAG_CP_FORCE.is_enabled();
+  let const should_preserve = FLAG_CP_PRESERVE.is_enabled();
+  let const should_prompt = FLAG_CP_INTERACTIVE.is_enabled() &&
+                            (!should_force || FLAG_CP_INTERACTIVE.position() >
+                                                  FLAG_CP_FORCE.position());
   let const is_verbose = FLAG_CP_VERBOSE.is_enabled();
   let const destination = operands[operands.count() - 1].view();
   let const is_destination_directory = Path{destination}.is_directory();
@@ -245,18 +282,21 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
+    let target = String{cxt.scratch_allocator(), destination};
     if (is_destination_directory) {
       /* The Path is held in a named local so the basename view does not dangle
          into a destroyed temporary. */
       let const source_path = Path{source};
       let const leaf = source_path.filename();
-      let const target = PathBuilder{destination}.append(leaf).build();
-      copy_path(ec, source, target.text().view(), is_recursive, is_verbose,
-                cxt.scratch_allocator());
-    } else {
-      copy_path(ec, source, destination, is_recursive, is_verbose,
-                cxt.scratch_allocator());
+      target = PathBuilder{destination}.append(leaf).build().text();
     }
+
+    if (should_prompt && Path{target.view()}.exists() &&
+        !confirm_koshkit_action(ec, "cp: overwrite '" + target + "'? "))
+      continue;
+
+    copy_path(ec, source, target.view(), is_recursive, should_force,
+              should_preserve, is_verbose, cxt.scratch_allocator());
   }
 
   return 0;

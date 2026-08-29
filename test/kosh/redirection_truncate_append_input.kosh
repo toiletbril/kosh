@@ -5,3 +5,7 @@ echo first > "$file"
 echo second >> "$file"
 cat < "$file"
 koshkit unlink "$file"
+set -o no-diagnostics
+eval '(umask 077; >| "$file")'
+echo "compact-redirection=$([[ -f $file ]] && echo preserved)"
+koshkit unlink "$file"

@@ -142,9 +142,18 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
 static fn lex_exact_arith_number(StringView from, ArithmeticValue *out_value,
                                  BumpArena &arena) throws -> usize;
 
+static pure fn is_leading_decimal_number(StringView source,
+                                         usize position) wontthrow -> bool
+{
+  return position + 1 < source.length && source[position] == '.' &&
+         lexer::is_number(source[position + 1]);
+}
+
 hot static fn arith_apply_binop(char kind, const ArithmeticValue &lhs,
                                 const ArithmeticValue &rhs, bool is_exact,
-                                BumpArena &arena) throws -> ArithmeticValue;
+                                BumpArena &arena,
+                                Maybe<u32> bc_scale = {}) throws
+    -> ArithmeticValue;
 
 /* A recursive-descent evaluator for $((...)) following C operator precedence.
  */
@@ -153,10 +162,11 @@ class ArithmeticParser
 public:
   ArithmeticParser(EvalContext *context_value, StringView source_value,
                    bool is_exact_value, BumpArena &arena_value,
-                   usize depth_value = 0, bool is_skipping = false)
+                   usize depth_value = 0, bool is_skipping = false,
+                   Maybe<u32> bc_scale_value = {})
       : context{context_value}, source{source_value}, pos{0},
         is_exact{is_exact_value}, depth{depth_value},
-        m_is_skipping{is_skipping}, arena{arena_value}
+        m_is_skipping{is_skipping}, bc_scale{bc_scale_value}, arena{arena_value}
   {}
 
   /* Null only on the analyze-time constant fold, where no variable read and no
@@ -174,6 +184,7 @@ public:
      the store. */
   bool m_is_skipping{false};
   bool should_error_unset{false};
+  Maybe<u32> bc_scale{};
 
   Maybe<SourceLocation> precise_base{};
   BumpArena &arena;
@@ -283,8 +294,8 @@ public:
       fail("The variable value recurses too deeply",
            "A variable value refers back to itself");
 
-    ArithmeticParser nested{context, value,     is_exact,
-                            arena,   depth + 1, m_is_skipping};
+    ArithmeticParser nested{context,   value,         is_exact, arena,
+                            depth + 1, m_is_skipping, bc_scale};
     nested.should_error_unset = should_error_unset;
     return nested.parse();
   }
@@ -389,7 +400,7 @@ public:
                 "'++' and '--' step a variable, not a value");
     let const updated =
         arith_apply_binop('+', read_lvalue_value(target),
-                          ArithmeticValue{delta}, is_exact, arena);
+                          ArithmeticValue{delta}, is_exact, arena, bc_scale);
     write_lvalue(target, updated);
     return updated;
   }
@@ -399,7 +410,7 @@ public:
     let const original = read_lvalue_value(target);
     write_lvalue(target,
                  arith_apply_binop('+', original, ArithmeticValue{delta},
-                                   is_exact, arena));
+                                   is_exact, arena, bc_scale));
     return original;
   }
 
@@ -456,6 +467,7 @@ public:
       static const compound_operator compound_operators[] = {
           {"<<=", 'L'},
           {">>=", 'R'},
+          {"**=", 'P'},
           {"+=",  '+'},
           {"-=",  '-'},
           {"*=",  '*'},
@@ -475,8 +487,9 @@ public:
         for (let const &[ op, kind ] : compound_operators) {
           if (consume(op)) {
             let const rhs = parse_assignment();
-            let const result = arith_apply_binop(
-                kind, read_lvalue_value(target), rhs, is_exact, arena);
+            let const result =
+                arith_apply_binop(kind, read_lvalue_value(target), rhs,
+                                  is_exact, arena, bc_scale);
             write_lvalue(target, result);
             return result;
           }
@@ -632,7 +645,7 @@ public:
       }
       switch (op.kind) {
       case 'P':
-        if (rhs.is_negative()) {
+        if (rhs.is_negative() && !bc_scale.has_value()) {
           if (m_is_skipping) {
             lhs = ArithmeticValue{};
             break;
@@ -640,7 +653,7 @@ public:
           fail_span(lhs_start, pos, "Exponent less than 0",
                     "'**' requires a non-negative exponent");
         }
-        lhs = arith_apply_binop('P', lhs, rhs, is_exact, arena);
+        lhs = arith_apply_binop('P', lhs, rhs, is_exact, arena, bc_scale);
         break;
       case '/':
         if (rhs.is_zero()) {
@@ -651,7 +664,7 @@ public:
           fail_span(lhs_start, pos, "Division by zero",
                     "The right operand evaluated to 0");
         }
-        lhs = arith_apply_binop('/', lhs, rhs, is_exact, arena);
+        lhs = arith_apply_binop('/', lhs, rhs, is_exact, arena, bc_scale);
         break;
       case '%':
         if (rhs.is_zero()) {
@@ -662,10 +675,10 @@ public:
           fail_span(lhs_start, pos, "Division by zero",
                     "The right operand evaluated to 0");
         }
-        lhs = arith_apply_binop('%', lhs, rhs, is_exact, arena);
+        lhs = arith_apply_binop('%', lhs, rhs, is_exact, arena, bc_scale);
         break;
       default:
-        lhs = arith_apply_binop(op.kind, lhs, rhs, is_exact, arena);
+        lhs = arith_apply_binop(op.kind, lhs, rhs, is_exact, arena, bc_scale);
         break;
       }
     }
@@ -688,7 +701,7 @@ public:
       if (consume("--")) return prefix_step(-1, operator_position);
       pos++;
       return arith_apply_binop('-', ArithmeticValue{}, parse_unary(), is_exact,
-                               arena);
+                               arena, bc_scale);
     }
     if (first == '!') {
       pos++;
@@ -706,8 +719,11 @@ public:
   enum class calculator_function : u8
   {
     Abs,
+    Atan,
     Ceil,
     Cmp,
+    Cos,
+    Exp,
     Fact,
     Fib,
     Floor,
@@ -717,10 +733,15 @@ public:
     IsEven,
     IsInt,
     IsOdd,
+    Length,
     Lcm,
+    Ln,
     Max,
     Min,
+    Scale,
     Sgn,
+    Sin,
+    Sqrt,
   };
 
   fn calculator_function_arguments(StringView name) throws
@@ -747,14 +768,22 @@ public:
     if (arguments.count() >= minimum_count &&
         arguments.count() <= maximum_count)
       return;
-    fail("Wrong number of arguments for '" + String{name} + "'",
-         "The function accepts " +
-             String::from(minimum_count, bump_allocator(arena)) +
-             (minimum_count == maximum_count
-                  ? String{" argument"}
-                  : String{" to "} +
-                        String::from(maximum_count, bump_allocator(arena)) +
-                        " arguments"));
+    let const allocator = bump_allocator(arena);
+    let detail = String{allocator, "The function accepts "};
+    if (maximum_count == ~usize{0}) {
+      detail += "at least ";
+      detail += String::from(minimum_count, allocator);
+      detail += minimum_count == 1 ? " argument" : " arguments";
+    } else if (minimum_count == maximum_count) {
+      detail += String::from(minimum_count, allocator);
+      detail += minimum_count == 1 ? " argument" : " arguments";
+    } else {
+      detail += String::from(minimum_count, allocator);
+      detail += " to ";
+      detail += String::from(maximum_count, allocator);
+      detail += " arguments";
+    }
+    fail("Wrong number of arguments for '" + String{name} + "'", detail);
   }
 
   fn require_integer_argument(StringView name,
@@ -805,12 +834,181 @@ public:
     return current;
   }
 
+  fn calculator_requested_scale(
+      StringView name, const ArrayList<ArithmeticValue> &arguments) throws
+      -> u32
+  {
+    u32 requested_scale = 20;
+    if (arguments.count() == 2) {
+      let const parsed = require_integer_argument(name, arguments[1]);
+      if (parsed < 0 || parsed > 100000)
+        fail("Invalid scale for '" + String{name} + "'",
+             "The scale must be between 0 and 100000");
+      requested_scale = static_cast<u32>(parsed);
+    }
+    return requested_scale;
+  }
+
+  fn calculator_work_scale(u32 requested_scale) throws -> u32
+  {
+    if (requested_scale > ~u32{0} - 12) throw std::bad_alloc{};
+    return requested_scale + 12;
+  }
+
+  fn calculator_fixed_multiply(const ArithmeticValue &left,
+                               const ArithmeticValue &right,
+                               u32 decimal_scale) throws -> ArithmeticValue
+  {
+    return ArithmeticValue::rescale(
+        ArithmeticValue::multiply(left, right, arena), decimal_scale, arena);
+  }
+
+  fn calculator_fixed_divide(const ArithmeticValue &left,
+                             const ArithmeticValue &right,
+                             u32 decimal_scale) throws -> ArithmeticValue
+  {
+    if (right.is_zero())
+      fail("Division by zero", "The right operand evaluated to 0");
+    u32 prepared_scale = left.get_decimal_scale();
+    if (decimal_scale > prepared_scale) prepared_scale = decimal_scale;
+    let const prepared = ArithmeticValue::rescale(left, prepared_scale, arena);
+    return ArithmeticValue::rescale(
+        ArithmeticValue::divide(prepared, right, arena), decimal_scale, arena);
+  }
+
+  fn calculator_atan(ArithmeticValue value, u32 requested_scale) throws
+      -> ArithmeticValue
+  {
+    let const work_scale = calculator_work_scale(requested_scale);
+    let const is_negative = value.is_negative();
+    value = ArithmeticValue::rescale(ArithmeticValue::absolute(value, arena),
+                                     work_scale, arena);
+    let const threshold = ArithmeticValue::parse_decimal("0.1", arena);
+    u32 doubling_count = 0;
+    while (value.compare(threshold, bump_allocator(arena)) > 0) {
+      let const square = calculator_fixed_multiply(value, value, work_scale);
+      let const root = ArithmeticValue::square_root(
+          ArithmeticValue::add(ArithmeticValue{1}, square, arena), work_scale,
+          arena);
+      value = calculator_fixed_divide(
+          value, ArithmeticValue::add(ArithmeticValue{1}, root, arena),
+          work_scale);
+      doubling_count++;
+      if (doubling_count > 64) throw std::bad_alloc{};
+    }
+
+    let const square = calculator_fixed_multiply(value, value, work_scale);
+    let term = value;
+    let sum = value;
+    let const iteration_count = static_cast<usize>(work_scale) * 2 + 128;
+    for (usize index = 1; index < iteration_count; index++) {
+      term = calculator_fixed_multiply(term, square, work_scale);
+      let const denominator = ArithmeticValue{static_cast<i64>(index * 2 + 1)};
+      let const contribution =
+          calculator_fixed_divide(term, denominator, work_scale);
+      if (contribution.is_zero()) break;
+      sum = (index & 1u) != 0
+                ? ArithmeticValue::subtract(sum, contribution, arena)
+                : ArithmeticValue::add(sum, contribution, arena);
+    }
+    for (u32 count = 0; count < doubling_count; count++)
+      sum = ArithmeticValue::add(sum, sum, arena);
+    if (is_negative)
+      sum = ArithmeticValue::subtract(ArithmeticValue{}, sum, arena);
+    return ArithmeticValue::rescale(sum, requested_scale, arena);
+  }
+
+  fn calculator_sin_cos(ArithmeticValue value, u32 requested_scale,
+                        bool is_cosine) throws -> ArithmeticValue
+  {
+    let const work_scale = calculator_work_scale(requested_scale);
+    value = ArithmeticValue::rescale(value, work_scale, arena);
+    let const square = calculator_fixed_multiply(value, value, work_scale);
+    let term = is_cosine ? ArithmeticValue{1} : value;
+    let sum = term;
+    let const iteration_count = static_cast<usize>(work_scale) * 2 + 128;
+    for (usize index = 1; index < iteration_count; index++) {
+      let const first = is_cosine ? index * 2 - 1 : index * 2;
+      let const second = is_cosine ? index * 2 : index * 2 + 1;
+      let const denominator = ArithmeticValue{static_cast<i64>(first * second)};
+      term = calculator_fixed_divide(
+          calculator_fixed_multiply(term, square, work_scale), denominator,
+          work_scale);
+      if (term.is_zero()) break;
+      sum = (index & 1u) != 0 ? ArithmeticValue::subtract(sum, term, arena)
+                              : ArithmeticValue::add(sum, term, arena);
+    }
+    return ArithmeticValue::rescale(sum, requested_scale, arena);
+  }
+
+  fn calculator_exp(ArithmeticValue value, u32 requested_scale) throws
+      -> ArithmeticValue
+  {
+    let const work_scale = calculator_work_scale(requested_scale);
+    value = ArithmeticValue::rescale(value, work_scale, arena);
+    let term = ArithmeticValue::rescale(ArithmeticValue{1}, work_scale, arena);
+    let sum = term;
+    let const iteration_count = static_cast<usize>(work_scale) * 4 + 256;
+    for (usize index = 1; index < iteration_count; index++) {
+      term = calculator_fixed_divide(
+          calculator_fixed_multiply(term, value, work_scale),
+          ArithmeticValue{static_cast<i64>(index)}, work_scale);
+      if (term.is_zero()) break;
+      sum = ArithmeticValue::add(sum, term, arena);
+    }
+    return ArithmeticValue::rescale(sum, requested_scale, arena);
+  }
+
+  fn calculator_ln(ArithmeticValue value, u32 requested_scale) throws
+      -> ArithmeticValue
+  {
+    if (value.is_zero() || value.is_negative())
+      fail("Logarithm operand is not positive",
+           "ln requires a value greater than 0");
+    let const work_scale = calculator_work_scale(requested_scale);
+    value = ArithmeticValue::rescale(value, work_scale, arena);
+    let const lower = ArithmeticValue::parse_decimal("0.8", arena);
+    let const upper = ArithmeticValue::parse_decimal("1.25", arena);
+    u32 root_count = 0;
+    while (value.compare(lower, bump_allocator(arena)) < 0 ||
+           value.compare(upper, bump_allocator(arena)) > 0)
+    {
+      value = ArithmeticValue::square_root(value, work_scale, arena);
+      root_count++;
+      if (root_count > 64) throw std::bad_alloc{};
+    }
+    let const numerator =
+        ArithmeticValue::subtract(value, ArithmeticValue{1}, arena);
+    let const denominator =
+        ArithmeticValue::add(value, ArithmeticValue{1}, arena);
+    let const reduced =
+        calculator_fixed_divide(numerator, denominator, work_scale);
+    let const square = calculator_fixed_multiply(reduced, reduced, work_scale);
+    let term = reduced;
+    let sum = reduced;
+    let const iteration_count = static_cast<usize>(work_scale) * 2 + 128;
+    for (usize index = 1; index < iteration_count; index++) {
+      term = calculator_fixed_multiply(term, square, work_scale);
+      let const contribution = calculator_fixed_divide(
+          term, ArithmeticValue{static_cast<i64>(index * 2 + 1)}, work_scale);
+      if (contribution.is_zero()) break;
+      sum = ArithmeticValue::add(sum, contribution, arena);
+    }
+    sum = ArithmeticValue::add(sum, sum, arena);
+    for (u32 count = 0; count < root_count; count++)
+      sum = ArithmeticValue::add(sum, sum, arena);
+    return ArithmeticValue::rescale(sum, requested_scale, arena);
+  }
+
   fn apply_calculator_function(StringView name) throws -> ArithmeticValue
   {
     static constexpr static_string_entry<calculator_function> ENTRIES[] = {
         {SSK("abs"),    calculator_function::Abs   },
+        {SSK("atan"),   calculator_function::Atan  },
         {SSK("ceil"),   calculator_function::Ceil  },
         {SSK("cmp"),    calculator_function::Cmp   },
+        {SSK("cos"),    calculator_function::Cos   },
+        {SSK("exp"),    calculator_function::Exp   },
         {SSK("fact"),   calculator_function::Fact  },
         {SSK("fib"),    calculator_function::Fib   },
         {SSK("floor"),  calculator_function::Floor },
@@ -820,10 +1018,15 @@ public:
         {SSK("iseven"), calculator_function::IsEven},
         {SSK("isint"),  calculator_function::IsInt },
         {SSK("isodd"),  calculator_function::IsOdd },
+        {SSK("length"), calculator_function::Length},
         {SSK("lcm"),    calculator_function::Lcm   },
+        {SSK("ln"),     calculator_function::Ln    },
         {SSK("max"),    calculator_function::Max   },
         {SSK("min"),    calculator_function::Min   },
+        {SSK("scale"),  calculator_function::Scale },
         {SSK("sgn"),    calculator_function::Sgn   },
+        {SSK("sin"),    calculator_function::Sin   },
+        {SSK("sqrt"),   calculator_function::Sqrt  },
     };
     static constexpr StaticStringMap FUNCTIONS{ENTRIES};
     let const function = FUNCTIONS.find(name);
@@ -836,6 +1039,10 @@ public:
     case calculator_function::Abs:
       require_argument_count(name, arguments, 1, 1);
       return ArithmeticValue::absolute(arguments[0], arena);
+    case calculator_function::Atan:
+      require_argument_count(name, arguments, 1, 2);
+      return calculator_atan(arguments[0],
+                             calculator_requested_scale(name, arguments));
     case calculator_function::Ceil:
     case calculator_function::Floor:
     case calculator_function::Frac:
@@ -860,6 +1067,14 @@ public:
       require_argument_count(name, arguments, 2, 2);
       return ArithmeticValue{
           arguments[0].compare(arguments[1], bump_allocator(arena))};
+    case calculator_function::Cos:
+      require_argument_count(name, arguments, 1, 2);
+      return calculator_sin_cos(
+          arguments[0], calculator_requested_scale(name, arguments), true);
+    case calculator_function::Exp:
+      require_argument_count(name, arguments, 1, 2);
+      return calculator_exp(arguments[0],
+                            calculator_requested_scale(name, arguments));
     case calculator_function::Fact: {
       require_argument_count(name, arguments, 1, 1);
       let const count = require_integer_argument(name, arguments[0]);
@@ -924,6 +1139,25 @@ public:
     case calculator_function::IsInt:
       require_argument_count(name, arguments, 1, 1);
       return ArithmeticValue{arguments[0].has_integer_value(arena) ? 1 : 0};
+    case calculator_function::Length: {
+      require_argument_count(name, arguments, 1, 1);
+      let const text = arguments[0].to_string(bump_allocator(arena));
+      usize digit_count = 0;
+      for (usize position = 0; position < text.count(); position++) {
+        if (text[position] >= '0' && text[position] <= '9') {
+          digit_count++;
+        }
+      }
+      let const body_start = text[0] == '-' ? usize{1} : usize{0};
+      if (text.count() > body_start + 1 && text[body_start] == '0' &&
+          text[body_start + 1] == '.')
+        digit_count--;
+      return ArithmeticValue{static_cast<i64>(digit_count)};
+    }
+    case calculator_function::Ln:
+      require_argument_count(name, arguments, 1, 2);
+      return calculator_ln(arguments[0],
+                           calculator_requested_scale(name, arguments));
     case calculator_function::Max:
     case calculator_function::Min: {
       require_argument_count(name, arguments, 1, ~usize{0});
@@ -937,10 +1171,33 @@ public:
       }
       return result;
     }
+    case calculator_function::Scale:
+      require_argument_count(name, arguments, 1, 1);
+      return ArithmeticValue{
+          static_cast<i64>(arguments[0].get_decimal_scale())};
     case calculator_function::Sgn:
       require_argument_count(name, arguments, 1, 1);
       return ArithmeticValue{
           arguments[0].is_zero() ? 0 : (arguments[0].is_negative() ? -1 : 1)};
+    case calculator_function::Sin:
+      require_argument_count(name, arguments, 1, 2);
+      return calculator_sin_cos(
+          arguments[0], calculator_requested_scale(name, arguments), false);
+    case calculator_function::Sqrt: {
+      require_argument_count(name, arguments, 1, 2);
+      u32 decimal_scale = arguments[0].get_decimal_scale() > 20
+                              ? arguments[0].get_decimal_scale()
+                              : 20;
+      if (arguments.count() == 2) {
+        let const requested_scale =
+            require_integer_argument(name, arguments[1]);
+        if (requested_scale < 0 || requested_scale > 100000)
+          fail("Invalid scale for 'sqrt'",
+               "The scale must be between 0 and 100000");
+        decimal_scale = static_cast<u32>(requested_scale);
+      }
+      return ArithmeticValue::square_root(arguments[0], decimal_scale, arena);
+    }
     }
     unreachable();
   }
@@ -959,7 +1216,11 @@ public:
       if (!consume(")")) fail("Expected ')'", "An opening '(' is unmatched");
       return value;
     }
-    if (pos < source.length && lexer::is_number(source[pos])) {
+    let const has_leading_decimal_point =
+        is_exact && is_leading_decimal_number(source, pos);
+    if (pos < source.length &&
+        (lexer::is_number(source[pos]) || has_leading_decimal_point))
+    {
       if (is_exact) {
         let value = ArithmeticValue{};
         pos += lex_exact_arith_number(source.substring(pos), &value, arena);
@@ -1136,13 +1397,20 @@ static fn tokenize_arithmetic(StringView src,
       i++;
       continue;
     }
-    if (lexer::is_number(current_byte)) {
+    let const has_leading_decimal_point = is_leading_decimal_number(src, i);
+    if (lexer::is_number(current_byte) || has_leading_decimal_point) {
       i64 value = 0;
-      let consumed = lex_arith_number(src.substring(i), &value);
-      if (i + consumed < src.length && src[i + consumed] == '.') {
-        consumed++;
-        consumed += arithmetic_internal::count_leading_digits(
-            src.substring(i + consumed), 10);
+      usize consumed;
+      if (has_leading_decimal_point) {
+        consumed = 1 + arithmetic_internal::count_leading_digits(
+                           src.substring(i + 1), 10);
+      } else {
+        consumed = lex_arith_number(src.substring(i), &value);
+        if (i + consumed < src.length && src[i + consumed] == '.') {
+          consumed++;
+          consumed += arithmetic_internal::count_leading_digits(
+              src.substring(i + consumed), 10);
+        }
       }
       out.push(arith_token{arith_token::kind::number, value,
                            src.substring_of_length(i, consumed)});
@@ -1261,11 +1529,75 @@ static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
   return {0, 0};
 }
 
+static fn bc_apply_binop(char kind, const ArithmeticValue &lhs,
+                         const ArithmeticValue &rhs, u32 scale,
+                         BumpArena &arena) throws -> ArithmeticValue
+{
+  if ((kind == '/' || kind == '%') && rhs.is_zero())
+    throw ErrorWithDetails{"Division by zero",
+                           "The right operand evaluated to 0"};
+
+  switch (kind) {
+  case '*': {
+    let const combined_scale =
+        static_cast<u64>(lhs.get_decimal_scale()) + rhs.get_decimal_scale();
+    let desired_scale = lhs.get_decimal_scale() > rhs.get_decimal_scale()
+                            ? lhs.get_decimal_scale()
+                            : rhs.get_decimal_scale();
+    if (scale > desired_scale) desired_scale = scale;
+    if (combined_scale < desired_scale)
+      desired_scale = static_cast<u32>(combined_scale);
+    return ArithmeticValue::rescale(ArithmeticValue::multiply(lhs, rhs, arena),
+                                    desired_scale, arena);
+  }
+  case '/': {
+    u32 prepared_scale = lhs.get_decimal_scale();
+    if (scale > prepared_scale) prepared_scale = scale;
+    let const prepared = ArithmeticValue::rescale(lhs, prepared_scale, arena);
+    return ArithmeticValue::rescale(
+        ArithmeticValue::divide(prepared, rhs, arena), scale, arena);
+  }
+  case '%': {
+    let const quotient = bc_apply_binop('/', lhs, rhs, scale, arena);
+    let const product = ArithmeticValue::multiply(quotient, rhs, arena);
+    let const remainder = ArithmeticValue::subtract(lhs, product, arena);
+    let const desired_scale_wide =
+        static_cast<u64>(scale) + rhs.get_decimal_scale();
+    if (desired_scale_wide > ~u32{0}) throw std::bad_alloc{};
+    let desired_scale = static_cast<u32>(desired_scale_wide);
+    if (lhs.get_decimal_scale() > desired_scale)
+      desired_scale = lhs.get_decimal_scale();
+    return ArithmeticValue::rescale(remainder, desired_scale, arena);
+  }
+  case 'P': {
+    if (!rhs.has_integer_value(arena))
+      throw ErrorWithDetails{"Exponent is not an integer",
+                             "'^' requires an integer exponent"};
+    let const exponent = ArithmeticValue::integer_part(rhs, arena);
+    let const is_negative = exponent.is_negative();
+    let const magnitude = ArithmeticValue::absolute(exponent, arena);
+    let const powered = ArithmeticValue::power(lhs, magnitude, arena);
+    if (is_negative)
+      return bc_apply_binop('/', ArithmeticValue{1}, powered, scale, arena);
+    let const exponent_count = magnitude.checked_i64();
+    let const combined_scale = static_cast<u64>(lhs.get_decimal_scale()) *
+                               static_cast<u64>(exponent_count);
+    let desired_scale =
+        lhs.get_decimal_scale() > scale ? lhs.get_decimal_scale() : scale;
+    if (combined_scale < desired_scale)
+      desired_scale = static_cast<u32>(combined_scale);
+    return ArithmeticValue::rescale(powered, desired_scale, arena);
+  }
+  default: return arith_apply_binop(kind, lhs, rhs, true, arena);
+  }
+}
+
 /* Uses the same helpers as the char parser's ladder so the fast path and the
    full parser agree. */
 hot static fn arith_apply_binop(char kind, const ArithmeticValue &lhs,
                                 const ArithmeticValue &rhs, bool is_exact,
-                                BumpArena &arena) throws -> ArithmeticValue
+                                BumpArena &arena, Maybe<u32> bc_scale) throws
+    -> ArithmeticValue
 {
   if (!is_exact) {
     let const left = lhs.wrapped_i64();
@@ -1309,6 +1641,10 @@ hot static fn arith_apply_binop(char kind, const ArithmeticValue &lhs,
                   kind);
     }
   }
+
+  if (bc_scale.has_value() &&
+      (kind == '*' || kind == '/' || kind == '%' || kind == 'P'))
+    return bc_apply_binop(kind, lhs, rhs, *bc_scale, arena);
 
   let const allocator = bump_allocator(arena);
 
@@ -1506,8 +1842,8 @@ namespace {
 fn evaluate_arithmetic_value(EvalContext *context, StringView expression,
                              const SourceLocation *expression_base,
                              bool is_exact, BumpArena &arena,
-                             bool should_error_unset = false) throws
-    -> ArithmeticValue
+                             bool should_error_unset = false,
+                             Maybe<u32> bc_scale = {}) throws -> ArithmeticValue
 {
   LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
@@ -1515,7 +1851,8 @@ fn evaluate_arithmetic_value(EvalContext *context, StringView expression,
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
-    let parser = ArithmeticParser{context, expression, is_exact, arena};
+    let parser = ArithmeticParser{context, expression, is_exact, arena,
+                                  0,       false,      bc_scale};
     parser.should_error_unset = should_error_unset;
     if (expression_base != nullptr) parser.precise_base = *expression_base;
     return parser.parse();
@@ -1524,7 +1861,8 @@ fn evaluate_arithmetic_value(EvalContext *context, StringView expression,
   LOG(All, "expanding parameters inside the arithmetic before the parse");
   let const expanded_word =
       context->expand_modifier_word(expression, true, true, expression_base);
-  let parser = ArithmeticParser{context, expanded_word.view(), is_exact, arena};
+  let parser = ArithmeticParser{
+      context, expanded_word.view(), is_exact, arena, 0, false, bc_scale};
   parser.should_error_unset = should_error_unset;
   return parser.parse();
 }
@@ -1563,6 +1901,17 @@ fn EvalContext::evaluate_calculator_arithmetic_text(
   const SourceLocation expression_base{0, 0};
   let const value = evaluate_arithmetic_value(
       this, expression, &expression_base, is_exact, m_scratch_arena, true);
+  return value.to_string(heap_allocator());
+}
+
+fn EvalContext::evaluate_bc_arithmetic_text(StringView expression,
+                                            u32 scale) throws -> String
+{
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
+  const SourceLocation expression_base{0, 0};
+  let const value = evaluate_arithmetic_value(
+      this, expression, &expression_base, true, m_scratch_arena, true, scale);
   return value.to_string(heap_allocator());
 }
 

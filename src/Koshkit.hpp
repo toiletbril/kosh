@@ -249,8 +249,10 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
 fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
                        const ArrayList<SourceLocation> *arg_locations = nullptr,
                        ArrayList<SourceLocation> *operand_locations = nullptr,
-                       bool should_accept_negative_number_operand =
-                           false) throws -> ArrayList<String>;
+                       bool should_accept_negative_number_operand = false,
+                       bool should_allow_options_after_operands = false,
+                       bool should_accept_unknown_flag_operand = false) throws
+    -> ArrayList<String>;
 
 fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description, const FlagList &flags) throws
@@ -459,6 +461,8 @@ UTILITY_STRUCT(Tabs);
 UTILITY_STRUCT(Tput);
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;
+fn confirm_koshkit_action(const ExecContext &ec, StringView prompt) throws
+    -> bool;
 
 /* Returns false on the first failure with the reason in
    os::last_system_error_message. */

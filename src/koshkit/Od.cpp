@@ -6,7 +6,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-A base] [-j skip] [-N count] [-t type]... [file ...]");
+HELP_SYNOPSIS_DECL("[-v] [-A base] [-j skip] [-N count] [-t type]... "
+                   "[file ...]");
 
 HELP_DESCRIPTION_DECL("The od utility writes formatted file bytes.");
 
@@ -14,6 +15,8 @@ FLAG(OD_ADDRESS, String, 'A', "address-radix", "Use d, o, x, or n addresses.");
 FLAG(OD_SKIP, String, 'j', "skip-bytes", "Skip this many input bytes.");
 FLAG(OD_COUNT, String, 'N', "read-bytes", "Read at most this many bytes.");
 FLAG(OD_TYPE, ManyStrings, 't', "format", "Add an output type.");
+FLAG(OD_VERBOSE, Bool, 'v', "output-duplicates",
+     "Write every repeated group of input data.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Od);
@@ -99,9 +102,33 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
     byte_limit = parsed.value();
   }
 
+  let input_operands = ArrayList<String>{cxt.scratch_allocator()};
+  let operand_count = operands.count();
+  if (!FLAG_OD_SKIP.is_set() && !operands.is_empty() &&
+      !operands.back().is_empty() && operands.back()[0] == '+')
+  {
+    let offset = operands.back().view().substring(1);
+    u64 multiplier = 1;
+    if (!offset.is_empty() && offset[offset.length - 1] == 'b') {
+      multiplier = 512;
+      offset = offset.substring_of_length(0, offset.length - 1);
+    }
+    let const is_decimal =
+        !offset.is_empty() && offset[offset.length - 1] == '.';
+    if (is_decimal) offset = offset.substring_of_length(0, offset.length - 1);
+    let const parsed = utils::parse_integer_in_base_u64(
+        offset, is_decimal ? int_base::decimal : int_base::octal);
+    if (parsed.is_error() || parsed.value() > UINT64_MAX / multiplier)
+      throw Error{"od: invalid legacy offset"};
+    skip_count = parsed.value() * multiplier;
+    operand_count--;
+  }
+  for (usize index = 0; index < operand_count; index++)
+    input_operands.push(operands[index].clone());
+
   let input_bytes = String{cxt.scratch_allocator()};
   let const sources =
-      source_list_from_operands(operands, cxt.scratch_allocator());
+      source_list_from_operands(input_operands, cxt.scratch_allocator());
   i32 status = 0;
   for (let const source : sources) {
     let const content = read_named_or_stdin(ec, source);
@@ -124,10 +151,20 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
   let const bytes = input_bytes.view().substring_of_length(first, available);
   let output = String{cxt.scratch_allocator()};
   let type_count = FLAG_OD_TYPE.count();
+  StringView previous_row;
+  bool did_suppress = false;
 
   for (usize row_start = 0; row_start < bytes.length; row_start += 16) {
     let const row_length =
         bytes.length - row_start < 16 ? bytes.length - row_start : 16;
+    let const row = bytes.substring_of_length(row_start, row_length);
+    if (!FLAG_OD_VERBOSE.is_enabled() && row == previous_row) {
+      if (!did_suppress) output += "*\n";
+      did_suppress = true;
+      continue;
+    }
+    previous_row = row;
+    did_suppress = false;
     let const format_count = type_count == 0 ? 1 : type_count;
 
     for (usize format_index = 0; format_index < format_count; format_index++) {

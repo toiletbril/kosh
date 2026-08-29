@@ -735,24 +735,102 @@ static pure fn terminal_speed_value(StringView text) wontthrow -> speed_t
   return static_cast<speed_t>(~speed_t{0});
 }
 
+struct terminal_flag
+{
+  const char *name;
+  tcflag_t value;
+  tcflag_t termios::*member;
+};
+
+static constexpr terminal_flag TERMINAL_FLAGS[] = {
+    {"echo",   ECHO,   &termios::c_lflag},
+    {"igncr",  IGNCR,  &termios::c_iflag},
+    {"opost",  OPOST,  &termios::c_oflag},
+    {"tostop", TOSTOP, &termios::c_lflag},
+    {"icanon", ICANON, &termios::c_lflag},
+    {"isig",   ISIG,   &termios::c_lflag},
+    {"iexten", IEXTEN, &termios::c_lflag},
+    {"echoe",  ECHOE,  &termios::c_lflag},
+    {"echok",  ECHOK,  &termios::c_lflag},
+    {"echonl", ECHONL, &termios::c_lflag},
+    {"noflsh", NOFLSH, &termios::c_lflag},
+    {"ignbrk", IGNBRK, &termios::c_iflag},
+    {"brkint", BRKINT, &termios::c_iflag},
+    {"ignpar", IGNPAR, &termios::c_iflag},
+    {"parmrk", PARMRK, &termios::c_iflag},
+    {"inpck",  INPCK,  &termios::c_iflag},
+    {"istrip", ISTRIP, &termios::c_iflag},
+    {"inlcr",  INLCR,  &termios::c_iflag},
+    {"icrnl",  ICRNL,  &termios::c_iflag},
+    {"ixon",   IXON,   &termios::c_iflag},
+    {"ixoff",  IXOFF,  &termios::c_iflag},
+    {"cstopb", CSTOPB, &termios::c_cflag},
+    {"cread",  CREAD,  &termios::c_cflag},
+    {"parenb", PARENB, &termios::c_cflag},
+    {"parodd", PARODD, &termios::c_cflag},
+    {"hupcl",  HUPCL,  &termios::c_cflag},
+    {"clocal", CLOCAL, &termios::c_cflag},
+#ifdef ONLCR
+    {"onlcr",  ONLCR,  &termios::c_oflag},
+#endif
+};
+
+struct terminal_control_character
+{
+  const char *name;
+  usize index;
+};
+
+static constexpr terminal_control_character TERMINAL_CONTROL_CHARACTERS[] = {
+    {"eof",   VEOF  },
+    {"eol",   VEOL  },
+    {"erase", VERASE},
+    {"intr",  VINTR },
+    {"kill",  VKILL },
+    {"quit",  VQUIT },
+    {"start", VSTART},
+    {"stop",  VSTOP },
+#ifdef VSUSP
+    {"susp",  VSUSP },
+#endif
+};
+
+static fn append_terminal_character(String &output, cc_t value) throws -> void
+{
+  if (value == _POSIX_VDISABLE) {
+    output += "undef";
+  } else if (value == 127) {
+    output += "^?";
+  } else if (value < 32) {
+    output += '^';
+    output += static_cast<char>(value + '@');
+  } else {
+    output += static_cast<char>(value);
+  }
+}
+
 fn terminal_settings(descriptor terminal, bool should_encode,
-                     Allocator allocator) throws -> Maybe<String>
+                     bool should_report_all, Allocator allocator) throws
+    -> Maybe<String>
 {
   termios state{};
   if (tcgetattr(terminal, &state) != 0) return None;
   let output = String{allocator};
   if (should_encode) {
-    output +=
-        String::from_in_base(state.c_iflag, false, int_base::hex, allocator);
-    output += ':';
-    output +=
-        String::from_in_base(state.c_oflag, false, int_base::hex, allocator);
-    output += ':';
-    output +=
-        String::from_in_base(state.c_cflag, false, int_base::hex, allocator);
-    output += ':';
-    output +=
-        String::from_in_base(state.c_lflag, false, int_base::hex, allocator);
+    bool is_first_field = true;
+    let do_append_field = [&](u64 value) throws {
+      if (!is_first_field) output += ':';
+      output += String::from_in_base(value, false, int_base::hex, allocator);
+      is_first_field = false;
+    };
+    do_append_field(state.c_iflag);
+    do_append_field(state.c_oflag);
+    do_append_field(state.c_cflag);
+    do_append_field(state.c_lflag);
+    do_append_field(cfgetispeed(&state));
+    do_append_field(cfgetospeed(&state));
+    for (usize index = 0; index < NCCS; index++)
+      do_append_field(state.c_cc[index]);
     output += '\n';
     return output;
   }
@@ -768,30 +846,102 @@ fn terminal_settings(descriptor terminal, bool should_encode,
     output += String::from(columns, allocator);
     output += "; ";
   }
-  struct terminal_flag
-  {
-    const char *name;
-    tcflag_t value;
-    tcflag_t termios::*member;
-  };
-  static constexpr terminal_flag FLAGS[] = {
-      {"echo",   ECHO,   &termios::c_lflag},
-      {"icanon", ICANON, &termios::c_lflag},
-      {"isig",   ISIG,   &termios::c_lflag},
-      {"iexten", IEXTEN, &termios::c_lflag},
-      {"opost",  OPOST,  &termios::c_oflag},
-      {"icrnl",  ICRNL,  &termios::c_iflag},
-#ifdef ONLCR
-      {"onlcr",  ONLCR,  &termios::c_oflag},
-#endif
-  };
-  for (let const &flag : FLAGS) {
+  for (let const &flag : TERMINAL_FLAGS) {
     if ((state.*(flag.member) & flag.value) == 0) output += '-';
     output += flag.name;
     output += ' ';
   }
+  if (should_report_all) {
+    for (let const &character : TERMINAL_CONTROL_CHARACTERS) {
+      output += character.name;
+      output += " = ";
+      append_terminal_character(output, state.c_cc[character.index]);
+      output += "; ";
+    }
+  }
   output += '\n';
   return output;
+}
+
+static fn restore_encoded_terminal_settings(termios &state,
+                                            StringView encoded) wontthrow
+    -> bool
+{
+  usize position = 0;
+  let do_read_field = [&](u64 &value) wontthrow -> bool {
+    if (position > encoded.length) return false;
+    usize end = position;
+    while (end < encoded.length && encoded[end] != ':')
+      end++;
+    if (end == position) return false;
+    let const parsed = utils::parse_integer_in_base_u64(
+        encoded.substring_of_length(position, end - position), int_base::hex);
+    if (parsed.is_error()) return false;
+    value = parsed.value();
+    position = end < encoded.length ? end + 1 : encoded.length + 1;
+    return true;
+  };
+
+  u64 input_flags = 0;
+  u64 output_flags = 0;
+  u64 control_flags = 0;
+  u64 local_flags = 0;
+  u64 input_speed = 0;
+  u64 output_speed = 0;
+  if (!do_read_field(input_flags) || !do_read_field(output_flags) ||
+      !do_read_field(control_flags) || !do_read_field(local_flags) ||
+      !do_read_field(input_speed) || !do_read_field(output_speed))
+  {
+    return false;
+  }
+
+  if (input_flags > std::numeric_limits<tcflag_t>::max() ||
+      output_flags > std::numeric_limits<tcflag_t>::max() ||
+      control_flags > std::numeric_limits<tcflag_t>::max() ||
+      local_flags > std::numeric_limits<tcflag_t>::max() ||
+      input_speed > std::numeric_limits<speed_t>::max() ||
+      output_speed > std::numeric_limits<speed_t>::max())
+  {
+    return false;
+  }
+
+  state.c_iflag = static_cast<tcflag_t>(input_flags);
+  state.c_oflag = static_cast<tcflag_t>(output_flags);
+  state.c_cflag = static_cast<tcflag_t>(control_flags);
+  state.c_lflag = static_cast<tcflag_t>(local_flags);
+  if (cfsetispeed(&state, static_cast<speed_t>(input_speed)) != 0 ||
+      cfsetospeed(&state, static_cast<speed_t>(output_speed)) != 0)
+  {
+    return false;
+  }
+
+  for (usize index = 0; index < NCCS; index++) {
+    u64 value = 0;
+    if (!do_read_field(value) || value > UCHAR_MAX) return false;
+    state.c_cc[index] = static_cast<cc_t>(value);
+  }
+
+  return position == encoded.length + 1;
+}
+
+static pure fn parse_terminal_character(StringView text, cc_t &value) wontthrow
+    -> bool
+{
+  if (text == "undef" || text == "^-") {
+    value = _POSIX_VDISABLE;
+    return true;
+  }
+  if (text == "^?") {
+    value = 127;
+    return true;
+  }
+  if (text.length == 2 && text[0] == '^') {
+    value = static_cast<cc_t>(text[1] & 31);
+    return true;
+  }
+  if (text.length != 1) return false;
+  value = static_cast<cc_t>(text[0]);
+  return true;
 }
 
 fn apply_terminal_settings(descriptor terminal,
@@ -799,38 +949,56 @@ fn apply_terminal_settings(descriptor terminal,
 {
   termios state{};
   if (tcgetattr(terminal, &state) != 0) return false;
+  if (settings.count() == 1 &&
+      settings[0].view().find_character(':').has_value())
+  {
+    if (!restore_encoded_terminal_settings(state, settings[0].view()))
+      return false;
+    return tcsetattr(terminal, TCSADRAIN, &state) == 0;
+  }
+
   winsize window{};
   let has_window = ioctl(terminal, TIOCGWINSZ, &window) == 0;
   for (usize index = 0; index < settings.count(); index++) {
     let const setting = settings[index].view();
     let const is_disabled = setting.length > 1 && setting[0] == '-';
     let const name = is_disabled ? setting.substring(1) : setting;
-    tcflag_t *field = nullptr;
-    tcflag_t flag = 0;
-    if (name == "echo") {
-      field = &state.c_lflag;
-      flag = ECHO;
-    } else if (name == "icanon") {
-      field = &state.c_lflag;
-      flag = ICANON;
-    } else if (name == "isig") {
-      field = &state.c_lflag;
-      flag = ISIG;
-    } else if (name == "iexten") {
-      field = &state.c_lflag;
-      flag = IEXTEN;
-    } else if (name == "opost") {
-      field = &state.c_oflag;
-      flag = OPOST;
-    } else if (name == "icrnl") {
-      field = &state.c_iflag;
-      flag = ICRNL;
-#ifdef ONLCR
-    } else if (name == "onlcr") {
-      field = &state.c_oflag;
-      flag = ONLCR;
-#endif
-    } else if (name == "raw") {
+    const terminal_flag *selected_flag = NULL;
+    for (let const &candidate : TERMINAL_FLAGS)
+      if (name == candidate.name) {
+        selected_flag = &candidate;
+        break;
+      }
+    if (selected_flag != NULL) {
+      if (is_disabled)
+        state.*(selected_flag->member) &= ~selected_flag->value;
+      else
+        state.*(selected_flag->member) |= selected_flag->value;
+      continue;
+    }
+
+    const terminal_control_character *selected_character = NULL;
+    for (let const &candidate : TERMINAL_CONTROL_CHARACTERS)
+      if (name == candidate.name) {
+        selected_character = &candidate;
+        break;
+      }
+    if (selected_character != NULL) {
+      if (is_disabled || ++index == settings.count()) return false;
+      cc_t value = 0;
+      if (!parse_terminal_character(settings[index].view(), value))
+        return false;
+      state.c_cc[selected_character->index] = value;
+      continue;
+    }
+
+    if (name == "cs5" || name == "cs6" || name == "cs7" || name == "cs8") {
+      if (is_disabled) return false;
+      static constexpr tcflag_t CHARACTER_SIZES[] = {CS5, CS6, CS7, CS8};
+      state.c_cflag = (state.c_cflag & ~CSIZE) | CHARACTER_SIZES[name[2] - '5'];
+      continue;
+    }
+    if (name == "raw") {
       if (!is_disabled) {
         cfmakeraw(&state);
       } else {
@@ -840,9 +1008,42 @@ fn apply_terminal_settings(descriptor terminal,
       }
       continue;
     } else if (name == "sane") {
+      if (is_disabled) return false;
       state.c_lflag |= ICANON | ISIG | ECHO | IEXTEN;
-      state.c_iflag |= ICRNL;
+      state.c_lflag &= ~(ECHONL | NOFLSH | TOSTOP);
+      state.c_iflag |= BRKINT | ICRNL | IXON;
+      state.c_iflag &= ~(IGNBRK | IGNCR | INLCR | IXOFF);
       state.c_oflag |= OPOST;
+      continue;
+    } else if (name == "ek") {
+      if (is_disabled) return false;
+      state.c_cc[VERASE] = CERASE;
+      state.c_cc[VKILL] = CKILL;
+      continue;
+    } else if (name == "nl") {
+      if (is_disabled)
+        state.c_iflag &= ~ICRNL;
+      else
+        state.c_iflag |= ICRNL;
+      continue;
+    } else if (name == "evenp" || name == "parity") {
+      state.c_cflag &= ~PARODD;
+      if (is_disabled) {
+        state.c_cflag &= ~PARENB;
+        state.c_cflag = (state.c_cflag & ~CSIZE) | CS8;
+      } else {
+        state.c_cflag |= PARENB;
+        state.c_cflag = (state.c_cflag & ~CSIZE) | CS7;
+      }
+      continue;
+    } else if (name == "oddp") {
+      if (is_disabled) {
+        state.c_cflag &= ~(PARENB | PARODD);
+        state.c_cflag = (state.c_cflag & ~CSIZE) | CS8;
+      } else {
+        state.c_cflag |= PARENB | PARODD;
+        state.c_cflag = (state.c_cflag & ~CSIZE) | CS7;
+      }
       continue;
     } else if (name == "rows" || name == "cols" || name == "columns") {
       if (++index == settings.count() || !has_window) return false;
@@ -868,10 +1069,6 @@ fn apply_terminal_settings(descriptor terminal,
         return false;
       continue;
     }
-    if (is_disabled)
-      *field &= ~flag;
-    else
-      *field |= flag;
   }
   if (tcsetattr(terminal, TCSADRAIN, &state) != 0) return false;
   return !has_window || ioctl(terminal, TIOCSWINSZ, &window) == 0;

@@ -30,6 +30,11 @@ fn parse_text_position_ranges(StringView text, Allocator allocator) throws
   let ranges = ArrayList<text_position_range>{allocator};
   usize position = 0;
 
+  while (position < text.length &&
+         (text[position] == ' ' || text[position] == '\t'))
+    position++;
+  if (position == text.length) return None;
+
   while (position < text.length) {
     usize first = 1;
     usize last = SIZE_MAX;
@@ -57,9 +62,16 @@ fn parse_text_position_ranges(StringView text, Allocator allocator) throws
 
     ranges.push({first, last});
     if (position == text.length) break;
-    if (text[position] != ',') return None;
-    position++;
-    if (position == text.length) return None;
+    if (text[position] == ',') {
+      position++;
+    } else if (text[position] != ' ' && text[position] != '\t') {
+      return None;
+    }
+    while (position < text.length &&
+           (text[position] == ' ' || text[position] == '\t'))
+      position++;
+    if (position == text.length) break;
+    if (text[position] == ',') return None;
   }
 
   ranges.sort();

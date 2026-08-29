@@ -3,18 +3,21 @@ a
 nums.txt
 --- ls a ---
 b
-cp-same-status=1 contents=same-file
-cp-hardlink-status=1 contents=same-file
 --- ls -l sym (mode nlink size name) ---
 lrwxrwxrwx 1 8 sym
 --- ls after operations ---
 a
 moved.txt
 nums.txt
-same-link.txt
-same.txt
 stamp
 sym
+cp-interactive-no=old
+cp-interactive-yes=new
+cp-preserve-mode=-rw-r-----
+cp-same-status=1 contents=same-file
+cp-hardlink-status=1 contents=same-file
+mv-interactive-no=old source=present
+mv-interactive-yes=new source=missing
 --- du -s nums.txt ---
 6	nums.txt
 du-unreadable=ok
@@ -25,6 +28,7 @@ libfoo
 --- realpath lexical basename ---
 lib
 --- ls a after rmdir ---
+rmdir-parents=missing
 --- unlink removes a single file ---
 unlink rc=0
 0

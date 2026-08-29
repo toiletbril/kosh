@@ -13,8 +13,9 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-i] [-p] [expression ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The calc utility evaluates each argument as an arithmetic expression and "
-    "prints the result. With no expression on a terminal it reads and "
+    "The calc utility joins its command-line operands into one arithmetic "
+    "expression and prints the result. With no expression on a terminal it "
+    "reads and "
     "evaluates expressions interactively, and a name = value line binds a "
     "variable for a later expression to read.");
 

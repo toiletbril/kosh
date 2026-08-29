@@ -6,11 +6,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[file]");
+HELP_SYNOPSIS_DECL("[-o outfile] [file]");
 
 HELP_DESCRIPTION_DECL(
     "The uudecode utility restores data produced by uuencode.");
 
+FLAG(UUDECODE_OUTPUT, String, 'o', "output", "Write to this output path.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Uudecode);
@@ -158,7 +159,9 @@ fn Uudecode::execute(
   }
   if (header[prefix_length + 3] != ' ')
     throw Error{"uudecode: missing output path"};
-  let const output_path = header.substring(prefix_length + 4);
+  let const output_path = FLAG_UUDECODE_OUTPUT.is_set()
+                              ? FLAG_UUDECODE_OUTPUT.value()
+                              : header.substring(prefix_length + 4);
   if (output_path.is_empty()) throw Error{"uudecode: missing output path"};
 
   let decoded = String{cxt.scratch_allocator()};
@@ -183,6 +186,10 @@ fn Uudecode::execute(
       throw Error{"uudecode: missing end line"};
   }
 
+  if (output_path == "-") {
+    ec.print_to_stdout(decoded.view());
+    return 0;
+  }
   if (!write_decoded_file(output_path, decoded.view(), mode)) {
     report_soft_koshkit_error(ec, cxt,
                               "uudecode: cannot write '" + String{output_path} +

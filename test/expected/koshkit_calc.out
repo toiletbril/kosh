@@ -12,6 +12,48 @@
 0
 === variable read ===
 42
+=== common functions ===
+12.50
+-2
+2
+-0.25
+-7
+1
+6
+36
+265252859812191058636308480000000
+354224848179261915075
+-4
+9.2
+1
+1
+0
+-1
+=== function errors ===
+1:9: error: The argument to 'fact' is negative.
+     1 |  fact(-1)
+       |          ^
+note: Factorial requires a non-negative integer.
+1:9: error: The argument to 'fib' is not an integer.
+     1 |  fib(1.5)
+       |          ^
+note: This function requires an integer value.
+1:6: error: Wrong number of arguments for 'gcd'.
+     1 |  gcd()
+       |       ^
+note: The function accepts at least 1 argument.
+1:7: error: Wrong number of arguments for 'cmp'.
+     1 |  cmp(1)
+       |        ^
+note: The function accepts 2 arguments.
+1:13: error: Unexpected character in the arithmetic expression.
+     1 |  min(1, 2, 3,)
+       |              ^
+note: This is not a valid operator or operand.
+1:9: error: Unknown calculator function 'unknown'.
+     1 |  unknown(1)
+       |          ^
+note: Use a supported numeric function name.
 === located parse error ===
 1:4: error: Unfinished expression.
      1 |  1 +
@@ -59,6 +101,9 @@ note: The right operand evaluated to 0.
 error: The variable 'base' is not set.
 == a decimal divisor preserves decimal arithmetic:
 1747.7
+== a leading decimal point is accepted:
+0.75
+-1.000
 == a valid expression prints the value:
 14
 == 128-bit width still prints in full:

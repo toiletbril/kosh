@@ -55,6 +55,8 @@ all:
 	@echo grouped-file
 EOF
 "$BIN" -c 'koshkit make -sf grouped.mk'
+echo "--- options after operands ---"
+"$BIN" -c 'koshkit make -f grouped.mk all -s'
 
 # The := immediate expansion breaks the MAKE := $(MAKE) self-reference, the
 # $(wildcard) function lists files, a $(VAR:a=b) substitution reference maps
@@ -158,6 +160,14 @@ echo "keep-last=$?"
 echo "compound=$?"
 "$BIN" -c 'koshkit make compound-ignored'
 echo "compound-ignored=$?"
+cat > Makefile <<'EOF'
+interrupted:
+	@: > interrupted
+	@kill -INT $$$$
+EOF
+"$BIN" -c 'koshkit make interrupted' 2> "$TEST_NULL_DEVICE"
+echo "interrupt=$?"
+[ -e interrupted ] && echo interrupt-cleanup=no || echo interrupt-cleanup=yes
 
 echo "--- special targets and suffix inference ---"
 cat > Makefile <<'EOF'
@@ -196,6 +206,10 @@ echo "no-builtins=$?"
 printf '#!/bin/sh\necho copied-shell\n' > builtin-script.sh
 "$BIN" -c 'koshkit make -s builtin-script'
 [ -x builtin-script ] && echo shell-rule=yes || echo shell-rule=no
+mv Makefile configured.mk
+: > standalone.c
+"$BIN" -c 'koshkit make CC=echo standalone.o'
+mv configured.mk Makefile
 
 echo "--- parsing automatic variables and cleanup ---"
 cat > Makefile <<'EOF'
@@ -295,6 +309,22 @@ MAKEFLAGS=n "$BIN" -c 'koshkit make inherited'
 "$BIN" -c 'koshkit make -n forced ordinary'
 [ -e forced-marker ] && echo forced-ran=yes || echo forced-ran=no
 [ -e ordinary-marker ] && echo ordinary-ran=yes || echo ordinary-ran=no
+cat > recursive.mk <<'EOF'
+all:
+	@$(MAKE) -f recursive-child.mk show
+EOF
+cat > recursive-child.mk <<'EOF'
+show:
+	@echo "recursive-value=[$(VALUE)]"
+EOF
+"$BIN" -c 'koshkit make -f recursive.mk "VALUE=one two"'
+cat > inherited-assignment.mk <<'EOF'
+show:
+	@echo "inherited-macro=$(HIDDEN) inherited-environment=$${HIDDEN-unset}"
+EOF
+unset HIDDEN
+MAKEFLAGS=HIDDEN=fromflags \
+  "$BIN" -c 'koshkit make -f inherited-assignment.mk show'
 
 echo "--- forced query and touch recipes ---"
 cat > Makefile <<'EOF'
@@ -356,6 +386,13 @@ case "$shell_result" in
   (*'-c echo shell-selected') echo shell-selected=yes ;;
   (*) echo "shell-selected=no [$shell_result]" ;;
 esac
+cat > shell-env.mk <<'EOF'
+SHELL = /bin/sh
+
+all:
+	@echo "shell-env=$$SHELL"
+EOF
+SHELL=inherited-value "$BIN" -c 'koshkit make -f shell-env.mk'
 
 echo "--- POSIX graph and inference edge cases ---"
 cat > Makefile <<'EOF'
@@ -422,6 +459,9 @@ grep '^\.y\.o:$' builtins.out
 grep '^\.l\.o:$' builtins.out
 grep '^\.y\.c:$' builtins.out
 grep '^\.l\.c:$' builtins.out
+grep -c '^\.f:$' builtins.out
+grep -c '^\.f\.o:$' builtins.out
+grep -c '^\.f\.a:$' builtins.out
 "$BIN" -c 'koshkit make -r -p -f Makefile all' > no-builtins.out
 grep '^\.SUFFIXES:$' no-builtins.out
 cat > Makefile <<'EOF'
@@ -466,6 +506,16 @@ cat > Makefile <<'EOF'
 EOF
 : > member.src
 "$BIN" -c 'koshkit make "library.a(member.o)"'
+printf '!<arch>\n%-16s%-12s%-6s%-6s%-8s%-10s`\n' \
+  'member.o/' '1577836800' '0' '0' '100644' '0' > timed.a
+: > timed.src
+touch -t 202101010000 timed.src
+touch -t 202201010000 timed.a
+cat > Makefile <<'EOF'
+timed.a(member.o): timed.src
+	@echo archive-member-stale
+EOF
+"$BIN" -c 'koshkit make "timed.a(member.o)"'
 
 echo "--- POSIX suffix precedence ---"
 cat > Makefile <<'EOF'
@@ -481,6 +531,23 @@ EOF
 : > ordered.c
 : > ordered.sh
 "$BIN" -c 'koshkit make ordered'
+cat > Makefile <<'EOF'
+.SUFFIXES:
+.SUFFIXES: .src .out
+
+.src.out:
+	@echo first-inference
+
+.src.out:
+	@echo second-inference
+EOF
+: > replaced.src
+"$BIN" -c 'koshkit make replaced.out'
+cat > Makefile <<'EOF'
+.config:
+	@echo dot-default
+EOF
+"$BIN" -c 'koshkit make'
 
 # The barebones make resolves a pattern rule when no explicit rule names the
 # goal, deriving the stem from the % and filling the automatic variables $@, $<,

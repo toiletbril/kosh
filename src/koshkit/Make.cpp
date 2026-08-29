@@ -8,7 +8,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-BiknpqSst] [-f file] [target ...]");
+HELP_SYNOPSIS_DECL(
+    "[-BeiknpqrSst] [-C directory] [-f makefile]... [macro=value ...] "
+    "[target ...]");
 
 HELP_DESCRIPTION_DECL(
     "The make utility runs the recipe of each requested target.");
@@ -75,6 +77,12 @@ constexpr static_string_entry<const char *> BUILTIN_VARIABLE_ENTRIES[] = {
 };
 constexpr StaticStringMap BUILTIN_VARIABLES{BUILTIN_VARIABLE_ENTRIES};
 
+constexpr PackedStringKey SPECIAL_TARGET_KEYS[] = {
+    SSK(".DEFAULT"),  SSK(".IGNORE"), SSK(".POSIX"),    SSK(".PRECIOUS"),
+    SSK(".SCCS_GET"), SSK(".SILENT"), SSK(".SUFFIXES"),
+};
+constexpr StaticStringSet SPECIAL_TARGETS{SPECIAL_TARGET_KEYS};
+
 struct builtin_rule_entry
 {
   const char *target;
@@ -83,8 +91,10 @@ struct builtin_rule_entry
 
 constexpr builtin_rule_entry BUILTIN_RULE_ENTRIES[] = {
     {".c",   {"$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<", nullptr, nullptr, nullptr}},
+    {".f",   {"$(FC) $(FFLAGS) $(LDFLAGS) -o $@ $<", NULL, NULL, NULL}         },
     {".sh",  {"cp $< $@", "chmod a+x $@", nullptr, nullptr}                    },
     {".c.o", {"$(CC) $(CFLAGS) -c $<", nullptr, nullptr, nullptr}              },
+    {".f.o", {"$(FC) $(FFLAGS) -c $<", NULL, NULL, NULL}                       },
     {".y.o",
      {"$(YACC) $(YFLAGS) $<", "$(CC) $(CFLAGS) -c y.tab.c", "rm -f y.tab.c",
       "mv y.tab.o $@"}                                                         },
@@ -96,6 +106,8 @@ constexpr builtin_rule_entry BUILTIN_RULE_ENTRIES[] = {
     {".c.a",
      {"$(CC) -c $(CFLAGS) $<", "$(AR) $(ARFLAGS) $@ $*.o", "rm -f $*.o",
       nullptr}                                                                 },
+    {".f.a",
+     {"$(FC) -c $(FFLAGS) $<", "$(AR) $(ARFLAGS) $@ $*.o", "rm -f $*.o", NULL} },
 };
 
 struct make_variable
@@ -340,6 +352,85 @@ static fn split_words(StringView text, Allocator allocator) throws
       words.push(String{allocator, text.substring_of_length(start, i - start)});
   }
   return words;
+}
+
+static fn split_makeflags_words(StringView text, Allocator allocator) throws
+    -> ArrayList<String>
+{
+  ArrayList<String> words{allocator};
+  usize text_position = 0;
+
+  while (text_position < text.length) {
+    while (text_position < text.length && is_blank(text[text_position]))
+      text_position++;
+    if (text_position == text.length) break;
+
+    String word{allocator};
+    while (text_position < text.length && !is_blank(text[text_position])) {
+      if (text[text_position] == '\\' && text_position + 1 < text.length)
+        text_position++;
+      word.push(text[text_position++]);
+    }
+    words.push(steal(word));
+  }
+
+  return words;
+}
+
+static fn archive_member_modification_time(const Path &archive,
+                                           StringView wanted_member) throws
+    -> Maybe<i64>
+{
+  let const contents = archive.read_entire_file();
+  if (!contents.has_value() || contents->view().length < 8 ||
+      contents->view().substring_of_length(0, 8) != StringView{"!<arch>\n"})
+    return None;
+
+  usize header_position = 8;
+  while (header_position <= contents->view().length &&
+         contents->view().length - header_position >= 60)
+  {
+    let const header =
+        contents->view().substring_of_length(header_position, 60);
+    if (header[58] != '`' || header[59] != '\n') {
+      return None;
+    }
+
+    let member_name = header.substring_of_length(0, 16).trim_blanks();
+    let const timestamp = utils::parse_decimal_i64(
+        header.substring_of_length(16, 12).trim_blanks());
+    let const member_size = utils::parse_decimal_u64(
+        header.substring_of_length(48, 10).trim_blanks());
+    if (timestamp.is_error() || member_size.is_error()) return None;
+
+    let const content_position = header_position + 60;
+    if (member_size.value() > contents->view().length - content_position)
+      return None;
+
+    u64 extended_name_length = 0;
+    if (member_name.starts_with(StringView{"#1/"})) {
+      let const parsed_name_length =
+          utils::parse_decimal_u64(member_name.substring(3));
+      if (parsed_name_length.is_error() ||
+          parsed_name_length.value() > member_size.value())
+        return None;
+      extended_name_length = parsed_name_length.value();
+      member_name = contents->view().substring_of_length(
+          content_position, static_cast<usize>(extended_name_length));
+    } else if (!member_name.is_empty() &&
+               member_name[member_name.length - 1] == '/')
+    {
+      member_name = member_name.substring_of_length(0, member_name.length - 1);
+    }
+
+    if (member_name == wanted_member) return timestamp.value();
+
+    let const padded_size = member_size.value() + (member_size.value() & 1u);
+    if (padded_size > contents->view().length - content_position) return None;
+    header_position = content_position + static_cast<usize>(padded_size);
+  }
+
+  return None;
 }
 
 static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
@@ -1030,16 +1121,40 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
                 mk.suffixes.push(suffix.clone());
           }
         }
+        let is_inference_rule = false;
+        if (!target.view().find_character('/').has_value())
+          for (const String &source_suffix : mk.suffixes) {
+            if (target.view() == source_suffix.view()) {
+              is_inference_rule = true;
+              break;
+            }
+            if (!target.view().starts_with(source_suffix.view())) continue;
+
+            let const target_suffix =
+                target.view().substring(source_suffix.view().length);
+            for (const String &known_suffix : mk.suffixes)
+              if (target_suffix == known_suffix.view()) {
+                is_inference_rule = true;
+                break;
+              }
+            if (is_inference_rule) break;
+          }
+
         if (mk.default_goal.is_empty() &&
             !target.view().find_character('%').has_value() &&
-            (target.view().is_empty() || target.view()[0] != '.'))
+            !SPECIAL_TARGETS.contains(target.view()) && !is_inference_rule)
           mk.default_goal = target.clone();
         if (!target.view().find_character('%').has_value())
           if (make_rule *existing = mk.find_mutable_rule(target.view());
               existing != nullptr)
           {
-            for (String &prerequisite : new_prerequisites)
-              existing->prerequisites.push(steal(prerequisite));
+            if (is_inference_rule) {
+              existing->prerequisites = steal(new_prerequisites);
+              existing->recipe_lines.clear();
+            } else {
+              for (String &prerequisite : new_prerequisites)
+                existing->prerequisites.push(steal(prerequisite));
+            }
             current_rule_indices.push(
                 static_cast<usize>(existing - mk.rules.begin()));
             continue;
@@ -1110,6 +1225,7 @@ struct make_build_options
   bool should_ignore_errors;
   bool should_keep_going;
   bool is_dry_run;
+  bool is_print_database;
   bool is_silent;
   bool should_touch;
 };
@@ -1365,15 +1481,25 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     };
 
   let const target_path = Path{automatic_target.view()};
-  let const was_target_existing = target_path.exists();
+  let const archive_member_time = archive_member.is_empty()
+                                      ? Maybe<i64>{}
+                                      : archive_member_modification_time(
+                                            target_path, archive_member.view());
+  let const was_target_existing = archive_member.is_empty()
+                                      ? target_path.exists()
+                                      : archive_member_time.has_value();
   let is_out_of_date = options.should_always_make || !was_target_existing ||
                        has_outdated_prerequisite;
   if (!is_out_of_date)
     for (const String &prerequisite : normal_prerequisites) {
       let const prerequisite_path = Path{prerequisite.view()};
-      if (!prerequisite_path.exists() ||
-          prerequisite_path.is_newer_than(target_path))
-      {
+      let is_prerequisite_newer = prerequisite_path.is_newer_than(target_path);
+      if (!archive_member.is_empty()) {
+        let const prerequisite_time = prerequisite_path.modification_time();
+        is_prerequisite_newer = prerequisite_time.has_value() &&
+                                *prerequisite_time > *archive_member_time;
+      }
+      if (!prerequisite_path.exists() || is_prerequisite_newer) {
         is_out_of_date = true;
         break;
       }
@@ -1427,8 +1553,15 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     all_prereqs += prerequisite.view();
 
     let const prerequisite_path = Path{prerequisite.view()};
+    let is_prerequisite_newer = prerequisite_path.is_newer_than(target_path);
+    if (!archive_member.is_empty()) {
+      let const prerequisite_time = prerequisite_path.modification_time();
+      is_prerequisite_newer = archive_member_time.has_value() &&
+                              prerequisite_time.has_value() &&
+                              *prerequisite_time > *archive_member_time;
+    }
     if (!was_target_existing || !prerequisite_path.exists() ||
-        prerequisite_path.is_newer_than(target_path))
+        is_prerequisite_newer)
     {
       if (!newer_prereqs.is_empty()) newer_prereqs += ' ';
       newer_prereqs += prerequisite.view();
@@ -1508,9 +1641,26 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       subshell_command += "set -e\n";
     subshell_command += recipe_source.view();
     subshell_command += "\n)";
-    let const status = cxt.run_source(subshell_command.view(), "make",
-                                      return_handling::Consume,
-                                      ec.source_location(), StringView{"make"});
+    i32 status = 0;
+    try {
+      status = cxt.run_source(subshell_command.view(), "make",
+                              return_handling::Consume, ec.source_location(),
+                              StringView{"make"});
+      if (os::INTERRUPT_REQUESTED) {
+        os::INTERRUPT_REQUESTED = 0;
+        let interrupt_error = InterruptErrorWithLocation{ec.source_location()};
+        interrupt_error.set_command_status(130);
+        throw interrupt_error;
+      }
+    } catch (InterruptErrorWithLocation &interrupt_error) {
+      if (!options.is_dry_run && !options.is_print_database &&
+          !options.is_query && target_path.exists() &&
+          !target_path.is_directory() && !mk.is_every_target_precious &&
+          mk.precious_targets.find(goal) == NULL)
+        unused(os::remove_file(goal));
+      interrupt_error.set_command_status(130);
+      throw;
+    }
     if (status != 0 && !should_ignore_errors && !should_ignore_target_errors) {
       if (!was_target_existing && target_path.exists() &&
           !mk.is_every_target_precious &&
@@ -1549,8 +1699,8 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   if (!args.is_empty()) filtered.push(args[0].clone());
   if (let inherited_makeflags = os::get_environment_variable("MAKEFLAGS");
       inherited_makeflags.has_value())
-    for (const String &word :
-         split_words(inherited_makeflags->view(), cxt.scratch_allocator()))
+    for (const String &word : split_makeflags_words(inherited_makeflags->view(),
+                                                    cxt.scratch_allocator()))
     {
       if (word.is_empty()) continue;
       if (is_command_line_assignment(word.view())) {
@@ -1632,7 +1782,8 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
      before parsing. The outer call already read its flags into locals, so the
      reset does not disturb it. */
   reset_flags(FLAG_LIST);
-  let const operands = parse_util_operands(FLAG_LIST, filtered);
+  let const operands =
+      parse_util_operands(FLAG_LIST, filtered, NULL, NULL, false, true);
   defer { reset_flags(FLAG_LIST); };
 
   let should_keep_going = false;
@@ -1682,10 +1833,6 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       requested_makefiles.push(String{cxt.scratch_allocator(), "makefile"});
     else if (Path{"Makefile"}.exists())
       requested_makefiles.push(String{cxt.scratch_allocator(), "Makefile"});
-    else
-      throw ErrorWithDetails{
-          "Unable to find a Makefile in the current directory",
-          "Create a `Makefile` or pass `-f <file>`"};
   }
 
   String source{cxt.scratch_allocator()};
@@ -1706,11 +1853,15 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   ArrayList<String> goals{cxt.scratch_allocator()};
+  StringMap<bool> command_line_variable_names{cxt.scratch_allocator()};
   for (const String &operand : operands) {
-    if (is_command_line_assignment(operand.view()))
+    if (is_command_line_assignment(operand.view())) {
       command_assignments.push(operand.clone());
-    else
+      command_line_variable_names.set(assignment_variable_name(operand.view()),
+                                      true);
+    } else {
       goals.push(operand.clone());
+    }
   }
 
   String makeflags{cxt.scratch_allocator()};
@@ -1731,7 +1882,13 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
     if (assignment_variable_name(assignment.view()) == StringView{"MAKEFLAGS"})
       continue;
     if (!makeflags.is_empty()) makeflags += ' ';
-    makeflags += assignment.view();
+    for (usize byte_position = 0; byte_position < assignment.view().length;
+         byte_position++)
+    {
+      let const byte = assignment.view()[byte_position];
+      if (byte == '\\' || is_blank(byte)) makeflags += '\\';
+      makeflags += byte;
+    }
   }
 
   let has_command_makeflags = false;
@@ -1761,11 +1918,15 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   ArrayList<saved_recipe_environment> saved_recipe_environment_values{
       cxt.scratch_allocator()};
   for (const make_variable &variable : mk.variables) {
-    if (variable.name.view() == StringView{"MAKEFLAGS"}) continue;
+    if (variable.name.view() == StringView{"MAKEFLAGS"} ||
+        variable.name.view() == StringView{"SHELL"})
+      continue;
     let old_value = os::get_environment_variable(variable.name.view());
     let const is_command_variable =
         mk.command_variable_names.find(variable.name.view()) != nullptr;
-    if (!is_command_variable && !old_value.has_value()) continue;
+    let const is_command_line_variable =
+        command_line_variable_names.find(variable.name.view()) != NULL;
+    if (!is_command_line_variable && !old_value.has_value()) continue;
     if (!is_command_variable && old_value.has_value() &&
         mk.does_environment_override)
       continue;
@@ -1840,6 +2001,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_MAKE_IGNORE_ERRORS.is_enabled() || mk.should_ignore_errors,
       should_keep_going,
       FLAG_MAKE_DRY_RUN.is_enabled(),
+      FLAG_MAKE_PRINT_DATABASE.is_enabled(),
       FLAG_MAKE_SILENT.is_enabled() || mk.is_silent,
       FLAG_MAKE_TOUCH.is_enabled()};
   let has_outdated_goal = false;
@@ -1866,6 +2028,9 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (did_fail) return 2;
+  if (!options.is_query && !has_outdated_goal)
+    ec.print_to_stdout("make: No action was needed.\n");
+
   return options.is_query && has_outdated_goal ? 1 : 0;
 }
 

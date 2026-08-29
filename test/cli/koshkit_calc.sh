@@ -24,6 +24,36 @@ echo "=== signed 128-bit minimum ==="
 echo "=== variable read ==="
 "$BIN" -c 'x=6; koshkit calc "x * 7"'
 
+echo "=== common functions ==="
+"$BIN" -c '
+koshkit calc "abs(-12.50)"
+koshkit calc "floor(-1.2)"
+koshkit calc "ceil(1.2)"
+koshkit calc "frac(-7.25)"
+koshkit calc "int(-7.25)"
+koshkit calc "cmp(999999999999999999999, 8)"
+koshkit calc "gcd(84, 30, 18)"
+koshkit calc "lcm(12, 18)"
+koshkit calc "fact(30)"
+koshkit calc "fib(100)"
+koshkit calc "min(9.2, -4, 7)"
+koshkit calc "max(9.2, -4, 7)"
+koshkit calc "isint(1.00)"
+koshkit calc "iseven(42)"
+koshkit calc "isodd(42)"
+koshkit calc "sgn(-0.01)"
+'
+
+echo "=== function errors ==="
+"$BIN" -c '
+koshkit calc "fact(-1)"
+koshkit calc "fib(1.5)"
+koshkit calc "gcd()"
+koshkit calc "cmp(1)"
+koshkit calc "min(1, 2, 3,)"
+koshkit calc "unknown(1)"
+' 2>&1
+
 echo "=== located parse error ==="
 "$BIN" -c 'koshkit calc "1 +"' 2>&1
 
@@ -65,6 +95,9 @@ unset KOSH_FLAGS
 # piped line and continuing past a bad one.
 echo "== a decimal divisor preserves decimal arithmetic:"
 "$BIN" -c 'koshkit calc 2312312 / 1323.0' 2>&1
+echo "== a leading decimal point is accepted:"
+"$BIN" -c "koshkit calc '.5 + .25'" 2>&1
+"$BIN" -c "koshkit calc -- '-.125 * 8'" 2>&1
 echo "== a valid expression prints the value:"
 "$BIN" -c "koshkit calc '2 + 3 * 4'" 2>&1
 echo "== 128-bit width still prints in full:"

@@ -7,12 +7,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-sf] target ... link");
+HELP_SYNOPSIS_DECL("[-fLPs] target ... link");
 
-HELP_DESCRIPTION_DECL("The ln utility creates a symbolic link to the target.");
+HELP_DESCRIPTION_DECL("The ln utility creates links to files.");
 
 FLAG(LN_SYMBOLIC, Bool, 's', "", "Create a symbolic link.");
 FLAG(LN_FORCE, Bool, 'f', "", "Remove an existing destination first.");
+FLAG(LN_LOGICAL, Bool, 'L', "", "Follow symbolic link sources.");
+FLAG(LN_PHYSICAL, Bool, 'P', "", "Link symbolic link sources themselves.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Ln);
@@ -37,10 +39,6 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
-  if (!FLAG_LN_SYMBOLIC.is_enabled())
-    throw ErrorWithDetails{"ln supports only symbolic links",
-                           "Re-run with `-s` to make a symlink"};
-
   let const destination = operands[operands.count() - 1].view();
   let const is_destination_directory = Path{destination}.is_directory();
 
@@ -64,9 +62,21 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link.view());
 
-    if (!os::create_symlink(target, link.view())) {
+    let link_target = target;
+    Maybe<Path> resolved_target;
+    if (!FLAG_LN_SYMBOLIC.is_enabled() &&
+        FLAG_LN_LOGICAL.position() > FLAG_LN_PHYSICAL.position())
+    {
+      resolved_target = os::canonical_path(Path{target});
+      if (resolved_target.has_value())
+        link_target = resolved_target->text().view();
+    }
+    let const did_create = FLAG_LN_SYMBOLIC.is_enabled()
+                               ? os::create_symlink(link_target, link.view())
+                               : os::create_hard_link(link_target, link.view());
+    if (!did_create) {
       report_soft_koshkit_error(ec, cxt,
-                                "ln: cannot create symbolic link '" + link +
+                                "ln: cannot create link '" + link +
                                     "': " + os::last_system_error_message());
       status = 1;
     }

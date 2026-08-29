@@ -736,6 +736,49 @@ fn touch_file_times(StringView path) wontthrow -> bool
   return did_set;
 }
 
+static fn unix_time_to_file_time(i64 seconds, u32 nanoseconds,
+                                 FILETIME &file_time) wontthrow -> bool
+{
+  constexpr i64 WINDOWS_TO_UNIX_EPOCH_SECONDS = 11644473600LL;
+  let const windows_seconds = seconds + WINDOWS_TO_UNIX_EPOCH_SECONDS;
+  if (windows_seconds < 0) return false;
+
+  ULARGE_INTEGER ticks{};
+  ticks.QuadPart =
+      static_cast<u64>(windows_seconds) * 10000000ULL + nanoseconds / 100ULL;
+  file_time.dwLowDateTime = ticks.LowPart;
+  file_time.dwHighDateTime = ticks.HighPart;
+  return true;
+}
+
+fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
+                  i64 modification_time, u32 modification_nanoseconds) wontthrow
+    -> bool
+{
+  FILETIME access_file_time{};
+  FILETIME modification_file_time{};
+  if (!unix_time_to_file_time(access_time, access_nanoseconds,
+                              access_file_time) ||
+      !unix_time_to_file_time(modification_time, modification_nanoseconds,
+                              modification_file_time))
+  {
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return false;
+  }
+
+  const String path_string{path};
+  let const handle =
+      CreateFileA(path_string.c_str(), FILE_WRITE_ATTRIBUTES,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                  OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+
+  let const did_set = SetFileTime(handle, NULL, &access_file_time,
+                                  &modification_file_time) != 0;
+  CloseHandle(handle);
+  return did_set;
+}
+
 fn remove_directory(StringView path) wontthrow -> bool
 {
   const String path_string{path};
@@ -941,6 +984,8 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
     status.owner_id = 0;
     status.group_id = 0;
     status.size = target->length();
+    status.access_time = 0;
+    status.access_nanoseconds = 0;
     status.modification_time = 0;
     status.modification_nanoseconds = 0;
     status.change_time = 0;
@@ -960,6 +1005,13 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
                          identity.nFileIndexLow;
         status.has_file_identity = true;
         status.link_count = identity.nNumberOfLinks;
+        ULARGE_INTEGER access_ticks{};
+        access_ticks.LowPart = identity.ftLastAccessTime.dwLowDateTime;
+        access_ticks.HighPart = identity.ftLastAccessTime.dwHighDateTime;
+        status.access_time = static_cast<i64>(
+            access_ticks.QuadPart / 10000000ULL - 11644473600ULL);
+        status.access_nanoseconds =
+            static_cast<u32>(access_ticks.QuadPart % 10000000ULL * 100ULL);
         ULARGE_INTEGER modification_ticks{};
         modification_ticks.LowPart = identity.ftLastWriteTime.dwLowDateTime;
         modification_ticks.HighPart = identity.ftLastWriteTime.dwHighDateTime;
@@ -999,12 +1051,18 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.owner_id = static_cast<u32>(info.st_uid);
   status.group_id = static_cast<u32>(info.st_gid);
   status.size = static_cast<u64>(info.st_size);
+  status.access_time = static_cast<i64>(info.st_atime);
   status.modification_time = static_cast<i64>(info.st_mtime);
   status.change_time = status.modification_time;
   WIN32_FILE_ATTRIBUTE_DATA attribute_data{};
   if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard,
                            &attribute_data) != 0)
   {
+    ULARGE_INTEGER access_ticks{};
+    access_ticks.LowPart = attribute_data.ftLastAccessTime.dwLowDateTime;
+    access_ticks.HighPart = attribute_data.ftLastAccessTime.dwHighDateTime;
+    status.access_nanoseconds =
+        static_cast<u32>(access_ticks.QuadPart % 10000000ULL * 100ULL);
     ULARGE_INTEGER modification_ticks{};
     modification_ticks.LowPart = attribute_data.ftLastWriteTime.dwLowDateTime;
     modification_ticks.HighPart = attribute_data.ftLastWriteTime.dwHighDateTime;

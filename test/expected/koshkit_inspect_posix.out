@@ -12,6 +12,68 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "file" "empty" "text" "binary"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-i" "empty" "text"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "text" "text-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "absent" "broken-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "text-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-h" "text-link" "broken-link"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "file" "absent"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "file-missing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 string \x97\x4A\x42\x32 image data"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 string \x97 fallback data"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 string no no-match"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\227JB2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-a" "magic-data"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-a" "-m" "magic-b" "magic-data"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-zero" "-m" "magic-b" "-M" "magic-a" "magic-data"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 uC <10 small" "0 uC >10 large"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\005"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\024"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-number" "magic-low" "magic-high"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 uC&0x0f 5 masked"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\025"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-mask" "magic-masked"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 uC 5 value-is-%d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-format" "magic-low"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "0 uC 1 parent" ">1 uC &0x80 child"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\001\200"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-continuation" "magic-child"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "invalid line" "0 string hello greeting"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "hello"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "-M" "magic-malformed" "magic-hello"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "strings" "binary"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "strings" "-n" "2" "-t" "d" "binary"]
@@ -19,6 +81,14 @@
     [SimpleCommand "koshkit" "od" "-An" "-tx1" "text"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "od" "-An" "-tc" "text"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "1234567890abcdef1234567890abcdef"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-A" "n" "-t" "x1" "repeated"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-v" "-A" "n" "-t" "x1" "repeated"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "text" "+1"]
 [Word
   Unquoted "root="
   CommandSubstitution "mktemp -d"
@@ -67,6 +137,397 @@
 ]
 [Word
   Unquoted "binary"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-i"
+]
+[Word
+  Unquoted "empty"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "text-link"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "absent"
+]
+[Word
+  Unquoted "broken-link"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "text-link"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-h"
+]
+[Word
+  Unquoted "text-link"
+]
+[Word
+  Unquoted "broken-link"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "absent"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "file-missing="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 string \x97\x4A\x42\x32 image data"
+]
+[Word
+  Unquoted "magic-a"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 string \x97 fallback data"
+]
+[Word
+  Unquoted "magic-b"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 string no no-match"
+]
+[Word
+  Unquoted "magic-zero"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\227JB2"
+]
+[Word
+  Unquoted "magic-data"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-a"
+]
+[Word
+  Unquoted "magic-data"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-a"
+]
+[Word
+  Unquoted "-m"
+]
+[Word
+  Unquoted "magic-b"
+]
+[Word
+  Unquoted "magic-data"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-zero"
+]
+[Word
+  Unquoted "-m"
+]
+[Word
+  Unquoted "magic-b"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-a"
+]
+[Word
+  Unquoted "magic-data"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 uC <10 small"
+]
+[Word
+  Literal "0 uC >10 large"
+]
+[Word
+  Unquoted "magic-number"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\005"
+]
+[Word
+  Unquoted "magic-low"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\024"
+]
+[Word
+  Unquoted "magic-high"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-number"
+]
+[Word
+  Unquoted "magic-low"
+]
+[Word
+  Unquoted "magic-high"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 uC&0x0f 5 masked"
+]
+[Word
+  Unquoted "magic-mask"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\025"
+]
+[Word
+  Unquoted "magic-masked"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-mask"
+]
+[Word
+  Unquoted "magic-masked"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 uC 5 value-is-%d"
+]
+[Word
+  Unquoted "magic-format"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-format"
+]
+[Word
+  Unquoted "magic-low"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "0 uC 1 parent"
+]
+[Word
+  Literal ">1 uC &0x80 child"
+]
+[Word
+  Unquoted "magic-continuation"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\001\200"
+]
+[Word
+  Unquoted "magic-child"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-continuation"
+]
+[Word
+  Unquoted "magic-child"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Literal "invalid line"
+]
+[Word
+  Literal "0 string hello greeting"
+]
+[Word
+  Unquoted "magic-malformed"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "magic-hello"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "-M"
+]
+[Word
+  Unquoted "magic-malformed"
+]
+[Word
+  Unquoted "magic-hello"
 ]
 [Word
   Unquoted "koshkit"
@@ -128,12 +589,111 @@
 [Word
   Unquoted "text"
 ]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "1234567890abcdef1234567890abcdef"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "x1"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "x1"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "+1"
+]
 empty: empty
 text: text
 binary: data
+empty: regular file
+text: regular file
+text-link: text
+text-link: symbolic link to text
+broken-link: symbolic link to absent
+absent: cannot open
+file-missing=0
+magic-data: image data
+magic-data: image data
+magic-data: fallback data
+magic-low: small
+magic-high: large
+magic-masked: masked
+magic-low: value-is-5
+magic-child: parent child
+magic-hello: greeting
 abcde
       1 abcde
       7 xy
         68 65 6c 6c 6f 0a
           h   e   l   l   o  \n
+        31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
+*
+        31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
+        31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
+          e   l   l   o  \n
 [Code 0]

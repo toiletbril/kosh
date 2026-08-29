@@ -16,6 +16,11 @@ echo "== --dry-run prints without deleting a file:"
 : > keep.txt
 "$BIN" -c 'koshkit rm --dry-run keep.txt' 2>&1
 [ -e keep.txt ] && echo "keep.txt still present"
+echo "== rm -i honors both answers under --dry-run:"
+declined=$(printf 'n\n' | "$BIN" -c 'koshkit rm -i --dry-run keep.txt' 2>/dev/null)
+printf 'declined=%s\n' "${declined:-empty}"
+accepted=$(printf 'y\n' | "$BIN" -c 'koshkit rm -i --dry-run keep.txt' 2>/dev/null)
+printf 'accepted=%s\n' "$accepted"
 echo "== --dry-run -r lists a tree in removal order without deleting it:"
 mkdir -p tree/sub
 : > tree/sub/b

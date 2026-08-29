@@ -18,6 +18,10 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "locale=$?"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "locale" "-ck" "decimal_point"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "locale" "-c" "charmap"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "logname"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "logname=$?"]
@@ -33,6 +37,18 @@
     [SimpleCommand "koshkit" "who"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "who=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "who" "-Hq"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "who-quick=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "who" "-m"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "who-current=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "who" "-Tu"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "who-state=$?"]
 [Word
   Unquoted "koshkit"
 ]
@@ -128,6 +144,36 @@
   Variable "?"
 ]
 [Word
+  Unquoted "LC_ALL=C"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "locale"
+]
+[Word
+  Unquoted "-ck"
+]
+[Word
+  Unquoted "decimal_point"
+]
+[Word
+  Unquoted "LC_ALL=C"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "locale"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "charmap"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -194,6 +240,63 @@
   DoubleQuoted "who="
   Variable "?"
 ]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "who"
+]
+[Word
+  Unquoted "-Hq"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "who-quick="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "who"
+]
+[Word
+  Unquoted "-m"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "who-current="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "who"
+]
+[Word
+  Unquoted "-Tu"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "who-state="
+  Variable "?"
+]
    February 2024
 Su Mo Tu We Th Fr Sa
              1  2  3
@@ -205,8 +308,15 @@ date=0
 getconf=0
 id=0
 locale=0
+LC_NUMERIC
+decimal_point="."
+LC_CTYPE
+ANSI_X3.4-1968
 logname=0
 tty=1
 uname=0
 who=0
+who-quick=0
+who-current=1
+who-state=0
 [Code 0]

@@ -147,6 +147,14 @@ fi >/dev/null
   echo both
 } >/dev/null 2>&1
 compound-redirect-equivalent=yes captured=yes
+local value=one
+
+<"$input" cat
+(
+  umask 077
+  >|"$output"
+)
+redirection-prefixes-lint=same idempotent=yes
 exec > >(tee -a capture.log) 2>&1
 mapfile -t child_pids < <(printf '%s\n' 10 20)
 process-substitutions-idempotent=yes

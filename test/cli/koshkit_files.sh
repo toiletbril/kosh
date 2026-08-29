@@ -13,12 +13,6 @@ echo "--- ls ---"
 echo "--- ls a ---"
 "$BIN" -c 'koshkit ls a'
 "$BIN" -c 'koshkit cp nums.txt copy.txt'
-printf 'same-file\n' > same.txt
-"$BIN" -c 'koshkit cp same.txt same.txt' 2>/dev/null
-printf 'cp-same-status=%s contents=%s\n' "$?" "$(cat same.txt)"
-ln same.txt same-link.txt
-"$BIN" -c 'koshkit cp same.txt same-link.txt' 2>/dev/null
-printf 'cp-hardlink-status=%s contents=%s\n' "$?" "$(cat same.txt)"
 "$BIN" -c 'koshkit mv copy.txt moved.txt'
 "$BIN" -c 'koshkit touch stamp'
 "$BIN" -c 'koshkit ln -s nums.txt sym'
@@ -31,6 +25,27 @@ echo "--- ls -l sym (mode nlink size name) ---"
 "$BIN" -c 'koshkit ls -l sym' | sed 's/^l[rwxsStT-]\{9\}/lrwxrwxrwx/' | awk '{print $1, $2, $5, $NF}'
 echo "--- ls after operations ---"
 "$BIN" -c 'koshkit ls'
+printf 'old\n' > cp-target.txt
+printf 'new\n' > cp-source.txt
+printf 'n\n' | "$BIN" -c 'koshkit cp -i cp-source.txt cp-target.txt' 2>/dev/null
+printf 'cp-interactive-no=%s\n' "$(cat cp-target.txt)"
+printf 'y\n' | "$BIN" -c 'koshkit cp -i cp-source.txt cp-target.txt' 2>/dev/null
+printf 'cp-interactive-yes=%s\n' "$(cat cp-target.txt)"
+chmod 640 cp-source.txt
+"$BIN" -c 'koshkit cp -p cp-source.txt cp-preserved.txt'
+printf 'cp-preserve-mode=%s\n' "$("$BIN" -c 'koshkit ls -l cp-preserved.txt' | cut -d ' ' -f 1)"
+printf 'same-file\n' > same.txt
+"$BIN" -c 'koshkit cp same.txt same.txt' 2>/dev/null
+printf 'cp-same-status=%s contents=%s\n' "$?" "$(cat same.txt)"
+ln same.txt same-link.txt
+"$BIN" -c 'koshkit cp same.txt same-link.txt' 2>/dev/null
+printf 'cp-hardlink-status=%s contents=%s\n' "$?" "$(cat same.txt)"
+printf 'old\n' > mv-target.txt
+printf 'new\n' > mv-source.txt
+printf 'n\n' | "$BIN" -c 'koshkit mv -i mv-source.txt mv-target.txt' 2>/dev/null
+printf 'mv-interactive-no=%s source=%s\n' "$(cat mv-target.txt)" "$([ -e mv-source.txt ] && echo present || echo missing)"
+printf 'y\n' | "$BIN" -c 'koshkit mv -i mv-source.txt mv-target.txt' 2>/dev/null
+printf 'mv-interactive-yes=%s source=%s\n' "$(cat mv-target.txt)" "$([ -e mv-source.txt ] && echo present || echo missing)"
 echo "--- du -s nums.txt ---"
 "$BIN" -c 'koshkit du -s nums.txt'
 mkdir unreadable
@@ -59,6 +74,8 @@ echo "--- realpath lexical basename ---"
 "$BIN" -c 'koshkit rmdir a/b'
 echo "--- ls a after rmdir ---"
 "$BIN" -c 'koshkit ls a'
+"$BIN" -c 'koshkit mkdir -p parent/child; koshkit rmdir -p parent/child'
+printf 'rmdir-parents=%s\n' "$([ -e parent ] && echo present || echo missing)"
 echo "--- unlink removes a single file ---"
 "$BIN" -c 'koshkit touch victim; koshkit unlink victim; echo "unlink rc=$?"'
 "$BIN" -c 'koshkit ls' | grep -c victim

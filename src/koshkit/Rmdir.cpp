@@ -5,10 +5,11 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("directory ...");
+HELP_SYNOPSIS_DECL("[-p] directory ...");
 
 HELP_DESCRIPTION_DECL("The rmdir utility removes each empty directory.");
 
+FLAG(RMDIR_PARENTS, Bool, 'p', "", "Remove empty parent directories.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Rmdir);
@@ -40,6 +41,25 @@ fn Rmdir::execute(const ExecContext &ec, EvalContext &cxt,
                                 "rmdir: failed to remove '" + operand +
                                     "': " + os::last_system_error_message());
       status = 1;
+      continue;
+    }
+
+    if (FLAG_RMDIR_PARENTS.is_enabled()) {
+      let current = Path{operand.view()};
+      loop
+      {
+        let parent = current.parent();
+        if (parent.is_empty() || parent == current) break;
+        if (!os::remove_directory(parent.text().view())) {
+          report_soft_koshkit_error(
+              ec, cxt,
+              "rmdir: failed to remove '" + parent.text() +
+                  "': " + os::last_system_error_message());
+          status = 1;
+          break;
+        }
+        current = steal(parent);
+      }
     }
   }
   return status;

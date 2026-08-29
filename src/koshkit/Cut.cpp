@@ -7,7 +7,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("-b list | -c list | -f list [-d delim] [-s] [file ...]");
+HELP_SYNOPSIS_DECL(
+    "-b list [-n] | -c list | -f list [-d delim] [-s] [file ...]");
 
 HELP_DESCRIPTION_DECL("The cut utility selects bytes, characters, or fields.");
 
@@ -15,6 +16,7 @@ FLAG(CUT_BYTES, String, 'b', "bytes", "Select byte positions.");
 FLAG(CUT_CHARACTERS, String, 'c', "characters", "Select character positions.");
 FLAG(CUT_FIELDS, String, 'f', "fields", "Select delimiter separated fields.");
 FLAG(CUT_DELIMITER, String, 'd', "delimiter", "Use this field delimiter.");
+FLAG(CUT_NO_SPLIT, Bool, 'n', "no-split", "Do not split multibyte characters.");
 FLAG(CUT_SUPPRESS, Bool, 's', "only-delimited",
      "Suppress lines without a delimiter.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -41,7 +43,8 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
                               static_cast<usize>(FLAG_CUT_CHARACTERS.is_set()) +
                               static_cast<usize>(FLAG_CUT_FIELDS.is_set());
   if (selection_count != 1 ||
-      (FLAG_CUT_DELIMITER.is_set() && !FLAG_CUT_FIELDS.is_set()))
+      (FLAG_CUT_DELIMITER.is_set() && !FLAG_CUT_FIELDS.is_set()) ||
+      (FLAG_CUT_NO_SPLIT.is_enabled() && !FLAG_CUT_BYTES.is_set()))
     return report_usage_error(ec, cxt, args[0].view());
 
   let const list = FLAG_CUT_BYTES.is_set()        ? FLAG_CUT_BYTES.value()
@@ -100,42 +103,31 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
       let const line = reader.get_line();
       if (!FLAG_CUT_FIELDS.is_set()) {
         if (FLAG_CUT_BYTES.is_set()) {
-          for (usize position = 0; position < line.length; position++)
-            if (text_position_is_selected(position + 1, *ranges))
-              output += line[position];
+          if (FLAG_CUT_NO_SPLIT.is_enabled()) {
+            usize byte_position = 0;
+            while (byte_position < line.length) {
+              let const decoded = utils::decode_utf8(line, byte_position, 0);
+              if (text_position_is_selected(byte_position + decoded.length,
+                                            *ranges))
+                output +=
+                    line.substring_of_length(byte_position, decoded.length);
+              byte_position += decoded.length;
+            }
+          } else {
+            for (usize position = 0; position < line.length; position++)
+              if (text_position_is_selected(position + 1, *ranges))
+                output += line[position];
+          }
         } else {
           usize byte_position = 0;
           usize character_position = 1;
 
           while (byte_position < line.length) {
-            let const first_byte = static_cast<u8>(line[byte_position]);
-            usize character_length = 1;
-            if ((first_byte & 0xe0u) == 0xc0u)
-              character_length = 2;
-            else if ((first_byte & 0xf0u) == 0xe0u)
-              character_length = 3;
-            else if ((first_byte & 0xf8u) == 0xf0u)
-              character_length = 4;
-            if (character_length > line.length - byte_position)
-              character_length = 1;
-
-            for (usize continuation_position = 1;
-                 continuation_position < character_length;
-                 continuation_position++)
-            {
-              if ((static_cast<u8>(
-                       line[byte_position + continuation_position]) &
-                   0xc0u) != 0x80u)
-              {
-                character_length = 1;
-                break;
-              }
-            }
+            let const decoded = utils::decode_utf8(line, byte_position, 0);
 
             if (text_position_is_selected(character_position, *ranges))
-              output +=
-                  line.substring_of_length(byte_position, character_length);
-            byte_position += character_length;
+              output += line.substring_of_length(byte_position, decoded.length);
+            byte_position += decoded.length;
             character_position++;
           }
         }

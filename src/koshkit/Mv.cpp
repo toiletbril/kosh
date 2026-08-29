@@ -6,11 +6,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-fv] source ... destination");
+HELP_SYNOPSIS_DECL("[-fiv] source ... destination");
 
 HELP_DESCRIPTION_DECL("The mv utility renames each source to the destination.");
 
 FLAG(MV_FORCE, Bool, 'f', "", "Overwrite an existing destination.");
+FLAG(MV_INTERACTIVE, Bool, 'i', "", "Ask before overwriting a destination.");
 FLAG(MV_VERBOSE, Bool, 'v', "", "Print the name of each move as it happens.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -157,6 +158,10 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const destination = operands[operands.count() - 1].view();
   let const is_destination_directory = Path{destination}.is_directory();
+  let const should_prompt =
+      FLAG_MV_INTERACTIVE.is_enabled() &&
+      (!FLAG_MV_FORCE.is_enabled() ||
+       FLAG_MV_INTERACTIVE.position() > FLAG_MV_FORCE.position());
 
   if (operands.count() > 2 && !is_destination_directory) {
     throw Error{
@@ -185,6 +190,10 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
+
+    if (should_prompt && Path{target.view()}.exists() &&
+        !confirm_koshkit_action(ec, "mv: overwrite '" + target + "'? "))
+      continue;
 
     if (!os::rename_path(source, target.view())) {
       let const rename_error_number = errno;

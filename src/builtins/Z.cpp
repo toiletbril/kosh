@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
@@ -200,14 +201,25 @@ pure fn Z::kind() const wontthrow -> Builtin::Kind { return Kind::Z; }
 
 fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  if (ec.args().count() > 1 && ec.args()[1] == "--help") {
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  let const operands = PARSE_BUILTIN_ARGS(ec);
+
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  if (operands.count() == 1) {
+    let const home_directory = os::get_home_directory();
+    if (!home_directory.has_value()) {
+      throw ErrorWithLocationAndDetails{
+          ec.source_location(), "Unable to determine the home directory",
+          "Set `HOME` to a valid path"};
+    }
+
+    return run_cd_to_directory(cxt, ec, home_directory->text());
   }
 
   let query = String{cxt.scratch_allocator()};
-  for (usize i = 1; i < ec.args().count(); i++) {
+  for (usize i = 1; i < operands.count(); i++) {
     if (i > 1) query += ' ';
-    query.append(ec.args()[i]);
+    query.append(operands[i]);
   }
 
   LOG(Debug, "z ranking the frecency store against query '%s'", query.c_str());
@@ -215,7 +227,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let entries = read_frecency_store(cxt.scratch_allocator());
   let const now = now_epoch_seconds();
 
-  const frecency_entry *best = nullptr;
+  const frecency_entry *best = NULL;
   let best_score = -1.0;
   for (let const &entry : entries) {
     if (!query.is_empty() &&
@@ -233,7 +245,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  if (best == nullptr)
+  if (best == NULL)
     throw make_error_for_arg(
         ec, 1, StringView{"No matching directory for '"} + query + "'");
 

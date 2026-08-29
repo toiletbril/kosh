@@ -5,13 +5,25 @@ koshkit mkdir -p man1
 printf 'LOCAL MANPAGE\n' >man1/topic.1
 export MANPATH=.
 koshkit man topic
+koshkit man -k LOCAL
 
 printf 'one\ntwo\n' | koshkit more
+printf 'one\ntwo\nthree\n' | koshkit more -p /two
+printf 'tagged-one\ntagged-two\n' > paged.txt
+printf 'topic\tpaged.txt\t2\n' > tags
+koshkit more -t topic
 
 koshkit tabs -8 >/dev/null
 echo "tabs=$?"
+koshkit tabs 4,8,12 >/dev/null
+echo "tabs-list=$?"
+koshkit tabs -a >/dev/null
+echo "tabs-template=$?"
 
 koshkit tput clear | koshkit od -A n -t x1
+TERM=dumb koshkit tput -T xterm clear >/dev/null
+echo "tput-type=$?"
+TERM=xterm koshkit tput longname
 
 koshkit stty -a </dev/null
 echo "stty-notty=$?"

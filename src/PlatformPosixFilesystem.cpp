@@ -561,6 +561,27 @@ fn touch_file_times(StringView path) wontthrow -> bool
   return did_succeed;
 }
 
+fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
+                  i64 modification_time, u32 modification_nanoseconds) wontthrow
+    -> bool
+{
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+    const struct timespec times[2] = {
+        {static_cast<time_t>(access_time),
+         static_cast<long>(access_nanoseconds)      },
+        {static_cast<time_t>(modification_time),
+         static_cast<long>(modification_nanoseconds)}
+    };
+    did_succeed = ::utimensat(AT_FDCWD, path_string.c_str(), times, 0) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
+}
+
 fn remove_directory(StringView path) wontthrow -> bool
 {
   bool did_succeed;
@@ -689,6 +710,8 @@ static fn fill_file_status(const struct stat &info,
   status.owner_id = static_cast<u32>(info.st_uid);
   status.group_id = static_cast<u32>(info.st_gid);
   status.size = static_cast<u64>(info.st_size);
+  status.access_time = static_cast<i64>(info.st_atime);
+  status.access_nanoseconds = static_cast<u32>(info.st_atim.tv_nsec);
   status.modification_time = static_cast<i64>(info.st_mtime);
   status.modification_nanoseconds = static_cast<u32>(info.st_mtim.tv_nsec);
   status.change_time = static_cast<i64>(info.st_ctime);

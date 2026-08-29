@@ -28,33 +28,20 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(arg_locations);
+  let const settings = parse_util_operands(FLAG_LIST, args, &arg_locations,
+                                           NULL, false, false, true);
   defer { reset_flags(FLAG_LIST); };
-  let settings = ArrayList<String>{cxt.scratch_allocator()};
-  bool should_report = args.count() == 1;
-  bool should_encode = false;
-  for (usize index = 1; index < args.count(); index++) {
-    let const argument = args[index].view();
-    if (argument == "--help") {
-      print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
-                      FLAG_LIST);
-      return 0;
-    }
-    if (argument == "-a") {
-      should_report = true;
-      continue;
-    }
-    if (argument == "-g") {
-      should_report = true;
-      should_encode = true;
-      continue;
-    }
-    settings.push(args[index].clone());
-  }
+
+  KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
+
+  let const should_report_all = FLAG_STTY_ALL.is_enabled();
+  let const should_encode = FLAG_STTY_ENCODE.is_enabled();
+  let const should_report =
+      settings.is_empty() || should_report_all || should_encode;
   let const terminal = ec.in_fd.value_or(KOSH_STDIN);
   if (should_report) {
-    let const output =
-        os::terminal_settings(terminal, should_encode, cxt.scratch_allocator());
+    let const output = os::terminal_settings(
+        terminal, should_encode, should_report_all, cxt.scratch_allocator());
     if (!output.has_value()) {
       report_soft_koshkit_error(ec, cxt,
                                 "stty: standard input is not a terminal");

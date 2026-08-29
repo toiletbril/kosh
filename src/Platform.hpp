@@ -461,6 +461,9 @@ fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
 fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool;
 fn make_fifo(StringView path, u32 mode) wontthrow -> bool;
 fn touch_file_times(StringView path) wontthrow -> bool;
+fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
+                  i64 modification_time, u32 modification_nanoseconds) wontthrow
+    -> bool;
 fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
@@ -500,6 +503,8 @@ struct file_status
   u32 owner_id{0};
   u32 group_id{0};
   u64 size{0};
+  i64 access_time{0};
+  u32 access_nanoseconds{0};
   i64 modification_time{0};
   u32 modification_nanoseconds{0};
   i64 change_time{0};
@@ -954,7 +959,8 @@ fn format_local_time(StringView format, i64 epoch) throws -> String;
 fn terminal_size(u32 &columns, u32 &rows,
                  descriptor output = KOSH_STDOUT) wontthrow -> bool;
 fn terminal_settings(descriptor terminal, bool should_encode,
-                     Allocator allocator) throws -> Maybe<String>;
+                     bool should_report_all, Allocator allocator) throws
+    -> Maybe<String>;
 fn apply_terminal_settings(descriptor terminal,
                            const ArrayList<String> &settings) wontthrow -> bool;
 

@@ -68,6 +68,18 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "link-existing=$?"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "$root/mode" "$root/ln-hard"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ln-hard=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "$root/mode" "$root/ln-symbolic"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ln-symbolic=$?"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "mkfifo" "-m" "600" "$root/fifo"]
   [CompoundListCondition, None]
     [Assign fifo_fields=$(koshkit ls -l "$root/fifo")]
@@ -427,6 +439,81 @@
   Unquoted "koshkit"
 ]
 [Word
+  Unquoted "ln"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ln-hard"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ln-hard"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ln-hard="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/mode"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ln-symbolic"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ln-symbolic"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ln-symbolic="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "mkfifo"
 ]
 [Word
@@ -680,6 +767,8 @@ chown-name=0
 chgrp=0
 link=0
 link-existing=1
+ln-hard=0
+ln-symbolic=0
 mkfifo=prw-------
 mkfifo-existing=1
 mkfifo-symbolic=pr--r--r--

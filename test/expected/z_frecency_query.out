@@ -1,3 +1,5 @@
+== no query changes to HOME:
+TMPDIR
 == a query matches the seeded directory:
 TMPDIR
 == a query with no match errors:

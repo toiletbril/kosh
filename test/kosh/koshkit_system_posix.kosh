@@ -8,6 +8,8 @@ koshkit id -u >/dev/null
 echo "id=$?"
 LC_ALL=C koshkit locale charmap >/dev/null
 echo "locale=$?"
+LC_ALL=C koshkit locale -ck decimal_point
+LC_ALL=C koshkit locale -c charmap
 koshkit logname >/dev/null
 echo "logname=$?"
 koshkit tty -s
@@ -16,3 +18,9 @@ koshkit uname -s >/dev/null
 echo "uname=$?"
 koshkit who >/dev/null
 echo "who=$?"
+koshkit who -Hq >/dev/null
+echo "who-quick=$?"
+koshkit who -m >/dev/null
+echo "who-current=$?"
+koshkit who -Tu >/dev/null
+echo "who-state=$?"

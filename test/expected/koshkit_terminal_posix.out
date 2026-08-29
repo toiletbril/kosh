@@ -12,17 +12,43 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "man" "topic"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "man" "-k" "LOCAL"]
+  [CompoundListCondition, None]
     [Pipeline]
       [SimpleCommand "printf" "one\ntwo\n"]
       [SimpleCommand "koshkit" "more"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "one\ntwo\nthree\n"]
+      [SimpleCommand "koshkit" "more" "-p" "/two"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "tagged-one\ntagged-two\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "topic\tpaged.txt\t2\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "more" "-t" "topic"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "tabs" "-8"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "tabs=$?"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "tabs" "4,8,12"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tabs-list=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "tabs" "-a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tabs-template=$?"]
+  [CompoundListCondition, None]
     [Pipeline]
       [SimpleCommand "koshkit" "tput" "clear"]
       [SimpleCommand "koshkit" "od" "-A" "n" "-t" "x1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "tput" "-T" "xterm" "clear"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tput-type=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "tput" "longname"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "stty" "-a"]
   [CompoundListCondition, None]
@@ -74,6 +100,18 @@
   Unquoted "topic"
 ]
 [Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "man"
+]
+[Word
+  Unquoted "-k"
+]
+[Word
+  Unquoted "LOCAL"
+]
+[Word
   Unquoted "printf"
 ]
 [Word
@@ -84,6 +122,54 @@
 ]
 [Word
   Unquoted "more"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\ntwo\nthree\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "more"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "/two"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "tagged-one\ntagged-two\n"
+]
+[Word
+  Unquoted "paged.txt"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "topic\tpaged.txt\t2\n"
+]
+[Word
+  Unquoted "tags"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "more"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "topic"
 ]
 [Word
   Unquoted "koshkit"
@@ -102,6 +188,44 @@
 ]
 [Word
   DoubleQuoted "tabs="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tabs"
+]
+[Word
+  Unquoted "4,8,12"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tabs-list="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tabs"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tabs-template="
   Variable "?"
 ]
 [Word
@@ -132,6 +256,46 @@
   Unquoted "x1"
 ]
 [Word
+  Unquoted "TERM=dumb"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tput"
+]
+[Word
+  Unquoted "-T"
+]
+[Word
+  Unquoted "xterm"
+]
+[Word
+  Unquoted "clear"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tput-type="
+  Variable "?"
+]
+[Word
+  Unquoted "TERM=xterm"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tput"
+]
+[Word
+  Unquoted "longname"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -151,12 +315,20 @@
   Variable "?"
 ]
 LOCAL MANPAGE
+topic (1) - LOCAL MANPAGE
 one
 two
+two
+three
+tagged-two
 tabs=0
+tabs-list=0
+tabs-template=0
         1b 5b 48 1b 5b 32 4a
-16:1: error: stty: standard input is not a terminal.
-    16 |  koshkit stty -a </dev/null
+tput-type=0
+xterm terminal
+28:1: error: stty: standard input is not a terminal.
+    28 |  koshkit stty -a </dev/null
        |  ^~~~~~~~~~~~~~~
 stty-notty=1
 [Code 0]

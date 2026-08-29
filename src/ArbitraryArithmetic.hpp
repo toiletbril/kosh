@@ -44,6 +44,10 @@ public:
                    BumpArena &arena) throws -> ArithmeticValue;
   static fn power(const ArithmeticValue &base, const ArithmeticValue &exponent,
                   BumpArena &arena) throws -> ArithmeticValue;
+  static fn square_root(const ArithmeticValue &value, u32 decimal_scale,
+                        BumpArena &arena) throws -> ArithmeticValue;
+  static fn rescale(const ArithmeticValue &value, u32 decimal_scale,
+                    BumpArena &arena) throws -> ArithmeticValue;
   static fn shift_left(const ArithmeticValue &value,
                        const ArithmeticValue &count, BumpArena &arena) throws
       -> ArithmeticValue;
@@ -74,6 +78,11 @@ private:
   static fn from_magnitude(const u64 *limbs, usize limb_count, bool is_negative,
                            u32 decimal_scale, BumpArena &arena) throws
       -> ArithmeticValue;
+  static fn allocate_promoted(usize limb_count, bool is_negative,
+                              u32 decimal_scale, BumpArena &arena,
+                              u64 *&limbs) throws -> ArithmeticValue;
+  static fn from_power_of_two(usize bit_position, bool is_negative,
+                              BumpArena &arena) throws -> ArithmeticValue;
 
   pure fn is_promoted() const wontthrow -> bool;
   pure fn get_storage() const wontthrow -> const Storage *;

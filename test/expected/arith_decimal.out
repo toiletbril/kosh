@@ -2,6 +2,10 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((1.25 + 2.5))"]
   [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((.5 + .25))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((-.125 * 8))"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "$((1.20 + 2.3))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((1.5 * 2.00))"]
@@ -11,6 +15,14 @@
     [SimpleCommand "echo" "$((1.0 / 3))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((5.5 % 2))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((-4.0 % 2.0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1.20 - 1.20))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0.0 * -2.00))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0.00 ** 3))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((1.5 ** 2))"]
   [CompoundListCondition, None]
@@ -77,6 +89,18 @@
   Unquoted "echo"
 ]
 [Word
+  ArithmeticExpansion ".5 + .25"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "-.125 * 8"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
   ArithmeticExpansion "1.20 + 2.3"
 ]
 [Word
@@ -102,6 +126,30 @@
 ]
 [Word
   ArithmeticExpansion "5.5 % 2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "-4.0 % 2.0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1.20 - 1.20"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0.0 * -2.00"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0.00 ** 3"
 ]
 [Word
   Unquoted "echo"
@@ -269,11 +317,17 @@
   Variable "decimal_lifetime"
 ]
 3.75
+0.75
+-1.000
 3.50
 3.000
 2.5
 0.3
 1.5
+0.0
+0.00
+0.000
+0.000000
 2.25
 123456789012345678901234567891.000
 1

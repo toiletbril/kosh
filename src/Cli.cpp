@@ -143,9 +143,10 @@ FlagManyStrings::FlagManyStrings(FlagList &flags, char short_name,
   flags.push(this);
 }
 
-fn FlagManyStrings::append(StringView v) throws -> void
+fn FlagManyStrings::append(StringView v, usize position) throws -> void
 {
   m_values.push_managed(v);
+  m_positions.push(position);
 }
 
 pure fn FlagManyStrings::is_empty() const wontthrow -> bool
@@ -162,6 +163,12 @@ pure fn FlagManyStrings::get(usize i) const wontthrow -> StringView
 {
   ASSERT(i < m_values.count());
   return m_values[i].view();
+}
+
+pure fn FlagManyStrings::get_position(usize i) const wontthrow -> usize
+{
+  ASSERT(i < m_positions.count());
+  return m_positions[i];
 }
 
 fn FlagManyStrings::next() throws -> StringView
@@ -181,6 +188,7 @@ fn FlagManyStrings::reset() throws -> void
   m_position = 0;
   m_value_location = {};
   m_values.clear();
+  m_positions.clear();
   m_value_position = 0;
 }
 
@@ -230,7 +238,9 @@ fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
                    const ArrayList<SourceLocation> *arg_locations,
                    ArrayList<SourceLocation> *operand_locations,
                    StringView program_name,
-                   bool should_accept_negative_number_operand) throws
+                   bool should_accept_negative_number_operand,
+                   bool should_allow_options_after_operands,
+                   bool should_accept_unknown_flag_operand) throws
     -> ArrayList<String>
 {
   reset_flags(flags);
@@ -256,7 +266,9 @@ fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
     return parse_flags(flags, static_cast<int>(args.count()), argument_data,
                        base_position, operand_value_flag, arg_locations,
                        operand_locations, program_name,
-                       should_accept_negative_number_operand);
+                       should_accept_negative_number_operand,
+                       should_allow_options_after_operands,
+                       should_accept_unknown_flag_operand);
   } catch (...) {
     reset_flags(flags);
     throw;
@@ -316,7 +328,9 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                const ArrayList<SourceLocation> *arg_locations,
                ArrayList<SourceLocation> *operand_locations,
                StringView program_name,
-               bool should_accept_negative_number_operand) throws
+               bool should_accept_negative_number_operand,
+               bool should_allow_options_after_operands,
+               bool should_accept_unknown_flag_operand) throws
     -> ArrayList<String>
 {
   ASSERT(argc >= 0);
@@ -381,11 +395,13 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
         LOG(All,
             "attaching the next argument '%s' as the value of the flag '%s'",
             argv[i], flag_name(previous_flag, was_previous_flag_long).c_str());
+        let const value_position = ++position;
         if (previous_flag->kind() == Flag::Kind::String)
           static_cast<FlagString *>(previous_flag)->set(argv[i]);
         else
-          static_cast<FlagManyStrings *>(previous_flag)->append(argv[i]);
-        previous_flag->set_position(++position);
+          static_cast<FlagManyStrings *>(previous_flag)
+              ->append(argv[i], value_position);
+        previous_flag->set_position(value_position);
         previous_flag->set_value_location(argument_location(
             argv, static_cast<usize>(i), base_position, arg_locations));
 
@@ -408,7 +424,8 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
       LOG(Debug, "taking '%s' as an operand", argv[i]);
       args.push_managed(StringView{argv[i]});
       do_record_operand(static_cast<usize>(i));
-      if (!is_program_name) should_ignore_rest = true;
+      if (!is_program_name && !should_allow_options_after_operands)
+        should_ignore_rest = true;
       continue;
     }
 
@@ -503,12 +520,14 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
               value_offset++;
 
               if (*value_offset != '\0') {
+                let const value_position = ++position;
                 if (flag->kind() == Flag::Kind::String)
                   static_cast<FlagString *>(flag)->set(value_offset);
                 else
-                  static_cast<FlagManyStrings *>(flag)->append(value_offset);
+                  static_cast<FlagManyStrings *>(flag)->append(value_offset,
+                                                               value_position);
 
-                flag->set_position(++position);
+                flag->set_position(value_position);
                 flag->set_value_location(attached_flag_value_location(
                     argv, static_cast<usize>(i), value_offset, base_position,
                     arg_locations));
@@ -524,12 +543,14 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                 throw error;
               }
             } else if (!is_long) {
+              let const value_position = ++position;
               if (flag->kind() == Flag::Kind::String)
                 static_cast<FlagString *>(flag)->set(value_offset);
               else
-                static_cast<FlagManyStrings *>(flag)->append(value_offset);
+                static_cast<FlagManyStrings *>(flag)->append(value_offset,
+                                                             value_position);
 
-              flag->set_position(++position);
+              flag->set_position(value_position);
               flag->set_value_location(attached_flag_value_location(
                   argv, static_cast<usize>(i), value_offset, base_position,
                   arg_locations));
@@ -549,6 +570,14 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
         } break;
         }
       } else {
+        if (should_accept_unknown_flag_operand) {
+          LOG(Debug, "taking the unknown flag '%s' as an operand", argv[i]);
+          args.push_managed(StringView{argv[i]});
+          do_record_operand(static_cast<usize>(i));
+          should_ignore_rest = true;
+          break;
+        }
+
         if (*flag_offset == '-') {
           let error = Error{prefixed_message(
               program_name, "Missing space between '-' and other options")};

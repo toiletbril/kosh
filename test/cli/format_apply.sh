@@ -114,6 +114,26 @@ printf 'compound-redirect-equivalent=%s captured=%s\n' \
   "$([ "$compound_original" = "$compound_formatted" ] && printf yes)" \
   "$(cmp -s "$root/compound-one.txt" "$root/compound-two.txt" && printf yes)"
 
+cat > "$root/redirection-prefixes.sh" <<'EOF'
+local value=one
+< "$input" cat
+(umask 077; >| "$output")
+EOF
+"$BIN" --lint --no-traces "$root/redirection-prefixes.sh" \
+  > /dev/null 2> "$root/redirection-prefixes-before.err"
+"$BIN" --format "$root/redirection-prefixes.sh" \
+  > "$root/redirection-prefixes-formatted.sh"
+"$BIN" --lint --no-traces "$root/redirection-prefixes-formatted.sh" \
+  > /dev/null 2> "$root/redirection-prefixes-after.err"
+cat "$root/redirection-prefixes-formatted.sh"
+"$BIN" --format "$root/redirection-prefixes-formatted.sh" \
+  > "$root/redirection-prefixes-second.sh"
+printf 'redirection-prefixes-lint=%s idempotent=%s\n' \
+  "$([ "$(tail -n 1 "$root/redirection-prefixes-before.err")" = \
+       "$(tail -n 1 "$root/redirection-prefixes-after.err")" ] && printf same)" \
+  "$(cmp -s "$root/redirection-prefixes-formatted.sh" \
+      "$root/redirection-prefixes-second.sh" && printf yes)"
+
 cat > "$root/process-substitutions.sh" <<'EOF'
 exec > >(tee -a capture.log) 2>&1
 mapfile -t child_pids < <(printf '%s\n' 10 20)
