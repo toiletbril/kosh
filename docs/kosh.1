@@ -1188,12 +1188,11 @@ form prints the utility names one per line.
 .PP
 The bundled set contains basename, bc, cal, calc, cat, chgrp, chmod, chown,
 cksum, cmp, comm, cp, csplit, cut, date, df, dirname, du, env, expand, expr,
-file, find, flock, fold, getconf, grep, head, id, killall, link, ln, locale,
+file, find, flock, fold, fuser, getconf, grep, head, id, killall, link, ln, locale,
 logger, logname, ls, make, man, mkdir, mkfifo, more, mv, nice, nl, nohup, nproc,
-od, paste, pathchk, pkill, pr, ps, realpath, renice, rm, rmdir, sed, seq, sleep,
+od, paste, pathchk, pkill, pr, ps, readlink, realpath, renice, rm, rmdir, sed, seq, sleep,
 sort, split, strings, stty, tabs, tail, tee, timeout, touch, tput, tr, tsort,
-tty, uname, unexpand, uniq, unlink, uudecode, uuencode, wc, which, who, whoami,
-xargs, and yes.
+tty, uname, unexpand, uniq, unlink, wc, which, who, whoami, xargs, and yes.
 .PP
 The command
 .BI "koshkit \-\-assimilate " DIR
@@ -1266,6 +1265,14 @@ and
 A command runs while a directory lock is held. The
 .B \-\-transaction\-held\-lock
 option keeps the lock after the process that launched the transaction exits.
+.TP
+.B fuser
+Process IDs that use each named file are printed. The
+.BR \-c ,
+.BR \-f ,
+and
+.B \-u
+options are supported.
 .TP
 .B grep
 Regular-expression matches are printed. The
@@ -1376,6 +1383,11 @@ Processes are listed with
 and the accepted
 .B \-w
 option.
+.TP
+.B readlink
+The target of one symbolic link is printed. The
+.B \-n
+option suppresses the trailing newline.
 .TP
 .B realpath
 The canonical absolute form of each path is printed.

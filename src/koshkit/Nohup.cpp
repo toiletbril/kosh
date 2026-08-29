@@ -26,7 +26,9 @@ fn Nohup::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -41,7 +43,14 @@ fn Nohup::execute(const ExecContext &ec, EvalContext &cxt,
   let const result = os::run_nohup(command, ec.in_fd.value_or(KOSH_STDIN),
                                    ec.out_fd.value_or(KOSH_STDOUT),
                                    ec.err_fd.value_or(KOSH_STDERR), home);
-  return result.value_or(126);
+  if (!result.has_value()) {
+    report_soft_koshkit_util_error(
+        ec, cxt, operand_locations[0], args[0].view(),
+        "cannot run '" + operands[0] + "': " + os::last_system_error_message());
+    return 126;
+  }
+
+  return *result;
 }
 
 } // namespace koshka::koshkit

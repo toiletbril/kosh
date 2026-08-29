@@ -26,6 +26,10 @@ echo "--- explicit target ---"
 echo "--- missing target ---"
 "$BIN" -c 'koshkit make nope' 2>&1
 echo "rc=$?"
+"$BIN" -c 'koshkit make -C KOSH_MISSING_DIRECTORY' 2>&1
+echo "missing-directory=$?"
+"$BIN" -c 'koshkit make -f KOSH_MISSING_MAKEFILE' 2>&1
+echo "missing-makefile=$?"
 
 echo "--- makefile selection and macro precedence ---"
 cat > Makefile <<'EOF'
@@ -93,6 +97,222 @@ EOF
 echo "--- advanced features ---"
 "$BIN" -c 'koshkit make' 2>&1
 
+echo "--- common make functions ---"
+mkdir -p existing/sub
+: > existing/sub/item.c
+cat > functions.mk <<'EOF'
+recursive = $(simple)
+simple := value
+items = src/main.c lib/test.c README src/main.c
+call_body = [$0][$1][$2]
+nested_call = $(call call_body,inner-$1,$2)-outer-$1
+call_all = [$1][$2][$3][$4][$5]
+call_level1 = $(call call_all,$1,$2,$3,$4,$5)
+call_level2 = $(call call_level1,$1,$2,$3)
+item = parent
+empty :=
+space := $(empty) $(empty)
+
+.DEFAULT_GOAL := functions
+
+functions:
+	@echo "subst=$(subst a,A,banana)"
+	@echo "patsubst=$(patsubst %.c,%.o,$(items))"
+	@echo "patsubst-exact=$(patsubst README,readme,$(items))"
+	@echo "subst-empty=$(subst ,X,abc)"
+	@echo "strip=[$(strip   one   two  )]"
+	@echo "findstring=$(findstring main,$(items))"
+	@echo "filter=$(filter %.c src/%,$(items))"
+	@echo "filter-out=$(filter-out %.c,$(items))"
+	@echo "filter-escaped=$(filter \%.c,%.c x.c)"
+	@echo 'filter-escaped-many=$(filter foo\%\%\\\%\%bar,foo%%\%%bar fooX\Ybar)'
+	@echo 'filter-escaped-pair=$(filter foo\\\%bar,foo\%bar foo\Xbar)'
+	@echo "filter-literals=$(filter README src/main.c,$(items))"
+	@echo "sort=$(sort beta alpha beta gamma)"
+	@echo "word=$(word 2,zero one two)"
+	@echo "word-missing=[$(word 9,zero one two)]"
+	@echo "wordlist=$(wordlist 2,3,zero one two three)"
+	@echo "words=$(words zero one two)"
+	@echo "firstword=$(firstword zero one two)"
+	@echo "lastword=$(lastword zero one two)"
+	@echo "dir=$(dir src/main.c README)"
+	@echo "notdir=$(notdir src/main.c README)"
+	@echo "notdir-empty=[$(notdir src/)]"
+	@echo "suffix=$(suffix src/main.c archive.tar.gz README .profile)"
+	@echo "basename=$(basename src/main.c archive.tar.gz README)"
+	@echo "addprefix=$(addprefix o/,one two)"
+	@echo "addsuffix=$(addsuffix .o,one two)"
+	@echo "join=$(join a b c,.x .y)"
+	@echo "if=$(if $(filter %.c,$(items)),yes,$(error rejected branch expanded))"
+	@echo "if-space=$(if $(space),yes,no)"
+	@echo "if-raw-space=$(if   ,yes,no)"
+	@echo "or=$(or ,,$(findstring main,$(items)),$(error rejected branch expanded))"
+	@printf 'or-space=[%s]\n' '$(or $(space),fallback)'
+	@echo "or-raw-space=$(or   ,fallback)"
+	@echo "and=$(and yes,$(findstring main,$(items)))"
+	@echo "and-space=$(and $(space),yes)"
+	@printf 'and-raw-space=[%s]\n' '$(and   ,yes)'
+	@echo "foreach=$(foreach item,one two,[$(item)])"
+	@echo "foreach-restored=$(item)"
+	@echo "call=$(call call_body,left,right)"
+	@echo "nested-call=$(call nested_call,left,right)"
+	@echo "call-eclipsed=$(call call_level2,one,two,three,four,five)"
+	@echo "call-builtin=$(call strip,$(warning call-expanded-once) value)"
+	@printf 'value=%s\n' '$(value recursive)'
+	@echo "origin=$(origin recursive) flavor=$(flavor recursive) simple-flavor=$(flavor simple)"
+	@echo "origins=$(origin COMMAND_ORIGIN) $(origin ENV_ORIGIN) $(origin missing)"
+	@echo "missing-flavor=$(flavor missing)"
+	@echo "abspath=$(notdir $(abspath missing/item.c))"
+	@echo "realpath=$(notdir $(realpath existing/sub/item.c))"
+	@echo "realpath-missing=[$(realpath missing/item.c)]"
+	@echo "ds=$(addprefix o/,$(addsuffix .o,common hashtable try list vec string))"
+	@echo "curdir=$(if $(CURDIR),set,unset)"
+	@echo "words-empty=$(words )"
+EOF
+ENV_ORIGIN=present \
+  "$BIN" -c 'koshkit make -f functions.mk COMMAND_ORIGIN=present'
+cat > definitions.mk <<'EOF'
+define bracket
+[$(1)]
+endef
+removed = stale
+undefine removed
+
+all:
+	@echo "define=$(call bracket,value) undefined=[$(removed)]"
+EOF
+"$BIN" -c 'koshkit make -f definitions.mk'
+cat > include-one.mk <<'EOF'
+included = one
+EOF
+cat > include-two.mk <<'EOF'
+included += two
+EOF
+cat > includes.mk <<'EOF'
+include
+include include-one.mk include-two.mk
+
+all:
+	@echo "includes=$(included)"
+EOF
+"$BIN" -c 'koshkit make -f includes.mk'
+cat > automatic-functions.mk <<'EOF'
+.DEFAULT_GOAL := auto.c
+automatic_command = echo "automatic-indirect=$@ first=$< target-file=$(@F)"
+
+auto.c: auto.in
+	@echo "automatic=$(@F:.c=.o)"
+	@$(automatic_command)
+EOF
+: > auto.in
+"$BIN" -c 'koshkit make -f automatic-functions.mk'
+cat > invalid-functions.mk <<'EOF'
+zero:
+	@echo "$(word 0,one two)"
+
+invalid:
+	@echo "$(word nope,one two)"
+
+arguments:
+	@echo "$(filter %.c)"
+EOF
+"$BIN" -c 'koshkit make -f invalid-functions.mk zero' 2> "$TEST_NULL_DEVICE"
+echo "word-zero=$?"
+"$BIN" -c 'koshkit make -f invalid-functions.mk invalid' 2> "$TEST_NULL_DEVICE"
+echo "word-invalid=$?"
+"$BIN" -c 'koshkit make -f invalid-functions.mk arguments' 2> "$TEST_NULL_DEVICE"
+echo "function-arguments=$?"
+cat > warning-function.mk <<'EOF'
+all:
+	@echo "warning=[$(warning warning-text)]"
+EOF
+"$BIN" -c 'koshkit make -f warning-function.mk' 2>&1
+cat > expansion-depth.mk <<'EOF'
+deep1 = $(deep2)
+deep2 = $(deep3)
+deep3 = $(deep4)
+deep4 = $(deep5)
+deep5 = $(deep6)
+deep6 = $(deep7)
+deep7 = $(deep8)
+deep8 = $(deep9)
+deep9 = $(deep10)
+deep10 = $(deep11)
+deep11 = $(deep12)
+deep12 = $(deep13)
+deep13 = $(deep14)
+deep14 = $(deep15)
+deep15 = $(deep16)
+deep16 = $(deep17)
+deep17 = $(deep18)
+deep18 = valid
+
+all:
+	@echo "deep-expansion=$(deep1)"
+EOF
+"$BIN" -c 'koshkit make -f expansion-depth.mk'
+cat > invalid-expansion.mk <<'EOF'
+unterminated:
+	@echo '$(missing'
+
+recursive = $(recursive)
+overflow:
+	@echo '$(recursive)'
+EOF
+"$BIN" -c 'koshkit make -f invalid-expansion.mk unterminated' 2> "$TEST_NULL_DEVICE"
+echo "unterminated-expansion=$?"
+"$BIN" -c 'koshkit make -f invalid-expansion.mk overflow' 2> "$TEST_NULL_DEVICE"
+echo "recursive-expansion=$?"
+
+mkdir -p 'C:'
+: > 'C:/src.c'
+cat > windows-drive.mk <<'EOF'
+C:/obj.o: C:/src.c
+	@echo windows-drive-rule
+EOF
+"$BIN" -c 'koshkit make -f windows-drive.mk C:/obj.o'
+
+mkdir -p ds-fixture/src
+for module in common hashtable try list vec string; do
+  : > "ds-fixture/src/$module.c"
+done
+cat > ds-fixture/Makefile <<'EOF'
+.PHONY: ds
+
+MAKEFLAGS += -s
+
+ds:
+	$(MAKE) -C src ds
+EOF
+cat > ds-fixture/src/Makefile <<'EOF'
+.PHONY: ds
+
+MODULES := common hashtable try list vec string
+OBJS := $(addprefix o/, $(addsuffix .o, $(MODULES)))
+LIB := ../ds.a
+
+o/%.o: %.c
+	@: > $@
+
+$(LIB): $(OBJS)
+	@: > $@
+
+o/:
+	mkdir o
+
+ds: o/ $(LIB)
+EOF
+: > ds-fixture/ds
+"$BIN" -c 'koshkit make -C ds-fixture ds'
+ds_object_count=0
+for module in common hashtable try list vec string; do
+  if [ -e "ds-fixture/src/o/$module.o" ]; then
+    ds_object_count=$((ds_object_count + 1))
+  fi
+done
+echo "ds-objects=$ds_object_count"
+[ -e ds-fixture/ds.a ] && echo ds-library=yes || echo ds-library=no
+
 echo "--- freshness and query modes ---"
 cat > Makefile <<'EOF'
 target: prerequisite
@@ -143,6 +363,9 @@ independent:
 compound:
 	@false; echo compound-must-not-run
 
+compound-final-failure:
+	@echo compound-before-failure; false
+
 compound-ignored:
 	-@false; echo compound-ignored
 EOF
@@ -158,6 +381,8 @@ echo "stop=$?"
 echo "keep-last=$?"
 "$BIN" -c 'koshkit make compound' 2> "$TEST_NULL_DEVICE"
 echo "compound=$?"
+"$BIN" -c 'koshkit make compound-final-failure' 2> "$TEST_NULL_DEVICE"
+echo "compound-final-failure=$?"
 "$BIN" -c 'koshkit make compound-ignored'
 echo "compound-ignored=$?"
 cat > Makefile <<'EOF'
@@ -312,12 +537,19 @@ MAKEFLAGS=n "$BIN" -c 'koshkit make inherited'
 cat > recursive.mk <<'EOF'
 all:
 	@$(MAKE) -f recursive-child.mk show
+
+dry:
+	@$(MAKE) -f recursive-child.mk dry
 EOF
 cat > recursive-child.mk <<'EOF'
 show:
 	@echo "recursive-value=[$(VALUE)]"
+
+dry:
+	@echo recursive-child-dry
 EOF
 "$BIN" -c 'koshkit make -f recursive.mk "VALUE=one two"'
+"$BIN" -c 'koshkit make -n -f recursive.mk dry'
 cat > inherited-assignment.mk <<'EOF'
 show:
 	@echo "inherited-macro=$(HIDDEN) inherited-environment=$${HIDDEN-unset}"
@@ -391,7 +623,7 @@ cat > shell.mk <<'EOF'
 SHELL = $(BIN)
 
 all:
-	@let shell_selected=1; echo shell-selected
+	@(( shell_selected = 1 )); echo shell-selected
 EOF
 shell_result=$("$BIN" -c 'koshkit make -f shell.mk')
 case "$shell_result" in
@@ -405,6 +637,16 @@ all:
 	@echo "shell-env=$$SHELL"
 EOF
 SHELL=inherited-value "$BIN" -c 'koshkit make -f shell-env.mk'
+cat > shell-function.mk <<'EOF'
+SHELL = false
+suppressed := $(shell echo should-not-run)
+SHELL = $(BIN)
+folded := $(shell printf 'one\ntwo\n')
+
+all:
+	@printf 'shell-function=[%s] folded=[%s]\n' '$(suppressed)' '$(folded)'
+EOF
+"$BIN" -c 'koshkit make -f shell-function.mk'
 cat > shell-export.mk <<'EOF'
 SHELL = $(BIN)
 export SHELL
@@ -446,6 +688,63 @@ EOF
 : > extra
 "$BIN" -c 'koshkit make tool'
 "$BIN" -c 'koshkit make item.out'
+cat > Makefile <<'EOF'
+%.mid: %.src
+	@: > $@
+
+%.out: %.missing %.src
+	@echo unusable-pattern
+
+%.out: %.mid
+	@: > $@
+
+%.bundle: %.left %.right
+	@: > $@
+
+%.right: %.seed
+	@: > $@
+
+literal\%target:
+	@echo literal-percent=yes
+
+escaped\%%.out: escaped\%%.in
+	@echo escaped-percent-pattern=yes
+
+%.specific: %.generic
+	@echo broad-pattern
+
+exact%.specific: exact%.source
+	@echo specific-pattern=yes
+
+%.cancel: %.old
+	@echo canceled-pattern
+
+%.cancel: %.old
+
+%.cancel: %.new
+	@echo replacement-pattern=yes
+
+%.pair: %.shared %.second
+	@echo shared-prerequisite=yes
+
+%.shared: %.seed
+	@: > $@
+
+%.second: %.shared
+	@: > $@
+EOF
+: > chained.src
+: > pair.left
+: > pair.seed
+: > 'escaped%name.in'
+: > exactname.generic
+: > exactname.source
+: > item.old
+: > item.new
+: > repeat.seed
+"$BIN" -c 'koshkit make chained.out pair.bundle literal%target escaped%name.out exactname.specific item.cancel repeat.pair'
+[ -e chained.mid ] && [ -e chained.out ] && echo chained-pattern=yes || echo chained-pattern=no
+[ -e pair.right ] && [ -e pair.bundle ] && echo multiple-pattern-prerequisites=yes || echo multiple-pattern-prerequisites=no
 
 echo "--- POSIX macro and built-in database ---"
 cat > Makefile <<'EOF'
@@ -469,6 +768,22 @@ all:
 	@case "$(MAKEFLAGS)" in (*'NAME=value'*) echo command-flags=yes;; (*) echo command-flags=no;; esac
 EOF
 "$BIN" -c 'koshkit make -s -f makeflags.mk NAME=value'
+cat > jobs.mk <<'EOF'
+all:
+	@:
+EOF
+"$BIN" -c 'koshkit make -j 4 -f jobs.mk all'
+echo "jobs-operand=$?"
+cat > recursive-print.mk <<'EOF'
+all:
+	@$(MAKE) -f recursive-print-child.mk show
+EOF
+cat > recursive-print-child.mk <<'EOF'
+show:
+	@case "$(MAKEFLAGS)" in (*p*) echo recursive-print=yes;; (*) echo recursive-print=no;; esac
+EOF
+"$BIN" -c 'koshkit make -p -f recursive-print.mk' > recursive-print.out
+grep '^recursive-print=' recursive-print.out
 "$BIN" -c 'koshkit make -p -f Makefile all' > builtins.out
 grep '^\.SUFFIXES:' builtins.out
 grep '^CC = c99$' builtins.out
@@ -482,6 +797,7 @@ grep '^\.l\.c:$' builtins.out
 grep -c '^\.f:$' builtins.out
 grep -c '^\.f\.o:$' builtins.out
 grep -c '^\.f\.a:$' builtins.out
+grep -c '^0 =' builtins.out
 "$BIN" -c 'koshkit make -r -p -f Makefile all' > no-builtins.out
 grep '^\.SUFFIXES:$' no-builtins.out
 cat > Makefile <<'EOF'
@@ -565,7 +881,10 @@ EOF
 "$BIN" -c 'koshkit make replaced.out'
 cat > Makefile <<'EOF'
 .config:
-	@echo dot-default
+	@echo dot-target
+
+ordinary:
+	@echo ordinary-default
 EOF
 "$BIN" -c 'koshkit make'
 

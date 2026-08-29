@@ -78,6 +78,24 @@ fn WordSegment::get_eval_cache() const throws -> segment_eval_cache &
   return *m_eval_cache;
 }
 
+fn WordSegment::set_exact_constant_arithmetic_text(StringView text) const throws
+    -> void
+{
+  let &cache = get_eval_cache();
+  let const arena =
+      is_substitution_cache_in_function_arena ? FUNCTION_ARENA : AST_ARENA;
+  if (arena == nullptr) return;
+  let const allocator = bump_allocator(*arena);
+  if (cache.arith == nullptr ||
+      !arena->is_lifetime_valid(cache.arithmetic_lifetime))
+  {
+    cache.arith = arena->create<arith_token_cache>(allocator);
+    cache.arithmetic_lifetime = arena->register_lifetime();
+  }
+  cache.arith->exact_constant_text = String{allocator, text};
+  cache.arith->has_exact_constant_text = true;
+}
+
 fn WordSegment::release_eval_cache() wontthrow -> void
 {
   if (m_eval_cache == nullptr) return;

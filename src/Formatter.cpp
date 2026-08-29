@@ -1004,9 +1004,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 
         if (has_following_statement) {
           writer.ensure_blank_line();
-          has_pending_declaration_separator = false;
-          has_pending_structural_separator = false;
         }
+        has_pending_declaration_separator = false;
+        has_pending_structural_separator = false;
       }
       writer.append_comment(text, piece.is_at_line_start);
       if (piece.source_position == 0 && text.starts_with("#!"))

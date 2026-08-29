@@ -255,7 +255,6 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const status = run_cd_to_directory(cxt, ec, target.text());
   if (status != 0) return status;
-  record_directory_access(target.text().view(), cxt.scratch_allocator());
 
   ec.print_to_stdout(target.text() + "\n");
   return 0;

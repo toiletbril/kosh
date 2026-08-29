@@ -1,13 +1,3 @@
-root=$(mktemp -d)
-cd "$root"
-
-printf 'Cat\n' | koshkit uuencode animal.txt
-
-printf '%s\n' 'begin 644 decoded.txt' '$0V%T"@``' '`' 'end' | koshkit uudecode
-koshkit cat decoded.txt
-printf '%s\n' 'begin 644 ignored.txt' '$0V%T"@``' '`' 'end' | koshkit uudecode -o override.txt
-koshkit cat override.txt
-
 printf 'one two three\n' | koshkit xargs -n 1 printf '<%s>\n'
 printf "'hello world' plain\\ value\n" | koshkit xargs printf '[%s]\n'
 printf 'one\ntwo\n' | koshkit xargs -I '{}' printf 'x%sx\n' '{}'

@@ -64,6 +64,18 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "sed" "y/ot/OT/" "lines"]
   [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "alpha\nBETA\n"]
+      [SimpleCommand "koshkit" "grep" "-i" "^[[:alpha:]]*ta$"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "ab\n"]
+      [SimpleCommand "koshkit" "sed" "-E" "s/a|b/x/g"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "ab\n"]
+      [SimpleCommand "koshkit" "sed" "s/a*/x/g"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "split" "-l" "2" "lines" "part"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "cat" "partaa" "partab"]
@@ -525,6 +537,57 @@
   Unquoted "lines"
 ]
 [Word
+  Unquoted "printf"
+]
+[Word
+  Literal "alpha\nBETA\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "-i"
+]
+[Word
+  Literal "^[[:alpha:]]*ta$"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "ab\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Unquoted "-E"
+]
+[Word
+  Literal "s/a|b/x/g"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "ab\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sed"
+]
+[Word
+  Literal "s/a*/x/g"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -888,6 +951,9 @@ One
 TwO
 Three
 fOur
+BETA
+xx
+xxbx
 one
 two
 three

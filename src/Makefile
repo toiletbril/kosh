@@ -35,6 +35,10 @@ endif
 endif
 endif
 
+ifeq ($(TARGET), Windows_NT)
+REGEX_SOURCES := regcomp regerror regexec tre-mem
+endif
+
 ifneq ($(TARGET), $(HOST_OS))
 ifneq ($(TARGET), Windows_NT)
 ifneq ($(TARGET), Darwin)
@@ -69,7 +73,8 @@ else
 OBJ_DIR := o/$(TARGET)/$(MODE)
 endif
 
-OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+REGEX_OBJECTS := $(REGEX_SOURCES:%=$(OBJ_DIR)/vendor/regex/%.o)
+OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(REGEX_OBJECTS)
 DEPS := $(OBJECTS:.o=.d)
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
@@ -343,9 +348,10 @@ endif
 
 # Missing Windows libraries.
 ifeq ($(TARGET), Windows_NT)
-CXXFLAGS += \
+LINK_LIBS += \
 	-luserenv \
-	-ladvapi32
+	-ladvapi32 \
+	-lrstrtmgr
 endif
 
 ifeq ($(TARGET), Windows_NT)
@@ -359,6 +365,9 @@ CXXFLAGS += \
 	-static-libstdc++
 endif
 endif
+
+REGEX_CFLAGS = $(filter-out -std=c++23 -fno-rtti,$(CXXFLAGS)) -std=c11 \
+	-I../vendor/regex
 
 # A bare `make` builds the shell, the same as `make kosh`, rather than the first
 # object the rules below would otherwise name as the default goal.
@@ -395,6 +404,10 @@ $(OBJ_DIR)/%.o: %.cpp Makefile
 	printf "\tCompiling %-42s $@... %-12s\r" $< ' '
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
 
+$(OBJ_DIR)/vendor/regex/%.o: ../vendor/regex/%.c Makefile
+	printf "\tCompiling %-42s $@... %-12s\r" $< ' '
+	$(CXX) $(REGEX_CFLAGS) -x c -MMD -MP -c $< -o $(CWD)$@
+
 # Linking.
 $(LINKED_OUT): $(OBJECTS)
 	printf "\tLinking $(LINKED_OUT)... %-64s\r" ' '
@@ -403,6 +416,9 @@ $(LINKED_OUT): $(OBJECTS)
 dirs: $(DIRS)
 	mkdir -p $(OBJ_DIR)/
 	for source_dir in $(DIRS); do mkdir -p $(OBJ_DIR)/$$source_dir; done
+ifneq ($(REGEX_SOURCES),)
+	mkdir -p $(OBJ_DIR)/vendor/regex
+endif
 ifeq ($(MODE), cov)
 	mkdir -p "$(COVERAGE_PROFILE_DIRECTORY)"
 endif

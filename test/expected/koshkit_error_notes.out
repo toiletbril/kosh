@@ -22,3 +22,71 @@ note: Supply SET1 and SET2, or use `-d` with one set.
      1 |  koshkit find . -type x
        |  ^~~~~~~~~~~~~~~~~~~~~~
 note: Pass `f`, `d`, or `l` after `-type`.
+=== readlink extra operand location ===
+1:24: error: readlink: extra operand 'second'.
+     1 |  koshkit readlink first second
+       |                         ^~~~~~
+=== fuser conflicting flags location ===
+1:17: error: fuser: -c and -f cannot be used together.
+     1 |  koshkit fuser -cf file
+       |                  ^
+=== whoami operand location ===
+1:16: error: whoami: unexpected operand 'extra'.
+     1 |  koshkit whoami extra
+       |                 ^~~~~
+=== nice increment location ===
+1:17: error: nice: invalid increment 'nope'.
+     1 |  koshkit nice -n nope true
+       |                  ^~~~
+=== nice command location ===
+1:14: error: nice: cannot run 'KOSH_MISSING_COMMAND': No such file or directory.
+     1 |  koshkit nice KOSH_MISSING_COMMAND
+       |               ^~~~~~~~~~~~~~~~~~~~
+=== grep pattern location ===
+1:14: error: grep: the pattern '[' is not a valid regex.
+     1 |  koshkit grep '['
+       |               ^~~
+=== grep file location ===
+1:20: error: grep: KOSH_MISSING_FILE: No such file or directory.
+     1 |  koshkit grep value KOSH_MISSING_FILE
+       |                     ^~~~~~~~~~~~~~~~~
+=== mv source location ===
+1:12: error: mv: unable to move 'KOSH_MISSING_SOURCE' to 'KOSH_MISSING_DESTINATION' because No such file or directory.
+     1 |  koshkit mv KOSH_MISSING_SOURCE KOSH_MISSING_DESTINATION
+       |             ^~~~~~~~~~~~~~~~~~~
+=== renice identifier location ===
+1:21: error: renice: invalid identifier 'nope'.
+     1 |  koshkit renice -n 1 nope
+       |                      ^~~~
+=== date operand location ===
+1:14: error: date: setting the system clock is unsupported.
+     1 |  koshkit date 2026
+       |               ^~~~
+=== getconf variable location ===
+1:17: error: getconf: unknown variable 'KOSH_MISSING_CONFIGURATION'.
+     1 |  koshkit getconf KOSH_MISSING_CONFIGURATION
+       |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
+=== locale name location ===
+1:16: error: locale: unknown name 'KOSH_MISSING_LOCALE'.
+     1 |  koshkit locale KOSH_MISSING_LOCALE
+       |                 ^~~~~~~~~~~~~~~~~~~
+=== id user location ===
+1:12: error: id: unknown user 'KOSH_MISSING_USER'.
+     1 |  koshkit id KOSH_MISSING_USER
+       |             ^~~~~~~~~~~~~~~~~
+=== stty setting location ===
+1:1: error: stty: Operation not supported by device.
+     1 |  koshkit stty KOSH_MISSING_SETTING
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+=== stty conflicting flag location ===
+1:17: error: stty: -a and -g cannot be used together.
+     1 |  koshkit stty -a -g
+       |                  ^~
+=== logger priority location ===
+1:19: error: logger: invalid priority 'KOSH_MISSING_PRIORITY'.
+     1 |  koshkit logger -p KOSH_MISSING_PRIORITY message
+       |                    ^~~~~~~~~~~~~~~~~~~~~
+=== nohup command location ===
+1:15: error: nohup: cannot run 'KOSH_MISSING_COMMAND': No such file or directory.
+     1 |  koshkit nohup KOSH_MISSING_COMMAND
+       |                ^~~~~~~~~~~~~~~~~~~~

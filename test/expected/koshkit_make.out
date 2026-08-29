@@ -6,10 +6,18 @@ finished
 echo hello from make
 hello from make
 --- missing target ---
-1:1: error: There is no rule to make the target 'nope'.
+1:14: error: make: There is no rule to make the target 'nope'.
      1 |  koshkit make nope
-       |  ^~~~~~~~~~~~~~~~~
+       |               ^~~~
 rc=2
+1:17: error: make: unable to change to the directory 'KOSH_MISSING_DIRECTORY': No such file or directory.
+     1 |  koshkit make -C KOSH_MISSING_DIRECTORY
+       |                  ^~~~~~~~~~~~~~~~~~~~~~
+missing-directory=2
+1:17: error: make: unable to read the makefile 'KOSH_MISSING_MAKEFILE': No such file or directory.
+     1 |  koshkit make -f KOSH_MISSING_MAKEFILE
+       |                  ^~~~~~~~~~~~~~~~~~~~~
+missing-makefile=2
 --- makefile selection and macro precedence ---
 value=command
 value=makefile
@@ -26,6 +34,75 @@ src=[a.c b.c]
 obj=[a.o b.o]
 flags=[one  two]
 tag=[debug]
+--- common make functions ---
+subst=bAnAnA
+patsubst=src/main.o lib/test.o README src/main.o
+patsubst-exact=src/main.c lib/test.c readme src/main.c
+subst-empty=abcX
+strip=[one two]
+findstring=main
+filter=src/main.c lib/test.c src/main.c
+filter-out=README
+filter-escaped=%.c
+filter-escaped-many=foo%%\%%bar
+filter-escaped-pair=foo\%bar
+filter-literals=src/main.c README src/main.c
+sort=alpha beta gamma
+word=one
+word-missing=[]
+wordlist=one two
+words=3
+firstword=zero
+lastword=two
+dir=src/ ./
+notdir=main.c README
+notdir-empty=[]
+suffix=.c .gz .profile
+basename=src/main archive.tar README
+addprefix=o/one o/two
+addsuffix=one.o two.o
+join=a.x b.y c
+if=yes
+if-space=yes
+if-raw-space=no
+or=main
+or-space=[ ]
+or-raw-space=fallback
+and=main
+and-space=yes
+and-raw-space=[]
+foreach=[one] [two]
+foreach-restored=parent
+call=[call_body][left][right]
+nested-call=[call_body][inner-left][right]-outer-left
+call-eclipsed=[one][two][three][][]
+make: warning: call-expanded-once
+call-builtin=value
+value=$(simple)
+origin=file flavor=recursive simple-flavor=simple
+origins=command line environment undefined
+missing-flavor=undefined
+abspath=item.c
+realpath=item.c
+realpath-missing=[]
+ds=o/common.o o/hashtable.o o/try.o o/list.o o/vec.o o/string.o
+curdir=set
+words-empty=0
+define=[value] undefined=[]
+includes=one two
+automatic=auto.o
+automatic-indirect=auto.c first=auto.in target-file=auto.c
+word-zero=2
+word-invalid=2
+function-arguments=2
+make: warning: warning-text
+warning=[]
+deep-expansion=valid
+unterminated-expansion=2
+recursive-expansion=2
+windows-drive-rule
+ds-objects=6
+ds-library=yes
 --- freshness and query modes ---
 make: No action was needed.
 fresh=0
@@ -42,9 +119,9 @@ visible
 touch touched
 touched=yes
 --- failing recipe aborts ---
-1:1: error: The recipe for the target 'broken' failed with status 1.
+1:14: error: make: The recipe for the target 'broken' failed with status 1.
      1 |  koshkit make broken
-       |  ^~~~~~~~~~~~~~~~~~~
+       |               ^~~~~~
 rc=2
 this line must not run
 ignore=0
@@ -53,7 +130,10 @@ keep-going=2
 stop=2
 independent
 keep-last=2
-compound=2
+compound-must-not-run
+compound=0
+compound-before-failure
+compound-final-failure=2
 compound-ignored
 compound-ignored=0
 interrupt=130
@@ -81,7 +161,7 @@ precious-kept=yes
 --- POSIX database stdin and target attributes ---
 1
 1
-1
+0
 empty-database=0
 false
 ignored-continued
@@ -99,6 +179,8 @@ echo ordinary-ran > ordinary-marker
 forced-ran=yes
 ordinary-ran=no
 recursive-value=[one two]
+koshkit make -f recursive-child.mk dry
+echo recursive-child-dry
 inherited-macro=fromflags inherited-environment=unset
 --- forced query and touch recipes ---
 query-status=1
@@ -120,17 +202,27 @@ command=fromcommand inherited=fromfile local=
 exported=frommake assigned=assigned-value unexported=unset
 shell-selected=yes
 shell-env=inherited-value
+shell-function=[] folded=[one two]
 shell-exported=yes
 --- POSIX graph and inference edge cases ---
 nested-independent
 nested-keep=2
 single-source=tool.src single-target=tool
 double-source=item.src double-target=item.out prerequisites=extra item.src
+literal-percent=yes
+escaped-percent-pattern=yes
+specific-pattern=yes
+replacement-pattern=yes
+shared-prerequisite=yes
+chained-pattern=yes
+multiple-pattern-prerequisites=yes
 --- POSIX macro and built-in database ---
 caret=first second
 plus=first second first
 paren=expanded-name brace=expanded-name short=expanded-name shell=/bin/sh
 command-flags=yes
+jobs-operand=0
+recursive-print=yes
 .SUFFIXES: .o .c .y .l .a .sh .f .c~ .y~ .l~ .sh~ .f~
 CC = c99
 CFLAGS = -O 1
@@ -143,6 +235,7 @@ CFLAGS = -O 1
 1
 1
 1
+0
 .SUFFIXES:
 echo   -o program program.c
 -o program program.c
@@ -156,7 +249,7 @@ archive-member-stale
 --- POSIX suffix precedence ---
 via-sh
 second-inference
-dot-default
+ordinary-default
 --- default goal builds both through the pattern ---
 echo cc foo.c -o foo.o
 cc foo.c -o foo.o

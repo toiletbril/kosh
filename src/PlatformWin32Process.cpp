@@ -10,25 +10,90 @@
 namespace koshka {
 namespace os {
 
+static fn windows_priority_class(i32 priority) wontthrow -> DWORD
+{
+  if (priority <= -10) return HIGH_PRIORITY_CLASS;
+  if (priority < 0) return ABOVE_NORMAL_PRIORITY_CLASS;
+  if (priority <= 5) return NORMAL_PRIORITY_CLASS;
+  if (priority <= 10) return BELOW_NORMAL_PRIORITY_CLASS;
+  return IDLE_PRIORITY_CLASS;
+}
+
+static fn priority_from_windows_class(DWORD priority_class) wontthrow
+    -> Maybe<i32>
+{
+  switch (priority_class) {
+  case REALTIME_PRIORITY_CLASS: return -20;
+  case HIGH_PRIORITY_CLASS: return -10;
+  case ABOVE_NORMAL_PRIORITY_CLASS: return -1;
+  case NORMAL_PRIORITY_CLASS: return 0;
+  case BELOW_NORMAL_PRIORITY_CLASS: return 10;
+  case IDLE_PRIORITY_CLASS: return 19;
+  default: return None;
+  }
+}
+
+struct windows_measured_launch_options
+{
+  DWORD creation_flags{};
+  Maybe<descriptor> inherited_handle;
+  Maybe<descriptor> input;
+  Maybe<descriptor> output;
+  Maybe<descriptor> error;
+};
+
+static fn
+run_measured_with_options(const ArrayList<String> &argv, measured_output output,
+                          const windows_measured_launch_options &options) throws
+    -> Maybe<measured_result>;
+
 fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
 {
-  unused(target);
-  unused(id);
-  return 0;
+  if (target != priority_target::Process || id < 0 || id > UINT32_MAX) {
+    SetLastError(ERROR_NOT_SUPPORTED);
+    return None;
+  }
+  let const process_id =
+      id == 0 ? GetCurrentProcessId() : static_cast<DWORD>(id);
+  let const process =
+      OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+  if (process == nullptr) return None;
+  defer { CloseHandle(process); };
+  let const priority_class = GetPriorityClass(process);
+  if (priority_class == 0) return None;
+
+  return priority_from_windows_class(priority_class);
 }
 
 fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool
 {
-  unused(target);
-  unused(id);
-  unused(priority);
-  return true;
+  if (target != priority_target::Process || id < 0 || id > UINT32_MAX) {
+    SetLastError(ERROR_NOT_SUPPORTED);
+    return false;
+  }
+  let const process_id =
+      id == 0 ? GetCurrentProcessId() : static_cast<DWORD>(id);
+  let const process = OpenProcess(PROCESS_SET_INFORMATION, FALSE, process_id);
+  if (process == nullptr) return false;
+  defer { CloseHandle(process); };
+  return SetPriorityClass(process, windows_priority_class(priority)) != FALSE;
 }
 
 fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
 {
-  unused(increment);
-  let const result = run_measured(argv, measured_output::Inherit);
+  let const current_priority_class = GetPriorityClass(GetCurrentProcess());
+  if (current_priority_class == 0) return None;
+  let const current_priority =
+      priority_from_windows_class(current_priority_class);
+  if (!current_priority.has_value()) return None;
+  let adjusted_priority = static_cast<i64>(*current_priority) + increment;
+  if (adjusted_priority < -20) adjusted_priority = -20;
+  if (adjusted_priority > 19) adjusted_priority = 19;
+  windows_measured_launch_options options{};
+  options.creation_flags =
+      windows_priority_class(static_cast<i32>(adjusted_priority));
+  let const result =
+      run_measured_with_options(argv, measured_output::Inherit, options);
   if (!result.has_value()) return None;
   return static_cast<i32>(result->exit_status);
 }
@@ -36,11 +101,55 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
 fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
              descriptor error, StringView home) throws -> Maybe<i32>
 {
-  unused(input);
-  unused(output);
-  unused(error);
-  unused(home);
-  let const result = run_measured(argv, measured_output::Inherit);
+  if (argv.is_empty()) return None;
+
+  SECURITY_ATTRIBUTES inheritable{};
+  inheritable.nLength = sizeof(inheritable);
+  inheritable.bInheritHandle = TRUE;
+  HANDLE null_input = INVALID_HANDLE_VALUE;
+  HANDLE nohup_output = INVALID_HANDLE_VALUE;
+  let child_input = input;
+  let child_output = output;
+  let child_error = error;
+  defer
+  {
+    if (null_input != INVALID_HANDLE_VALUE) CloseHandle(null_input);
+    if (nohup_output != INVALID_HANDLE_VALUE) CloseHandle(nohup_output);
+  };
+
+  if (is_fd_a_tty(child_input)) {
+    null_input = CreateFileA("NUL", GENERIC_READ,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
+                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (null_input == INVALID_HANDLE_VALUE) return None;
+    child_input = null_input;
+  }
+  if (is_fd_a_tty(child_output)) {
+    nohup_output = CreateFileA("nohup.out", FILE_APPEND_DATA,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
+                               OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (nohup_output == INVALID_HANDLE_VALUE && !home.is_empty()) {
+      let home_output = String{heap_allocator(), home};
+      if (home_output.back() != '/' && home_output.back() != '\\') {
+        home_output += '/';
+      }
+      home_output += "nohup.out";
+      nohup_output =
+          CreateFileA(home_output.c_str(), FILE_APPEND_DATA,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
+                      OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    }
+    if (nohup_output == INVALID_HANDLE_VALUE) return None;
+    child_output = nohup_output;
+  }
+  if (is_fd_a_tty(child_error)) child_error = child_output;
+  windows_measured_launch_options options{};
+  options.creation_flags = CREATE_NEW_PROCESS_GROUP;
+  options.input = child_input;
+  options.output = child_output;
+  options.error = child_error;
+  let const result =
+      run_measured_with_options(argv, measured_output::Inherit, options);
   if (!result.has_value()) return None;
   return static_cast<i32>(result->exit_status);
 }
@@ -1374,8 +1483,9 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
   return false;
 }
 
-fn run_measured(const ArrayList<String> &argv, measured_output output,
-                const Maybe<descriptor> &inherited_handle) throws
+static fn
+run_measured_with_options(const ArrayList<String> &argv, measured_output output,
+                          const windows_measured_launch_options &options) throws
     -> Maybe<measured_result>
 {
   let const suppress_output = output == measured_output::Suppress;
@@ -1389,9 +1499,9 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
 
   STARTUPINFOA startup{};
   startup.cb = sizeof(startup);
-  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-  startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-  startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  startup.hStdInput = options.input.value_or(GetStdHandle(STD_INPUT_HANDLE));
+  startup.hStdOutput = options.output.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
+  startup.hStdError = options.error.value_or(GetStdHandle(STD_ERROR_HANDLE));
 
   HANDLE null_handle = INVALID_HANDLE_VALUE;
   if (suppress_output) {
@@ -1423,7 +1533,9 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
       startup.hStdError != nullptr && startup.hStdError != INVALID_HANDLE_VALUE;
   let const should_use_standard_handles =
       standard_handles_are_valid &&
-      (suppress_output || inherited_handle.has_value());
+      (suppress_output || options.inherited_handle.has_value() ||
+       options.input.has_value() || options.output.has_value() ||
+       options.error.has_value());
   if (should_use_standard_handles) startup.dwFlags = STARTF_USESTDHANDLES;
 
   inherited_handle_state input_inheritance{};
@@ -1435,8 +1547,8 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
     make_handle_inheritable(startup.hStdOutput, output_inheritance);
     make_handle_inheritable(startup.hStdError, error_inheritance);
   }
-  if (inherited_handle.has_value())
-    make_handle_inheritable(*inherited_handle, extra_inheritance);
+  if (options.inherited_handle.has_value())
+    make_handle_inheritable(*options.inherited_handle, extra_inheritance);
   defer { restore_handle_inheritance(input_inheritance); };
   defer { restore_handle_inheritance(output_inheritance); };
   defer { restore_handle_inheritance(error_inheritance); };
@@ -1444,13 +1556,15 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
 
   const u64 start_nanos = monotonic_nanos();
   let const should_inherit_handles =
-      should_use_standard_handles || inherited_handle.has_value();
+      should_use_standard_handles || options.inherited_handle.has_value();
 
   /* CreateProcessA may rewrite lpCommandLine in place. */
   if (CreateProcessA(nullptr, const_cast<LPSTR>(command_line.data()), nullptr,
-                     nullptr, should_inherit_handles, 0, nullptr, nullptr,
-                     &startup, &process_info) == 0)
+                     nullptr, should_inherit_handles, options.creation_flags,
+                     nullptr, nullptr, &startup, &process_info) == 0)
+  {
     return None;
+  }
   defer { CloseHandle(process_info.hProcess); };
   defer { CloseHandle(process_info.hThread); };
 
@@ -1472,6 +1586,15 @@ fn run_measured(const ArrayList<String> &argv, measured_output output,
         static_cast<u64>(memory_counters.PeakWorkingSetSize);
 
   return result;
+}
+
+fn run_measured(const ArrayList<String> &argv, measured_output output,
+                const Maybe<descriptor> &inherited_handle) throws
+    -> Maybe<measured_result>
+{
+  windows_measured_launch_options options{};
+  options.inherited_handle = inherited_handle;
+  return run_measured_with_options(argv, output, options);
 }
 fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 {
@@ -1496,6 +1619,182 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
     processes.push(steal(process));
   } while (Process32Next(snapshot, &entry) != 0);
   return processes;
+}
+
+static fn utf8_to_absolute_wide_path(StringView path,
+                                     Allocator allocator) throws
+    -> Maybe<ArrayList<wchar_t>>
+{
+  if (path.length > static_cast<usize>(INT_MAX)) {
+    SetLastError(ERROR_FILENAME_EXCED_RANGE);
+    return None;
+  }
+  let const wide_length =
+      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data,
+                          static_cast<int>(path.length), nullptr, 0);
+  if (wide_length <= 0) return None;
+
+  ArrayList<wchar_t> wide_path{allocator};
+  wide_path.reserve(static_cast<usize>(wide_length) + 1);
+  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data,
+                          static_cast<int>(path.length), wide_path.begin(),
+                          wide_length) != wide_length)
+    return None;
+  wide_path.begin()[wide_length] = L'\0';
+
+  let const absolute_length =
+      GetFullPathNameW(wide_path.begin(), 0, nullptr, nullptr);
+  if (absolute_length == 0) return None;
+  ArrayList<wchar_t> absolute_path{allocator};
+  absolute_path.reserve(static_cast<usize>(absolute_length));
+  if (GetFullPathNameW(wide_path.begin(), absolute_length,
+                       absolute_path.begin(), nullptr) == 0)
+    return None;
+  return absolute_path;
+}
+
+static fn wide_to_utf8(const wchar_t *text, usize length,
+                       Allocator allocator) throws -> Maybe<String>
+{
+  if (length > static_cast<usize>(INT_MAX)) return None;
+  let const utf8_length = WideCharToMultiByte(
+      CP_UTF8, 0, text, static_cast<int>(length), nullptr, 0, nullptr, nullptr);
+  if (utf8_length <= 0) return None;
+  ArrayList<char> utf8{allocator};
+  utf8.reserve(static_cast<usize>(utf8_length));
+  if (WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length),
+                          utf8.begin(), utf8_length, nullptr,
+                          nullptr) != utf8_length)
+    return None;
+  return String{
+      allocator, StringView{utf8.begin(), static_cast<usize>(utf8_length)}
+  };
+}
+
+fn scan_process_file_users(const ArrayList<process_file_query> &queries,
+                           ArrayList<process_file_user> &users,
+                           Allocator scratch) throws -> Maybe<u32>
+{
+  for (let const &query : queries) {
+    let wide_path = utf8_to_absolute_wide_path(query.path, scratch);
+    if (!wide_path.has_value()) return query.query_position;
+
+    DWORD session_handle = 0;
+    wchar_t session_key[CCH_RM_SESSION_KEY + 1]{};
+    let result = RmStartSession(&session_handle, 0, session_key);
+    if (result != ERROR_SUCCESS) {
+      SetLastError(result);
+      return query.query_position;
+    }
+    defer { RmEndSession(session_handle); };
+
+    LPCWSTR filenames[] = {wide_path->begin()};
+    result = RmRegisterResources(session_handle, 1, filenames, 0, nullptr, 0,
+                                 nullptr);
+    if (result != ERROR_SUCCESS) {
+      SetLastError(result);
+      return query.query_position;
+    }
+
+    UINT required_count = 0;
+    UINT process_count = 0;
+    DWORD reboot_reasons = 0;
+    result = RmGetList(session_handle, &required_count, &process_count, nullptr,
+                       &reboot_reasons);
+    if (result == ERROR_SUCCESS && required_count == 0) continue;
+    if (result != ERROR_MORE_DATA) {
+      SetLastError(result);
+      return query.query_position;
+    }
+
+    ArrayList<RM_PROCESS_INFO> process_infos{scratch};
+    for (usize attempt_count = 0; attempt_count < 4; attempt_count++) {
+      process_infos.reserve(required_count);
+      process_count = required_count;
+      result = RmGetList(session_handle, &required_count, &process_count,
+                         process_infos.begin(), &reboot_reasons);
+      if (result == ERROR_SUCCESS) break;
+      if (result != ERROR_MORE_DATA || attempt_count == 3) {
+        SetLastError(result);
+        return query.query_position;
+      }
+    }
+
+    let const query_user_start = users.count();
+    for (UINT process_position = 0; process_position < process_count;
+         process_position++)
+    {
+      let const pid =
+          process_infos.begin()[process_position].Process.dwProcessId;
+      bool is_duplicate = false;
+      for (usize user_position = query_user_start;
+           user_position < users.count(); user_position++)
+      {
+        let const &user = users[user_position];
+        if (user.query_position == query.query_position && user.pid == pid) {
+          is_duplicate = true;
+          break;
+        }
+      }
+      if (is_duplicate) continue;
+      users.push(process_file_user{pid, 0, query.query_position,
+                                   static_cast<u8>(process_file_use::File)});
+    }
+  }
+  return None;
+}
+
+fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws
+    -> Maybe<String>
+{
+  unused(owner_id);
+  let const process =
+      OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (process == nullptr) return None;
+  defer { CloseHandle(process); };
+
+  HANDLE token = nullptr;
+  if (OpenProcessToken(process, TOKEN_QUERY, &token) == FALSE) return None;
+  defer { CloseHandle(token); };
+
+  DWORD token_length = 0;
+  GetTokenInformation(token, TokenUser, nullptr, 0, &token_length);
+  if (token_length == 0) return None;
+  ArrayList<u8> token_buffer{allocator};
+  token_buffer.reserve(token_length);
+  if (GetTokenInformation(token, TokenUser, token_buffer.begin(), token_length,
+                          &token_length) == FALSE)
+    return None;
+  let const *token_user =
+      reinterpret_cast<const TOKEN_USER *>(token_buffer.begin());
+
+  DWORD name_length = 0;
+  DWORD domain_length = 0;
+  SID_NAME_USE sid_type{};
+  LookupAccountSidW(nullptr, token_user->User.Sid, nullptr, &name_length,
+                    nullptr, &domain_length, &sid_type);
+  if (name_length == 0) return None;
+  ArrayList<wchar_t> name{allocator};
+  ArrayList<wchar_t> domain{allocator};
+  name.reserve(name_length);
+  domain.reserve(domain_length == 0 ? 1 : domain_length);
+  if (LookupAccountSidW(nullptr, token_user->User.Sid, name.begin(),
+                        &name_length, domain.begin(), &domain_length,
+                        &sid_type) == FALSE)
+    return None;
+  if (name_length > 0 && name.begin()[name_length - 1] == L'\0') name_length--;
+  if (domain_length > 0 && domain.begin()[domain_length - 1] == L'\0')
+    domain_length--;
+
+  let user_name = wide_to_utf8(name.begin(), name_length, allocator);
+  if (!user_name.has_value()) return None;
+  if (domain_length == 0) return user_name;
+  let domain_name = wide_to_utf8(domain.begin(), domain_length, allocator);
+  if (!domain_name.has_value()) return None;
+  let qualified_name = String{allocator, domain_name->view()};
+  qualified_name += '\\';
+  qualified_name += user_name->view();
+  return qualified_name;
 }
 
 } /* namespace os */

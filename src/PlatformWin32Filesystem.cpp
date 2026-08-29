@@ -687,11 +687,23 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
 
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 {
-  /* Windows has no POSIX permission bits, so the mode is accepted and ignored.
-   */
-  unused(path);
-  unused(mode);
-  return true;
+  let const owner_is_writable = (mode & 0200u) != 0;
+  let const group_is_writable = (mode & 0020u) != 0;
+  let const other_is_writable = (mode & 0002u) != 0;
+  if (owner_is_writable != group_is_writable ||
+      owner_is_writable != other_is_writable)
+  {
+    SetLastError(ERROR_NOT_SUPPORTED);
+    return false;
+  }
+  let const path_text = String{heap_allocator(), path};
+  let attributes = GetFileAttributesA(path_text.c_str());
+  if (attributes == INVALID_FILE_ATTRIBUTES) return false;
+  if (owner_is_writable)
+    attributes &= ~FILE_ATTRIBUTE_READONLY;
+  else
+    attributes |= FILE_ATTRIBUTE_READONLY;
+  return SetFileAttributesA(path_text.c_str(), attributes) != FALSE;
 }
 
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
@@ -821,7 +833,7 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
                              flags) != 0;
 }
 
-fn read_symlink(StringView path) wontthrow -> Maybe<String>
+fn read_symlink(StringView path, Allocator allocator) wontthrow -> Maybe<String>
 {
   struct symbolic_link_reparse_data
   {
@@ -866,41 +878,80 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
 
   const WCHAR *wide_target = nullptr;
   usize wide_target_length = 0;
+  bool is_substitute_name = false;
+  let const do_select_target =
+      [&](usize path_buffer_position, u16 data_length,
+          u16 substitute_name_offset, u16 substitute_name_length,
+          u16 print_name_offset, u16 print_name_length) -> bool {
+    constexpr usize reparse_header_length = sizeof(u32) + sizeof(u16) * 2;
+    if (path_buffer_position < reparse_header_length ||
+        bytes_returned < path_buffer_position)
+    {
+      return false;
+    }
+    let const fixed_data_length = path_buffer_position - reparse_header_length;
+    if (data_length < fixed_data_length ||
+        reparse_header_length + data_length > bytes_returned)
+    {
+      return false;
+    }
+    let const offset =
+        print_name_length > 0 ? print_name_offset : substitute_name_offset;
+    let const length =
+        print_name_length > 0 ? print_name_length : substitute_name_length;
+    let const path_buffer_length = data_length - fixed_data_length;
+    if ((offset % sizeof(WCHAR)) != 0 || (length % sizeof(WCHAR)) != 0 ||
+        offset > path_buffer_length || length > path_buffer_length - offset)
+    {
+      return false;
+    }
+    wide_target =
+        reinterpret_cast<const WCHAR *>(buffer + path_buffer_position + offset);
+    wide_target_length = length / sizeof(WCHAR);
+    is_substitute_name = print_name_length == 0;
+    return true;
+  };
+  if (bytes_returned < sizeof(u32)) return koshka::None;
   let const tag = *reinterpret_cast<const u32 *>(buffer);
   if (tag == IO_REPARSE_TAG_SYMLINK) {
+    constexpr usize path_buffer_position =
+        offsetof(symbolic_link_reparse_data, path_buffer);
+    if (bytes_returned < path_buffer_position) return koshka::None;
     let const *data =
         reinterpret_cast<const symbolic_link_reparse_data *>(buffer);
-    let const offset = data->print_name_length > 0
-                           ? data->print_name_offset
-                           : data->substitute_name_offset;
-    let const length = data->print_name_length > 0
-                           ? data->print_name_length
-                           : data->substitute_name_length;
-    wide_target = reinterpret_cast<const WCHAR *>(
-        reinterpret_cast<const u8 *>(data->path_buffer) + offset);
-    wide_target_length = length / sizeof(WCHAR);
+    if (!do_select_target(path_buffer_position, data->data_length,
+                          data->substitute_name_offset,
+                          data->substitute_name_length, data->print_name_offset,
+                          data->print_name_length))
+      return koshka::None;
   } else if (tag == IO_REPARSE_TAG_MOUNT_POINT) {
+    constexpr usize path_buffer_position =
+        offsetof(mount_point_reparse_data, path_buffer);
+    if (bytes_returned < path_buffer_position) return koshka::None;
     let const *data =
         reinterpret_cast<const mount_point_reparse_data *>(buffer);
-    let const offset = data->print_name_length > 0
-                           ? data->print_name_offset
-                           : data->substitute_name_offset;
-    let const length = data->print_name_length > 0
-                           ? data->print_name_length
-                           : data->substitute_name_length;
-    wide_target = reinterpret_cast<const WCHAR *>(
-        reinterpret_cast<const u8 *>(data->path_buffer) + offset);
-    wide_target_length = length / sizeof(WCHAR);
+    if (!do_select_target(path_buffer_position, data->data_length,
+                          data->substitute_name_offset,
+                          data->substitute_name_length, data->print_name_offset,
+                          data->print_name_length))
+      return koshka::None;
   } else {
     return koshka::None;
   }
 
-  if (wide_target_length == 0) return String{StringView{}};
+  constexpr WCHAR NAMESPACE_PREFIX[] = L"\\??\\";
+  if (is_substitute_name && wide_target_length >= 4 &&
+      std::memcmp(wide_target, NAMESPACE_PREFIX, 4 * sizeof(WCHAR)) == 0)
+  {
+    wide_target += 4;
+    wide_target_length -= 4;
+  }
+  if (wide_target_length == 0) return String{allocator};
   let const utf8_length = WideCharToMultiByte(
       CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length), nullptr, 0,
       nullptr, nullptr);
   if (utf8_length <= 0) return koshka::None;
-  let utf8_target = ArrayList<char>{heap_allocator()};
+  let utf8_target = ArrayList<char>{allocator};
   utf8_target.reserve(static_cast<usize>(utf8_length));
   if (WideCharToMultiByte(
           CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length),
@@ -909,6 +960,7 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
     return koshka::None;
   }
   return String{
+      allocator,
       StringView{utf8_target.begin(), static_cast<usize>(utf8_length)}
   };
 }
@@ -973,7 +1025,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   let const attributes = GetFileAttributesA(path_string.c_str());
   if (attributes == INVALID_FILE_ATTRIBUTES) return false;
   if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
-    let const target = read_symlink(path);
+    let const target = read_symlink(path, heap_allocator());
     if (!target.has_value()) return false;
 
     status.device_id = 0;

@@ -29,6 +29,9 @@ koshkit sed -e '1i\zero' records
 koshkit sed -e '2a\after' records
 koshkit sed -e '2,3c\replaced' records
 koshkit sed 'y/ot/OT/' lines
+printf 'alpha\nBETA\n' | koshkit grep -i '^[[:alpha:]]*ta$'
+printf 'ab\n' | koshkit sed -E 's/a|b/x/g'
+printf 'ab\n' | koshkit sed 's/a*/x/g'
 
 koshkit split -l 2 lines part
 koshkit cat partaa partab

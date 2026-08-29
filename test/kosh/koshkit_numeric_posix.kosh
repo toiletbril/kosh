@@ -20,6 +20,7 @@ printf '%s\n' 'scale=12' 's(1)' 'c(1)' 'a(1)' 'l(2)' 'e(1)' | koshkit bc -l
 koshkit expr 2 + 3 '*' 4
 koshkit expr 7 '>' 3
 koshkit expr abc : 'a\(.*\)'
+koshkit expr ababa : '\(ab*\)\1a'
 koshkit expr 0 '|' hello
 koshkit expr 0 >/dev/null
 echo "expr-false=$?"

@@ -1227,9 +1227,25 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
 {
   if (argv.is_empty()) return None;
   let const raw_argv = make_os_args(argv);
+  int exec_error_pipe[2];
+  if (pipe(exec_error_pipe) != 0) return None;
+  if (fcntl(exec_error_pipe[1], F_SETFD, FD_CLOEXEC) != 0) {
+    let const saved_errno = errno;
+    close(exec_error_pipe[0]);
+    close(exec_error_pipe[1]);
+    errno = saved_errno;
+    return None;
+  }
   let const child = fork();
-  if (child == -1) return None;
+  if (child == -1) {
+    let const saved_errno = errno;
+    close(exec_error_pipe[0]);
+    close(exec_error_pipe[1]);
+    errno = saved_errno;
+    return None;
+  }
   if (child == 0) {
+    close(exec_error_pipe[0]);
     errno = 0;
     let current = getpriority(PRIO_PROCESS, 0);
     if (current == -1 && errno != 0) current = 0;
@@ -1238,15 +1254,33 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
     if (target > 19) target = 19;
     unused(setpriority(PRIO_PROCESS, 0, static_cast<int>(target)));
     execvp(raw_argv[0], const_cast<char *const *>(raw_argv.begin()));
-    _exit(errno == ENOENT ? 127 : 126);
+    let const child_errno = errno;
+    unused(write(exec_error_pipe[1], &child_errno, sizeof(child_errno)));
+    _exit(child_errno == ENOENT ? 127 : 126);
   }
 
+  close(exec_error_pipe[1]);
+  int child_errno = 0;
+  ssize_t error_length;
+  do {
+    error_length = read(exec_error_pipe[0], &child_errno, sizeof(child_errno));
+  } while (error_length == -1 && errno == EINTR);
+  let const read_errno = errno;
+  close(exec_error_pipe[0]);
   int status = 0;
   pid_t waited;
   do {
     waited = waitpid(child, &status, 0);
   } while (waited == -1 && errno == EINTR);
   if (waited != child) return None;
+  if (error_length == -1) {
+    errno = read_errno;
+    return None;
+  }
+  if (error_length == static_cast<ssize_t>(sizeof(child_errno))) {
+    errno = child_errno;
+    return None;
+  }
   if (WIFEXITED(status)) return WEXITSTATUS(status);
   if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
   return None;
@@ -1261,9 +1295,26 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
   if (!home_output.is_empty() && home_output.back() != '/') home_output += '/';
   home_output += "nohup.out";
 
+  int exec_error_pipe[2];
+  if (pipe(exec_error_pipe) != 0) return None;
+  if (fcntl(exec_error_pipe[1], F_SETFD, FD_CLOEXEC) != 0) {
+    let const saved_errno = errno;
+    close(exec_error_pipe[0]);
+    close(exec_error_pipe[1]);
+    errno = saved_errno;
+    return None;
+  }
+
   let const child = fork();
-  if (child == -1) return None;
+  if (child == -1) {
+    let const saved_errno = errno;
+    close(exec_error_pipe[0]);
+    close(exec_error_pipe[1]);
+    errno = saved_errno;
+    return None;
+  }
   if (child == 0) {
+    close(exec_error_pipe[0]);
     signal(SIGHUP, SIG_IGN);
     let child_input = input;
     let child_output = output;
@@ -1279,7 +1330,11 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
       if (nohup_output == -1 && !home.is_empty())
         nohup_output =
             open(home_output.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
-      if (nohup_output == -1) _exit(127);
+      if (nohup_output == -1) {
+        let const child_errno = errno;
+        unused(write(exec_error_pipe[1], &child_errno, sizeof(child_errno)));
+        _exit(127);
+      }
       child_output = nohup_output;
     }
     if (isatty(child_error)) child_error = child_output;
@@ -1289,15 +1344,33 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
     if (null_input > STDERR_FILENO) close(null_input);
     if (nohup_output > STDERR_FILENO) close(nohup_output);
     execvp(raw_argv[0], const_cast<char *const *>(raw_argv.begin()));
-    _exit(errno == ENOENT ? 127 : 126);
+    let const child_errno = errno;
+    unused(write(exec_error_pipe[1], &child_errno, sizeof(child_errno)));
+    _exit(child_errno == ENOENT ? 127 : 126);
   }
 
+  close(exec_error_pipe[1]);
+  int child_errno = 0;
+  ssize_t error_length;
+  do {
+    error_length = read(exec_error_pipe[0], &child_errno, sizeof(child_errno));
+  } while (error_length == -1 && errno == EINTR);
+  let const read_errno = errno;
+  close(exec_error_pipe[0]);
   int status = 0;
   pid_t waited;
   do {
     waited = waitpid(child, &status, 0);
   } while (waited == -1 && errno == EINTR);
   if (waited != child) return None;
+  if (error_length == -1) {
+    errno = read_errno;
+    return None;
+  }
+  if (error_length == static_cast<ssize_t>(sizeof(child_errno))) {
+    errno = child_errno;
+    return None;
+  }
   if (WIFEXITED(status)) return WEXITSTATUS(status);
   if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
   return None;

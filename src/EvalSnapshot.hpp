@@ -17,10 +17,30 @@
 
 namespace koshka {
 
+struct completion_spec
+{
+  String function_name{heap_allocator()};
+  String word_list{heap_allocator()};
+  bool should_use_default{false};
+  RuntimeState defining_runtime;
+
+  fn clone(Allocator allocator) const throws -> completion_spec
+  {
+    let copy = completion_spec{};
+    copy.function_name = String{allocator, function_name.view()};
+    copy.word_list = String{allocator, word_list.view()};
+    copy.should_use_default = should_use_default;
+    copy.defining_runtime = defining_runtime;
+    return copy;
+  }
+};
+
 struct eval_state_snapshot
 {
   StringMap<String> shell_variables;
   StringMap<ArrayList<String>> indexed_arrays;
+  StringMap<completion_spec> completion_specs;
+  Maybe<completion_spec> default_completion_spec;
   HashSet associative_names;
   StringMap<String> associative_values;
   StringMap<String> sparse_array_values;
@@ -54,24 +74,15 @@ struct eval_state_snapshot
   u64 annoying_diagnostics_mutation_revision;
   u64 random_state;
   shell_option_mutations option_mutations;
-};
-
-struct completion_spec
-{
-  String function_name{heap_allocator()};
-  String word_list{heap_allocator()};
-  bool should_use_default{false};
-  RuntimeState defining_runtime;
-
-  fn clone(Allocator allocator) const throws -> completion_spec
-  {
-    let copy = completion_spec{};
-    copy.function_name = String{allocator, function_name.view()};
-    copy.word_list = String{allocator, word_list.view()};
-    copy.should_use_default = should_use_default;
-    copy.defining_runtime = defining_runtime;
-    return copy;
-  }
+  ArrayList<ArrayList<local_binding>> local_scopes;
+  usize local_scope_depth;
+  Maybe<i64> last_background_pid;
+  usize getopts_char_index;
+  i64 getopts_last_optind;
+  bool terminal_exec_allowed;
+  ArrayList<job> jobs;
+  ArrayList<os::process> detached_job_processes;
+  i32 next_job_id;
 };
 
 /* Owns one compiled regex and frees it on destruction, so the regex cache

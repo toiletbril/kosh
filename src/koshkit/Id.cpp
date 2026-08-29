@@ -48,7 +48,9 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -69,8 +71,9 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
   if (!operands.is_empty()) {
     let const resolved = resolve_user_id(operands[0].view());
     if (!resolved.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "id: unknown user '" + operands[0] + "'");
+      report_soft_koshkit_util_error(ec, cxt, operand_locations[0],
+                                     args[0].view(),
+                                     "unknown user '" + operands[0] + "'");
       return 1;
     }
     user_id = *resolved;

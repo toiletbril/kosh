@@ -1,25 +1,5 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [Assign root=$(mktemp -d)]
-  [CompoundListCondition, None]
-    [SimpleCommand "cd" "$root"]
-  [CompoundListCondition, None]
-    [Pipeline]
-      [SimpleCommand "printf" "Cat\n"]
-      [SimpleCommand "koshkit" "uuencode" "animal.txt"]
-  [CompoundListCondition, None]
-    [Pipeline]
-      [SimpleCommand "printf" "%s\n" "begin 644 decoded.txt" "$0V%T"@``" "`" "end"]
-      [SimpleCommand "koshkit" "uudecode"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "cat" "decoded.txt"]
-  [CompoundListCondition, None]
-    [Pipeline]
-      [SimpleCommand "printf" "%s\n" "begin 644 ignored.txt" "$0V%T"@``" "`" "end"]
-      [SimpleCommand "koshkit" "uudecode" "-o" "override.txt"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "cat" "override.txt"]
-  [CompoundListCondition, None]
     [Pipeline]
       [SimpleCommand "printf" "one two three\n"]
       [SimpleCommand "koshkit" "xargs" "-n" "1" "printf" "<%s>\n"]
@@ -31,103 +11,6 @@
     [Pipeline]
       [SimpleCommand "printf" "one\ntwo\n"]
       [SimpleCommand "koshkit" "xargs" "-I" "{}" "printf" "x%sx\n" "{}"]
-[Word
-  Unquoted "root="
-  CommandSubstitution "mktemp -d"
-]
-[Word
-  Unquoted "cd"
-]
-[Word
-  Variable "root"
-]
-[Word
-  Unquoted "printf"
-]
-[Word
-  Literal "Cat\n"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "uuencode"
-]
-[Word
-  Unquoted "animal.txt"
-]
-[Word
-  Unquoted "printf"
-]
-[Word
-  Literal "%s\n"
-]
-[Word
-  Literal "begin 644 decoded.txt"
-]
-[Word
-  Literal "$0V%T"@``"
-]
-[Word
-  Literal "`"
-]
-[Word
-  Literal "end"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "uudecode"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "cat"
-]
-[Word
-  Unquoted "decoded.txt"
-]
-[Word
-  Unquoted "printf"
-]
-[Word
-  Literal "%s\n"
-]
-[Word
-  Literal "begin 644 ignored.txt"
-]
-[Word
-  Literal "$0V%T"@``"
-]
-[Word
-  Literal "`"
-]
-[Word
-  Literal "end"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "uudecode"
-]
-[Word
-  Unquoted "-o"
-]
-[Word
-  Unquoted "override.txt"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "cat"
-]
-[Word
-  Unquoted "override.txt"
-]
 [Word
   Unquoted "printf"
 ]
@@ -199,12 +82,6 @@
 [Word
   Literal "{}"
 ]
-begin 644 animal.txt
-$0V%T"@``
-`
-end
-Cat
-Cat
 <one>
 <two>
 <three>

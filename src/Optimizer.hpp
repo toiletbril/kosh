@@ -82,14 +82,14 @@ fn propagated_literal_word_value(const Token *token,
                                  const AnalysisContext &actx) throws
     -> Maybe<String>;
 
-/* Fold a constant arithmetic expansion to its decimal result, first replacing
-   each identifier that names a recorded constant integer with its value. With
-   x recorded as 2 the expression x+x folds to 4. Returns None when an
-   identifier is not a recorded integer constant or the result is not provably
-   constant. */
+/* Fold a constant arithmetic expansion to its exact decimal text, first
+   replacing each identifier that names a recorded constant integer with its
+   value. With x recorded as 2 the expression x+x folds to 4. Returns None when
+   an identifier is not a recorded integer constant or the result is not
+   provably constant. */
 fn try_fold_arithmetic_with_constants(StringView expression,
                                       const AnalysisContext &actx) wontthrow
-    -> Maybe<i64>;
+    -> Maybe<String>;
 
 /* Run the transformation rules over one node to a fixpoint. The recursive
    analyze walk calls this on each node after it has analyzed the node's

@@ -279,6 +279,19 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return shell_fd;
 }
 
+fn descriptors_refer_to_same_file(os::descriptor first,
+                                  os::descriptor second) wontthrow -> bool
+{
+  struct stat first_status{};
+  struct stat second_status{};
+  if (::fstat(first, &first_status) != 0 ||
+      ::fstat(second, &second_status) != 0)
+    return false;
+
+  return first_status.st_dev == second_status.st_dev &&
+         first_status.st_ino == second_status.st_ino;
+}
+
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
 {
   return static_cast<os::descriptor>(fd_number);
@@ -470,98 +483,6 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
   static const int did_bind_collate = (setlocale(LC_COLLATE, ""), 0);
   unused(did_bind_collate);
   return strcoll(left.c_str(), right.c_str());
-}
-
-fn compile_regex(StringView pattern, case_sensitivity sensitivity,
-                 compiled_regex &out) throws -> regex_compile_result
-{
-  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
-  let const pattern_text = String{heap_allocator(), pattern};
-  int compile_flags = REG_EXTENDED;
-  if (is_case_insensitive) compile_flags |= REG_ICASE;
-
-  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
-    return regex_compile_result::Invalid;
-
-  return regex_compile_result::Ok;
-}
-
-fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
-                       compiled_regex &out) throws -> regex_compile_result
-{
-  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
-  let const pattern_text = String{heap_allocator(), pattern};
-  int compile_flags = 0;
-  if (is_case_insensitive) compile_flags |= REG_ICASE;
-
-  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
-    return regex_compile_result::Invalid;
-
-  return regex_compile_result::Ok;
-}
-
-fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message,
-                 Allocator scratch) throws -> regex_match_result
-{
-  let const subject_text = String{scratch, subject};
-  let const group_count = compiled.re.re_nsub + 1;
-  let matches = ArrayList<regmatch_t>{scratch};
-  matches.reserve(group_count);
-  for (usize i = 0; i < group_count; i++)
-    matches.push(regmatch_t{});
-
-  const int match_result = regexec(&compiled.re, subject_text.c_str(),
-                                   group_count, matches.begin(), 0);
-
-  if (match_result == REG_NOMATCH) return regex_match_result::NoMatch;
-
-  if (match_result != 0) {
-    char error_text[256];
-    regerror(match_result, &compiled.re, error_text, sizeof(error_text));
-    error_message = String{heap_allocator(), StringView{error_text}};
-    return regex_match_result::Error;
-  }
-
-  spans.reserve(group_count);
-  for (usize i = 0; i < group_count; i++) {
-    spans.push(regex_span{static_cast<i64>(matches[i].rm_so),
-                          static_cast<i64>(matches[i].rm_eo)});
-  }
-
-  return regex_match_result::Matched;
-}
-
-fn free_regex(compiled_regex &compiled) wontthrow -> void
-{
-  regfree(&compiled.re);
-}
-
-fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
-                        compiled_regex &out) throws -> regex_compile_result
-{
-  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
-  const String pattern_text{heap_allocator(), pattern};
-  int compile_flags = REG_NOSUB;
-  if (is_case_insensitive) compile_flags |= REG_ICASE;
-
-  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
-    return regex_compile_result::Invalid;
-
-  return regex_compile_result::Ok;
-}
-
-fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
-{
-#if defined REG_STARTEND
-  regmatch_t bounds[1];
-  bounds[0].rm_so = 0;
-  bounds[0].rm_eo = static_cast<regoff_t>(subject.length);
-  return regexec(&compiled.re, subject.data, 1, bounds, REG_STARTEND) == 0;
-#else
-  const String null_terminated{heap_allocator(), subject};
-  return regexec(&compiled.re, null_terminated.c_str(), 0, nullptr, 0) == 0;
-#endif
 }
 
 fn read_process_cpu_times() wontthrow -> cpu_times
@@ -975,16 +896,20 @@ static pure fn parse_terminal_character(StringView text, cc_t &value) wontthrow
 }
 
 fn apply_terminal_settings(descriptor terminal,
-                           const ArrayList<String> &settings) wontthrow -> bool
+                           const ArrayList<String> &settings) wontthrow
+    -> terminal_settings_apply_result
 {
   termios state{};
-  if (tcgetattr(terminal, &state) != 0) return false;
+  if (tcgetattr(terminal, &state) != 0)
+    return {terminal_settings_apply_kind::SystemError, 0};
   if (settings.count() == 1 &&
       settings[0].view().find_character(':').has_value())
   {
     if (!restore_encoded_terminal_settings(state, settings[0].view()))
-      return false;
-    return tcsetattr(terminal, TCSADRAIN, &state) == 0;
+      return {terminal_settings_apply_kind::InvalidSetting, 0};
+    if (tcsetattr(terminal, TCSADRAIN, &state) != 0)
+      return {terminal_settings_apply_kind::SystemError, 0};
+    return {terminal_settings_apply_kind::Success, 0};
   }
 
   winsize window{};
@@ -1006,10 +931,11 @@ fn apply_terminal_settings(descriptor terminal,
     if (let const selected_character = TERMINAL_CONTROL_CHARACTERS.find(name);
         selected_character.has_value())
     {
-      if (is_disabled || ++index == settings.count()) return false;
+      if (is_disabled || ++index == settings.count())
+        return {terminal_settings_apply_kind::InvalidSetting, index - 1};
       cc_t value = 0;
       if (!parse_terminal_character(settings[index].view(), value))
-        return false;
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       state.c_cc[selected_character->index] = value;
       continue;
     }
@@ -1018,15 +944,16 @@ fn apply_terminal_settings(descriptor terminal,
     if (!selected_setting.has_value()) {
       let const speed = terminal_speed_value(name);
       if (speed == static_cast<speed_t>(~speed_t{0}) || is_disabled)
-        return false;
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       if (cfsetispeed(&state, speed) != 0 || cfsetospeed(&state, speed) != 0)
-        return false;
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       continue;
     }
 
     switch (*selected_setting) {
     case terminal_setting_kind::CharacterSize: {
-      if (is_disabled) return false;
+      if (is_disabled)
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       static constexpr tcflag_t CHARACTER_SIZES[] = {CS5, CS6, CS7, CS8};
       state.c_cflag = (state.c_cflag & ~CSIZE) | CHARACTER_SIZES[name[2] - '5'];
       continue;
@@ -1041,7 +968,8 @@ fn apply_terminal_settings(descriptor terminal,
       }
       continue;
     case terminal_setting_kind::Sane:
-      if (is_disabled) return false;
+      if (is_disabled)
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       state.c_lflag |= ICANON | ISIG | ECHO | IEXTEN;
       state.c_lflag &= ~(ECHONL | NOFLSH | TOSTOP);
       state.c_iflag |= BRKINT | ICRNL | IXON;
@@ -1049,7 +977,8 @@ fn apply_terminal_settings(descriptor terminal,
       state.c_oflag |= OPOST;
       continue;
     case terminal_setting_kind::EraseKill:
-      if (is_disabled) return false;
+      if (is_disabled)
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       state.c_cc[VERASE] = '\177';
       state.c_cc[VKILL] = '\025';
       continue;
@@ -1080,9 +1009,11 @@ fn apply_terminal_settings(descriptor terminal,
       continue;
     case terminal_setting_kind::Rows:
     case terminal_setting_kind::Columns: {
-      if (++index == settings.count() || !has_window) return false;
+      if (++index == settings.count() || !has_window)
+        return {terminal_settings_apply_kind::InvalidSetting, index - 1};
       let const parsed = utils::parse_decimal_u64(settings[index].view());
-      if (parsed.is_error() || parsed.value() > UINT16_MAX) return false;
+      if (parsed.is_error() || parsed.value() > UINT16_MAX)
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       if (*selected_setting == terminal_setting_kind::Rows)
         window.ws_row = static_cast<u16>(parsed.value());
       else
@@ -1091,9 +1022,11 @@ fn apply_terminal_settings(descriptor terminal,
     }
     case terminal_setting_kind::Minimum:
     case terminal_setting_kind::Time: {
-      if (++index == settings.count()) return false;
+      if (++index == settings.count())
+        return {terminal_settings_apply_kind::InvalidSetting, index - 1};
       let const parsed = utils::parse_decimal_u64(settings[index].view());
-      if (parsed.is_error() || parsed.value() > UCHAR_MAX) return false;
+      if (parsed.is_error() || parsed.value() > UCHAR_MAX)
+        return {terminal_settings_apply_kind::InvalidSetting, index};
       state.c_cc[*selected_setting == terminal_setting_kind::Minimum ? VMIN
                                                                      : VTIME] =
           static_cast<cc_t>(parsed.value());
@@ -1101,8 +1034,11 @@ fn apply_terminal_settings(descriptor terminal,
     }
     }
   }
-  if (tcsetattr(terminal, TCSADRAIN, &state) != 0) return false;
-  return !has_window || ioctl(terminal, TIOCSWINSZ, &window) == 0;
+  if (tcsetattr(terminal, TCSADRAIN, &state) != 0)
+    return {terminal_settings_apply_kind::SystemError, 0};
+  if (has_window && ioctl(terminal, TIOCSWINSZ, &window) != 0)
+    return {terminal_settings_apply_kind::SystemError, 0};
+  return {terminal_settings_apply_kind::Success, 0};
 }
 
 fn make_fd_inheritable(descriptor fd) wontthrow -> void

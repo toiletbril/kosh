@@ -341,9 +341,12 @@ hot fn Parser::parse_select() throws -> Command *
 
   let const parsed_body = parse_loop_body(location, "Unterminated select loop");
 
-  return m_lexer.arena().create<SelectLoop>(
+  let loop_node = m_lexer.arena().create<SelectLoop>(
       location, name_token->source_location(), variable_name, steal(words),
       has_in_clause, parsed_body.body);
+  loop_node->set_source_end_position(parsed_body.done_location.position +
+                                     parsed_body.done_location.length);
+  return loop_node;
 }
 
 /* In a case word or pattern a NAME=VALUE token is a plain word, rebuilt into a
@@ -413,6 +416,7 @@ hot fn Parser::parse_case() throws -> Command *
   }
 
   let items = ArrayList<case_item>{heap_allocator()};
+  usize end_position = location.position + location.length;
 
   loop
   {
@@ -427,6 +431,8 @@ hot fn Parser::parse_case() throws -> Command *
     }
     if (t->kind() == Token::Kind::Esac) {
       m_lexer.advance_past_last_peek();
+      end_position =
+          t->source_location().position + t->source_location().length;
       break;
     }
 
@@ -490,6 +496,8 @@ hot fn Parser::parse_case() throws -> Command *
       break;
     case Token::Kind::Esac:
       m_lexer.advance_past_last_peek();
+      end_position =
+          after->source_location().position + after->source_location().length;
       is_last_arm = true;
       break;
     default: break;
@@ -499,7 +507,9 @@ hot fn Parser::parse_case() throws -> Command *
     if (is_last_arm) break;
   }
 
-  return m_lexer.arena().create<CaseClause>(location, word, steal(items));
+  let clause = m_lexer.arena().create<CaseClause>(location, word, steal(items));
+  clause->set_source_end_position(end_position);
+  return clause;
 }
 
 hot fn Parser::parse_brace_group() throws -> Command *
@@ -700,9 +710,12 @@ hot fn Parser::parse_c_style_for(const SourceLocation &location,
 
   let const parsed_body = parse_loop_body(location, "Unterminated for loop");
 
-  return m_lexer.arena().create<expressions::CStyleForLoop>(
+  let loop_node = m_lexer.arena().create<expressions::CStyleForLoop>(
       location, open->source_location().position + 2, init, condition, step,
       parsed_body.body);
+  loop_node->set_source_end_position(parsed_body.done_location.position +
+                                     parsed_body.done_location.length);
+  return loop_node;
 }
 
 fn Parser::parse_loop_body(const SourceLocation &location,

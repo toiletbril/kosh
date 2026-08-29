@@ -201,12 +201,14 @@ public:
   FlagManyStrings(char short_name, StringView long_name, flag_section section,
                   StringView description);
 
-  fn append(StringView v, usize position = 0) throws -> void;
+  fn append(StringView v, usize position = 0,
+            SourceLocation location = {}) throws -> void;
   pure fn count() const wontthrow -> usize;
   pure fn is_empty() const wontthrow -> bool;
 
   pure fn get(usize i) const wontthrow -> StringView;
   pure fn get_position(usize i) const wontthrow -> usize;
+  pure fn get_location(usize i) const wontthrow -> SourceLocation;
 
   fn next() throws -> StringView;
   pure fn at_end() const wontthrow -> bool;
@@ -217,6 +219,7 @@ public:
 private:
   ArrayList<String> m_values{heap_allocator()};
   ArrayList<usize> m_positions{heap_allocator()};
+  ArrayList<SourceLocation> m_locations{heap_allocator()};
   usize m_value_position{0};
 };
 

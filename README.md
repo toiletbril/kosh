@@ -228,4 +228,4 @@ Is it exceptional?
 - [x] The shell supports Bash scripts.
 - [x] ShellCheck-style warnings are built in.
 - [x] Koshkit replaces common Unix programs that are absent from Windows.
-- [ ] Arbitrary-precision numeric expressions are planned.
+- [x] Arbitrary-precision numeric expressions are supported.

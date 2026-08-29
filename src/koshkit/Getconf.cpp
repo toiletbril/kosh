@@ -60,7 +60,9 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -70,8 +72,13 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_GETCONF_SPECIFICATION.is_set() &&
       FLAG_GETCONF_SPECIFICATION.value() != "POSIX_V7_LP64_OFF64" &&
       FLAG_GETCONF_SPECIFICATION.value() != "POSIX_V7_ILP32_OFFBIG")
-    throw Error{"getconf: unsupported specification '" +
-                String{FLAG_GETCONF_SPECIFICATION.value()} + "'"};
+  {
+    report_soft_koshkit_util_error(
+        ec, cxt, FLAG_GETCONF_SPECIFICATION.value_location(), args[0].view(),
+        "unsupported specification '" +
+            String{FLAG_GETCONF_SPECIFICATION.value()} + "'");
+    return 2;
+  }
 
   Maybe<i64> value;
   if (let const system_key = SYSTEM_CONFIGURATIONS.find(operands[0].view());
@@ -87,8 +94,9 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
       return report_usage_error(ec, cxt, args[0].view());
     value = os::path_configuration(operands[1].view(), *path_key);
   } else {
-    report_soft_koshkit_error(
-        ec, cxt, "getconf: unknown variable '" + operands[0] + "'");
+    report_soft_koshkit_util_error(ec, cxt, operand_locations[0],
+                                   args[0].view(),
+                                   "unknown variable '" + operands[0] + "'");
     return 1;
   }
 

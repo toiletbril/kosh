@@ -136,10 +136,10 @@ _kosh_fc_complete()
 complete -F _kosh_fc_complete fc
 
 _koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date \
-df dirname du env expand expr file find flock fold getconf grep head id killall link ln locale \
+df dirname du env expand expr file find flock fold fuser getconf grep head id killall link ln locale \
 logger logname ls make man mkdir mkfifo more mv nice nl nohup nproc od paste pathchk pkill pr ps \
-realpath renice rm rmdir sed seq sleep sort split strings stty tabs tail tee timeout touch tput \
-tr tsort tty uname unexpand uniq unlink uudecode uuencode wc which who whoami xargs yes"
+readlink realpath renice rm rmdir sed seq sleep sort split strings stty tabs tail tee timeout touch tput \
+tr tsort tty uname unexpand uniq unlink wc which who whoami xargs yes"
 
 _koshkit_util_flags()
 {
@@ -166,7 +166,6 @@ _koshkit_util_flags()
     tee)           echo "-a" ;;
     touch)         echo "-a -c -m -r -t" ;;
     tput)          echo "-T --terminal" ;;
-    uudecode)      echo "-o --output" ;;
     who)           echo "-a --all -b --boot -d --dead -H --heading -l --login -m --current -p --process -q --quick -r --runlevel -s --short -t --time -T --terminal-state -u --idle" ;;
     du)            echo "-s -h" ;;
     head|tail)     echo "-n -c" ;;
@@ -180,6 +179,8 @@ _koshkit_util_flags()
     make)          echo "-f --file -C --directory -B --always-make -k --keep-going -e --environment-overrides -i --ignore-errors -S --stop -n --just-print -p --print-data-base -q --question -r --no-builtin-rules -s --silent -t --touch" ;;
     find)          echo "-name -type -maxdepth -mindepth -print" ;;
     flock)         echo "--transaction-held-lock" ;;
+    fuser)         echo "-c -f -u" ;;
+    readlink)      echo "-n" ;;
     ps)            echo "-a -u -x -w" ;;
     which)         echo "-a --all -q --quiet" ;;
     *)             echo "" ;;

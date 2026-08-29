@@ -62,7 +62,9 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -103,11 +105,15 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const *locale_values = localeconv();
-  for (let const &operand : operands) {
+  for (usize operand_position = 0; operand_position < operands.count();
+       operand_position++)
+  {
+    let const &operand = operands[operand_position];
     let const keyword = LOCALE_KEYWORDS.find(operand.view());
     if (!keyword.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "locale: unknown name '" + operand + "'");
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[operand_position], args[0].view(),
+          "unknown name '" + operand + "'");
       return 1;
     }
     if (FLAG_LOCALE_CATEGORY.is_enabled()) {

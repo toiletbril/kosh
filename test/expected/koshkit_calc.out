@@ -12,6 +12,19 @@
 0
 === variable read ===
 42
+=== obvious xor power hint ===
+1:3: warning: The `^` operator performs bitwise XOR in Bash arithmetic.
+     1 |  2 ^ 8
+       |    ^
+note: Use `**`, the Bash power operator, if you meant exponentiation.
+10
+10
+1:3: warning: The `^` operator performs bitwise XOR in Bash arithmetic.
+     1 |  2 ^ 8
+       |    ^
+note: Use `**`, the Bash power operator, if you meant exponentiation.
+10
+10
 === common functions ===
 12.50
 -2
@@ -29,6 +42,32 @@
 1
 0
 -1
+=== decimal functions ===
+0.7853981633
+1.000000
+2.7182818284
+5
+0.00000000
+4
+0.000000
+1.4142135623
+-0.34999350
+0.93675212
+22026.46579
+0.00000000
+=== decimal function errors ===
+1:6: error: Logarithm operand is not positive.
+     1 |  ln(0)
+       |       ^
+note: ln requires a value greater than 0.
+1:9: error: Square root operand is negative.
+     1 |  sqrt(-1)
+       |          ^
+note: sqrt requires a value greater than or equal to 0.
+1:11: error: Invalid scale for 'sin'.
+     1 |  sin(1, -1)
+       |            ^
+note: The scale must be between 0 and 100000.
 === function errors ===
 1:9: error: The argument to 'fact' is negative.
      1 |  fact(-1)

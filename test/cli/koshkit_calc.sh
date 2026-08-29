@@ -24,6 +24,11 @@ echo "=== signed 128-bit minimum ==="
 echo "=== variable read ==="
 "$BIN" -c 'x=6; koshkit calc "x * 7"'
 
+echo "=== obvious xor power hint ==="
+"$BIN" -c 'koshkit calc "2 ^ 8"' 2>&1
+"$BIN" -c 'x=2; koshkit calc "x ^ 8"' 2>&1
+printf '2 ^ 8\nx = 2\nx ^ 8\n' | "$BIN" -c 'koshkit calc -i' 2>&1
+
 echo "=== common functions ==="
 "$BIN" -c '
 koshkit calc "abs(-12.50)"
@@ -43,6 +48,29 @@ koshkit calc "iseven(42)"
 koshkit calc "isodd(42)"
 koshkit calc "sgn(-0.01)"
 '
+
+echo "=== decimal functions ==="
+"$BIN" -c '
+koshkit calc "atan(1, 10)"
+koshkit calc "cos(0, 6)"
+koshkit calc "exp(1, 10)"
+koshkit calc "length(-0.00120)"
+koshkit calc "ln(1, 8)"
+koshkit calc "scale(1.2300)"
+koshkit calc "sin(0, 6)"
+koshkit calc "sqrt(2, 10)"
+koshkit calc "sin(1000000, 8)"
+koshkit calc "cos(1000000, 8)"
+koshkit calc "exp(10, 5)"
+koshkit calc "exp(-1000, 8)"
+'
+
+echo "=== decimal function errors ==="
+"$BIN" -c '
+koshkit calc "ln(0)"
+koshkit calc "sqrt(-1)"
+koshkit calc "sin(1, -1)"
+' 2>&1
 
 echo "=== function errors ==="
 "$BIN" -c '

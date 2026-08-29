@@ -9,6 +9,9 @@ unset KOSH_FLAGS
 echo "=== constant arithmetic fold ==="
 "$BIN" --optimizer-diagnostics -c 'echo $((1 + 2 * 3))'
 
+echo "=== exact constant arithmetic fold ==="
+"$BIN" --optimizer-diagnostics -c 'echo $((2 ** 256))'
+
 echo "=== constant propagation into arithmetic ==="
 "$BIN" --optimizer-diagnostics -c 'x=2; y=3; echo $((x + y))'
 

@@ -1,4 +1,5 @@
 #include "DiagnosticsChecksInternal.hpp"
+#include "EvalOperations.hpp"
 #include "Lexer.hpp"
 #include "PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
@@ -115,6 +116,8 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
      same term multiplies the truncated value, shellcheck SC2017. Any operator
      that ends the term clears the flag. */
   let has_pending_division = false;
+  let const obvious_power_position =
+      obvious_xor_power_operator_position(expression);
 
   struct arithmetic_write
   {
@@ -252,38 +255,17 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
       if (has_reported_xor_power ||
           (position + 1 < expression.length && expression[position + 1] == '='))
         break;
-
-      let left_end = position;
-      while (left_end > 0 && lexer::is_whitespace(expression[left_end - 1]))
-        left_end--;
-      let left_start = left_end;
-      while (left_start > 0 && lexer::is_number(expression[left_start - 1]))
-        left_start--;
-
-      let right_start = position + 1;
-      while (right_start < expression.length &&
-             lexer::is_whitespace(expression[right_start]))
-        right_start++;
-      let right_end = right_start;
-      while (right_end < expression.length &&
-             lexer::is_number(expression[right_end]))
-        right_end++;
-
-      let expression_start = left_start;
-      while (expression_start > 0 &&
-             lexer::is_whitespace(expression[expression_start - 1]))
-        expression_start--;
-      let expression_end = right_end;
-      while (expression_end < expression.length &&
-             lexer::is_whitespace(expression[expression_end]))
-        expression_end++;
-
-      let const has_literal_left =
-          left_start < left_end && expression_start == 0;
-      let const has_literal_right =
-          right_start < right_end && expression_end == expression.length;
-      if (has_literal_left && has_literal_right) {
-        actx.report_diagnostic(diagnostic_id::arithmetic_xor_power, location);
+      if (obvious_power_position.has_value() &&
+          *obvious_power_position == position)
+      {
+        let operator_location = location;
+        if (expression_base_position.has_value()) {
+          operator_location =
+              SourceLocation{*expression_base_position + position, 1,
+                             location.source_name_index};
+        }
+        actx.report_diagnostic(diagnostic_id::arithmetic_xor_power,
+                               operator_location);
         has_reported_xor_power = true;
       }
       break;

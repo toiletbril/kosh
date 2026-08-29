@@ -617,42 +617,55 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
 
 fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
-fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
+fn EvalContext::snapshot_state() throws -> eval_state_snapshot
 {
   let working_directory = os::reference_current_directory();
   if (!working_directory.is_valid())
     throw Error{"Could not preserve the current working directory"};
 
-  return eval_state_snapshot{m_shell_variables,
-                             m_indexed_arrays,
-                             m_associative_names,
-                             m_associative_values,
-                             m_sparse_array_values,
-                             m_sparse_array_names,
-                             m_shopt_options,
-                             m_functions,
-                             m_aliases,
-                             m_positional_params,
-                             m_last_argument,
-                             m_directory_stack,
-                             steal(working_directory),
-                             os::get_file_creation_mask(),
-                             m_traps,
-                             m_readonly_names,
-                             m_integer_names,
-                             m_exported_names,
-                             m_environment_undo_log.count(),
-                             RuntimeState::capture(*this),
-                             m_program_resolver,
-                             m_init_moods_sourcing,
-                             m_initialized_moods,
-                             m_was_mood_set_explicitly,
-                             m_mood_mutation_revision,
-                             m_warning_mutation_revision,
-                             m_diagnostics_mutation_revision,
-                             m_annoying_diagnostics_mutation_revision,
-                             m_random_state,
-                             m_shell_option_mutations};
+  let snapshot = eval_state_snapshot{m_shell_variables,
+                                     m_indexed_arrays,
+                                     m_completion_specs,
+                                     m_default_completion_spec,
+                                     m_associative_names,
+                                     m_associative_values,
+                                     m_sparse_array_values,
+                                     m_sparse_array_names,
+                                     m_shopt_options,
+                                     m_functions,
+                                     m_aliases,
+                                     m_positional_params,
+                                     m_last_argument,
+                                     m_directory_stack,
+                                     steal(working_directory),
+                                     os::get_file_creation_mask(),
+                                     m_traps,
+                                     m_readonly_names,
+                                     m_integer_names,
+                                     m_exported_names,
+                                     m_environment_undo_log.count(),
+                                     RuntimeState::capture(*this),
+                                     m_program_resolver,
+                                     m_init_moods_sourcing,
+                                     m_initialized_moods,
+                                     m_was_mood_set_explicitly,
+                                     m_mood_mutation_revision,
+                                     m_warning_mutation_revision,
+                                     m_diagnostics_mutation_revision,
+                                     m_annoying_diagnostics_mutation_revision,
+                                     m_random_state,
+                                     m_shell_option_mutations,
+                                     m_local_scopes,
+                                     m_local_scope_depth,
+                                     m_last_background_pid,
+                                     m_getopts_char_index,
+                                     m_getopts_last_optind,
+                                     m_terminal_exec_allowed,
+                                     steal(m_jobs),
+                                     steal(m_detached_job_processes),
+                                     m_next_job_id};
+  m_next_job_id = 1;
+  return snapshot;
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -660,6 +673,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   LOG(Debug, "restoring the evaluator state after a subshell or substitution");
   m_shell_variables = steal(snapshot.shell_variables);
   m_indexed_arrays = steal(snapshot.indexed_arrays);
+  m_completion_specs = steal(snapshot.completion_specs);
+  m_default_completion_spec = steal(snapshot.default_completion_spec);
   m_associative_names = steal(snapshot.associative_names);
   m_associative_values = steal(snapshot.associative_values);
   m_sparse_array_values = steal(snapshot.sparse_array_values);
@@ -683,6 +698,27 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
       snapshot.annoying_diagnostics_mutation_revision;
   m_random_state = snapshot.random_state;
   m_shell_option_mutations = snapshot.option_mutations;
+  m_local_scopes = steal(snapshot.local_scopes);
+  m_local_scope_depth = snapshot.local_scope_depth;
+  m_last_background_pid = snapshot.last_background_pid;
+  m_getopts_char_index = snapshot.getopts_char_index;
+  m_getopts_last_optind = snapshot.getopts_last_optind;
+  m_terminal_exec_allowed = snapshot.terminal_exec_allowed;
+
+  for (let &child_job : m_jobs) {
+    if (child_job.is_primary_process_active)
+      m_detached_job_processes.push(child_job.pid);
+    for (let const process : child_job.earlier_pipeline_processes)
+      m_detached_job_processes.push(process);
+  }
+  snapshot.detached_job_processes.reserve(
+      snapshot.detached_job_processes.count() +
+      m_detached_job_processes.count());
+  for (let const process : m_detached_job_processes)
+    snapshot.detached_job_processes.push(process);
+  m_jobs = steal(snapshot.jobs);
+  m_detached_job_processes = steal(snapshot.detached_job_processes);
+  m_next_job_id = snapshot.next_job_id;
 
   m_readonly_names = steal(snapshot.readonly_names);
   m_integer_names = steal(snapshot.integer_names);

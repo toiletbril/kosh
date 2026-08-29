@@ -29,6 +29,36 @@ printf 'format-diagnostics=%s,%s,%s\n' \
   "$diagnostics_before_status" "$diagnostics_after_status" \
   "$([ "$diagnostics_before" = "$diagnostics_after" ] && printf same)"
 
+cat > "$root/openmpi-guard.sh" <<'EOF'
+DUALCASE=1; export DUALCASE
+if test -n "${ZSH_VERSION+set}" && (emulate sh) >/dev/null 2>&1; then :
+  emulate sh
+  NULLCMD=:
+else
+  case `(set -o) 2>/dev/null` in
+  *posix*) :
+    set -o posix ;;
+  *) :
+     ;;
+esac
+fi
+EOF
+"$BIN" --lint --no-traces "$root/openmpi-guard.sh" \
+  > /dev/null 2> "$root/openmpi-before.err"
+openmpi_before_status=$?
+"$BIN" --format "$root/openmpi-guard.sh" > "$root/openmpi-formatted.sh"
+"$BIN" --lint --no-traces "$root/openmpi-formatted.sh" \
+  > /dev/null 2> "$root/openmpi-after.err"
+openmpi_after_status=$?
+openmpi_before_warnings=$(grep -c ': warning:' "$root/openmpi-before.err" || :)
+openmpi_after_warnings=$(grep -c ': warning:' "$root/openmpi-after.err" || :)
+openmpi_before_errors=$(grep -c ': error:' "$root/openmpi-before.err" || :)
+openmpi_after_errors=$(grep -c ': error:' "$root/openmpi-after.err" || :)
+printf 'openmpi-format-diagnostics=%s,%s warnings=%s,%s errors=%s,%s\n' \
+  "$openmpi_before_status" "$openmpi_after_status" \
+  "$openmpi_before_warnings" "$openmpi_after_warnings" \
+  "$openmpi_before_errors" "$openmpi_after_errors"
+
 cat > "$root/comments.sh" <<'EOF'
 #!/bin/sh
   # keep this text without wrapping
@@ -386,6 +416,9 @@ printf '%s\n' "$group_value"
 } > "$TEST_NULL_DEVICE"
 printf '%s\n' after-group
 eof_value=one
+# The first trailing comment has no following statement.
+# The second trailing comment has no following statement either.
+# The third trailing comment completes the trailing comment run.
 EOF
 "$BIN" --format "$root/statement-spacing.sh" \
   > "$root/statement-spacing-formatted.sh"

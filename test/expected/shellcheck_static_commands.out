@@ -1145,9 +1145,9 @@ note: Write `a*c/b` to multiply first.
     74 |    echo $((010 + 1))
        |            ^~~~~~~
 note: Drop the leading zero, or write `10#010` for base ten.
-76:11: warning: The `^` operator performs bitwise XOR in Bash arithmetic.
+76:13: warning: The `^` operator performs bitwise XOR in Bash arithmetic.
     76 |    echo $((2 ^ 8))
-       |            ^~~~~
+       |              ^
 note: Use `**`, the Bash power operator, if you meant exponentiation.
 82:3: warning: The number produced by the expansion is run as a command. (SC2084)
     82 |    $((count + 1))

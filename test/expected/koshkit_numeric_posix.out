@@ -60,6 +60,8 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "expr" "abc" ":" "a\(.*\)"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "ababa" ":" "\(ab*\)\1a"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "expr" "0" "|" "hello"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "expr" "0"]
@@ -433,6 +435,21 @@
   Unquoted "expr"
 ]
 [Word
+  Unquoted "ababa"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "\(ab*\)\1a"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
   Unquoted "0"
 ]
 [Word
@@ -506,6 +523,7 @@ bc-math
 14
 1
 bc
+ab
 hello
 expr-false=1
 [Code 0]

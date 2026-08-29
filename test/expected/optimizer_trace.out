@@ -4,6 +4,12 @@
        |          ^~~~~~~~~
 Eliminated 1 statement.
 7
+=== exact constant arithmetic fold ===
+1:9: warning: The arithmetic expression `2 ** 256` is constant and was folded to '115792089237316195423570985008687907853269984665640564039457584007913129639936'.
+     1 |  echo $((2 ** 256))
+       |          ^~~~~~~~
+Eliminated 1 statement.
+115792089237316195423570985008687907853269984665640564039457584007913129639936
 === constant propagation into arithmetic ===
 [optimizer] recorded constant: x = 2
 [optimizer] recorded constant: y = 3

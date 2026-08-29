@@ -35,6 +35,7 @@
 #if defined __linux__
 #include <linux/perf_event.h>
 #include <sched.h>
+#include <sys/sysmacros.h>
 #include <sys/syscall.h>
 #endif
 #if defined __GLIBC__
@@ -70,8 +71,10 @@ extern "C" void __lsan_disable(void);
 #include <io.h>
 #include <malloc.h>
 #include <psapi.h>
+#include <restartmanager.h>
 #include <sys/stat.h>
 #include <tlhelp32.h>
+#include "../vendor/regex/regex.h"
 #define KOSH_SUPPORT_VECTOR (KOSH_PLATFORM_WIN32)
 #endif
 /* clang-format on */
@@ -454,6 +457,38 @@ struct process_entry
 fn enumerate_processes(process_detail detail = process_detail::Basic) throws
     -> ArrayList<process_entry>;
 
+enum class process_file_use : u8
+{
+  Cwd = 1u << 0u,
+  Root = 1u << 1u,
+  Executable = 1u << 2u,
+  Mapped = 1u << 3u,
+  File = 1u << 4u,
+};
+
+struct process_file_query
+{
+  StringView path;
+  u64 device_id;
+  u64 file_id;
+  u32 query_position;
+  bool should_match_device;
+};
+
+struct process_file_user
+{
+  u32 pid;
+  u32 owner_id;
+  u32 query_position;
+  u8 use_mask;
+};
+
+fn scan_process_file_users(const ArrayList<process_file_query> &queries,
+                           ArrayList<process_file_user> &users,
+                           Allocator scratch) throws -> Maybe<u32>;
+fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws
+    -> Maybe<String>;
+
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool;
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
@@ -468,7 +503,8 @@ fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
-fn read_symlink(StringView path) wontthrow -> Maybe<String>;
+fn read_symlink(StringView path, Allocator allocator) wontthrow
+    -> Maybe<String>;
 
 struct filesystem_status
 {
@@ -658,6 +694,8 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor;
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
+fn descriptors_refer_to_same_file(os::descriptor first,
+                                  os::descriptor second) wontthrow -> bool;
 
 /* On POSIX the descriptor is the shell fd number, on Windows it is the handle
    that occupies the shell's standard-handle slot. */
@@ -675,17 +713,11 @@ struct regex_span
   i64 end{-1};
 };
 
-/* An opaque compiled extended regex. On POSIX it holds a regex_t, on a platform
-   with no regex engine it holds nothing. Ownership is tracked by CompiledRegex,
-   not here. */
+/* An opaque compiled regular expression. Ownership is tracked by
+   CompiledRegex, not here. */
 struct compiled_regex
 {
-#if KOSH_PLATFORM_IS KOSH_PLATFORM_POSIX
   regex_t re{};
-#else
-  String pattern{heap_allocator()};
-  bool is_case_insensitive{false};
-#endif
 };
 
 enum class regex_compile_result : u8
@@ -701,10 +733,7 @@ enum class regex_match_result : u8
   Error,
 };
 
-/* False on a platform with no regex engine, so [[ =~ ]] reports it is
-   unsupported rather than matching. */
-constexpr bool HAS_REGEX_ENGINE =
-    ((KOSH_SUPPORT_VECTOR) &KOSH_PLATFORM_POSIX) != 0;
+constexpr bool HAS_REGEX_ENGINE = true;
 
 fn compile_regex(StringView pattern, case_sensitivity sensitivity,
                  compiled_regex &out) throws -> regex_compile_result;
@@ -717,13 +746,13 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
 
-/* Compiles a search pattern for a line-at-a-time grep. On POSIX it is a basic
-   regex with no capture, on a platform with no engine it is a literal
-   substring. */
+/* Compiles a basic search pattern with no capture for line-at-a-time grep. */
 fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
                         compiled_regex &out) throws -> regex_compile_result;
 
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool;
+fn regex_matches_null_terminated(compiled_regex &compiled,
+                                 StringView subject) throws -> bool;
 
 pure fn path_is_absolute(StringView path) wontthrow -> bool;
 pure fn path_is_drive_relative(StringView path) wontthrow -> bool;
@@ -961,8 +990,23 @@ fn terminal_size(u32 &columns, u32 &rows,
 fn terminal_settings(descriptor terminal, bool should_encode,
                      bool should_report_all, Allocator allocator) throws
     -> Maybe<String>;
+
+enum class terminal_settings_apply_kind : u8
+{
+  Success,
+  InvalidSetting,
+  SystemError,
+};
+
+struct terminal_settings_apply_result
+{
+  terminal_settings_apply_kind kind;
+  usize setting_position;
+};
+
 fn apply_terminal_settings(descriptor terminal,
-                           const ArrayList<String> &settings) wontthrow -> bool;
+                           const ArrayList<String> &settings) wontthrow
+    -> terminal_settings_apply_result;
 
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. Windows has no equivalent and reports zero. */

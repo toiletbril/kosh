@@ -30,7 +30,9 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -48,9 +50,9 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
                                    : os::case_sensitivity::Sensitive,
                                compiled) != os::regex_compile_result::Ok)
   {
-    report_soft_koshkit_error(ec, cxt,
-                              "grep: the pattern '" + operands[0] +
-                                  "' is not a valid regex");
+    report_soft_koshkit_util_error(
+        ec, cxt, operand_locations[0], args[0].view(),
+        "the pattern '" + operands[0] + "' is not a valid regex");
     return 2;
   }
   defer { os::free_regex(compiled); };
@@ -62,13 +64,19 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   bool has_any_match = false;
   i32 status = 0;
-  for (let const &source : sources) {
+  for (usize source_position = 0; source_position < sources.count();
+       source_position++)
+  {
+    let const source = sources[source_position];
+    let const source_location = source_position + 1 < operand_locations.count()
+                                    ? operand_locations[source_position + 1]
+                                    : ec.source_location();
     let const input = open_named_or_stdin(ec, source);
     if (!input.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "grep: " + String{cxt.scratch_allocator(), source} + ": " +
-              os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, source_location, args[0].view(),
+                                     String{cxt.scratch_allocator(), source} +
+                                         ": " +
+                                         os::last_system_error_message());
       status = 2;
       continue;
     }
@@ -85,15 +93,15 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       if (result == utils::BufferedLineReader::Result::End) break;
       if (result == utils::BufferedLineReader::Result::Error) {
         if (os::INTERRUPT_REQUESTED) return 130;
-        report_soft_koshkit_error(
-            ec, cxt,
-            "grep: " + String{cxt.scratch_allocator(), source} + ": " +
-                os::last_system_error_message());
+        report_soft_koshkit_util_error(ec, cxt, source_location, args[0].view(),
+                                       String{cxt.scratch_allocator(), source} +
+                                           ": " +
+                                           os::last_system_error_message());
         status = 2;
         break;
       }
       let const line = reader.get_line();
-      let const is_match = os::regex_matches(compiled, line);
+      let const is_match = os::regex_matches_null_terminated(compiled, line);
       if (is_match == should_invert) continue;
 
       has_any_match = true;

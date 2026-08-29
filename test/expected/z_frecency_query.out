@@ -1,7 +1,9 @@
 == no query changes to HOME:
 TMPDIR
+bare-rank=6
 == a query matches the seeded directory:
 TMPDIR
+query-rank=7
 == a query with no match errors:
 1:3: error: Builtin `z`: No matching directory for 'no_such_dir_xyz'.
      1 |  z no_such_dir_xyz

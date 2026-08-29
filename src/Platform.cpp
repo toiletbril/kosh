@@ -71,6 +71,108 @@ fn descriptor_is_shell_fd(os::descriptor fd, i32 shell_fd) wontthrow -> bool
   return fd == descriptor_for_shell_fd(shell_fd);
 }
 
+fn compile_regex(StringView pattern, case_sensitivity sensitivity,
+                 compiled_regex &out) throws -> regex_compile_result
+{
+  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
+  let const pattern_text = String{heap_allocator(), pattern};
+  int compile_flags = REG_EXTENDED;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
+    return regex_compile_result::Invalid;
+
+  return regex_compile_result::Ok;
+}
+
+fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
+                       compiled_regex &out) throws -> regex_compile_result
+{
+  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
+  let const pattern_text = String{heap_allocator(), pattern};
+  int compile_flags = 0;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
+    return regex_compile_result::Invalid;
+
+  return regex_compile_result::Ok;
+}
+
+fn execute_regex(compiled_regex &compiled, StringView subject,
+                 ArrayList<regex_span> &spans, String &error_message,
+                 Allocator scratch) throws -> regex_match_result
+{
+  let const subject_text = String{scratch, subject};
+  let const group_count = compiled.re.re_nsub + 1;
+  let matches = ArrayList<regmatch_t>{scratch};
+  matches.reserve(group_count);
+  for (usize i = 0; i < group_count; i++)
+    matches.push(regmatch_t{});
+
+  const int match_result = regexec(&compiled.re, subject_text.c_str(),
+                                   group_count, matches.begin(), 0);
+
+  if (match_result == REG_NOMATCH) return regex_match_result::NoMatch;
+
+  if (match_result != 0) {
+    char error_text[256];
+    regerror(match_result, &compiled.re, error_text, sizeof(error_text));
+    error_message = String{heap_allocator(), StringView{error_text}};
+    return regex_match_result::Error;
+  }
+
+  spans.reserve(group_count);
+  for (usize i = 0; i < group_count; i++) {
+    spans.push(regex_span{static_cast<i64>(matches[i].rm_so),
+                          static_cast<i64>(matches[i].rm_eo)});
+  }
+
+  return regex_match_result::Matched;
+}
+
+fn free_regex(compiled_regex &compiled) wontthrow -> void
+{
+  regfree(&compiled.re);
+}
+
+fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
+                        compiled_regex &out) throws -> regex_compile_result
+{
+  let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
+  const String pattern_text{heap_allocator(), pattern};
+  int compile_flags = REG_NOSUB;
+  if (is_case_insensitive) compile_flags |= REG_ICASE;
+
+  if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
+    return regex_compile_result::Invalid;
+
+  return regex_compile_result::Ok;
+}
+
+fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
+{
+#if defined REG_STARTEND
+  regmatch_t bounds[1];
+  bounds[0].rm_so = 0;
+  bounds[0].rm_eo = static_cast<regoff_t>(subject.length);
+  return regexec(&compiled.re, subject.data, 1, bounds, REG_STARTEND) == 0;
+#else
+  const String null_terminated{heap_allocator(), subject};
+  return regexec(&compiled.re, null_terminated.c_str(), 0, nullptr, 0) == 0;
+#endif
+}
+
+fn regex_matches_null_terminated(compiled_regex &compiled,
+                                 StringView subject) throws -> bool
+{
+#if defined REG_STARTEND
+  return regex_matches(compiled, subject);
+#else
+  return regexec(&compiled.re, subject.data, 0, nullptr, 0) == 0;
+#endif
+}
+
 static u64 DESCRIPTOR_EPOCH = 0;
 
 pure fn get_descriptor_epoch() wontthrow -> u64 { return DESCRIPTOR_EPOCH; }

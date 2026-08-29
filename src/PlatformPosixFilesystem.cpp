@@ -636,25 +636,35 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
   return did_succeed;
 }
 
-fn read_symlink(StringView path) wontthrow -> Maybe<String>
+fn read_symlink(StringView path, Allocator allocator) wontthrow -> Maybe<String>
 {
   const String path_string{path};
-  /* readlink cannot flag truncation, so the buffer grows until it stops
-     filling. */
-  usize capacity = 256;
+  char inline_buffer[256];
+  let length =
+      ::readlink(path_string.c_str(), inline_buffer, sizeof(inline_buffer));
+  if (length < 0) return koshka::None;
+  if (static_cast<usize>(length) < sizeof(inline_buffer))
+    return String{
+        allocator, StringView{inline_buffer, static_cast<usize>(length)}
+    };
+
+  usize capacity = sizeof(inline_buffer) * 2;
+  ArrayList<char> buffer{allocator};
   loop
   {
-    ArrayList<char> buffer{heap_allocator()};
     buffer.reserve(capacity);
-    let const length =
-        ::readlink(path_string.c_str(), buffer.begin(), capacity);
+    length = ::readlink(path_string.c_str(), buffer.begin(), capacity);
     if (length < 0) return koshka::None;
     if (static_cast<usize>(length) < capacity)
       return String{
-          StringView{buffer.begin(), static_cast<usize>(length)}
+          allocator, StringView{buffer.begin(), static_cast<usize>(length)}
       };
 
-    if (capacity >= (1U << 20)) return koshka::None;
+    if (capacity >= (1U << 20)) {
+      errno = ENAMETOOLONG;
+      return koshka::None;
+    }
+
     capacity *= 2;
   }
 }

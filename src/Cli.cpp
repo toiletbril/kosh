@@ -143,10 +143,12 @@ FlagManyStrings::FlagManyStrings(FlagList &flags, char short_name,
   flags.push(this);
 }
 
-fn FlagManyStrings::append(StringView v, usize position) throws -> void
+fn FlagManyStrings::append(StringView v, usize position,
+                           SourceLocation location) throws -> void
 {
   m_values.push_managed(v);
   m_positions.push(position);
+  m_locations.push(steal(location));
 }
 
 pure fn FlagManyStrings::is_empty() const wontthrow -> bool
@@ -171,6 +173,12 @@ pure fn FlagManyStrings::get_position(usize i) const wontthrow -> usize
   return m_positions[i];
 }
 
+pure fn FlagManyStrings::get_location(usize i) const wontthrow -> SourceLocation
+{
+  ASSERT(i < m_locations.count());
+  return m_locations[i];
+}
+
 fn FlagManyStrings::next() throws -> StringView
 {
   ASSERT(m_value_position < m_values.count());
@@ -189,6 +197,7 @@ fn FlagManyStrings::reset() throws -> void
   m_value_location = {};
   m_values.clear();
   m_positions.clear();
+  m_locations.clear();
   m_value_position = 0;
 }
 
@@ -323,6 +332,22 @@ static fn attached_flag_value_location(
   return location;
 }
 
+static fn boolean_flag_location(
+    const char *const *argv, usize argument_index, const char *flag_offset,
+    bool is_long, usize base_position,
+    const ArrayList<SourceLocation> *arg_locations) throws -> SourceLocation
+{
+  let location =
+      argument_location(argv, argument_index, base_position, arg_locations);
+  let const argument_length = std::strlen(argv[argument_index]);
+  if (!is_long && argument_length > 2 && location.length == argument_length) {
+    location.position += static_cast<u32>(flag_offset - argv[argument_index]);
+    location.length = 1;
+  }
+
+  return location;
+}
+
 fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                usize base_position, const Flag *operand_value_flag,
                const ArrayList<SourceLocation> *arg_locations,
@@ -396,14 +421,15 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
             "attaching the next argument '%s' as the value of the flag '%s'",
             argv[i], flag_name(previous_flag, was_previous_flag_long).c_str());
         let const value_position = ++position;
+        let const value_location = argument_location(
+            argv, static_cast<usize>(i), base_position, arg_locations);
         if (previous_flag->kind() == Flag::Kind::String)
           static_cast<FlagString *>(previous_flag)->set(argv[i]);
         else
           static_cast<FlagManyStrings *>(previous_flag)
-              ->append(argv[i], value_position);
+              ->append(argv[i], value_position, value_location);
         previous_flag->set_position(value_position);
-        previous_flag->set_value_location(argument_location(
-            argv, static_cast<usize>(i), base_position, arg_locations));
+        previous_flag->set_value_location(value_location);
 
         continue;
       }
@@ -480,6 +506,9 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
 
           bool_flag->enable();
           bool_flag->set_position(++position);
+          bool_flag->set_value_location(
+              boolean_flag_location(argv, static_cast<usize>(i), flag_offset,
+                                    is_long, base_position, arg_locations));
           LOG(All, "enabled the flag '%s'",
               flag_name(bool_flag, is_long).c_str());
 
@@ -495,6 +524,9 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
 
           repeated_flag->increment();
           repeated_flag->set_position(++position);
+          repeated_flag->set_value_location(
+              boolean_flag_location(argv, static_cast<usize>(i), flag_offset,
+                                    is_long, base_position, arg_locations));
           LOG(All, "incremented the flag '%s'",
               flag_name(repeated_flag, is_long).c_str());
 
@@ -523,9 +555,13 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                 let const value_position = ++position;
                 if (flag->kind() == Flag::Kind::String)
                   static_cast<FlagString *>(flag)->set(value_offset);
-                else
-                  static_cast<FlagManyStrings *>(flag)->append(value_offset,
-                                                               value_position);
+                else {
+                  let const value_location = attached_flag_value_location(
+                      argv, static_cast<usize>(i), value_offset, base_position,
+                      arg_locations);
+                  static_cast<FlagManyStrings *>(flag)->append(
+                      value_offset, value_position, value_location);
+                }
 
                 flag->set_position(value_position);
                 flag->set_value_location(attached_flag_value_location(
@@ -546,9 +582,13 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
               let const value_position = ++position;
               if (flag->kind() == Flag::Kind::String)
                 static_cast<FlagString *>(flag)->set(value_offset);
-              else
-                static_cast<FlagManyStrings *>(flag)->append(value_offset,
-                                                             value_position);
+              else {
+                let const value_location = attached_flag_value_location(
+                    argv, static_cast<usize>(i), value_offset, base_position,
+                    arg_locations);
+                static_cast<FlagManyStrings *>(flag)->append(
+                    value_offset, value_position, value_location);
+              }
 
               flag->set_position(value_position);
               flag->set_value_location(attached_flag_value_location(

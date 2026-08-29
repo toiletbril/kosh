@@ -675,8 +675,7 @@ text: regular file
 text-link: text
 text-link: symbolic link to text
 broken-link: symbolic link to absent
-absent: cannot open
-file-missing=0
+file-missing=1
 magic-data: image data
 magic-data: image data
 magic-data: fallback data

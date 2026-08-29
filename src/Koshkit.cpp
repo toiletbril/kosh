@@ -383,12 +383,44 @@ cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
     print_error(String{message} + "\n");
 }
 
+cold noinline fn report_soft_koshkit_error(EvalContext &cxt,
+                                           SourceLocation location,
+                                           StringView message) throws -> void
+{
+  const ErrorWithLocation located{steal(location), message};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view(), &cxt));
+  else
+    print_error(String{message} + "\n");
+}
+
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt, StringView message,
                                            StringView note) throws -> void
 {
   report_soft_koshkit_error(ec, cxt, message);
   show_message(Note{String{note}}.to_string());
+}
+
+cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
+                                                EvalContext &cxt,
+                                                StringView utility_name,
+                                                StringView message) throws
+    -> void
+{
+  report_soft_koshkit_error(ec, cxt, String{utility_name} + ": " + message);
+}
+
+cold noinline fn report_soft_koshkit_util_error(
+    const ExecContext &, EvalContext &cxt, SourceLocation location,
+    StringView utility_name, StringView message) throws -> void
+{
+  let const prefixed = String{utility_name} + ": " + message;
+  const ErrorWithLocation located{steal(location), prefixed.view()};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view(), &cxt));
+  else
+    print_error(prefixed + "\n");
 }
 
 } /* namespace koshkit */

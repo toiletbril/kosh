@@ -923,6 +923,17 @@ public:
   {
     let const work_scale = calculator_work_scale(requested_scale);
     value = ArithmeticValue::rescale(value, work_scale, arena);
+    let const quarter_pi = calculator_atan(ArithmeticValue{1}, work_scale);
+    let const half_pi = ArithmeticValue::add(quarter_pi, quarter_pi, arena);
+    let const pi = ArithmeticValue::add(half_pi, half_pi, arena);
+    let const two_pi = ArithmeticValue::add(pi, pi, arena);
+    value = ArithmeticValue::modulo(value, two_pi, arena);
+    if (value.compare(pi, bump_allocator(arena)) > 0)
+      value = ArithmeticValue::subtract(value, two_pi, arena);
+    let const negative_pi =
+        ArithmeticValue::subtract(ArithmeticValue{}, pi, arena);
+    if (value.compare(negative_pi, bump_allocator(arena)) < 0)
+      value = ArithmeticValue::add(value, two_pi, arena);
     let const square = calculator_fixed_multiply(value, value, work_scale);
     let term = is_cosine ? ArithmeticValue{1} : value;
     let sum = term;
@@ -945,7 +956,18 @@ public:
       -> ArithmeticValue
   {
     let const work_scale = calculator_work_scale(requested_scale);
-    value = ArithmeticValue::rescale(value, work_scale, arena);
+    let const is_negative = value.is_negative();
+    value = ArithmeticValue::rescale(ArithmeticValue::absolute(value, arena),
+                                     work_scale, arena);
+    let const reduction_limit = ArithmeticValue::parse_decimal("0.5", arena);
+    u32 squaring_count = 0;
+    while (value.compare(reduction_limit, bump_allocator(arena)) > 0) {
+      value = calculator_fixed_divide(value, ArithmeticValue{2}, work_scale);
+      squaring_count++;
+      if (squaring_count > 4096)
+        fail("The operand to 'exp' is too large",
+             "Use an absolute value below 2 ** 4096");
+    }
     let term = ArithmeticValue::rescale(ArithmeticValue{1}, work_scale, arena);
     let sum = term;
     let const iteration_count = static_cast<usize>(work_scale) * 4 + 256;
@@ -956,6 +978,10 @@ public:
       if (term.is_zero()) break;
       sum = ArithmeticValue::add(sum, term, arena);
     }
+    for (u32 count = 0; count < squaring_count; count++)
+      sum = calculator_fixed_multiply(sum, sum, work_scale);
+    if (is_negative)
+      sum = calculator_fixed_divide(ArithmeticValue{1}, sum, work_scale);
     return ArithmeticValue::rescale(sum, requested_scale, arena);
   }
 
@@ -1185,6 +1211,9 @@ public:
           arguments[0], calculator_requested_scale(name, arguments), false);
     case calculator_function::Sqrt: {
       require_argument_count(name, arguments, 1, 2);
+      if (arguments[0].is_negative())
+        fail("Square root operand is negative",
+             "sqrt requires a value greater than or equal to 0");
       u32 decimal_scale = arguments[0].get_decimal_scale() > 20
                               ? arguments[0].get_decimal_scale()
                               : 20;
@@ -1360,6 +1389,10 @@ static fn lex_exact_arith_number(StringView from, ArithmeticValue *out_value,
   {
     let const fractional_count = arithmetic_internal::count_leading_digits(
         from.substring(decimal_integer_count + 1), 10);
+    if (decimal_integer_count == 0 && fractional_count == 0) {
+      *out_value = ArithmeticValue{};
+      return 0;
+    }
     let const consumed = decimal_integer_count + 1 + fractional_count;
     *out_value = ArithmeticValue::parse_decimal(
         from.substring_of_length(0, consumed), arena);
@@ -1993,20 +2026,21 @@ fn EvalContext::evaluate_arithmetic_cached_text(
         segment.text.view(),
         source_location.has_value() ? &*source_location : nullptr);
 
-  let const scratch = scratch_mark();
-  defer { scratch_release(scratch); };
   let &cache = segment.get_eval_cache();
   if (cache.arith == nullptr ||
       !cache_arena->is_lifetime_valid(cache.arithmetic_lifetime))
   {
-    cache.arith = cache_arena->create<arith_token_cache>();
+    cache.arith =
+        cache_arena->create<arith_token_cache>(bump_allocator(*cache_arena));
     cache.arithmetic_lifetime = cache_arena->register_lifetime();
   }
 
   let const is_exact = mood() == mimic_mood::Default;
   if (is_exact && cache.arith->has_exact_constant_text) {
-    return String{heap_allocator(), cache.arith->exact_constant_text.view()};
+    return String{scratch_allocator(), cache.arith->exact_constant_text.view()};
   }
+  let const scratch = scratch_mark();
+  defer { scratch_release(scratch); };
   let const value = evaluate_arithmetic_cached_value(
       this, segment.text.view(), cache.arith->tokens, cache.arith->is_tokenized,
       cache.arith->is_simple,
@@ -2027,7 +2061,7 @@ fn EvalContext::evaluate_arithmetic_cached_text(
 
     if (is_constant) {
       cache.arith->exact_constant_text =
-          String{heap_allocator(), result.view()};
+          String{bump_allocator(*cache_arena), result.view()};
       cache.arith->has_exact_constant_text = true;
     }
   }
@@ -2120,6 +2154,48 @@ fn evaluate_constant_arithmetic_nonzero(StringView expression,
   defer { arena.release(scratch); };
   let parser = ArithmeticParser{nullptr, expression, is_exact, arena};
   return !parser.parse().is_zero();
+}
+
+fn evaluate_constant_arithmetic_text(StringView expression,
+                                     Allocator allocator) throws -> String
+{
+  let &arena = get_constant_arithmetic_arena();
+  let const scratch = arena.mark();
+  defer { arena.release(scratch); };
+  let parser = ArithmeticParser{nullptr, expression, true, arena};
+  return parser.parse().to_string(allocator);
+}
+
+pure fn obvious_xor_power_operator_position(StringView expression) wontthrow
+    -> Maybe<usize>
+{
+  usize position = 0;
+  while (position < expression.length &&
+         lexer::is_whitespace(expression[position]))
+    position++;
+  let const left_start = position;
+  while (position < expression.length && lexer::is_number(expression[position]))
+    position++;
+  if (position == left_start) return None;
+  while (position < expression.length &&
+         lexer::is_whitespace(expression[position]))
+    position++;
+  if (position >= expression.length || expression[position] != '^') return None;
+  let const operator_position = position++;
+  if (position < expression.length && expression[position] == '=') return None;
+  while (position < expression.length &&
+         lexer::is_whitespace(expression[position]))
+    position++;
+  let const right_start = position;
+  while (position < expression.length && lexer::is_number(expression[position]))
+    position++;
+  if (position == right_start) return None;
+  while (position < expression.length &&
+         lexer::is_whitespace(expression[position]))
+    position++;
+  if (position != expression.length) return None;
+
+  return operator_position;
 }
 
 } /* namespace koshka */

@@ -1,0 +1,10 @@
+pid=passed
+stdout-framing=passed
+use=passed
+user=passed
+operands=passed
+combined=passed
+no-operand=2
+unused=passed
+missing=1
+device=passed

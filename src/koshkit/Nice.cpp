@@ -29,7 +29,9 @@ fn Nice::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -38,18 +40,33 @@ fn Nice::execute(const ExecContext &ec, EvalContext &cxt,
   i64 increment = 10;
   if (FLAG_NICE_INCREMENT.is_set()) {
     let const parsed = utils::parse_decimal_i64(FLAG_NICE_INCREMENT.value());
-    if (parsed.is_error()) throw Error{"nice: invalid increment"};
+    if (parsed.is_error()) {
+      report_soft_koshkit_util_error(
+          ec, cxt, FLAG_NICE_INCREMENT.value_location(), args[0].view(),
+          "invalid increment '" + String{FLAG_NICE_INCREMENT.value()} + "'");
+      return 2;
+    }
     increment = parsed.value();
   }
-  if (increment < INT32_MIN || increment > INT32_MAX)
-    throw Error{"nice: increment is out of range"};
+  if (increment < INT32_MIN || increment > INT32_MAX) {
+    report_soft_koshkit_util_error(ec, cxt,
+                                   FLAG_NICE_INCREMENT.value_location(),
+                                   args[0].view(), "increment is out of range");
+    return 2;
+  }
 
   let command = ArrayList<String>{cxt.scratch_allocator()};
   for (let const &operand : operands)
     command.push(operand.clone());
   unused(cxt.materialize_kosh_identity());
   let const result = os::run_nice(command, static_cast<i32>(increment));
-  return result.value_or(126);
+  if (!result.has_value()) {
+    report_soft_koshkit_util_error(
+        ec, cxt, operand_locations[0], args[0].view(),
+        "cannot run '" + operands[0] + "': " + os::last_system_error_message());
+    return 126;
+  }
+  return *result;
 }
 
 } // namespace koshka::koshkit

@@ -1,0 +1,34 @@
+#!/bin/env kosh
+
+koshkit mkdir -p "$TEST_TEMP_DIRECTORY/koshkit-readlink"
+cd "$TEST_TEMP_DIRECTORY/koshkit-readlink"
+
+printf 'default=['
+koshkit ln -sf relative-target readlink-link
+koshkit readlink readlink-link
+printf ']\n'
+
+printf 'no-newline=['
+koshkit readlink -n readlink-link
+printf ']\n'
+
+koshkit ln -sf missing-target readlink-dangling
+koshkit ln -sf readlink-link readlink-chain
+printf 'dangling='
+koshkit readlink readlink-dangling
+printf 'chain='
+koshkit readlink readlink-chain
+
+: > regular
+koshkit readlink regular 2> "$TEST_NULL_DEVICE"
+echo "nonlink=$?"
+koshkit readlink missing 2> "$TEST_NULL_DEVICE"
+echo "missing=$?"
+koshkit readlink 2> "$TEST_NULL_DEVICE"
+echo "no-operand=$?"
+koshkit readlink readlink-link readlink-chain 2> "$TEST_NULL_DEVICE"
+echo "extra-operand=$?"
+
+koshkit ln -sf -- option-target -n
+printf 'option='
+koshkit readlink -- -n

@@ -35,6 +35,7 @@ public:
     Basename,
     Dirname,
     Realpath,
+    Readlink,
     Du,
     Head,
     Tail,
@@ -58,6 +59,7 @@ public:
     Unlink,
     Nproc,
     Flock,
+    Fuser,
     Calc,
     Chgrp,
     Chmod,
@@ -94,8 +96,6 @@ public:
     Who,
     Bc,
     Expr,
-    Uuencode,
-    Uudecode,
     Xargs,
     Logger,
     Nice,
@@ -134,6 +134,7 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("basename"), Utility::Kind::Basename},
     {SSK("dirname"),  Utility::Kind::Dirname },
     {SSK("realpath"), Utility::Kind::Realpath},
+    {SSK("readlink"), Utility::Kind::Readlink},
     {SSK("du"),       Utility::Kind::Du      },
     {SSK("head"),     Utility::Kind::Head    },
     {SSK("tail"),     Utility::Kind::Tail    },
@@ -157,6 +158,7 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("unlink"),   Utility::Kind::Unlink  },
     {SSK("nproc"),    Utility::Kind::Nproc   },
     {SSK("flock"),    Utility::Kind::Flock   },
+    {SSK("fuser"),    Utility::Kind::Fuser   },
     {SSK("calc"),     Utility::Kind::Calc    },
     {SSK("chgrp"),    Utility::Kind::Chgrp   },
     {SSK("chmod"),    Utility::Kind::Chmod   },
@@ -193,8 +195,6 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("who"),      Utility::Kind::Who     },
     {SSK("bc"),       Utility::Kind::Bc      },
     {SSK("expr"),     Utility::Kind::Expr    },
-    {SSK("uuencode"), Utility::Kind::Uuencode},
-    {SSK("uudecode"), Utility::Kind::Uudecode},
     {SSK("xargs"),    Utility::Kind::Xargs   },
     {SSK("logger"),   Utility::Kind::Logger  },
     {SSK("nice"),     Utility::Kind::Nice    },
@@ -290,6 +290,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Basename);                                                            \
   U_CASE(Dirname);                                                             \
   U_CASE(Realpath);                                                            \
+  U_CASE(Readlink);                                                            \
   U_CASE(Du);                                                                  \
   U_CASE(Head);                                                                \
   U_CASE(Tail);                                                                \
@@ -313,6 +314,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Unlink);                                                              \
   U_CASE(Nproc);                                                               \
   U_CASE(Flock);                                                               \
+  U_CASE(Fuser);                                                               \
   U_CASE(Calc);                                                                \
   U_CASE(Chgrp);                                                               \
   U_CASE(Chmod);                                                               \
@@ -349,8 +351,6 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Who);                                                                 \
   U_CASE(Bc);                                                                  \
   U_CASE(Expr);                                                                \
-  U_CASE(Uuencode);                                                            \
-  U_CASE(Uudecode);                                                            \
   U_CASE(Xargs);                                                               \
   U_CASE(Logger);                                                              \
   U_CASE(Nice);                                                                \
@@ -388,6 +388,7 @@ UTILITY_STRUCT(Touch);
 UTILITY_STRUCT(Basename);
 UTILITY_STRUCT(Dirname);
 UTILITY_STRUCT(Realpath);
+UTILITY_STRUCT(Readlink);
 UTILITY_STRUCT(Du);
 UTILITY_STRUCT(Head);
 UTILITY_STRUCT(Tail);
@@ -411,6 +412,7 @@ UTILITY_STRUCT(WhoAmI);
 UTILITY_STRUCT(Unlink);
 UTILITY_STRUCT(Nproc);
 UTILITY_STRUCT(Flock);
+UTILITY_STRUCT(Fuser);
 UTILITY_STRUCT(Calc);
 UTILITY_STRUCT(Chgrp);
 UTILITY_STRUCT(Chmod);
@@ -447,8 +449,6 @@ UTILITY_STRUCT(Uname);
 UTILITY_STRUCT(Who);
 UTILITY_STRUCT(Bc);
 UTILITY_STRUCT(Expr);
-UTILITY_STRUCT(Uuencode);
-UTILITY_STRUCT(Uudecode);
 UTILITY_STRUCT(Xargs);
 UTILITY_STRUCT(Logger);
 UTILITY_STRUCT(Nice);
@@ -509,9 +509,23 @@ cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt,
                                            StringView message) throws -> void;
 
+cold noinline fn report_soft_koshkit_error(EvalContext &cxt,
+                                           SourceLocation location,
+                                           StringView message) throws -> void;
+
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt, StringView message,
                                            StringView note) throws -> void;
+
+cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
+                                                EvalContext &cxt,
+                                                StringView utility_name,
+                                                StringView message) throws
+    -> void;
+
+cold noinline fn report_soft_koshkit_util_error(
+    const ExecContext &ec, EvalContext &cxt, SourceLocation location,
+    StringView utility_name, StringView message) throws -> void;
 
 } /* namespace koshkit */
 

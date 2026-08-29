@@ -28,14 +28,21 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const settings = parse_util_operands(FLAG_LIST, args, &arg_locations,
-                                           NULL, false, false, true);
+  let setting_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const settings = parse_util_operands(
+      FLAG_LIST, args, &arg_locations, &setting_locations, false, false, true);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   let const should_report_all = FLAG_STTY_ALL.is_enabled();
   let const should_encode = FLAG_STTY_ENCODE.is_enabled();
+  if (should_report_all && should_encode) {
+    report_soft_koshkit_util_error(ec, cxt, FLAG_STTY_ENCODE.value_location(),
+                                   args[0].view(),
+                                   "-a and -g cannot be used together");
+    return 1;
+  }
   let const should_report =
       settings.is_empty() || should_report_all || should_encode;
   let const terminal = ec.in_fd.value_or(KOSH_STDIN);
@@ -43,16 +50,25 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
     let const output = os::terminal_settings(
         terminal, should_encode, should_report_all, cxt.scratch_allocator());
     if (!output.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "stty: standard input is not a terminal");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "standard input is not a terminal");
       return 1;
     }
     ec.print_to_stdout(output->view());
   }
-  if (!settings.is_empty() && !os::apply_terminal_settings(terminal, settings))
-  {
-    report_soft_koshkit_error(ec, cxt, "stty: invalid terminal setting");
-    return 1;
+  if (!settings.is_empty()) {
+    let const result = os::apply_terminal_settings(terminal, settings);
+    if (result.kind == os::terminal_settings_apply_kind::SystemError) {
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     os::last_system_error_message());
+      return 1;
+    }
+    if (result.kind == os::terminal_settings_apply_kind::InvalidSetting) {
+      report_soft_koshkit_util_error(
+          ec, cxt, setting_locations[result.setting_position], args[0].view(),
+          "invalid terminal setting");
+      return 1;
+    }
   }
   return 0;
 }

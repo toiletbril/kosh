@@ -54,6 +54,7 @@ struct file_magic_path
 {
   usize position;
   StringView path;
+  SourceLocation location;
 };
 
 static pure fn magic_digit(char byte) wontthrow -> u8
@@ -192,7 +193,7 @@ static fn parse_magic_type(StringView text, file_magic_rule &rule) throws
     position = 5;
   } else if (text.starts_with("long")) {
     rule.kind = file_magic_kind::Signed;
-    rule.byte_count = 8;
+    rule.byte_count = 4;
     position = 4;
   } else if (text[0] == 's') {
     rule.kind = file_magic_kind::String;
@@ -483,20 +484,25 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   let const allocator = cxt.scratch_allocator();
+  i32 status = 0;
   ArrayList<file_magic_path> magic_paths{allocator};
   for (usize index = 0; index < FLAG_FILE_MAGIC.count(); index++)
     magic_paths.push(file_magic_path{FLAG_FILE_MAGIC.get_position(index),
-                                     FLAG_FILE_MAGIC.get(index)});
+                                     FLAG_FILE_MAGIC.get(index),
+                                     FLAG_FILE_MAGIC.get_location(index)});
   for (usize index = 0; index < FLAG_FILE_MAGIC_ONLY.count(); index++)
     magic_paths.push(file_magic_path{FLAG_FILE_MAGIC_ONLY.get_position(index),
-                                     FLAG_FILE_MAGIC_ONLY.get(index)});
+                                     FLAG_FILE_MAGIC_ONLY.get(index),
+                                     FLAG_FILE_MAGIC_ONLY.get_location(index)});
   for (usize index = 1; index < magic_paths.count(); index++) {
     let current = magic_paths[index];
     usize destination = index;
@@ -511,8 +517,13 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<file_magic_rule> magic_rules{allocator};
   for (let const &magic_path : magic_paths) {
-    if (!append_magic_database(magic_path.path, magic_rules, allocator))
-      ec.print_to_stderr("file: cannot open " + magic_path.path + "\n");
+    if (!append_magic_database(magic_path.path, magic_rules, allocator)) {
+      report_soft_koshkit_util_error(
+          ec, cxt, magic_path.location, args[0].view(),
+          "cannot open '" + String{allocator, magic_path.path} +
+              "': " + os::last_system_error_message());
+      status = 1;
+    }
   }
 
   let const should_apply_default_tests =
@@ -521,16 +532,22 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       !FLAG_FILE_NO_FOLLOW.is_enabled() ||
       FLAG_FILE_FOLLOW.position() > FLAG_FILE_NO_FOLLOW.position();
 
-  for (let const &operand : operands) {
+  for (usize operand_position = 0; operand_position < operands.count();
+       operand_position++)
+  {
+    let const &operand = operands[operand_position];
     os::file_status file_status{};
     if (!os::stat_path(operand.view(), file_status)) {
-      ec.print_to_stdout(operand + ": cannot open\n");
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[operand_position], args[0].view(),
+          "cannot open '" + operand + "': " + os::last_system_error_message());
+      status = 1;
       continue;
     }
 
     let const is_symbolic_link = os::file_type_letter(file_status.mode) == 'l';
     if (is_symbolic_link) {
-      let const target = os::read_symlink(operand.view());
+      let const target = os::read_symlink(operand.view(), allocator);
       if (!should_follow ||
           !os::stat_path_following(operand.view(), file_status))
       {
@@ -559,7 +576,11 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       let const descriptor =
           os::open_file_descriptor(operand.view(), os::file_open_mode::Read);
       if (!descriptor.has_value()) {
-        ec.print_to_stdout(operand + ": cannot open\n");
+        report_soft_koshkit_util_error(
+            ec, cxt, operand_locations[operand_position], args[0].view(),
+            "cannot open '" + operand +
+                "': " + os::last_system_error_message());
+        status = 1;
         continue;
       }
       defer { os::close_fd(*descriptor); };
@@ -567,7 +588,11 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       if (!magic_rules.is_empty()) {
         let const contents = os::read_fd_to_string(*descriptor, allocator);
         if (!contents.has_value()) {
-          ec.print_to_stdout(operand + ": cannot open\n");
+          report_soft_koshkit_util_error(
+              ec, cxt, operand_locations[operand_position], args[0].view(),
+              "cannot read '" + operand +
+                  "': " + os::last_system_error_message());
+          status = 1;
           continue;
         }
         if (contents->is_empty()) {
@@ -589,7 +614,11 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       char buffer[8192];
       let const read_count = os::read_fd(*descriptor, buffer, sizeof(buffer));
       if (!read_count.has_value()) {
-        ec.print_to_stdout(operand + ": cannot open\n");
+        report_soft_koshkit_util_error(
+            ec, cxt, operand_locations[operand_position], args[0].view(),
+            "cannot read '" + operand +
+                "': " + os::last_system_error_message());
+        status = 1;
         continue;
       }
       description += file_content_description(StringView{buffer, *read_count});
@@ -600,7 +629,7 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
     ec.print_to_stdout(operand + ": " + description + "\n");
   }
 
-  return 0;
+  return status;
 }
 
 } // namespace koshka::koshkit

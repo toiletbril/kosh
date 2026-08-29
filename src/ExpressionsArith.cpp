@@ -820,8 +820,6 @@ static fn evaluate_subshell_in_process(const Expression *body,
 {
   ASSERT(body != nullptr);
 
-  cxt.set_terminal_exec_allowed(false);
-
   /* This shell has no process-level subshell, so isolation is by snapshot. A
      loop in the parent is not the subshell's to break, so the body runs with a
      fresh loop count. */
@@ -832,22 +830,26 @@ static fn evaluate_subshell_in_process(const Expression *body,
   LOG(Debug, "entering the snapshot subshell");
 
   let snapshot = cxt.snapshot_state();
-
-  /* The defer runs after restore_state on both the normal and the thrown
-     path. */
   let const subshell_mark = cxt.scratch_mark();
   defer { cxt.scratch_release(subshell_mark); };
-  cxt.enter_subshell();
-  /* The inherited EXIT action belongs to the parent and must not fire at the
-     subshell's end. An EXIT action the body sets survives this clear. */
-  cxt.clear_inherited_exit_trap();
+  bool did_enter_subshell = false;
   i64 ret = 0;
   try {
-    ret = body->evaluate(cxt);
-  } catch (const ErrorBase &error) {
-    /* A script-fatal error is confined to the subshell in every mood, status 1
-       the way bash answers it and 2 the way dash does. */
-    if (error.is_script_fatal()) {
+    cxt.set_terminal_exec_allowed(false);
+    cxt.enter_subshell();
+    did_enter_subshell = true;
+    /* The inherited EXIT action belongs to the parent and must not fire at the
+       subshell's end. An EXIT action the body sets survives this clear. */
+    cxt.clear_inherited_exit_trap();
+    try {
+      ret = body->evaluate(cxt);
+    } catch (const ErrorBase &error) {
+      /* A script-fatal error is confined to the subshell in every mood, status
+         1 the way bash answers it and 2 the way dash does. */
+      if (!error.is_script_fatal()) {
+        cxt.run_subshell_exit_trap();
+        throw;
+      }
       LOG(Debug, "the subshell confined a script-fatal error: %s",
           error.message().c_str());
       const String *source = cxt.current_source();
@@ -856,35 +858,30 @@ static fn evaluate_subshell_in_process(const Expression *body,
       ret = cxt.is_bash_compatible() ? 1 : 2;
       cxt.set_last_exit_status(static_cast<i32>(ret));
       cxt.clear_control_flow();
-    } else {
-      cxt.run_subshell_exit_trap();
-      cxt.leave_subshell();
-      cxt.restore_state(steal(snapshot));
-      throw;
     }
-  } catch (...) {
+
+    /* Exit and return end only the subshell. A break or continue is scoped to a
+       loop inside it and is consumed here. */
+    if (cxt.has_pending_control_flow()) {
+      let const kind = cxt.pending_control_flow().kind;
+      if (kind == control_flow::Kind::Exit ||
+          kind == control_flow::Kind::Return)
+      {
+        ret = cxt.pending_control_flow().value;
+        cxt.clear_control_flow();
+      } else if (kind == control_flow::Kind::Break ||
+                 kind == control_flow::Kind::Continue)
+      {
+        cxt.clear_control_flow();
+      }
+    }
+
     cxt.run_subshell_exit_trap();
-    cxt.leave_subshell();
+  } catch (...) {
+    if (did_enter_subshell) cxt.leave_subshell();
     cxt.restore_state(steal(snapshot));
     throw;
   }
-
-  /* Exit and return end only the subshell. A break or continue is scoped to a
-     loop inside it and is consumed here. */
-  if (cxt.has_pending_control_flow()) {
-    let const kind = cxt.pending_control_flow().kind;
-    if (kind == control_flow::Kind::Exit || kind == control_flow::Kind::Return)
-    {
-      ret = cxt.pending_control_flow().value;
-      cxt.clear_control_flow();
-    } else if (kind == control_flow::Kind::Break ||
-               kind == control_flow::Kind::Continue)
-    {
-      cxt.clear_control_flow();
-    }
-  }
-
-  cxt.run_subshell_exit_trap();
   cxt.leave_subshell();
   cxt.restore_state(steal(snapshot));
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);

@@ -73,6 +73,70 @@
             [SimpleCommand "echo" "got $l"]
   [CompoundListCondition, None]
     [Pipeline]
+      [SimpleCommand "printf" "yes\n"]
+      [IfClause]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-r" "answer"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "test" "$answer" "=" "yes"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "if-direct"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "no\n"]
+      [IfClause]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-r" "answer"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "test" "$answer" "=" "yes"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "if-missed"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "if-else"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "later\n"]
+      [IfClause]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-r" "answer"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "test" "$answer" "=" "first"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "if-missed"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "test" "$answer" "=" "later"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "if-elif"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "case-value\n"]
+      [CaseClause]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "case-stage"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [CStyleForLoop "pipeline_index = 0; pipeline_index < 2; pipeline_index++"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "cfor-$pipeline_index"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
       [SimpleCommand "true"]
       [SimpleCommand "false"]
   [CompoundListCondition, None]
@@ -285,6 +349,244 @@
   Unquoted "done"
 ]
 [Word
+  Unquoted "printf"
+]
+[Word
+  Literal "yes\n"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "answer"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Variable "answer"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "if-direct"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "no\n"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "answer"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Variable "answer"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "if-missed"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "if-else"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "later\n"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "answer"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Variable "answer"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "if-missed"
+]
+[Word
+  Unquoted "elif"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Variable "answer"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "later"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "if-elif"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "case-value\n"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  CommandSubstitution "cat"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "case-value"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "case-stage"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "pipeline_index"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "pipeline_index"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "pipeline_index++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cfor-"
+  Variable "pipeline_index"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
   Unquoted "true"
 ]
 [Word
@@ -395,25 +697,25 @@ note: Add `-r` to read the line literally.
     15 |  printf 'a\nb\nc\n' | while read l; do echo "got $l"; done
        |                             ^~~~~~
 note: Add `-r` to read the line literally.
-17:8: warning: The 'false' command never reads the upstream output. (SC2216)
-    17 |  true | false
+37:8: warning: The 'false' command never reads the upstream output. (SC2216)
+    37 |  true | false
        |         ^~~~~
-19:9: warning: The 'true' command never reads the upstream output. (SC2216)
-    19 |  false | true
+39:9: warning: The 'true' command never reads the upstream output. (SC2216)
+    39 |  false | true
        |          ^~~~
-21:17: warning: The `read` runs in the pipeline subshell. (SC2030)
-    21 |  false | read -r x
+41:17: warning: The `read` runs in the pipeline subshell. (SC2030)
+    41 |  false | read -r x
        |                  ^
 note: Feed the loop with a redirection or process substitution.
-23:19: warning: The `read` runs in the pipeline subshell. (SC2030)
-    23 |  echo hi | read -r y
+43:19: warning: The `read` runs in the pipeline subshell. (SC2030)
+    43 |  echo hi | read -r y
        |                    ^
 note: Feed the loop with a redirection or process substitution.
-25:8: warning: The 'true' command never reads the upstream output. (SC2216)
-    25 |  true | true
+45:8: warning: The 'true' command never reads the upstream output. (SC2216)
+    45 |  true | true
        |         ^~~~
-27:10: warning: The 'false' command never reads the upstream output. (SC2216)
-    27 |  ! true | false
+47:10: warning: The 'false' command never reads the upstream output. (SC2216)
+    47 |  ! true | false
        |           ^~~~~
 Encountered 10 warnings.
 x
@@ -428,6 +730,12 @@ hi
 got a
 got b
 got c
+if-direct
+if-else
+if-elif
+case-stage
+cfor-0
+cfor-1
 tf=1
 ft=1
 fr=1

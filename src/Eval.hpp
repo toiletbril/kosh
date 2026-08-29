@@ -460,7 +460,7 @@ public:
     });
   }
 
-  fn snapshot_state() const throws -> eval_state_snapshot;
+  fn snapshot_state() throws -> eval_state_snapshot;
   fn restore_state(eval_state_snapshot snapshot) throws -> void;
 
   fn enter_subshell() wontthrow -> void;

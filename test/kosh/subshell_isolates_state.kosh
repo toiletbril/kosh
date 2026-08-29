@@ -35,4 +35,31 @@ echo after-plain
 echo exit-rc=$?
 v=$( trap "echo CSUB" EXIT; echo captured )
 echo got=$v
+
+set -- -ab
+OPTIND=1
+( getopts ab child_option )
+getopts ab parent_option
+echo "getopts-parent=$parent_option:$OPTIND"
+
+complete -W parent completion-command
+( complete -W child completion-command )
+complete -p completion-command
+completion_output=$(complete -W substitution completion-command)
+complete -p completion-command
+
+sleep 0.2 &
+parent_background=$!
+( sleep 0.2 & : )
+if [ "$!" = "$parent_background" ]; then
+  echo background-pid-restored
+else
+  echo background-pid-leaked
+fi
+if [ "$(jobs -p | koshkit wc -l)" -eq 1 ]; then
+  echo jobs-restored
+else
+  echo jobs-leaked
+fi
+wait "$parent_background"
 echo done

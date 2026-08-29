@@ -161,6 +161,67 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "got=$v"]
   [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "-ab"]
+  [CompoundListCondition, None]
+    [Assign OPTIND=1]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "getopts" "ab" "child_option"]
+  [CompoundListCondition, None]
+    [SimpleCommand "getopts" "ab" "parent_option"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "getopts-parent=$parent_option:$OPTIND"]
+  [CompoundListCondition, None]
+    [SimpleCommand "complete" "-W" "parent" "completion-command"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "complete" "-W" "child" "completion-command"]
+  [CompoundListCondition, None]
+    [SimpleCommand "complete" "-p" "completion-command"]
+  [CompoundListCondition, None]
+    [Assign completion_output=$(complete -W substitution completion-command)]
+  [CompoundListCondition, None]
+    [SimpleCommand "complete" "-p" "completion-command"]
+  [CompoundListCondition, None]
+    [SimpleCommand "sleep" "0.2", Async]
+  [CompoundListCondition, None]
+    [Assign parent_background=$!]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "sleep" "0.2", Async]
+        [CompoundListCondition, None]
+          [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$!" "=" "$parent_background" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "background-pid-restored"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "background-pid-leaked"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$(jobs -p | koshkit wc -l)" "-eq" "1" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "jobs-restored"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "jobs-leaked"]
+  [CompoundListCondition, None]
+    [SimpleCommand "wait" "$parent_background"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "done"]
 [Word
   Unquoted "koshkit"
@@ -559,6 +620,194 @@
   Variable "v"
 ]
 [Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "-ab"
+]
+[Word
+  Unquoted "OPTIND=1"
+]
+[Word
+  Unquoted "getopts"
+]
+[Word
+  Unquoted "ab"
+]
+[Word
+  Unquoted "child_option"
+]
+[Word
+  Unquoted "getopts"
+]
+[Word
+  Unquoted "ab"
+]
+[Word
+  Unquoted "parent_option"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "getopts-parent="
+  Variable "parent_option"
+  DoubleQuoted ":"
+  Variable "OPTIND"
+]
+[Word
+  Unquoted "complete"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "parent"
+]
+[Word
+  Unquoted "completion-command"
+]
+[Word
+  Unquoted "complete"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "child"
+]
+[Word
+  Unquoted "completion-command"
+]
+[Word
+  Unquoted "complete"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "completion-command"
+]
+[Word
+  Unquoted "completion_output="
+  CommandSubstitution "complete -W substitution completion-command"
+]
+[Word
+  Unquoted "complete"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "completion-command"
+]
+[Word
+  Unquoted "sleep"
+]
+[Word
+  Unquoted "0.2"
+]
+[Word
+  Unquoted "parent_background="
+  Variable "!"
+]
+[Word
+  Unquoted "sleep"
+]
+[Word
+  Unquoted "0.2"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "!"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Variable "parent_background"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "background-pid-restored"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "background-pid-leaked"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  CommandSubstitution "jobs -p | koshkit wc -l"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "jobs-restored"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "jobs-leaked"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "wait"
+]
+[Word
+  Variable "parent_background"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -584,6 +833,11 @@ plain-sub
 after-plain
 exit-rc=3
 got=captured CSUB
+getopts-parent=a:1
+complete -W 'parent' completion-command
+complete -W 'parent' completion-command
+background-pid-restored
+jobs-restored
 done
 [Code 0]
 PARENT

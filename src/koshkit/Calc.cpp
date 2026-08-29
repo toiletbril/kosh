@@ -1,6 +1,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../EvalOperations.hpp"
 #include "../Koshkit.hpp"
 #include "../Lexer.hpp"
 #include "../Platform.hpp"
@@ -41,6 +42,17 @@ namespace {
 fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
                 StringView expression) throws -> i32
 {
+  if (let const operator_position =
+          obvious_xor_power_operator_position(expression))
+  {
+    let const warning = WarningWithLocationAndDetails{
+        SourceLocation{*operator_position, 1},
+        "The `^` operator performs bitwise XOR in Bash arithmetic",
+        "Use `**`, the Bash power operator, if you meant exponentiation"
+    };
+    show_message(warning.to_string(expression, &cxt));
+  }
+
   try {
     let result = cxt.evaluate_calculator_arithmetic_text(expression);
     result += '\n';

@@ -26,7 +26,7 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Renice);
 namespace koshka::koshkit {
 
 static fn renice_identifier(StringView text, os::priority_target target) throws
-    -> i64
+    -> Maybe<i64>
 {
   let const parsed = utils::parse_decimal_i64(text);
   if (!parsed.is_error() && parsed.value() >= 0) return parsed.value();
@@ -34,7 +34,7 @@ static fn renice_identifier(StringView text, os::priority_target target) throws
     let const user = os::username_to_uid(text);
     if (user.has_value()) return *user;
   }
-  throw Error{"renice: invalid identifier '" + String{text} + "'"};
+  return None;
 }
 
 Renice::Renice() = default;
@@ -46,7 +46,9 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -60,30 +62,47 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
   let const parsed = utils::parse_decimal_i64(FLAG_RENICE_INCREMENT.value());
   if (parsed.is_error() || parsed.value() < INT32_MIN ||
       parsed.value() > INT32_MAX)
-    throw Error{"renice: invalid increment"};
+  {
+    report_soft_koshkit_util_error(
+        ec, cxt, FLAG_RENICE_INCREMENT.value_location(), args[0].view(),
+        "invalid increment '" + String{FLAG_RENICE_INCREMENT.value()} + "'");
+    return 2;
+  }
   let const increment = parsed.value();
   let const target =
       FLAG_RENICE_GROUP.is_enabled()  ? os::priority_target::ProcessGroup
       : FLAG_RENICE_USER.is_enabled() ? os::priority_target::User
                                       : os::priority_target::Process;
   i32 result = 0;
-  for (let const &operand : operands) {
+  for (usize operand_position = 0; operand_position < operands.count();
+       operand_position++)
+  {
+    let const &operand = operands[operand_position];
     let const id = renice_identifier(operand.view(), target);
-    let const current = os::get_priority(target, id);
+    if (!id.has_value()) {
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[operand_position], args[0].view(),
+          "invalid identifier '" + operand + "'");
+      result = 1;
+      continue;
+    }
+    let const current = os::get_priority(target, *id);
     if (!current.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "renice: cannot read priority for '" + operand +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[operand_position], args[0].view(),
+          "cannot read priority for '" + operand +
+              "': " + os::last_system_error_message());
       result = 1;
       continue;
     }
     let priority = static_cast<i64>(*current) + increment;
     if (priority < -20) priority = -20;
     if (priority > 19) priority = 19;
-    if (!os::set_priority(target, id, static_cast<i32>(priority))) {
-      report_soft_koshkit_error(ec, cxt,
-                                "renice: cannot adjust '" + operand +
-                                    "': " + os::last_system_error_message());
+    if (!os::set_priority(target, *id, static_cast<i32>(priority))) {
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[operand_position], args[0].view(),
+          "cannot adjust '" + operand +
+              "': " + os::last_system_error_message());
       result = 1;
     }
   }

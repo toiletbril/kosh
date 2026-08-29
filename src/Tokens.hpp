@@ -32,8 +32,12 @@ struct arith_token
    an unevaluated segment carries a null pointer. */
 struct arith_token_cache
 {
-  ArrayList<arith_token> tokens{heap_allocator()};
-  String exact_constant_text{heap_allocator()};
+  explicit arith_token_cache(Allocator allocator = heap_allocator())
+      : tokens{allocator}, exact_constant_text{allocator}
+  {}
+
+  ArrayList<arith_token> tokens;
+  String exact_constant_text;
   bool is_tokenized{false};
   bool is_simple{false};
   bool has_exact_constant_text{false};
@@ -48,8 +52,7 @@ struct segment_eval_cache
   arith_token_cache *arith{nullptr};
   BumpArena::LifetimeIdentity substitution_lifetime{};
   BumpArena::LifetimeIdentity arithmetic_lifetime{};
-  i64 folded_arithmetic_result{0};
-  bool has_folded_arithmetic_result{false};
+  bool has_optimizer_arithmetic_result{false};
 };
 
 /* The text of one word segment. A parsed segment borrows its bytes from the
@@ -403,23 +406,18 @@ public:
     return copy;
   }
 
-  hot pure fn has_folded_arithmetic_result() const wontthrow -> bool
+  hot pure fn has_optimizer_arithmetic_result() const wontthrow -> bool
   {
     return m_eval_cache != nullptr &&
-           m_eval_cache->has_folded_arithmetic_result;
+           m_eval_cache->has_optimizer_arithmetic_result;
   }
 
-  pure fn get_folded_arithmetic_result() const wontthrow -> i64
-  {
-    ASSERT(has_folded_arithmetic_result());
-    return m_eval_cache->folded_arithmetic_result;
-  }
-
-  fn set_folded_arithmetic_result(i64 result) const throws -> void
+  fn set_optimizer_arithmetic_result(StringView exact_text = {}) const throws
+      -> void
   {
     let &cache = get_eval_cache();
-    cache.folded_arithmetic_result = result;
-    cache.has_folded_arithmetic_result = true;
+    cache.has_optimizer_arithmetic_result = true;
+    if (!exact_text.is_empty()) set_exact_constant_arithmetic_text(exact_text);
   }
 
   fn move_resources_to_arena(BumpArena &arena) throws -> void;
@@ -451,6 +449,7 @@ public:
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 
 private:
+  fn set_exact_constant_arithmetic_text(StringView text) const throws -> void;
   fn release_eval_cache() wontthrow -> void;
 
   mutable segment_eval_cache *m_eval_cache{nullptr};

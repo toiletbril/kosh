@@ -112,7 +112,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
   let const source_status = source_file_status(source);
 
   if (source_path.is_symbolic_link() && is_recursive) {
-    if (let const target = os::read_symlink(source)) {
+    if (let const target = os::read_symlink(source, allocator)) {
       /* Symlink creation fails when the path is already present, so an existing
          destination is removed first. */
       if ((destination_path.exists() || destination_path.is_symbolic_link()) &&

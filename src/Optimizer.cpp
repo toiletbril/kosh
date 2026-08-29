@@ -242,9 +242,29 @@ fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>
   }
 }
 
+fn try_fold_exact_constant_arithmetic(StringView expression) wontthrow
+    -> Maybe<String>
+{
+  if (expression.length == 0) return None;
+
+  for (usize i = 0; i < expression.length; i++) {
+    if (!is_constant_arithmetic_byte(expression[i])) return None;
+  }
+
+  try {
+    return evaluate_constant_arithmetic_text(expression, heap_allocator());
+  } catch (const ErrorBase &) {
+    LOG(All,
+        "swallowed an exact arithmetic error while folding '%.*s', leaving "
+        "the segment for the runtime path",
+        static_cast<int>(expression.length), expression.data);
+    return None;
+  }
+}
+
 fn try_fold_arithmetic_with_constants(StringView expression,
                                       const AnalysisContext &actx) wontthrow
-    -> Maybe<i64>
+    -> Maybe<String>
 {
   if (expression.length == 0) return None;
   if (actx.constant_variables.count() == 0) return None;
@@ -286,7 +306,8 @@ fn try_fold_arithmetic_with_constants(StringView expression,
     for (usize j = 0; j < rewritten.count(); j++) {
       if (!is_constant_arithmetic_byte(rewritten[j])) return None;
     }
-    return evaluate_constant_arithmetic(rewritten.view());
+    return evaluate_constant_arithmetic_text(rewritten.view(),
+                                             heap_allocator());
   } catch (const ErrorBase &) {
     LOG(All,
         "swallowed an arithmetic error while folding '%.*s' with constants",
@@ -460,31 +481,32 @@ fn fold_constant_arithmetic_in_word(
   bool did_fold = false;
   for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
-    if (segment.has_folded_arithmetic_result()) continue;
+    if (segment.has_optimizer_arithmetic_result()) continue;
 
     if (arithmetic_has_side_effect(segment.text.view())) {
       actx.constant_variables.clear();
       continue;
     }
 
-    let result = try_fold_constant_arithmetic(segment.text.view());
+    let result = try_fold_exact_constant_arithmetic(segment.text.view());
+    let const is_direct_constant = result.has_value();
     if (!result.has_value())
       result = try_fold_arithmetic_with_constants(segment.text.view(), actx);
     if (result.has_value()) {
-      LOG(All, "folded the constant arithmetic '%.*s' to %lld",
+      LOG(All, "folded the constant arithmetic '%.*s' to %s",
           static_cast<int>(segment.text.view().length),
-          segment.text.view().data, static_cast<long long>(*result));
-      segment.set_folded_arithmetic_result(*result);
+          segment.text.view().data, result->c_str());
+      segment.set_optimizer_arithmetic_result(
+          is_direct_constant ? result->view() : StringView{});
       did_fold = true;
       actx.optimizer_eliminated_count++;
       if (actx.should_report_optimizer_diagnostics) {
-        let const folded = String::from(*result, heap_allocator());
         let const segment_location =
             segment.get_source_location(fallback_location.source_name_index);
         actx.report_diagnostic(diagnostic_id::optimizer_folded_arithmetic,
                                segment_location.has_value() ? *segment_location
                                                             : fallback_location,
-                               {segment.text.view(), folded.view()});
+                               {segment.text.view(), result->view()});
       }
     }
   }

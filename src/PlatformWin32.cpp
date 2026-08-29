@@ -27,16 +27,44 @@ fn write_system_log(StringView tag, StringView priority, StringView message,
                     bool should_include_pid,
                     bool should_copy_to_stderr) wontthrow -> bool
 {
-  unused(priority);
-  unused(should_include_pid);
   let output = String{heap_allocator(), tag};
+  if (should_include_pid) {
+    output += '[';
+    output += String::from(GetCurrentProcessId(), heap_allocator());
+    output += ']';
+  }
   if (!output.is_empty()) output += ": ";
   output += message;
   output += '\n';
-  OutputDebugStringA(output.c_str());
-  if (should_copy_to_stderr)
+
+  WORD event_type = EVENTLOG_INFORMATION_TYPE;
+  let const dot = priority.find_character('.');
+  let const severity =
+      dot.has_value() ? priority.substring(*dot + 1) : priority;
+  if (severity == "emerg" || severity == "alert" || severity == "crit" ||
+      severity == "err")
+  {
+    event_type = EVENTLOG_ERROR_TYPE;
+  } else if (severity == "warning" || severity == "notice") {
+    event_type = EVENTLOG_WARNING_TYPE;
+  } else if (severity != "info" && severity != "debug") {
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return false;
+  }
+
+  let const source_name =
+      String{heap_allocator(), tag.is_empty() ? "kosh" : tag};
+  let const event_source = RegisterEventSourceA(nullptr, source_name.c_str());
+  if (event_source == nullptr) return false;
+  defer { DeregisterEventSource(event_source); };
+  const char *event_strings[] = {output.c_str()};
+  let const was_reported = ReportEventA(event_source, event_type, 0, 0, nullptr,
+                                        1, 0, event_strings, nullptr) != FALSE;
+  if (should_copy_to_stderr) {
     unused(write_fd(KOSH_STDERR, output.view().data, output.length()));
-  return true;
+  }
+
+  return was_reported;
 }
 
 fn write_fd(os::descriptor fd, const opaque *buf, usize size) wontthrow
@@ -372,6 +400,23 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return handle != nullptr ? handle : KOSH_INVALID_FD;
 }
 
+fn descriptors_refer_to_same_file(os::descriptor first,
+                                  os::descriptor second) wontthrow -> bool
+{
+  if (first == KOSH_INVALID_FD || second == KOSH_INVALID_FD) return false;
+  if (first == second) return true;
+
+  BY_HANDLE_FILE_INFORMATION first_info{};
+  BY_HANDLE_FILE_INFORMATION second_info{};
+  if (GetFileInformationByHandle(first, &first_info) == 0 ||
+      GetFileInformationByHandle(second, &second_info) == 0)
+    return false;
+
+  return first_info.dwVolumeSerialNumber == second_info.dwVolumeSerialNumber &&
+         first_info.nFileIndexHigh == second_info.nFileIndexHigh &&
+         first_info.nFileIndexLow == second_info.nFileIndexLow;
+}
+
 fn descriptor_from_fd_number(i64 fd_number) wontthrow -> os::descriptor
 {
   return reinterpret_cast<os::descriptor>(
@@ -588,99 +633,20 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
   return right < left ? 1 : 0;
 }
 
-fn compile_regex(StringView pattern, case_sensitivity sensitivity,
-                 compiled_regex &out) throws -> regex_compile_result
-{
-  unused(pattern);
-  unused(sensitivity);
-  unused(out);
-  return regex_compile_result::Invalid;
-}
-
-fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
-                       compiled_regex &out) throws -> regex_compile_result
-{
-  unused(pattern);
-  unused(sensitivity);
-  unused(out);
-  return regex_compile_result::Invalid;
-}
-
-fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message,
-                 Allocator scratch) throws -> regex_match_result
-{
-  unused(compiled);
-  unused(subject);
-  unused(spans);
-  unused(error_message);
-  unused(scratch);
-  return regex_match_result::Error;
-}
-
-fn free_regex(compiled_regex &compiled) wontthrow -> void { unused(compiled); }
-
-fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
-                        compiled_regex &out) throws -> regex_compile_result
-{
-  out.pattern = String{heap_allocator(), pattern};
-  out.is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
-  return regex_compile_result::Ok;
-}
-
-fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool
-{
-  const StringView needle = compiled.pattern.view();
-  if (needle.length == 0) return true;
-  if (needle.length > subject.length) return false;
-
-  if (!compiled.is_case_insensitive) {
-    usize start = 0;
-    while (start + needle.length <= subject.length) {
-      let const found = subject.substring(start).find_character(needle[0]);
-      if (!found.has_value()) return false;
-      start += *found;
-      if (start + needle.length > subject.length) return false;
-
-      bool is_matched = true;
-      for (usize k = 1; k < needle.length; k++)
-        if (subject[start + k] != needle[k]) {
-          is_matched = false;
-          break;
-        }
-      if (is_matched) return true;
-      start++;
-    }
-    return false;
-  }
-
-  for (usize start = 0; start + needle.length <= subject.length; start++) {
-    bool is_matched = true;
-    for (usize k = 0; k < needle.length; k++) {
-      if (utils::ascii_to_lower(subject[start + k]) !=
-          utils::ascii_to_lower(needle[k]))
-      {
-        is_matched = false;
-        break;
-      }
-    }
-    if (is_matched) return true;
-  }
-
-  return false;
-}
-
 fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 {
+  SYSTEM_INFO system_info{};
+  GetSystemInfo(&system_info);
   switch (key) {
   case system_configuration_key::ArgMax: return 32767;
-  case system_configuration_key::ChildMax: return 256;
-  case system_configuration_key::ClockTicks: return 100;
-  case system_configuration_key::GroupsMax: return 0;
-  case system_configuration_key::OpenMax: return 512;
-  case system_configuration_key::PageSize: return 4096;
-  case system_configuration_key::StreamMax: return 512;
-  case system_configuration_key::PosixVersion: return 200809;
+  case system_configuration_key::ChildMax: return None;
+  case system_configuration_key::ClockTicks: return None;
+  case system_configuration_key::GroupsMax: return None;
+  case system_configuration_key::OpenMax: return _getmaxstdio();
+  case system_configuration_key::PageSize:
+    return static_cast<i64>(system_info.dwPageSize);
+  case system_configuration_key::StreamMax: return _getmaxstdio();
+  case system_configuration_key::PosixVersion: return None;
   }
   return None;
 }
@@ -688,17 +654,34 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>
 {
-  unused(path);
+  let const path_text = String{heap_allocator(), path};
+  if (GetFileAttributesA(path_text.c_str()) == INVALID_FILE_ATTRIBUTES)
+    return None;
   switch (key) {
   case path_configuration_key::LinkMax: return 1024;
-  case path_configuration_key::MaxCanonical: return 255;
-  case path_configuration_key::MaxInput: return 255;
-  case path_configuration_key::NameMax: return 255;
+  case path_configuration_key::MaxCanonical: return None;
+  case path_configuration_key::MaxInput: return None;
+  case path_configuration_key::NameMax: {
+    char volume_path[MAX_PATH];
+    if (GetVolumePathNameA(path_text.c_str(), volume_path,
+                           countof(volume_path)) == FALSE)
+    {
+      return None;
+    }
+    DWORD maximum_component_length = 0;
+    if (GetVolumeInformationA(volume_path, nullptr, 0, nullptr,
+                              &maximum_component_length, nullptr, nullptr,
+                              0) == FALSE)
+    {
+      return None;
+    }
+    return static_cast<i64>(maximum_component_length);
+  }
   case path_configuration_key::PathMax: return 32767;
-  case path_configuration_key::PipeBuffer: return 4096;
+  case path_configuration_key::PipeBuffer: return None;
   case path_configuration_key::ChownRestricted: return 1;
   case path_configuration_key::NoTrunc: return 1;
-  case path_configuration_key::DisableCharacter: return 0;
+  case path_configuration_key::DisableCharacter: return None;
   }
   return None;
 }
@@ -748,17 +731,73 @@ fn terminal_settings(descriptor terminal, bool should_encode,
                      bool should_report_all, Allocator allocator) throws
     -> Maybe<String>
 {
-  unused(should_encode);
-  unused(should_report_all);
-  if (!is_fd_a_tty(terminal)) return None;
-  return String{allocator, "speed 0 baud; echo icanon isig\n"};
+  DWORD mode = 0;
+  if (GetConsoleMode(terminal, &mode) == FALSE) return None;
+  if (should_encode) {
+    char encoded[32];
+    let const length = std::snprintf(encoded, sizeof(encoded), "win32:%08lx\n",
+                                     static_cast<unsigned long>(mode));
+    return String{
+        allocator, StringView{encoded, static_cast<usize>(length)}
+    };
+  }
+  let output = String{allocator, "speed 0 baud; "};
+  if ((mode & ENABLE_ECHO_INPUT) == 0) output += '-';
+  output += "echo ";
+  if ((mode & ENABLE_LINE_INPUT) == 0) output += '-';
+  output += "icanon ";
+  if ((mode & ENABLE_PROCESSED_INPUT) == 0) output += '-';
+  output += "isig";
+  if (should_report_all) output += "; rows 0; columns 0";
+  output += '\n';
+  return output;
 }
 
 fn apply_terminal_settings(descriptor terminal,
-                           const ArrayList<String> &settings) wontthrow -> bool
+                           const ArrayList<String> &settings) wontthrow
+    -> terminal_settings_apply_result
 {
-  unused(settings);
-  return is_fd_a_tty(terminal);
+  DWORD mode = 0;
+  if (GetConsoleMode(terminal, &mode) == FALSE)
+    return {terminal_settings_apply_kind::SystemError, 0};
+  for (usize setting_position = 0; setting_position < settings.count();
+       setting_position++)
+  {
+    let const &setting_text = settings[setting_position];
+    let const setting = setting_text.view();
+    if (setting.starts_with(StringView{"win32:"})) {
+      let const encoded = String{heap_allocator(), setting.substring(6)};
+      char *end = nullptr;
+      let const parsed = std::strtoul(encoded.c_str(), &end, 16);
+      if (end == encoded.c_str() || *end != '\0' || parsed > MAXDWORD) {
+        return {terminal_settings_apply_kind::InvalidSetting, setting_position};
+      }
+      mode = static_cast<DWORD>(parsed);
+      continue;
+    }
+    let is_disabled = false;
+    let name = setting;
+    if (!name.is_empty() && name[0] == '-') {
+      is_disabled = true;
+      name = name.substring(1);
+    }
+    DWORD flag = 0;
+    if (name == "echo")
+      flag = ENABLE_ECHO_INPUT;
+    else if (name == "icanon")
+      flag = ENABLE_LINE_INPUT;
+    else if (name == "isig")
+      flag = ENABLE_PROCESSED_INPUT;
+    else
+      return {terminal_settings_apply_kind::InvalidSetting, setting_position};
+    if (is_disabled)
+      mode &= ~flag;
+    else
+      mode |= flag;
+  }
+  if (SetConsoleMode(terminal, mode) == FALSE)
+    return {terminal_settings_apply_kind::SystemError, 0};
+  return {terminal_settings_apply_kind::Success, 0};
 }
 
 fn get_environment_variable(StringView key) -> Maybe<String>

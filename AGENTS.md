@@ -221,9 +221,12 @@ reuse.
 - Print the required change table after each edit batch.
 - Complete type and container migrations across every use before compiling.
   Verify overloads, constructor inputs, conditional result types, and old API
-  references.
+  references. Verify that every named parameter in a new shared definition is
+  used. Copy iteration syntax from an existing use of the same type.
 - Keep borrowed views within the lifetime of their owners. Prove source spans,
   offsets, lengths, and static evidence at the contract required by the code.
+- Copy shared helper names and signatures from their declarations before the
+  first call site is compiled.
 - Inspect the printed syntax tree before changing control-flow ownership. Use
   nonconstant fixtures when testing uncertain branches.
 - Search for an existing shared path before changing a shared owner. Adapter
@@ -231,7 +234,9 @@ reuse.
 - Keep agent scopes disjoint. Do not inspect or edit a scope under active
   review, and use only the current session's supported coordination methods.
 - Locate the owning runner and input type before running a focused test. Run
-  cwd-sensitive scripts through that runner.
+  cwd-sensitive scripts through that runner. Add and observe the failing
+  canonical regression before a behavior patch is applied. The failing test
+  command must finish before source editing begins.
 - Rebuild the required debug, release, or coverage artifact before testing it.
   Verify its mode and embedded revision when build invalidation matters.
 - Regenerate only the owning goldens, read every changed line, and update exact
@@ -249,8 +254,13 @@ reuse.
 - Verify platform tool interfaces and sanitizer support before invoking them.
   Force-sign every relinked macOS workload binary.
 - Use a bounded temporary directory. Validate every cleanup target, use the
-  system removal command without force, and move rejected cleanup targets to
-  Trash.
+  system removal command without force only when the environment permits it.
+  Select a reviewed patch or a recoverable Trash path before issuing a cleanup
+  command when direct removal is filtered.
+- A readiness poll must yield between probes and enforce a wall-time-scale
+  ceiling.
+- Make conditionals and immediate variables must follow every variable they
+  inspect or expand.
 - Use the release binary for performance comparisons. Clear inherited jobserver
   flags before forcing serial submakes.
 - Check commit subject length and the active git identity before committing.

@@ -678,6 +678,22 @@ fn ArithmeticValue::compare(const ArithmeticValue &other,
   let const left_negative = is_negative();
   let const right_negative = other.is_negative();
   if (left_negative != right_negative) return left_negative ? -1 : 1;
+  if (get_decimal_scale() == other.get_decimal_scale()) {
+    i32 ordering = 0;
+    if (limb_count() != other.limb_count()) {
+      ordering = limb_count() < other.limb_count() ? -1 : 1;
+    } else {
+      for (usize position = limb_count(); position > 0; position--) {
+        let const left_limb = limb_at(position - 1);
+        let const right_limb = other.limb_at(position - 1);
+        if (left_limb == right_limb) continue;
+        ordering = left_limb < right_limb ? -1 : 1;
+        break;
+      }
+    }
+
+    return left_negative ? -ordering : ordering;
+  }
   let const decimal_scale = get_decimal_scale() > other.get_decimal_scale()
                                 ? get_decimal_scale()
                                 : other.get_decimal_scale();
@@ -731,9 +747,11 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
     }
   }
 
+  let const decimal_scale = static_cast<usize>(get_decimal_scale());
+  if (decimal_scale == 0 && !is_negative()) return digits;
+
   let result = String{allocator};
   if (is_negative()) result.push('-');
-  let const decimal_scale = static_cast<usize>(get_decimal_scale());
   if (decimal_scale == 0) {
     result.append(digits.view());
     return result;

@@ -518,7 +518,7 @@ fn current_executable_path() wontthrow -> Maybe<String>
 
   return String{raw_path};
 #else
-  let const raw_path = read_symlink("/proc/self/exe");
+  let const raw_path = read_symlink("/proc/self/exe", heap_allocator());
   if (!raw_path.has_value()) return None;
 
   if (let const canonical = canonical_path(Path{raw_path->view()}); canonical)
@@ -620,6 +620,34 @@ static donteliminate fn nth_space_field(StringView text, usize index) wontthrow
   return StringView{};
 }
 
+static fn linux_process_real_uid(StringView process_directory) throws
+    -> Maybe<u32>
+{
+  let const status =
+      Path{(String{process_directory} + "/status").view()}.read_entire_file();
+  if (!status.has_value()) return None;
+  let const text = status->view();
+  usize line_start_position = 0;
+  for (usize position = 0; position <= text.length; position++) {
+    if (position != text.length && text[position] != '\n') continue;
+    let const line = text.substring_of_length(line_start_position,
+                                              position - line_start_position);
+    line_start_position = position + 1;
+    if (line.length < 5 ||
+        line.substring_of_length(0, 5) != StringView{"Uid:\t"})
+      continue;
+    usize digit_end_position = 5;
+    while (digit_end_position < line.length &&
+           line[digit_end_position] >= '0' && line[digit_end_position] <= '9')
+      digit_end_position++;
+    let const uid =
+        line.substring_of_length(5, digit_end_position - 5).to<u32>();
+    return uid.is_error() ? Maybe<u32>{None} : Maybe<u32>{uid.value()};
+  }
+
+  return None;
+}
+
 fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 {
   let const include_resource_stats = detail == process_detail::ResourceStats;
@@ -648,33 +676,8 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
     process.pid = parsed_pid.value();
     process.name = steal(*command_name);
 
-    if (let status =
-            Path{(process_directory + "/status").view()}.read_entire_file();
-        status.has_value())
-    {
-      let const text = status->view();
-      usize line_start_position = 0;
-      for (usize position = 0; position <= text.length; position++) {
-        if (position != text.length && text[position] != '\n') continue;
-        let const line = text.substring_of_length(
-            line_start_position, position - line_start_position);
-        line_start_position = position + 1;
-        if (line.length < 5 ||
-            line.substring_of_length(0, 5) != StringView{"Uid:\t"})
-          continue;
-
-        usize digit_end_position = 5;
-        while (digit_end_position < line.length &&
-               line[digit_end_position] >= '0' &&
-               line[digit_end_position] <= '9')
-          digit_end_position++;
-        let const uid_text =
-            line.substring_of_length(5, digit_end_position - 5);
-        if (let const uid = uid_text.to<i64>(); !uid.is_error())
-          process.owner_id = static_cast<u32>(uid.value());
-        break;
-      }
-    }
+    if (let const uid = linux_process_real_uid(process_directory.view()))
+      process.owner_id = *uid;
 
     if (let command_line =
             Path{(process_directory + "/cmdline").view()}.read_entire_file();
@@ -747,6 +750,204 @@ fn enumerate_processes(process_detail) throws -> ArrayList<process_entry>
 }
 
 #endif
+
+fn scan_process_file_users(const ArrayList<process_file_query> &queries,
+                           ArrayList<process_file_user> &users,
+                           Allocator scratch) throws -> Maybe<u32>
+{
+  unused(scratch);
+#if defined __APPLE__
+  for (let const &query : queries) {
+    const String path{query.path};
+    let const flags =
+        query.should_match_device ? PROC_LISTPIDSPATH_PATH_IS_VOLUME : 0;
+    let byte_count =
+        ::proc_listpidspath(PROC_ALL_PIDS, 0, path.c_str(), flags, nullptr, 0);
+    if (byte_count < 0) return query.query_position;
+    if (byte_count == 0) continue;
+
+    ArrayList<pid_t> pids{heap_allocator()};
+    pids.reserve(static_cast<usize>(byte_count) / sizeof(pid_t));
+    byte_count = ::proc_listpidspath(PROC_ALL_PIDS, 0, path.c_str(), flags,
+                                     pids.begin(), byte_count);
+    if (byte_count < 0) return query.query_position;
+
+    let const pid_count = static_cast<usize>(byte_count) / sizeof(pid_t);
+    for (usize pid_position = 0; pid_position < pid_count; pid_position++) {
+      let const pid = pids.begin()[pid_position];
+      if (pid <= 0) continue;
+
+      struct proc_bsdinfo process_info{};
+      if (::proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &process_info,
+                         sizeof(process_info)) != sizeof(process_info))
+        continue;
+      users.push(process_file_user{
+          static_cast<u32>(pid), static_cast<u32>(process_info.pbi_ruid),
+          query.query_position, static_cast<u8>(process_file_use::File)});
+    }
+  }
+  return None;
+#elif defined __linux__
+  DIR *proc_directory = ::opendir("/proc");
+  if (proc_directory == nullptr) return queries[0].query_position;
+  defer { ::closedir(proc_directory); };
+
+  let const do_matches = [](const process_file_query &query,
+                            const struct stat &status) {
+    if (query.should_match_device)
+      return query.device_id == static_cast<u64>(status.st_dev);
+    return query.device_id == static_cast<u64>(status.st_dev) &&
+           query.file_id == static_cast<u64>(status.st_ino);
+  };
+  let const do_apply_status = [&](ArrayList<u8> &use_masks,
+                                  const struct stat &status,
+                                  process_file_use use) {
+    for (usize query_position = 0; query_position < queries.count();
+         query_position++)
+      if (do_matches(queries[query_position], status))
+        use_masks[query_position] |= static_cast<u8>(use);
+  };
+
+  ArrayList<u8> use_masks{scratch};
+  use_masks.reserve(queries.count());
+  for (usize query_position = 0; query_position < queries.count();
+       query_position++)
+    use_masks.push(0);
+
+  for (struct dirent *entry = ::readdir(proc_directory); entry != nullptr;
+       entry = ::readdir(proc_directory))
+  {
+    let const name = StringView{entry->d_name};
+    if (name.is_empty() || !name.is_all_decimal_digits()) continue;
+    let const parsed_pid = name.to<u32>();
+    if (parsed_pid.is_error()) continue;
+
+    char process_path[64];
+    let const process_path_length = std::snprintf(
+        process_path, sizeof(process_path), "/proc/%s", entry->d_name);
+    if (process_path_length <= 0 ||
+        static_cast<usize>(process_path_length) >= sizeof(process_path))
+      continue;
+    let const process_user_id = linux_process_real_uid(process_path);
+    if (!process_user_id.has_value()) continue;
+
+    std::memset(use_masks.begin(), 0, use_masks.count() * sizeof(u8));
+
+    struct named_reference
+    {
+      StringView name;
+      process_file_use use;
+    };
+    const named_reference references[] = {
+        {"root", process_file_use::Root      },
+        {"cwd",  process_file_use::Cwd       },
+        {"exe",  process_file_use::Executable},
+    };
+    for (let const &reference : references) {
+      char reference_path[80];
+      let const length = std::snprintf(
+          reference_path, sizeof(reference_path), "%s/%.*s", process_path,
+          static_cast<int>(reference.name.length), reference.name.data);
+      if (length <= 0 || static_cast<usize>(length) >= sizeof(reference_path))
+        continue;
+      struct stat reference_status{};
+      if (::stat(reference_path, &reference_status) == 0)
+        do_apply_status(use_masks, reference_status, reference.use);
+    }
+
+    char descriptor_path[80];
+    let const descriptor_path_length = std::snprintf(
+        descriptor_path, sizeof(descriptor_path), "%s/fd", process_path);
+    if (descriptor_path_length > 0 &&
+        static_cast<usize>(descriptor_path_length) < sizeof(descriptor_path))
+    {
+      if (DIR *descriptor_directory = ::opendir(descriptor_path);
+          descriptor_directory != nullptr)
+      {
+        defer { ::closedir(descriptor_directory); };
+        let const descriptor_directory_fd = ::dirfd(descriptor_directory);
+        for (struct dirent *descriptor = ::readdir(descriptor_directory);
+             descriptor != nullptr;
+             descriptor = ::readdir(descriptor_directory))
+        {
+          if (descriptor->d_name[0] == '.') continue;
+          struct stat descriptor_status{};
+          if (::fstatat(descriptor_directory_fd, descriptor->d_name,
+                        &descriptor_status, 0) == 0)
+            do_apply_status(use_masks, descriptor_status,
+                            process_file_use::File);
+        }
+      }
+    }
+
+    char maps_path[80];
+    let const maps_path_length =
+        std::snprintf(maps_path, sizeof(maps_path), "%s/maps", process_path);
+    if (maps_path_length > 0 &&
+        static_cast<usize>(maps_path_length) < sizeof(maps_path))
+    {
+      if (FILE *maps = std::fopen(maps_path, "r"); maps != nullptr) {
+        defer { std::fclose(maps); };
+        char line[4096];
+        while (std::fgets(line, sizeof(line), maps) != nullptr) {
+          char *field = line;
+          for (usize field_position = 0; field_position < 3; field_position++) {
+            while (*field != '\0' && *field != ' ')
+              field++;
+            while (*field == ' ')
+              field++;
+          }
+          char *end = nullptr;
+          let const major_id = std::strtoull(field, &end, 16);
+          if (end == field || *end != ':') continue;
+          field = end + 1;
+          let const minor_id = std::strtoull(field, &end, 16);
+          if (end == field || *end != ' ') continue;
+          field = end;
+          while (*field == ' ')
+            field++;
+          let const file_id = std::strtoull(field, &end, 10);
+          if (end == field || file_id == 0) continue;
+
+          struct stat mapped_status{};
+          mapped_status.st_dev = makedev(major_id, minor_id);
+          mapped_status.st_ino = static_cast<ino_t>(file_id);
+          do_apply_status(use_masks, mapped_status, process_file_use::Mapped);
+        }
+      }
+    }
+
+    for (usize query_position = 0; query_position < queries.count();
+         query_position++)
+    {
+      if (use_masks[query_position] == 0) continue;
+      users.push(process_file_user{parsed_pid.value(), *process_user_id,
+                                   queries[query_position].query_position,
+                                   use_masks[query_position]});
+    }
+  }
+  return None;
+#else
+  unused(queries);
+  unused(users);
+  errno = ENOTSUP;
+  return queries[0].query_position;
+#endif
+}
+
+fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws
+    -> Maybe<String>
+{
+  unused(pid);
+  if (let const name = uid_to_username(owner_id))
+    return String{allocator, name->view()};
+  if (owner_id == get_real_user_id()) {
+    if (let const name = get_current_user())
+      return String{allocator, name->view()};
+  }
+
+  return None;
+}
 
 fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 {

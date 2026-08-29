@@ -7,6 +7,7 @@ else
   echo no
 fi
 format-diagnostics=0,0,same
+openmpi-format-diagnostics=0,0 warnings=0,0 errors=0,0
 #!/bin/sh
 
 # keep this text without wrapping
@@ -350,6 +351,9 @@ done
 
 printf '%s\n' after-group
 eof_value=one
+# The first trailing comment has no following statement.
+# The second trailing comment has no following statement either.
+# The third trailing comment completes the trailing comment run.
 statement-spacing-equivalent=yes idempotent=yes
 builtin eval \
         -- \

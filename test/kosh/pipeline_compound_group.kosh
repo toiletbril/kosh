@@ -14,6 +14,26 @@ echo 4 | false || echo 4;
 
 printf 'a\nb\nc\n' | while read l; do echo "got $l"; done
 
+printf 'yes\n' | if read -r answer && test "$answer" = yes; then
+  echo if-direct
+fi | cat
+printf 'no\n' | if read -r answer && test "$answer" = yes; then
+  echo if-missed
+else
+  echo if-else
+fi | cat
+printf 'later\n' | if read -r answer && test "$answer" = first; then
+  echo if-missed
+elif test "$answer" = later; then
+  echo if-elif
+fi | cat
+printf 'case-value\n' | case "$(cat)" in
+  case-value) echo case-stage ;;
+esac | cat
+true | for ((pipeline_index = 0; pipeline_index < 2; pipeline_index++)); do
+  echo "cfor-$pipeline_index"
+done | cat
+
 true | false
 echo "tf=$?"
 false | true

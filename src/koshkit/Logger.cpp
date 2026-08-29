@@ -3,6 +3,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 
 FLAG_LIST_DECL();
 
@@ -21,6 +22,33 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 REGISTER_KOSHKIT_UTIL_FLAGS(Logger);
 
 namespace koshka::koshkit {
+
+constexpr PackedStringKey LOGGER_FACILITY_KEYS[] = {
+    SSK("auth"),   SSK("authpriv"), SSK("cron"),   SSK("daemon"), SSK("ftp"),
+    SSK("kern"),   SSK("local0"),   SSK("local1"), SSK("local2"), SSK("local3"),
+    SSK("local4"), SSK("local5"),   SSK("local6"), SSK("local7"), SSK("lpr"),
+    SSK("mail"),   SSK("news"),     SSK("syslog"), SSK("user"),   SSK("uucp")};
+
+constexpr StaticStringSet LOGGER_FACILITIES{LOGGER_FACILITY_KEYS};
+
+constexpr PackedStringKey LOGGER_SEVERITY_KEYS[] = {
+    SSK("alert"), SSK("crit"), SSK("debug"),  SSK("emerg"),
+    SSK("err"),   SSK("info"), SSK("notice"), SSK("warning")};
+
+constexpr StaticStringSet LOGGER_SEVERITIES{LOGGER_SEVERITY_KEYS};
+
+static pure fn logger_priority_is_valid(StringView priority) wontthrow -> bool
+{
+  let severity = priority;
+  if (let const separator = priority.find_character('.'); separator.has_value())
+  {
+    let const facility = priority.substring_of_length(0, *separator);
+    severity = priority.substring(*separator + 1);
+    if (!LOGGER_FACILITIES.contains(facility)) return false;
+  }
+
+  return LOGGER_SEVERITIES.contains(severity);
+}
 
 Logger::Logger() = default;
 
@@ -42,10 +70,10 @@ fn Logger::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_LOGGER_FILE.is_set()) {
     let const content = read_named_or_stdin(ec, FLAG_LOGGER_FILE.value());
     if (!content.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "logger: cannot read '" +
-                                    String{FLAG_LOGGER_FILE.value()} +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, FLAG_LOGGER_FILE.value_location(), args[0].view(),
+          "cannot read '" + String{FLAG_LOGGER_FILE.value()} +
+              "': " + os::last_system_error_message());
       return 1;
     }
     message = content->clone();
@@ -66,11 +94,26 @@ fn Logger::execute(const ExecContext &ec, EvalContext &cxt,
   let const priority = FLAG_LOGGER_PRIORITY.is_set()
                            ? FLAG_LOGGER_PRIORITY.value()
                            : StringView{"user.notice"};
-  return os::write_system_log(tag, priority, message.view(),
-                              FLAG_LOGGER_PID.is_enabled(),
-                              FLAG_LOGGER_STDERR.is_enabled())
-             ? 0
-             : 1;
+  if (!logger_priority_is_valid(priority)) {
+    report_soft_koshkit_util_error(
+        ec, cxt, FLAG_LOGGER_PRIORITY.value_location(), args[0].view(),
+        "invalid priority '" + String{priority} + "'");
+    return 1;
+  }
+  if (!os::write_system_log(tag, priority, message.view(),
+                            FLAG_LOGGER_PID.is_enabled(),
+                            FLAG_LOGGER_STDERR.is_enabled()))
+  {
+    let const location = FLAG_LOGGER_PRIORITY.is_set()
+                             ? FLAG_LOGGER_PRIORITY.value_location()
+                             : arg_locations[0];
+    report_soft_koshkit_util_error(ec, cxt, location, args[0].view(),
+                                   "cannot write to the system log: " +
+                                       os::last_system_error_message());
+    return 1;
+  }
+
+  return 0;
 }
 
 } // namespace koshka::koshkit

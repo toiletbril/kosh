@@ -29,6 +29,10 @@ class EvalContext;
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
 fn evaluate_constant_arithmetic_nonzero(StringView expression,
                                         bool is_exact) throws -> bool;
+fn evaluate_constant_arithmetic_text(StringView expression,
+                                     Allocator allocator) throws -> String;
+pure fn obvious_xor_power_operator_position(StringView expression) wontthrow
+    -> Maybe<usize>;
 
 fn find_substring_length_separator(StringView body) wontthrow -> usize;
 

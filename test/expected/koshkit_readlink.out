@@ -1,0 +1,336 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$TEST_TEMP_DIRECTORY/koshkit-readlink"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY/koshkit-readlink"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "default=["]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-sf" "relative-target" "readlink-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "readlink-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "]\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "no-newline=["]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "-n" "readlink-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "]\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-sf" "missing-target" "readlink-dangling"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-sf" "readlink-link" "readlink-chain"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "dangling="]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "readlink-dangling"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "chain="]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "readlink-chain"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "regular"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nonlink=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "missing"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "missing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "no-operand=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "readlink-link" "readlink-chain"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "extra-operand=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-sf" "--" "option-target" "-n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "option="]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "readlink" "--" "-n"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/koshkit-readlink"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+  DoubleQuoted "/koshkit-readlink"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "default=["
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-sf"
+]
+[Word
+  Unquoted "relative-target"
+]
+[Word
+  Unquoted "readlink-link"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "readlink-link"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "]\n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "no-newline=["
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "readlink-link"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "]\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-sf"
+]
+[Word
+  Unquoted "missing-target"
+]
+[Word
+  Unquoted "readlink-dangling"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-sf"
+]
+[Word
+  Unquoted "readlink-link"
+]
+[Word
+  Unquoted "readlink-chain"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "dangling="
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "readlink-dangling"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "chain="
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "readlink-chain"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "regular"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "regular"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "nonlink="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "missing"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "missing="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "no-operand="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "readlink-link"
+]
+[Word
+  Unquoted "readlink-chain"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "extra-operand="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-sf"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "option-target"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "option="
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "readlink"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "-n"
+]
+default=[relative-target
+]
+no-newline=[relative-target]
+dangling=missing-target
+chain=readlink-link
+nonlink=1
+missing=1
+no-operand=2
+extra-operand=1
+option=option-target
+[Code 0]

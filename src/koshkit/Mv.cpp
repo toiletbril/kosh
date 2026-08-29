@@ -27,7 +27,7 @@ static fn copy_file_contents(StringView source, StringView destination,
   let const in_fd = os::open_file_descriptor(source, os::file_open_mode::Read);
   if (!in_fd.has_value())
     throw Error{
-        "mv: unable to open '" + String{allocator, source}
+        "unable to open '" + String{allocator, source}
           +
         "': " + os::last_system_error_message()
     };
@@ -37,7 +37,7 @@ static fn copy_file_contents(StringView source, StringView destination,
       os::open_file_descriptor(destination, os::file_open_mode::Truncate);
   if (!out_fd.has_value())
     throw Error{
-        "mv: unable to create '" + String{allocator, destination}
+        "unable to create '" + String{allocator, destination}
           +
         "': " + os::last_system_error_message()
     };
@@ -49,7 +49,7 @@ static fn copy_file_contents(StringView source, StringView destination,
     let const read_count = os::read_fd(*in_fd, buffer, sizeof(buffer));
     if (!read_count.has_value())
       throw Error{
-          "mv: a read of '" + String{allocator, source}
+          "a read of '" + String{allocator, source}
             +
           "' failed: " + os::last_system_error_message()
       };
@@ -61,7 +61,7 @@ static fn copy_file_contents(StringView source, StringView destination,
                                      *read_count - written_count);
       if (!chunk.has_value() || *chunk == 0) {
         throw Error{
-            "mv: a write to '" + String{allocator, destination}
+            "a write to '" + String{allocator, destination}
               +
             "' failed: " + os::last_system_error_message()
         };
@@ -84,17 +84,17 @@ static fn move_across_devices(StringView source, StringView target,
                                                     ".kosh_mv", StringView{});
   if (!temporary_path.has_value())
     throw Error{
-        "mv: unable to create a temporary file beside '" +
+        "unable to create a temporary file beside '" +
         String{allocator, target}
         + "': " + os::last_system_error_message()
     };
   defer { unused(os::remove_file(temporary_path->text().view())); };
 
   if (is_source_symbolic_link) {
-    let const link_target = os::read_symlink(source);
+    let const link_target = os::read_symlink(source, allocator);
     if (!link_target.has_value())
       throw Error{
-          "mv: unable to read the symlink '" + String{allocator, source}
+          "unable to read the symlink '" + String{allocator, source}
             +
           "': " + os::last_system_error_message()
       };
@@ -103,7 +103,7 @@ static fn move_across_devices(StringView source, StringView target,
         !os::create_symlink(link_target->view(), temporary_path->text().view()))
     {
       throw Error{
-          "mv: unable to create a temporary symlink beside '" +
+          "unable to create a temporary symlink beside '" +
           String{allocator, target}
           + "': " + os::last_system_error_message()
       };
@@ -116,7 +116,7 @@ static fn move_across_devices(StringView source, StringView target,
         !os::set_file_mode(temporary_path->text().view(), source_status.mode))
     {
       throw Error{
-          "mv: unable to preserve the mode of '" + String{allocator, source}
+          "unable to preserve the mode of '" + String{allocator, source}
             +
           "': " + os::last_system_error_message()
       };
@@ -125,14 +125,14 @@ static fn move_across_devices(StringView source, StringView target,
 
   if (!os::rename_path(temporary_path->text().view(), target))
     throw Error{
-        "mv: unable to publish '" + String{allocator, target}
+        "unable to publish '" + String{allocator, target}
           +
         "': " + os::last_system_error_message()
     };
 
   if (!os::remove_file(source))
     throw Error{
-        "mv: unable to remove '" + String{allocator, source}
+        "unable to remove '" + String{allocator, source}
           +
         "': " + os::last_system_error_message()
     };
@@ -149,7 +149,9 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -164,11 +166,11 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
        FLAG_MV_INTERACTIVE.position() > FLAG_MV_FORCE.position());
 
   if (operands.count() > 2 && !is_destination_directory) {
-    throw Error{
-        "mv: the destination '" + String{cxt.scratch_allocator(), destination}
-          +
-        "' is not a directory, so it cannot hold several sources"
-    };
+    report_soft_koshkit_util_error(
+        ec, cxt, operand_locations[operands.count() - 1], args[0].view(),
+        "the destination '" + String{cxt.scratch_allocator(), destination} +
+            "' is not a directory, so it cannot hold several sources");
+    return 1;
   }
 
   let output = String{cxt.scratch_allocator()};
@@ -183,10 +185,10 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
                    .text();
 
     if (Path{source}.is_same_file_as(Path{target.view()})) {
-      report_soft_koshkit_error(ec, cxt,
-                                "mv: '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "' and '" + target + "' are the same file");
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[i], args[0].view(),
+          "'" + String{cxt.scratch_allocator(), source} + "' and '" + target +
+              "' are the same file");
       status = 1;
       continue;
     }
@@ -195,19 +197,27 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
         !confirm_koshkit_action(ec, "mv: overwrite '" + target + "'? "))
       continue;
 
-    if (!os::rename_path(source, target.view())) {
-      let const rename_error_number = errno;
-      if (rename_error_number != EXDEV ||
-          !move_across_devices(source, target.view(), cxt.scratch_allocator()))
-      {
-        report_soft_koshkit_error(ec, cxt,
-                                  "mv: unable to move '" +
-                                      String{cxt.scratch_allocator(), source} +
-                                      "' to '" + target + "' because " +
-                                      os::last_system_error_message());
-        status = 1;
-        continue;
+    try {
+      if (!os::rename_path(source, target.view())) {
+        let const rename_error_number = errno;
+        if (rename_error_number != EXDEV ||
+            !move_across_devices(source, target.view(),
+                                 cxt.scratch_allocator()))
+        {
+          report_soft_koshkit_util_error(
+              ec, cxt, operand_locations[i], args[0].view(),
+              "unable to move '" + String{cxt.scratch_allocator(), source} +
+                  "' to '" + target + "' because " +
+                  os::last_system_error_message());
+          status = 1;
+          continue;
+        }
       }
+    } catch (Error &error) {
+      report_soft_koshkit_util_error(ec, cxt, operand_locations[i],
+                                     args[0].view(), error.message().view());
+      status = 1;
+      continue;
     }
     if (FLAG_MV_VERBOSE.is_enabled())
       output += "renamed '" + String{cxt.scratch_allocator(), source} +
