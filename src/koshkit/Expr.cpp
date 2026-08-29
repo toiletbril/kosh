@@ -35,6 +35,38 @@ public:
   }
 
 private:
+  enum class ComparisonOperatorKind : uchar
+  {
+    Equal,
+    NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+  };
+
+  pure fn peek_comparison_operator() const wontthrow
+      -> Maybe<ComparisonOperatorKind>
+  {
+    if (m_position == m_tokens.count()) return None;
+    let const token = m_tokens[m_position].view();
+    if (token.length == 1) {
+      switch (token[0]) {
+      case '=': return ComparisonOperatorKind::Equal;
+      case '<': return ComparisonOperatorKind::Less;
+      case '>': return ComparisonOperatorKind::Greater;
+      default: return None;
+      }
+    }
+    if (token.length != 2 || token[1] != '=') return None;
+    switch (token[0]) {
+    case '!': return ComparisonOperatorKind::NotEqual;
+    case '<': return ComparisonOperatorKind::LessEqual;
+    case '>': return ComparisonOperatorKind::GreaterEqual;
+    default: return None;
+    }
+  }
+
   pure fn peek(StringView token) const wontthrow -> bool
   {
     return m_position < m_tokens.count() &&
@@ -73,10 +105,11 @@ private:
   fn parse_comparison() throws -> String
   {
     let left = parse_addition();
-    while (peek("=") || peek("!=") || peek("<") || peek("<=") || peek(">") ||
-           peek(">="))
+    loop
     {
-      let const operation = take();
+      let const operation = peek_comparison_operator();
+      if (!operation.has_value()) break;
+      m_position++;
       let right = parse_addition();
       let const left_number = left.view().to<i64>();
       let const right_number = right.view().to<i64>();
@@ -89,12 +122,15 @@ private:
                 : right.view() < left.view() ? 1
                                              : 0;
 
-      let const matches = operation.view() == "="    ? order == 0
-                          : operation.view() == "!=" ? order != 0
-                          : operation.view() == "<"  ? order < 0
-                          : operation.view() == "<=" ? order <= 0
-                          : operation.view() == ">"  ? order > 0
-                                                     : order >= 0;
+      bool matches = false;
+      switch (*operation) {
+      case ComparisonOperatorKind::Equal: matches = order == 0; break;
+      case ComparisonOperatorKind::NotEqual: matches = order != 0; break;
+      case ComparisonOperatorKind::Less: matches = order < 0; break;
+      case ComparisonOperatorKind::LessEqual: matches = order <= 0; break;
+      case ComparisonOperatorKind::Greater: matches = order > 0; break;
+      case ComparisonOperatorKind::GreaterEqual: matches = order >= 0; break;
+      }
       left = String{m_allocator, matches ? "1" : "0"};
     }
     return left;

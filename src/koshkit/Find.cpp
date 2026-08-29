@@ -3,6 +3,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -30,6 +31,27 @@ struct find_options
   i64 max_depth{-1};
   i64 min_depth{0};
 };
+
+enum class find_predicate_kind : uchar
+{
+  Help,
+  Print,
+  Name,
+  Type,
+  MaximumDepth,
+  MinimumDepth,
+};
+
+static constexpr static_string_entry<find_predicate_kind>
+    FIND_PREDICATE_ENTRIES[] = {
+        {SSK("--help"),    find_predicate_kind::Help        },
+        {SSK("-print"),    find_predicate_kind::Print       },
+        {SSK("-name"),     find_predicate_kind::Name        },
+        {SSK("-type"),     find_predicate_kind::Type        },
+        {SSK("-maxdepth"), find_predicate_kind::MaximumDepth},
+        {SSK("-mindepth"), find_predicate_kind::MinimumDepth},
+};
+static constexpr StaticStringMap FIND_PREDICATES{FIND_PREDICATE_ENTRIES};
 
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
                              const find_options &options) throws -> bool
@@ -169,20 +191,31 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (; index < args.count(); index++) {
     let const predicate = args[index].view();
-    if (predicate == "--help") {
+    let const predicate_kind = FIND_PREDICATES.find(predicate);
+    if (!predicate_kind.has_value())
+      throw Error{
+          "find: unknown predicate '" +
+          String{cxt.scratch_allocator(), predicate}
+          + "'"
+      };
+
+    switch (*predicate_kind) {
+    case find_predicate_kind::Help:
       print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
                       FLAG_LIST);
       return 0;
-    } else if (predicate == "-print") {
+    case find_predicate_kind::Print:
       /* The walk prints every matched entry already, so -print is the default
          and needs no action. */
-    } else if (predicate == "-name") {
+      break;
+    case find_predicate_kind::Name:
       if (index + 1 >= args.count())
         throw ErrorWithDetails{"find: -name expects a pattern",
                                "Pass a glob after `-name`, e.g. `-name '*.c'`"};
       name_patterns.push(args[index + 1].view());
       index++;
-    } else if (predicate == "-type") {
+      break;
+    case find_predicate_kind::Type: {
       if (index + 1 >= args.count())
         throw ErrorWithDetails{"find: -type expects one of f, d, or l",
                                "Pass `f`, `d`, or `l` after `-type`"};
@@ -195,20 +228,18 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
       }
       options.type_filter = type[0];
       index++;
-    } else if (predicate == "-maxdepth") {
+      break;
+    }
+    case find_predicate_kind::MaximumDepth:
       options.max_depth = parse_depth_argument(args, index + 1, predicate,
                                                cxt.scratch_allocator());
       index++;
-    } else if (predicate == "-mindepth") {
+      break;
+    case find_predicate_kind::MinimumDepth:
       options.min_depth = parse_depth_argument(args, index + 1, predicate,
                                                cxt.scratch_allocator());
       index++;
-    } else {
-      throw Error{
-          "find: unknown predicate '" +
-          String{cxt.scratch_allocator(), predicate}
-          + "'"
-      };
+      break;
     }
   }
 

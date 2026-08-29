@@ -208,6 +208,7 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
   else
     for (let const &operand : operands)
       base.push(operand.clone());
+  let const base_size = xargs_command_size(base);
   let const maximum_arguments =
       FLAG_XARGS_MAX_ARGUMENTS.is_set()
           ? parse_xargs_limit(FLAG_XARGS_MAX_ARGUMENTS.value(),
@@ -240,13 +241,18 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
       let const first_line = item_position < items.count()
                                  ? items[item_position].line_number
                                  : usize{0};
+      let command_size = base_size;
       usize added_count = 0;
       while (item_position < items.count() && added_count < maximum_arguments &&
              items[item_position].line_number - first_line < maximum_lines)
       {
-        command.push(items[item_position].value.clone());
-        if (xargs_command_size(command) > maximum_size) {
-          command.pop_back();
+        let const argument_size = items[item_position].value.length();
+        let const candidate_size =
+            command_size == SIZE_MAX ||
+                    argument_size > SIZE_MAX - command_size - 1
+                ? SIZE_MAX
+                : command_size + argument_size + 1;
+        if (candidate_size > maximum_size) {
           if (added_count == 0) {
             if (FLAG_XARGS_EXIT.is_enabled())
               throw Error{"xargs: one argument exceeds the size limit"};
@@ -255,6 +261,8 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
           }
           break;
         }
+        command.push(items[item_position].value.clone());
+        command_size = candidate_size;
         item_position++;
         added_count++;
       }

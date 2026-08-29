@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../StaticStringMap.hpp"
 
 FLAG_LIST_DECL();
 
@@ -20,6 +21,31 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 REGISTER_KOSHKIT_UTIL_FLAGS(Locale);
 
 namespace koshka::koshkit {
+
+enum class locale_value_kind : uchar
+{
+  CharacterMap,
+  CurrencySymbol,
+  DecimalPoint,
+  ThousandsSeparator,
+};
+
+struct locale_keyword
+{
+  StringView category;
+  locale_value_kind value_kind;
+};
+
+static constexpr static_string_entry<locale_keyword> LOCALE_KEYWORD_ENTRIES[] =
+    {
+        {SSK("charmap"),         {"LC_CTYPE", locale_value_kind::CharacterMap}  },
+        {SSK("currency_symbol"),
+         {"LC_MONETARY", locale_value_kind::CurrencySymbol}                     },
+        {SSK("decimal_point"),   {"LC_NUMERIC", locale_value_kind::DecimalPoint}},
+        {SSK("thousands_sep"),
+         {"LC_NUMERIC", locale_value_kind::ThousandsSeparator}                  },
+};
+static constexpr StaticStringMap LOCALE_KEYWORDS{LOCALE_KEYWORD_ENTRIES};
 
 static fn locale_environment_value(const char *name) wontthrow -> StringView
 {
@@ -78,37 +104,36 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const *locale_values = localeconv();
   for (let const &operand : operands) {
-    static constexpr static_string_entry<StringView> CATEGORY_ENTRIES[] = {
-        {SSK("charmap"),         "LC_CTYPE"   },
-        {SSK("currency_symbol"), "LC_MONETARY"},
-        {SSK("decimal_point"),   "LC_NUMERIC" },
-        {SSK("thousands_sep"),   "LC_NUMERIC" },
-    };
-    static constexpr StaticStringMap CATEGORIES{CATEGORY_ENTRIES};
-    let const category = CATEGORIES.find(operand.view());
-    if (!category.has_value()) {
+    let const keyword = LOCALE_KEYWORDS.find(operand.view());
+    if (!keyword.has_value()) {
       report_soft_koshkit_error(ec, cxt,
                                 "locale: unknown name '" + operand + "'");
       return 1;
     }
     if (FLAG_LOCALE_CATEGORY.is_enabled()) {
-      ec.print_to_stdout(*category);
+      ec.print_to_stdout(keyword->category);
       ec.print_to_stdout("\n");
     }
 
     StringView value;
-    if (operand.view() == "charmap") {
+    switch (keyword->value_kind) {
+    case locale_value_kind::CharacterMap: {
       let lowered = String{cxt.scratch_allocator(), active_locale};
       lowered.lowercase_ascii();
       value = std::strstr(lowered.c_str(), "utf") != NULL
                   ? StringView{"UTF-8"}
                   : StringView{"ANSI_X3.4-1968"};
-    } else if (operand.view() == "decimal_point") {
-      value = StringView{locale_values->decimal_point};
-    } else if (operand.view() == "thousands_sep") {
-      value = StringView{locale_values->thousands_sep};
-    } else if (operand.view() == "currency_symbol") {
+      break;
+    }
+    case locale_value_kind::CurrencySymbol:
       value = StringView{locale_values->currency_symbol};
+      break;
+    case locale_value_kind::DecimalPoint:
+      value = StringView{locale_values->decimal_point};
+      break;
+    case locale_value_kind::ThousandsSeparator:
+      value = StringView{locale_values->thousands_sep};
+      break;
     }
     if (FLAG_LOCALE_KEYWORD.is_enabled()) {
       ec.print_to_stdout(operand.view());

@@ -1083,8 +1083,7 @@ fn CaseClause::analyze(AnalysisContext &actx,
      unquoted * glob, a single UnquotedText segment whose text is *. A quoted
      '*' matches only a literal asterisk. */
   let tally = case_arm_tally{};
-  let earlier_patterns = ArrayList<String>{heap_allocator()};
-  let earlier_pattern_locations = ArrayList<SourceLocation>{heap_allocator()};
+  let earlier_patterns = StringMap<SourceLocation>{heap_allocator()};
   let earlier_shadow_prefixes = ArrayList<String>{heap_allocator()};
   let earlier_shadow_locations = ArrayList<SourceLocation>{heap_allocator()};
   for (let const &item : m_items) {
@@ -1095,17 +1094,14 @@ fn CaseClause::analyze(AnalysisContext &actx,
       let const literal = pattern_word.to_literal_string();
       let const raw_pattern = pattern->raw_string();
       let is_duplicate = false;
-      for (usize earlier_index = 0; earlier_index < earlier_patterns.count();
-           earlier_index++)
+      if (let const *earlier_location =
+              earlier_patterns.find(raw_pattern.view());
+          earlier_location != nullptr)
       {
-        let const &earlier = earlier_patterns[earlier_index];
-        if (raw_pattern.view() == earlier.view()) {
-          actx.report_diagnostic(diagnostic_id::sc2221,
-                                 pattern->source_location(), {},
-                                 earlier_pattern_locations[earlier_index]);
-          is_duplicate = true;
-          break;
-        }
+        actx.report_diagnostic(diagnostic_id::sc2221,
+                               pattern->source_location(), {},
+                               *earlier_location);
+        is_duplicate = true;
       }
       if (!is_duplicate) {
         for (usize prefix_index = 0;
@@ -1119,8 +1115,8 @@ fn CaseClause::analyze(AnalysisContext &actx,
           break;
         }
       }
-      earlier_patterns.push(String{raw_pattern.view()});
-      earlier_pattern_locations.push(pattern->source_location());
+      if (!is_duplicate)
+        earlier_patterns.set(raw_pattern.view(), pattern->source_location());
       if (pattern_word.segments.count() == 1 &&
           pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
           !literal.is_empty() && literal[literal.count() - 1] == '*')

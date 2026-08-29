@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -62,19 +63,24 @@ static pure fn nl_style_numbers(StringView style, bool is_empty,
   return !is_empty;
 }
 
+enum class nl_number_format : uchar
+{
+  Left,
+  Right,
+  Zero,
+};
+
 static fn append_nl_number(String &output, i64 number, usize width,
-                           StringView format, StringView separator) throws
+                           nl_number_format format, StringView separator) throws
     -> void
 {
   let const digits = String::from(number, output.allocator());
   let const padding = width > digits.length() ? width - digits.length() : 0;
-  if (format != "ln")
-    for (usize position = 0; position < padding; position++)
-      output += format == "rz" ? '0' : ' ';
+  if (format != nl_number_format::Left)
+    output.append_repeated(format == nl_number_format::Zero ? '0' : ' ',
+                           padding);
   output += digits.view();
-  if (format == "ln")
-    for (usize position = 0; position < padding; position++)
-      output += ' ';
+  if (format == nl_number_format::Left) output.append_repeated(' ', padding);
   output += separator;
 }
 
@@ -105,10 +111,17 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
       (footer_style != "a" && footer_style != "t" && footer_style != "n"))
     throw Error{"nl: unsupported numbering style"};
 
-  let const number_format =
+  let const number_format_name =
       FLAG_NL_FORMAT.is_set() ? FLAG_NL_FORMAT.value() : StringView{"rn"};
-  if (number_format != "ln" && number_format != "rn" && number_format != "rz")
-    throw Error{"nl: invalid number format"};
+  static constexpr static_string_entry<nl_number_format>
+      NUMBER_FORMAT_ENTRIES[] = {
+          {SSK("ln"), nl_number_format::Left },
+          {SSK("rn"), nl_number_format::Right},
+          {SSK("rz"), nl_number_format::Zero },
+  };
+  static constexpr StaticStringMap NUMBER_FORMATS{NUMBER_FORMAT_ENTRIES};
+  let const number_format = NUMBER_FORMATS.find(number_format_name);
+  if (!number_format.has_value()) throw Error{"nl: invalid number format"};
 
   let const increment =
       FLAG_NL_INCREMENT.is_set()
@@ -192,7 +205,7 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
                          blank_group))
     {
       append_nl_number(output, number, static_cast<usize>(width_value),
-                       number_format, separator);
+                       *number_format, separator);
       if (increment > static_cast<u64>(INT64_MAX - number))
         number = INT64_MAX;
       else

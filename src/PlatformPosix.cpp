@@ -4,6 +4,7 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -36,28 +37,21 @@ fn logged_in_users() throws -> ArrayList<user_session>
 
 static pure fn system_log_priority(StringView priority) wontthrow -> int
 {
-  struct named_priority
-  {
-    StringView name;
-    int value;
+  static constexpr static_string_entry<int> PRIORITY_ENTRIES[] = {
+      {SSK("emerg"),   LOG_EMERG  },
+      {SSK("alert"),   LOG_ALERT  },
+      {SSK("crit"),    LOG_CRIT   },
+      {SSK("err"),     LOG_ERR    },
+      {SSK("warning"), LOG_WARNING},
+      {SSK("notice"),  LOG_NOTICE },
+      {SSK("info"),    LOG_INFO   },
+      {SSK("debug"),   LOG_DEBUG  },
   };
-  static constexpr named_priority PRIORITIES[] = {
-      {"emerg",   LOG_EMERG  },
-      {"alert",   LOG_ALERT  },
-      {"crit",    LOG_CRIT   },
-      {"err",     LOG_ERR    },
-      {"warning", LOG_WARNING},
-      {"notice",  LOG_NOTICE },
-      {"info",    LOG_INFO   },
-      {"debug",   LOG_DEBUG  },
-  };
-  let level = LOG_NOTICE;
+  static constexpr StaticStringMap PRIORITIES{PRIORITY_ENTRIES};
   let name = priority;
   if (let const separator = priority.find_character('.'); separator.has_value())
     name = priority.substring(*separator + 1);
-  for (let const &candidate : PRIORITIES)
-    if (candidate.name == name) return candidate.value;
-  return level;
+  return PRIORITIES.find(name).value_or(LOG_NOTICE);
 }
 
 fn write_system_log(StringView tag, StringView priority, StringView message,
@@ -701,38 +695,32 @@ static pure fn terminal_speed_number(speed_t speed) wontthrow -> u32
 
 static pure fn terminal_speed_value(StringView text) wontthrow -> speed_t
 {
-  struct terminal_speed
-  {
-    StringView name;
-    speed_t value;
-  };
-  static constexpr terminal_speed SPEEDS[] = {
-      {"0",      B0     },
-      {"50",     B50    },
-      {"75",     B75    },
-      {"110",    B110   },
-      {"134",    B134   },
-      {"150",    B150   },
-      {"200",    B200   },
-      {"300",    B300   },
-      {"600",    B600   },
-      {"1200",   B1200  },
-      {"1800",   B1800  },
-      {"2400",   B2400  },
-      {"4800",   B4800  },
-      {"9600",   B9600  },
-      {"19200",  B19200 },
-      {"38400",  B38400 },
+  static constexpr static_string_entry<speed_t> SPEED_ENTRIES[] = {
+      {SSK("0"),      B0     },
+      {SSK("50"),     B50    },
+      {SSK("75"),     B75    },
+      {SSK("110"),    B110   },
+      {SSK("134"),    B134   },
+      {SSK("150"),    B150   },
+      {SSK("200"),    B200   },
+      {SSK("300"),    B300   },
+      {SSK("600"),    B600   },
+      {SSK("1200"),   B1200  },
+      {SSK("1800"),   B1800  },
+      {SSK("2400"),   B2400  },
+      {SSK("4800"),   B4800  },
+      {SSK("9600"),   B9600  },
+      {SSK("19200"),  B19200 },
+      {SSK("38400"),  B38400 },
 #ifdef B57600
-      {"57600",  B57600 },
+      {SSK("57600"),  B57600 },
 #endif
 #ifdef B115200
-      {"115200", B115200},
+      {SSK("115200"), B115200},
 #endif
   };
-  for (let const &speed : SPEEDS)
-    if (speed.name == text) return speed.value;
-  return static_cast<speed_t>(~speed_t{0});
+  static constexpr StaticStringMap SPEEDS{SPEED_ENTRIES};
+  return SPEEDS.find(text).value_or(static_cast<speed_t>(~speed_t{0}));
 }
 
 struct terminal_flag
@@ -742,38 +730,39 @@ struct terminal_flag
   tcflag_t termios::*member;
 };
 
-static constexpr terminal_flag TERMINAL_FLAGS[] = {
-    {"echo",   ECHO,   &termios::c_lflag},
-    {"igncr",  IGNCR,  &termios::c_iflag},
-    {"opost",  OPOST,  &termios::c_oflag},
-    {"tostop", TOSTOP, &termios::c_lflag},
-    {"icanon", ICANON, &termios::c_lflag},
-    {"isig",   ISIG,   &termios::c_lflag},
-    {"iexten", IEXTEN, &termios::c_lflag},
-    {"echoe",  ECHOE,  &termios::c_lflag},
-    {"echok",  ECHOK,  &termios::c_lflag},
-    {"echonl", ECHONL, &termios::c_lflag},
-    {"noflsh", NOFLSH, &termios::c_lflag},
-    {"ignbrk", IGNBRK, &termios::c_iflag},
-    {"brkint", BRKINT, &termios::c_iflag},
-    {"ignpar", IGNPAR, &termios::c_iflag},
-    {"parmrk", PARMRK, &termios::c_iflag},
-    {"inpck",  INPCK,  &termios::c_iflag},
-    {"istrip", ISTRIP, &termios::c_iflag},
-    {"inlcr",  INLCR,  &termios::c_iflag},
-    {"icrnl",  ICRNL,  &termios::c_iflag},
-    {"ixon",   IXON,   &termios::c_iflag},
-    {"ixoff",  IXOFF,  &termios::c_iflag},
-    {"cstopb", CSTOPB, &termios::c_cflag},
-    {"cread",  CREAD,  &termios::c_cflag},
-    {"parenb", PARENB, &termios::c_cflag},
-    {"parodd", PARODD, &termios::c_cflag},
-    {"hupcl",  HUPCL,  &termios::c_cflag},
-    {"clocal", CLOCAL, &termios::c_cflag},
+static constexpr static_string_entry<terminal_flag> TERMINAL_FLAG_ENTRIES[] = {
+    {SSK("echo"),   {"echo", ECHO, &termios::c_lflag}    },
+    {SSK("igncr"),  {"igncr", IGNCR, &termios::c_iflag}  },
+    {SSK("opost"),  {"opost", OPOST, &termios::c_oflag}  },
+    {SSK("tostop"), {"tostop", TOSTOP, &termios::c_lflag}},
+    {SSK("icanon"), {"icanon", ICANON, &termios::c_lflag}},
+    {SSK("isig"),   {"isig", ISIG, &termios::c_lflag}    },
+    {SSK("iexten"), {"iexten", IEXTEN, &termios::c_lflag}},
+    {SSK("echoe"),  {"echoe", ECHOE, &termios::c_lflag}  },
+    {SSK("echok"),  {"echok", ECHOK, &termios::c_lflag}  },
+    {SSK("echonl"), {"echonl", ECHONL, &termios::c_lflag}},
+    {SSK("noflsh"), {"noflsh", NOFLSH, &termios::c_lflag}},
+    {SSK("ignbrk"), {"ignbrk", IGNBRK, &termios::c_iflag}},
+    {SSK("brkint"), {"brkint", BRKINT, &termios::c_iflag}},
+    {SSK("ignpar"), {"ignpar", IGNPAR, &termios::c_iflag}},
+    {SSK("parmrk"), {"parmrk", PARMRK, &termios::c_iflag}},
+    {SSK("inpck"),  {"inpck", INPCK, &termios::c_iflag}  },
+    {SSK("istrip"), {"istrip", ISTRIP, &termios::c_iflag}},
+    {SSK("inlcr"),  {"inlcr", INLCR, &termios::c_iflag}  },
+    {SSK("icrnl"),  {"icrnl", ICRNL, &termios::c_iflag}  },
+    {SSK("ixon"),   {"ixon", IXON, &termios::c_iflag}    },
+    {SSK("ixoff"),  {"ixoff", IXOFF, &termios::c_iflag}  },
+    {SSK("cstopb"), {"cstopb", CSTOPB, &termios::c_cflag}},
+    {SSK("cread"),  {"cread", CREAD, &termios::c_cflag}  },
+    {SSK("parenb"), {"parenb", PARENB, &termios::c_cflag}},
+    {SSK("parodd"), {"parodd", PARODD, &termios::c_cflag}},
+    {SSK("hupcl"),  {"hupcl", HUPCL, &termios::c_cflag}  },
+    {SSK("clocal"), {"clocal", CLOCAL, &termios::c_cflag}},
 #ifdef ONLCR
-    {"onlcr",  ONLCR,  &termios::c_oflag},
+    {SSK("onlcr"),  {"onlcr", ONLCR, &termios::c_oflag}  },
 #endif
 };
+static constexpr StaticStringMap TERMINAL_FLAGS{TERMINAL_FLAG_ENTRIES};
 
 struct terminal_control_character
 {
@@ -781,19 +770,58 @@ struct terminal_control_character
   usize index;
 };
 
-static constexpr terminal_control_character TERMINAL_CONTROL_CHARACTERS[] = {
-    {"eof",   VEOF  },
-    {"eol",   VEOL  },
-    {"erase", VERASE},
-    {"intr",  VINTR },
-    {"kill",  VKILL },
-    {"quit",  VQUIT },
-    {"start", VSTART},
-    {"stop",  VSTOP },
+static constexpr static_string_entry<terminal_control_character>
+    TERMINAL_CONTROL_CHARACTER_ENTRIES[] = {
+        {SSK("eof"),   {"eof", VEOF}    },
+        {SSK("eol"),   {"eol", VEOL}    },
+        {SSK("erase"), {"erase", VERASE}},
+        {SSK("intr"),  {"intr", VINTR}  },
+        {SSK("kill"),  {"kill", VKILL}  },
+        {SSK("quit"),  {"quit", VQUIT}  },
+        {SSK("start"), {"start", VSTART}},
+        {SSK("stop"),  {"stop", VSTOP}  },
 #ifdef VSUSP
-    {"susp",  VSUSP },
+        {SSK("susp"),  {"susp", VSUSP}  },
 #endif
 };
+static constexpr StaticStringMap TERMINAL_CONTROL_CHARACTERS{
+    TERMINAL_CONTROL_CHARACTER_ENTRIES};
+
+enum class terminal_setting_kind : uchar
+{
+  CharacterSize,
+  Raw,
+  Sane,
+  EraseKill,
+  Newline,
+  EvenParity,
+  OddParity,
+  Rows,
+  Columns,
+  Minimum,
+  Time,
+};
+
+static constexpr static_string_entry<terminal_setting_kind>
+    TERMINAL_SETTING_ENTRIES[] = {
+        {SSK("cs5"),     terminal_setting_kind::CharacterSize},
+        {SSK("cs6"),     terminal_setting_kind::CharacterSize},
+        {SSK("cs7"),     terminal_setting_kind::CharacterSize},
+        {SSK("cs8"),     terminal_setting_kind::CharacterSize},
+        {SSK("raw"),     terminal_setting_kind::Raw          },
+        {SSK("sane"),    terminal_setting_kind::Sane         },
+        {SSK("ek"),      terminal_setting_kind::EraseKill    },
+        {SSK("nl"),      terminal_setting_kind::Newline      },
+        {SSK("evenp"),   terminal_setting_kind::EvenParity   },
+        {SSK("parity"),  terminal_setting_kind::EvenParity   },
+        {SSK("oddp"),    terminal_setting_kind::OddParity    },
+        {SSK("rows"),    terminal_setting_kind::Rows         },
+        {SSK("cols"),    terminal_setting_kind::Columns      },
+        {SSK("columns"), terminal_setting_kind::Columns      },
+        {SSK("min"),     terminal_setting_kind::Minimum      },
+        {SSK("time"),    terminal_setting_kind::Time         },
+};
+static constexpr StaticStringMap TERMINAL_SETTINGS{TERMINAL_SETTING_ENTRIES};
 
 static fn append_terminal_character(String &output, cc_t value) throws -> void
 {
@@ -846,13 +874,15 @@ fn terminal_settings(descriptor terminal, bool should_encode,
     output += String::from(columns, allocator);
     output += "; ";
   }
-  for (let const &flag : TERMINAL_FLAGS) {
+  for (let const &entry : TERMINAL_FLAG_ENTRIES) {
+    let const &flag = entry.value;
     if ((state.*(flag.member) & flag.value) == 0) output += '-';
     output += flag.name;
     output += ' ';
   }
   if (should_report_all) {
-    for (let const &character : TERMINAL_CONTROL_CHARACTERS) {
+    for (let const &entry : TERMINAL_CONTROL_CHARACTER_ENTRIES) {
+      let const &character = entry.value;
       output += character.name;
       output += " = ";
       append_terminal_character(output, state.c_cc[character.index]);
@@ -963,13 +993,9 @@ fn apply_terminal_settings(descriptor terminal,
     let const setting = settings[index].view();
     let const is_disabled = setting.length > 1 && setting[0] == '-';
     let const name = is_disabled ? setting.substring(1) : setting;
-    const terminal_flag *selected_flag = NULL;
-    for (let const &candidate : TERMINAL_FLAGS)
-      if (name == candidate.name) {
-        selected_flag = &candidate;
-        break;
-      }
-    if (selected_flag != NULL) {
+    if (let const selected_flag = TERMINAL_FLAGS.find(name);
+        selected_flag.has_value())
+    {
       if (is_disabled)
         state.*(selected_flag->member) &= ~selected_flag->value;
       else
@@ -977,13 +1003,9 @@ fn apply_terminal_settings(descriptor terminal,
       continue;
     }
 
-    const terminal_control_character *selected_character = NULL;
-    for (let const &candidate : TERMINAL_CONTROL_CHARACTERS)
-      if (name == candidate.name) {
-        selected_character = &candidate;
-        break;
-      }
-    if (selected_character != NULL) {
+    if (let const selected_character = TERMINAL_CONTROL_CHARACTERS.find(name);
+        selected_character.has_value())
+    {
       if (is_disabled || ++index == settings.count()) return false;
       cc_t value = 0;
       if (!parse_terminal_character(settings[index].view(), value))
@@ -992,13 +1014,24 @@ fn apply_terminal_settings(descriptor terminal,
       continue;
     }
 
-    if (name == "cs5" || name == "cs6" || name == "cs7" || name == "cs8") {
+    let const selected_setting = TERMINAL_SETTINGS.find(name);
+    if (!selected_setting.has_value()) {
+      let const speed = terminal_speed_value(name);
+      if (speed == static_cast<speed_t>(~speed_t{0}) || is_disabled)
+        return false;
+      if (cfsetispeed(&state, speed) != 0 || cfsetospeed(&state, speed) != 0)
+        return false;
+      continue;
+    }
+
+    switch (*selected_setting) {
+    case terminal_setting_kind::CharacterSize: {
       if (is_disabled) return false;
       static constexpr tcflag_t CHARACTER_SIZES[] = {CS5, CS6, CS7, CS8};
       state.c_cflag = (state.c_cflag & ~CSIZE) | CHARACTER_SIZES[name[2] - '5'];
       continue;
     }
-    if (name == "raw") {
+    case terminal_setting_kind::Raw:
       if (!is_disabled) {
         cfmakeraw(&state);
       } else {
@@ -1007,7 +1040,7 @@ fn apply_terminal_settings(descriptor terminal,
         state.c_oflag |= OPOST;
       }
       continue;
-    } else if (name == "sane") {
+    case terminal_setting_kind::Sane:
       if (is_disabled) return false;
       state.c_lflag |= ICANON | ISIG | ECHO | IEXTEN;
       state.c_lflag &= ~(ECHONL | NOFLSH | TOSTOP);
@@ -1015,18 +1048,18 @@ fn apply_terminal_settings(descriptor terminal,
       state.c_iflag &= ~(IGNBRK | IGNCR | INLCR | IXOFF);
       state.c_oflag |= OPOST;
       continue;
-    } else if (name == "ek") {
+    case terminal_setting_kind::EraseKill:
       if (is_disabled) return false;
       state.c_cc[VERASE] = '\177';
       state.c_cc[VKILL] = '\025';
       continue;
-    } else if (name == "nl") {
+    case terminal_setting_kind::Newline:
       if (is_disabled)
         state.c_iflag &= ~ICRNL;
       else
         state.c_iflag |= ICRNL;
       continue;
-    } else if (name == "evenp" || name == "parity") {
+    case terminal_setting_kind::EvenParity:
       state.c_cflag &= ~PARODD;
       if (is_disabled) {
         state.c_cflag &= ~PARENB;
@@ -1036,7 +1069,7 @@ fn apply_terminal_settings(descriptor terminal,
         state.c_cflag = (state.c_cflag & ~CSIZE) | CS7;
       }
       continue;
-    } else if (name == "oddp") {
+    case terminal_setting_kind::OddParity:
       if (is_disabled) {
         state.c_cflag &= ~(PARENB | PARODD);
         state.c_cflag = (state.c_cflag & ~CSIZE) | CS8;
@@ -1045,29 +1078,27 @@ fn apply_terminal_settings(descriptor terminal,
         state.c_cflag = (state.c_cflag & ~CSIZE) | CS7;
       }
       continue;
-    } else if (name == "rows" || name == "cols" || name == "columns") {
+    case terminal_setting_kind::Rows:
+    case terminal_setting_kind::Columns: {
       if (++index == settings.count() || !has_window) return false;
       let const parsed = utils::parse_decimal_u64(settings[index].view());
       if (parsed.is_error() || parsed.value() > UINT16_MAX) return false;
-      if (name == "rows")
+      if (*selected_setting == terminal_setting_kind::Rows)
         window.ws_row = static_cast<u16>(parsed.value());
       else
         window.ws_col = static_cast<u16>(parsed.value());
       continue;
-    } else if (name == "min" || name == "time") {
+    }
+    case terminal_setting_kind::Minimum:
+    case terminal_setting_kind::Time: {
       if (++index == settings.count()) return false;
       let const parsed = utils::parse_decimal_u64(settings[index].view());
       if (parsed.is_error() || parsed.value() > UCHAR_MAX) return false;
-      state.c_cc[name == "min" ? VMIN : VTIME] =
+      state.c_cc[*selected_setting == terminal_setting_kind::Minimum ? VMIN
+                                                                     : VTIME] =
           static_cast<cc_t>(parsed.value());
       continue;
-    } else {
-      let const speed = terminal_speed_value(name);
-      if (speed == static_cast<speed_t>(~speed_t{0}) || is_disabled)
-        return false;
-      if (cfsetispeed(&state, speed) != 0 || cfsetospeed(&state, speed) != 0)
-        return false;
-      continue;
+    }
     }
   }
   if (tcsetattr(terminal, TCSADRAIN, &state) != 0) return false;

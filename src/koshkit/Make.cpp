@@ -4,6 +4,7 @@
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -82,6 +83,14 @@ constexpr PackedStringKey SPECIAL_TARGET_KEYS[] = {
     SSK(".SCCS_GET"), SSK(".SILENT"), SSK(".SUFFIXES"),
 };
 constexpr StaticStringSet SPECIAL_TARGETS{SPECIAL_TARGET_KEYS};
+
+constexpr PackedStringKey CONDITIONAL_DIRECTIVE_KEYS[] = {
+    SSK("ifeq"), SSK("ifneq"), SSK("ifdef"), SSK("ifndef")};
+constexpr StaticStringSet CONDITIONAL_DIRECTIVES{CONDITIONAL_DIRECTIVE_KEYS};
+
+constexpr PackedStringKey IGNORED_STATEMENT_KEYS[] = {
+    SSK("undefine"), SSK("unexport"), SSK("define")};
+constexpr StaticStringSet IGNORED_STATEMENTS{IGNORED_STATEMENT_KEYS};
 
 struct builtin_rule_entry
 {
@@ -946,9 +955,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
 
     /* An inactive branch still tracks nested directives so the matching endif
        pops the right one. */
-    if (directive == "ifeq" || directive == "ifneq" || directive == "ifdef" ||
-        directive == "ifndef")
-    {
+    if (CONDITIONAL_DIRECTIVES.contains(directive)) {
       let const is_parent_active = do_is_active();
       let const is_taken =
           is_parent_active &&
@@ -965,9 +972,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
         conditional_state &top = conditionals[conditionals.count() - 1];
         let const rest = trim(trimmed.substring(directive.length));
         let const else_directive = leading_word(rest);
-        if (else_directive == "ifeq" || else_directive == "ifneq" ||
-            else_directive == "ifdef" || else_directive == "ifndef")
-        {
+        if (CONDITIONAL_DIRECTIVES.contains(else_directive)) {
           let const is_taken =
               top.is_parent_active && !top.was_any_branch_taken &&
               evaluate_conditional(cxt, mk, else_directive,
@@ -1028,9 +1033,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
       statement = trim(statement.substring(directive.length));
 
     let const statement_word = leading_word(statement);
-    if (statement_word == "undefine" || statement_word == "unexport" ||
-        statement_word == "define")
-    {
+    if (IGNORED_STATEMENTS.contains(statement_word)) {
       current_rule_indices.clear();
       current_pattern_indices.clear();
       continue;

@@ -109,27 +109,101 @@ struct conditional_evaluator
     return raw;
   }
 
-  static pure fn is_unary_op(StringView s) wontthrow -> bool
+  enum class UnaryOperatorKind : uchar
   {
-    static constexpr PackedStringKey KEYS[] = {
-        SSK("-a"), SSK("-z"), SSK("-n"), SSK("-e"), SSK("-f"), SSK("-d"),
-        SSK("-r"), SSK("-w"), SSK("-x"), SSK("-s"), SSK("-h"), SSK("-L"),
-        SSK("-b"), SSK("-c"), SSK("-p"), SSK("-S"), SSK("-g"), SSK("-u"),
-        SSK("-k"), SSK("-O"), SSK("-G"), SSK("-v"), SSK("-t"), SSK("-o"),
+    Empty,
+    Nonempty,
+    VariableSet,
+    PathExists,
+    RegularFile,
+    Directory,
+    Readable,
+    Writable,
+    Executable,
+    NonemptyFile,
+    SymbolicLink,
+    BlockDevice,
+    CharacterDevice,
+    Fifo,
+    Socket,
+    Setgid,
+    Setuid,
+    Sticky,
+    EffectiveUserOwner,
+    EffectiveGroupOwner,
+    Terminal,
+    ShellOption,
+  };
+
+  static pure fn unary_operator(StringView text) wontthrow
+      -> Maybe<UnaryOperatorKind>
+  {
+    static constexpr static_string_entry<UnaryOperatorKind> ENTRIES[] = {
+        {SSK("-z"), UnaryOperatorKind::Empty              },
+        {SSK("-n"), UnaryOperatorKind::Nonempty           },
+        {SSK("-v"), UnaryOperatorKind::VariableSet        },
+        {SSK("-a"), UnaryOperatorKind::PathExists         },
+        {SSK("-e"), UnaryOperatorKind::PathExists         },
+        {SSK("-f"), UnaryOperatorKind::RegularFile        },
+        {SSK("-d"), UnaryOperatorKind::Directory          },
+        {SSK("-r"), UnaryOperatorKind::Readable           },
+        {SSK("-w"), UnaryOperatorKind::Writable           },
+        {SSK("-x"), UnaryOperatorKind::Executable         },
+        {SSK("-s"), UnaryOperatorKind::NonemptyFile       },
+        {SSK("-h"), UnaryOperatorKind::SymbolicLink       },
+        {SSK("-L"), UnaryOperatorKind::SymbolicLink       },
+        {SSK("-b"), UnaryOperatorKind::BlockDevice        },
+        {SSK("-c"), UnaryOperatorKind::CharacterDevice    },
+        {SSK("-p"), UnaryOperatorKind::Fifo               },
+        {SSK("-S"), UnaryOperatorKind::Socket             },
+        {SSK("-g"), UnaryOperatorKind::Setgid             },
+        {SSK("-u"), UnaryOperatorKind::Setuid             },
+        {SSK("-k"), UnaryOperatorKind::Sticky             },
+        {SSK("-O"), UnaryOperatorKind::EffectiveUserOwner },
+        {SSK("-G"), UnaryOperatorKind::EffectiveGroupOwner},
+        {SSK("-t"), UnaryOperatorKind::Terminal           },
+        {SSK("-o"), UnaryOperatorKind::ShellOption        },
     };
-    static constexpr StaticStringSet UNARY_OPS{KEYS};
-    return UNARY_OPS.contains(s);
+    static constexpr StaticStringMap OPERATORS{ENTRIES};
+    return OPERATORS.find(text);
   }
 
-  static pure fn is_binary_word_op(StringView s) wontthrow -> bool
+  enum class BinaryOperatorKind : uchar
   {
-    static constexpr PackedStringKey KEYS[] = {
-        SSK("="),   SSK("=="),  SSK("!="),  SSK("=~"),  SSK("-eq"),
-        SSK("-ne"), SSK("-lt"), SSK("-le"), SSK("-gt"), SSK("-ge"),
-        SSK("-ef"), SSK("-nt"), SSK("-ot"),
+    PatternEqual,
+    PatternNotEqual,
+    Regex,
+    ArithmeticEqual,
+    ArithmeticNotEqual,
+    ArithmeticLess,
+    ArithmeticLessEqual,
+    ArithmeticGreater,
+    ArithmeticGreaterEqual,
+    SameFile,
+    NewerFile,
+    OlderFile,
+  };
+
+  static pure fn binary_operator(StringView text) wontthrow
+      -> Maybe<BinaryOperatorKind>
+  {
+    static constexpr static_string_entry<BinaryOperatorKind> ENTRIES[] = {
+        {SSK("="),   BinaryOperatorKind::PatternEqual          },
+        {SSK("=="),  BinaryOperatorKind::PatternEqual          },
+        {SSK("!="),  BinaryOperatorKind::PatternNotEqual       },
+        {SSK("=~"),  BinaryOperatorKind::Regex                 },
+        {SSK("-eq"), BinaryOperatorKind::ArithmeticEqual       },
+        {SSK("-ne"), BinaryOperatorKind::ArithmeticNotEqual    },
+        {SSK("-lt"), BinaryOperatorKind::ArithmeticLess        },
+        {SSK("-le"), BinaryOperatorKind::ArithmeticLessEqual   },
+        {SSK("-gt"), BinaryOperatorKind::ArithmeticGreater     },
+        {SSK("-ge"), BinaryOperatorKind::ArithmeticGreaterEqual},
+        {SSK("-ef"), BinaryOperatorKind::SameFile              },
+        {SSK("-nt"), BinaryOperatorKind::NewerFile             },
+        {SSK("-ot"), BinaryOperatorKind::OlderFile             },
     };
-    static constexpr StaticStringSet BINARY_WORD_OPS{KEYS};
-    return BINARY_WORD_OPS.contains(s);
+    static constexpr StaticStringMap OPERATORS{ENTRIES};
+    return OPERATORS.find(text);
   }
 
   static pure fn is_regex_metacharacter(char c) wontthrow -> bool
@@ -195,11 +269,12 @@ struct conditional_evaluator
     return true;
   }
 
-  fn eval_unary(StringView op, StringView operand) throws -> bool
+  fn eval_unary(UnaryOperatorKind op, StringView operand) throws -> bool
   {
-    if (op == "-z") return operand.is_empty();
-    if (op == "-n") return !operand.is_empty();
-    if (op == "-v") {
+    switch (op) {
+    case UnaryOperatorKind::Empty: return operand.is_empty();
+    case UnaryOperatorKind::Nonempty: return !operand.is_empty();
+    case UnaryOperatorKind::VariableSet: {
       if (let const bracket = operand.find_character('[');
           bracket.has_value() && operand[operand.length - 1] == ']')
       {
@@ -210,20 +285,32 @@ struct conditional_evaluator
       }
       return cxt.get_variable_value(operand).has_value();
     }
-    let const path = Path{operand};
-    if (op == "-a" || op == "-e") {
-      return path.exists();
-    }
-    if (op == "-f") return path.is_regular_file();
-    if (op == "-d") return path.is_directory();
-    if (op == "-r") return path.is_readable();
-    if (op == "-w") return path.is_writable();
-    if (op == "-x") return path.is_executable();
-    if (op == "-s") {
+    case UnaryOperatorKind::PathExists: return Path{operand}.exists();
+    case UnaryOperatorKind::RegularFile: return Path{operand}.is_regular_file();
+    case UnaryOperatorKind::Directory: return Path{operand}.is_directory();
+    case UnaryOperatorKind::Readable: return Path{operand}.is_readable();
+    case UnaryOperatorKind::Writable: return Path{operand}.is_writable();
+    case UnaryOperatorKind::Executable: return Path{operand}.is_executable();
+    case UnaryOperatorKind::NonemptyFile: {
+      let const path = Path{operand};
       let const size = path.file_size();
       return size.has_value() && size.value() > 0;
     }
-    if (op == "-t") {
+    case UnaryOperatorKind::SymbolicLink:
+      return Path{operand}.is_symbolic_link();
+    case UnaryOperatorKind::BlockDevice: return Path{operand}.is_block_device();
+    case UnaryOperatorKind::CharacterDevice:
+      return Path{operand}.is_character_device();
+    case UnaryOperatorKind::Fifo: return Path{operand}.is_fifo();
+    case UnaryOperatorKind::Socket: return Path{operand}.is_socket();
+    case UnaryOperatorKind::Setgid: return Path{operand}.has_setgid_bit();
+    case UnaryOperatorKind::Setuid: return Path{operand}.has_setuid_bit();
+    case UnaryOperatorKind::Sticky: return Path{operand}.has_sticky_bit();
+    case UnaryOperatorKind::EffectiveUserOwner:
+      return Path{operand}.is_owned_by_effective_user();
+    case UnaryOperatorKind::EffectiveGroupOwner:
+      return Path{operand}.is_owned_by_effective_group();
+    case UnaryOperatorKind::Terminal: {
       if (ErrorOr<i64> descriptor = operand.to<i64>(); !descriptor.is_error())
         return os::is_fd_a_tty(
             os::descriptor_from_fd_number(descriptor.value()));
@@ -233,30 +320,25 @@ struct conditional_evaluator
       error.set_command_status(2);
       throw error;
     }
-    if (op == "-h" || op == "-L") {
-      return path.is_symbolic_link();
-    }
-    if (op == "-b") return path.is_block_device();
-    if (op == "-c") return path.is_character_device();
-    if (op == "-p") return path.is_fifo();
-    if (op == "-S") return path.is_socket();
-    if (op == "-g") return path.has_setgid_bit();
-    if (op == "-u") return path.has_setuid_bit();
-    if (op == "-k") return path.has_sticky_bit();
-    if (op == "-O") return path.is_owned_by_effective_user();
-    if (op == "-G") return path.is_owned_by_effective_group();
-    if (op == "-o") {
+    case UnaryOperatorKind::ShellOption:
       return query_shell_option(cxt, operand).value_or(false);
     }
-    return path.exists();
+
+    return false;
   }
 
-  fn eval_binary(StringView left, StringView op, StringView right) throws
-      -> bool
+  fn eval_binary(StringView left, BinaryOperatorKind op,
+                 StringView right) throws -> bool
   {
-    if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
-    if (op == "-nt") return Path{left}.is_newer_than(Path{right});
-    if (op == "-ot") return Path{left}.is_older_than(Path{right});
+    switch (op) {
+    case BinaryOperatorKind::SameFile:
+      return Path{left}.is_same_file_as(Path{right});
+    case BinaryOperatorKind::NewerFile:
+      return Path{left}.is_newer_than(Path{right});
+    case BinaryOperatorKind::OlderFile:
+      return Path{left}.is_older_than(Path{right});
+    default: break;
+    }
 
     /* The arithmetic comparison operands are full expressions, so 1+1 and a
        bare variable name evaluate. An empty operand reads as zero. */
@@ -268,12 +350,15 @@ struct conditional_evaluator
     };
     let const ordering =
         cxt.compare_arithmetic(do_normalize(left), do_normalize(right));
-    if (op == "-eq") return ordering == 0;
-    if (op == "-ne") return ordering != 0;
-    if (op == "-lt") return ordering < 0;
-    if (op == "-le") return ordering <= 0;
-    if (op == "-gt") return ordering > 0;
-    return ordering >= 0;
+    switch (op) {
+    case BinaryOperatorKind::ArithmeticEqual: return ordering == 0;
+    case BinaryOperatorKind::ArithmeticNotEqual: return ordering != 0;
+    case BinaryOperatorKind::ArithmeticLess: return ordering < 0;
+    case BinaryOperatorKind::ArithmeticLessEqual: return ordering <= 0;
+    case BinaryOperatorKind::ArithmeticGreater: return ordering > 0;
+    case BinaryOperatorKind::ArithmeticGreaterEqual: return ordering >= 0;
+    default: return false;
+    }
   }
 
   fn eval_primary() throws -> bool
@@ -288,7 +373,10 @@ struct conditional_evaluator
 
     let const first_literal = operand_literal(first);
 
-    if (first.is_bare_unquoted && is_unary_op(first_literal.view())) {
+    let selected_unary_operator = Maybe<UnaryOperatorKind>{};
+    if (first.is_bare_unquoted)
+      selected_unary_operator = unary_operator(first_literal.view());
+    if (selected_unary_operator.has_value()) {
       if (pos + 1 >= elements.count() || kind_at(pos + 1) != Kind::Operand) {
         fail_conditional("The unary operator '" + first_literal +
                          "' is missing its operand");
@@ -299,7 +387,8 @@ struct conditional_evaluator
       /* bash does not nounset the operand of -v, so the unset-variable
          diagnostic stays silent while it expands. The defer restores the prior
          value so a throw cannot strand the suppression on. */
-      let const is_existence_test = first_literal.view() == "-v";
+      let const is_existence_test =
+          *selected_unary_operator == UnaryOperatorKind::VariableSet;
       let const saved_suppress_unset =
           cxt.is_warning_suppressed(suppressible_warning::UnsetReference);
       let const saved_suppress_test_operand =
@@ -315,7 +404,7 @@ struct conditional_evaluator
                                    saved_suppress_test_operand);
       };
       let const operand = operand_value(elements[pos - 1]);
-      return eval_unary(first_literal.view(), operand.view());
+      return eval_unary(*selected_unary_operator, operand.view());
     }
 
     if (pos + 1 < elements.count()) {
@@ -333,7 +422,8 @@ struct conditional_evaluator
       }
       if (next == Kind::Operand && elements[pos + 1].is_bare_unquoted) {
         let const op = operand_literal(elements[pos + 1]);
-        if (is_binary_word_op(op.view())) {
+        let const selected_binary_operator = binary_operator(op.view());
+        if (selected_binary_operator.has_value()) {
           if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
           {
             throw Error{"Expected an operand after '" + op + "'"};
@@ -341,10 +431,23 @@ struct conditional_evaluator
           pos += 3;
           if (is_skipping) return false;
 
-          let const is_test_operand_op =
-              op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
-              op == "-gt" || op == "-ge" || op == "-ef" || op == "-nt" ||
-              op == "-ot";
+          let const is_test_operand_op = [&]() -> bool {
+            switch (*selected_binary_operator) {
+            case BinaryOperatorKind::ArithmeticEqual:
+            case BinaryOperatorKind::ArithmeticNotEqual:
+            case BinaryOperatorKind::ArithmeticLess:
+            case BinaryOperatorKind::ArithmeticLessEqual:
+            case BinaryOperatorKind::ArithmeticGreater:
+            case BinaryOperatorKind::ArithmeticGreaterEqual:
+            case BinaryOperatorKind::SameFile:
+            case BinaryOperatorKind::NewerFile:
+            case BinaryOperatorKind::OlderFile: return true;
+            case BinaryOperatorKind::PatternEqual:
+            case BinaryOperatorKind::PatternNotEqual:
+            case BinaryOperatorKind::Regex: return false;
+            }
+            return false;
+          }();
           let const saved_suppress_test_operand =
               cxt.is_warning_suppressed(suppressible_warning::UnsetTestOperand);
           if (is_test_operand_op)
@@ -357,7 +460,9 @@ struct conditional_evaluator
           };
 
           let const left = operand_value(elements[pos - 3]);
-          if (op == "==" || op == "=" || op == "!=") {
+          if (*selected_binary_operator == BinaryOperatorKind::PatternEqual ||
+              *selected_binary_operator == BinaryOperatorKind::PatternNotEqual)
+          {
             let active = Bitset{cxt.scratch_allocator()};
             let const pattern =
                 operand_pattern_masked(elements[pos - 1], active);
@@ -366,7 +471,10 @@ struct conditional_evaluator
               let const is_matched =
                   utils::glob_matches(pattern.view(), left.view(), active, 0,
                                       cxt.extglob_enabled());
-              return op == "!=" ? !is_matched : is_matched;
+              return *selected_binary_operator ==
+                             BinaryOperatorKind::PatternNotEqual
+                         ? !is_matched
+                         : is_matched;
             }
 
             let const match_pattern =
@@ -376,9 +484,12 @@ struct conditional_evaluator
             let const is_matched =
                 utils::glob_matches(match_pattern.view(), match_value.view(),
                                     active, 0, cxt.extglob_enabled());
-            return op == "!=" ? !is_matched : is_matched;
+            return *selected_binary_operator ==
+                           BinaryOperatorKind::PatternNotEqual
+                       ? !is_matched
+                       : is_matched;
           }
-          if (op == "=~") {
+          if (*selected_binary_operator == BinaryOperatorKind::Regex) {
             let active = Bitset{cxt.scratch_allocator()};
             const String pattern =
                 operand_pattern_masked(elements[pos - 1], active);
@@ -396,7 +507,8 @@ struct conditional_evaluator
             }
           }
           let const right = operand_value(elements[pos - 1]);
-          return eval_binary(left.view(), op.view(), right.view());
+          return eval_binary(left.view(), *selected_binary_operator,
+                             right.view());
         }
       }
     }

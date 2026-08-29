@@ -164,15 +164,16 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   if (is_append) {
     if (let const *array = lookup_indexed_array(name); array != nullptr)
       running_index = array->count();
-    if (m_sparse_array_names.contains(name)) {
-      let const sparse = collect_sparse_array_entries(
-          m_sparse_array_values, name, scratch_allocator());
-      if (!sparse.is_empty()) {
-        let const next_after_sparse = sparse[sparse.count() - 1].index + 1;
-        if (next_after_sparse > running_index)
-          running_index = next_after_sparse;
-      }
-    }
+    if (m_sparse_array_names.contains(name))
+      for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
+                            [&](usize index, const String &value) throws {
+                              unused(value);
+                              if (index == SIZE_MAX)
+                                throw Error{"Unable to append to '" + name +
+                                            "' because its index is too large"};
+                              if (index >= running_index)
+                                running_index = index + 1;
+                            });
   } else {
     set_indexed_array(name, ArrayList<String>{heap_allocator()});
   }
@@ -517,13 +518,14 @@ fn EvalContext::declare_local(StringView name) throws -> void
 
   let previous_sparse_indices = ArrayList<usize>{heap_allocator()};
   let previous_sparse_values = ArrayList<String>{heap_allocator()};
-  if (m_sparse_array_names.contains(name))
-    for (const sparse_array_entry &entry : collect_sparse_array_entries(
-             m_sparse_array_values, name, heap_allocator()))
-    {
+  if (m_sparse_array_names.contains(name)) {
+    let previous_sparse_entries = collect_sparse_array_entries(
+        m_sparse_array_values, name, heap_allocator());
+    for (sparse_array_entry &entry : previous_sparse_entries) {
       previous_sparse_indices.push(entry.index);
-      previous_sparse_values.push(String{heap_allocator(), entry.value.view()});
+      previous_sparse_values.push(steal(entry.value));
     }
+  }
 
   /* A local starts with no attributes, so the integer and read-only marks are
      dropped here and the saved flags put them back when the scope ends. */
@@ -839,22 +841,23 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
 fn EvalContext::collect_array_subscripts(StringView name) const throws
     -> ArrayList<String>
 {
+  if (is_associative_array(name)) return associative_keys(name);
+
   let out = ArrayList<String>{heap_allocator()};
-  if (is_associative_array(name)) {
-    let const keys = associative_keys(name);
-    out.reserve(keys.count());
-    for (const String &key : keys)
-      out.push(String{heap_allocator(), key.view()});
-    return out;
-  }
   if (let const *array = lookup_indexed_array(name); array != nullptr) {
     out.reserve(array->count());
     for (usize i = 0; i < array->count(); i++)
       out.push(String::from(i, heap_allocator()));
     if (m_sparse_array_names.contains(name)) {
-      for (const sparse_array_entry &entry : collect_sparse_array_entries(
-               m_sparse_array_values, name, scratch_allocator()))
-        out.push(String::from(entry.index, heap_allocator()));
+      let sparse_indices = ArrayList<usize>{scratch_allocator()};
+      for_each_sparse_index(m_sparse_array_values, name, scratch_allocator(),
+                            [&](usize index, const String &value) throws {
+                              unused(value);
+                              sparse_indices.push(index);
+                            });
+      sparse_indices.sort();
+      for (let const index : sparse_indices)
+        out.push(String::from(index, heap_allocator()));
     }
     return out;
   }

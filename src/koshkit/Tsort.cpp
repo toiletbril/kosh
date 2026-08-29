@@ -90,16 +90,24 @@ fn Tsort::execute(const ExecContext &ec, EvalContext &cxt,
     let const to = do_vertex_index(tokens[token_index + 1]);
     if (from == to) continue;
 
-    bool has_edge = false;
-    for (let const existing : vertices[from].outgoing)
-      if (existing == to) {
-        has_edge = true;
-        break;
-      }
-    if (has_edge) continue;
-
     vertices[from].outgoing.push(to);
-    vertices[to].incoming_count++;
+  }
+
+  let edge_marks = ArrayList<usize>{cxt.scratch_allocator()};
+  edge_marks.reserve(vertices.count());
+  for (usize index = 0; index < vertices.count(); index++)
+    edge_marks.push(0);
+  for (usize from = 0; from < vertices.count(); from++) {
+    let deduplicated = ArrayList<usize>{cxt.scratch_allocator()};
+    deduplicated.reserve(vertices[from].outgoing.count());
+    let const edge_mark = from + 1;
+    for (let const to : vertices[from].outgoing) {
+      if (edge_marks[to] == edge_mark) continue;
+      edge_marks[to] = edge_mark;
+      deduplicated.push(to);
+      vertices[to].incoming_count++;
+    }
+    vertices[from].outgoing = steal(deduplicated);
   }
 
   let ready = ArrayList<usize>{cxt.scratch_allocator()};
