@@ -36,3 +36,12 @@ printf 'in-process=%s\n' \
     "$(grep -c 'running the captured substitution in process' "$d/log")"
 printf 'child-process=%s\n' \
     "$(grep -c 'running the captured substitution in a child process' "$d/log")"
+
+"$BIN" --mood bash -c '
+"$BIN" -c : &
+parent=$!
+ulimit -n 5
+value=$(printf hi)
+wait "$parent"
+printf "snapshot-wait=%s value=<%s>\n" "$?" "$value"
+' 2>&1

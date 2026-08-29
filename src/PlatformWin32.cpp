@@ -13,6 +13,57 @@ namespace koshka {
 
 namespace os {
 
+static fn utf8_to_wide(StringView text, Allocator allocator) throws
+    -> Maybe<ArrayList<wchar_t>>
+{
+  if (text.length > static_cast<usize>(INT_MAX)) {
+    SetLastError(ERROR_FILENAME_EXCED_RANGE);
+    return None;
+  }
+
+  ArrayList<wchar_t> wide{allocator};
+  if (text.is_empty()) {
+    wide.reserve(1);
+    wide.begin()[0] = L'\0';
+    return wide;
+  }
+
+  let const wide_length =
+      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data,
+                          static_cast<int>(text.length), nullptr, 0);
+  if (wide_length <= 0) return None;
+  wide.reserve(static_cast<usize>(wide_length) + 1);
+  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data,
+                          static_cast<int>(text.length), wide.begin(),
+                          wide_length) != wide_length)
+    return None;
+  wide.begin()[wide_length] = L'\0';
+  return wide;
+}
+
+static fn wide_to_utf8(const wchar_t *text, usize length,
+                       Allocator allocator) throws -> Maybe<String>
+{
+  if (length == 0) return String{allocator};
+  if (length > static_cast<usize>(INT_MAX)) {
+    SetLastError(ERROR_FILENAME_EXCED_RANGE);
+    return None;
+  }
+  let const utf8_length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                              text, static_cast<int>(length),
+                                              nullptr, 0, nullptr, nullptr);
+  if (utf8_length <= 0) return None;
+  ArrayList<char> utf8{allocator};
+  utf8.reserve(static_cast<usize>(utf8_length));
+  if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text,
+                          static_cast<int>(length), utf8.begin(), utf8_length,
+                          nullptr, nullptr) != utf8_length)
+    return None;
+  return String{
+      allocator, StringView{utf8.begin(), static_cast<usize>(utf8_length)}
+  };
+}
+
 fn logged_in_users() throws -> ArrayList<user_session>
 {
   let result = ArrayList<user_session>{heap_allocator()};
@@ -238,7 +289,11 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
   /* A failed delete keeps the path and retries once the descriptor closes. */
   usize kept = mark;
   for (usize i = mark; i < m_paths.count(); i++) {
-    if (DeleteFileA(m_paths[i].c_str()) != FALSE) continue;
+    try {
+      let const wide_path = utf8_to_wide(m_paths[i].view(), heap_allocator());
+      if (wide_path.has_value() && DeleteFileW(wide_path->begin()) != FALSE)
+        continue;
+    } catch (...) {}
     if (kept != i) m_paths[kept] = steal(m_paths[i]);
     kept++;
   }
@@ -471,28 +526,25 @@ fn allocate_free_shell_fd(i32 floor_fd) wontthrow -> i32
 fn get_current_user() -> Maybe<String>
 {
   DWORD size = 0;
-  GetUserNameA(nullptr, &size);
+  GetUserNameW(nullptr, &size);
   if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-    ArrayList<char> buffer{heap_allocator()};
+    ArrayList<wchar_t> buffer{heap_allocator()};
     buffer.reserve(size);
     for (DWORD i = 0; i < size; i++)
-      buffer.push('\0');
-    if (GetUserNameA(buffer.begin(), &size))
-      return String{
-          StringView{buffer.begin(), size - 1}
-      };
+      buffer.push(L'\0');
+    if (GetUserNameW(buffer.begin(), &size))
+      return wide_to_utf8(buffer.begin(), size - 1);
   }
   return koshka::None;
 }
 
+fn get_login_user() throws -> Maybe<String> { return get_current_user(); }
+
 fn get_hostname() throws -> Maybe<String>
 {
-  char buffer[MAX_COMPUTERNAME_LENGTH + 1];
-  DWORD size = sizeof(buffer);
-  if (GetComputerNameA(buffer, &size))
-    return String{
-        StringView{buffer, size}
-    };
+  wchar_t buffer[MAX_COMPUTERNAME_LENGTH + 1];
+  DWORD size = countof(buffer);
+  if (GetComputerNameW(buffer, &size)) return wide_to_utf8(buffer, size);
   return koshka::None;
 }
 
@@ -654,22 +706,23 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>
 {
-  let const path_text = String{heap_allocator(), path};
-  if (GetFileAttributesA(path_text.c_str()) == INVALID_FILE_ATTRIBUTES)
+  let const path_text = utf8_to_wide(path);
+  if (!path_text.has_value() ||
+      GetFileAttributesW(path_text->begin()) == INVALID_FILE_ATTRIBUTES)
     return None;
   switch (key) {
   case path_configuration_key::LinkMax: return 1024;
   case path_configuration_key::MaxCanonical: return None;
   case path_configuration_key::MaxInput: return None;
   case path_configuration_key::NameMax: {
-    char volume_path[MAX_PATH];
-    if (GetVolumePathNameA(path_text.c_str(), volume_path,
+    wchar_t volume_path[MAX_PATH];
+    if (GetVolumePathNameW(path_text->begin(), volume_path,
                            countof(volume_path)) == FALSE)
     {
       return None;
     }
     DWORD maximum_component_length = 0;
-    if (GetVolumeInformationA(volume_path, nullptr, 0, nullptr,
+    if (GetVolumeInformationW(volume_path, nullptr, 0, nullptr,
                               &maximum_component_length, nullptr, nullptr,
                               0) == FALSE)
     {
@@ -802,11 +855,13 @@ fn apply_terminal_settings(descriptor terminal,
 
 fn get_environment_variable(StringView key) -> Maybe<String>
 {
-  String key_string{key};
-  char inline_buffer[256];
+  let const wide_key = utf8_to_wide(key, heap_allocator());
+  if (!wide_key.has_value()) return None;
+
+  wchar_t inline_buffer[256];
   SetLastError(ERROR_SUCCESS);
   let required_size =
-      GetEnvironmentVariableA(key_string.c_str(), inline_buffer,
+      GetEnvironmentVariableW(wide_key->begin(), inline_buffer,
                               static_cast<DWORD>(countof(inline_buffer)));
   if (required_size == 0) {
     return GetLastError() == ERROR_ENVVAR_NOT_FOUND
@@ -814,44 +869,46 @@ fn get_environment_variable(StringView key) -> Maybe<String>
                : Maybe<String>{String{heap_allocator()}};
   }
   if (required_size < countof(inline_buffer))
-    return String{
-        StringView{inline_buffer, static_cast<usize>(required_size)}
-    };
+    return wide_to_utf8(inline_buffer, static_cast<usize>(required_size),
+                        heap_allocator());
 
-  let buffer = ArrayList<char>{heap_allocator()};
+  let buffer = ArrayList<wchar_t>{heap_allocator()};
   buffer.reserve(static_cast<usize>(required_size));
-  let const value_length = GetEnvironmentVariableA(
-      key_string.c_str(), buffer.begin(), required_size);
+  let const value_length =
+      GetEnvironmentVariableW(wide_key->begin(), buffer.begin(), required_size);
   if (value_length == 0 || value_length >= required_size) return koshka::None;
-  return String{
-      StringView{buffer.begin(), static_cast<usize>(value_length)}
-  };
+  return wide_to_utf8(buffer.begin(), static_cast<usize>(value_length),
+                      heap_allocator());
 }
 
 fn set_environment_variable(StringView key, StringView value) -> void
 {
-  String key_string{key};
-  String value_string{value};
-  SetEnvironmentVariableA(key_string.c_str(), value_string.c_str());
+  let const wide_key = utf8_to_wide(key, heap_allocator());
+  let const wide_value = utf8_to_wide(value, heap_allocator());
+  if (!wide_key.has_value() || !wide_value.has_value()) return;
+
+  SetEnvironmentVariableW(wide_key->begin(), wide_value->begin());
 }
 
 fn unset_environment_variable(StringView key) -> void
 {
-  String key_string{key};
-  SetEnvironmentVariableA(key_string.c_str(), nullptr);
+  let const wide_key = utf8_to_wide(key, heap_allocator());
+  if (!wide_key.has_value()) return;
+
+  SetEnvironmentVariableW(wide_key->begin(), nullptr);
 }
 
 fn signal_internal_diagnostic() wontthrow -> void
 {
-  char marker_path[MAX_PATH];
-  let const marker_path_length = GetEnvironmentVariableA(
-      "KOSH_INTERNAL_DIAGNOSTIC_MARKER", marker_path, countof(marker_path));
+  wchar_t marker_path[MAX_PATH];
+  let const marker_path_length = GetEnvironmentVariableW(
+      L"KOSH_INTERNAL_DIAGNOSTIC_MARKER", marker_path, countof(marker_path));
   if (marker_path_length == 0 || marker_path_length >= countof(marker_path)) {
     return;
   }
 
   let const marker =
-      CreateFileA(marker_path, FILE_APPEND_DATA,
+      CreateFileW(marker_path, FILE_APPEND_DATA,
                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                   nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, nullptr);
   if (marker == INVALID_HANDLE_VALUE) return;
@@ -863,21 +920,26 @@ fn signal_internal_diagnostic() wontthrow -> void
 fn environment_names() -> ArrayList<String>
 {
   ArrayList<String> names{heap_allocator()};
-  char *block = GetEnvironmentStringsA();
+  wchar_t *block = GetEnvironmentStringsW();
   if (block == nullptr) return names;
-  defer { FreeEnvironmentStringsA(block); };
-  for (char *entry = block; *entry != '\0';) {
-    StringView pair{entry};
-    if (pair[0] == '=') {
-      entry += pair.length + 1;
-      continue;
+  defer { FreeEnvironmentStringsW(block); };
+
+  for (wchar_t *entry = block; *entry != L'\0';) {
+    usize pair_length = 0;
+    while (entry[pair_length] != L'\0')
+      pair_length++;
+
+    if (entry[0] != L'=') {
+      usize name_length = 0;
+      while (name_length < pair_length && entry[name_length] != L'=')
+        name_length++;
+      let name = wide_to_utf8(entry, name_length, heap_allocator());
+      if (name.has_value()) names.push(name.take());
     }
-    let const equals = pair.find_character('=');
-    let const split =
-        equals.has_value() ? pair.substring_of_length(0, *equals) : pair;
-    names.push(String{split});
-    entry += pair.length + 1;
+
+    entry += pair_length + 1;
   }
+
   return names;
 }
 

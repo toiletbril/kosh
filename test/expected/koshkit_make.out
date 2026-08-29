@@ -89,7 +89,30 @@ ds=o/common.o o/hashtable.o o/try.o o/list.o o/vec.o o/string.o
 curdir=set
 words-empty=0
 define=[value] undefined=[]
+define-words=3
+eval=one two
+eval-recipe-first
+eval-recipe-second
 includes=one two
+--- makefile parse error locations ---
+malformed-main.mk:1:1: error: A define line must name a variable.
+     1 |  define
+       |  ^~~~~~
+malformed-included.mk:1:1: error: A define line must name a variable.
+     1 |  define
+       |  ^~~~~~
+malformed-continued.mk:1:1: error: A define line must name a variable.
+     1 |  define \
+       |  ^~~~~~~~
+malformed-expansion.mk:1:1: error: The make variable reference is unterminated.
+     1 |  BROKEN := $(unterminated
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~
+malformed-function.mk:1:1: error: The makefile stopped the build with the message 'included expansion failed'.
+     1 |  BROKEN := $(error included expansion failed)
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+malformed-eval.mk.eval.2:1:1: error: A define line must name a variable.
+     1 |  define
+       |  ^~~~~~
 automatic=auto.o
 automatic-indirect=auto.c first=auto.in target-file=auto.c
 word-zero=2
@@ -200,6 +223,7 @@ member-dir=obj member-file=member.o
 --- POSIX recipe environment and shell macro ---
 command=fromcommand inherited=fromfile local=
 exported=frommake assigned=assigned-value unexported=unset
+default-shell=self
 shell-selected=yes
 shell-env=inherited-value
 shell-function=[] folded=[one two]
@@ -214,14 +238,22 @@ escaped-percent-pattern=yes
 specific-pattern=yes
 replacement-pattern=yes
 shared-prerequisite=yes
+combined-first=explicit.seed combined-all=explicit.extra explicit.seed
+winning-pattern=exactname.chosen
 chained-pattern=yes
 multiple-pattern-prerequisites=yes
 --- POSIX macro and built-in database ---
 caret=first second
 plus=first second first
-paren=expanded-name brace=expanded-name short=expanded-name shell=/bin/sh
+paren=expanded-name brace=expanded-name short=expanded-name shell=self
 command-flags=yes
-jobs-operand=0
+jobs=[j]
+jobs=[j4]
+jobs=[j4]
+jobs=[S]
+jobs=[k]
+jobs=[S]
+jobs=[k]
 recursive-print=yes
 .SUFFIXES: .o .c .y .l .a .sh .f .c~ .y~ .l~ .sh~ .f~
 CC = c99
@@ -246,6 +278,7 @@ right>
 --- POSIX archive inference ---
 archive=library.a member=member.o source=member.src stem=member
 archive-member-stale
+archive-cleanup=yes
 --- POSIX suffix precedence ---
 via-sh
 second-inference

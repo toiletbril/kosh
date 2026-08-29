@@ -1,6 +1,8 @@
 pid=passed
 stdout-framing=passed
 use=passed
+cwd-use=passed
+executable-use=passed
 user=passed
 operands=passed
 combined=passed

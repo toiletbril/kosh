@@ -572,79 +572,140 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   LOG(Debug, "running the captured substitution in process");
   ASSERT(in_process_snapshot.has_value());
   let snapshot = steal(*in_process_snapshot);
+  bool did_begin_restoration = false;
+  let const do_evaluate_in_process = [&]() throws -> String {
+    let const pipe = os::make_pipe();
+    if (!pipe) throw Error{"Could not open a pipe for command substitution"};
+    bool is_pipe_input_open = true;
+    bool is_pipe_output_open = true;
+    defer
+    {
+      if (is_pipe_output_open) os::close_fd(pipe->out);
+      if (is_pipe_input_open) os::close_fd(pipe->in);
+    };
 
-  let const pipe = os::make_pipe();
-  if (!pipe) throw Error{"Could not open a pipe for command substitution"};
+    let captured = String{heap_allocator()};
+    let drain_context =
+        command_substitution_drain_context{nullptr, 0, 0, pipe->in};
+    let const reader =
+        os::start_thread(drain_command_substitution_pipe, &drain_context);
+    if (!reader) {
+      os::close_fd(pipe->in);
+      is_pipe_input_open = false;
+      os::close_fd(pipe->out);
+      is_pipe_output_open = false;
+      throw Error{"Could not start a thread for command substitution"};
+    }
 
-  let captured = String{heap_allocator()};
-  let drain_context =
-      command_substitution_drain_context{nullptr, 0, 0, pipe->in};
-  let const reader =
-      os::start_thread(drain_command_substitution_pipe, &drain_context);
-  if (!reader) {
-    os::close_fd(pipe->in);
-    os::close_fd(pipe->out);
-    throw Error{"Could not start a thread for command substitution"};
-  }
+    bool is_reader_running = true;
+    bool is_stdout_redirected = false;
+    bool did_change_interactive_state = false;
+    bool did_enter_subshell = false;
+    os::descriptor saved_stdout = KOSH_INVALID_FD;
+    let const was_interactive = m_shell_is_interactive;
+    let const do_cleanup = [&]() wontthrow -> void {
+      if (did_enter_subshell) {
+        leave_subshell();
+        did_enter_subshell = false;
+      }
+      if (did_change_interactive_state) {
+        m_shell_is_interactive = was_interactive;
+        did_change_interactive_state = false;
+      }
+      if (is_stdout_redirected) {
+        koshka::flush();
+        os::restore_stdout(saved_stdout);
+        is_stdout_redirected = false;
+      }
+      if (is_pipe_output_open) {
+        os::close_fd(pipe->out);
+        is_pipe_output_open = false;
+      }
+      if (is_reader_running) {
+        os::join_thread(*reader);
+        is_reader_running = false;
+      }
+      if (is_pipe_input_open) {
+        os::close_fd(pipe->in);
+        is_pipe_input_open = false;
+      }
+    };
+    defer
+    {
+      do_cleanup();
+      std::free(drain_context.data);
+    };
 
-  koshka::flush();
-  let const saved = os::redirect_stdout(pipe->out);
+    koshka::flush();
+    saved_stdout = os::redirect_stdout(pipe->out);
+    is_stdout_redirected = true;
 
-  let const was_interactive = m_shell_is_interactive;
-  m_shell_is_interactive = false;
+    m_shell_is_interactive = false;
+    did_change_interactive_state = true;
 
-  /* A break, continue, return, or exit inside a substitution acts only within
-     it and must not escape into the enclosing loop, function, or shell. */
-  enter_subshell();
-  clear_inherited_exit_trap();
-  std::exception_ptr error;
-  try {
-    ast->evaluate(*this);
-  } catch (...) {
-    error = std::current_exception();
-  }
-  if (has_pending_control_flow()) {
-    if (pending_control_flow().kind == control_flow::Kind::Exit)
-      set_last_exit_status(static_cast<i32>(pending_control_flow().value));
-    clear_control_flow();
-  }
-  /* The substitution's own EXIT action runs while stdout still points at the
-     pipe, so its output joins the captured value. */
-  if (!error) {
+    /* A break, continue, return, or exit inside a substitution acts only within
+       it and must not escape into the enclosing loop, function, or shell. */
+    enter_subshell();
+    did_enter_subshell = true;
+    clear_inherited_exit_trap();
+    std::exception_ptr error;
     try {
-      run_subshell_exit_trap();
+      ast->evaluate(*this);
     } catch (...) {
       error = std::current_exception();
     }
+    if (has_pending_control_flow()) {
+      if (pending_control_flow().kind == control_flow::Kind::Exit)
+        set_last_exit_status(static_cast<i32>(pending_control_flow().value));
+      clear_control_flow();
+    }
+    /* The substitution's own EXIT action runs while stdout still points at the
+       pipe, so its output joins the captured value. */
+    if (!error) {
+      try {
+        run_subshell_exit_trap();
+      } catch (...) {
+        error = std::current_exception();
+      }
+    }
+    do_cleanup();
+
+    if (drain_context.data != nullptr) {
+      captured.append(StringView{drain_context.data, drain_context.length});
+      std::free(drain_context.data);
+      drain_context.data = nullptr;
+    }
+
+    did_begin_restoration = true;
+    restore_state(steal(snapshot));
+
+    if (error) {
+      /* A throw inside the substitution is contained to its subshell the way
+         bash holds a fatal expansion error to the command substitution. */
+      LOG(Debug, "the command substitution failed, containing the error with "
+                 "status 1");
+      render_contained_substitution_error(error, source.view());
+      set_last_exit_status(1);
+    }
+
+    captured.strip_trailing_newlines();
+    return captured;
+  };
+
+  try {
+    return do_evaluate_in_process();
+  } catch (...) {
+    if (!did_begin_restoration) {
+      let const error = std::current_exception();
+      try {
+        restore_state(steal(snapshot));
+      } catch (...) {
+        LOG(Debug, "restoring an interrupted command substitution failed");
+      }
+      std::rethrow_exception(error);
+    }
+    throw;
   }
-  leave_subshell();
-
-  m_shell_is_interactive = was_interactive;
-
-  koshka::flush();
-  os::restore_stdout(saved);
-  os::close_fd(pipe->out);
-  os::join_thread(*reader);
-  os::close_fd(pipe->in);
-
-  if (drain_context.data != nullptr) {
-    captured.append(StringView{drain_context.data, drain_context.length});
-    std::free(drain_context.data);
-  }
-
-  restore_state(steal(snapshot));
-
-  if (error) {
-    /* A throw inside the substitution is contained to its subshell the way bash
-       holds a fatal expansion error to the command substitution. */
-    LOG(Debug,
-        "the command substitution failed, containing the error with status 1");
-    render_contained_substitution_error(error, source.view());
-    set_last_exit_status(1);
-  }
-
-  captured.strip_trailing_newlines();
-  return captured;
 }
 
 fn EvalContext::capture_function_substitution(const WordSegment &segment) throws

@@ -66,6 +66,9 @@ extern "C" void __lsan_disable(void);
 #define NOMINMAX
 #endif
 #include <windows.h>
+#ifndef WC_ERR_INVALID_CHARS
+#define WC_ERR_INVALID_CHARS 0x00000080
+#endif
 #include <winioctl.h>
 #include <direct.h>
 #include <io.h>
@@ -532,6 +535,7 @@ fn crc32c_update(u32 crc, const void *data, usize length) wontthrow -> u32;
 struct file_status
 {
   u64 device_id{0};
+  u64 special_device_id{0};
   u64 file_id{0};
   bool has_file_identity{false};
   u32 mode{0};
@@ -918,6 +922,8 @@ fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 fn normalize_program_name(String &program_name) throws -> program_name_info;
 
 fn get_current_user() throws -> Maybe<String>;
+
+fn get_login_user() throws -> Maybe<String>;
 
 fn get_hostname() throws -> Maybe<String>;
 

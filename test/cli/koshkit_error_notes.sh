@@ -25,6 +25,8 @@ echo "=== fuser conflicting flags location ==="
 "$BIN" -c 'koshkit fuser -cf file' 2>&1
 echo "=== whoami operand location ==="
 "$BIN" -c 'koshkit whoami extra' 2>&1
+echo "=== logname operand location ==="
+"$BIN" -c 'koshkit logname extra' 2>&1
 
 echo "=== nice increment location ==="
 "$BIN" -c 'koshkit nice -n nope true' 2>&1

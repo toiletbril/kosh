@@ -10,8 +10,8 @@ LC_ALL=C koshkit locale charmap >/dev/null
 echo "locale=$?"
 LC_ALL=C koshkit locale -ck decimal_point
 LC_ALL=C koshkit locale -c charmap
-koshkit logname >/dev/null
-echo "logname=$?"
+LOGNAME=spoofed USER=spoofed koshkit logname >/dev/null
+echo "logname-unspoofed=$?"
 koshkit tty -s
 echo "tty=$?"
 koshkit uname -s >/dev/null

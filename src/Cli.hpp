@@ -114,6 +114,7 @@ public:
     RepeatedBool,
     String,
     ManyStrings,
+    OptionalValue,
   };
 
   pure fn kind() const wontthrow -> Kind;
@@ -221,6 +222,33 @@ private:
   ArrayList<usize> m_positions{heap_allocator()};
   ArrayList<SourceLocation> m_locations{heap_allocator()};
   usize m_value_position{0};
+};
+
+class FlagOptionalValue : public Flag
+{
+public:
+  using value_acceptor = bool (*)(StringView);
+
+  FlagOptionalValue(FlagList &flags, char short_name, StringView long_name,
+                    flag_section section, StringView description,
+                    value_acceptor should_accept_value);
+  FlagOptionalValue(char short_name, StringView long_name, flag_section section,
+                    StringView description, value_acceptor should_accept_value);
+
+  fn enable() wontthrow -> void;
+  fn set(StringView value) throws -> void;
+  pure fn is_enabled() const wontthrow -> bool;
+  pure fn has_value() const wontthrow -> bool;
+  pure fn value() const wontthrow -> StringView;
+  pure fn should_accept_value(StringView value) const wontthrow -> bool;
+
+  fn reset() throws -> void;
+
+private:
+  bool m_is_enabled{false};
+  bool m_has_value{false};
+  String m_value{heap_allocator()};
+  value_acceptor m_should_accept_value;
 };
 
 /* operand_value_flag names the one flag whose value is read from the first

@@ -155,24 +155,7 @@ hot fn String::operator<(const String &other) const wontthrow -> bool
 fn String::find_substring(StringView needle, usize from) const wontthrow
     -> Maybe<usize>
 {
-  if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
-  if (needle.length > m_length) return None;
-  let const last_start = m_length - needle.length;
-  if (from > last_start) return None;
-
-  let i = from;
-  while (i <= last_start) {
-    let const scan_length = last_start - i + 1;
-    let const found = std::memchr(
-        m_data + i, static_cast<unsigned char>(needle.data[0]), scan_length);
-    if (found == nullptr) return None;
-    let const candidate =
-        static_cast<usize>(static_cast<const char *>(found) - m_data);
-    if (std::memcmp(m_data + candidate, needle.data, needle.length) == 0)
-      return candidate;
-    i = candidate + 1;
-  }
-  return None;
+  return view().find_substring(needle, from);
 }
 
 fn String::find_last_character(char wanted) const wontthrow -> Maybe<usize>

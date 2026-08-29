@@ -416,11 +416,7 @@ cold noinline fn report_soft_koshkit_util_error(
     StringView utility_name, StringView message) throws -> void
 {
   let const prefixed = String{utility_name} + ": " + message;
-  const ErrorWithLocation located{steal(location), prefixed.view()};
-  if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view(), &cxt));
-  else
-    print_error(prefixed + "\n");
+  report_soft_koshkit_error(cxt, steal(location), prefixed.view());
 }
 
 } /* namespace koshkit */

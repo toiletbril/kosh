@@ -15,6 +15,30 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "lines=$(koshkit whoami | koshkit wc -l)"]
   [CompoundListCondition, None]
+    [Assign spoofed_user=$(LOGNAME=KOSH_FAKE USER=KOSH_FAKE koshkit whoami)]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "spoofed=no"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "spoofed=yes"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "effective=yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "effective=no"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "whoami" "--help"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "help=$?"]
@@ -66,6 +90,88 @@
   CommandSubstitution "koshkit whoami | koshkit wc -l"
 ]
 [Word
+  Unquoted "spoofed_user="
+  CommandSubstitution "LOGNAME=KOSH_FAKE USER=KOSH_FAKE koshkit whoami"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "spoofed_user"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "KOSH_FAKE"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "spoofed=no"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "spoofed=yes"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  CommandSubstitution "koshkit whoami"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  CommandSubstitution "koshkit id -un"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "effective=yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "effective=no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -86,5 +192,7 @@
 ]
 nonempty=yes
 lines=1
+spoofed=no
+effective=yes
 help=0
 [Code 0]

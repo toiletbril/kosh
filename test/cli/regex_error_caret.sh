@@ -5,3 +5,5 @@ unset KOSH_FLAGS
 "$BIN" -c '[[ aa =~ (a|aa) ]]; printf "longest=%s\n" "${BASH_REMATCH[1]}"'
 "$BIN" -c '[[ b =~ (a)?b ]]; printf "optional=<%s>\n" "${BASH_REMATCH[1]}"'
 "$BIN" -c 'shopt -s nocasematch; [[ AbC =~ ^abc$ ]]; echo "nocase=$?"'
+"$BIN" -c '[[ привет =~ ^пр(ив)ет$ ]]; printf "unicode=%s\n" "${BASH_REMATCH[1]}"'
+"$BIN" -c '[[ 𐍈𐍈 =~ ^(𐍈)+$ ]]; printf "unicode-scalar=%s\n" "${BASH_REMATCH[1]}"'

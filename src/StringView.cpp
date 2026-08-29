@@ -109,6 +109,31 @@ fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
   return static_cast<usize>(static_cast<const char *>(found) - data);
 }
 
+fn StringView::find_substring(StringView needle, usize from) const wontthrow
+    -> Maybe<usize>
+{
+  if (needle.length == 0) return from <= length ? Maybe<usize>{from} : None;
+  if (needle.length > length) return None;
+  let const last_start = length - needle.length;
+  if (from > last_start) return None;
+
+  let position = from;
+  while (position <= last_start) {
+    let const scan_length = last_start - position + 1;
+    let const found =
+        std::memchr(data + position, static_cast<unsigned char>(needle.data[0]),
+                    scan_length);
+    if (found == nullptr) return None;
+    let const candidate =
+        static_cast<usize>(static_cast<const char *>(found) - data);
+    if (std::memcmp(data + candidate, needle.data, needle.length) == 0)
+      return candidate;
+    position = candidate + 1;
+  }
+
+  return None;
+}
+
 fn StringView::substring(usize start) const wontthrow -> StringView
 {
   if (start >= length)

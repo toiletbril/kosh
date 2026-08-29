@@ -1337,6 +1337,11 @@ and
 .B \-P
 options select symbolic links, replacement, and source link handling.
 .TP
+.B logname
+The login session user name is printed. It can differ from the effective user
+reported by
+.BR whoami .
+.TP
 .B ls
 Sorted entries are listed with
 .BR \-a ,
@@ -1369,6 +1374,21 @@ continues independent goals after an error. The
 and
 .B \-t
 options provide the POSIX make execution modes.
+The
+.B \-j
+extension accepts an optional decimal job count and propagates it through
+MAKEFLAGS.
+Common variable functions include
+.BR call ,
+.BR eval ,
+.BR filter ,
+.BR filter-out ,
+.BR foreach ,
+.BR patsubst ,
+.BR shell ,
+.BR sort ,
+and
+.BR wildcard .
 .TP
 .B mkdir
 Directories are created with
@@ -1499,7 +1519,7 @@ and
 options are supported.
 .TP
 .B whoami
-The current user name is printed.
+The effective user name is printed.
 .TP
 .B yes
 The joined operands, or y when none are given, are repeated until output

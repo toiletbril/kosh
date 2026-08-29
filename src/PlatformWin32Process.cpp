@@ -118,14 +118,14 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
   };
 
   if (is_fd_a_tty(child_input)) {
-    null_input = CreateFileA("NUL", GENERIC_READ,
+    null_input = CreateFileW(L"NUL", GENERIC_READ,
                              FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (null_input == INVALID_HANDLE_VALUE) return None;
     child_input = null_input;
   }
   if (is_fd_a_tty(child_output)) {
-    nohup_output = CreateFileA("nohup.out", FILE_APPEND_DATA,
+    nohup_output = CreateFileW(L"nohup.out", FILE_APPEND_DATA,
                                FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
                                OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (nohup_output == INVALID_HANDLE_VALUE && !home.is_empty()) {
@@ -134,8 +134,11 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
         home_output += '/';
       }
       home_output += "nohup.out";
+      let const wide_home_output =
+          utf8_to_wide(home_output.view(), heap_allocator());
+      if (!wide_home_output.has_value()) return None;
       nohup_output =
-          CreateFileA(home_output.c_str(), FILE_APPEND_DATA,
+          CreateFileW(wide_home_output->begin(), FILE_APPEND_DATA,
                       FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
                       OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     }
@@ -172,6 +175,15 @@ static fn append_windows_quoted_arg(String &out, StringView arg) throws -> void;
 
 static pure fn is_batch_program(StringView path) wontthrow -> bool;
 
+static fn create_process_utf8(StringView application_path,
+                              StringView command_line,
+                              StringView working_directory,
+                              DWORD creation_flags, LPVOID environment_block,
+                              const STARTUPINFOW &startup_info,
+                              const HANDLE *inherited_handles,
+                              usize inherited_handle_count,
+                              PROCESS_INFORMATION &process_info) throws -> bool;
+
 fn capture_program_output(const ArrayList<String> &argv,
                           u64 timeout_nanos) wontthrow -> Maybe<String>
 {
@@ -187,7 +199,7 @@ fn capture_program_output(const ArrayList<String> &argv,
     return None;
 
   let const null_input =
-      CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+      CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                   &inheritable, OPEN_EXISTING, 0, nullptr);
   if (null_input == INVALID_HANDLE_VALUE) return None;
   defer { CloseHandle(null_input); };
@@ -214,9 +226,10 @@ fn capture_program_output(const ArrayList<String> &argv,
       append_windows_quoted_arg(batch_command, argv[argument_position].view());
     }
 
-    let const command_processor = std::getenv("COMSPEC");
-    application_path_storage =
-        String{command_processor != nullptr ? command_processor : "cmd.exe"};
+    let command_processor = get_environment_variable("COMSPEC");
+    application_path_storage = command_processor.has_value()
+                                   ? command_processor.take()
+                                   : String{"cmd.exe"};
     application_path = application_path_storage.c_str();
     let processor_command_line = String{heap_allocator()};
     append_windows_quoted_arg(processor_command_line,
@@ -229,7 +242,7 @@ fn capture_program_output(const ArrayList<String> &argv,
   LOG(Debug, "capturing output from '%s' with command line '%s'",
       application_path, command_line.c_str());
 
-  STARTUPINFOA startup_info{};
+  STARTUPINFOW startup_info{};
   startup_info.cb = sizeof(startup_info);
   startup_info.dwFlags = STARTF_USESTDHANDLES;
   startup_info.hStdInput = null_input;
@@ -237,9 +250,10 @@ fn capture_program_output(const ArrayList<String> &argv,
   startup_info.hStdError = write_end;
 
   PROCESS_INFORMATION process_info{};
-  if (CreateProcessA(application_path, const_cast<LPSTR>(command_line.data()),
-                     nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr,
-                     &startup_info, &process_info) == FALSE)
+  HANDLE inherited_handles[] = {null_input, write_end};
+  if (!create_process_utf8(StringView{application_path}, command_line.view(),
+                           {}, CREATE_NO_WINDOW, nullptr, startup_info,
+                           inherited_handles, 2, process_info))
   {
     return None;
   }
@@ -372,29 +386,222 @@ struct inherited_handle_state
 
 static fn make_handle_inheritable(HANDLE handle,
                                   inherited_handle_state &state) wontthrow
-    -> void
+    -> bool
 {
-  if (handle == nullptr || handle == INVALID_HANDLE_VALUE) return;
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE) return false;
 
   DWORD flags = 0;
-  if (GetHandleInformation(handle, &flags) == FALSE) return;
-  if ((flags & HANDLE_FLAG_INHERIT) != 0) return;
+  if (GetHandleInformation(handle, &flags) == FALSE) return false;
+  if ((flags & HANDLE_FLAG_INHERIT) != 0) return true;
   if (SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ==
       FALSE)
-    return;
+    return false;
 
   state.handle = handle;
   state.original_flags = flags;
   state.should_restore = true;
+  return true;
 }
 
 static fn
 restore_handle_inheritance(const inherited_handle_state &state) wontthrow
-    -> void
+    -> bool
 {
-  if (!state.should_restore) return;
-  SetHandleInformation(state.handle, HANDLE_FLAG_INHERIT,
-                       state.original_flags & HANDLE_FLAG_INHERIT);
+  if (!state.should_restore) return true;
+  return SetHandleInformation(state.handle, HANDLE_FLAG_INHERIT,
+                              state.original_flags & HANDLE_FLAG_INHERIT) !=
+         FALSE;
+}
+
+static fn ensure_valid_standard_handles(STARTUPINFOW &startup_info,
+                                        HANDLE &null_handle) wontthrow -> bool
+{
+  let const are_standard_handles_valid =
+      startup_info.hStdInput != nullptr &&
+      startup_info.hStdInput != INVALID_HANDLE_VALUE &&
+      startup_info.hStdOutput != nullptr &&
+      startup_info.hStdOutput != INVALID_HANDLE_VALUE &&
+      startup_info.hStdError != nullptr &&
+      startup_info.hStdError != INVALID_HANDLE_VALUE;
+  if (are_standard_handles_valid) return true;
+
+  SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+  null_handle = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
+                            OPEN_EXISTING, 0, nullptr);
+  if (null_handle == INVALID_HANDLE_VALUE) return false;
+  if (startup_info.hStdInput == nullptr ||
+      startup_info.hStdInput == INVALID_HANDLE_VALUE)
+    startup_info.hStdInput = null_handle;
+  if (startup_info.hStdOutput == nullptr ||
+      startup_info.hStdOutput == INVALID_HANDLE_VALUE)
+    startup_info.hStdOutput = null_handle;
+  if (startup_info.hStdError == nullptr ||
+      startup_info.hStdError == INVALID_HANDLE_VALUE)
+    startup_info.hStdError = null_handle;
+  return true;
+}
+
+static fn create_process_utf8(StringView application_path,
+                              StringView command_line,
+                              StringView working_directory,
+                              DWORD creation_flags, LPVOID environment_block,
+                              const STARTUPINFOW &startup_info,
+                              const HANDLE *inherited_handles,
+                              usize inherited_handle_count,
+                              PROCESS_INFORMATION &process_info) throws -> bool
+{
+  if ((startup_info.dwFlags & STARTF_USESTDHANDLES) != 0 &&
+      (startup_info.hStdInput == nullptr ||
+       startup_info.hStdInput == INVALID_HANDLE_VALUE ||
+       startup_info.hStdOutput == nullptr ||
+       startup_info.hStdOutput == INVALID_HANDLE_VALUE ||
+       startup_info.hStdError == nullptr ||
+       startup_info.hStdError == INVALID_HANDLE_VALUE))
+  {
+    SetLastError(ERROR_INVALID_HANDLE);
+    return false;
+  }
+
+  let wide_application = application_path.is_empty()
+                             ? Maybe<ArrayList<wchar_t>>{}
+                             : utf8_to_wide(application_path, heap_allocator());
+  if (!application_path.is_empty() && !wide_application.has_value())
+    return false;
+  let wide_command_line = utf8_to_wide(command_line, heap_allocator());
+  if (!wide_command_line.has_value()) return false;
+  let wide_working_directory =
+      working_directory.is_empty()
+          ? Maybe<ArrayList<wchar_t>>{}
+          : utf8_to_wide(working_directory, heap_allocator());
+  if (!working_directory.is_empty() && !wide_working_directory.has_value())
+    return false;
+
+  HANDLE unique_handles[4]{};
+  usize unique_handle_count = 0;
+  for (usize handle_position = 0; handle_position < inherited_handle_count;
+       handle_position++)
+  {
+    let const handle = inherited_handles[handle_position];
+    if (handle == nullptr || handle == INVALID_HANDLE_VALUE) continue;
+    bool is_duplicate = false;
+    for (usize unique_position = 0; unique_position < unique_handle_count;
+         unique_position++)
+      if (unique_handles[unique_position] == handle) {
+        is_duplicate = true;
+        break;
+      }
+    if (is_duplicate) continue;
+    if (unique_handle_count == 4) {
+      SetLastError(ERROR_TOO_MANY_OPEN_FILES);
+      return false;
+    }
+    unique_handles[unique_handle_count++] = handle;
+  }
+
+  static SRWLOCK launch_lock = SRWLOCK_INIT;
+  AcquireSRWLockExclusive(&launch_lock);
+  defer { ReleaseSRWLockExclusive(&launch_lock); };
+
+  inherited_handle_state inheritance_states[4]{};
+  usize inheritable_handle_count = 0;
+  DWORD preserved_error = ERROR_SUCCESS;
+  bool did_restore_inheritance = false;
+  defer
+  {
+    if (!did_restore_inheritance)
+      for (usize restore_position = 0;
+           restore_position < inheritable_handle_count; restore_position++)
+        if (!restore_handle_inheritance(inheritance_states[restore_position]) &&
+            preserved_error == ERROR_SUCCESS)
+          preserved_error = GetLastError();
+    if (preserved_error != ERROR_SUCCESS) SetLastError(preserved_error);
+  };
+  for (usize handle_position = 0; handle_position < unique_handle_count;
+       handle_position++)
+    if (!make_handle_inheritable(unique_handles[handle_position],
+                                 inheritance_states[handle_position]))
+    {
+      preserved_error = GetLastError();
+      return false;
+    } else {
+      inheritable_handle_count = handle_position + 1;
+    }
+
+  SIZE_T attribute_size = 0;
+  LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = nullptr;
+  ArrayList<u8> attribute_storage{heap_allocator()};
+  STARTUPINFOEXW extended_startup{};
+  extended_startup.StartupInfo.cb = unique_handle_count == 0
+                                        ? sizeof(STARTUPINFOW)
+                                        : sizeof(extended_startup);
+  extended_startup.StartupInfo.dwFlags = startup_info.dwFlags;
+  extended_startup.StartupInfo.wShowWindow = startup_info.wShowWindow;
+  extended_startup.StartupInfo.hStdInput = startup_info.hStdInput;
+  extended_startup.StartupInfo.hStdOutput = startup_info.hStdOutput;
+  extended_startup.StartupInfo.hStdError = startup_info.hStdError;
+  bool is_attribute_list_initialized = false;
+  defer
+  {
+    if (is_attribute_list_initialized)
+      DeleteProcThreadAttributeList(attribute_list);
+  };
+  if (unique_handle_count != 0) {
+    InitializeProcThreadAttributeList(nullptr, 1, 0, &attribute_size);
+    if (attribute_size == 0) {
+      preserved_error = GetLastError();
+      return false;
+    }
+    attribute_storage.reserve(static_cast<usize>(attribute_size));
+    attribute_list = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(
+        attribute_storage.begin());
+    if (InitializeProcThreadAttributeList(attribute_list, 1, 0,
+                                          &attribute_size) == FALSE)
+    {
+      preserved_error = GetLastError();
+      return false;
+    }
+    is_attribute_list_initialized = true;
+    if (UpdateProcThreadAttribute(
+            attribute_list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+            unique_handles, sizeof(HANDLE) * unique_handle_count, nullptr,
+            nullptr) == FALSE)
+    {
+      preserved_error = GetLastError();
+      return false;
+    }
+    extended_startup.lpAttributeList = attribute_list;
+    creation_flags |= EXTENDED_STARTUPINFO_PRESENT;
+  }
+
+  let const did_create =
+      CreateProcessW(
+          wide_application.has_value() ? wide_application->begin() : nullptr,
+          wide_command_line->begin(), nullptr, nullptr,
+          unique_handle_count != 0, creation_flags, environment_block,
+          wide_working_directory.has_value() ? wide_working_directory->begin()
+                                             : nullptr,
+          &extended_startup.StartupInfo, &process_info) != FALSE;
+  if (!did_create) preserved_error = GetLastError();
+
+  DWORD restoration_error = ERROR_SUCCESS;
+  for (usize restore_position = 0; restore_position < inheritable_handle_count;
+       restore_position++)
+    if (!restore_handle_inheritance(inheritance_states[restore_position]) &&
+        restoration_error == ERROR_SUCCESS)
+      restoration_error = GetLastError();
+  did_restore_inheritance = true;
+  if (restoration_error == ERROR_SUCCESS) return did_create;
+
+  if (did_create) {
+    TerminateProcess(process_info.hProcess, 127);
+    WaitForSingleObject(process_info.hProcess, INFINITE);
+    CloseHandle(process_info.hThread);
+    CloseHandle(process_info.hProcess);
+    process_info = PROCESS_INFORMATION{};
+  }
+  preserved_error = restoration_error;
+  return false;
 }
 
 static fn timeout_job_name(HANDLE process_handle, char (&name)[64]) wontthrow
@@ -513,9 +720,10 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
                                 ec.args()[argument_index].view());
     }
 
-    let const command_processor = std::getenv("COMSPEC");
-    application_path_storage =
-        String{command_processor != nullptr ? command_processor : "cmd.exe"};
+    let command_processor = get_environment_variable("COMSPEC");
+    application_path_storage = command_processor.has_value()
+                                   ? command_processor.take()
+                                   : String{"cmd.exe"};
     application_path = application_path_storage.c_str();
     let processor_command_line = String{heap_allocator()};
     append_windows_quoted_arg(processor_command_line,
@@ -539,7 +747,7 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
   }
 
   PROCESS_INFORMATION process_info{};
-  STARTUPINFOA startup_info{};
+  STARTUPINFOW startup_info{};
 
   startup_info.cb = sizeof(startup_info);
   startup_info.hStdInput = ec.in_fd.value_or(GetStdHandle(STD_INPUT_HANDLE));
@@ -558,9 +766,6 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
     if (!were_handles_handed_to_fallback) ec.close_fds();
   };
 
-  inherited_handle_state input_inheritance{};
-  inherited_handle_state output_inheritance{};
-  inherited_handle_state error_inheritance{};
   let const has_command_redirection =
       ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value() ||
       ec.should_duplicate_error_to_output ||
@@ -576,57 +781,34 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
     if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
   };
   if (should_use_standard_handles) {
-    if (startup_info.hStdInput == nullptr ||
-        startup_info.hStdInput == INVALID_HANDLE_VALUE ||
-        startup_info.hStdOutput == nullptr ||
-        startup_info.hStdOutput == INVALID_HANDLE_VALUE ||
-        startup_info.hStdError == nullptr ||
-        startup_info.hStdError == INVALID_HANDLE_VALUE)
-    {
-      SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr,
-                                      TRUE};
-      null_handle = CreateFileA("NUL", GENERIC_READ | GENERIC_WRITE,
-                                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                &inheritable, OPEN_EXISTING, 0, nullptr);
-      if (null_handle == INVALID_HANDLE_VALUE)
-        throw ErrorWithLocation{ec.source_location(),
-                                last_system_error_message()};
-      if (startup_info.hStdInput == nullptr ||
-          startup_info.hStdInput == INVALID_HANDLE_VALUE)
-        startup_info.hStdInput = null_handle;
-      if (startup_info.hStdOutput == nullptr ||
-          startup_info.hStdOutput == INVALID_HANDLE_VALUE)
-        startup_info.hStdOutput = null_handle;
-      if (startup_info.hStdError == nullptr ||
-          startup_info.hStdError == INVALID_HANDLE_VALUE)
-        startup_info.hStdError = null_handle;
-    }
+    if (!ensure_valid_standard_handles(startup_info, null_handle))
+      throw ErrorWithLocation{ec.source_location(),
+                              last_system_error_message()};
 
     startup_info.dwFlags = STARTF_USESTDHANDLES;
-    make_handle_inheritable(startup_info.hStdInput, input_inheritance);
-    make_handle_inheritable(startup_info.hStdOutput, output_inheritance);
-    make_handle_inheritable(startup_info.hStdError, error_inheritance);
   }
-  defer { restore_handle_inheritance(input_inheritance); };
-  defer { restore_handle_inheritance(output_inheritance); };
-  defer { restore_handle_inheritance(error_inheritance); };
 
   /* An empty CreateProcess environment block is two nulls, a null pointer would
      inherit the shell's environment. */
-  char empty_environment_block[] = {'\0', '\0'};
+  wchar_t empty_environment_block[] = {L'\0', L'\0'};
   LPVOID environment_block =
       ec.should_use_empty_environment ? empty_environment_block : nullptr;
 
   DWORD creation_flags =
       should_create_new_process_group ? CREATE_NEW_PROCESS_GROUP : 0;
   if (should_start_suspended) creation_flags |= CREATE_SUSPENDED;
+  if (ec.should_use_empty_environment)
+    creation_flags |= CREATE_UNICODE_ENVIRONMENT;
 
-  /* CreateProcessA may rewrite lpCommandLine in place, so it is passed mutable.
-   */
-  if (CreateProcessA(application_path, const_cast<LPSTR>(command_line.data()),
-                     nullptr, nullptr, should_use_standard_handles,
-                     creation_flags, environment_block, working_directory,
-                     &startup_info, &process_info) == 0)
+  HANDLE inherited_handles[] = {startup_info.hStdInput, startup_info.hStdOutput,
+                                startup_info.hStdError};
+  let const inherited_handle_count = should_use_standard_handles ? 3 : 0;
+  if (!create_process_utf8(
+          StringView{application_path}, command_line.view(),
+          working_directory != nullptr ? StringView{working_directory}
+                                       : StringView{},
+          creation_flags, environment_block, startup_info, inherited_handles,
+          inherited_handle_count, process_info))
   {
     if (allow_script_fallback && GetLastError() == ERROR_BAD_EXE_FORMAT) {
       if (!resolved_program_path_storage.is_empty())
@@ -685,32 +867,40 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
   let const module_path = current_executable_path();
   if (!module_path.has_value()) return koshka::None;
 
-  char temp_dir[MAX_PATH];
-  let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
+  wchar_t temp_dir[MAX_PATH];
+  let const temp_directory_length = GetTempPathW(MAX_PATH, temp_dir);
   if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH) {
     return koshka::None;
   }
-  char temp_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "kos", 0, temp_path) == 0) return koshka::None;
+  wchar_t temp_path[MAX_PATH];
+  if (GetTempFileNameW(temp_dir, L"kos", 0, temp_path) == 0)
+    return koshka::None;
   bool should_delete_temp_path = true;
   defer
   {
-    if (should_delete_temp_path) DeleteFileA(temp_path);
+    if (should_delete_temp_path) DeleteFileW(temp_path);
   };
+  let temp_path_utf8 = wide_to_utf8(
+      temp_path, static_cast<usize>(lstrlenW(temp_path)), heap_allocator());
+  if (!temp_path_utf8.has_value()) return koshka::None;
 
   SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
   const HANDLE temp_file =
-      CreateFileA(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
+      CreateFileW(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
   if (temp_file == INVALID_HANDLE_VALUE) return koshka::None;
   defer { CloseHandle(temp_file); };
 
-  char diagnostic_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "kos", 0, diagnostic_path) == 0)
+  wchar_t diagnostic_path[MAX_PATH];
+  if (GetTempFileNameW(temp_dir, L"kos", 0, diagnostic_path) == 0)
     return koshka::None;
-  defer { DeleteFileA(diagnostic_path); };
+  defer { DeleteFileW(diagnostic_path); };
+  let diagnostic_path_utf8 = wide_to_utf8(
+      diagnostic_path, static_cast<usize>(lstrlenW(diagnostic_path)),
+      heap_allocator());
+  if (!diagnostic_path_utf8.has_value()) return koshka::None;
   const HANDLE diagnostic_file =
-      CreateFileA(diagnostic_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
+      CreateFileW(diagnostic_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
                   CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
   if (diagnostic_file == INVALID_HANDLE_VALUE) return koshka::None;
   bool is_diagnostic_file_open = true;
@@ -719,10 +909,14 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
     if (is_diagnostic_file_open) CloseHandle(diagnostic_file);
   };
 
-  char diagnostic_marker_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "kos", 0, diagnostic_marker_path) == 0)
+  wchar_t diagnostic_marker_path[MAX_PATH];
+  if (GetTempFileNameW(temp_dir, L"kos", 0, diagnostic_marker_path) == 0)
     return koshka::None;
-  defer { DeleteFileA(diagnostic_marker_path); };
+  defer { DeleteFileW(diagnostic_marker_path); };
+  let diagnostic_marker_path_utf8 = wide_to_utf8(
+      diagnostic_marker_path,
+      static_cast<usize>(lstrlenW(diagnostic_marker_path)), heap_allocator());
+  if (!diagnostic_marker_path_utf8.has_value()) return koshka::None;
 
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), module_path->view()});
@@ -737,15 +931,18 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);
 
-  STARTUPINFOA startup_info{};
+  STARTUPINFOW startup_info{};
   startup_info.cb = sizeof(startup_info);
   startup_info.dwFlags = STARTF_USESTDHANDLES;
   startup_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
   startup_info.hStdOutput = temp_file;
   startup_info.hStdError = diagnostic_file;
-  inherited_handle_state input_inheritance{};
-  make_handle_inheritable(startup_info.hStdInput, input_inheritance);
-  defer { restore_handle_inheritance(input_inheritance); };
+  HANDLE null_handle = INVALID_HANDLE_VALUE;
+  defer
+  {
+    if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
+  };
+  if (!ensure_valid_standard_handles(startup_info, null_handle)) return None;
 
   PROCESS_INFORMATION process_info{};
   let const previous_root_trace_marker =
@@ -754,7 +951,7 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
       get_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER");
   set_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE", "1");
   set_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER",
-                           diagnostic_marker_path);
+                           diagnostic_marker_path_utf8->view());
   defer
   {
     if (previous_root_trace_marker.has_value())
@@ -768,10 +965,11 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
     else
       unset_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER");
   };
-  if (CreateProcessA(module_path->c_str(),
-                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
-                     TRUE, 0, nullptr, nullptr, &startup_info,
-                     &process_info) == 0)
+  HANDLE inherited_handles[] = {startup_info.hStdInput, temp_file,
+                                diagnostic_file};
+  if (!create_process_utf8(module_path->view(), command_line.view(), {}, 0,
+                           nullptr, startup_info, inherited_handles, 3,
+                           process_info))
     return koshka::None;
   defer { CloseHandle(process_info.hProcess); };
   defer { CloseHandle(process_info.hThread); };
@@ -779,16 +977,20 @@ static fn run_substitution_to_temp(StringView source, bool bash_compatible,
 
   CloseHandle(diagnostic_file);
   is_diagnostic_file_open = false;
-  let diagnostic_output = Path{diagnostic_path}.read_entire_file();
+  let diagnostic_output = Path{diagnostic_path_utf8->view()}.read_entire_file();
 
   /* A backslash would read as an escape in the target word, so slashes are
      returned, which CreateFile accepts the same. */
   let result = process_substitution_temp_result{};
-  for (const char *byte = temp_path; *byte != '\0'; byte++)
-    result.path += *byte == '\\' ? '/' : *byte;
+  let const temp_path_view = temp_path_utf8->view();
+  for (usize byte_position = 0; byte_position < temp_path_view.length;
+       byte_position++)
+    result.path += temp_path_view[byte_position] == '\\'
+                       ? '/'
+                       : temp_path_view[byte_position];
   if (diagnostic_output.has_value())
     result.diagnostic_output = diagnostic_output.take();
-  let const marker_size = Path{diagnostic_marker_path}.file_size();
+  let const marker_size = Path{diagnostic_marker_path_utf8->view()}.file_size();
   result.has_shell_diagnostic = marker_size.has_value() && *marker_size != 0;
   should_delete_temp_path = false;
   return result;
@@ -841,30 +1043,28 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);
 
-  STARTUPINFOA startup_info{};
+  STARTUPINFOW startup_info{};
   startup_info.cb = sizeof(startup_info);
   startup_info.dwFlags = STARTF_USESTDHANDLES;
   startup_info.hStdInput = in_fd ? *in_fd : GetStdHandle(STD_INPUT_HANDLE);
   startup_info.hStdOutput = out_fd ? *out_fd : GetStdHandle(STD_OUTPUT_HANDLE);
   startup_info.hStdError = err_fd ? *err_fd : GetStdHandle(STD_ERROR_HANDLE);
-  inherited_handle_state input_inheritance{};
-  inherited_handle_state output_inheritance{};
-  inherited_handle_state error_inheritance{};
-  make_handle_inheritable(startup_info.hStdInput, input_inheritance);
-  make_handle_inheritable(startup_info.hStdOutput, output_inheritance);
-  make_handle_inheritable(startup_info.hStdError, error_inheritance);
-  defer { restore_handle_inheritance(input_inheritance); };
-  defer { restore_handle_inheritance(output_inheritance); };
-  defer { restore_handle_inheritance(error_inheritance); };
+  HANDLE null_handle = INVALID_HANDLE_VALUE;
+  defer
+  {
+    if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
+  };
+  if (!ensure_valid_standard_handles(startup_info, null_handle)) return None;
 
   PROCESS_INFORMATION process_info{};
   let const creation_flags = process_group == process_group_mode::Inherit
                                  ? static_cast<DWORD>(0)
                                  : CREATE_NEW_PROCESS_GROUP;
-  if (CreateProcessA(module_path->c_str(),
-                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
-                     TRUE, creation_flags, nullptr, nullptr, &startup_info,
-                     &process_info) == 0)
+  HANDLE inherited_handles[] = {startup_info.hStdInput, startup_info.hStdOutput,
+                                startup_info.hStdError};
+  if (!create_process_utf8(module_path->view(), command_line.view(), {},
+                           creation_flags, nullptr, startup_info,
+                           inherited_handles, 3, process_info))
     return koshka::None;
   CloseHandle(process_info.hThread);
   return process_info.hProcess;
@@ -1239,23 +1439,31 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
 
 cold fn last_system_error_message() throws -> String
 {
-  LPSTR errno_str{};
-  DWORD win_errno = GetLastError();
+  LPWSTR errno_text{};
+  let const win_errno = GetLastError();
+  if (win_errno == ERROR_FILE_NOT_FOUND || win_errno == ERROR_PATH_NOT_FOUND)
+    return String{"No such file or directory"};
 
-  DWORD ret = FormatMessageA(
+  let const ret = FormatMessageW(
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
           FORMAT_MESSAGE_IGNORE_INSERTS,
       nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, nullptr); /* NOLINT */
+      reinterpret_cast<LPWSTR>(&errno_text), 0, nullptr); /* NOLINT */
 
   if (ret == 0) {
     return String::from(win_errno, heap_allocator()) +
            StringView{" (Error message could not be processed due to "
                       "a FormatMessage() failure)"};
   }
-  defer { LocalFree(errno_str); };
+  defer { LocalFree(errno_text); };
 
-  StringView view{static_cast<char *>(errno_str)};
+  let converted =
+      wide_to_utf8(errno_text, static_cast<usize>(ret), heap_allocator());
+  if (!converted.has_value()) {
+    return String::from(win_errno, heap_allocator()) +
+           StringView{" (Error message could not be converted to UTF-8)"};
+  }
+  let view = converted->view();
   /* FormatMessage ends with a period, spacing, and a CRLF, trimmed here. */
   while (view.length > 0) {
     let const last_byte = view[view.length - 1];
@@ -1270,7 +1478,9 @@ cold fn last_system_error_message() throws -> String
   String err{heap_allocator()};
   for (usize i = 0; i < view.length; i++) {
     /* A %N placeholder is replaced with a word since no argument is passed. */
-    if (view[i] == '%' && i + 1 < view.length && isdigit(view[i + 1])) {
+    if (view[i] == '%' && i + 1 < view.length && view[i + 1] >= '0' &&
+        view[i + 1] <= '9')
+    {
       err += StringView{"input"};
       i++;
       continue;
@@ -1278,12 +1488,8 @@ cold fn last_system_error_message() throws -> String
     err.push(view[i]);
   }
 
-  if (err.length() > 0) {
-    String capitalized{heap_allocator()};
-    capitalized.push(static_cast<char>(toupper(err[0])));
-    capitalized += err.substring(1);
-    err = steal(capitalized);
-  }
+  if (err.length() > 0 && err[0] >= 'a' && err[0] <= 'z')
+    err[0] = static_cast<char>(err[0] - 'a' + 'A');
 
   return err;
 }
@@ -1384,15 +1590,15 @@ static fn query_parent_process_id() wontthrow -> i64
   if (snapshot == INVALID_HANDLE_VALUE) return 0;
   defer { CloseHandle(snapshot); };
 
-  PROCESSENTRY32 entry{};
+  PROCESSENTRY32W entry{};
   entry.dwSize = sizeof(entry);
-  if (Process32First(snapshot, &entry) == FALSE) return 0;
+  if (Process32FirstW(snapshot, &entry) == FALSE) return 0;
 
   let const process_id = GetCurrentProcessId();
   do {
     if (entry.th32ProcessID == process_id)
       return static_cast<i64>(entry.th32ParentProcessID);
-  } while (Process32Next(snapshot, &entry) != FALSE);
+  } while (Process32NextW(snapshot, &entry) != FALSE);
 
   return 0;
 }
@@ -1497,7 +1703,7 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
 
   let command_line = make_os_args(argv);
 
-  STARTUPINFOA startup{};
+  STARTUPINFOW startup{};
   startup.cb = sizeof(startup);
   startup.hStdInput = options.input.value_or(GetStdHandle(STD_INPUT_HANDLE));
   startup.hStdOutput = options.output.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
@@ -1508,7 +1714,7 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
     SECURITY_ATTRIBUTES inherit_sa{};
     inherit_sa.nLength = sizeof(inherit_sa);
     inherit_sa.bInheritHandle = TRUE;
-    null_handle = CreateFileA("NUL", GENERIC_READ | GENERIC_WRITE,
+    null_handle = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit_sa,
                               OPEN_EXISTING, 0, nullptr);
     if (null_handle != INVALID_HANDLE_VALUE) {
@@ -1538,30 +1744,15 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
        options.error.has_value());
   if (should_use_standard_handles) startup.dwFlags = STARTF_USESTDHANDLES;
 
-  inherited_handle_state input_inheritance{};
-  inherited_handle_state output_inheritance{};
-  inherited_handle_state error_inheritance{};
-  inherited_handle_state extra_inheritance{};
-  if (should_use_standard_handles) {
-    make_handle_inheritable(startup.hStdInput, input_inheritance);
-    make_handle_inheritable(startup.hStdOutput, output_inheritance);
-    make_handle_inheritable(startup.hStdError, error_inheritance);
-  }
-  if (options.inherited_handle.has_value())
-    make_handle_inheritable(*options.inherited_handle, extra_inheritance);
-  defer { restore_handle_inheritance(input_inheritance); };
-  defer { restore_handle_inheritance(output_inheritance); };
-  defer { restore_handle_inheritance(error_inheritance); };
-  defer { restore_handle_inheritance(extra_inheritance); };
-
   const u64 start_nanos = monotonic_nanos();
-  let const should_inherit_handles =
-      should_use_standard_handles || options.inherited_handle.has_value();
-
-  /* CreateProcessA may rewrite lpCommandLine in place. */
-  if (CreateProcessA(nullptr, const_cast<LPSTR>(command_line.data()), nullptr,
-                     nullptr, should_inherit_handles, options.creation_flags,
-                     nullptr, nullptr, &startup, &process_info) == 0)
+  HANDLE inherited_handles[] = {
+      should_use_standard_handles ? startup.hStdInput : INVALID_HANDLE_VALUE,
+      should_use_standard_handles ? startup.hStdOutput : INVALID_HANDLE_VALUE,
+      should_use_standard_handles ? startup.hStdError : INVALID_HANDLE_VALUE,
+      options.inherited_handle.value_or(INVALID_HANDLE_VALUE)};
+  if (!create_process_utf8({}, command_line.view(), {}, options.creation_flags,
+                           nullptr, startup, inherited_handles, 4,
+                           process_info))
   {
     return None;
   }
@@ -1606,18 +1797,23 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
   if (snapshot == INVALID_HANDLE_VALUE) return processes;
   defer { CloseHandle(snapshot); };
 
-  PROCESSENTRY32 entry{};
+  PROCESSENTRY32W entry{};
   entry.dwSize = sizeof(entry);
-  if (Process32First(snapshot, &entry) == 0) return processes;
+  if (Process32FirstW(snapshot, &entry) == 0) return processes;
   do {
+    let name = wide_to_utf8(entry.szExeFile,
+                            static_cast<usize>(lstrlenW(entry.szExeFile)),
+                            heap_allocator());
+    if (!name.has_value()) continue;
+
     process_entry process{};
     process.pid = static_cast<i64>(entry.th32ProcessID);
-    process.name = String{entry.szExeFile};
+    process.name = name.take();
     /* The snapshot exposes only the executable name, used as the command line.
      */
     process.command_line = process.name.clone();
     processes.push(steal(process));
-  } while (Process32Next(snapshot, &entry) != 0);
+  } while (Process32NextW(snapshot, &entry) != 0);
   return processes;
 }
 
@@ -1625,50 +1821,24 @@ static fn utf8_to_absolute_wide_path(StringView path,
                                      Allocator allocator) throws
     -> Maybe<ArrayList<wchar_t>>
 {
-  if (path.length > static_cast<usize>(INT_MAX)) {
-    SetLastError(ERROR_FILENAME_EXCED_RANGE);
-    return None;
-  }
-  let const wide_length =
-      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data,
-                          static_cast<int>(path.length), nullptr, 0);
-  if (wide_length <= 0) return None;
+  let wide_path = utf8_to_wide(path, allocator);
+  if (!wide_path.has_value()) return None;
 
-  ArrayList<wchar_t> wide_path{allocator};
-  wide_path.reserve(static_cast<usize>(wide_length) + 1);
-  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data,
-                          static_cast<int>(path.length), wide_path.begin(),
-                          wide_length) != wide_length)
-    return None;
-  wide_path.begin()[wide_length] = L'\0';
-
-  let const absolute_length =
-      GetFullPathNameW(wide_path.begin(), 0, nullptr, nullptr);
+  let absolute_length =
+      GetFullPathNameW(wide_path->begin(), 0, nullptr, nullptr);
   if (absolute_length == 0) return None;
   ArrayList<wchar_t> absolute_path{allocator};
-  absolute_path.reserve(static_cast<usize>(absolute_length));
-  if (GetFullPathNameW(wide_path.begin(), absolute_length,
-                       absolute_path.begin(), nullptr) == 0)
-    return None;
-  return absolute_path;
-}
-
-static fn wide_to_utf8(const wchar_t *text, usize length,
-                       Allocator allocator) throws -> Maybe<String>
-{
-  if (length > static_cast<usize>(INT_MAX)) return None;
-  let const utf8_length = WideCharToMultiByte(
-      CP_UTF8, 0, text, static_cast<int>(length), nullptr, 0, nullptr, nullptr);
-  if (utf8_length <= 0) return None;
-  ArrayList<char> utf8{allocator};
-  utf8.reserve(static_cast<usize>(utf8_length));
-  if (WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length),
-                          utf8.begin(), utf8_length, nullptr,
-                          nullptr) != utf8_length)
-    return None;
-  return String{
-      allocator, StringView{utf8.begin(), static_cast<usize>(utf8_length)}
-  };
+  for (usize attempt_count = 0; attempt_count < 4; attempt_count++) {
+    absolute_path.reserve(static_cast<usize>(absolute_length));
+    let const written = GetFullPathNameW(wide_path->begin(), absolute_length,
+                                         absolute_path.begin(), nullptr);
+    if (written == 0) return None;
+    if (written < absolute_length) return absolute_path;
+    if (written == MAXDWORD) return None;
+    absolute_length = written + 1;
+  }
+  SetLastError(ERROR_INSUFFICIENT_BUFFER);
+  return None;
 }
 
 fn scan_process_file_users(const ArrayList<process_file_query> &queries,
@@ -1737,8 +1907,32 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
         }
       }
       if (is_duplicate) continue;
-      users.push(process_file_user{pid, 0, query.query_position,
-                                   static_cast<u8>(process_file_use::File)});
+      let use_mask = static_cast<u8>(process_file_use::File);
+      let const process =
+          OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+      if (process != nullptr) {
+        defer { CloseHandle(process); };
+        ArrayList<wchar_t> image_path{scratch};
+        constexpr DWORD MAXIMUM_IMAGE_PATH_LENGTH = 32768;
+        image_path.reserve(MAXIMUM_IMAGE_PATH_LENGTH);
+        DWORD image_path_length = MAXIMUM_IMAGE_PATH_LENGTH;
+        if (QueryFullProcessImageNameW(process, 0, image_path.begin(),
+                                       &image_path_length) != FALSE)
+        {
+          let image_path_utf8 =
+              wide_to_utf8(image_path.begin(),
+                           static_cast<usize>(image_path_length), scratch);
+          file_status image_status{};
+          if (image_path_utf8.has_value() &&
+              stat_path_following(image_path_utf8->view(), image_status) &&
+              image_status.device_id == query.device_id &&
+              image_status.file_id == query.file_id)
+          {
+            use_mask |= static_cast<u8>(process_file_use::Executable);
+          }
+        }
+      }
+      users.push(process_file_user{pid, 0, query.query_position, use_mask});
     }
   }
   return None;

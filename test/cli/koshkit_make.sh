@@ -175,13 +175,43 @@ cat > definitions.mk <<'EOF'
 define bracket
 [$(1)]
 endef
+define multiline_words
+one
+two
+three
+endef
 removed = stale
 undefine removed
 
 all:
 	@echo "define=$(call bracket,value) undefined=[$(removed)]"
+	@echo "define-words=$(words $(multiline_words))"
 EOF
 "$BIN" -c 'koshkit make -f definitions.mk'
+cat > eval.mk <<'EOF'
+define evaluated_rule
+evaluated:
+	@echo "eval=$(EVAL_ONE) $(EVAL_TWO)"
+endef
+
+$(eval EVAL_ONE := one)
+$(foreach item,two,$(eval EVAL_TWO := $(item)))
+$(eval $(value evaluated_rule))
+
+all: evaluated
+EOF
+"$BIN" -c 'koshkit make -f eval.mk'
+cat > eval-recipe.mk <<'EOF'
+define evaluated_recipe_rule
+evaluated-recipe-target:
+	@:
+endef
+
+all:
+	@$(eval $(value evaluated_recipe_rule)) echo eval-recipe-first
+	@echo eval-recipe-second
+EOF
+"$BIN" -c 'koshkit make -f eval-recipe.mk'
 cat > include-one.mk <<'EOF'
 included = one
 EOF
@@ -196,6 +226,23 @@ all:
 	@echo "includes=$(included)"
 EOF
 "$BIN" -c 'koshkit make -f includes.mk'
+
+echo "--- makefile parse error locations ---"
+printf 'define\n' > malformed-main.mk
+"$BIN" -c 'koshkit make -f malformed-main.mk' 2>&1
+printf 'define\n' > malformed-included.mk
+printf 'include malformed-included.mk\n' > include-error.mk
+"$BIN" -c 'koshkit make -f include-error.mk' 2>&1
+printf 'define \\\n  \n' > malformed-continued.mk
+"$BIN" -c 'koshkit make -f malformed-continued.mk' 2>&1
+printf 'BROKEN := $(unterminated\n' > malformed-expansion.mk
+"$BIN" -c 'koshkit make -f malformed-expansion.mk' 2>&1
+printf 'BROKEN := $(error included expansion failed)\n' > malformed-function.mk
+printf 'include malformed-function.mk\n' > include-function-error.mk
+"$BIN" -c 'koshkit make -f include-function-error.mk' 2>&1
+printf '$(eval define)\n' > malformed-eval.mk
+"$BIN" -c 'koshkit make -f malformed-eval.mk' 2>&1
+
 cat > automatic-functions.mk <<'EOF'
 .DEFAULT_GOAL := auto.c
 automatic_command = echo "automatic-indirect=$@ first=$< target-file=$(@F)"
@@ -619,6 +666,11 @@ all:
 	@echo "exported=$$EXPORTED assigned=$$ASSIGNED unexported=$${UNEXPORTED-unset}"
 EOF
 UNEXPORTED=fromenvironment "$BIN" -c 'koshkit make -f export.mk'
+cat > default-shell.mk <<'EOF'
+all:
+	@if [ "$(SHELL)" = "$(BIN)" ]; then echo default-shell=self; else echo default-shell=other; fi
+EOF
+"$BIN" -c 'koshkit make -f default-shell.mk'
 cat > shell.mk <<'EOF'
 SHELL = $(BIN)
 
@@ -732,6 +784,17 @@ exact%.specific: exact%.source
 
 %.second: %.shared
 	@: > $@
+
+%.combined: %.seed
+	@echo "combined-first=$< combined-all=$^"
+
+%.winner: %.discarded
+	@echo discarded-pattern
+
+exact%.winner: exact%.chosen
+	@echo "winning-pattern=$^"
+
+explicit.combined: explicit.extra
 EOF
 : > chained.src
 : > pair.left
@@ -742,7 +805,11 @@ EOF
 : > item.old
 : > item.new
 : > repeat.seed
-"$BIN" -c 'koshkit make chained.out pair.bundle literal%target escaped%name.out exactname.specific item.cancel repeat.pair'
+: > explicit.seed
+: > explicit.extra
+: > exactname.discarded
+: > exactname.chosen
+"$BIN" -c 'koshkit make chained.out pair.bundle literal%target escaped%name.out exactname.specific item.cancel repeat.pair explicit.combined exactname.winner'
 [ -e chained.mid ] && [ -e chained.out ] && echo chained-pattern=yes || echo chained-pattern=no
 [ -e pair.right ] && [ -e pair.bundle ] && echo multiple-pattern-prerequisites=yes || echo multiple-pattern-prerequisites=no
 
@@ -753,7 +820,7 @@ NAME = A
 $(NAME) = expanded-name
 
 all: duplicate
-	@echo "paren=$(A) brace=${A} short=$A shell=$(SHELL)"
+	@if [ "$(SHELL)" = "$(BIN)" ]; then shell=self; else shell=other; fi; echo "paren=$(A) brace=${A} short=$A shell=$$shell"
 
 duplicate: first second first
 	@echo "caret=$^"
@@ -770,10 +837,15 @@ EOF
 "$BIN" -c 'koshkit make -s -f makeflags.mk NAME=value'
 cat > jobs.mk <<'EOF'
 all:
-	@:
+	@echo "jobs=[$(MAKEFLAGS)]"
 EOF
-"$BIN" -c 'koshkit make -j 4 -f jobs.mk all'
-echo "jobs-operand=$?"
+"$BIN" -c 'koshkit make -j4 -j -f jobs.mk all'
+"$BIN" -c 'koshkit make -j -j4 -f jobs.mk all'
+MAKEFLAGS=j4 "$BIN" -c 'koshkit make -f jobs.mk all'
+MAKEFLAGS=kS "$BIN" -c 'koshkit make -f jobs.mk all'
+MAKEFLAGS=Sk "$BIN" -c 'koshkit make -f jobs.mk all'
+MAKEFLAGS=k "$BIN" -c 'koshkit make -S -f jobs.mk all'
+MAKEFLAGS=S "$BIN" -c 'koshkit make -k -f jobs.mk all'
 cat > recursive-print.mk <<'EOF'
 all:
 	@$(MAKE) -f recursive-print-child.mk show
@@ -852,6 +924,13 @@ timed.a(member.o): timed.src
 	@echo archive-member-stale
 EOF
 "$BIN" -c 'koshkit make "timed.a(member.o)"'
+cat > Makefile <<'EOF'
+failed.a(member.o):
+	@: > failed.a
+	@false
+EOF
+"$BIN" -c 'koshkit make "failed.a(member.o)"' 2> "$TEST_NULL_DEVICE"
+[ -e failed.a ] && echo archive-cleanup=no || echo archive-cleanup=yes
 
 echo "--- POSIX suffix precedence ---"
 cat > Makefile <<'EOF'

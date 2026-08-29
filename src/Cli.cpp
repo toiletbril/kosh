@@ -201,6 +201,69 @@ fn FlagManyStrings::reset() throws -> void
   m_value_position = 0;
 }
 
+FlagOptionalValue::FlagOptionalValue(char short_name, StringView long_name,
+                                     flag_section section,
+                                     StringView description,
+                                     value_acceptor should_accept_value)
+    : Flag(Flag::Kind::OptionalValue, short_name, long_name, section,
+           description),
+      m_should_accept_value(should_accept_value)
+{}
+
+FlagOptionalValue::FlagOptionalValue(FlagList &flags, char short_name,
+                                     StringView long_name, flag_section section,
+                                     StringView description,
+                                     value_acceptor should_accept_value)
+    : FlagOptionalValue(short_name, long_name, section, description,
+                        should_accept_value)
+{
+  flags.push(this);
+}
+
+fn FlagOptionalValue::enable() wontthrow -> void
+{
+  m_value.clear();
+  m_has_value = false;
+  m_is_enabled = true;
+}
+
+fn FlagOptionalValue::set(StringView value) throws -> void
+{
+  m_value = value;
+  m_has_value = true;
+  m_is_enabled = true;
+}
+
+pure fn FlagOptionalValue::is_enabled() const wontthrow -> bool
+{
+  return m_is_enabled;
+}
+
+pure fn FlagOptionalValue::has_value() const wontthrow -> bool
+{
+  return m_has_value;
+}
+
+pure fn FlagOptionalValue::value() const wontthrow -> StringView
+{
+  return m_value.view();
+}
+
+pure fn FlagOptionalValue::should_accept_value(StringView value) const wontthrow
+    -> bool
+{
+  return m_should_accept_value(value);
+}
+
+fn FlagOptionalValue::reset() throws -> void
+{
+  m_position = 0;
+  m_value_location = {};
+  m_value.clear();
+  m_is_enabled = false;
+  m_has_value = false;
+}
+
 static fn find_flag(const FlagList &flags, const char *flag_start, bool is_long,
                     Flag **result_flag, const char **value_start) throws -> bool
 {
@@ -537,6 +600,45 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
           }
         } break;
 
+        case Flag::Kind::OptionalValue: {
+          let const optional_flag = static_cast<FlagOptionalValue *>(flag);
+          optional_flag->enable();
+          optional_flag->set_position(++position);
+          optional_flag->set_value_location(
+              boolean_flag_location(argv, static_cast<usize>(i), flag_offset,
+                                    is_long, base_position, arg_locations));
+
+          let value = StringView{value_offset};
+          if (is_long && !value.is_empty() && value[0] == '=')
+            value = value.substring(1);
+          if (!value.is_empty() && optional_flag->should_accept_value(value)) {
+            optional_flag->set(value);
+            optional_flag->set_value_location(attached_flag_value_location(
+                argv, static_cast<usize>(i), value.data, base_position,
+                arg_locations));
+          } else if (!value.is_empty() && is_long) {
+            let error = ErrorWithLocation{
+                argument_location(argv, static_cast<usize>(i), base_position,
+                                  arg_locations),
+                prefixed_message(program_name,
+                                 "Invalid value '" + String{value} + "' for '" +
+                                     flag_name(flag, true) + "'")};
+            error.set_command_status(2);
+            throw error;
+          } else if (!value.is_empty()) {
+            ++flag_offset;
+            should_repeat = true;
+          } else if (i + 1 < argc && optional_flag->should_accept_value(
+                                         StringView{argv[i + 1]}))
+          {
+            i++;
+            let const value_location = argument_location(
+                argv, static_cast<usize>(i), base_position, arg_locations);
+            optional_flag->set(StringView{argv[i]});
+            optional_flag->set_value_location(value_location);
+          }
+        } break;
+
         case Flag::Kind::String:
         case Flag::Kind::ManyStrings: {
           if (*value_offset == '\0') {
@@ -750,6 +852,9 @@ fn reset_flags(const FlagList &flags) throws -> void
     case Flag::Kind::ManyStrings:
       static_cast<FlagManyStrings *>(flag)->reset();
       break;
+    case Flag::Kind::OptionalValue:
+      static_cast<FlagOptionalValue *>(flag)->reset();
+      break;
     }
 }
 
@@ -916,6 +1021,7 @@ cold fn make_flag_help(const FlagList &flags) throws -> String
       switch (f->kind()) {
       case koshka::Flag::Kind::String: left += "=<...>"; break;
       case koshka::Flag::Kind::ManyStrings: left += "=<.., ..>"; break;
+      case koshka::Flag::Kind::OptionalValue: left += "[=<...>]"; break;
       case koshka::Flag::Kind::Bool:
       case koshka::Flag::Kind::RepeatedBool: break;
       }

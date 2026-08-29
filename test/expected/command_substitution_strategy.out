@@ -1,3 +1,7 @@
 144 external
 in-process=465
 child-process=6
+5:1: error: Could not open a pipe for command substitution.
+     5 |  value=$(printf hi)
+       |  ^~~~~~~~~~~~~~~~~~
+snapshot-wait=0 value=<>

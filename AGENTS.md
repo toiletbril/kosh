@@ -213,6 +213,8 @@ reuse.
 - Use the simplest bounded probe that preserves the input. Quote command syntax
   safely, place options before path separators, and run independent probes
   independently.
+- Use literal ripgrep patterns unless `--pcre2` is explicitly enabled for a
+  pattern that requires lookaround.
 - Limit transcript searches by record count and output bytes. Read-only reviews
   must stream results without creating artifacts.
 - Confirm that each replacement differs, and copy exact anchors from the latest
@@ -261,6 +263,8 @@ reuse.
   ceiling.
 - Make conditionals and immediate variables must follow every variable they
   inspect or expand.
+- Separate implementation extensions from POSIX conformance claims in user
+  documentation.
 - Use the release binary for performance comparisons. Clear inherited jobserver
   flags before forcing serial submakes.
 - Check commit subject length and the active git identity before committing.

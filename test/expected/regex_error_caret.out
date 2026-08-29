@@ -5,3 +5,5 @@ note: The pattern must be a valid extended regular expression.
 longest=aa
 optional=<>
 nocase=0
+unicode=ив
+unicode-scalar=𐍈

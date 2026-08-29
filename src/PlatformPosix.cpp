@@ -343,6 +343,13 @@ fn get_current_user() throws -> Maybe<String>
   return uid_to_username(static_cast<u32>(getuid()));
 }
 
+fn get_login_user() throws -> Maybe<String>
+{
+  char name[256];
+  if (getlogin_r(name, sizeof(name)) == 0) return String{name};
+  return uid_to_username(static_cast<u32>(getuid()));
+}
+
 fn get_hostname() throws -> Maybe<String>
 {
   char buffer[256];
@@ -1287,7 +1294,18 @@ static fn lookup_id_by_name(StringView database_path, StringView wanted_name,
 
 fn uid_to_username(u32 uid) throws -> Maybe<String>
 {
+#if defined __APPLE__
+  struct passwd entry{};
+  struct passwd *result = nullptr;
+  char buffer[16384];
+  if (getpwuid_r(static_cast<uid_t>(uid), &entry, buffer, sizeof(buffer),
+                 &result) != 0 ||
+      result == nullptr || result->pw_name == nullptr)
+    return None;
+  return String{result->pw_name};
+#else
   return lookup_name_by_id("/etc/passwd", uid, 2);
+#endif
 }
 
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>

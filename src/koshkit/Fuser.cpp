@@ -92,11 +92,15 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
 #endif
 
     let const is_block_device = os::file_type_letter(file_status.mode) == 'b';
-    queries.push(os::process_file_query{
-        operands[operand_position].view(), file_status.device_id,
-        file_status.file_id, static_cast<u32>(operand_position),
+    let const should_match_device =
         FLAG_FUSER_FILESYSTEM.is_enabled() ||
-            (is_block_device && !FLAG_FUSER_FILE.is_enabled())});
+        (is_block_device && !FLAG_FUSER_FILE.is_enabled());
+    queries.push(os::process_file_query{
+        operands[operand_position].view(),
+        should_match_device && is_block_device ? file_status.special_device_id
+                                               : file_status.device_id,
+        file_status.file_id, static_cast<u32>(operand_position),
+        should_match_device});
   }
 
   let users = ArrayList<os::process_file_user>{cxt.scratch_allocator()};
@@ -149,6 +153,7 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
         metadata_output += pid.view();
       } else {
         standard_output += pid.view();
+        standard_output.push(' ');
       }
       append_use_letters(metadata_output, user.use_mask);
       if (FLAG_FUSER_USER.is_enabled()) {
@@ -164,6 +169,7 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
       user_position++;
     }
     metadata_output.push('\n');
+    if (!is_combined) standard_output.push('\n');
   }
 
   if (is_combined)

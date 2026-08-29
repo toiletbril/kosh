@@ -176,7 +176,7 @@ _koshkit_util_flags()
     uniq)          echo "-c" ;;
     timeout)       echo "-s --signal -k --kill-after -p --preserve-status" ;;
     pkill|killall) echo "-s --signal -l --list" ;;
-    make)          echo "-f --file -C --directory -B --always-make -k --keep-going -e --environment-overrides -i --ignore-errors -S --stop -n --just-print -p --print-data-base -q --question -r --no-builtin-rules -s --silent -t --touch" ;;
+    make)          echo "-f --file -C --directory -B --always-make -k --keep-going -e --environment-overrides -i --ignore-errors -S --stop -n --just-print -j --jobs -p --print-data-base -q --question -r --no-builtin-rules -s --silent -t --touch" ;;
     find)          echo "-name -type -maxdepth -mindepth -print" ;;
     flock)         echo "--transaction-held-lock" ;;
     fuser)         echo "-c -f -u" ;;

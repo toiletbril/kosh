@@ -34,6 +34,10 @@ note: Pass `f`, `d`, or `l` after `-type`.
 1:16: error: whoami: unexpected operand 'extra'.
      1 |  koshkit whoami extra
        |                 ^~~~~
+=== logname operand location ===
+1:17: error: logname: unexpected operand 'extra'.
+     1 |  koshkit logname extra
+       |                  ^~~~~
 === nice increment location ===
 1:17: error: nice: invalid increment 'nope'.
      1 |  koshkit nice -n nope true

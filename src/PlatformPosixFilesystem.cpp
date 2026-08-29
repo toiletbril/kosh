@@ -713,6 +713,7 @@ static fn fill_file_status(const struct stat &info,
                            file_status &status) wontthrow -> void
 {
   status.device_id = static_cast<u64>(info.st_dev);
+  status.special_device_id = static_cast<u64>(info.st_rdev);
   status.file_id = static_cast<u64>(info.st_ino);
   status.has_file_identity = true;
   status.mode = static_cast<u32>(info.st_mode);

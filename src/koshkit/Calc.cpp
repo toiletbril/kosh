@@ -39,27 +39,36 @@ pure fn Calc::kind() const wontthrow -> Utility::Kind { return Kind::Calc; }
 
 namespace {
 
-fn evaluate_one(const ExecContext &ec, EvalContext &cxt,
-                StringView expression) throws -> i32
+fn evaluate_one(const ExecContext &ec, EvalContext &cxt, StringView expression,
+                const SourceLocation *expression_base = nullptr) throws -> i32
 {
+  let render_source = expression;
+  if (expression_base != nullptr && cxt.current_source() != nullptr)
+    render_source = cxt.current_source()->view();
+
   if (let const operator_position =
           obvious_xor_power_operator_position(expression))
   {
+    let warning_location = SourceLocation{*operator_position, 1};
+    if (expression_base != nullptr) {
+      warning_location.position += expression_base->position;
+      warning_location.source_name_index = expression_base->source_name_index;
+    }
     let const warning = WarningWithLocationAndDetails{
-        SourceLocation{*operator_position, 1},
+        warning_location,
         "The `^` operator performs bitwise XOR in Bash arithmetic",
-        "Use `**`, the Bash power operator, if you meant exponentiation"
-    };
-    show_message(warning.to_string(expression, &cxt));
+        "Use `**`, the Bash power operator, if you meant exponentiation"};
+    show_message(warning.to_string(render_source, &cxt));
   }
 
   try {
-    let result = cxt.evaluate_calculator_arithmetic_text(expression);
+    let result =
+        cxt.evaluate_calculator_arithmetic_text(expression, expression_base);
     result += '\n';
     ec.print_to_stdout(result);
     return 0;
   } catch (const ErrorWithLocation &error) {
-    show_message(error.to_string(expression, &cxt));
+    show_message(error.to_string(render_source, &cxt));
     return 1;
   } catch (const Error &error) {
     show_message(error.to_string());
@@ -248,7 +257,9 @@ fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -285,7 +296,39 @@ fn Calc::execute(const ExecContext &ec, EvalContext &cxt,
     expression += operands[i].view();
   }
 
-  return evaluate_one(ec, cxt, expression.view());
+  Maybe<SourceLocation> expression_base;
+  if (!operand_locations.is_empty() &&
+      operand_locations.count() == operands.count() &&
+      cxt.current_source() != nullptr)
+  {
+    let const first_location = operand_locations[0];
+    let const last_location = operand_locations[operand_locations.count() - 1];
+    let const expression_end =
+        static_cast<usize>(last_location.position) + last_location.length;
+    let const source = cxt.current_source()->view();
+    let const is_one_source =
+        first_location.source_name_index == last_location.source_name_index;
+    let const is_valid_span = first_location.position <= expression_end &&
+                              expression_end <= source.length;
+    let const operand_source =
+        is_one_source && is_valid_span
+            ? source.substring_of_length(first_location.position,
+                                         expression_end -
+                                             first_location.position)
+            : StringView{};
+    if (let const expression_offset =
+            operand_source.find_substring(expression.view());
+        expression_offset.has_value())
+    {
+      expression_base =
+          SourceLocation{first_location.position + *expression_offset,
+                         expression.count(), first_location.source_name_index};
+    }
+  }
+
+  return evaluate_one(ec, cxt, expression.view(),
+                      expression_base.has_value() ? &*expression_base
+                                                  : nullptr);
 }
 
 } /* namespace koshkit */

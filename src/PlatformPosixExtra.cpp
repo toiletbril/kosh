@@ -755,10 +755,36 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
                            ArrayList<process_file_user> &users,
                            Allocator scratch) throws -> Maybe<u32>
 {
-  unused(scratch);
 #if defined __APPLE__
+  unused(scratch);
+  let const do_matches_vnode = [](const process_file_query &query,
+                                  const struct vinfo_stat &status) {
+    if (query.should_match_device)
+      return query.device_id == static_cast<u64>(status.vst_dev);
+    return query.device_id == static_cast<u64>(status.vst_dev) &&
+           query.file_id == static_cast<u64>(status.vst_ino);
+  };
+  let const do_matches_status = [](const process_file_query &query,
+                                   const struct stat &status) {
+    if (query.should_match_device)
+      return query.device_id == static_cast<u64>(status.st_dev);
+    return query.device_id == static_cast<u64>(status.st_dev) &&
+           query.file_id == static_cast<u64>(status.st_ino);
+  };
+  let const filesystems = mounted_filesystems();
+
   for (let const &query : queries) {
-    const String path{query.path};
+    let path = String{query.path};
+    if (query.should_match_device)
+      for (let const &filesystem : filesystems) {
+        struct stat mounted_status{};
+        if (::stat(filesystem.target.c_str(), &mounted_status) == 0 &&
+            query.device_id == static_cast<u64>(mounted_status.st_dev))
+        {
+          path = filesystem.target.clone();
+          break;
+        }
+      }
     let const flags =
         query.should_match_device ? PROC_LISTPIDSPATH_PATH_IS_VOLUME : 0;
     let byte_count =
@@ -781,9 +807,75 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
       if (::proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &process_info,
                          sizeof(process_info)) != sizeof(process_info))
         continue;
-      users.push(process_file_user{
-          static_cast<u32>(pid), static_cast<u32>(process_info.pbi_ruid),
-          query.query_position, static_cast<u8>(process_file_use::File)});
+
+      u8 use_mask = 0;
+      struct proc_vnodepathinfo vnode_paths{};
+      if (::proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &vnode_paths,
+                         sizeof(vnode_paths)) == sizeof(vnode_paths))
+      {
+        if (do_matches_vnode(query, vnode_paths.pvi_cdir.vip_vi.vi_stat))
+          use_mask |= static_cast<u8>(process_file_use::Cwd);
+        if (do_matches_vnode(query, vnode_paths.pvi_rdir.vip_vi.vi_stat))
+          use_mask |= static_cast<u8>(process_file_use::Root);
+      }
+
+      char executable_path[PROC_PIDPATHINFO_MAXSIZE];
+      if (::proc_pidpath(pid, executable_path, sizeof(executable_path)) > 0) {
+        struct stat executable_status{};
+        if (::stat(executable_path, &executable_status) == 0 &&
+            do_matches_status(query, executable_status))
+          use_mask |= static_cast<u8>(process_file_use::Executable);
+      }
+
+      let descriptor_bytes =
+          ::proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nullptr, 0);
+      if (descriptor_bytes > 0) {
+        ArrayList<struct proc_fdinfo> descriptors{heap_allocator()};
+        descriptors.reserve(static_cast<usize>(descriptor_bytes) /
+                            sizeof(struct proc_fdinfo));
+        descriptor_bytes = ::proc_pidinfo(
+            pid, PROC_PIDLISTFDS, 0, descriptors.begin(), descriptor_bytes);
+        if (descriptor_bytes > 0) {
+          let const descriptor_count =
+              static_cast<usize>(descriptor_bytes) / sizeof(struct proc_fdinfo);
+          for (usize descriptor_position = 0;
+               descriptor_position < descriptor_count; descriptor_position++)
+          {
+            let const &descriptor = descriptors.begin()[descriptor_position];
+            if (descriptor.proc_fdtype != PROX_FDTYPE_VNODE) continue;
+            struct vnode_fdinfowithpath vnode{};
+            if (::proc_pidfdinfo(pid, descriptor.proc_fd,
+                                 PROC_PIDFDVNODEPATHINFO, &vnode,
+                                 sizeof(vnode)) != sizeof(vnode))
+              continue;
+            if (do_matches_vnode(query, vnode.pvip.vip_vi.vi_stat)) {
+              use_mask |= static_cast<u8>(process_file_use::File);
+              break;
+            }
+          }
+        }
+      }
+
+      u64 region_address = 0;
+      for (;;) {
+        struct proc_regionwithpathinfo region{};
+        if (::proc_pidinfo(pid, PROC_PIDREGIONPATHINFO, region_address, &region,
+                           sizeof(region)) != sizeof(region))
+          break;
+        if (do_matches_vnode(query, region.prp_vip.vip_vi.vi_stat)) {
+          use_mask |= static_cast<u8>(process_file_use::Mapped);
+          break;
+        }
+        let const next_address =
+            region.prp_prinfo.pri_address + region.prp_prinfo.pri_size;
+        if (next_address <= region_address) break;
+        region_address = next_address;
+      }
+
+      if (use_mask != 0)
+        users.push(process_file_user{static_cast<u32>(pid),
+                                     static_cast<u32>(process_info.pbi_ruid),
+                                     query.query_position, use_mask});
     }
   }
   return None;
@@ -928,6 +1020,7 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
   }
   return None;
 #else
+  unused(scratch);
   unused(queries);
   unused(users);
   errno = ENOTSUP;

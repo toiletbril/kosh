@@ -27,13 +27,20 @@ fn Logname::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (!operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  let const name = os::get_current_user();
+  if (!operands.is_empty()) {
+    report_soft_koshkit_util_error(ec, cxt, operand_locations[0],
+                                   args[0].view(),
+                                   "unexpected operand '" + operands[0] + "'");
+    return 2;
+  }
+  let const name = os::get_login_user();
   if (!name.has_value()) {
     report_soft_koshkit_util_error(ec, cxt, args[0].view(),
                                    "login name is unavailable");

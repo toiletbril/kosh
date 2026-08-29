@@ -927,6 +927,10 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
                           const ArithmeticValue &exponent,
                           BumpArena &arena) throws -> ArithmeticValue
 {
+  let const do_throw_result_too_large = []() throws -> void {
+    throw ErrorWithDetails{"Exponent is too large",
+                           "The result cannot fit in addressable memory"};
+  };
   if (!exponent.has_integer_value(arena))
     throw ErrorWithDetails{"Exponent is not an integer",
                            "'**' requires an integer exponent"};
@@ -942,49 +946,68 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
     if (!base.is_negative()) return ArithmeticValue{1};
     return ArithmeticValue{(integral_exponent.limb_at(0) & 1u) != 0 ? -1 : 1};
   }
-  if (integral_exponent.limb_count() > 1)
-    throw ErrorWithDetails{"Exponent is too large",
-                           "The result cannot fit in addressable memory"};
+  if (integral_exponent.limb_count() > 1) do_throw_result_too_large();
 
   let const exponent_value = integral_exponent.limb_at(0);
+  let const decimal_scale = base.get_decimal_scale();
+  if (decimal_scale != 0 && exponent_value > ~u32{0} / decimal_scale)
+    do_throw_result_too_large();
   if (base.is_zero()) {
-    if (exponent_value > ~u32{0} / base.get_decimal_scale())
-      throw ErrorWithDetails{"Exponent is too large",
-                             "The result cannot fit in addressable memory"};
-    return from_magnitude(
-        NULL, 0, false,
-        static_cast<u32>(exponent_value) * base.get_decimal_scale(), arena);
+    return from_magnitude(nullptr, 0, false,
+                          static_cast<u32>(exponent_value) * decimal_scale,
+                          arena);
   }
+
+  let const highest_limb = base.limb_at(base.limb_count() - 1);
+  let const base_bit_length =
+      static_cast<u128>(base.limb_count() - 1) * 64u +
+      (64u - static_cast<u32>(__builtin_clzll(highest_limb)));
+  let const maximum_result_bit_length =
+      static_cast<u128>(ArrayList<u64>::MAXIMUM_ELEMENT_COUNT) * 64u;
+  if (base_bit_length != 0 && static_cast<u128>(exponent_value) >
+                                  maximum_result_bit_length / base_bit_length)
+    do_throw_result_too_large();
+
   if (base.is_integer() && base.limb_count() == 1 &&
       __builtin_popcountll(base.limb_at(0)) == 1)
   {
     let const base_bit_position =
         static_cast<usize>(__builtin_ctzll(base.limb_at(0)));
     if (exponent_value > SIZE_MAX / base_bit_position)
-      throw ErrorWithDetails{"Exponent is too large",
-                             "The result cannot fit in addressable memory"};
+      do_throw_result_too_large();
     let const result_bit_position =
         static_cast<usize>(exponent_value) * base_bit_position;
-    let const result_limb_position = result_bit_position / 64;
-    if (result_limb_position >= ArrayList<u64>::MAXIMUM_ELEMENT_COUNT)
-      throw ErrorWithDetails{"Exponent is too large",
-                             "The result cannot fit in addressable memory"};
     return from_power_of_two(result_bit_position,
                              base.is_negative() && (exponent_value & 1u) != 0,
                              arena);
   }
 
   u64 remaining = exponent_value;
-  let result = ArithmeticValue{1};
-  let factor = base;
+  BumpArena generation_arenas[2];
+  usize generation_position = 0;
+  let result = ArithmeticValue::add(ArithmeticValue{1}, ArithmeticValue{},
+                                    generation_arenas[0]);
+  let factor =
+      ArithmeticValue::add(base, ArithmeticValue{}, generation_arenas[0]);
 
   while (remaining > 0) {
-    if ((remaining & 1u) != 0) result = multiply(result, factor, arena);
+    let const next_position = 1 - generation_position;
+    generation_arenas[next_position].reset();
+    let next_result =
+        (remaining & 1u) != 0
+            ? multiply(result, factor, generation_arenas[next_position])
+            : add(result, ArithmeticValue{}, generation_arenas[next_position]);
     remaining >>= 1u;
-    if (remaining != 0) factor = multiply(factor, factor, arena);
+    let next_factor =
+        remaining != 0
+            ? multiply(factor, factor, generation_arenas[next_position])
+            : ArithmeticValue{};
+    result = next_result;
+    factor = next_factor;
+    generation_position = next_position;
   }
 
-  return result;
+  return add(result, ArithmeticValue{}, arena);
 }
 
 fn ArithmeticValue::square_root(const ArithmeticValue &value, u32 decimal_scale,
@@ -996,31 +1019,41 @@ fn ArithmeticValue::square_root(const ArithmeticValue &value, u32 decimal_scale,
   if (decimal_scale < value.get_decimal_scale())
     decimal_scale = value.get_decimal_scale();
   if (value.is_zero())
-    return from_magnitude(NULL, 0, false, decimal_scale, arena);
-  let const allocator = bump_allocator(arena);
-  let magnitude = value.copy_magnitude(allocator);
+    return from_magnitude(nullptr, 0, false, decimal_scale, arena);
+  BumpArena scaled_arena;
+  let magnitude = value.copy_magnitude(bump_allocator(scaled_arena));
   let const scale_growth_wide =
       static_cast<u64>(decimal_scale) * 2 - value.get_decimal_scale();
   if (scale_growth_wide > ~u32{0}) throw std::bad_alloc{};
   let const scale_growth = static_cast<u32>(scale_growth_wide);
   multiply_power_of_ten(magnitude, scale_growth);
-  let const scaled =
-      from_magnitude(magnitude.begin(), magnitude.count(), false, 0, arena);
+  let const scaled = from_magnitude(magnitude.begin(), magnitude.count(), false,
+                                    0, scaled_arena);
   let const highest_limb = scaled.limb_at(scaled.limb_count() - 1);
   let const bit_count = (scaled.limb_count() - 1) * 64 + 64 -
                         static_cast<usize>(__builtin_clzll(highest_limb));
-  let estimate = from_power_of_two((bit_count + 1) / 2, false, arena);
+  BumpArena iteration_arenas[2];
+  usize estimate_position = 0;
+  let estimate =
+      from_power_of_two((bit_count + 1) / 2, false, iteration_arenas[0]);
 
   loop
   {
-    let const quotient = divide(scaled, estimate, arena);
+    let const next_position = 1 - estimate_position;
+    iteration_arenas[next_position].reset();
+    let const quotient =
+        divide(scaled, estimate, iteration_arenas[next_position]);
     let const next =
-        divide(add(estimate, quotient, arena), ArithmeticValue{2}, arena);
-    if (next.compare(estimate, allocator) >= 0) break;
+        divide(add(estimate, quotient, iteration_arenas[next_position]),
+               ArithmeticValue{2}, iteration_arenas[next_position]);
+    if (next.compare(estimate,
+                     bump_allocator(iteration_arenas[next_position])) >= 0)
+      break;
     estimate = next;
+    estimate_position = next_position;
   }
 
-  let const result_magnitude = estimate.copy_magnitude(allocator);
+  let const result_magnitude = estimate.copy_magnitude(bump_allocator(arena));
   return from_magnitude(result_magnitude.begin(), result_magnitude.count(),
                         false, decimal_scale, arena);
 }

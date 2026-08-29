@@ -359,10 +359,13 @@ CXXFLAGS += \
 	-Wno-unknown-pragmas
 ifneq ($(WINDOWS_GNU_ABI),)
 CXXFLAGS += \
-	-mconsole \
-	-static \
-	-static-libgcc \
-	-static-libstdc++
+		-mconsole \
+		-static \
+		-static-libgcc \
+		-static-libstdc++
+LINK_LIBS += -municode
+else
+LINK_LIBS += -Wl,/entry:wmainCRTStartup
 endif
 endif
 

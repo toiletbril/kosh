@@ -80,11 +80,61 @@ const StringView SHOPT_OPTION_NAMES[] = {
     "xpg_echo",
 };
 
-fn is_known_shopt_option(StringView name) throws -> bool
+constexpr PackedStringKey SHOPT_OPTION_KEYS[] = {
+    SSK("autocd"),
+    SSK("assoc_expand_once"),
+    SSK("cdable_vars"),
+    SSK("cdspell"),
+    SSK("checkhash"),
+    SSK("checkjobs"),
+    SSK("checkwinsize"),
+    SSK("cmdhist"),
+    SSK("complete_fullquote"),
+    SSK("direxpand"),
+    SSK("dirspell"),
+    SSK("dotglob"),
+    SSK("execfail"),
+    SSK("expand_aliases"),
+    SSK("extdebug"),
+    SSK("extglob"),
+    SSK("extquote"),
+    SSK("failglob"),
+    SSK("force_fignore"),
+    SSK("globasciiranges"),
+    SSK("globskipdots"),
+    SSK("globstar"),
+    SSK("gnu_errfmt"),
+    SSK("histappend"),
+    SSK("histreedit"),
+    SSK("histverify"),
+    SSK("hostcomplete"),
+    SSK("huponexit"),
+    SSK("inherit_errexit"),
+    SSK("interactive_comments"),
+    SSK("lastpipe"),
+    SSK("lithist"),
+    SSK("localvar_inherit"),
+    SSK("localvar_unset"),
+    SSK("login_shell"),
+    SSK("mailwarn"),
+    SSK("no_empty_cmd_completion"),
+    SSK("nocaseglob"),
+    SSK("nocasematch"),
+    SSK("nullglob"),
+    SSK("progcomp"),
+    SSK("progcomp_alias"),
+    SSK("promptvars"),
+    SSK("restricted_shell"),
+    SSK("shift_verbose"),
+    SSK("sourcepath"),
+    SSK("varredir_close"),
+    SSK("xpg_echo"),
+};
+constexpr StaticStringSet SHOPT_OPTIONS{SHOPT_OPTION_KEYS};
+
+pure fn is_known_shopt_option(StringView name) wontthrow -> bool
 {
-  for (let const &known : SHOPT_OPTION_NAMES)
-    if (known == name) return true;
-  return false;
+  return SHOPT_OPTIONS.contains(name);
 }
 
 fn shopt_status_line(StringView name, bool on, Allocator allocator) throws
@@ -144,11 +194,7 @@ pure fn Shopt::kind() const wontthrow -> Builtin::Kind { return Kind::Shopt; }
 fn Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const args =
-      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,
-                      nullptr, &ec.arg_locations(), &operand_locations,
-                      builtin_error_context(ec.program()));
-  defer { reset_flags(FLAG_LIST); };
+  let const args = PARSE_BUILTIN_ARGS_WITH_LOCATIONS(ec, operand_locations);
 
   if (FLAG_HELP.is_enabled())
     SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(

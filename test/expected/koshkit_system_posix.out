@@ -24,7 +24,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "logname"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "logname=$?"]
+    [SimpleCommand "echo" "logname-unspoofed=$?"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "tty" "-s"]
   [CompoundListCondition, None]
@@ -174,6 +174,12 @@
   Unquoted "charmap"
 ]
 [Word
+  Unquoted "LOGNAME=spoofed"
+]
+[Word
+  Unquoted "USER=spoofed"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -186,7 +192,7 @@
   Unquoted "echo"
 ]
 [Word
-  DoubleQuoted "logname="
+  DoubleQuoted "logname-unspoofed="
   Variable "?"
 ]
 [Word
@@ -312,7 +318,7 @@ LC_NUMERIC
 decimal_point="."
 LC_CTYPE
 ANSI_X3.4-1968
-logname=0
+logname-unspoofed=0
 tty=1
 uname=0
 who=0

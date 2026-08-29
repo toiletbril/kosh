@@ -11,14 +11,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL(
-    "[-BeiknpqrSst] [-C directory] [-f makefile]... [macro=value ...] "
-    "[target ...]");
+HELP_SYNOPSIS_DECL("[-BeiknpqrSst] [-j[jobs]] [-C directory] [-f makefile]... "
+                   "[macro=value ...] "
+                   "[target ...]");
 
 HELP_DESCRIPTION_DECL(
     "The make utility runs the recipe of each requested target.");
 
-FLAG(MAKE_FILE, String, 'f', "file",
+FLAG(MAKE_FILE, ManyStrings, 'f', "file",
      "Read the named file instead of Makefile.");
 FLAG(MAKE_DIR, String, 'C', "directory",
      "Change to this directory before reading the Makefile.");
@@ -43,6 +43,18 @@ FLAG(MAKE_NO_BUILTINS, Bool, 'r', "no-builtin-rules",
 FLAG(MAKE_SILENT, Bool, 's', "silent", "Do not print recipes before running.");
 FLAG(MAKE_TOUCH, Bool, 't', "touch",
      "Update targets without running their recipes.");
+
+static pure fn is_make_job_count(koshka::StringView value) wontthrow -> bool
+{
+  return !value.is_empty() && value.is_all_decimal_digits();
+}
+static koshka::FlagOptionalValue FLAG_MAKE_JOBS{
+    FLAG_LIST,
+    'j',
+    "jobs",
+    koshka::flag_section::NoSection,
+    "Accept an optional job count and propagate it through MAKEFLAGS.",
+    is_make_job_count};
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Make);
@@ -58,7 +70,6 @@ namespace {
    makefile assignment and the environment, which the expander checks first. */
 constexpr static_string_entry<const char *> BUILTIN_VARIABLE_ENTRIES[] = {
     {SSK("MAKE"),         "koshkit make"},
-    {SSK("SHELL"),        "/bin/sh"     },
     {SSK("AR"),           "ar"          },
     {SSK("ARFLAGS"),      "-rv"         },
     {SSK("YACC"),         "yacc"        },
@@ -90,6 +101,7 @@ enum class make_function_kind : u8
   Call,
   Dir,
   Error,
+  Eval,
   Filter,
   FilterOut,
   Findstring,
@@ -133,6 +145,7 @@ constexpr static_string_entry<make_function_spec> MAKE_FUNCTION_ENTRIES[] = {
     {SSK("call"),       {make_function_kind::Call, 1, UINT8_MAX}},
     {SSK("dir"),        {make_function_kind::Dir, 0, 1}         },
     {SSK("error"),      {make_function_kind::Error, 0, 1}       },
+    {SSK("eval"),       {make_function_kind::Eval, 0, 1}        },
     {SSK("filter"),     {make_function_kind::Filter, 2, 2}      },
     {SSK("filter-out"), {make_function_kind::FilterOut, 2, 2}   },
     {SSK("findstring"), {make_function_kind::Findstring, 2, 2}  },
@@ -161,11 +174,29 @@ constexpr static_string_entry<make_function_spec> MAKE_FUNCTION_ENTRIES[] = {
 };
 constexpr StaticStringMap MAKE_FUNCTIONS{MAKE_FUNCTION_ENTRIES};
 
-constexpr PackedStringKey SPECIAL_TARGET_KEYS[] = {
-    SSK(".DEFAULT"),  SSK(".IGNORE"),   SSK(".PHONY"),  SSK(".POSIX"),
-    SSK(".PRECIOUS"), SSK(".SCCS_GET"), SSK(".SILENT"), SSK(".SUFFIXES"),
+enum class make_special_target : u8
+{
+  Default,
+  Ignore,
+  Phony,
+  Posix,
+  Precious,
+  SccsGet,
+  Silent,
+  Suffixes,
 };
-constexpr StaticStringSet SPECIAL_TARGETS{SPECIAL_TARGET_KEYS};
+
+constexpr static_string_entry<make_special_target> SPECIAL_TARGET_ENTRIES[] = {
+    {SSK(".DEFAULT"),  make_special_target::Default },
+    {SSK(".IGNORE"),   make_special_target::Ignore  },
+    {SSK(".PHONY"),    make_special_target::Phony   },
+    {SSK(".POSIX"),    make_special_target::Posix   },
+    {SSK(".PRECIOUS"), make_special_target::Precious},
+    {SSK(".SCCS_GET"), make_special_target::SccsGet },
+    {SSK(".SILENT"),   make_special_target::Silent  },
+    {SSK(".SUFFIXES"), make_special_target::Suffixes},
+};
+constexpr StaticStringMap SPECIAL_TARGETS{SPECIAL_TARGET_ENTRIES};
 
 constexpr PackedStringKey CONDITIONAL_DIRECTIVE_KEYS[] = {
     SSK("ifeq"), SSK("ifneq"), SSK("ifdef"), SSK("ifndef")};
@@ -227,6 +258,16 @@ struct make_variable
   make_variable_flavor flavor;
 };
 
+struct make_pattern
+{
+  explicit make_pattern(Allocator allocator)
+      : prefix(allocator), suffix(allocator)
+  {}
+  String prefix;
+  String suffix;
+  bool has_wildcard{false};
+};
+
 struct make_rule
 {
   explicit make_rule(Allocator allocator)
@@ -238,6 +279,21 @@ struct make_rule
   ArrayList<String> recipe_lines;
   /* Each entry is the raw `NAME op= value` text. */
   ArrayList<String> variable_assignments;
+};
+
+struct make_pattern_rule
+{
+  explicit make_pattern_rule(Allocator allocator)
+      : rule(allocator), pattern(allocator)
+  {}
+  make_rule rule;
+  make_pattern pattern;
+};
+
+struct make_source_document
+{
+  String source;
+  u32 source_name_index;
 };
 
 struct makefile
@@ -253,7 +309,7 @@ struct makefile
   {}
   ArrayList<make_variable> variables;
   ArrayList<make_rule> rules;
-  ArrayList<make_rule> pattern_rules;
+  ArrayList<make_pattern_rule> pattern_rules;
   /* The first ordinary explicit target, the bare-make goal. A target-specific
      variable line does not set it, the way GNU make picks the first real rule.
    */
@@ -273,6 +329,9 @@ struct makefile
   bool is_silent{false};
   bool is_every_target_precious{false};
   usize call_max_argument_count{0};
+  usize eval_depth{0};
+  u32 active_source_name_index{0};
+  ArrayList<make_source_document> *source_documents{nullptr};
 
   fn find_variable(StringView name) const throws -> const String *
   {
@@ -322,6 +381,10 @@ struct makefile
     variables.pop_back();
   }
 };
+
+static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
+                              ArrayList<make_source_document> &sources,
+                              usize first_source_position) throws -> void;
 
 /* This runs on the raw recipe before the $(NAME) expansion, and a $$ escape is
    carried through untouched so the later expansion collapses it to a single $
@@ -477,15 +540,10 @@ static fn split_words(StringView text, Allocator allocator) throws
     -> ArrayList<String>
 {
   ArrayList<String> words{allocator};
-  usize i = 0;
-  while (i < text.length) {
-    while (i < text.length && is_blank(text[i]))
-      i++;
-    let const start = i;
-    while (i < text.length && !is_blank(text[i]))
-      i++;
-    if (i > start)
-      words.push(String{allocator, text.substring_of_length(start, i - start)});
+  usize text_position = 0;
+  while (text_position < text.length) {
+    let const word = text.next_ascii_whitespace_word(text_position);
+    if (!word.is_empty()) words.push(String{allocator, word});
   }
   return words;
 }
@@ -718,11 +776,7 @@ static fn lookup_make_variable(EvalContext &cxt, const makefile &mk,
       do_use_stored(*variable);
       return lookup;
     }
-#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
     lookup.set_borrowed_value(cxt.shell_executable_path());
-#else
-    lookup.set_borrowed_value("/bin/sh");
-#endif
     lookup.origin = make_variable_origin::Default;
     lookup.flavor = make_variable_flavor::Recursive;
     return lookup;
@@ -809,14 +863,8 @@ static fn split_word_views(StringView text, Allocator allocator) throws
   usize text_position = 0;
 
   while (text_position < text.length) {
-    while (text_position < text.length && is_blank(text[text_position]))
-      text_position++;
-    let const word_start = text_position;
-    while (text_position < text.length && !is_blank(text[text_position]))
-      text_position++;
-    if (text_position > word_start)
-      words.push(
-          text.substring_of_length(word_start, text_position - word_start));
+    let const word = text.next_ascii_whitespace_word(text_position);
+    if (!word.is_empty()) words.push(word);
   }
 
   return words;
@@ -830,38 +878,12 @@ static fn append_make_word(String &result, StringView word,
   has_word = true;
 }
 
-static fn find_make_text(StringView text, StringView wanted) wontthrow
-    -> Maybe<usize>
-{
-  if (wanted.is_empty()) return 0;
-  if (wanted.length > text.length) return None;
-
-  for (usize position = 0; position + wanted.length <= text.length; position++)
-  {
-    if (text[position] != wanted[0]) continue;
-    if (text.substring_of_length(position, wanted.length) == wanted)
-      return position;
-  }
-
-  return None;
-}
-
 static pure fn recipe_references_make_variable(StringView recipe) wontthrow
     -> bool
 {
-  return find_make_text(recipe, "$(MAKE)").has_value() ||
-         find_make_text(recipe, "${MAKE}").has_value();
+  return recipe.find_substring("$(MAKE)").has_value() ||
+         recipe.find_substring("${MAKE}").has_value();
 }
-
-struct make_pattern
-{
-  explicit make_pattern(Allocator allocator)
-      : prefix(allocator), suffix(allocator)
-  {}
-  String prefix;
-  String suffix;
-  bool has_wildcard{false};
-};
 
 struct make_percent_text
 {
@@ -1053,11 +1075,7 @@ static fn restore_make_variable(makefile &mk,
                                 Allocator allocator) throws -> void
 {
   if (!snapshot.was_present) {
-    ASSERT(mk.variable_index.find(snapshot.name.view()) != NULL);
-    ASSERT(*mk.variable_index.find(snapshot.name.view()) + 1 ==
-           mk.variables.count());
-    mk.variable_index.erase(snapshot.name.view());
-    mk.variables.pop_back();
+    mk.remove_variable(snapshot.name.view());
     return;
   }
 
@@ -1252,7 +1270,7 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     usize source_position = 0;
     while (source_position < source.count()) {
       let const match =
-          find_make_text(source.view().substring(source_position), from.view());
+          source.view().substring(source_position).find_substring(from.view());
       if (!match.has_value()) {
         result += source.view().substring(source_position);
         break;
@@ -1281,7 +1299,7 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
   case make_function_kind::Findstring: {
     let const wanted = do_expand(0);
     let const source = do_expand(1);
-    return find_make_text(source.view(), wanted.view()).has_value()
+    return source.view().find_substring(wanted.view()).has_value()
                ? wanted.clone()
                : String{allocator};
   }
@@ -1560,6 +1578,31 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     let const patterns = do_expand(0);
     return make_wildcard(cxt, patterns.view());
   }
+  case make_function_kind::Eval: {
+    if (mk.source_documents == nullptr)
+      throw Error{"The make eval parser is unavailable"};
+    if (mk.eval_depth >= 17)
+      throw Error{"Make eval calls exceed the supported nesting depth"};
+
+    let evaluated_source = do_expand(0);
+    let source_name = String{allocator};
+    if (let const active_name = source_name_at(mk.active_source_name_index);
+        active_name.has_value())
+      source_name = String{allocator, *active_name};
+    else
+      source_name = String{allocator, "make"};
+    source_name += ".eval.";
+    source_name +=
+        String::from(mk.source_documents->count() + 1, allocator).view();
+    let const first_source_position = mk.source_documents->count();
+    mk.source_documents->push(make_source_document{
+        steal(evaluated_source), intern_source_name(source_name.view())});
+
+    mk.eval_depth++;
+    defer { mk.eval_depth--; };
+    parse_makefile_into(cxt, mk, *mk.source_documents, first_source_position);
+    return String{allocator};
+  }
   case make_function_kind::Error:
     throw Error{"The makefile stopped the build with the message '" +
                 do_expand(0) + "'"};
@@ -1577,12 +1620,13 @@ static fn expand(EvalContext &cxt, makefile &mk, StringView text,
     throw Error{"Make variable expansion exceeds the supported depth"};
 
   String result{cxt.scratch_allocator()};
+  ArrayList<char> close_stack{cxt.scratch_allocator()};
   usize text_position = 0;
   while (text_position < text.length) {
     if (text[text_position] == '$' && text_position + 1 < text.length &&
         (text[text_position + 1] == '(' || text[text_position + 1] == '{'))
     {
-      ArrayList<char> close_stack{cxt.scratch_allocator()};
+      close_stack.clear();
       close_stack.push(text[text_position + 1] == '(' ? ')' : '}');
       usize close_position = text_position + 2;
       while (close_position < text.length && !close_stack.is_empty()) {
@@ -1790,14 +1834,24 @@ static fn ends_with_continuation(StringView line) wontthrow -> bool
   return (backslash_count % 2) == 1;
 }
 
-static fn join_continuations(StringView source, Allocator allocator) throws
-    -> ArrayList<String>
+struct make_logical_line
 {
+  String text;
+  SourceLocation source_span;
+};
+
+static fn join_continuations(const make_source_document &document,
+                             Allocator allocator) throws
+    -> ArrayList<make_logical_line>
+{
+  let const source = document.source.view();
   let const physical = utils::split_lines(source, allocator, true);
-  ArrayList<String> logical{allocator};
+  ArrayList<make_logical_line> logical{allocator};
   usize i = 0;
   while (i < physical.count()) {
     let const raw = physical[i].without_trailing_newline();
+    let const source_start = static_cast<usize>(raw.data - source.data);
+    usize source_end = source_start + raw.length;
     let line = String{allocator, raw};
 
     if (!raw.is_empty() && raw[0] == '\t') {
@@ -1805,6 +1859,7 @@ static fn join_continuations(StringView source, Allocator allocator) throws
         line += '\n';
         i++;
         let next = physical[i].without_trailing_newline();
+        source_end = static_cast<usize>(next.data - source.data) + next.length;
         if (!next.is_empty() && next[0] == '\t') next = next.substring(1);
         line += next;
       }
@@ -1815,12 +1870,16 @@ static fn join_continuations(StringView source, Allocator allocator) throws
                    line.view().substring_of_length(0, line.view().length - 1)};
         i++;
         let const next = physical[i].without_trailing_newline();
+        source_end = static_cast<usize>(next.data - source.data) + next.length;
         line += ' ';
         line += trim(next);
       }
     }
 
-    logical.push(steal(line));
+    logical.push(make_logical_line{
+        steal(line), SourceLocation{source_start, source_end - source_start,
+                                    document.source_name_index}
+    });
     i++;
   }
   return logical;
@@ -1903,22 +1962,467 @@ struct conditional_state
 
 struct make_source_frame
 {
-  explicit make_source_frame(ArrayList<String> &&new_lines,
+  explicit make_source_frame(ArrayList<make_logical_line> &&new_lines,
                              usize new_include_depth = 0)
       : lines(steal(new_lines)), include_depth(new_include_depth)
   {}
-  ArrayList<String> lines;
+  ArrayList<make_logical_line> lines;
   usize line_position{0};
   usize include_depth{0};
 };
 
-static fn parse_makefile(EvalContext &cxt, StringView source,
+static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
+                              ArrayList<make_source_document> &sources,
+                              usize first_source_position) throws -> void
+{
+  let const saved_source_name_index = mk.active_source_name_index;
+  defer { mk.active_source_name_index = saved_source_name_index; };
+
+  ArrayList<usize> current_rule_indices{cxt.scratch_allocator()};
+  ArrayList<usize> current_pattern_indices{cxt.scratch_allocator()};
+  ArrayList<conditional_state> conditionals{cxt.scratch_allocator()};
+
+  let const do_is_active = [&]() -> bool {
+    for (const conditional_state &state : conditionals)
+      if (!state.is_branch_active) return false;
+    return true;
+  };
+
+  ArrayList<make_source_frame> source_frames{cxt.scratch_allocator()};
+  for (usize source_position = sources.count();
+       source_position > first_source_position; source_position--)
+    source_frames.push(make_source_frame{join_continuations(
+        sources[source_position - 1], cxt.scratch_allocator())});
+  SourceLocation active_source_span;
+  try {
+    while (!source_frames.is_empty()) {
+      make_source_frame &source_frame =
+          source_frames[source_frames.count() - 1];
+      if (source_frame.line_position == source_frame.lines.count()) {
+        source_frames.pop_back();
+        continue;
+      }
+
+      const make_logical_line &logical =
+          source_frame.lines[source_frame.line_position++];
+      active_source_span = logical.source_span;
+      mk.active_source_name_index = logical.source_span.source_name_index;
+      let line = logical.text.view();
+
+      /* A recipe line is kept verbatim and expanded only at build time. */
+      if (!line.is_empty() && line[0] == '\t') {
+        if (do_is_active()) {
+          for (usize index : current_rule_indices)
+            mk.rules[index].recipe_lines.push(
+                String{cxt.scratch_allocator(), line.substring(1)});
+          for (usize index : current_pattern_indices)
+            mk.pattern_rules[index].rule.recipe_lines.push(
+                String{cxt.scratch_allocator(), line.substring(1)});
+        }
+        continue;
+      }
+
+      String uncommented{cxt.scratch_allocator()};
+      for (usize line_position = 0; line_position < line.length;
+           line_position++)
+      {
+        if (line[line_position] == '\\' && line_position + 1 < line.length &&
+            line[line_position + 1] == '#')
+        {
+          uncommented += '#';
+          line_position++;
+          continue;
+        }
+        if (line[line_position] == '#') break;
+        uncommented += line[line_position];
+      }
+      line = uncommented.view();
+
+      let const trimmed = trim(line);
+      if (trimmed.is_empty()) {
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+
+      let const directive = leading_word(trimmed);
+
+      /* An inactive branch still tracks nested directives so the matching endif
+         pops the right one. */
+      if (CONDITIONAL_DIRECTIVES.contains(directive)) {
+        let const is_parent_active = do_is_active();
+        let const is_taken =
+            is_parent_active &&
+            evaluate_conditional(cxt, mk, directive,
+                                 trimmed.substring(directive.length));
+        conditionals.push(
+            conditional_state{is_taken, is_taken, is_parent_active});
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+      if (directive == "else") {
+        if (!conditionals.is_empty()) {
+          conditional_state &top = conditionals[conditionals.count() - 1];
+          let const rest = trim(trimmed.substring(directive.length));
+          let const else_directive = leading_word(rest);
+          if (CONDITIONAL_DIRECTIVES.contains(else_directive)) {
+            let const is_taken =
+                top.is_parent_active && !top.was_any_branch_taken &&
+                evaluate_conditional(cxt, mk, else_directive,
+                                     rest.substring(else_directive.length));
+            top.is_branch_active = is_taken;
+            if (is_taken) top.was_any_branch_taken = true;
+          } else {
+            top.is_branch_active =
+                top.is_parent_active && !top.was_any_branch_taken;
+            top.was_any_branch_taken = true;
+          }
+        }
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+      if (directive == "endif") {
+        if (!conditionals.is_empty()) conditionals.pop_back();
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+
+      if (directive == "define") {
+        let const name = trim(trimmed.substring(directive.length));
+        if (name.is_empty())
+          throw ErrorWithLocation{logical.source_span,
+                                  "A define line must name a variable"};
+
+        String value{cxt.scratch_allocator()};
+        usize define_depth = 1;
+        while (source_frame.line_position < source_frame.lines.count()) {
+          let const definition_line =
+              source_frame.lines[source_frame.line_position++].text.view();
+          let const definition_directive = leading_word(trim(definition_line));
+          if (definition_directive == "define") {
+            define_depth++;
+          } else if (definition_directive == "endef") {
+            define_depth--;
+            if (define_depth == 0) break;
+          }
+          if (!value.is_empty()) value += '\n';
+          value += definition_line;
+        }
+        if (define_depth != 0)
+          throw ErrorWithLocation{logical.source_span,
+                                  "The define directive is unterminated"};
+        if (do_is_active()) {
+          String assignment{cxt.scratch_allocator(), "="};
+          assignment += value.view();
+          apply_assignment(cxt, mk, name, assignment.view());
+        }
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+
+      if (!do_is_active()) {
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+
+      if (directive == "include") {
+        let const expanded_path =
+            expand(cxt, mk, trim(trimmed.substring(directive.length)), 0);
+        let const include_paths =
+            split_words(expanded_path.view(), cxt.scratch_allocator());
+        if (include_paths.is_empty()) {
+          current_rule_indices.clear();
+          current_pattern_indices.clear();
+          continue;
+        }
+        let const include_depth = source_frame.include_depth + 1;
+        if (include_depth >= 17)
+          throw ErrorWithLocation{
+              logical.source_span,
+              "Makefile includes exceed the supported nesting depth"};
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        for (usize include_position = include_paths.count();
+             include_position > 0; include_position--)
+        {
+          let const &include_path = include_paths[include_position - 1];
+          let const included_source =
+              Path{include_path.view()}.read_entire_file();
+          if (!included_source.has_value())
+            throw ErrorWithLocation{
+                logical.source_span,
+                "Unable to read the included makefile '" + include_path +
+                    "': " + os::last_system_error_message()};
+          sources.push(
+              make_source_document{steal(*included_source),
+                                   intern_source_name(include_path.view())});
+          source_frames.push(make_source_frame{
+              join_continuations(sources.back(), cxt.scratch_allocator()),
+              include_depth});
+        }
+        continue;
+      }
+
+      /* override re-asserts a value, so its prefix is stripped and the
+         assignment parses as usual. */
+      let expanded_statement = String{cxt.scratch_allocator()};
+      let statement = trimmed;
+      if (directive == "override")
+        statement = trim(statement.substring(directive.length));
+
+      let const statement_word = leading_word(statement);
+      if (statement_word == "undefine") {
+        let const names = expand(
+            cxt, mk, trim(statement.substring(statement_word.length)), 0);
+        for (const String &name :
+             split_words(names.view(), cxt.scratch_allocator()))
+          if (mk.command_variable_names.find(name.view()) == nullptr)
+            mk.remove_variable(name.view());
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+      if (statement_word == "unexport") {
+        let const names = trim(statement.substring(statement_word.length));
+        for (const String &name : split_words(names, cxt.scratch_allocator())) {
+          mk.exported_variable_names.erase(name.view());
+          mk.unexported_variable_names.set(name.view(), true);
+        }
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        continue;
+      }
+      if (statement_word == "export") {
+        let const after_export =
+            trim(statement.substring(statement_word.length));
+        if (after_export.is_empty()) {
+          current_rule_indices.clear();
+          current_pattern_indices.clear();
+          continue;
+        }
+        if (!after_export.find_character('=').has_value()) {
+          for (const String &name :
+               split_words(after_export, cxt.scratch_allocator()))
+          {
+            mk.exported_variable_names.set(name.view(), true);
+            mk.unexported_variable_names.erase(name.view());
+          }
+          current_rule_indices.clear();
+          current_pattern_indices.clear();
+          continue;
+        }
+        let const exported_name = assignment_variable_name(after_export);
+        if (!exported_name.is_empty()) {
+          mk.exported_variable_names.set(exported_name, true);
+          mk.unexported_variable_names.erase(exported_name);
+        }
+        statement = after_export;
+      }
+
+      if (statement.length >= 2 && statement[0] == '$' &&
+          (statement[1] == '(' || statement[1] == '{'))
+      {
+        expanded_statement = expand(cxt, mk, statement, 0);
+        statement = trim(expanded_statement.view());
+        if (statement.is_empty()) {
+          current_rule_indices.clear();
+          current_pattern_indices.clear();
+          continue;
+        }
+      }
+
+      let const colon = rule_colon(statement);
+      let const equals = statement.find_character('=');
+      let const is_rule =
+          colon.has_value() && (!equals.has_value() || *colon < *equals);
+
+      if (is_rule) {
+        let const after_colon = statement.substring(*colon + 1);
+        if (is_target_variable_assignment(after_colon)) {
+          let const targets = expand(
+              cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
+          current_rule_indices.clear();
+          current_pattern_indices.clear();
+          for (const String &target :
+               split_words(targets.view(), cxt.scratch_allocator()))
+          {
+            make_rule *rule = mk.find_mutable_rule(target.view());
+            if (rule == nullptr) {
+              make_rule fresh{cxt.scratch_allocator()};
+              fresh.target = target.clone();
+              rule = &mk.rules[mk.add_rule(steal(fresh))];
+            }
+            rule->variable_assignments.push(
+                String{cxt.scratch_allocator(), trim(after_colon)});
+          }
+          continue;
+        }
+
+        /* The targets and prerequisites expand when the rule is read. */
+        let const targets =
+            expand(cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
+        let prerequisite_text = after_colon;
+        let inline_recipe = StringView{};
+        if (let const semicolon = after_colon.find_character(';');
+            semicolon.has_value())
+        {
+          prerequisite_text = after_colon.substring_of_length(0, *semicolon);
+          inline_recipe = trim(after_colon.substring(*semicolon + 1));
+        }
+        let const prerequisites = expand(cxt, mk, prerequisite_text, 0);
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+        for (const String &target :
+             split_words(targets.view(), cxt.scratch_allocator()))
+        {
+          let parsed_target =
+              parse_make_pattern(target.view(), cxt.scratch_allocator());
+          let normalized_target = parsed_target.prefix.clone();
+          if (parsed_target.has_wildcard) {
+            normalized_target.push('%');
+            normalized_target += parsed_target.suffix.view();
+          }
+          let new_prerequisites =
+              split_words(prerequisites.view(), cxt.scratch_allocator());
+          if (let const special_target =
+                  SPECIAL_TARGETS.find(normalized_target.view());
+              special_target.has_value())
+          {
+            switch (*special_target) {
+            case make_special_target::Phony:
+              for (const String &phony : new_prerequisites)
+                mk.phony_targets.set(phony.view(), true);
+              continue;
+            case make_special_target::Ignore:
+              if (new_prerequisites.is_empty())
+                mk.should_ignore_errors = true;
+              else
+                for (const String &ignored : new_prerequisites)
+                  mk.ignored_targets.set(ignored.view(), true);
+              break;
+            case make_special_target::Silent:
+              if (new_prerequisites.is_empty())
+                mk.is_silent = true;
+              else
+                for (const String &silent : new_prerequisites)
+                  mk.silent_targets.set(silent.view(), true);
+              break;
+            case make_special_target::Precious:
+              if (new_prerequisites.is_empty())
+                mk.is_every_target_precious = true;
+              else
+                for (const String &precious : new_prerequisites)
+                  mk.precious_targets.set(precious.view(), true);
+              break;
+            case make_special_target::Suffixes:
+              if (new_prerequisites.is_empty()) {
+                mk.suffixes.clear();
+              } else {
+                for (const String &suffix : new_prerequisites)
+                  if (!mk.suffixes.find(suffix.view()).has_value())
+                    mk.suffixes.push(suffix.clone());
+              }
+              break;
+            default: break;
+            }
+          }
+          let is_inference_rule = false;
+          if (!normalized_target.view().find_character('/').has_value())
+            for (const String &source_suffix : mk.suffixes) {
+              if (normalized_target.view() == source_suffix.view()) {
+                is_inference_rule = true;
+                break;
+              }
+              if (!normalized_target.view().starts_with(source_suffix.view()))
+                continue;
+
+              let const target_suffix = normalized_target.view().substring(
+                  source_suffix.view().length);
+              for (const String &known_suffix : mk.suffixes)
+                if (target_suffix == known_suffix.view()) {
+                  is_inference_rule = true;
+                  break;
+                }
+              if (is_inference_rule) break;
+            }
+
+          if (mk.default_goal.is_empty() && normalized_target[0] != '.' &&
+              !parsed_target.has_wildcard &&
+              !SPECIAL_TARGETS.find(normalized_target.view()).has_value() &&
+              !is_inference_rule)
+            mk.default_goal = normalized_target.clone();
+          if (!parsed_target.has_wildcard)
+            if (make_rule *existing =
+                    mk.find_mutable_rule(normalized_target.view());
+                existing != nullptr)
+            {
+              if (is_inference_rule) {
+                existing->prerequisites = steal(new_prerequisites);
+                existing->recipe_lines.clear();
+              } else {
+                for (String &prerequisite : new_prerequisites)
+                  existing->prerequisites.push(steal(prerequisite));
+              }
+              current_rule_indices.push(
+                  static_cast<usize>(existing - mk.rules.begin()));
+              continue;
+            }
+
+          if (parsed_target.has_wildcard) {
+            make_pattern_rule pattern_rule{cxt.scratch_allocator()};
+            pattern_rule.rule.target = target.clone();
+            pattern_rule.rule.prerequisites = steal(new_prerequisites);
+            pattern_rule.pattern = steal(parsed_target);
+            mk.pattern_rules.push(steal(pattern_rule));
+            current_pattern_indices.push(mk.pattern_rules.count() - 1);
+          } else {
+            make_rule rule{cxt.scratch_allocator()};
+            rule.target = steal(normalized_target);
+            rule.prerequisites = steal(new_prerequisites);
+            current_rule_indices.push(mk.add_rule(steal(rule)));
+          }
+        }
+        if (!inline_recipe.is_empty()) {
+          for (usize index : current_rule_indices)
+            mk.rules[index].recipe_lines.push(
+                String{cxt.scratch_allocator(), inline_recipe});
+          for (usize index : current_pattern_indices)
+            mk.pattern_rules[index].rule.recipe_lines.push(
+                String{cxt.scratch_allocator(), inline_recipe});
+        }
+        continue;
+      }
+
+      if (equals.has_value()) {
+        let const expanded_name =
+            expand(cxt, mk, statement.substring_of_length(0, *equals), 0);
+        apply_assignment(cxt, mk, expanded_name.view(),
+                         statement.substring(*equals));
+        current_rule_indices.clear();
+        current_pattern_indices.clear();
+      }
+    }
+  } catch (const ErrorWithLocation &) {
+    throw;
+  } catch (const ErrorBase &error) {
+    relocate_error(error, active_source_span);
+  }
+}
+
+static fn parse_makefile(EvalContext &cxt,
+                         ArrayList<make_source_document> &sources,
                          const ArrayList<String> &command_assignments,
                          bool does_environment_override,
                          bool should_use_builtin_rules,
                          StringView initial_makeflags = {}) throws -> makefile
 {
   makefile mk{cxt.scratch_allocator()};
+  mk.source_documents = &sources;
   mk.does_environment_override = does_environment_override;
   if (!initial_makeflags.is_empty()) {
     mk.variable_index.set("MAKEFLAGS", mk.variables.count());
@@ -1938,405 +2442,21 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
     apply_assignment(cxt, mk, assignment.view().substring_of_length(0, *equals),
                      assignment.view().substring(*equals), true);
   }
-  ArrayList<usize> current_rule_indices{cxt.scratch_allocator()};
-  ArrayList<usize> current_pattern_indices{cxt.scratch_allocator()};
-  ArrayList<conditional_state> conditionals{cxt.scratch_allocator()};
 
-  let const do_is_active = [&]() -> bool {
-    for (const conditional_state &state : conditionals)
-      if (!state.is_branch_active) return false;
-    return true;
-  };
+  parse_makefile_into(cxt, mk, sources, 0);
 
-  ArrayList<make_source_frame> source_frames{cxt.scratch_allocator()};
-  source_frames.push(
-      make_source_frame{join_continuations(source, cxt.scratch_allocator())});
-  while (!source_frames.is_empty()) {
-    make_source_frame &source_frame = source_frames[source_frames.count() - 1];
-    if (source_frame.line_position == source_frame.lines.count()) {
-      source_frames.pop_back();
-      continue;
-    }
-
-    const String &logical = source_frame.lines[source_frame.line_position++];
-    let line = logical.view();
-
-    /* A recipe line is kept verbatim and expanded only at build time. */
-    if (!line.is_empty() && line[0] == '\t') {
-      if (do_is_active()) {
-        for (usize index : current_rule_indices)
-          mk.rules[index].recipe_lines.push(
-              String{cxt.scratch_allocator(), line.substring(1)});
-        for (usize index : current_pattern_indices)
-          mk.pattern_rules[index].recipe_lines.push(
-              String{cxt.scratch_allocator(), line.substring(1)});
-      }
-      continue;
-    }
-
-    String uncommented{cxt.scratch_allocator()};
-    for (usize line_position = 0; line_position < line.length; line_position++)
-    {
-      if (line[line_position] == '\\' && line_position + 1 < line.length &&
-          line[line_position + 1] == '#')
-      {
-        uncommented += '#';
-        line_position++;
-        continue;
-      }
-      if (line[line_position] == '#') break;
-      uncommented += line[line_position];
-    }
-    line = uncommented.view();
-
-    let const trimmed = trim(line);
-    if (trimmed.is_empty()) {
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-
-    let const directive = leading_word(trimmed);
-
-    /* An inactive branch still tracks nested directives so the matching endif
-       pops the right one. */
-    if (CONDITIONAL_DIRECTIVES.contains(directive)) {
-      let const is_parent_active = do_is_active();
-      let const is_taken =
-          is_parent_active &&
-          evaluate_conditional(cxt, mk, directive,
-                               trimmed.substring(directive.length));
-      conditionals.push(
-          conditional_state{is_taken, is_taken, is_parent_active});
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-    if (directive == "else") {
-      if (!conditionals.is_empty()) {
-        conditional_state &top = conditionals[conditionals.count() - 1];
-        let const rest = trim(trimmed.substring(directive.length));
-        let const else_directive = leading_word(rest);
-        if (CONDITIONAL_DIRECTIVES.contains(else_directive)) {
-          let const is_taken =
-              top.is_parent_active && !top.was_any_branch_taken &&
-              evaluate_conditional(cxt, mk, else_directive,
-                                   rest.substring(else_directive.length));
-          top.is_branch_active = is_taken;
-          if (is_taken) top.was_any_branch_taken = true;
-        } else {
-          top.is_branch_active =
-              top.is_parent_active && !top.was_any_branch_taken;
-          top.was_any_branch_taken = true;
-        }
-      }
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-    if (directive == "endif") {
-      if (!conditionals.is_empty()) conditionals.pop_back();
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-
-    if (directive == "define") {
-      let const name = trim(trimmed.substring(directive.length));
-      if (name.is_empty()) throw Error{"A define line must name a variable"};
-
-      String value{cxt.scratch_allocator()};
-      usize define_depth = 1;
-      while (source_frame.line_position < source_frame.lines.count()) {
-        let const definition_line =
-            source_frame.lines[source_frame.line_position++].view();
-        let const definition_directive = leading_word(trim(definition_line));
-        if (definition_directive == "define") {
-          define_depth++;
-        } else if (definition_directive == "endef") {
-          define_depth--;
-          if (define_depth == 0) break;
-        }
-        if (!value.is_empty()) value += '\n';
-        value += definition_line;
-      }
-      if (define_depth != 0)
-        throw Error{"The define directive is unterminated"};
-      if (do_is_active()) {
-        String assignment{cxt.scratch_allocator(), "="};
-        assignment += value.view();
-        apply_assignment(cxt, mk, name, assignment.view());
-      }
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-
-    if (!do_is_active()) {
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-
-    if (directive == "include") {
-      let const expanded_path =
-          expand(cxt, mk, trim(trimmed.substring(directive.length)), 0);
-      let const include_paths =
-          split_words(expanded_path.view(), cxt.scratch_allocator());
-      if (include_paths.is_empty()) {
-        current_rule_indices.clear();
-        current_pattern_indices.clear();
-        continue;
-      }
-      let const include_depth = source_frame.include_depth + 1;
-      if (include_depth >= 17)
-        throw Error{"Makefile includes exceed the supported nesting depth"};
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      for (usize include_position = include_paths.count(); include_position > 0;
-           include_position--)
-      {
-        let const &include_path = include_paths[include_position - 1];
-        let const included_source =
-            Path{include_path.view()}.read_entire_file();
-        if (!included_source.has_value())
-          throw Error{"Unable to read the included makefile '" + include_path +
-                      "': " + os::last_system_error_message()};
-        source_frames.push(
-            make_source_frame{join_continuations(included_source->view(),
-                                                 cxt.scratch_allocator()),
-                              include_depth});
-      }
-      continue;
-    }
-
-    /* override re-asserts a value, so its prefix is stripped and the assignment
-       parses as usual. */
-    let statement = trimmed;
-    if (directive == "override")
-      statement = trim(statement.substring(directive.length));
-
-    let const statement_word = leading_word(statement);
-    if (statement_word == "undefine") {
-      let const names =
-          expand(cxt, mk, trim(statement.substring(statement_word.length)), 0);
-      for (const String &name :
-           split_words(names.view(), cxt.scratch_allocator()))
-        if (mk.command_variable_names.find(name.view()) == NULL)
-          mk.remove_variable(name.view());
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-    if (statement_word == "unexport") {
-      let const names = trim(statement.substring(statement_word.length));
-      for (const String &name : split_words(names, cxt.scratch_allocator())) {
-        mk.exported_variable_names.erase(name.view());
-        mk.unexported_variable_names.set(name.view(), true);
-      }
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      continue;
-    }
-    if (statement_word == "export") {
-      let const after_export = trim(statement.substring(statement_word.length));
-      if (after_export.is_empty()) {
-        current_rule_indices.clear();
-        current_pattern_indices.clear();
-        continue;
-      }
-      if (!after_export.find_character('=').has_value()) {
-        for (const String &name :
-             split_words(after_export, cxt.scratch_allocator()))
-        {
-          mk.exported_variable_names.set(name.view(), true);
-          mk.unexported_variable_names.erase(name.view());
-        }
-        current_rule_indices.clear();
-        current_pattern_indices.clear();
-        continue;
-      }
-      let const exported_name = assignment_variable_name(after_export);
-      if (!exported_name.is_empty()) {
-        mk.exported_variable_names.set(exported_name, true);
-        mk.unexported_variable_names.erase(exported_name);
-      }
-      statement = after_export;
-    }
-
-    let const colon = rule_colon(statement);
-    let const equals = statement.find_character('=');
-    let const is_rule =
-        colon.has_value() && (!equals.has_value() || *colon < *equals);
-
-    if (is_rule) {
-      let const after_colon = statement.substring(*colon + 1);
-      if (is_target_variable_assignment(after_colon)) {
-        let const targets =
-            expand(cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
-        current_rule_indices.clear();
-        current_pattern_indices.clear();
-        for (const String &target :
-             split_words(targets.view(), cxt.scratch_allocator()))
-        {
-          make_rule *rule = mk.find_mutable_rule(target.view());
-          if (rule == nullptr) {
-            make_rule fresh{cxt.scratch_allocator()};
-            fresh.target = target.clone();
-            rule = &mk.rules[mk.add_rule(steal(fresh))];
-          }
-          rule->variable_assignments.push(
-              String{cxt.scratch_allocator(), trim(after_colon)});
-        }
-        continue;
-      }
-
-      /* The targets and prerequisites expand when the rule is read. */
-      let const targets =
-          expand(cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
-      let prerequisite_text = after_colon;
-      let inline_recipe = StringView{};
-      if (let const semicolon = after_colon.find_character(';');
-          semicolon.has_value())
-      {
-        prerequisite_text = after_colon.substring_of_length(0, *semicolon);
-        inline_recipe = trim(after_colon.substring(*semicolon + 1));
-      }
-      let const prerequisites = expand(cxt, mk, prerequisite_text, 0);
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-      for (const String &target :
-           split_words(targets.view(), cxt.scratch_allocator()))
-      {
-        let const parsed_target =
-            parse_make_pattern(target.view(), cxt.scratch_allocator());
-        let normalized_target = parsed_target.prefix.clone();
-        if (parsed_target.has_wildcard) {
-          normalized_target.push('%');
-          normalized_target += parsed_target.suffix.view();
-        }
-        let new_prerequisites =
-            split_words(prerequisites.view(), cxt.scratch_allocator());
-        if (normalized_target.view() == StringView{".PHONY"}) {
-          for (const String &phony : new_prerequisites)
-            mk.phony_targets.set(phony.view(), true);
-          continue;
-        }
-        if (normalized_target.view() == StringView{".IGNORE"}) {
-          if (new_prerequisites.is_empty())
-            mk.should_ignore_errors = true;
-          else
-            for (const String &ignored : new_prerequisites)
-              mk.ignored_targets.set(ignored.view(), true);
-        }
-        if (normalized_target.view() == StringView{".SILENT"}) {
-          if (new_prerequisites.is_empty())
-            mk.is_silent = true;
-          else
-            for (const String &silent : new_prerequisites)
-              mk.silent_targets.set(silent.view(), true);
-        }
-        if (normalized_target.view() == StringView{".PRECIOUS"}) {
-          if (new_prerequisites.is_empty())
-            mk.is_every_target_precious = true;
-          else
-            for (const String &precious : new_prerequisites)
-              mk.precious_targets.set(precious.view(), true);
-        }
-        if (normalized_target.view() == StringView{".SUFFIXES"}) {
-          if (new_prerequisites.is_empty()) {
-            mk.suffixes.clear();
-          } else {
-            for (const String &suffix : new_prerequisites)
-              if (!mk.suffixes.find(suffix.view()).has_value())
-                mk.suffixes.push(suffix.clone());
-          }
-        }
-        let is_inference_rule = false;
-        if (!normalized_target.view().find_character('/').has_value())
-          for (const String &source_suffix : mk.suffixes) {
-            if (normalized_target.view() == source_suffix.view()) {
-              is_inference_rule = true;
-              break;
-            }
-            if (!normalized_target.view().starts_with(source_suffix.view()))
-              continue;
-
-            let const target_suffix =
-                normalized_target.view().substring(source_suffix.view().length);
-            for (const String &known_suffix : mk.suffixes)
-              if (target_suffix == known_suffix.view()) {
-                is_inference_rule = true;
-                break;
-              }
-            if (is_inference_rule) break;
-          }
-
-        if (mk.default_goal.is_empty() && normalized_target[0] != '.' &&
-            !parsed_target.has_wildcard &&
-            !SPECIAL_TARGETS.contains(normalized_target.view()) &&
-            !is_inference_rule)
-          mk.default_goal = normalized_target.clone();
-        if (!parsed_target.has_wildcard)
-          if (make_rule *existing =
-                  mk.find_mutable_rule(normalized_target.view());
-              existing != nullptr)
-          {
-            if (is_inference_rule) {
-              existing->prerequisites = steal(new_prerequisites);
-              existing->recipe_lines.clear();
-            } else {
-              for (String &prerequisite : new_prerequisites)
-                existing->prerequisites.push(steal(prerequisite));
-            }
-            current_rule_indices.push(
-                static_cast<usize>(existing - mk.rules.begin()));
-            continue;
-          }
-
-        make_rule rule{cxt.scratch_allocator()};
-        rule.target = parsed_target.has_wildcard ? target.clone()
-                                                 : steal(normalized_target);
-        rule.prerequisites = steal(new_prerequisites);
-        if (parsed_target.has_wildcard) {
-          mk.pattern_rules.push(steal(rule));
-          current_pattern_indices.push(mk.pattern_rules.count() - 1);
-        } else {
-          current_rule_indices.push(mk.add_rule(steal(rule)));
-        }
-      }
-      if (!inline_recipe.is_empty()) {
-        for (usize index : current_rule_indices)
-          mk.rules[index].recipe_lines.push(
-              String{cxt.scratch_allocator(), inline_recipe});
-        for (usize index : current_pattern_indices)
-          mk.pattern_rules[index].recipe_lines.push(
-              String{cxt.scratch_allocator(), inline_recipe});
-      }
-      continue;
-    }
-
-    if (equals.has_value()) {
-      let const expanded_name =
-          expand(cxt, mk, statement.substring_of_length(0, *equals), 0);
-      apply_assignment(cxt, mk, expanded_name.view(),
-                       statement.substring(*equals));
-      current_rule_indices.clear();
-      current_pattern_indices.clear();
-    }
-  }
-
-  ArrayList<make_rule> retained_pattern_rules{cxt.scratch_allocator()};
+  ArrayList<make_pattern_rule> retained_pattern_rules{cxt.scratch_allocator()};
   for (usize pattern_position = 0; pattern_position < mk.pattern_rules.count();
        pattern_position++)
   {
-    make_rule &pattern = mk.pattern_rules[pattern_position];
+    make_pattern_rule &pattern_rule = mk.pattern_rules[pattern_position];
+    make_rule &pattern = pattern_rule.rule;
     if (pattern.recipe_lines.is_empty()) continue;
     bool is_canceled = false;
     for (usize later_position = pattern_position + 1;
          later_position < mk.pattern_rules.count(); later_position++)
     {
-      let const &later = mk.pattern_rules[later_position];
+      let const &later = mk.pattern_rules[later_position].rule;
       if (!later.recipe_lines.is_empty() ||
           later.target.view() != pattern.target.view() ||
           later.prerequisites.count() != pattern.prerequisites.count())
@@ -2354,7 +2474,7 @@ static fn parse_makefile(EvalContext &cxt, StringView source,
         }
       if (is_canceled) break;
     }
-    if (!is_canceled) retained_pattern_rules.push(steal(pattern));
+    if (!is_canceled) retained_pattern_rules.push(steal(pattern_rule));
   }
   mk.pattern_rules = steal(retained_pattern_rules);
 
@@ -2417,11 +2537,10 @@ static fn is_make_target_supplyable(EvalContext &cxt, makefile &mk,
   active_targets.set(goal, true);
   defer { active_targets.erase(goal); };
 
-  for (const make_rule &pattern : mk.pattern_rules) {
+  for (const make_pattern_rule &pattern_rule : mk.pattern_rules) {
+    let const &pattern = pattern_rule.rule;
     if (pattern.recipe_lines.is_empty()) continue;
-    let const parsed_pattern =
-        parse_make_pattern(pattern.target.view(), cxt.scratch_allocator());
-    let const stem = match_make_pattern(parsed_pattern, goal);
+    let const stem = match_make_pattern(pattern_rule.pattern, goal);
     if (!stem.has_value()) continue;
 
     bool are_prerequisites_supplyable = true;
@@ -2491,12 +2610,14 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
         "' is part of a dependency cycle"
     };
 
-  const ArrayList<String> *recipe_lines = nullptr;
+  ArrayList<String> recipe_lines{cxt.scratch_allocator()};
   ArrayList<String> prerequisites{cxt.scratch_allocator()};
-  const ArrayList<String> *target_assignments = nullptr;
+  ArrayList<String> target_assignments{cxt.scratch_allocator()};
+  ArrayList<String> explicit_prerequisites{cxt.scratch_allocator()};
   String target_stem{cxt.scratch_allocator()};
   String inferred_first_prerequisite{cxt.scratch_allocator()};
   const make_rule *explicit_rule = mk.find_rule(goal);
+  bool has_explicit_rule = explicit_rule != nullptr;
   String automatic_target{cxt.scratch_allocator(), goal};
   String archive_member{cxt.scratch_allocator()};
   if (let const open = goal.find_character('('); open.has_value() &&
@@ -2511,57 +2632,93 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   }
 
   if (explicit_rule != nullptr) {
-    for (const String &prerequisite : explicit_rule->prerequisites) {
+    for (const String &prerequisite : explicit_rule->prerequisites)
+      explicit_prerequisites.push(prerequisite.clone());
+    for (const String &recipe : explicit_rule->recipe_lines)
+      recipe_lines.push(recipe.clone());
+    for (const String &assignment : explicit_rule->variable_assignments)
+      target_assignments.push(assignment.clone());
+    explicit_rule = nullptr;
+
+    for (const String &prerequisite : explicit_prerequisites) {
       let const expanded = expand(cxt, mk, prerequisite.view(), 0);
       for (const String &word :
            split_words(expanded.view(), cxt.scratch_allocator()))
         prerequisites.push(word.clone());
     }
-    if (!explicit_rule->recipe_lines.is_empty())
-      recipe_lines = &explicit_rule->recipe_lines;
-    target_assignments = &explicit_rule->variable_assignments;
   }
 
-  if (recipe_lines == nullptr) {
+  if (recipe_lines.is_empty()) {
     StringMap<bool> supply_active_targets{cxt.scratch_allocator()};
     StringMap<bool> supplyability_cache{cxt.scratch_allocator()};
+    ArrayList<String> inferred_prerequisites{cxt.scratch_allocator()};
     usize best_stem_length = ~usize{0};
-    for (const make_rule &pattern : mk.pattern_rules) {
+    let const pattern_rule_count = mk.pattern_rules.count();
+    for (usize pattern_rule_position = 0;
+         pattern_rule_position < pattern_rule_count; pattern_rule_position++)
+    {
+      make_pattern_rule pattern_rule{cxt.scratch_allocator()};
+      let const &stored_pattern_rule = mk.pattern_rules[pattern_rule_position];
+      pattern_rule.pattern.prefix = stored_pattern_rule.pattern.prefix.clone();
+      pattern_rule.pattern.suffix = stored_pattern_rule.pattern.suffix.clone();
+      pattern_rule.pattern.has_wildcard =
+          stored_pattern_rule.pattern.has_wildcard;
+      for (const String &prerequisite : stored_pattern_rule.rule.prerequisites)
+        pattern_rule.rule.prerequisites.push(prerequisite.clone());
+      for (const String &recipe : stored_pattern_rule.rule.recipe_lines)
+        pattern_rule.rule.recipe_lines.push(recipe.clone());
+      for (const String &assignment :
+           stored_pattern_rule.rule.variable_assignments)
+        pattern_rule.rule.variable_assignments.push(assignment.clone());
+
+      let const &pattern = pattern_rule.rule;
       if (pattern.recipe_lines.is_empty()) continue;
-      let const parsed_pattern =
-          parse_make_pattern(pattern.target.view(), cxt.scratch_allocator());
-      let const stem = match_make_pattern(parsed_pattern, goal);
+      let const stem = match_make_pattern(pattern_rule.pattern, goal);
       if (!stem.has_value() || stem->length >= best_stem_length) continue;
 
       ArrayList<String> candidate{cxt.scratch_allocator()};
+      bool is_every_prerequisite_supplyable = true;
       for (const String &prerequisite : pattern.prerequisites) {
         let substituted = String{cxt.scratch_allocator()};
         append_make_replacement(substituted, prerequisite.view(), *stem, true);
         let const expanded = expand(cxt, mk, substituted.view(), 0);
         for (const String &word :
              split_words(expanded.view(), cxt.scratch_allocator()))
-          candidate.push(word.clone());
-      }
-      bool are_prerequisites_supplyable = true;
-      for (const String &prerequisite : candidate)
-        if (!is_make_target_supplyable(cxt, mk, prerequisite.view(),
-                                       supply_active_targets,
-                                       supplyability_cache))
         {
-          are_prerequisites_supplyable = false;
-          break;
+          if (!is_make_target_supplyable(cxt, mk, word.view(),
+                                         supply_active_targets,
+                                         supplyability_cache))
+          {
+            is_every_prerequisite_supplyable = false;
+            break;
+          }
+          candidate.push(word.clone());
         }
-      if (!are_prerequisites_supplyable) continue;
+        if (!is_every_prerequisite_supplyable) break;
+      }
+      if (!is_every_prerequisite_supplyable) continue;
 
       best_stem_length = stem->length;
-      prerequisites = steal(candidate);
-      recipe_lines = &pattern.recipe_lines;
+      inferred_first_prerequisite.clear();
+      if (!candidate.is_empty()) {
+        inferred_first_prerequisite = candidate[0].clone();
+      }
+      inferred_prerequisites.clear();
+      for (String &prerequisite : candidate)
+        inferred_prerequisites.push(steal(prerequisite));
+      recipe_lines.clear();
+      for (const String &recipe : pattern.recipe_lines)
+        recipe_lines.push(recipe.clone());
+      target_assignments.clear();
+      for (const String &assignment : pattern.variable_assignments)
+        target_assignments.push(assignment.clone());
       target_stem = String{cxt.scratch_allocator(), *stem};
     }
-    if (!prerequisites.is_empty())
-      inferred_first_prerequisite = prerequisites[0].clone();
 
-    if (recipe_lines == nullptr) {
+    for (String &prerequisite : inferred_prerequisites)
+      prerequisites.push(steal(prerequisite));
+
+    if (recipe_lines.is_empty()) {
       let const inference_target =
           archive_member.is_empty() ? goal : automatic_target.view();
       let target_suffix = StringView{};
@@ -2604,19 +2761,20 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
 
         inferred_first_prerequisite = source.clone();
         prerequisites.push(steal(source));
-        recipe_lines = &suffix_rule->recipe_lines;
+        recipe_lines.clear();
+        for (const String &recipe : suffix_rule->recipe_lines)
+          recipe_lines.push(recipe.clone());
         target_stem = stem.clone();
         break;
       }
     }
 
-    if (recipe_lines == nullptr && explicit_rule != nullptr) {
-      recipe_lines = &explicit_rule->recipe_lines;
-    } else if (recipe_lines == nullptr) {
+    if (recipe_lines.is_empty() && !has_explicit_rule) {
       if (const make_rule *fallback = mk.find_rule(".DEFAULT");
           fallback != nullptr)
       {
-        recipe_lines = &fallback->recipe_lines;
+        for (const String &recipe : fallback->recipe_lines)
+          recipe_lines.push(recipe.clone());
         inferred_first_prerequisite = String{cxt.scratch_allocator(), goal};
       } else {
         if (Path{goal}.exists()) {
@@ -2651,16 +2809,13 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   /* The saved values restore in reverse so a repeated += unwinds cleanly. */
   let saved_variables =
       ArrayList<make_variable_snapshot>{cxt.scratch_allocator()};
-  if (target_assignments != nullptr)
-    for (const String &assignment : *target_assignments) {
-      let const name = assignment_variable_name(assignment.view());
-      saved_variables.push(
-          save_make_variable(mk, name, cxt.scratch_allocator()));
-      let const equals = assignment.view().find_character('=');
-      apply_assignment(cxt, mk,
-                       assignment.view().substring_of_length(0, *equals),
-                       assignment.view().substring(*equals));
-    }
+  for (const String &assignment : target_assignments) {
+    let const name = assignment_variable_name(assignment.view());
+    saved_variables.push(save_make_variable(mk, name, cxt.scratch_allocator()));
+    let const equals = assignment.view().find_character('=');
+    apply_assignment(cxt, mk, assignment.view().substring_of_length(0, *equals),
+                     assignment.view().substring(*equals));
+  }
   defer
   {
     for (usize i = saved_variables.count(); i-- > 0;) {
@@ -2746,7 +2901,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     return false;
   }
 
-  if (options.should_touch && !recipe_lines->is_empty()) {
+  if (options.should_touch && !recipe_lines.is_empty()) {
     if (!options.is_silent)
       ec.print_to_stdout("touch " + String{cxt.scratch_allocator(), goal} +
                          "\n");
@@ -2840,7 +2995,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   let const should_ignore_target_errors =
       options.should_ignore_errors || mk.ignored_targets.find(goal) != nullptr;
 
-  for (const String &recipe : *recipe_lines) {
+  for (const String &recipe : recipe_lines) {
     let body = recipe.view();
     bool is_silent = false;
     bool should_ignore_errors = false;
@@ -2920,8 +3075,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       if (!options.is_dry_run && !options.is_print_database &&
           !options.is_query && target_path.exists() &&
           !target_path.is_directory() && !mk.is_every_target_precious &&
-          mk.precious_targets.find(goal) == NULL)
-        unused(os::remove_file(goal));
+          mk.precious_targets.find(goal) == nullptr)
+        unused(os::remove_file(automatic_target.view()));
       interrupt_error.set_command_status(130);
       throw;
     }
@@ -2929,7 +3084,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       if (!was_target_existing && target_path.exists() &&
           !mk.is_every_target_precious &&
           mk.precious_targets.find(goal) == nullptr)
-        unused(os::remove_file(goal));
+        unused(os::remove_file(automatic_target.view()));
 
       throw Error{
           "The recipe for the target '" +
@@ -2955,30 +3110,20 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  ArrayList<String> filtered{cxt.scratch_allocator()};
-  ArrayList<SourceLocation> filtered_locations{cxt.scratch_allocator()};
+  ArrayList<String> parse_arguments{cxt.scratch_allocator()};
+  ArrayList<SourceLocation> parse_locations{cxt.scratch_allocator()};
   ArrayList<String> requested_makefiles{cxt.scratch_allocator()};
   ArrayList<SourceLocation> requested_makefile_locations{
       cxt.scratch_allocator()};
-  ArrayList<String> option_order{cxt.scratch_allocator()};
   ArrayList<String> command_assignments{cxt.scratch_allocator()};
   let const do_argument_location = [&](usize argument_position) {
     return argument_position < arg_locations.count()
                ? arg_locations[argument_position]
                : ec.source_location();
   };
-  let const do_attached_location = [&](usize argument_position,
-                                       usize value_offset) {
-    let location = do_argument_location(argument_position);
-    if (location.length == args[argument_position].count()) {
-      location.position += static_cast<u32>(value_offset);
-      location.length -= static_cast<u32>(value_offset);
-    }
-    return location;
-  };
   if (!args.is_empty()) {
-    filtered.push(args[0].clone());
-    filtered_locations.push(do_argument_location(0));
+    parse_arguments.push(args[0].clone());
+    parse_locations.push(do_argument_location(0));
   }
   if (let inherited_makeflags = os::get_environment_variable("MAKEFLAGS");
       inherited_makeflags.has_value())
@@ -2992,125 +3137,54 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       }
       let letters = word.view();
       if (letters == "--") break;
-      if (letters[0] == '-') letters = letters.substring(1);
-      if (letters.is_empty() || letters[0] == '-') continue;
-
-      bool has_only_make_flags = true;
-      for (usize letter_position = 0; letter_position < letters.length;
-           letter_position++)
-        if (!StringView{"BeiknpqrSst"}
-                 .find_character(letters[letter_position])
-                 .has_value())
-        {
-          has_only_make_flags = false;
-          break;
-        }
-      if (!has_only_make_flags) continue;
-
-      let inherited_options = String{cxt.scratch_allocator(), "-"};
-      inherited_options += letters;
-      filtered.push(inherited_options.clone());
-      filtered_locations.push(ec.source_location());
-      option_order.push(steal(inherited_options));
-    }
-
-  for (usize arg_index = 1; arg_index < args.count(); arg_index++) {
-    const String &arg = args[arg_index];
-    let const text = arg.view();
-    option_order.push(arg.clone());
-    if ((text == "-f" || text == "--file") && arg_index + 1 < args.count()) {
-      arg_index++;
-      requested_makefiles.push(args[arg_index].clone());
-      requested_makefile_locations.push(do_argument_location(arg_index));
-      continue;
-    }
-    if (text.starts_with(StringView{"--file="})) {
-      requested_makefiles.push(
-          String{cxt.scratch_allocator(), text.substring(7)});
-      requested_makefile_locations.push(do_attached_location(arg_index, 7));
-      continue;
-    }
-    bool was_makefile_option = false;
-    if (text.length > 2 && text[0] == '-' && text[1] != '-') {
-      for (usize option_position = 1; option_position < text.length;
-           option_position++)
-      {
-        if (text[option_position] == 'C' || text[option_position] == 'j') break;
-        if (text[option_position] != 'f') continue;
-
-        if (option_position > 1)
-          filtered.push(String{cxt.scratch_allocator(),
-                               text.substring_of_length(0, option_position)});
-        if (option_position > 1)
-          filtered_locations.push(do_argument_location(arg_index));
-        if (option_position + 1 < text.length) {
-          requested_makefiles.push(String{cxt.scratch_allocator(),
-                                          text.substring(option_position + 1)});
-          requested_makefile_locations.push(
-              do_attached_location(arg_index, option_position + 1));
-        } else if (arg_index + 1 < args.count()) {
-          arg_index++;
-          requested_makefiles.push(args[arg_index].clone());
-          requested_makefile_locations.push(do_argument_location(arg_index));
-        }
-        was_makefile_option = true;
-        break;
+      if (letters[0] == '-') {
+        parse_arguments.push(word.clone());
+      } else {
+        let inherited_options = String{cxt.scratch_allocator(), "-"};
+        inherited_options += letters;
+        parse_arguments.push(steal(inherited_options));
       }
+      parse_locations.push(ec.source_location());
     }
-    if (was_makefile_option) continue;
-    bool is_jobs_flag = text == "-j";
-    if (!is_jobs_flag && text.length > 2 && text[0] == '-' && text[1] == 'j') {
-      is_jobs_flag = true;
-      for (usize k = 2; k < text.length; k++)
-        if (text[k] < '0' || text[k] > '9') {
-          is_jobs_flag = false;
-          break;
-        }
-    }
-    if (is_jobs_flag && text == StringView{"-j"} &&
-        arg_index + 1 < args.count() &&
-        args[arg_index + 1].view().is_all_decimal_digits())
-      arg_index++;
-    if (!is_jobs_flag) {
-      filtered.push(arg.clone());
-      filtered_locations.push(do_argument_location(arg_index));
-    }
+
+  for (usize argument_position = 1; argument_position < args.count();
+       argument_position++)
+  {
+    parse_arguments.push(args[argument_position].clone());
+    parse_locations.push(do_argument_location(argument_position));
   }
 
-  /* A recipe's $(MAKE) re-enters this util while the outer call is still on the
-     stack, and the flag list is shared, so the inherited -C or -f is cleared
-     before parsing. The outer call already read its flags into locals, so the
-     reset does not disturb it. */
   reset_flags(FLAG_LIST);
   ArrayList<SourceLocation> operand_locations{cxt.scratch_allocator()};
   let const operands =
-      parse_util_operands(FLAG_LIST, filtered, &filtered_locations,
+      parse_util_operands(FLAG_LIST, parse_arguments, &parse_locations,
                           &operand_locations, false, true);
   defer { reset_flags(FLAG_LIST); };
 
-  let should_keep_going = false;
-  for (const String &arg : option_order) {
-    let const text = arg.view();
-    if (text == "--keep-going") {
-      should_keep_going = true;
-      continue;
-    }
-    if (text == "--stop") {
-      should_keep_going = false;
-      continue;
-    }
-    if (text.length < 2 || text[0] != '-' || text[1] == '-') continue;
-
-    for (usize option_position = 1; option_position < text.length;
-         option_position++)
-    {
-      if (text[option_position] == 'k') should_keep_going = true;
-      if (text[option_position] == 'S') should_keep_going = false;
-      if (text[option_position] == 'f' || text[option_position] == 'C') break;
-    }
+  for (usize makefile_position = 0; makefile_position < FLAG_MAKE_FILE.count();
+       makefile_position++)
+  {
+    requested_makefiles.push(
+        String{cxt.scratch_allocator(), FLAG_MAKE_FILE.get(makefile_position)});
+    requested_makefile_locations.push(
+        FLAG_MAKE_FILE.get_location(makefile_position));
   }
+  let const should_keep_going =
+      FLAG_MAKE_KEEP_GOING.position() > FLAG_MAKE_STOP.position();
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
+
+  make_runtime_flags runtime_flags{FLAG_MAKE_ALWAYS_MAKE.is_enabled(),
+                                   FLAG_MAKE_ENVIRONMENT_OVERRIDES.is_enabled(),
+                                   FLAG_MAKE_IGNORE_ERRORS.is_enabled(),
+                                   should_keep_going,
+                                   FLAG_MAKE_DRY_RUN.is_enabled(),
+                                   FLAG_MAKE_QUESTION.is_enabled(),
+                                   FLAG_MAKE_PRINT_DATABASE.is_enabled(),
+                                   FLAG_MAKE_NO_BUILTINS.is_enabled(),
+                                   FLAG_MAKE_SILENT.is_enabled(),
+                                   FLAG_MAKE_TOUCH.is_enabled()};
+  let const is_stop_enabled = FLAG_MAKE_STOP.is_enabled();
 
   Maybe<Path> saved_directory;
   if (FLAG_MAKE_DIR.is_set()) {
@@ -3140,14 +3214,16 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  String source{cxt.scratch_allocator()};
+  ArrayList<make_source_document> make_sources{cxt.scratch_allocator()};
   for (usize makefile_position = 0;
        makefile_position < requested_makefiles.count(); makefile_position++)
   {
     let const &makefile_path = requested_makefiles[makefile_position];
     if (makefile_path.view() == StringView{"-"}) {
-      source += utils::read_entire_standard_input().view();
+      let source = utils::read_entire_standard_input();
       source += '\n';
+      make_sources.push(
+          make_source_document{steal(source), intern_source_name("-")});
       continue;
     }
 
@@ -3160,8 +3236,10 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
               "': " + os::last_system_error_message());
       return 2;
     }
-    source += part->view();
+    let source = steal(*part);
     source += '\n';
+    make_sources.push(make_source_document{
+        steal(source), intern_source_name(makefile_path.view())});
   }
 
   ArrayList<String> goals{cxt.scratch_allocator()};
@@ -3182,19 +3260,23 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   String makeflags{cxt.scratch_allocator()};
-  if (FLAG_MAKE_ALWAYS_MAKE.is_enabled()) makeflags += 'B';
-  if (FLAG_MAKE_ENVIRONMENT_OVERRIDES.is_enabled()) makeflags += 'e';
-  if (FLAG_MAKE_IGNORE_ERRORS.is_enabled()) makeflags += 'i';
-  if (should_keep_going)
+  if (runtime_flags.should_always_make) makeflags += 'B';
+  if (runtime_flags.does_environment_override) makeflags += 'e';
+  if (runtime_flags.should_ignore_errors) makeflags += 'i';
+  if (FLAG_MAKE_JOBS.is_enabled()) {
+    makeflags += 'j';
+    if (FLAG_MAKE_JOBS.has_value()) makeflags += FLAG_MAKE_JOBS.value();
+  }
+  if (runtime_flags.should_keep_going)
     makeflags += 'k';
-  else if (FLAG_MAKE_STOP.is_enabled())
+  else if (is_stop_enabled)
     makeflags += 'S';
-  if (FLAG_MAKE_DRY_RUN.is_enabled()) makeflags += 'n';
-  if (FLAG_MAKE_PRINT_DATABASE.is_enabled()) makeflags += 'p';
-  if (FLAG_MAKE_QUESTION.is_enabled()) makeflags += 'q';
-  if (FLAG_MAKE_NO_BUILTINS.is_enabled()) makeflags += 'r';
-  if (FLAG_MAKE_SILENT.is_enabled()) makeflags += 's';
-  if (FLAG_MAKE_TOUCH.is_enabled()) makeflags += 't';
+  if (runtime_flags.is_dry_run) makeflags += 'n';
+  if (runtime_flags.is_print_database) makeflags += 'p';
+  if (runtime_flags.is_query) makeflags += 'q';
+  if (runtime_flags.should_disable_builtin_rules) makeflags += 'r';
+  if (runtime_flags.is_silent) makeflags += 's';
+  if (runtime_flags.should_touch) makeflags += 't';
 
   for (const String &assignment : command_assignments) {
     if (assignment_variable_name(assignment.view()) == StringView{"MAKEFLAGS"})
@@ -3219,21 +3301,24 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       os::unset_environment_variable("MAKEFLAGS");
   };
 
-  let mk =
-      parse_makefile(cxt, source.view(), command_assignments,
-                     FLAG_MAKE_ENVIRONMENT_OVERRIDES.is_enabled(),
-                     !FLAG_MAKE_NO_BUILTINS.is_enabled(), makeflags.view());
+  Maybe<makefile> parsed_makefile;
+  try {
+    parsed_makefile = parse_makefile(
+        cxt, make_sources, command_assignments,
+        runtime_flags.does_environment_override,
+        !runtime_flags.should_disable_builtin_rules, makeflags.view());
+  } catch (const ErrorWithLocation &error) {
+    for (const make_source_document &document : make_sources) {
+      if (document.source_name_index != error.location().source_name_index)
+        continue;
+      show_message(error.to_string(document.source.view(), &cxt));
+      return 2;
+    }
+    throw;
+  }
+  ASSERT(parsed_makefile.has_value());
+  let mk = steal(*parsed_makefile);
 
-  make_runtime_flags runtime_flags{FLAG_MAKE_ALWAYS_MAKE.is_enabled(),
-                                   FLAG_MAKE_ENVIRONMENT_OVERRIDES.is_enabled(),
-                                   FLAG_MAKE_IGNORE_ERRORS.is_enabled(),
-                                   should_keep_going,
-                                   FLAG_MAKE_DRY_RUN.is_enabled(),
-                                   FLAG_MAKE_QUESTION.is_enabled(),
-                                   FLAG_MAKE_PRINT_DATABASE.is_enabled(),
-                                   FLAG_MAKE_NO_BUILTINS.is_enabled(),
-                                   FLAG_MAKE_SILENT.is_enabled(),
-                                   FLAG_MAKE_TOUCH.is_enabled()};
   if (const String *parsed_makeflags = mk.find_variable("MAKEFLAGS");
       parsed_makeflags != nullptr)
   {
@@ -3319,7 +3404,8 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       for (const String &recipe : rule.recipe_lines)
         ec.print_to_stdout("\t" + recipe + "\n");
     }
-    for (const make_rule &rule : mk.pattern_rules) {
+    for (const make_pattern_rule &pattern_rule : mk.pattern_rules) {
+      let const &rule = pattern_rule.rule;
       let description = rule.target + ":";
       for (const String &prerequisite : rule.prerequisites)
         description += " " + prerequisite;
@@ -3391,7 +3477,7 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>
 {
   let targets = ArrayList<String>{cxt.scratch_allocator()};
-  let const source = makefile.read_entire_file();
+  let source = makefile.read_entire_file();
   if (!source.has_value()) return targets;
 
   /* Completion leaves the makefile's $(shell ...) functions unrun. */
@@ -3400,8 +3486,10 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   defer { cxt.set_make_shell_suppressed(saved_suppressed); };
 
   let const command_assignments = ArrayList<String>{cxt.scratch_allocator()};
-  let const mk =
-      parse_makefile(cxt, source->view(), command_assignments, false, true);
+  let sources = ArrayList<make_source_document>{cxt.scratch_allocator()};
+  sources.push(make_source_document{
+      steal(*source), intern_source_name(makefile.text().view())});
+  let const mk = parse_makefile(cxt, sources, command_assignments, false, true);
   for (const make_rule &rule : mk.rules) {
     let const name = rule.target.view();
     if (name.is_empty() || name[0] == '.') continue;

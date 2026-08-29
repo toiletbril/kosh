@@ -31,19 +31,35 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   let const do_resolve_direct =
       [](const Path &candidate, bool should_preserve_extended_prefix)
           wontthrow -> Maybe<Path> {
-    let const handle = CreateFileA(
-        candidate.c_str(), 0,
+    let const wide_candidate =
+        utf8_to_wide(candidate.text().view(), heap_allocator());
+    if (!wide_candidate.has_value()) return koshka::None;
+    let const handle = CreateFileW(
+        wide_candidate->begin(), 0,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     if (handle == INVALID_HANDLE_VALUE) return koshka::None;
-    defer { CloseHandle(handle); };
+    defer
+    {
+      let const error = GetLastError();
+      CloseHandle(handle);
+      SetLastError(error);
+    };
 
-    char buffer[32768];
-    let const length = GetFinalPathNameByHandleA(
-        handle, buffer, sizeof(buffer), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-    if (length == 0 || length >= sizeof(buffer)) return koshka::None;
+    constexpr DWORD path_format = FILE_NAME_NORMALIZED | VOLUME_NAME_DOS;
+    let const required =
+        GetFinalPathNameByHandleW(handle, nullptr, 0, path_format);
+    if (required == 0) return koshka::None;
+    let buffer = ArrayList<wchar_t>{heap_allocator()};
+    buffer.reserve(required);
+    let const length = GetFinalPathNameByHandleW(handle, buffer.begin(),
+                                                 required, path_format);
+    if (length == 0 || length >= required) return koshka::None;
+    let const resolved_text = wide_to_utf8(
+        buffer.begin(), static_cast<usize>(length), heap_allocator());
+    if (!resolved_text.has_value()) return koshka::None;
 
-    let const resolved = StringView{buffer, static_cast<usize>(length)};
+    let const resolved = resolved_text->view();
     if (should_preserve_extended_prefix) return Path{resolved};
     if (resolved.starts_with(StringView{"\\\\?\\UNC\\"})) {
       let unc_path = String{"\\\\"};
@@ -83,7 +99,6 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   }
   if (!has_dot_component) return do_resolve_direct(path, has_extended_prefix);
 
-  char initial_path[32768];
   usize position = 0;
   let resolved = Path{};
   if (text.length >= 7 && is_directory_separator(text[0]) &&
@@ -114,27 +129,38 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
     resolved = Path{text.substring_of_length(0, 3)};
     position = 3;
   } else {
-    let initial_length = DWORD{};
+    wchar_t initial_input[4]{};
+    bool should_read_current_directory = false;
     if (text.length >= 2 && text[1] == ':') {
-      char drive_directory[4]{text[0], ':', '.', '\0'};
-      initial_length = GetFullPathNameA(drive_directory, countof(initial_path),
-                                        initial_path, nullptr);
+      initial_input[0] = static_cast<wchar_t>(text[0]);
+      initial_input[1] = L':';
+      initial_input[2] = L'.';
       position = 2;
     } else if (is_directory_separator(text[0])) {
-      char drive_root[2]{text[0], '\0'};
-      initial_length = GetFullPathNameA(drive_root, countof(initial_path),
-                                        initial_path, nullptr);
+      initial_input[0] = static_cast<wchar_t>(text[0]);
       position = 1;
     } else {
-      initial_length =
-          GetCurrentDirectoryA(countof(initial_path), initial_path);
+      should_read_current_directory = true;
     }
-    if (initial_length == 0 || initial_length >= countof(initial_path)) {
-      return koshka::None;
-    }
-    resolved = Path{
-        StringView{initial_path, static_cast<usize>(initial_length)}
-    };
+
+    let const required =
+        should_read_current_directory
+            ? GetCurrentDirectoryW(0, nullptr)
+            : GetFullPathNameW(initial_input, 0, nullptr, nullptr);
+    if (required == 0) return koshka::None;
+    let initial_path = ArrayList<wchar_t>{heap_allocator()};
+    initial_path.reserve(required);
+    let const initial_length =
+        should_read_current_directory
+            ? GetCurrentDirectoryW(required, initial_path.begin())
+            : GetFullPathNameW(initial_input, required, initial_path.begin(),
+                               nullptr);
+    if (initial_length == 0 || initial_length >= required) return koshka::None;
+    let const initial_text =
+        wide_to_utf8(initial_path.begin(), static_cast<usize>(initial_length),
+                     heap_allocator());
+    if (!initial_text.has_value()) return koshka::None;
+    resolved = Path{initial_text->view()};
   }
 
   let initial_resolved = do_resolve_direct(resolved, has_extended_prefix);
@@ -166,11 +192,17 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
 {
   let matches = ArrayList<String>{allocator};
 
-  const String pattern_string{allocator, pattern};
-  WIN32_FIND_DATAA find_data;
-  const HANDLE handle = FindFirstFileA(pattern_string.c_str(), &find_data);
+  let const wide_pattern = utf8_to_wide(pattern, heap_allocator());
+  if (!wide_pattern.has_value()) return matches;
+  WIN32_FIND_DATAW find_data;
+  const HANDLE handle = FindFirstFileW(wide_pattern->begin(), &find_data);
   if (handle == INVALID_HANDLE_VALUE) return matches;
-  defer { FindClose(handle); };
+  defer
+  {
+    let const error = GetLastError();
+    FindClose(handle);
+    SetLastError(error);
+  };
 
   /* FindFirstFile yields bare names, so the directory prefix is kept to rebuild
      the path. */
@@ -180,15 +212,18 @@ fn glob_matches(StringView pattern, Allocator allocator) throws
   const StringView prefix = pattern.substring_of_length(0, prefix_length);
 
   do {
-    const StringView name{find_data.cFileName};
-    if (name == "." || name == "..") {
+    let const name = wide_to_utf8(
+        find_data.cFileName, static_cast<usize>(lstrlenW(find_data.cFileName)),
+        allocator);
+    if (!name.has_value()) return matches;
+    if (name->view() == "." || name->view() == "..") {
       continue;
     }
 
     let entry = String{allocator, prefix};
-    entry += name;
+    entry += name->view();
     matches.push(steal(entry));
-  } while (FindNextFileA(handle, &find_data) != 0);
+  } while (FindNextFileW(handle, &find_data) != 0);
 
   return matches;
 }
@@ -219,18 +254,20 @@ fn resolve_drive_relative_path(StringView path) throws -> Maybe<Path>
 {
   if (!path_is_drive_relative(path)) return None;
 
-  char drive_current_directory[4]{path[0], ':', '.', '\0'};
+  wchar_t drive_current_directory[4]{static_cast<wchar_t>(path[0]), L':', L'.',
+                                     L'\0'};
   let const required =
-      GetFullPathNameA(drive_current_directory, 0, nullptr, nullptr);
+      GetFullPathNameW(drive_current_directory, 0, nullptr, nullptr);
   if (required == 0) return None;
-  let buffer = ArrayList<char>{heap_allocator()};
+  let buffer = ArrayList<wchar_t>{heap_allocator()};
   buffer.reserve(static_cast<usize>(required));
-  let const length = GetFullPathNameA(drive_current_directory, required,
+  let const length = GetFullPathNameW(drive_current_directory, required,
                                       buffer.begin(), nullptr);
   if (length == 0 || length >= required) return None;
-  let result = Path{
-      StringView{buffer.begin(), static_cast<usize>(length)}
-  };
+  let const text = wide_to_utf8(buffer.begin(), static_cast<usize>(length),
+                                heap_allocator());
+  if (!text.has_value()) return None;
+  let result = Path{text->view()};
   if (path.length > 2) result.push_component(path.substring(2));
   return result;
 }
@@ -276,30 +313,34 @@ fn temp_directory_path() throws -> String
 cold fn path_exists(StringView path) wontthrow -> bool
 {
   if (path == StringView{"/dev/null"}) return true;
-  const String path_string{path};
-  return GetFileAttributesA(path_string.c_str()) != INVALID_FILE_ATTRIBUTES;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  return wide_path.has_value() &&
+         GetFileAttributesW(wide_path->begin()) != INVALID_FILE_ATTRIBUTES;
 }
 
 cold fn path_is_directory(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  let const attributes = GetFileAttributesA(path_string.c_str());
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+  let const attributes = GetFileAttributesW(wide_path->begin());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 fn path_is_regular_file(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  let const attributes = GetFileAttributesA(path_string.c_str());
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+  let const attributes = GetFileAttributesW(wide_path->begin());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
 fn path_is_symbolic_link(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  let const attributes = GetFileAttributesA(path_string.c_str());
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+  let const attributes = GetFileAttributesW(wide_path->begin());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
@@ -354,9 +395,10 @@ fn path_is_owned_by_effective_group(StringView path) wontthrow -> bool
 
 fn path_file_size(StringView path) wontthrow -> Maybe<u64>
 {
-  const String path_string{path};
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return None;
   WIN32_FILE_ATTRIBUTE_DATA data{};
-  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
+  if (GetFileAttributesExW(wide_path->begin(), GetFileExInfoStandard, &data) ==
       0)
     return None;
   if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return None;
@@ -365,9 +407,10 @@ fn path_file_size(StringView path) wontthrow -> Maybe<u64>
 
 fn path_modification_time(StringView path) wontthrow -> Maybe<i64>
 {
-  const String path_string{path};
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return None;
   WIN32_FILE_ATTRIBUTE_DATA data{};
-  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard, &data) ==
+  if (GetFileAttributesExW(wide_path->begin(), GetFileExInfoStandard, &data) ==
       0)
     return None;
   let const windows_ticks =
@@ -381,29 +424,37 @@ fn path_modification_time(StringView path) wontthrow -> Maybe<i64>
 
 fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
 {
-  const String first_string{first};
-  const String second_string{second};
+  let const wide_first = utf8_to_wide(first, heap_allocator());
+  if (!wide_first.has_value()) return false;
+  let const wide_second = utf8_to_wide(second, heap_allocator());
+  if (!wide_second.has_value()) return false;
   /* FILE_FLAG_BACKUP_SEMANTICS lets a directory open too. */
   let const first_handle =
-      CreateFileA(first_string.c_str(), 0,
+      CreateFileW(wide_first->begin(), 0,
                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
   if (first_handle == INVALID_HANDLE_VALUE) return false;
   let const second_handle =
-      CreateFileA(second_string.c_str(), 0,
+      CreateFileW(wide_second->begin(), 0,
                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
   if (second_handle == INVALID_HANDLE_VALUE) {
+    let const error = GetLastError();
     CloseHandle(first_handle);
+    SetLastError(error);
     return false;
   }
   BY_HANDLE_FILE_INFORMATION first_info{}, second_info{};
   let const both_read =
       GetFileInformationByHandle(first_handle, &first_info) != 0 &&
       GetFileInformationByHandle(second_handle, &second_info) != 0;
+  let const error = both_read ? ERROR_SUCCESS : GetLastError();
   CloseHandle(first_handle);
   CloseHandle(second_handle);
-  if (!both_read) return false;
+  if (!both_read) {
+    SetLastError(error);
+    return false;
+  }
   return first_info.dwVolumeSerialNumber == second_info.dwVolumeSerialNumber &&
          first_info.nFileIndexHigh == second_info.nFileIndexHigh &&
          first_info.nFileIndexLow == second_info.nFileIndexLow;
@@ -411,13 +462,15 @@ fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
 
 fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
 {
-  const String first_string{first};
-  const String second_string{second};
+  let const wide_first = utf8_to_wide(first, heap_allocator());
+  if (!wide_first.has_value()) return false;
+  let const wide_second = utf8_to_wide(second, heap_allocator());
+  if (!wide_second.has_value()) return false;
   WIN32_FILE_ATTRIBUTE_DATA first_data{}, second_data{};
-  if (GetFileAttributesExA(first_string.c_str(), GetFileExInfoStandard,
+  if (GetFileAttributesExW(wide_first->begin(), GetFileExInfoStandard,
                            &first_data) == 0)
     return false;
-  if (GetFileAttributesExA(second_string.c_str(), GetFileExInfoStandard,
+  if (GetFileAttributesExW(wide_second->begin(), GetFileExInfoStandard,
                            &second_data) == 0)
     return false;
   return CompareFileTime(&first_data.ftLastWriteTime,
@@ -431,14 +484,14 @@ fn path_is_older_than(StringView first, StringView second) wontthrow -> bool
 
 fn path_is_readable(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  return _access(path_string.c_str(), 4) == 0;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  return wide_path.has_value() && _waccess(wide_path->begin(), 4) == 0;
 }
 
 fn path_is_writable(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  return _access(path_string.c_str(), 2) == 0;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  return wide_path.has_value() && _waccess(wide_path->begin(), 2) == 0;
 }
 
 fn path_is_executable(StringView path) wontthrow -> bool
@@ -449,25 +502,34 @@ fn path_is_executable(StringView path) wontthrow -> bool
 
 cold fn read_current_directory() throws -> Path
 {
-  char buffer[4096];
-  if (_getcwd(buffer, sizeof(buffer)) != nullptr)
-    return Path{StringView{buffer}};
-  return Path{};
+  let const required = GetCurrentDirectoryW(0, nullptr);
+  if (required == 0) return Path{};
+  let buffer = ArrayList<wchar_t>{heap_allocator()};
+  buffer.reserve(required);
+  let const length = GetCurrentDirectoryW(required, buffer.begin());
+  if (length == 0 || length >= required) return Path{};
+  let const path = wide_to_utf8(buffer.begin(), static_cast<usize>(length),
+                                heap_allocator());
+  if (!path.has_value()) return Path{};
+
+  return Path{path->view()};
 }
 
 fn change_current_directory(StringView path) throws -> ErrorOr<Ok>
 {
   const String path_string{path};
-  if (_chdir(path_string.c_str()) != 0)
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value() || SetCurrentDirectoryW(wide_path->begin()) == 0)
     return Error{"Could not change directory to '" + path_string +
                  "': " + os::last_system_error_message()};
+
   return Success;
 }
 
 fn reference_current_directory() wontthrow -> DirectoryReference
 {
-  return DirectoryReference{CreateFileA(
-      ".", 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+  return DirectoryReference{CreateFileW(
+      L".", 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr)};
 }
 
@@ -476,21 +538,30 @@ fn restore_current_directory(const DirectoryReference &reference) wontthrow
 {
   if (!reference.is_valid()) return false;
 
-  char path[32768];
-  let const length = GetFinalPathNameByHandleA(
-      reference.get(), path, static_cast<DWORD>(countof(path)),
-      FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-  if (length == 0 || length >= countof(path)) return false;
-  let restored_path = StringView{path, static_cast<usize>(length)};
-  if (restored_path.starts_with(StringView{"\\\\?\\UNC\\"})) {
-    let unc_path = String{"\\\\"};
-    unc_path += restored_path.substring(8);
-    return SetCurrentDirectoryA(unc_path.c_str()) != 0;
+  constexpr DWORD path_format = FILE_NAME_NORMALIZED | VOLUME_NAME_DOS;
+  let const required =
+      GetFinalPathNameByHandleW(reference.get(), nullptr, 0, path_format);
+  if (required == 0) return false;
+  let path = ArrayList<wchar_t>{heap_allocator()};
+  path.reserve(required);
+  let const length = GetFinalPathNameByHandleW(reference.get(), path.begin(),
+                                               required, path_format);
+  if (length == 0 || length >= required) return false;
+  if (length >= 8 &&
+      std::memcmp(path.begin(), L"\\\\?\\UNC\\", 8 * sizeof(wchar_t)) == 0)
+  {
+    std::memmove(path.begin() + 2, path.begin() + 8,
+                 (length - 7) * sizeof(wchar_t));
+    path.begin()[0] = L'\\';
+    path.begin()[1] = L'\\';
+    return SetCurrentDirectoryW(path.begin()) != 0;
   }
-  if (restored_path.starts_with(StringView{"\\\\?\\"}))
-    restored_path = restored_path.substring(4);
-  let const restored_path_string = String{restored_path};
-  return SetCurrentDirectoryA(restored_path_string.c_str()) != 0;
+  let const *restored_path =
+      length >= 4 &&
+              std::memcmp(path.begin(), L"\\\\?\\", 4 * sizeof(wchar_t)) == 0
+          ? path.begin() + 4
+          : path.begin();
+  return SetCurrentDirectoryW(restored_path) != 0;
 }
 
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
@@ -515,23 +586,34 @@ cold fn list_directory_typed(StringView dir) throws
   pattern.push(DIRECTORY_SEPARATOR);
   pattern.push('*');
 
-  WIN32_FIND_DATAA data{};
-  let const handle = FindFirstFileA(pattern.c_str(), &data);
+  let const wide_pattern = utf8_to_wide(pattern.view(), heap_allocator());
+  if (!wide_pattern.has_value()) return None;
+  WIN32_FIND_DATAW data{};
+  let const handle = FindFirstFileW(wide_pattern->begin(), &data);
   if (handle == INVALID_HANDLE_VALUE) return None;
-  defer { FindClose(handle); };
+  defer
+  {
+    let const error = GetLastError();
+    FindClose(handle);
+    SetLastError(error);
+  };
 
   let entries = ArrayList<Path::directory_child>{heap_allocator()};
   do {
-    let const name = StringView{data.cFileName};
-    if (name == StringView{"."} || name == StringView{".."}) continue;
+    let const name = wide_to_utf8(data.cFileName,
+                                  static_cast<usize>(lstrlenW(data.cFileName)),
+                                  heap_allocator());
+    if (!name.has_value()) return None;
+    if (name->view() == StringView{"."} || name->view() == StringView{".."})
+      continue;
 
     Path::entry_kind kind = Path::entry_kind::Regular;
     if ((data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
       kind = Path::entry_kind::Symlink;
     else if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
       kind = Path::entry_kind::Directory;
-    entries.push(Path::directory_child{String{name}, kind});
-  } while (FindNextFileA(handle, &data) != 0);
+    entries.push(Path::directory_child{name.take(), kind});
+  } while (FindNextFileW(handle, &data) != 0);
   return entries;
 }
 
@@ -556,9 +638,11 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   att.bInheritHandle = FALSE;
   att.lpSecurityDescriptor = nullptr; /* NOLINT */
 
-  String path_string =
-      path == StringView{"/dev/null"} ? String{"NUL"} : String{path};
-  HANDLE handle = CreateFileA(path_string.c_str(), access,
+  let const path_text =
+      path == StringView{"/dev/null"} ? StringView{"NUL"} : path;
+  let const wide_path = utf8_to_wide(path_text, heap_allocator());
+  if (!wide_path.has_value()) return koshka::None;
+  HANDLE handle = CreateFileW(wide_path->begin(), access,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
                               disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return koshka::None;
@@ -568,22 +652,29 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
 
 fn acquire_process_lock(StringView path) throws -> Maybe<descriptor>
 {
-  const String path_string{path};
-  char absolute_path[32768];
-  let const length = GetFullPathNameA(
-      path_string.c_str(), countof(absolute_path), absolute_path, nullptr);
-  if (length == 0 || length >= countof(absolute_path)) return None;
-
-  let lock_path = String{
-      StringView{absolute_path, static_cast<usize>(length)}
-  };
-  if (!is_directory_separator(lock_path.back())) lock_path += '\\';
-  lock_path += ".kosh-flock.lock";
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return None;
+  constexpr wchar_t LOCK_NAME[] = L".kosh-flock.lock";
+  constexpr usize LOCK_NAME_LENGTH = countof(LOCK_NAME) - 1;
+  let const required =
+      GetFullPathNameW(wide_path->begin(), 0, nullptr, nullptr);
+  if (required == 0) return None;
+  let absolute_path = ArrayList<wchar_t>{heap_allocator()};
+  absolute_path.reserve(static_cast<usize>(required) + LOCK_NAME_LENGTH + 1);
+  let length = GetFullPathNameW(wide_path->begin(), required,
+                                absolute_path.begin(), nullptr);
+  if (length == 0 || length >= required) return None;
+  if (absolute_path.begin()[length - 1] != L'\\' &&
+      absolute_path.begin()[length - 1] != L'/')
+  {
+    absolute_path.begin()[length++] = L'\\';
+  }
+  std::memcpy(absolute_path.begin() + length, LOCK_NAME, sizeof(LOCK_NAME));
   SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
   loop
   {
-    let const lock = CreateFileA(
-        lock_path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, &attributes,
+    let const lock = CreateFileW(
+        absolute_path.begin(), GENERIC_READ | GENERIC_WRITE, 0, &attributes,
         OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_NORMAL, nullptr);
     if (lock != INVALID_HANDLE_VALUE) return lock;
 
@@ -602,20 +693,23 @@ fn release_process_lock(descriptor lock) wontthrow -> void
 
 fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 {
-  char temp_dir[MAX_PATH];
-  let const temp_directory_length = GetTempPathA(MAX_PATH, temp_dir);
+  wchar_t temp_dir[MAX_PATH];
+  let const temp_directory_length = GetTempPathW(MAX_PATH, temp_dir);
   if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH) {
     return koshka::None;
   }
 
-  char temp_path[MAX_PATH];
-  if (GetTempFileNameA(temp_dir, "kos", 0, temp_path) == 0) return koshka::None;
+  wchar_t temp_path[MAX_PATH];
+  if (GetTempFileNameW(temp_dir, L"kos", 0, temp_path) == 0)
+    return koshka::None;
 
-  HANDLE handle = CreateFileA(
+  HANDLE handle = CreateFileW(
       temp_path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
       FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
-    DeleteFileA(temp_path);
+    let const error = GetLastError();
+    DeleteFileW(temp_path);
+    SetLastError(error);
     return koshka::None;
   }
 
@@ -642,47 +736,66 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
     return None;
   }
 
-  let prefix_text = String{
-      prefix.substring_of_length(0, prefix.length < 3 ? prefix.length : 3)};
-  while (prefix_text.count() < 3)
-    prefix_text.push('x');
+  let const wide_directory =
+      utf8_to_wide(directory.text().view(), heap_allocator());
+  if (!wide_directory.has_value()) return None;
+  let const wide_prefix = utf8_to_wide(prefix, heap_allocator());
+  if (!wide_prefix.has_value()) return None;
+  wchar_t prefix_text[4]{L'x', L'x', L'x', L'\0'};
+  let const prefix_length = static_cast<usize>(lstrlenW(wide_prefix->begin()));
+  std::memcpy(prefix_text, wide_prefix->begin(),
+              (prefix_length < 3 ? prefix_length : 3) * sizeof(wchar_t));
 
-  char temp_path[MAX_PATH];
+  wchar_t temp_path[MAX_PATH];
   HANDLE handle = INVALID_HANDLE_VALUE;
   for (u32 attempt = 1; attempt <= 256; attempt++) {
     let unique = static_cast<UINT>(
         (GetCurrentProcessId() ^ GetTickCount() ^ attempt) & 0xffffU);
     if (unique == 0) unique = 1;
-    if (GetTempFileNameA(directory.c_str(), prefix_text.c_str(), unique,
+    if (GetTempFileNameW(wide_directory->begin(), prefix_text, unique,
                          temp_path) == 0)
     {
       continue;
     }
-    handle = CreateFileA(temp_path, GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+    handle = CreateFileW(temp_path, GENERIC_WRITE, 0, nullptr, CREATE_NEW,
                          FILE_ATTRIBUTE_TEMPORARY, nullptr);
     if (handle != INVALID_HANDLE_VALUE) break;
   }
   if (handle == INVALID_HANDLE_VALUE) return None;
 
   if (!write_all(handle, content.data, content.count())) {
+    let const error = GetLastError();
     unused(close_fd(handle));
-    unused(DeleteFileA(temp_path));
+    unused(DeleteFileW(temp_path));
+    SetLastError(error);
     return None;
   }
 
   if (!close_fd(handle)) {
-    unused(DeleteFileA(temp_path));
+    let const error = GetLastError();
+    unused(DeleteFileW(temp_path));
+    SetLastError(error);
     return None;
   }
 
-  return Path{StringView{temp_path}};
+  let const path = wide_to_utf8(
+      temp_path, static_cast<usize>(lstrlenW(temp_path)), heap_allocator());
+  if (!path.has_value()) {
+    let const error = GetLastError();
+    unused(DeleteFileW(temp_path));
+    SetLastError(error);
+    return None;
+  }
+
+  return Path{path->view()};
 }
 
 fn make_directory(StringView path, u32 mode) wontthrow -> bool
 {
   unused(mode);
-  const String path_string{path};
-  return CreateDirectoryA(path_string.c_str(), nullptr) != 0;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  return wide_path.has_value() &&
+         CreateDirectoryW(wide_path->begin(), nullptr) != 0;
 }
 
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
@@ -696,14 +809,15 @@ fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
     SetLastError(ERROR_NOT_SUPPORTED);
     return false;
   }
-  let const path_text = String{heap_allocator(), path};
-  let attributes = GetFileAttributesA(path_text.c_str());
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+  let attributes = GetFileAttributesW(wide_path->begin());
   if (attributes == INVALID_FILE_ATTRIBUTES) return false;
   if (owner_is_writable)
     attributes &= ~FILE_ATTRIBUTE_READONLY;
   else
     attributes |= FILE_ATTRIBUTE_READONLY;
-  return SetFileAttributesA(path_text.c_str(), attributes) != FALSE;
+  return SetFileAttributesW(wide_path->begin(), attributes) != FALSE;
 }
 
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
@@ -719,10 +833,12 @@ fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
 
 fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool
 {
-  const String target_string{target};
-  const String link_string{link_path};
-  return CreateHardLinkA(link_string.c_str(), target_string.c_str(), nullptr) !=
-         0;
+  let const wide_target = utf8_to_wide(target, heap_allocator());
+  if (!wide_target.has_value()) return false;
+  let const wide_link_path = utf8_to_wide(link_path, heap_allocator());
+  return wide_link_path.has_value() &&
+         CreateHardLinkW(wide_link_path->begin(), wide_target->begin(),
+                         nullptr) != 0;
 }
 
 fn make_fifo(StringView path, u32 mode) wontthrow -> bool
@@ -735,16 +851,20 @@ fn make_fifo(StringView path, u32 mode) wontthrow -> bool
 
 fn touch_file_times(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
   HANDLE handle =
-      CreateFileA(path_string.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ,
+      CreateFileW(wide_path->begin(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ,
                   nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return false;
 
   FILETIME now;
   GetSystemTimeAsFileTime(&now);
   let const did_set = SetFileTime(handle, nullptr, &now, &now) != 0;
+  let const error = did_set ? ERROR_SUCCESS : GetLastError();
   CloseHandle(handle);
+  if (!did_set) SetLastError(error);
+
   return did_set;
 }
 
@@ -778,43 +898,47 @@ fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
     return false;
   }
 
-  const String path_string{path};
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
   let const handle =
-      CreateFileA(path_string.c_str(), FILE_WRITE_ATTRIBUTES,
-                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
-                  OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+      CreateFileW(wide_path->begin(), FILE_WRITE_ATTRIBUTES,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return false;
 
-  let const did_set = SetFileTime(handle, NULL, &access_file_time,
+  let const did_set = SetFileTime(handle, nullptr, &access_file_time,
                                   &modification_file_time) != 0;
+  let const error = did_set ? ERROR_SUCCESS : GetLastError();
   CloseHandle(handle);
+  if (!did_set) SetLastError(error);
+
   return did_set;
 }
 
 fn remove_directory(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  return RemoveDirectoryA(path_string.c_str()) != 0;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  return wide_path.has_value() && RemoveDirectoryW(wide_path->begin()) != 0;
 }
 
 fn remove_file(StringView path) wontthrow -> bool
 {
-  const String path_string{path};
-  return DeleteFileA(path_string.c_str()) != 0;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  return wide_path.has_value() && DeleteFileW(wide_path->begin()) != 0;
 }
 
 fn rename_path(StringView from, StringView to) wontthrow -> bool
 {
-  const String from_string{from};
-  const String to_string{to};
-  return MoveFileExA(from_string.c_str(), to_string.c_str(),
+  let const wide_from = utf8_to_wide(from, heap_allocator());
+  if (!wide_from.has_value()) return false;
+  let const wide_to = utf8_to_wide(to, heap_allocator());
+  return wide_to.has_value() &&
+         MoveFileExW(wide_from->begin(), wide_to->begin(),
                      MOVEFILE_REPLACE_EXISTING) != 0;
 }
 
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 {
-  const String target_string{target};
-  const String link_string{link_path};
 /* An older mingw SDK omits these flags, defined here when absent. */
 #ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
 #define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
@@ -822,14 +946,19 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 #ifndef SYMBOLIC_LINK_FLAG_DIRECTORY
 #define SYMBOLIC_LINK_FLAG_DIRECTORY 0x1
 #endif
+  let const wide_target = utf8_to_wide(target, heap_allocator());
+  if (!wide_target.has_value()) return false;
+  let const wide_link_path = utf8_to_wide(link_path, heap_allocator());
+  if (!wide_link_path.has_value()) return false;
+
   /* A directory target needs the directory flag, the unprivileged flag avoids
      elevation on developer-mode Windows. */
   DWORD flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-  const DWORD attributes = GetFileAttributesA(target_string.c_str());
+  const DWORD attributes = GetFileAttributesW(wide_target->begin());
   if (attributes != INVALID_FILE_ATTRIBUTES &&
       (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
     flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
-  return CreateSymbolicLinkA(link_string.c_str(), target_string.c_str(),
+  return CreateSymbolicLinkW(wide_link_path->begin(), wide_target->begin(),
                              flags) != 0;
 }
 
@@ -859,14 +988,20 @@ fn read_symlink(StringView path, Allocator allocator) wontthrow -> Maybe<String>
     WCHAR path_buffer[1];
   };
 
-  const String path_string{path};
-  let const handle = CreateFileA(
-      path_string.c_str(), 0,
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return koshka::None;
+  let const handle = CreateFileW(
+      wide_path->begin(), 0,
       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
       OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
       nullptr);
   if (handle == INVALID_HANDLE_VALUE) return koshka::None;
-  defer { CloseHandle(handle); };
+  defer
+  {
+    let const error = GetLastError();
+    CloseHandle(handle);
+    SetLastError(error);
+  };
 
   alignas(void *) u8 buffer[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
   DWORD bytes_returned = 0;
@@ -911,67 +1046,80 @@ fn read_symlink(StringView path, Allocator allocator) wontthrow -> Maybe<String>
     is_substitute_name = print_name_length == 0;
     return true;
   };
-  if (bytes_returned < sizeof(u32)) return koshka::None;
+  if (bytes_returned < sizeof(u32)) {
+    SetLastError(ERROR_INVALID_DATA);
+    return koshka::None;
+  }
   let const tag = *reinterpret_cast<const u32 *>(buffer);
   if (tag == IO_REPARSE_TAG_SYMLINK) {
     constexpr usize path_buffer_position =
         offsetof(symbolic_link_reparse_data, path_buffer);
-    if (bytes_returned < path_buffer_position) return koshka::None;
+    if (bytes_returned < path_buffer_position) {
+      SetLastError(ERROR_INVALID_DATA);
+      return koshka::None;
+    }
     let const *data =
         reinterpret_cast<const symbolic_link_reparse_data *>(buffer);
     if (!do_select_target(path_buffer_position, data->data_length,
                           data->substitute_name_offset,
                           data->substitute_name_length, data->print_name_offset,
                           data->print_name_length))
+    {
+      SetLastError(ERROR_INVALID_DATA);
       return koshka::None;
+    }
   } else if (tag == IO_REPARSE_TAG_MOUNT_POINT) {
     constexpr usize path_buffer_position =
         offsetof(mount_point_reparse_data, path_buffer);
-    if (bytes_returned < path_buffer_position) return koshka::None;
+    if (bytes_returned < path_buffer_position) {
+      SetLastError(ERROR_INVALID_DATA);
+      return koshka::None;
+    }
     let const *data =
         reinterpret_cast<const mount_point_reparse_data *>(buffer);
     if (!do_select_target(path_buffer_position, data->data_length,
                           data->substitute_name_offset,
                           data->substitute_name_length, data->print_name_offset,
                           data->print_name_length))
+    {
+      SetLastError(ERROR_INVALID_DATA);
       return koshka::None;
+    }
   } else {
+    SetLastError(ERROR_NOT_SUPPORTED);
     return koshka::None;
   }
 
+  constexpr WCHAR UNC_NAMESPACE_PREFIX[] = L"\\??\\UNC\\";
   constexpr WCHAR NAMESPACE_PREFIX[] = L"\\??\\";
-  if (is_substitute_name && wide_target_length >= 4 &&
-      std::memcmp(wide_target, NAMESPACE_PREFIX, 4 * sizeof(WCHAR)) == 0)
+  bool is_unc_target = false;
+  if (is_substitute_name && wide_target_length >= 8 &&
+      std::memcmp(wide_target, UNC_NAMESPACE_PREFIX, 8 * sizeof(WCHAR)) == 0)
+  {
+    wide_target += 8;
+    wide_target_length -= 8;
+    is_unc_target = true;
+  } else if (is_substitute_name && wide_target_length >= 4 &&
+             std::memcmp(wide_target, NAMESPACE_PREFIX, 4 * sizeof(WCHAR)) == 0)
   {
     wide_target += 4;
     wide_target_length -= 4;
   }
-  if (wide_target_length == 0) return String{allocator};
-  let const utf8_length = WideCharToMultiByte(
-      CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length), nullptr, 0,
-      nullptr, nullptr);
-  if (utf8_length <= 0) return koshka::None;
-  let utf8_target = ArrayList<char>{allocator};
-  utf8_target.reserve(static_cast<usize>(utf8_length));
-  if (WideCharToMultiByte(
-          CP_UTF8, 0, wide_target, static_cast<int>(wide_target_length),
-          utf8_target.begin(), utf8_length, nullptr, nullptr) != utf8_length)
-  {
-    return koshka::None;
-  }
-  return String{
-      allocator,
-      StringView{utf8_target.begin(), static_cast<usize>(utf8_length)}
-  };
+  let target = wide_to_utf8(wide_target, wide_target_length, allocator);
+  if (!target.has_value() || !is_unc_target) return target;
+  let unc_target = String{allocator, "\\\\"};
+  unc_target += target->view();
+  return unc_target;
 }
 
 fn stat_filesystem(StringView path, filesystem_status &status) wontthrow -> bool
 {
-  const String path_string{path};
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
   ULARGE_INTEGER available{};
   ULARGE_INTEGER total{};
   ULARGE_INTEGER free{};
-  if (GetDiskFreeSpaceExA(path_string.c_str(), &available, &total, &free) == 0)
+  if (GetDiskFreeSpaceExW(wide_path->begin(), &available, &total, &free) == 0)
     return false;
   constexpr u64 block_size = 512;
   status.block_size = block_size;
@@ -984,15 +1132,19 @@ fn stat_filesystem(StringView path, filesystem_status &status) wontthrow -> bool
 fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
 {
   let result = ArrayList<mounted_filesystem>{heap_allocator()};
-  char drives[512];
-  let const length = GetLogicalDriveStringsA(sizeof(drives), drives);
-  if (length == 0 || length >= sizeof(drives)) return result;
+  wchar_t drives[512];
+  let const length = GetLogicalDriveStringsW(countof(drives), drives);
+  if (length == 0 || length >= countof(drives)) return result;
   usize position = 0;
 
-  while (position < length && drives[position] != '\0') {
-    let const drive = StringView{drives + position};
-    result.push(mounted_filesystem{String{drive}, String{drive}});
-    position += drive.length + 1;
+  while (position < length && drives[position] != L'\0') {
+    let const drive_length = static_cast<usize>(lstrlenW(drives + position));
+    let const drive =
+        wide_to_utf8(drives + position, drive_length, heap_allocator());
+    if (!drive.has_value()) return result;
+    let target = drive.take();
+    result.push(mounted_filesystem{target.clone(), steal(target)});
+    position += drive_length + 1;
   }
 
   return result;
@@ -1000,16 +1152,21 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
 
 fn current_executable_path() wontthrow -> Maybe<String>
 {
-  char module_path[MAX_PATH];
-  let const module_path_length =
-      GetModuleFileNameA(nullptr, module_path, MAX_PATH);
-  if (module_path_length == 0 || module_path_length == MAX_PATH) {
-    return koshka::None;
-  }
+  ArrayList<wchar_t> module_path{heap_allocator()};
+  DWORD capacity = MAX_PATH;
 
-  return String{
-      StringView{module_path, module_path_length}
-  };
+  loop
+  {
+    module_path.reserve(capacity);
+    let const module_path_length =
+        GetModuleFileNameW(nullptr, module_path.begin(), capacity);
+    if (module_path_length == 0) return None;
+    if (module_path_length < capacity)
+      return wide_to_utf8(module_path.begin(), module_path_length,
+                          heap_allocator());
+    if (capacity >= 32768) return None;
+    capacity = capacity > 16384 ? 32768 : capacity * 2;
+  }
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
@@ -1021,8 +1178,9 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
     return true;
   }
 
-  const String path_string{path};
-  let const attributes = GetFileAttributesA(path_string.c_str());
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+  let const attributes = GetFileAttributesW(wide_path->begin());
   if (attributes == INVALID_FILE_ATTRIBUTES) return false;
   if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
     let const target = read_symlink(path, heap_allocator());
@@ -1044,8 +1202,8 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
     status.change_nanoseconds = 0;
     status.blocks = (status.size + 511) / 512;
 
-    let const handle = CreateFileA(
-        path_string.c_str(), 0,
+    let const handle = CreateFileW(
+        wide_path->begin(), 0,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING,
         FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
@@ -1079,13 +1237,13 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
     return true;
   }
 
-  struct stat info{};
-  if (::stat(path_string.c_str(), &info) != 0) return false;
+  struct _stat64 info{};
+  if (_wstat64(wide_path->begin(), &info) != 0) return false;
   status.device_id = 0;
   status.file_id = 0;
   status.has_file_identity = false;
   let const handle =
-      CreateFileA(path_string.c_str(), 0,
+      CreateFileW(wide_path->begin(), 0,
                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
   if (handle != INVALID_HANDLE_VALUE) {
@@ -1107,7 +1265,7 @@ fn stat_path(StringView path, file_status &status) wontthrow -> bool
   status.modification_time = static_cast<i64>(info.st_mtime);
   status.change_time = status.modification_time;
   WIN32_FILE_ATTRIBUTE_DATA attribute_data{};
-  if (GetFileAttributesExA(path_string.c_str(), GetFileExInfoStandard,
+  if (GetFileAttributesExW(wide_path->begin(), GetFileExInfoStandard,
                            &attribute_data) != 0)
   {
     ULARGE_INTEGER access_ticks{};
@@ -1161,10 +1319,9 @@ fn file_type_letter(u32 mode) wontthrow -> char
 
 fn uid_to_username(u32 uid) throws -> Maybe<String>
 {
-  /* Windows names users through the security database, so ls uses the numeric
-   * id. */
-  unused(uid);
-  return koshka::None;
+  if (uid != 0) return None;
+  return process_owner_name(static_cast<u32>(get_current_process_id()), uid,
+                            heap_allocator());
 }
 
 fn gid_to_groupname(u32 gid) throws -> Maybe<String>
@@ -1175,8 +1332,9 @@ fn gid_to_groupname(u32 gid) throws -> Maybe<String>
 
 fn username_to_uid(StringView username) throws -> Maybe<u32>
 {
-  unused(username);
-  return koshka::None;
+  let const current = get_current_user();
+  if (current.has_value() && current->view() == username) return 0;
+  return None;
 }
 
 fn groupname_to_gid(StringView groupname) throws -> Maybe<u32>

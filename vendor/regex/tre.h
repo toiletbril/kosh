@@ -35,6 +35,8 @@
 
 #define hidden
 
+#include <stdint.h>
+
 #undef  TRE_MBSTATE
 
 #define NDEBUG
@@ -42,16 +44,65 @@
 #define TRE_REGEX_T_FIELD __opaque
 typedef int reg_errcode_t;
 
-typedef wchar_t tre_char_t;
+typedef uint32_t tre_char_t;
 
 #define DPRINT(msg) do { } while(0)
 
 #define elementsof(x)	( sizeof(x) / sizeof(x[0]) )
 
-#define tre_mbrtowc(pwc, s, n, ps) (mbtowc((pwc), (s), (n)))
+static inline int tre_utf8_decode(tre_char_t *result, const char *text,
+                                  size_t length)
+{
+  if (length == 0) return -1;
+
+  const unsigned char first = (unsigned char)text[0];
+  uint32_t codepoint;
+  uint32_t minimum;
+  size_t byte_count;
+  size_t byte_position;
+
+  if (first == 0) {
+    *result = 0;
+    return 0;
+  }
+  if (first < 0x80) {
+    *result = first;
+    return 1;
+  }
+  if (first >= 0xc2 && first <= 0xdf) {
+    codepoint = first & 0x1f;
+    minimum = 0x80;
+    byte_count = 2;
+  } else if (first >= 0xe0 && first <= 0xef) {
+    codepoint = first & 0x0f;
+    minimum = 0x800;
+    byte_count = 3;
+  } else if (first >= 0xf0 && first <= 0xf4) {
+    codepoint = first & 0x07;
+    minimum = 0x10000;
+    byte_count = 4;
+  } else {
+    return -1;
+  }
+  if (length < byte_count) return -1;
+
+  for (byte_position = 1; byte_position < byte_count; byte_position++) {
+    const unsigned char continuation = (unsigned char)text[byte_position];
+    if (continuation == 0) return -1;
+    if ((continuation & 0xc0) != 0x80) return -1;
+    codepoint = (codepoint << 6) | (continuation & 0x3f);
+  }
+  if (codepoint < minimum || (codepoint >= 0xd800 && codepoint <= 0xdfff) ||
+      codepoint > 0x10ffff)
+    return -1;
+  *result = codepoint;
+  return (int)byte_count;
+}
+
+#define tre_mbrtowc(pwc, s, n, ps) tre_utf8_decode((pwc), (s), (n))
 
 /* Wide characters. */
-typedef wint_t tre_cint_t;
+typedef uint32_t tre_cint_t;
 #define TRE_CHAR_MAX 0x10ffff
 
 #define tre_isalnum iswalnum
@@ -69,7 +120,6 @@ typedef wint_t tre_cint_t;
 
 #define tre_tolower towlower
 #define tre_toupper towupper
-#define tre_strlen  wcslen
 
 /* Use system provided iswctype() and wctype(). */
 typedef wctype_t tre_ctype_t;

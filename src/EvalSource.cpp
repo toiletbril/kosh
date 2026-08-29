@@ -168,6 +168,34 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   let const previous_runtime = m_runtime;
   let const was_restricted_shell = m_is_restricted_shell;
+  let const previous_script_run = m_is_script_run;
+  let previous_shell_name = String{m_shell_name};
+  let const previous_source = m_current_source;
+  let const previous_origin = m_current_origin;
+  let const previous_location = m_current_location;
+  let isolated_snapshot = Maybe<eval_state_snapshot>{};
+  if (isolated) isolated_snapshot = snapshot_state();
+
+  bool should_restore_isolated_state = isolated;
+  let const do_restore_auxiliary_state = [&]() throws {
+    set_current_source(previous_source, previous_origin);
+    m_current_location = previous_location;
+    previous_runtime.restore(*this);
+    m_is_restricted_shell = was_restricted_shell;
+    m_is_script_run = previous_script_run;
+    m_shell_name = steal(previous_shell_name);
+  };
+  defer
+  {
+    if (should_restore_isolated_state) {
+      try {
+        restore_state(steal(*isolated_snapshot));
+        do_restore_auxiliary_state();
+      } catch (...) {
+        LOG(Debug, "restoring an interrupted mimicked script failed");
+      }
+    }
+  };
 
   m_runtime.mood = mode;
   m_runtime.set_option(shell_option_id::Restricted, false);
@@ -177,7 +205,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   };
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
-  let const previous_script_run = m_is_script_run;
   m_is_script_run = true;
 
   /* A mimicked script runs with the strictness of the mood it mimics, so a bash
@@ -211,19 +238,24 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       Lexer{contents->view(), *AST_ARENA, false, script_filename, mood()}
   };
 
-  let previous_shell_name = String{m_shell_name};
   let params = ArrayList<String>{heap_allocator()};
   params.reserve(ec.args().count() - 1);
   for (usize i = 1; i < ec.args().count(); i++)
     params.push_managed(ec.args()[i].view());
 
-  let const previous_source = m_current_source;
-  let const previous_origin = m_current_origin;
-  let const previous_location = m_current_location;
-
   /* A standard descriptor with no staged redirect is backed up too, since the
      script may move it with an exec redirection that a fork would contain. */
   let saved_fds = ArrayList<os::saved_descriptor>{heap_allocator()};
+  bool should_restore_fds = true;
+  let const do_restore_fds = [&]() {
+    for (usize i = saved_fds.count(); i > 0; i--)
+      os::restore_descriptor(saved_fds[i - 1]);
+    should_restore_fds = false;
+  };
+  defer
+  {
+    if (should_restore_fds) do_restore_fds();
+  };
   saved_fds.push(ec.in_fd.has_value()
                      ? os::save_and_replace_descriptor(0, *ec.in_fd)
                      : os::save_descriptor(0));
@@ -233,10 +265,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   saved_fds.push(ec.err_fd.has_value()
                      ? os::save_and_replace_descriptor(2, *ec.err_fd)
                      : os::save_descriptor(2));
-  let const do_restore_fds = [&]() {
-    for (usize i = saved_fds.count(); i > 0; i--)
-      os::restore_descriptor(saved_fds[i - 1]);
-  };
   let const do_render_error = [&](const std::exception_ptr &error) {
     try {
       std::rethrow_exception(error);
@@ -289,6 +317,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   set_current_source(&*contents, String{ec.program().view()});
   m_current_location = SourceLocation{};
   m_mimicry_depth++;
+  bool should_leave_mimicry = true;
+  defer
+  {
+    if (should_leave_mimicry) m_mimicry_depth--;
+  };
 
   let const do_evaluate_script = [&]() throws {
     let const was_terminal_exec_allowed = terminal_exec_allowed();
@@ -318,6 +351,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     }
     let const is_interrupt = do_finish_script(error, false);
     m_mimicry_depth--;
+    should_leave_mimicry = false;
     do_restore_fds();
     do_restore_restricted_shell();
     if (error) {
@@ -328,9 +362,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     return last_exit_status();
   }
 
-  /* The isolated run snapshots the mutable state and runs in a subshell, so the
-     script's cd, exports, functions, and exit do not leak to the parent. */
-  let snapshot = snapshot_state();
   set_positional_params(steal(params));
   seed_shell_identity_variables(mode == mimic_mood::Bash);
   enter_subshell();
@@ -349,20 +380,13 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const is_interrupt = do_finish_script(error, true);
   leave_subshell();
   m_mimicry_depth--;
+  should_leave_mimicry = false;
   do_restore_fds();
 
   let const status = last_exit_status();
-  defer
-  {
-    restore_state(steal(snapshot));
-    set_current_source(previous_source, previous_origin);
-    m_current_location = previous_location;
-    previous_runtime.restore(*this);
-    do_restore_restricted_shell();
-    m_is_script_run = previous_script_run;
-    m_shell_name = steal(previous_shell_name);
-  };
-
+  should_restore_isolated_state = false;
+  restore_state(steal(*isolated_snapshot));
+  do_restore_auxiliary_state();
   if (error) {
     if (is_interrupt) throw InterruptErrorWithLocation{previous_location};
 

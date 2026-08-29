@@ -165,7 +165,7 @@ FLAG(DEBUG_TOILETLINE_ALLOCATION, Bool, '\0', "debug-toiletline-allocation",
 
 #include "MainOperations.hpp"
 
-fn main(int argc, char **argv) -> int
+static fn kosh_main(int argc, char **argv) -> int
 {
   koshka::os::initialize_platform_runtime();
   koshka::os::register_platform_flags(FLAG_LIST);
@@ -1291,3 +1291,43 @@ fn main(int argc, char **argv) -> int
 
   unreachable("the main command loop terminated without exiting");
 }
+
+#if defined _WIN32
+fn wmain(int argc, wchar_t **wide_argv) -> int
+{
+  let narrow_arguments =
+      koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+  narrow_arguments.reserve(static_cast<usize>(argc));
+  for (int argument_position = 0; argument_position < argc; argument_position++)
+  {
+    usize wide_length = 0;
+    while (wide_argv[argument_position][wide_length] != L'\0')
+      wide_length++;
+    if (wide_length > static_cast<usize>(INT_MAX)) return 1;
+    let const utf8_length = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, wide_argv[argument_position],
+        static_cast<int>(wide_length), nullptr, 0, nullptr, nullptr);
+    if (wide_length != 0 && utf8_length <= 0) return 1;
+    let utf8 = koshka::ArrayList<char>{koshka::heap_allocator()};
+    utf8.reserve(static_cast<usize>(utf8_length));
+    if (utf8_length != 0 &&
+        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                            wide_argv[argument_position],
+                            static_cast<int>(wide_length), utf8.begin(),
+                            utf8_length, nullptr, nullptr) != utf8_length)
+      return 1;
+    narrow_arguments.push(koshka::String{
+        koshka::StringView{utf8.begin(), static_cast<usize>(utf8_length)}
+    });
+  }
+
+  let narrow_argv = koshka::ArrayList<char *>{koshka::heap_allocator()};
+  narrow_argv.reserve(static_cast<usize>(argc) + 1);
+  for (koshka::String &argument : narrow_arguments)
+    narrow_argv.push(const_cast<char *>(argument.c_str()));
+  narrow_argv.push(nullptr);
+  return kosh_main(argc, narrow_argv.begin());
+}
+#else
+fn main(int argc, char **argv) -> int { return kosh_main(argc, argv); }
+#endif

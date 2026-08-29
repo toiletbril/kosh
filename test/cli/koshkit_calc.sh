@@ -1,5 +1,5 @@
-# calc evaluates arithmetic through the shell evaluator and computes in 128 bits,
-# so 2 ** 100 prints in full. A malformed expression renders a located caret.
+# calc evaluates arbitrary-precision arithmetic through the shell evaluator.
+# A malformed expression renders a located caret.
 # calc is a koshkit utility, so the bundled evaluator is reached through
 # `koshkit calc`, which a calc binary on PATH does not shadow.
 unset KOSH_FLAGS
@@ -61,6 +61,10 @@ koshkit calc "sin(0, 6)"
 koshkit calc "sqrt(2, 10)"
 koshkit calc "sin(1000000, 8)"
 koshkit calc "cos(1000000, 8)"
+koshkit calc "sin(2, 10)"
+koshkit calc "cos(2, 10)"
+koshkit calc "sin(-2, 10)"
+koshkit calc "cos(-2, 10)"
 koshkit calc "exp(10, 5)"
 koshkit calc "exp(-1000, 8)"
 '
@@ -70,6 +74,7 @@ echo "=== decimal function errors ==="
 koshkit calc "ln(0)"
 koshkit calc "sqrt(-1)"
 koshkit calc "sin(1, -1)"
+koshkit calc "sin(1, 999999999999999999999999)"
 ' 2>&1
 
 echo "=== function errors ==="
@@ -87,6 +92,13 @@ echo "=== located parse error ==="
 
 echo "=== located division by zero ==="
 "$BIN" -c 'koshkit calc "5 / 0"' 2>&1
+"$BIN" -c 'koshkit calc 5 / 0' 2>&1
+"$BIN" -c 'koshkit calc "10 % (3 - 3)"' 2>&1
+
+echo "=== oversized decimal power ==="
+"$BIN" -c 'koshkit calc "0.1 ** 4294967296"' 2>&1
+"$BIN" -c 'koshkit calc "3 ** 18446744073709551615"' 2>&1
+"$BIN" -c 'koshkit calc "x=3, x**= 18446744073709551615"' 2>&1
 
 echo "=== no expression ==="
 "$BIN" -c 'koshkit calc' 2>&1

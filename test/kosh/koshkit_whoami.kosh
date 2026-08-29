@@ -8,5 +8,19 @@ else
 fi
 
 echo "lines=$(koshkit whoami | koshkit wc -l)"
+
+spoofed_user=$(LOGNAME=KOSH_FAKE USER=KOSH_FAKE koshkit whoami)
+if [[ $spoofed_user != KOSH_FAKE ]]; then
+  echo spoofed=no
+else
+  echo spoofed=yes
+fi
+
+if [[ $(koshkit whoami) == $(koshkit id -un) ]]; then
+  echo effective=yes
+else
+  echo effective=no
+fi
+
 koshkit whoami --help > "$TEST_NULL_DEVICE"
 echo "help=$?"

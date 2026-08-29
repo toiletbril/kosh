@@ -32,3 +32,10 @@ echo "extra-operand=$?"
 koshkit ln -sf -- option-target -n
 printf 'option='
 koshkit readlink -- -n
+
+koshkit ln -sf цель ссылка
+printf 'unicode=['
+koshkit readlink ссылка
+printf '] no-newline=['
+koshkit readlink -n ссылка
+printf ']\n'

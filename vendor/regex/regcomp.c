@@ -533,12 +533,12 @@ static reg_errcode_t parse_bracket_terms(tre_parse_ctx_t *ctx, const char *s, st
 	const char *start = s;
 	tre_ctype_t class;
 	int min, max;
-	wchar_t wc;
+	tre_char_t wc;
 	int len;
 
 	for (;;) {
 		class = 0;
-		len = mbtowc(&wc, s, -1);
+		len = tre_mbrtowc(&wc, s, (size_t)-1, NULL);
 		if (len <= 0)
 			return *s ? REG_BADPAT : REG_EBRACK;
 		if (*s == ']' && s != start) {
@@ -573,7 +573,7 @@ static reg_errcode_t parse_bracket_terms(tre_parse_ctx_t *ctx, const char *s, st
 			s += len;
 			if (*s == '-' && s[1] != ']') {
 				s++;
-				len = mbtowc(&wc, s, -1);
+				len = tre_mbrtowc(&wc, s, (size_t)-1, NULL);
 				max = wc;
 				/* XXX - Should use collation order instead of
 				   encoding values in character ranges. */
@@ -795,7 +795,7 @@ static reg_errcode_t parse_atom(tre_parse_ctx_t *ctx, const char *s)
 	int len, ere = ctx->cflags & REG_EXTENDED;
 	const char *p;
 	tre_ast_node_t *node;
-	wchar_t wc;
+	tre_char_t wc;
 	switch (*s) {
 	case '[':
 		return parse_bracket(ctx, s+1);
@@ -917,7 +917,7 @@ static reg_errcode_t parse_atom(tre_parse_ctx_t *ctx, const char *s)
 		break;
 	default:
 parse_literal:
-		len = mbtowc(&wc, s, -1);
+		len = tre_mbrtowc(&wc, s, (size_t)-1, NULL);
 		if (len < 0)
 			return REG_BADPAT;
 		if (ctx->cflags & REG_ICASE && (tre_isupper(wc) || tre_islower(wc))) {

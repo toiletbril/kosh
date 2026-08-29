@@ -91,6 +91,9 @@ public:
 
   hot mustuse pure fn find_character(char wanted) const wontthrow
       -> Maybe<usize>;
+  mustuse pure fn find_substring(StringView needle,
+                                 usize from = 0) const wontthrow
+      -> Maybe<usize>;
 
   mustuse pure fn substring(usize start) const wontthrow -> StringView;
 

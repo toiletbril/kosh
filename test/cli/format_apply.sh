@@ -426,10 +426,13 @@ cat "$root/statement-spacing-formatted.sh"
 "$BIN" --format "$root/statement-spacing-formatted.sh" \
   > "$root/statement-spacing-second.sh"
 spacing_original=$("$BIN" --no-diagnostics "$root/statement-spacing.sh")
+spacing_original_status=$?
 spacing_formatted=$("$BIN" --no-diagnostics \
   "$root/statement-spacing-formatted.sh")
-printf 'statement-spacing-equivalent=%s idempotent=%s\n' \
+spacing_formatted_status=$?
+printf 'statement-spacing-equivalent=%s status-equivalent=%s idempotent=%s\n' \
   "$([ "$spacing_original" = "$spacing_formatted" ] && printf yes)" \
+  "$([ "$spacing_original_status" = "$spacing_formatted_status" ] && printf yes)" \
   "$(cmp -s "$root/statement-spacing-formatted.sh" \
       "$root/statement-spacing-second.sh" && printf yes)"
 

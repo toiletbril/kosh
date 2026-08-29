@@ -9,7 +9,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("");
 
 HELP_DESCRIPTION_DECL(
-    "The whoami utility prints the name of the current user.");
+    "The whoami utility prints the name of the effective user.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -41,19 +41,22 @@ cold fn WhoAmI::execute(
     return 2;
   }
 
-  LOG(Debug, "whoami printing the current user name");
+  LOG(Debug, "whoami printing the effective user name");
 
   let output = String{cxt.scratch_allocator()};
 
-  if (let const user = os::get_current_user(); user.has_value()) {
+  if (let const user =
+          os::uid_to_username(static_cast<u32>(os::get_effective_user_id()));
+      user.has_value())
+  {
     output.append(user->view());
     output += '\n';
     ec.print_to_stdout(output);
     return 0;
   }
 
-  report_soft_koshkit_util_error(ec, cxt, ec.source_location(), args[0].view(),
-                                 "cannot determine the current user: " +
+  report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                 "cannot determine the effective user: " +
                                      os::last_system_error_message());
   return 1;
 }

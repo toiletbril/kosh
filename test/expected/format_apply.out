@@ -354,7 +354,7 @@ eof_value=one
 # The first trailing comment has no following statement.
 # The second trailing comment has no following statement either.
 # The third trailing comment completes the trailing comment run.
-statement-spacing-equivalent=yes idempotent=yes
+statement-spacing-equivalent=yes status-equivalent=yes idempotent=yes
 builtin eval \
         -- \
   "$(one/two/three.dump | four/five:six/seven.awk resolve 2>/dev/null)"
