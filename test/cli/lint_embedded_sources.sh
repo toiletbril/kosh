@@ -18,6 +18,11 @@ jobs:
       - shell: bash
         run: |
           printf '%s\n' "$GITHUB_EMBEDDED"
+          awk 'BEGIN { print "$10" }'
+      - shell: pwsh
+        run: |
+          Write-Output "$POWERSHELL_HOST"
+      - run: target-only-ci-command
 EOF
 
 cat > "$root/README.md" <<'EOF'
@@ -190,6 +195,10 @@ count_variable()
 }
 
 github=$(count_variable GITHUB_EMBEDDED "$root/.github/workflows/check.yml")
+github_output=$("$BIN" --lint --no-traces \
+  "$root/.github/workflows/check.yml" 2>&1)
+github_host=$(printf '%s' "$github_output" | \
+  grep -Ec 'POWERSHELL_HOST|target-only-ci-command|positional parameter|Expected a command before the pipe')
 markdown=$(count_variable MARKDOWN_EMBEDDED "$root/README.md")
 container=$(count_variable CONTAINER_EMBEDDED "$root/Containerfile")
 makefile=$(count_variable MAKE_EMBEDDED "$root/Makefile")
@@ -219,6 +228,7 @@ nix=$(count_variable NIX_HOST "$root/check.nix")
 
 printf 'github=%s markdown=%s container=%s make=%s package=%s\n' \
   "$github" "$markdown" "$container" "$makefile" "$package"
+printf 'github-host=%s\n' "$github_host"
 printf 'gitea=%s forgejo=%s gitlab=%s ansible=%s compose=%s cloud-build=%s\n' \
   "$gitea" "$forgejo" "$gitlab" "$ansible" "$compose" "$cloud_build"
 printf 'circle=%s azure=%s bitbucket=%s buildkite=%s travis=%s kubernetes=%s\n' \

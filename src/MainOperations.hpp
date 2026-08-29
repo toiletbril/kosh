@@ -339,7 +339,8 @@ static fn run_script_contents(
     Expression **out_ast = nullptr, Maybe<usize> history_event_number = None,
     analysis_diagnostic_totals *diagnostic_totals = nullptr,
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
-    bool should_require_shebang = true) -> int
+    bool should_require_shebang = true,
+    bool should_silence_unresolved_commands = false) -> int
 {
   i32 exit_code = EXIT_FAILURE;
 
@@ -506,7 +507,8 @@ static fn run_script_contents(
         return analyze_ast(
             ast, script_contents, context.function_names(),
             context.alias_names(), &context, context.warning_level(),
-            context.warnings_enabled() && context.shell_is_interactive(),
+            should_silence_unresolved_commands ||
+                (context.warnings_enabled() && context.shell_is_interactive()),
             context.mood() == mimic_mood::Default,
             context.annoying_diagnostics_enabled(), shellcheck_suppressions,
             analysis_scope_definitions, shellcheck_directive_spans,
@@ -678,7 +680,7 @@ static fn run_lint_document_contents(
     context.set_warning_level(fragment.mood == mimic_mood::Default ? 0 : 3);
     let const fragment_status = run_script_contents(
         fragment.analysis_source, context, ast_arena, filename, nullptr,
-        nullptr, None, diagnostic_totals, diagnostic_sink, false);
+        nullptr, None, diagnostic_totals, diagnostic_sink, false, true);
     if (fragment_status != EXIT_SUCCESS) status = fragment_status;
   }
 

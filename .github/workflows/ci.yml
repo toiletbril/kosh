@@ -70,8 +70,7 @@ jobs:
             ./scripts/llvm-tool.sh llvm-cov report ./kosh-cov \
               -instr-profile=coverage/kosh.profdata src \
               -ignore-filename-regex='toiletline' \
-              | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ \
-                     { print "| "$1" | "$10" | "$13" |" }'
+              | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ { print "| "$1" | "$10" | "$13" |" }'
             echo
             echo '<details><summary>Uncovered line ranges</summary>'
             echo

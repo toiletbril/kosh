@@ -189,10 +189,10 @@ fn parser_format_add_indented_fragment(parsed_format_document &document,
                                        StringView host_source, usize host_start,
                                        usize host_end, usize indent_length,
                                        mimic_mood mood) throws -> void;
-fn parser_format_extract_yaml_keys(parsed_format_document &document,
-                                   StringView source, const StringView *keys,
-                                   usize key_count,
-                                   mimic_mood default_mood) throws -> void;
+fn parser_format_extract_yaml_keys(
+    parsed_format_document &document, StringView source, const StringView *keys,
+    usize key_count, mimic_mood default_mood,
+    bool should_select_workflow_shell = false) throws -> void;
 fn parser_format_extract_json_keys(parsed_format_document &document,
                                    StringView source, const StringView *keys,
                                    usize key_count,

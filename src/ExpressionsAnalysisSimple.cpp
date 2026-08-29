@@ -39,6 +39,45 @@ constexpr PackedStringKey GENERATED_EXECUTABLE_DRIVER_VARIABLE_KEYS[] = {
 constexpr StaticStringSet GENERATED_EXECUTABLE_DRIVER_VARIABLES{
     GENERATED_EXECUTABLE_DRIVER_VARIABLE_KEYS};
 
+enum class shell_quote_state : u8
+{
+  Normal,
+  Single,
+  Double,
+};
+
+pure fn has_multi_digit_positional_expansion(StringView source) wontthrow
+    -> bool
+{
+  shell_quote_state state = shell_quote_state::Normal;
+  for (usize position = 0; position < source.length; position++) {
+    let const byte = source[position];
+    if (state == shell_quote_state::Single) {
+      if (byte == '\'') state = shell_quote_state::Normal;
+      continue;
+    }
+    if (byte == '\\') {
+      if (position + 1 < source.length) position++;
+      continue;
+    }
+    if (byte == '"') {
+      state = state == shell_quote_state::Double ? shell_quote_state::Normal
+                                                 : shell_quote_state::Double;
+      continue;
+    }
+    if (state == shell_quote_state::Normal && byte == '\'') {
+      state = shell_quote_state::Single;
+      continue;
+    }
+    if (byte == '$' && position + 2 < source.length &&
+        source[position + 1] >= '1' && source[position + 1] <= '9' &&
+        source[position + 2] >= '0' && source[position + 2] <= '9')
+      return true;
+  }
+
+  return false;
+}
+
 fn literal_generated_path(const Token *token, const AnalysisContext &) throws
     -> Maybe<String>
 {
@@ -841,7 +880,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     }
 
     bool has_dollar_bracket = false;
-    bool has_multi_digit_positional = false;
     bool has_double_dot = false;
     bool has_open_brace = false;
     bool has_dollar_byte = false;
@@ -864,14 +902,6 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         {
           has_dollar_bracket = true;
         }
-        if (position + 2 < source_text.length &&
-            source_text[position + 1] >= '1' &&
-            source_text[position + 1] <= '9' &&
-            source_text[position + 2] >= '0' &&
-            source_text[position + 2] <= '9')
-        {
-          has_multi_digit_positional = true;
-        }
         /* The quote that follows leaves the dollar sign literal. The word is
            read no further only when the quote also closes the word, and a
            dollar sign that carries text before it is ordinary prose. */
@@ -886,6 +916,9 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       }
     }
+
+    let const has_multi_digit_positional =
+        has_multi_digit_positional_expansion(source_text);
 
     if (source_text.length >= 2 && source_text[0] == '`' &&
         source_text[source_text.length - 1] == '`')

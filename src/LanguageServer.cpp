@@ -524,8 +524,9 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
     if (document.canonical_path.has_value())
       followed_paths.add(document.canonical_path->text().view());
     analyze_ast(ast, document.shell_source(), functions, aliases, &m_context, 3,
-                false, m_context.mood() == mimic_mood::Default, true,
-                suppressions, scopes, directives, heredoc_misses,
+                document.format.is_host_format,
+                m_context.mood() == mimic_mood::Default, true, suppressions,
+                scopes, directives, heredoc_misses,
                 document.path.has_value() && !document.format.is_host_format,
                 false, &followed_paths, &source_effects, nullptr, nullptr, true,
                 true, nullptr, &diagnostics, this, &symbol_records);

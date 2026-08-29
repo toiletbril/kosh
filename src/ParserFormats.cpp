@@ -367,6 +367,88 @@ static pure fn mood_near(StringView source, usize position,
   return fallback;
 }
 
+static pure fn yaml_key_position(StringView line) wontthrow -> usize
+{
+  usize position = leading_spaces(line);
+  if (position < line.length && line[position] == '-') {
+    position++;
+    while (position < line.length && line[position] == ' ')
+      position++;
+  }
+
+  return position;
+}
+
+static pure fn yaml_line_value(StringView line, StringView key) wontthrow
+    -> Maybe<StringView>
+{
+  let const position = yaml_key_position(line);
+  if (position + key.length >= line.length ||
+      line.substring_of_length(position, key.length) != key ||
+      line[position + key.length] != ':')
+    return None;
+
+  return line.substring(position + key.length + 1).trim_blanks();
+}
+
+static pure fn previous_line(StringView source, usize &position) wontthrow
+    -> StringView
+{
+  if (position == 0) return StringView{};
+  usize end = position;
+  if (end > 0 && source[end - 1] == '\n') end--;
+  let start = end;
+  while (start > 0 && source[start - 1] != '\n')
+    start--;
+  position = start;
+
+  return source.substring_of_length(start, end - start);
+}
+
+static pure fn workflow_shell_mood(StringView value) wontthrow
+    -> Maybe<mimic_mood>
+{
+  if (!value.is_empty() && (value[0] == '\'' || value[0] == '"'))
+    value = value.substring(1);
+  if (value.starts_with("bash")) return mimic_mood::Bash;
+  if (value.starts_with("sh") || value.starts_with("dash"))
+    return mimic_mood::Posix;
+  if (value.starts_with("kosh")) return mimic_mood::Default;
+
+  return None;
+}
+
+static pure fn selected_workflow_mood(StringView source, usize line_start,
+                                      StringView line,
+                                      mimic_mood fallback) wontthrow
+    -> Maybe<mimic_mood>
+{
+  let const current_indent = leading_spaces(line);
+  let scan_position = line_start;
+  while (scan_position > 0) {
+    let const previous = previous_line(source, scan_position);
+    if (previous.trim_blanks().is_empty()) continue;
+    let const previous_indent = leading_spaces(previous);
+    if (previous_indent == current_indent &&
+        previous_indent < previous.length && previous[previous_indent] == '-')
+      break;
+    if (let const shell = yaml_line_value(previous, "shell"); shell.has_value())
+      return workflow_shell_mood(*shell);
+    if (previous_indent < current_indent) break;
+  }
+
+  scan_position = line_start;
+  while (scan_position > 0) {
+    let const previous = previous_line(source, scan_position);
+    let const runner = yaml_line_value(previous, "runs-on");
+    if (!runner.has_value()) continue;
+    if (parser_format_has_substring(*runner, "windows")) return None;
+    break;
+  }
+
+  return fallback;
+}
+
 static fn add_yaml_inline_fragment(parsed_format_document &document,
                                    StringView source, usize start, usize end,
                                    mimic_mood mood) throws -> void
@@ -384,8 +466,9 @@ static fn add_yaml_inline_fragment(parsed_format_document &document,
 
 fn parser_format_extract_yaml_keys(parsed_format_document &document,
                                    StringView source, const StringView *keys,
-                                   usize key_count,
-                                   mimic_mood default_mood) throws -> void
+                                   usize key_count, mimic_mood default_mood,
+                                   bool should_select_workflow_shell) throws
+    -> void
 {
   usize position = 0;
   while (position < source.length) {
@@ -393,7 +476,11 @@ fn parser_format_extract_yaml_keys(parsed_format_document &document,
     let const line = source.next_line(position);
     usize content_position = 0;
     if (!yaml_key_match(line, keys, key_count, content_position)) continue;
-    let const mood = mood_near(source, line_start, default_mood);
+    let const mood =
+        should_select_workflow_shell
+            ? selected_workflow_mood(source, line_start, line, default_mood)
+            : Maybe<mimic_mood>{mood_near(source, line_start, default_mood)};
+    if (!mood.has_value()) continue;
     if (content_position < line.length &&
         (line[content_position] == '|' || line[content_position] == '>'))
     {
@@ -418,13 +505,13 @@ fn parser_format_extract_yaml_keys(parsed_format_document &document,
       }
       if (content_indent > 0)
         parser_format_add_indented_fragment(document, source, block_start,
-                                            block_end, content_indent, mood);
+                                            block_end, content_indent, *mood);
       continue;
     }
 
     if (content_position < line.length) {
       add_yaml_inline_fragment(document, source, line_start + content_position,
-                               line_start + line.length, mood);
+                               line_start + line.length, *mood);
       continue;
     }
 
@@ -441,7 +528,7 @@ fn parser_format_extract_yaml_keys(parsed_format_document &document,
       while (item_content < item_line.length && item_line[item_content] == ' ')
         item_content++;
       add_yaml_inline_fragment(document, source, item_start + item_content,
-                               item_start + item_line.length, mood);
+                               item_start + item_line.length, *mood);
     }
   }
 }
