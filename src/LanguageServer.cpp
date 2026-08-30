@@ -523,13 +523,21 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
     let source_effects = StringMap<followed_source_effects>{heap_allocator()};
     if (document.canonical_path.has_value())
       followed_paths.add(document.canonical_path->text().view());
+    let const is_mixed_command_context =
+        document.format.kind == parser_format_kind::DevContainer;
+    let const should_silence_unresolved_commands =
+        !is_mixed_command_context &&
+        parser_format_should_silence_unresolved_commands(document.format.kind);
+    let const *format_document =
+        is_mixed_command_context ? &document.format : nullptr;
     analyze_ast(ast, document.shell_source(), functions, aliases, &m_context, 3,
-                document.format.is_host_format,
+                should_silence_unresolved_commands,
                 m_context.mood() == mimic_mood::Default, true, suppressions,
                 scopes, directives, heredoc_misses,
                 document.path.has_value() && !document.format.is_host_format,
                 false, &followed_paths, &source_effects, nullptr, nullptr, true,
-                true, nullptr, &diagnostics, this, &symbol_records);
+                true, nullptr, &diagnostics, this, &symbol_records, nullptr,
+                format_document);
     symbol_records.variable_occurrences.sort(
         [](const variable_occurrence_record &left,
            const variable_occurrence_record &right) {

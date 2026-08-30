@@ -37,7 +37,9 @@ vim.lsp.config("kosh", {
     "spec",
   },
   root_dir = function(bufnr, on_dir)
-    on_dir(vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd())
+    on_dir(vim.fs.root(bufnr, { ".git" })
+      or vim.fs.root(bufnr, { "Makefile" })
+      or vim.fn.getcwd())
   end,
 })
 vim.lsp.enable("kosh")

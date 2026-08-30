@@ -1317,10 +1317,11 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
   /* The resolution scan reads PATH and the filesystem, so it is skipped when
      its only diagnostic cannot reach the output. */
   let const should_check_command_resolution =
-      name.has_value() && !actx.should_silence_unresolved_commands &&
-      !is_command_shadowed && !command_is_html_entity_tail &&
-      !has_explained_resolution_failure &&
-      actx.should_report(resolution_diagnostic);
+      name.has_value() && !is_command_shadowed &&
+      !command_is_html_entity_tail && !has_explained_resolution_failure &&
+      actx.should_report(resolution_diagnostic) &&
+      !actx.should_silence_unresolved_command_at(
+          m_args[0]->source_location().position);
 
   let unavailable = Maybe<utils::unavailable_path_source_component>{};
   let command_was_resolved = false;

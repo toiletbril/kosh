@@ -5,14 +5,15 @@ namespace koshka {
 fn parse_dev_container_format(const parser_format_input &input,
                               parsed_format_document &document) throws -> void
 {
-  static const StringView KEYS[] = {"initializeCommand",
-                                    "onCreateCommand",
-                                    "updateContentCommand",
-                                    "postCreateCommand",
-                                    "postStartCommand",
-                                    "postAttachCommand",
-                                    "waitFor"};
-  parser_format_extract_json_keys(document, input.source, KEYS, 7,
+  static const parser_format_json_key KEYS[] = {
+      {"initializeCommand",    false},
+      {"onCreateCommand",      true },
+      {"updateContentCommand", true },
+      {"postCreateCommand",    true },
+      {"postStartCommand",     true },
+      {"postAttachCommand",    true }
+  };
+  parser_format_extract_json_keys(document, input.source, KEYS, 6,
                                   mimic_mood::Posix);
 }
 

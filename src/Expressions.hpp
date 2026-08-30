@@ -12,6 +12,7 @@ using namespace tokens;
 
 class Token;
 struct heredoc_contents;
+struct parsed_format_document;
 
 struct pending_analysis_warning
 {
@@ -439,6 +440,7 @@ public:
      resolution reports the same missing command, so the analysis copy would
      double the report. A script run keeps the check. */
   bool should_silence_unresolved_commands{false};
+  const parsed_format_document *format_document{nullptr};
   bool has_unknown_path{false};
   bool has_unknown_working_directory{false};
   bool is_inside_subshell_analysis{false};
@@ -617,6 +619,8 @@ public:
   fn trace_optimizer_line(StringView message) const throws -> void;
   fn print_script_backtrace_if_rooted(
       const SourceLocation &location) const throws -> void;
+  pure fn should_silence_unresolved_command_at(usize position) const wontthrow
+      -> bool;
 
 private:
   pure fn should_report(diagnostic_tier tier) const wontthrow -> bool;
@@ -650,7 +654,8 @@ fn analyze_ast(
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
     AnalysisSourceProvider *source_provider = nullptr,
     analysis_symbol_records *symbol_records = nullptr,
-    AnalysisUnitStream *unit_stream = nullptr) throws -> bool;
+    AnalysisUnitStream *unit_stream = nullptr,
+    const parsed_format_document *format_document = nullptr) throws -> bool;
 
 mustuse pure fn is_source_location_variable(StringView name) wontthrow -> bool;
 

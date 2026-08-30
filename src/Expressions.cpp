@@ -14,6 +14,7 @@
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Parser.hpp"
+#include "ParserFormats.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
@@ -662,6 +663,19 @@ pure fn AnalysisContext::should_report(diagnostic_tier tier) const wontthrow
   }
 
   return warning_level >= required_level;
+}
+
+pure fn AnalysisContext::should_silence_unresolved_command_at(
+    usize position) const wontthrow -> bool
+{
+  if (should_silence_unresolved_commands) return true;
+  if (format_document == nullptr) return false;
+  let const fragment_index =
+      parser_format_fragment_at(*format_document, position);
+  if (!fragment_index.has_value()) return false;
+
+  return format_document->fragments[*fragment_index]
+      .should_silence_unresolved_commands;
 }
 
 fn AnalysisContext::report_diagnostic(
@@ -1683,28 +1697,26 @@ pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool
   return state == bracket_scan_state::InsideClass;
 }
 
-fn analyze_ast(const Expression *root, StringView source,
-               const HashSet &known_functions, const HashSet &known_aliases,
-               EvalContext *eval_context, u8 warning_level,
-               bool silence_unresolved_commands, bool is_default_mood,
-               bool should_emit_annoying_diagnostics,
-               const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
-               const ArrayList<analysis_scope_definition> &scope_definitions,
-               const ArrayList<shellcheck_directive_span> &directive_spans,
-               const ArrayList<heredoc_terminator_miss> &heredoc_misses,
-               bool is_named_script_file,
-               bool should_report_optimizer_diagnostics,
-               HashSet *followed_source_paths,
-               StringMap<followed_source_effects> *source_effects_cache,
-               AnalysisContext *parent_analysis_context,
-               analysis_diagnostic_totals *deferred_diagnostic_totals,
-               bool should_merge_parent_state,
-               bool should_merge_parent_uncertainty,
-               followed_source_effects *source_effects,
-               ArrayList<source_diagnostic> *diagnostic_sink,
-               AnalysisSourceProvider *source_provider,
-               analysis_symbol_records *symbol_records,
-               AnalysisUnitStream *unit_stream) throws -> bool
+fn analyze_ast(
+    const Expression *root, StringView source, const HashSet &known_functions,
+    const HashSet &known_aliases, EvalContext *eval_context, u8 warning_level,
+    bool silence_unresolved_commands, bool is_default_mood,
+    bool should_emit_annoying_diagnostics,
+    const ArrayList<shellcheck_suppression> &shellcheck_suppressions,
+    const ArrayList<analysis_scope_definition> &scope_definitions,
+    const ArrayList<shellcheck_directive_span> &directive_spans,
+    const ArrayList<heredoc_terminator_miss> &heredoc_misses,
+    bool is_named_script_file, bool should_report_optimizer_diagnostics,
+    HashSet *followed_source_paths,
+    StringMap<followed_source_effects> *source_effects_cache,
+    AnalysisContext *parent_analysis_context,
+    analysis_diagnostic_totals *deferred_diagnostic_totals,
+    bool should_merge_parent_state, bool should_merge_parent_uncertainty,
+    followed_source_effects *source_effects,
+    ArrayList<source_diagnostic> *diagnostic_sink,
+    AnalysisSourceProvider *source_provider,
+    analysis_symbol_records *symbol_records, AnalysisUnitStream *unit_stream,
+    const parsed_format_document *format_document) throws -> bool
 {
   ASSERT(root != nullptr || unit_stream != nullptr);
 
@@ -1717,6 +1729,7 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.should_emit_annoying_diagnostics = should_emit_annoying_diagnostics;
   actx.shellcheck_suppressions = &shellcheck_suppressions;
   actx.should_silence_unresolved_commands = silence_unresolved_commands;
+  actx.format_document = format_document;
   actx.eval_context = eval_context;
   actx.should_report_optimizer_diagnostics =
       should_report_optimizer_diagnostics;

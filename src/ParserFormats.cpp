@@ -276,6 +276,8 @@ fn parser_format_add_fragment(parsed_format_document &document,
       host_source.substring_of_length(host_start, host_end - host_start)};
   fragment.mood = mood;
   fragment.codec = codec;
+  fragment.should_silence_unresolved_commands =
+      parser_format_should_silence_unresolved_commands(document.kind);
   fragment.host_start = host_start;
   fragment.host_end = host_end;
   fragment.indent_length = indent_length;
@@ -579,7 +581,8 @@ fn parser_format_add_json_fragment(parsed_format_document &document,
 }
 
 fn parser_format_extract_json_keys(parsed_format_document &document,
-                                   StringView source, const StringView *keys,
+                                   StringView source,
+                                   const parser_format_json_key *keys,
                                    usize key_count,
                                    mimic_mood default_mood) throws -> void
 {
@@ -597,13 +600,20 @@ fn parser_format_extract_json_keys(parsed_format_document &document,
     if (position >= source.length) break;
     let const key = source.substring_of_length(key_start, position - key_start);
     position++;
-    bool is_wanted = false;
-    for (usize key_index = 0; key_index < key_count; key_index++)
-      if (key == keys[key_index]) is_wanted = true;
-    if (!is_wanted) continue;
-    while (position < source.length && source[position] != ':')
+    while (position < source.length &&
+           (source[position] == ' ' || source[position] == '\t' ||
+            source[position] == '\n' || source[position] == '\r'))
       position++;
-    if (position < source.length) position++;
+    if (position >= source.length || source[position] != ':') continue;
+    position++;
+
+    const parser_format_json_key *matched_key = nullptr;
+    for (usize key_index = 0; key_index < key_count; key_index++) {
+      if (key != keys[key_index].name) continue;
+      matched_key = &keys[key_index];
+      break;
+    }
+    if (matched_key == nullptr) continue;
     while (position < source.length &&
            (source[position] == ' ' || source[position] == '\t' ||
             source[position] == '\n' || source[position] == '\r'))
@@ -614,16 +624,32 @@ fn parser_format_extract_json_keys(parsed_format_document &document,
       if (source[position] == '\\' && position + 1 < source.length) position++;
       position++;
     }
+    let const fragment_count = document.fragments.count();
     parser_format_add_json_fragment(document, source, value_start, position,
                                     default_mood);
+    if (document.fragments.count() != fragment_count)
+      document.fragments.back().should_silence_unresolved_commands =
+          matched_key->should_silence_unresolved_commands;
+    if (position < source.length) position++;
   }
 }
 
 pure fn parser_format_fragment_at(const parsed_format_document &document,
                                   usize host_position) wontthrow -> Maybe<usize>
 {
-  for (usize index = 0; index < document.fragments.count(); index++)
-    if (document.fragments[index].contains(host_position)) return index;
+  usize lower = 0;
+  usize upper = document.fragments.count();
+  while (lower < upper) {
+    let const middle = lower + (upper - lower) / 2;
+    let const &fragment = document.fragments[middle];
+    if (host_position < fragment.host_start) {
+      upper = middle;
+    } else if (host_position >= fragment.host_end) {
+      lower = middle + 1;
+    } else {
+      return middle;
+    }
+  }
 
   return None;
 }
@@ -707,6 +733,41 @@ fn parser_format_analysis_source(const parsed_format_document &document,
   }
 
   return result;
+}
+
+pure fn parser_format_should_silence_unresolved_commands(
+    parser_format_kind kind) wontthrow -> bool
+{
+  switch (kind) {
+  case parser_format_kind::Shell:
+  case parser_format_kind::UnknownHost:
+  case parser_format_kind::Markdown:
+  case parser_format_kind::Makefile:
+  case parser_format_kind::Taskfile:
+  case parser_format_kind::Justfile:
+  case parser_format_kind::VscodeTasks: return false;
+  case parser_format_kind::GithubActions:
+  case parser_format_kind::GiteaActions:
+  case parser_format_kind::ForgejoActions:
+  case parser_format_kind::GitlabCi:
+  case parser_format_kind::Ansible:
+  case parser_format_kind::Dockerfile:
+  case parser_format_kind::Compose:
+  case parser_format_kind::CloudBuild:
+  case parser_format_kind::CircleCi:
+  case parser_format_kind::AzurePipelines:
+  case parser_format_kind::BitbucketPipelines:
+  case parser_format_kind::Buildkite:
+  case parser_format_kind::TravisCi:
+  case parser_format_kind::Kubernetes:
+  case parser_format_kind::PackageJson:
+  case parser_format_kind::Drone:
+  case parser_format_kind::Woodpecker:
+  case parser_format_kind::RpmSpec:
+  case parser_format_kind::DevContainer: return true;
+  }
+
+  return false;
 }
 
 fn parse_format_document(const parser_format_input &input) throws

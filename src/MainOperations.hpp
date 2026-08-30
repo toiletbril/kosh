@@ -680,7 +680,8 @@ static fn run_lint_document_contents(
     context.set_warning_level(fragment.mood == mimic_mood::Default ? 0 : 3);
     let const fragment_status = run_script_contents(
         fragment.analysis_source, context, ast_arena, filename, nullptr,
-        nullptr, None, diagnostic_totals, diagnostic_sink, false, true);
+        nullptr, None, diagnostic_totals, diagnostic_sink, false,
+        fragment.should_silence_unresolved_commands);
     if (fragment_status != EXIT_SUCCESS) status = fragment_status;
   }
 

@@ -19,6 +19,8 @@ frame()
   frame '{"jsonrpc":"2.0","id":8,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/.github/workflows/check.yml"},"position":{"line":6,"character":13}}}'
   frame '{"jsonrpc":"2.0","id":9,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/.github/workflows/check.yml"},"position":{"line":6,"character":27},"newName":"renamed"}}'
   frame '{"jsonrpc":"2.0","id":10,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/.github/workflows/check.yml"},"range":{"start":{"line":6,"character":36},"end":{"line":6,"character":50}},"context":{"diagnostics":[]}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/README.md","languageId":"markdown","version":1,"text":"```bash\nmissing_lsp_executable\n```\n"}}}'
+  frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/.devcontainer/devcontainer.json","languageId":"json","version":1,"text":"{\n\"postCreateCommand\":\"missing_lsp_dev_target\",\n\"waitFor\":\"missing_lsp_dev_wait\",\n\"initializeCommand\":\"missing_lsp_dev_host\"\n}"}}}'
   frame '{"jsonrpc":"2.0","id":7,"method":"shutdown","params":null}'
   frame '{"jsonrpc":"2.0","method":"exit"}'
 } > "$directory/input"
@@ -38,6 +40,26 @@ esac
 case $output in
 *'missing-shebang'*) printf 'host-shebang=unexpected\n' ;;
 *) printf 'host-shebang=none\n' ;;
+esac
+case $output in
+*"The command 'missing_lsp_executable' was not found"*)
+  printf 'local-command-diagnostic=ok\n'
+  ;;
+*) printf 'local-command-diagnostic=missing\n' ;;
+esac
+case $output in
+*'"start":{"line":3,"character":21},"end":{"line":3,"character":41}'*"The command 'missing_lsp_dev_host' was not found"*)
+  printf 'dev-host-diagnostic=ok\n'
+  ;;
+*) printf 'dev-host-diagnostic=missing\n' ;;
+esac
+case $output in
+*'missing_lsp_dev_target'*) printf 'dev-target-diagnostic=unexpected\n' ;;
+*) printf 'dev-target-diagnostic=none\n' ;;
+esac
+case $output in
+*'missing_lsp_dev_wait'*) printf 'dev-wait-diagnostic=unexpected\n' ;;
+*) printf 'dev-wait-diagnostic=none\n' ;;
 esac
 case $output in
 *'"name":"value"'*) printf 'outline=ok\n' ;;

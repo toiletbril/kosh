@@ -4,3 +4,6 @@ gitea=1 forgejo=1 gitlab=1 ansible=1 compose=1 cloud-build=1
 circle=1 azure=1 bitbucket=1 buildkite=1 travis=1 kubernetes=1
 drone=1 woodpecker=1 taskfile=1 justfile=1 rpm=1
 vscode=1 dev-container=1 jenkins=0 terraform=0 nix=0
+missing markdown=1 make=1 package=0 taskfile=1 justfile=1 vscode=1
+target container=0 dev-lifecycle=0 dev-wait=0 dev-host=1
+json-value-key=0

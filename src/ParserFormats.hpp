@@ -45,12 +45,19 @@ enum class parser_format_codec : u8
   JsonString,
 };
 
+struct parser_format_json_key
+{
+  StringView name;
+  bool should_silence_unresolved_commands;
+};
+
 struct parser_format_fragment
 {
   String analysis_source{heap_allocator()};
   String shell_source{heap_allocator()};
   mimic_mood mood{mimic_mood::Posix};
   parser_format_codec codec{parser_format_codec::Direct};
+  bool should_silence_unresolved_commands{false};
   usize host_start{0};
   usize host_end{0};
   usize indent_length{0};
@@ -174,6 +181,8 @@ fn parser_format_apply_replacements(
     -> Maybe<String>;
 fn parser_format_analysis_source(const parsed_format_document &document,
                                  StringView host_source) throws -> String;
+pure fn parser_format_should_silence_unresolved_commands(
+    parser_format_kind kind) wontthrow -> bool;
 
 pure fn parser_format_has_substring(StringView source,
                                     StringView wanted) wontthrow -> bool;
@@ -194,7 +203,8 @@ fn parser_format_extract_yaml_keys(
     usize key_count, mimic_mood default_mood,
     bool should_select_workflow_shell = false) throws -> void;
 fn parser_format_extract_json_keys(parsed_format_document &document,
-                                   StringView source, const StringView *keys,
+                                   StringView source,
+                                   const parser_format_json_key *keys,
                                    usize key_count,
                                    mimic_mood default_mood) throws -> void;
 fn parser_format_add_json_fragment(parsed_format_document &document,
