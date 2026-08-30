@@ -668,7 +668,7 @@ EOF
 UNEXPORTED=fromenvironment "$BIN" -c 'koshkit make -f export.mk'
 cat > default-shell.mk <<'EOF'
 all:
-	@if [ "$(SHELL)" = "$(BIN)" ]; then echo default-shell=self; else echo default-shell=other; fi
+	@shell_value=$$(printf '%s' '$(SHELL)' | koshkit tr '\\' '/'); bin_value=$$(printf '%s' '$(BIN)' | koshkit tr '\\' '/'); if [ "$$shell_value" = "$$bin_value" ]; then echo default-shell=self; else echo default-shell=other; fi
 EOF
 "$BIN" -c 'koshkit make -f default-shell.mk'
 cat > shell.mk <<'EOF'
@@ -820,7 +820,7 @@ NAME = A
 $(NAME) = expanded-name
 
 all: duplicate
-	@if [ "$(SHELL)" = "$(BIN)" ]; then shell=self; else shell=other; fi; echo "paren=$(A) brace=${A} short=$A shell=$$shell"
+	@shell_value=$$(printf '%s' '$(SHELL)' | koshkit tr '\\' '/'); bin_value=$$(printf '%s' '$(BIN)' | koshkit tr '\\' '/'); if [ "$$shell_value" = "$$bin_value" ]; then shell=self; else shell=other; fi; echo "paren=$(A) brace=${A} short=$A shell=$$shell"
 
 duplicate: first second first
 	@echo "caret=$^"

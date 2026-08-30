@@ -21,7 +21,7 @@ TEST_JOBS := 1
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 export TEST_PATH_ENVIRONMENT_NAME := Path
-export MSYS2_ENV_CONV_EXCL := Path
+export MSYS2_ENV_CONV_EXCL := Path;SHELL
 export HOME := $(USERPROFILE)
 else
 export TEST_PATH_SEPARATOR := :
@@ -32,6 +32,9 @@ TEST_JOBS ?= $(shell ../scripts/cpu-count.sh)
 export TEST_HOST_PATH_SEPARATOR := :
 export TEST_TEMP_DIRECTORY := .test-work
 export TEST_MKTEMP_DIRECTORY := $(shell $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/.test-work
+export TEST_SYSTEM_RM := $(shell \
+	rm_path=$$(command -v rm); \
+	echo "$$(cd "$$(dirname "$$rm_path")" && $(TEST_ABSOLUTE_DIRECTORY_COMMAND))/$$(basename "$$rm_path")")
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)

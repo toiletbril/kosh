@@ -11,7 +11,7 @@ finish()
     if [ -n "$holder_pid_two" ]; then
       wait "$holder_pid_two" 2>/dev/null
     fi
-    "$TEST_SYSTEM_PATH/rm" -r "$d"
+    "$TEST_SYSTEM_RM" -r "$d"
   fi
 }
 trap finish EXIT
@@ -19,10 +19,10 @@ trap finish EXIT
 : > "$d/held"
 : > "$d/unused"
 if [ "${OS-}" = Windows_NT ]; then
-  "$BIN" -c 'cd "$4" || exit; exec <"$1"; : > "$2"; while [ ! -e "$3" ]; do koshkit sleep 0.01; done' \
+  "$BIN" -c 'cd "$4" || exit; exec <"$1"; printf "%s\n" "$BASHPID" > "$2"; while [ ! -e "$3" ]; do koshkit sleep 0.01; done' \
     fuser-holder "$d/held" "$d/ready" "$d/release" "$d" &
   holder_pid=$!
-  "$BIN" -c 'exec <"$1"; : > "$2"; while [ ! -e "$3" ]; do koshkit sleep 0.01; done' \
+  "$BIN" -c 'exec <"$1"; printf "%s\n" "$BASHPID" > "$2"; while [ ! -e "$3" ]; do koshkit sleep 0.01; done' \
     fuser-holder-two "$d/held" "$d/ready-two" "$d/release" &
   holder_pid_two=$!
 else
@@ -46,14 +46,20 @@ while [ ! -e "$d/ready-two" ] && [ "$attempt_count" -lt 1000 ]; do
   attempt_count=$((attempt_count + 1))
 done
 [ -e "$d/ready-two" ] || exit 1
-if [ "$holder_pid" -lt "$holder_pid_two" ]; then
-  first_pid=$holder_pid
-  second_pid=$holder_pid_two
-  expected_pids="$holder_pid $holder_pid_two "
+fuser_pid=$holder_pid
+fuser_pid_two=$holder_pid_two
+if [ "${OS-}" = Windows_NT ]; then
+  fuser_pid=$(cat "$d/ready")
+  fuser_pid_two=$(cat "$d/ready-two")
+fi
+if [ "$fuser_pid" -lt "$fuser_pid_two" ]; then
+  first_pid=$fuser_pid
+  second_pid=$fuser_pid_two
+  expected_pids="$fuser_pid $fuser_pid_two "
 else
-  first_pid=$holder_pid_two
-  second_pid=$holder_pid
-  expected_pids="$holder_pid_two $holder_pid "
+  first_pid=$fuser_pid_two
+  second_pid=$fuser_pid
+  expected_pids="$fuser_pid_two $fuser_pid "
 fi
 expected_combined=$d/held:$first_pid'f'$second_pid'f'
 
@@ -86,7 +92,7 @@ if [ "${OS-}" = Windows_NT ]; then
   esac
 else
   case $(cat "$d/cwd-stdout"):$(cat "$d/cwd-stderr") in
-    *"$holder_pid"*:"$d:"*c*) echo cwd-use=passed ;;
+    *"$fuser_pid"*:"$d:"*c*) echo cwd-use=passed ;;
     *) echo cwd-use=failed ;;
   esac
 fi
@@ -94,7 +100,7 @@ fi
 "$BIN" -c 'koshkit fuser "$1"' fuser "$BIN" \
   > "$d/executable-stdout" 2> "$d/executable-stderr"
 case $(cat "$d/executable-stdout"):$(cat "$d/executable-stderr") in
-  *"$holder_pid"*:"$BIN:"*e*) echo executable-use=passed ;;
+  *"$fuser_pid"*:"$BIN:"*e*) echo executable-use=passed ;;
   *) echo executable-use=failed ;;
 esac
 
@@ -143,7 +149,7 @@ else
   "$BIN" -c 'koshkit fuser -c "$1"' fuser "$d/held" \
     > "$d/device-stdout" 2> "$d/device-stderr"
   if [ "$?" -eq 0 ] &&
-    case $(cat "$d/device-stdout") in *"$holder_pid"*) true;; *) false;; esac
+    case $(cat "$d/device-stdout") in *"$fuser_pid"*) true;; *) false;; esac
   then
     echo device=passed
   else

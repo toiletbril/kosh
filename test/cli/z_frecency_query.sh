@@ -25,5 +25,5 @@ printf '%s\t9\t9999999999\n%s\t5\t9999999999\n' "$d/removed" "$d" > "$store"
 KOSH_DIRECTORY_HISTORY="$store" "$BIN" -c "z $(basename "$d")" |
     tr '\\' '/' | sed "s#$normalized_d#TMPDIR#"
 if [ -n "$d" ] && [ -n "$store" ]; then
-  "$TEST_SYSTEM_PATH/rm" -r "$d" "$store"
+  "$TEST_SYSTEM_RM" -r "$d" "$store"
 fi

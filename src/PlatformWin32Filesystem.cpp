@@ -801,14 +801,6 @@ fn make_directory(StringView path, u32 mode) wontthrow -> bool
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 {
   let const owner_is_writable = (mode & 0200u) != 0;
-  let const group_is_writable = (mode & 0020u) != 0;
-  let const other_is_writable = (mode & 0002u) != 0;
-  if (owner_is_writable != group_is_writable ||
-      owner_is_writable != other_is_writable)
-  {
-    SetLastError(ERROR_NOT_SUPPORTED);
-    return false;
-  }
   let const wide_path = utf8_to_wide(path, heap_allocator());
   if (!wide_path.has_value()) return false;
   let attributes = GetFileAttributesW(wide_path->begin());
