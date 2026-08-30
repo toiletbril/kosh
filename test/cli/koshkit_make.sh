@@ -686,7 +686,7 @@ cat > shell-env.mk <<'EOF'
 SHELL = $(BIN)
 
 all:
-	@if [ "$$SHELL" = "$$EXPECTED_SHELL" ]; then echo shell-env=inherited-value; else echo "shell-env=$$SHELL"; fi
+	@shell_value=$$(printf '%s' "$$SHELL" | koshkit tr "\\\\" '/'); expected_shell=$$(printf '%s' "$$EXPECTED_SHELL" | koshkit tr "\\\\" '/'); case "$$shell_value" in "$$expected_shell"|"$$expected_shell.exe") echo shell-env=inherited-value;; *) echo "shell-env=$$SHELL";; esac
 EOF
 SHELL="$TEST_SYSTEM_RM" EXPECTED_SHELL="$TEST_SYSTEM_RM" \
   "$BIN" -c 'koshkit make -f shell-env.mk'

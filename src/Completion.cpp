@@ -378,7 +378,7 @@ static fn complete_command_name_prefix(
     -> GhostPrefixCollector
 {
   let collector =
-      GhostPrefixCollector{GhostPrefixCollector::Selection::CommonPrefix};
+      GhostPrefixCollector{GhostPrefixCollector::Selection::FirstMatch};
   collect_command_names(token, match_mode, context, collector,
                         extra_command_names);
   return collector;

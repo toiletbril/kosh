@@ -33,7 +33,7 @@ done
 command_result=$(env -u PATH "$TEST_PATH_ENVIRONMENT_NAME=$d/commands" \
     "$BIN" --debug-ghost-at 'probe')
 assert_field "$command_result" count 2
-assert_field "$command_result" prefix probe-
+assert_field "$command_result" prefix probe-alpha
 assert_field "$command_result" materialized 0
 test "$(result_field "$command_result" source-scans)" -le 128
 echo 'command ghost skips unrelated PATH names'
