@@ -57,6 +57,12 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
     ec.print_to_stdout(output->view());
   }
   if (!settings.is_empty()) {
+    if (!os::is_fd_a_tty(terminal)) {
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "standard input is not a terminal");
+      return 1;
+    }
+
     let const result = os::apply_terminal_settings(terminal, settings);
     if (result.kind == os::terminal_settings_apply_kind::SystemError) {
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),

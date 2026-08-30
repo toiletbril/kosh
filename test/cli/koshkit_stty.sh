@@ -7,7 +7,7 @@ trap 'test -n "$d" && /bin/rm -r "$d"' EXIT
 
 command_text="exec \"$BIN\" -c 'before=\$(koshkit stty -g) || exit
 echo
-\"$BIN\" -c \"koshkit stty KOSH_MISSING_SETTING\" 2>&1
+\"$BIN\" -c \"koshkit stty KOSH_MISSING_SETTING\" </dev/tty 2>&1
 overflow=10000000000000000:\${before#*:}
 if koshkit stty \"\$overflow\" 2>/dev/null; then echo invalid=failed; else echo invalid=passed; fi
 koshkit stty -echo igncr -opost tostop erase \"^H\" || exit

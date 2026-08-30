@@ -46,7 +46,7 @@ EOF
 cat > "$root/Makefile" <<'EOF'
 SHELL := /bin/bash
 all:
-	printf '%s\n' "$MAKE_EMBEDDED"
+	printf '%s\n' "$$MAKE_EMBEDDED" "$(MAKE_ONLY)" "$@"
 	missing_make_executable
 EOF
 
@@ -230,10 +230,13 @@ container=$(printf '%s' "$container_output" | \
   grep -c "The variable 'CONTAINER_EMBEDDED'")
 container_target_missing=$(printf '%s' "$container_output" | \
   grep -c "The command 'missing_container_target_executable' was not found")
-set -- $(count_variable_and_missing_executable MAKE_EMBEDDED \
-  missing_make_executable "$root/Makefile")
-makefile=$1
-make_missing=$2
+make_output=$("$BIN" --lint --no-traces "$root/Makefile" 2>&1)
+makefile=$(printf '%s' "$make_output" | \
+  grep -c "The variable 'MAKE_EMBEDDED'")
+make_missing=$(printf '%s' "$make_output" | \
+  grep -c "The command 'missing_make_executable' was not found")
+make_host=$(printf '%s' "$make_output" | \
+  grep -Ec "MAKE_ONLY|positional parameter")
 set -- $(count_variable_and_missing_executable PACKAGE_EMBEDDED \
   missing_package_executable "$root/package.json")
 package=$1
@@ -285,6 +288,7 @@ nix=$(count_variable NIX_HOST "$root/check.nix")
 printf 'github=%s markdown=%s container=%s make=%s package=%s\n' \
   "$github" "$markdown" "$container" "$makefile" "$package"
 printf 'github-host=%s\n' "$github_host"
+printf 'make-host=%s\n' "$make_host"
 printf 'gitea=%s forgejo=%s gitlab=%s ansible=%s compose=%s cloud-build=%s\n' \
   "$gitea" "$forgejo" "$gitlab" "$ansible" "$compose" "$cloud_build"
 printf 'circle=%s azure=%s bitbucket=%s buildkite=%s travis=%s kubernetes=%s\n' \

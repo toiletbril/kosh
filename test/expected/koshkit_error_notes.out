@@ -79,7 +79,7 @@ note: Pass `f`, `d`, or `l` after `-type`.
      1 |  koshkit id KOSH_MISSING_USER
        |             ^~~~~~~~~~~~~~~~~
 === stty setting location ===
-1:1: error: stty: Operation not supported by device.
+1:1: error: stty: standard input is not a terminal.
      1 |  koshkit stty KOSH_MISSING_SETTING
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 === stty conflicting flag location ===

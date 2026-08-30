@@ -1481,15 +1481,15 @@ cold fn last_system_error_message() throws -> String
     if (view[i] == '%' && i + 1 < view.length && view[i + 1] >= '0' &&
         view[i + 1] <= '9')
     {
-      err += StringView{"input"};
+      err += err.is_empty() ? StringView{"Input"} : StringView{"input"};
       i++;
       continue;
     }
-    err.push(view[i]);
+    let const byte = view[i];
+    err.push(err.is_empty() && byte >= 'a' && byte <= 'z'
+                 ? static_cast<char>(byte - 'a' + 'A')
+                 : byte);
   }
-
-  if (err.length() > 0 && err[0] >= 'a' && err[0] <= 'z')
-    err[0] = static_cast<char>(err[0] - 'a' + 'A');
 
   return err;
 }

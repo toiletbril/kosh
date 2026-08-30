@@ -600,9 +600,9 @@ cold fn list_directory_typed(StringView dir) throws
 
   let entries = ArrayList<Path::directory_child>{heap_allocator()};
   do {
-    let const name = wide_to_utf8(data.cFileName,
-                                  static_cast<usize>(lstrlenW(data.cFileName)),
-                                  heap_allocator());
+    let name = wide_to_utf8(data.cFileName,
+                            static_cast<usize>(lstrlenW(data.cFileName)),
+                            heap_allocator());
     if (!name.has_value()) return None;
     if (name->view() == StringView{"."} || name->view() == StringView{".."})
       continue;
@@ -1139,8 +1139,7 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
 
   while (position < length && drives[position] != L'\0') {
     let const drive_length = static_cast<usize>(lstrlenW(drives + position));
-    let const drive =
-        wide_to_utf8(drives + position, drive_length, heap_allocator());
+    let drive = wide_to_utf8(drives + position, drive_length, heap_allocator());
     if (!drive.has_value()) return result;
     let target = drive.take();
     result.push(mounted_filesystem{target.clone(), steal(target)});

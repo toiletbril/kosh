@@ -290,7 +290,8 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
   usize kept = mark;
   for (usize i = mark; i < m_paths.count(); i++) {
     try {
-      let const wide_path = utf8_to_wide(m_paths[i].view(), heap_allocator());
+      let const wide_path =
+          utf8_to_wide(m_paths[i].text().view(), heap_allocator());
       if (wide_path.has_value() && DeleteFileW(wide_path->begin()) != FALSE)
         continue;
     } catch (...) {}
@@ -533,7 +534,7 @@ fn get_current_user() -> Maybe<String>
     for (DWORD i = 0; i < size; i++)
       buffer.push(L'\0');
     if (GetUserNameW(buffer.begin(), &size))
-      return wide_to_utf8(buffer.begin(), size - 1);
+      return wide_to_utf8(buffer.begin(), size - 1, heap_allocator());
   }
   return koshka::None;
 }
@@ -544,7 +545,8 @@ fn get_hostname() throws -> Maybe<String>
 {
   wchar_t buffer[MAX_COMPUTERNAME_LENGTH + 1];
   DWORD size = countof(buffer);
-  if (GetComputerNameW(buffer, &size)) return wide_to_utf8(buffer, size);
+  if (GetComputerNameW(buffer, &size))
+    return wide_to_utf8(buffer, size, heap_allocator());
   return koshka::None;
 }
 
@@ -706,7 +708,7 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>
 {
-  let const path_text = utf8_to_wide(path);
+  let const path_text = utf8_to_wide(path, heap_allocator());
   if (!path_text.has_value() ||
       GetFileAttributesW(path_text->begin()) == INVALID_FILE_ATTRIBUTES)
     return None;
