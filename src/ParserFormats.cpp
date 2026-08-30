@@ -1,6 +1,7 @@
 #include "ParserFormats.hpp"
 
 #include "MimicMood.hpp"
+#include "Path.hpp"
 
 namespace koshka {
 
@@ -123,7 +124,7 @@ static pure fn known_host_extension(StringView path) wontthrow -> bool
   return false;
 }
 
-static pure fn detect_format_kind(const parser_format_input &input) wontthrow
+static pure fn detect_format_kind(const parser_format_input &input) throws
     -> parser_format_kind
 {
   let path = input.path.has_value() ? *input.path : StringView{};
@@ -242,7 +243,13 @@ static pure fn detect_format_kind(const parser_format_input &input) wontthrow
       parser_format_ascii_equal(filename, "jenkinsfile"))
     return parser_format_kind::UnknownHost;
 
-  return parser_format_kind::Shell;
+  if (path.is_empty() || !language_id.is_empty() ||
+      Path{path}.is_shell_source(source))
+  {
+    return parser_format_kind::Shell;
+  }
+
+  return parser_format_kind::UnknownHost;
 }
 
 static fn make_analysis_source(StringView host_source, usize host_start,

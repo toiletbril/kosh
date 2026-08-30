@@ -1,5 +1,5 @@
-1:14: error: stty: invalid terminal setting.
-     1 |  koshkit stty KOSH_MISSING_SETTING
+3:14: error: stty: invalid terminal setting.
+     3 |  koshkit stty KOSH_MISSING_SETTING 2>&1
        |               ^~~~~~~~~~~~~~~~~~~~
 invalid=passed
 modes=passed

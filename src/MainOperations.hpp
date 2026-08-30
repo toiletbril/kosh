@@ -4,6 +4,41 @@
 
 namespace koshka {
 
+static fn unrecognized_format_message(Maybe<StringView> filename) throws
+    -> String
+{
+  let message = String{filename.has_value() ? *filename : StringView{"input"}};
+  message.append(": error: The file format is not recognized.\n");
+  message.append("note: Recognized formats include ");
+
+  usize supported_format_count = 0;
+  for (usize kind_index = 0; kind_index < PARSER_FORMAT_KIND_COUNT;
+       kind_index++)
+  {
+    let const name =
+        parser_format_kind_name(static_cast<parser_format_kind>(kind_index));
+    if (!name.is_empty()) supported_format_count++;
+  }
+
+  usize appended_format_count = 0;
+  for (usize kind_index = 0; kind_index < PARSER_FORMAT_KIND_COUNT;
+       kind_index++)
+  {
+    let const name =
+        parser_format_kind_name(static_cast<parser_format_kind>(kind_index));
+    if (name.is_empty()) continue;
+    if (appended_format_count != 0)
+      message.append(appended_format_count + 1 == supported_format_count
+                         ? ", and "
+                         : ", ");
+    message.append(name);
+    appended_format_count++;
+  }
+  message.push('.');
+
+  return message;
+}
+
 fn kosh_binary_flag_list() wontthrow -> const FlagList & { return FLAG_LIST; }
 
 #if !defined NDEBUG
@@ -657,10 +692,19 @@ static fn run_lint_document_contents(
     const String &source, EvalContext &context, BumpArena &ast_arena,
     Maybe<StringView> filename,
     analysis_diagnostic_totals *diagnostic_totals = nullptr,
-    ArrayList<source_diagnostic> *diagnostic_sink = nullptr) throws -> int
+    ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
+    bool *is_format_recognized = nullptr) throws -> int
 {
   let const document =
       parse_format_document(parser_format_input{source.view(), filename, None});
+  if (is_format_recognized != nullptr)
+    *is_format_recognized = document.kind != parser_format_kind::UnknownHost;
+  if (document.kind == parser_format_kind::UnknownHost) {
+    let const message = unrecognized_format_message(filename);
+    show_message(message.view());
+
+    return EXIT_FAILURE;
+  }
   if (!document.is_host_format)
     return run_script_contents(source, context, ast_arena, filename, nullptr,
                                nullptr, None, diagnostic_totals,
@@ -695,6 +739,11 @@ static fn format_document_source(StringView source, Maybe<StringView> filename,
 {
   let const document =
       parse_format_document(parser_format_input{source, filename, None});
+  if (document.kind == parser_format_kind::UnknownHost) {
+    errors.push(unrecognized_format_message(filename));
+
+    return None;
+  }
   if (!document.is_host_format)
     return format_shell_source(source, mood, ast_arena, errors);
 
@@ -1222,9 +1271,11 @@ static fn run_format_operation(const ArrayList<String> &file_names,
   if (!should_apply && input_count == 0) input_count = 1;
 
   for (usize input_index = 0; input_index < input_count; input_index++) {
+    let const is_standard_input =
+        file_names.is_empty() || file_names[input_index] == "-";
     Maybe<apply_file_snapshot> snapshot;
     let source = String{heap_allocator()};
-    if (file_names.is_empty() || file_names[input_index] == "-") {
+    if (is_standard_input) {
       source = utils::read_entire_standard_input();
     } else if (should_apply) {
       snapshot = read_apply_file(Path{file_names[input_index].view()});
@@ -1249,11 +1300,17 @@ static fn run_format_operation(const ArrayList<String> &file_names,
       let normalized_source = source.clone();
       normalized_source.normalize_crlf_line_endings();
       let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
-      let const source_name = file_names.is_empty()
+      let const source_name = is_standard_input
                                   ? Maybe<StringView>{}
                                   : Maybe<StringView>{file_names[input_index]};
+      bool is_format_recognized = true;
       unused(run_lint_document_contents(normalized_source, context, ast_arena,
-                                        source_name, nullptr, &diagnostics));
+                                        source_name, nullptr, &diagnostics,
+                                        &is_format_recognized));
+      if (!is_format_recognized) {
+        did_fail = true;
+        continue;
+      }
       let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
 
       for (let const &diagnostic : diagnostics) {
@@ -1284,7 +1341,7 @@ static fn run_format_operation(const ArrayList<String> &file_names,
     }
 
     let errors = ArrayList<String>{heap_allocator()};
-    let const source_name = file_names.is_empty()
+    let const source_name = is_standard_input
                                 ? Maybe<StringView>{}
                                 : Maybe<StringView>{file_names[input_index]};
     let formatted = format_document_source(source.view(), source_name, mood,
@@ -1332,8 +1389,14 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let source = snapshot->contents.clone();
     source.normalize_crlf_line_endings();
     let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
+    bool is_format_recognized = true;
     unused(run_lint_document_contents(source, context, ast_arena,
-                                      file_name.view(), nullptr, &diagnostics));
+                                      file_name.view(), nullptr, &diagnostics,
+                                      &is_format_recognized));
+    if (!is_format_recognized) {
+      did_fail = true;
+      continue;
+    }
     let normalized_fixes = ArrayList<source_fix>{heap_allocator()};
     let reported_severities = ArrayList<applied_fix_tally>{heap_allocator()};
     for (let const &diagnostic : diagnostics) {

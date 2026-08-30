@@ -4,6 +4,11 @@ memory-summary-last=yes
 one-command-order=LINT_COMMAND_ONE,LINT_COMMAND_TWO,LINT_FILE_ONE,LINT_FILE_TWO rc=1
 parse-command=1 parse-file=1 errors=2 rc=1
 missing=1 directory=1 continued=1 rc=1
+unknown.txt: error: The file format is not recognized.
+note: Recognized formats include shell scripts, GitHub Actions, Gitea Actions, Forgejo Actions, GitLab CI, Ansible, Dockerfiles, Compose files, Markdown, Makefiles, Google Cloud Build, CircleCI, Azure Pipelines, Bitbucket Pipelines, Buildkite, Travis CI, Kubernetes, package.json, Drone, Woodpecker, Taskfiles, Justfiles, RPM specs, VS Code tasks, and Dev Containers.
+unknown.yaml: error: The file format is not recognized.
+note: Recognized formats include shell scripts, GitHub Actions, Gitea Actions, Forgejo Actions, GitLab CI, Ansible, Dockerfiles, Compose files, Markdown, Makefiles, Google Cloud Build, CircleCI, Azure Pipelines, Bitbucket Pipelines, Buildkite, Travis CI, Kubernetes, package.json, Drone, Woodpecker, Taskfiles, Justfiles, RPM specs, VS Code tasks, and Dev Containers.
+unknown-formats-status=1
 noexec-first=1 noexec-second=0 rc=0
 noexec-commands=2 noexec-files=0 rc=0
 dash-file=1 second-file=1 rc=1

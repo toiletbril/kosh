@@ -1,4 +1,5 @@
 unset KOSH_FLAGS
+BIN=$(cd "$(dirname "$BIN")" && pwd -P)/$(basename "$BIN")
 root=$TEST_TEMP_DIRECTORY/format-apply
 mkdir -p "$root"
 trap '[ -n "$root" ] && /bin/rm -rf "$root"' EXIT
@@ -452,6 +453,19 @@ before=$(cat "$root/invalid.sh")
 "$BIN" --format --apply "$root/invalid.sh" >/dev/null 2>&1
 printf 'parse-status=%s unchanged=%s\n' "$?" \
   "$([ "$(cat "$root/invalid.sh")" = "$before" ] && printf yes)"
+
+printf 'printf unrecognized\n' > "$root/unrecognized.txt"
+cp "$root/unrecognized.txt" "$root/unrecognized.expected"
+(cd "$root" && "$BIN" --format unrecognized.txt) 2>&1
+printf 'unrecognized-format-status=%s\n' "$?"
+"$BIN" --format --apply "$root/unrecognized.txt" >/dev/null 2>&1
+format_apply_status=$?
+"$BIN" --lint --apply --no-traces "$root/unrecognized.txt" >/dev/null 2>&1
+lint_apply_status=$?
+printf 'unrecognized-apply-status=%s,%s unchanged=%s\n' \
+  "$format_apply_status" "$lint_apply_status" \
+  "$(cmp -s "$root/unrecognized.txt" "$root/unrecognized.expected" && \
+      printf yes)"
 
 printf '#!/bin/sh\n[ "\0441" == y ]\nif\n' > "$root/invalid-lint.sh"
 cp "$root/invalid-lint.sh" "$root/invalid-lint.expected"

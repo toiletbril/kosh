@@ -360,6 +360,10 @@ builtin eval \
   "$(one/two/three.dump | four/five:six/seven.awk resolve 2>/dev/null)"
 substitution-wrap-idempotent=yes
 parse-status=1 unchanged=yes
+unrecognized.txt: error: The file format is not recognized.
+note: Recognized formats include shell scripts, GitHub Actions, Gitea Actions, Forgejo Actions, GitLab CI, Ansible, Dockerfiles, Compose files, Markdown, Makefiles, Google Cloud Build, CircleCI, Azure Pipelines, Bitbucket Pipelines, Buildkite, Travis CI, Kubernetes, package.json, Drone, Woodpecker, Taskfiles, Justfiles, RPM specs, VS Code tasks, and Dev Containers.
+unrecognized-format-status=1
+unrecognized-apply-status=1,1 unchanged=yes
 lint-parse-status=1 unchanged=yes
 combined-parse-status=1 unchanged=yes
 apply-alone-status=2

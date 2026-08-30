@@ -7,7 +7,7 @@ trap 'test -n "$d" && /bin/rm -r "$d"' EXIT
 
 command_text="exec \"$BIN\" -c 'before=\$(koshkit stty -g) || exit
 echo
-\"$BIN\" -c \"koshkit stty KOSH_MISSING_SETTING\" </dev/tty 2>&1
+koshkit stty KOSH_MISSING_SETTING 2>&1
 overflow=10000000000000000:\${before#*:}
 if koshkit stty \"\$overflow\" 2>/dev/null; then echo invalid=failed; else echo invalid=passed; fi
 koshkit stty -echo igncr -opost tostop erase \"^H\" || exit
@@ -19,7 +19,7 @@ koshkit stty \"\$before\" || exit
 after=\$(koshkit stty -g) || exit
 if [ \"\$before\" = \"\$after\" ]; then echo restore=passed; else echo restore=failed; fi'"
 
-output_pattern='^(1:14: error: stty: invalid terminal setting\.|     1 \|  koshkit stty KOSH_MISSING_SETTING|       \|               \^~~~~~~~~~~~~~~~~~~~|(invalid|modes|changed|restore)=)'
+output_pattern='^(3:14: error: stty: invalid terminal setting\.|     3 \|  koshkit stty KOSH_MISSING_SETTING|       \|               \^~~~~~~~~~~~~~~~~~~~|(invalid|modes|changed|restore)=)'
 if script -q -c true /dev/null >/dev/null 2>&1; then
   script -q -c "$command_text" /dev/null | tr -d '\r' |
     grep -E "$output_pattern"

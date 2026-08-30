@@ -37,6 +37,9 @@ cat > "$root/stdin.bash" <<'EOF'
 echo "$LINT_STDIN"
 EOF
 
+printf 'echo "$LINT_UNKNOWN_TEXT"\n' > "$root/unknown.txt"
+printf 'name: unknown\n' > "$root/unknown.yaml"
+
 diagnostic_names()
 {
   names=
@@ -137,6 +140,11 @@ after_open_error=$(printf '%s\n' "$output" |
   grep -c "The variable 'LINT_FILE_TWO'")
 printf 'missing=%s directory=%s continued=%s rc=%s\n' \
   "$missing_count" "$directory_count" "$after_open_error" "$rc"
+
+output=$("$BIN" --lint --no-traces unknown.txt unknown.yaml 2>&1)
+rc=$?
+printf '%s\n' "$output"
+printf 'unknown-formats-status=%s\n' "$rc"
 
 output=$("$BIN" -n -WWW --no-traces first.bash parse.bash 2>&1)
 rc=$?

@@ -40,6 +40,14 @@
 
 #include <assert.h>
 
+#ifndef CHARCLASS_NAME_MAX
+#define CHARCLASS_NAME_MAX 14
+#endif
+
+#ifndef RE_DUP_MAX
+#define RE_DUP_MAX 255
+#endif
+
 /***********************************************************************
  from tre-compile.h
 ***********************************************************************/

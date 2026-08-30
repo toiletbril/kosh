@@ -8,35 +8,57 @@
 
 namespace koshka {
 
+#define PARSER_FORMAT_KIND_ENTRIES(X)                                          \
+  X(Shell, "shell scripts")                                                    \
+  X(UnknownHost, "")                                                           \
+  X(GithubActions, "GitHub Actions")                                           \
+  X(GiteaActions, "Gitea Actions")                                             \
+  X(ForgejoActions, "Forgejo Actions")                                         \
+  X(GitlabCi, "GitLab CI")                                                     \
+  X(Ansible, "Ansible")                                                        \
+  X(Dockerfile, "Dockerfiles")                                                 \
+  X(Compose, "Compose files")                                                  \
+  X(Markdown, "Markdown")                                                      \
+  X(Makefile, "Makefiles")                                                     \
+  X(CloudBuild, "Google Cloud Build")                                          \
+  X(CircleCi, "CircleCI")                                                      \
+  X(AzurePipelines, "Azure Pipelines")                                         \
+  X(BitbucketPipelines, "Bitbucket Pipelines")                                 \
+  X(Buildkite, "Buildkite")                                                    \
+  X(TravisCi, "Travis CI")                                                     \
+  X(Kubernetes, "Kubernetes")                                                  \
+  X(PackageJson, "package.json")                                               \
+  X(Drone, "Drone")                                                            \
+  X(Woodpecker, "Woodpecker")                                                  \
+  X(Taskfile, "Taskfiles")                                                     \
+  X(Justfile, "Justfiles")                                                     \
+  X(RpmSpec, "RPM specs")                                                      \
+  X(VscodeTasks, "VS Code tasks")                                              \
+  X(DevContainer, "Dev Containers")
+
 enum class parser_format_kind : u8
 {
-  Shell,
-  UnknownHost,
-  GithubActions,
-  GiteaActions,
-  ForgejoActions,
-  GitlabCi,
-  Ansible,
-  Dockerfile,
-  Compose,
-  Markdown,
-  Makefile,
-  CloudBuild,
-  CircleCi,
-  AzurePipelines,
-  BitbucketPipelines,
-  Buildkite,
-  TravisCi,
-  Kubernetes,
-  PackageJson,
-  Drone,
-  Woodpecker,
-  Taskfile,
-  Justfile,
-  RpmSpec,
-  VscodeTasks,
-  DevContainer,
+#define PARSER_FORMAT_KIND_ENUM(kind, label) kind,
+  PARSER_FORMAT_KIND_ENTRIES(PARSER_FORMAT_KIND_ENUM)
+#undef PARSER_FORMAT_KIND_ENUM
 };
+
+constexpr usize PARSER_FORMAT_KIND_COUNT =
+    static_cast<usize>(parser_format_kind::DevContainer) + 1;
+
+inline pure fn parser_format_kind_name(parser_format_kind kind) wontthrow
+    -> StringView
+{
+  static constexpr StringView NAMES[PARSER_FORMAT_KIND_COUNT] = {
+#define PARSER_FORMAT_KIND_NAME(kind, label) label,
+      PARSER_FORMAT_KIND_ENTRIES(PARSER_FORMAT_KIND_NAME)
+#undef PARSER_FORMAT_KIND_NAME
+  };
+  let const index = static_cast<usize>(kind);
+  return index < PARSER_FORMAT_KIND_COUNT ? NAMES[index] : StringView{};
+}
+
+#undef PARSER_FORMAT_KIND_ENTRIES
 
 enum class parser_format_codec : u8
 {
