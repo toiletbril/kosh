@@ -22,10 +22,13 @@ static fn scaled_blocks(u64 block_count, u64 block_size,
                         u64 output_unit) wontthrow -> u64
 {
   let const byte_count = static_cast<u128>(block_count) * block_size;
-  let const scaled_count = (byte_count + output_unit - 1) / output_unit;
-  if (scaled_count > UINT64_MAX) return UINT64_MAX;
+  let const rounded_byte_count = byte_count + output_unit - 1;
+  let const high = static_cast<u64>(rounded_byte_count >> 64u);
+  if (high >= output_unit) return UINT64_MAX;
 
-  return static_cast<u64>(scaled_count);
+  u64 remainder = 0;
+  return os::divide_u128_by_u64(high, static_cast<u64>(rounded_byte_count),
+                                output_unit, remainder);
 }
 
 Df::Df() = default;
@@ -79,11 +82,14 @@ fn Df::execute(const ExecContext &ec, EvalContext &cxt,
                                         filesystem.block_size, output_unit);
     let const used = total > free ? total - free : 0;
     let const capacity_base = used + available;
-    let const capacity = capacity_base == 0
-                             ? 0
-                             : static_cast<u64>((static_cast<u128>(used) * 100 +
-                                                 capacity_base - 1) /
-                                                capacity_base);
+    u64 capacity = 0;
+    if (capacity_base != 0) {
+      let const numerator = static_cast<u128>(used) * 100 + capacity_base - 1;
+      u64 remainder = 0;
+      capacity = os::divide_u128_by_u64(static_cast<u64>(numerator >> 64u),
+                                        static_cast<u64>(numerator),
+                                        capacity_base, remainder);
+    }
     ec.print_to_stdout(mounted.source + " " +
                        String::from(total, cxt.scratch_allocator()) + " " +
                        String::from(used, cxt.scratch_allocator()) + " " +

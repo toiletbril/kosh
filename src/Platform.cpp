@@ -35,6 +35,34 @@ static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
 namespace koshka {
 namespace os {
 
+fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
+    -> u64
+{
+  ASSERT(high < divisor);
+
+#if defined _MSC_VER && defined _M_X64 && !defined __clang__
+  return _udiv128(high, low, divisor, &remainder);
+#elif defined _MSC_VER
+  u64 quotient = 0;
+  remainder = high;
+
+  for (u32 bit_position = 64; bit_position > 0; bit_position--) {
+    let const has_overflow = (remainder >> 63u) != 0;
+    remainder = (remainder << 1u) | ((low >> (bit_position - 1)) & 1u);
+    if (has_overflow || remainder >= divisor) {
+      remainder -= divisor;
+      quotient |= u64{1} << (bit_position - 1);
+    }
+  }
+
+  return quotient;
+#else
+  let const dividend = (static_cast<u128>(high) << 64u) | low;
+  remainder = static_cast<u64>(dividend % divisor);
+  return static_cast<u64>(dividend / divisor);
+#endif
+}
+
 static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
 {
   return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;

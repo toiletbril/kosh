@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-export TIMEFORMAT="%R"
+export TIMEFORMAT="%3R"
 
 WORK=$TEST_TEMP_DIRECTORY/bench
 cleanup_benchmark_work() {

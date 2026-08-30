@@ -210,17 +210,16 @@ fn get_scaled_magnitude(const ArithmeticValue &value, u32 decimal_scale,
 
 fn divide_small(ArrayList<u64> &limbs, u64 divisor) wontthrow -> u64
 {
-  u128 remainder = 0;
+  u64 remainder = 0;
 
   for (usize index = limbs.count(); index > 0; index--) {
-    let const current = (remainder << 64u) | limbs[index - 1];
-    limbs[index - 1] = static_cast<u64>(current / divisor);
-    remainder = current % divisor;
+    limbs[index - 1] =
+        os::divide_u128_by_u64(remainder, limbs[index - 1], divisor, remainder);
   }
 
   trim_limbs(limbs);
 
-  return static_cast<u64>(remainder);
+  return remainder;
 }
 
 pure fn magnitude_bit_length(const ArrayList<u64> &limbs) wontthrow -> usize
@@ -717,10 +716,10 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
     for (usize chunk_position = 0; chunk_position < chunks.count();
          chunk_position++)
     {
-      let const current =
-          (static_cast<u128>(chunks[chunk_position]) << 64u) | carry;
-      chunks[chunk_position] = static_cast<u64>(current % DECIMAL_CHUNK_BASE);
-      carry = static_cast<u64>(current / DECIMAL_CHUNK_BASE);
+      u64 remainder = 0;
+      carry = os::divide_u128_by_u64(chunks[chunk_position], carry,
+                                     DECIMAL_CHUNK_BASE, remainder);
+      chunks[chunk_position] = remainder;
     }
 
     while (carry != 0) {
@@ -867,12 +866,13 @@ fn ArithmeticValue::divide(const ArithmeticValue &left,
   if (!left.is_promoted() && !right.is_promoted()) {
     let const left_value = left.inline_value();
     let const right_value = right.inline_value();
-    let const minimum = static_cast<i128>(u128{1} << 127u);
-    if (left_value == minimum && right_value == -1) {
-      const u64 magnitude[] = {0, u64{1} << 63u};
-      return from_magnitude(magnitude, 2, false, 0, arena);
+    if (left_value >= INT64_MIN && left_value <= INT64_MAX &&
+        right_value >= INT64_MIN && right_value <= INT64_MAX &&
+        !(left_value == INT64_MIN && right_value == -1))
+    {
+      return from_signed_128(
+          static_cast<i64>(left_value) / static_cast<i64>(right_value), arena);
     }
-    return from_signed_128(left_value / right_value, arena);
   }
 
   let const decimal_scale = left.get_decimal_scale() > right.get_decimal_scale()
@@ -903,9 +903,13 @@ fn ArithmeticValue::modulo(const ArithmeticValue &left,
   if (!left.is_promoted() && !right.is_promoted()) {
     let const left_value = left.inline_value();
     let const right_value = right.inline_value();
-    let const minimum = static_cast<i128>(u128{1} << 127u);
-    if (left_value == minimum && right_value == -1) return ArithmeticValue{};
-    return from_signed_128(left_value % right_value, arena);
+    if (left_value >= INT64_MIN && left_value <= INT64_MAX &&
+        right_value >= INT64_MIN && right_value <= INT64_MAX &&
+        !(left_value == INT64_MIN && right_value == -1))
+    {
+      return from_signed_128(
+          static_cast<i64>(left_value) % static_cast<i64>(right_value), arena);
+    }
   }
 
   let const decimal_scale = left.get_decimal_scale() > right.get_decimal_scale()
@@ -960,12 +964,12 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
 
   let const highest_limb = base.limb_at(base.limb_count() - 1);
   let const base_bit_length =
-      static_cast<u128>(base.limb_count() - 1) * 64u +
+      static_cast<u64>(base.limb_count() - 1) * 64u +
       (64u - static_cast<u32>(__builtin_clzll(highest_limb)));
   let const maximum_result_bit_length =
-      static_cast<u128>(ArrayList<u64>::MAXIMUM_ELEMENT_COUNT) * 64u;
-  if (base_bit_length != 0 && static_cast<u128>(exponent_value) >
-                                  maximum_result_bit_length / base_bit_length)
+      static_cast<u64>(ArrayList<u64>::MAXIMUM_ELEMENT_COUNT) * 64u;
+  if (base_bit_length != 0 &&
+      exponent_value > maximum_result_bit_length / base_bit_length)
     do_throw_result_too_large();
 
   if (base.is_integer() && base.limb_count() == 1 &&

@@ -414,7 +414,13 @@ $(OBJ_DIR)/vendor/regex/%.o: ../vendor/regex/%.c Makefile
 # Linking.
 $(LINKED_OUT): $(OBJECTS)
 	printf "\tLinking $(LINKED_OUT)... %-64s\r" ' '
+ifeq ($(TARGET), Windows_NT)
+	cd $(OBJ_DIR) && $(CXX) $(CXXFLAGS) $(USE_LD) \
+		$(patsubst $(OBJ_DIR)/%,%,$(OBJECTS)) $(LINK_LIBS) \
+		-o $(abspath $@)
+else
 	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
+endif
 
 dirs: $(DIRS)
 	mkdir -p $(OBJ_DIR)/

@@ -527,6 +527,9 @@ fn stat_filesystem(StringView path, filesystem_status &status) wontthrow
     -> bool;
 fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>;
 
+fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
+    -> u64;
+
 fn current_executable_path() wontthrow -> Maybe<String>;
 
 fn crc32c_update(u32 crc, const void *data, usize length) wontthrow -> u32;

@@ -381,8 +381,11 @@ fn sample_command(StringView shell_binary, StringView command,
       if (run_limit.has_value() && *run_limit > 0) {
         percent = static_cast<u64>(i) * 100 / *run_limit;
       } else if (duration_nanos > 0) {
-        percent = static_cast<u64>(static_cast<u128>(elapsed_nanos) * 100 /
-                                   duration_nanos);
+        let const progress = static_cast<u128>(elapsed_nanos) * 100;
+        u64 remainder = 0;
+        percent = os::divide_u128_by_u64(static_cast<u64>(progress >> 64u),
+                                         static_cast<u64>(progress),
+                                         duration_nanos, remainder);
       }
       draw_progress(command, percent, allocator);
     }
