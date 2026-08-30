@@ -686,9 +686,10 @@ cat > shell-env.mk <<'EOF'
 SHELL = $(BIN)
 
 all:
-	@echo "shell-env=$$SHELL"
+	@if [ "$$SHELL" = "$$EXPECTED_SHELL" ]; then echo shell-env=inherited-value; else echo "shell-env=$$SHELL"; fi
 EOF
-SHELL=inherited-value "$BIN" -c 'koshkit make -f shell-env.mk'
+SHELL="$TEST_SYSTEM_RM" EXPECTED_SHELL="$TEST_SYSTEM_RM" \
+  "$BIN" -c 'koshkit make -f shell-env.mk'
 cat > shell-function.mk <<'EOF'
 SHELL = false
 suppressed := $(shell echo should-not-run)

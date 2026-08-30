@@ -21,7 +21,7 @@ TEST_JOBS := 1
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 export TEST_PATH_ENVIRONMENT_NAME := Path
-export MSYS2_ENV_CONV_EXCL := Path;SHELL
+export MSYS2_ENV_CONV_EXCL := Path
 export HOME := $(USERPROFILE)
 else
 export TEST_PATH_SEPARATOR := :
