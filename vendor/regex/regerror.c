@@ -28,6 +28,7 @@ static const char messages[] = {
 
 size_t regerror(int e, const regex_t *restrict preg, char *restrict buf, size_t size)
 {
+	(void)preg;
 	const char *s;
 	for (s=messages; e && *s; e--, s+=strlen(s)+1);
 	if (!*s) s++;

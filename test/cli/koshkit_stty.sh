@@ -21,10 +21,10 @@ if [ \"\$before\" = \"\$after\" ]; then echo restore=passed; else echo restore=f
 
 output_pattern='^(3:14: error: stty: invalid terminal setting\.|     3 \|  koshkit stty KOSH_MISSING_SETTING|       \|               \^~~~~~~~~~~~~~~~~~~~|(invalid|modes|changed|restore)=)'
 if script -q -c true /dev/null >/dev/null 2>&1; then
-  script -q -c "$command_text" /dev/null | tr -d '\r' |
+  NO_COLOR=1 script -q -c "$command_text" /dev/null | tr -d '\r' |
     grep -E "$output_pattern"
 elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
-  script -q /dev/null /bin/sh -c "$command_text" | tr -d '\r' |
+  NO_COLOR=1 script -q /dev/null /bin/sh -c "$command_text" | tr -d '\r' |
     grep -E "$output_pattern"
 else
   exit 1
