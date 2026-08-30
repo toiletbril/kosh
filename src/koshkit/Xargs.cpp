@@ -177,7 +177,9 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -203,11 +205,17 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let base = ArrayList<String>{cxt.scratch_allocator()};
-  if (operands.is_empty())
+  let base_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  if (operands.is_empty()) {
     base.push(String{"echo"});
-  else
-    for (let const &operand : operands)
+    base_locations.push(ec.source_location());
+  } else {
+    for (usize index = 0; index < operands.count(); index++) {
+      let const &operand = operands[index];
       base.push(operand.clone());
+      base_locations.push(operand_locations[index]);
+    }
+  }
   let const base_size = xargs_command_size(base);
   let const maximum_arguments =
       FLAG_XARGS_MAX_ARGUMENTS.is_set()
@@ -229,6 +237,7 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
   while (item_position < items.count() || should_run_empty) {
     should_run_empty = false;
     let command = base.clone();
+    let command_locations = base_locations.clone();
     if (FLAG_XARGS_REPLACE.is_set()) {
       let const replacement = items[item_position++].value.view();
       for (usize index = 1; index < command.count(); index++) {
@@ -257,11 +266,13 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
             if (FLAG_XARGS_EXIT.is_enabled())
               throw Error{"xargs: one argument exceeds the size limit"};
             command.push(items[item_position].value.clone());
+            command_locations.push(ec.source_location());
             item_position++;
           }
           break;
         }
         command.push(items[item_position].value.clone());
+        command_locations.push(ec.source_location());
         command_size = candidate_size;
         item_position++;
         added_count++;
@@ -273,11 +284,41 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
     if (FLAG_XARGS_PROMPT.is_enabled())
       throw Error{
           "xargs: interactive prompting requires a controlling terminal"};
-    unused(cxt.materialize_kosh_identity());
-    let const result = os::run_measured(command, os::measured_output::Inherit);
-    if (!result.has_value()) return 126;
-    if (result->exit_status == 255) return 124;
-    if (result->exit_status != 0) status = 1;
+    Maybe<ExecContext> sub;
+    try {
+      let const *source = cxt.current_source();
+      sub = ExecContext::make_from(
+          ec.source_location(),
+          source != nullptr ? source->view() : StringView{}, steal(command),
+          cxt.mood(), cxt.koshkit(), cxt.get_program_resolver(),
+          steal(command_locations));
+    } catch (const CommandResolutionErrorWithLocation &resolution_error) {
+      let const *source = cxt.current_source();
+      show_message(resolution_error.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
+      return static_cast<i32>(resolution_error.command_status());
+    }
+
+    let snapshot = cxt.snapshot_state();
+    cxt.enter_subshell();
+    i32 command_status = 0;
+    try {
+      command_status =
+          utils::execute_context(steal(*sub), cxt, execution_mode::Foreground);
+    } catch (...) {
+      cxt.leave_subshell();
+      cxt.restore_state(steal(snapshot));
+      throw;
+    }
+    if (cxt.has_pending_control_flow()) {
+      command_status = static_cast<i32>(cxt.pending_control_flow().value);
+      cxt.clear_control_flow();
+    }
+    cxt.leave_subshell();
+    cxt.restore_state(steal(snapshot));
+
+    if (command_status == 255) return 124;
+    if (command_status != 0) status = 1;
   }
   return status;
 }

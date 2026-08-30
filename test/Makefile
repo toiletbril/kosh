@@ -118,6 +118,7 @@ WINDOWS_SKIPPED_TEST_NAMES := \
 	ast_process_substitution \
 	ast_redirection_varieties \
 	heredoc_fd_three \
+	koshkit_filesystem_posix \
 	lex_process_substitution \
 	mood_conditional \
 	redirect_csh_both_streams \

@@ -187,14 +187,28 @@
   [CompoundListCondition, None]
     [SimpleCommand "complete" "-p" "completion-command"]
   [CompoundListCondition, None]
-    [SimpleCommand "sleep" "0.2", Async]
+    [Assign release=$TEST_TEMP_DIRECTORY/subshell-state/release-$BASHPID]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "!" "-e" "$release" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "sleep" "0.01"]
   [CompoundListCondition, None]
     [Assign parent_background=$!]
   [CompoundListCondition, None]
     [Subshell]
       [CompoundList]
         [CompoundListCondition, None]
-          [SimpleCommand "sleep" "0.2", Async]
+          [WhileLoop]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "[" "!" "-e" "$release" "]"]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "koshkit" "sleep" "0.01"]
         [CompoundListCondition, None]
           [SimpleCommand ":"]
   [CompoundListCondition, None]
@@ -219,6 +233,9 @@
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "jobs-leaked"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [SimpleCommand ":"]
   [CompoundListCondition, None]
     [SimpleCommand "wait" "$parent_background"]
   [CompoundListCondition, None]
@@ -705,20 +722,80 @@
   Unquoted "completion-command"
 ]
 [Word
+  Unquoted "release="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/subshell-state/release-"
+  Variable "BASHPID"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "release"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "sleep"
 ]
 [Word
-  Unquoted "0.2"
+  Unquoted "0.01"
+]
+[Word
+  Unquoted "done"
 ]
 [Word
   Unquoted "parent_background="
   Variable "!"
 ]
 [Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "release"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "sleep"
 ]
 [Word
-  Unquoted "0.2"
+  Unquoted "0.01"
+]
+[Word
+  Unquoted "done"
 ]
 [Word
   Unquoted ":"
@@ -800,6 +877,12 @@
 ]
 [Word
   Unquoted "fi"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "release"
 ]
 [Word
   Unquoted "wait"

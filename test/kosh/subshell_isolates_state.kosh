@@ -48,9 +48,10 @@ complete -p completion-command
 completion_output=$(complete -W substitution completion-command)
 complete -p completion-command
 
-sleep 0.2 &
+release=$TEST_TEMP_DIRECTORY/subshell-state/release-$BASHPID
+while [ ! -e "$release" ]; do koshkit sleep 0.01; done &
 parent_background=$!
-( sleep 0.2 & : )
+( while [ ! -e "$release" ]; do koshkit sleep 0.01; done & : )
 if [ "$!" = "$parent_background" ]; then
   echo background-pid-restored
 else
@@ -61,5 +62,6 @@ if [ "$(jobs -p | koshkit wc -l)" -eq 1 ]; then
 else
   echo jobs-leaked
 fi
+: > "$release"
 wait "$parent_background"
 echo done
