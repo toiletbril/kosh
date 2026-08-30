@@ -243,6 +243,14 @@ static pure fn common_prefix_length(StringView left, StringView right,
 class GhostPrefixCollector
 {
 public:
+  enum class Selection : u8
+  {
+    CommonPrefix,
+    FirstMatch,
+  };
+
+  explicit GhostPrefixCollector(Selection selection) : selection(selection) {}
+
   fn add(StringView name, match_tier tier) throws -> void
   {
     let const tier_index = static_cast<usize>(tier);
@@ -251,6 +259,11 @@ public:
       best_tier = tier_index;
       prefix = String{completion_allocator(), name};
       match_count = 1;
+      return;
+    }
+
+    if (selection == Selection::FirstMatch) {
+      match_count++;
       return;
     }
 
@@ -276,6 +289,7 @@ private:
   usize match_count{0};
   usize source_scan_count{0};
   String prefix{completion_allocator()};
+  Selection selection;
 };
 
 template <typename Collector>
@@ -363,7 +377,8 @@ static fn complete_command_name_prefix(
     const ArrayList<StringView> *extra_command_names) throws
     -> GhostPrefixCollector
 {
-  let collector = GhostPrefixCollector{};
+  let collector =
+      GhostPrefixCollector{GhostPrefixCollector::Selection::CommonPrefix};
   collect_command_names(token, match_mode, context, collector,
                         extra_command_names);
   return collector;
@@ -603,7 +618,7 @@ collect_filesystem_matches(StringView token,
 template <typename Collector>
 static fn complete_filesystem_with(
     StringView token, const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, EvalContext &context,
+    filesystem_entry_filter filter, EvalContext &context, Collector collector,
     const utils::decoded_shell_word *decoded = nullptr) throws -> Collector
 {
   let decoded_storage = utils::decoded_shell_word{completion_allocator()};
@@ -614,7 +629,6 @@ static fn complete_filesystem_with(
       decoded_storage = utils::decode_shell_word(token, completion_allocator());
     decoded = &decoded_storage;
   }
-  let collector = Collector{};
   collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
                              context, collector);
 
@@ -629,7 +643,8 @@ complete_filesystem(StringView token, const Path &base_directory,
     -> ArrayList<String>
 {
   let collector = complete_filesystem_with<CommandListCollector>(
-      token, base_directory, text_mode, filter, context, decoded);
+      token, base_directory, text_mode, filter, context, CommandListCollector{},
+      decoded);
   return collector.take();
 }
 
@@ -648,7 +663,9 @@ static fn complete_filesystem_prefix(
     -> GhostPrefixCollector
 {
   return complete_filesystem_with<GhostPrefixCollector>(
-      token, base_directory, text_mode, filter, context, decoded);
+      token, base_directory, text_mode, filter, context,
+      GhostPrefixCollector{GhostPrefixCollector::Selection::FirstMatch},
+      decoded);
 }
 
 /* Only the trailing component is globbed. */

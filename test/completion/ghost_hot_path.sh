@@ -64,7 +64,7 @@ done
 filesystem_result=$(PATH=/bin "$BIN" \
     --debug-ghost-at "echo $d/filesystem/probe")
 assert_field "$filesystem_result" count 2
-assert_field "$filesystem_result" prefix "$d/filesystem/probe-"
+assert_field "$filesystem_result" prefix "$d/filesystem/probe-alpha"
 assert_field "$filesystem_result" source-scans 2
 assert_field "$filesystem_result" materialized 0
 echo 'filesystem ghost skips unrelated directory entries'
