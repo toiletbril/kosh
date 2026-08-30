@@ -11,7 +11,7 @@ import termios
 import time
 
 binary = sys.argv[1]
-with tempfile.NamedTemporaryFile(delete=False) as source:
+with tempfile.NamedTemporaryFile(delete=False, suffix=".sh") as source:
     source.write(b'if test -n "$value"; then echo "$value"; fi\n')
     source_path = source.name
 

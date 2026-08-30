@@ -37,25 +37,29 @@
 
 #include <stdint.h>
 
-#undef  TRE_MBSTATE
+#undef TRE_MBSTATE
 
+#ifndef NDEBUG
 #define NDEBUG
+#endif
 
 #define TRE_REGEX_T_FIELD __opaque
 typedef int reg_errcode_t;
 
 typedef uint32_t tre_char_t;
 
-#define DPRINT(msg) do { } while(0)
+#define DPRINT(msg)                                                            \
+  do {                                                                         \
+  } while (0)
 
-#define elementsof(x)	( sizeof(x) / sizeof(x[0]) )
+#define elementsof(x) (sizeof(x) / sizeof(x[0]))
 
 static inline int tre_utf8_decode(tre_char_t *result, const char *text,
                                   size_t length)
 {
   if (length == 0) return -1;
 
-  const unsigned char first = (unsigned char)text[0];
+  const unsigned char first = (unsigned char) text[0];
   uint32_t codepoint;
   uint32_t minimum;
   size_t byte_count;
@@ -87,7 +91,7 @@ static inline int tre_utf8_decode(tre_char_t *result, const char *text,
   if (length < byte_count) return -1;
 
   for (byte_position = 1; byte_position < byte_count; byte_position++) {
-    const unsigned char continuation = (unsigned char)text[byte_position];
+    const unsigned char continuation = (unsigned char) text[byte_position];
     if (continuation == 0) return -1;
     if ((continuation & 0xc0) != 0x80) return -1;
     codepoint = (codepoint << 6) | (continuation & 0x3f);
@@ -96,7 +100,7 @@ static inline int tre_utf8_decode(tre_char_t *result, const char *text,
       codepoint > 0x10ffff)
     return -1;
   *result = codepoint;
-  return (int)byte_count;
+  return (int) byte_count;
 }
 
 #define tre_mbrtowc(pwc, s, n, ps) tre_utf8_decode((pwc), (s), (n))
@@ -105,17 +109,17 @@ static inline int tre_utf8_decode(tre_char_t *result, const char *text,
 typedef uint32_t tre_cint_t;
 #define TRE_CHAR_MAX 0x10ffff
 
-#define tre_isalnum iswalnum
-#define tre_isalpha iswalpha
-#define tre_isblank iswblank
-#define tre_iscntrl iswcntrl
-#define tre_isdigit iswdigit
-#define tre_isgraph iswgraph
-#define tre_islower iswlower
-#define tre_isprint iswprint
-#define tre_ispunct iswpunct
-#define tre_isspace iswspace
-#define tre_isupper iswupper
+#define tre_isalnum  iswalnum
+#define tre_isalpha  iswalpha
+#define tre_isblank  iswblank
+#define tre_iscntrl  iswcntrl
+#define tre_isdigit  iswdigit
+#define tre_isgraph  iswgraph
+#define tre_islower  iswlower
+#define tre_isprint  iswprint
+#define tre_ispunct  iswpunct
+#define tre_isspace  iswspace
+#define tre_isupper  iswupper
 #define tre_isxdigit iswxdigit
 
 #define tre_tolower towlower
@@ -128,10 +132,8 @@ typedef wctype_t tre_ctype_t;
 
 /* Returns number of bytes to add to (char *)ptr to make it
    properly aligned for the type. */
-#define ALIGN(ptr, type) \
-  ((((long)ptr) % sizeof(type)) \
-   ? (sizeof(type) - (((long)ptr) % sizeof(type))) \
-   : 0)
+#define ALIGN(ptr, type)                                                       \
+  ((_Alignof(type) - ((uintptr_t) (ptr) % _Alignof(type))) % _Alignof(type))
 
 #undef MAX
 #undef MIN
@@ -142,7 +144,8 @@ typedef wctype_t tre_ctype_t;
    the terminator is a transition with NULL `state'. */
 typedef struct tnfa_transition tre_tnfa_transition_t;
 
-struct tnfa_transition {
+struct tnfa_transition
+{
   /* Range of accepted characters. */
   tre_cint_t code_min;
   tre_cint_t code_max;
@@ -155,7 +158,8 @@ struct tnfa_transition {
   /* Assertion bitmap. */
   int assertions;
   /* Assertion parameters. */
-  union {
+  union
+  {
     /* Character class assertion. */
     tre_ctype_t class;
     /* Back reference assertion. */
@@ -165,28 +169,29 @@ struct tnfa_transition {
   tre_ctype_t *neg_classes;
 };
 
-
 /* Assertions. */
-#define ASSERT_AT_BOL		  1   /* Beginning of line. */
-#define ASSERT_AT_EOL		  2   /* End of line. */
-#define ASSERT_CHAR_CLASS	  4   /* Character class in `class'. */
-#define ASSERT_CHAR_CLASS_NEG	  8   /* Character classes in `neg_classes'. */
-#define ASSERT_AT_BOW		 16   /* Beginning of word. */
-#define ASSERT_AT_EOW		 32   /* End of word. */
-#define ASSERT_AT_WB		 64   /* Word boundary. */
-#define ASSERT_AT_WB_NEG	128   /* Not a word boundary. */
-#define ASSERT_BACKREF		256   /* A back reference in `backref'. */
-#define ASSERT_LAST		256
+#define ASSERT_AT_BOL         1   /* Beginning of line. */
+#define ASSERT_AT_EOL         2   /* End of line. */
+#define ASSERT_CHAR_CLASS     4   /* Character class in `class'. */
+#define ASSERT_CHAR_CLASS_NEG 8   /* Character classes in `neg_classes'. */
+#define ASSERT_AT_BOW         16  /* Beginning of word. */
+#define ASSERT_AT_EOW         32  /* End of word. */
+#define ASSERT_AT_WB          64  /* Word boundary. */
+#define ASSERT_AT_WB_NEG      128 /* Not a word boundary. */
+#define ASSERT_BACKREF        256 /* A back reference in `backref'. */
+#define ASSERT_LAST           256
 
 /* Tag directions. */
-typedef enum {
+typedef enum
+{
   TRE_TAG_MINIMIZE = 0,
   TRE_TAG_MAXIMIZE = 1
 } tre_tag_direction_t;
 
 /* Instructions to compute submatch register values from tag values
    after a successful match.  */
-struct tre_submatch_data {
+struct tre_submatch_data
+{
   /* Tag that gives the value for rm_so (submatch start offset). */
   int so_tag;
   /* Tag that gives the value for rm_eo (submatch end offset). */
@@ -197,11 +202,11 @@ struct tre_submatch_data {
 
 typedef struct tre_submatch_data tre_submatch_data_t;
 
-
 /* TNFA definition. */
 typedef struct tnfa tre_tnfa_t;
 
-struct tnfa {
+struct tnfa
+{
   tre_tnfa_transition_t *transitions;
   unsigned int num_transitions;
   tre_tnfa_transition_t *initial;
@@ -225,12 +230,14 @@ struct tnfa {
 
 #define TRE_MEM_BLOCK_SIZE 1024
 
-typedef struct tre_list {
+typedef struct tre_list
+{
   void *data;
   struct tre_list *next;
 } tre_list_t;
 
-typedef struct tre_mem_struct {
+typedef struct tre_mem_struct
+{
   tre_list_t *blocks;
   tre_list_t *current;
   char *ptr;
@@ -244,11 +251,11 @@ typedef struct tre_mem_struct {
 #define tre_mem_destroy    __tre_mem_destroy
 
 hidden tre_mem_t tre_mem_new_impl(int provided, void *provided_block);
-hidden void *tre_mem_alloc_impl(tre_mem_t mem, int provided, void *provided_block,
-                                int zero, size_t size);
+hidden void *tre_mem_alloc_impl(tre_mem_t mem, int provided,
+                                void *provided_block, int zero, size_t size);
 
 /* Returns a new memory allocator or NULL if out of memory. */
-#define tre_mem_new()  tre_mem_new_impl(0, NULL)
+#define tre_mem_new() tre_mem_new_impl(0, NULL)
 
 /* Allocates a block of `size' bytes from `mem'.  Returns a pointer to the
    allocated block or NULL if an underlying malloc() failed. */
@@ -263,20 +270,19 @@ hidden void *tre_mem_alloc_impl(tre_mem_t mem, int provided, void *provided_bloc
 /* alloca() versions.  Like above, but memory is allocated with alloca()
    instead of malloc(). */
 
-#define tre_mem_newa() \
+#define tre_mem_newa()                                                         \
   tre_mem_new_impl(1, alloca(sizeof(struct tre_mem_struct)))
 
-#define tre_mem_alloca(mem, size)					      \
-  ((mem)->n >= (size)							      \
-   ? tre_mem_alloc_impl((mem), 1, NULL, 0, (size))			      \
-   : tre_mem_alloc_impl((mem), 1, alloca(TRE_MEM_BLOCK_SIZE), 0, (size)))
+#define tre_mem_alloca(mem, size)                                              \
+  ((mem)->n >= (size)                                                          \
+       ? tre_mem_alloc_impl((mem), 1, NULL, 0, (size))                         \
+       : tre_mem_alloc_impl((mem), 1, alloca(TRE_MEM_BLOCK_SIZE), 0, (size)))
 #endif /* TRE_USE_ALLOCA */
-
 
 /* Frees the memory allocator and all memory allocated with it. */
 hidden void tre_mem_destroy(tre_mem_t mem);
 
-#define xmalloc malloc
-#define xcalloc calloc
-#define xfree free
+#define xmalloc  malloc
+#define xcalloc  calloc
+#define xfree    free
 #define xrealloc realloc

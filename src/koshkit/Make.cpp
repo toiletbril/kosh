@@ -3227,7 +3227,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const part = Path{makefile_path.view()}.read_entire_file();
+    let part = Path{makefile_path.view()}.read_entire_file();
     if (!part.has_value()) {
       report_soft_koshkit_util_error(
           ec, cxt, requested_makefile_locations[makefile_position],
