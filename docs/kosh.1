@@ -1,7 +1,7 @@
 .TH KOSH 1 "2026-08-18" "kosh" "User Commands"
 .SH NAME
-kosh \- a very fast and debuggable POSIX- and Bash-compatible command shell,
-formatter and language\-server
+kosh \- a fast and debuggable POSIX- and Bash-compatible command shell,
+formatter and language server
 .SH SYNOPSIS
 .B kosh
 .RI [ options ]
@@ -46,11 +46,11 @@ is the Koshka shell executable. It is an interpreter, interactive shell and a
 diagnostic tool with full Bash and POSIX shell syntax and Bash-compatible
 extensions.
 .PP
-Koshka contains ~300 built-in shellcheck diagnostics and is 5x faster than
-bash, or ~100x faster than shellcheck.
+Koshka includes about 300 built-in ShellCheck diagnostics. It is five times
+faster than Bash and about 100 times faster than ShellCheck.
 .PP
-The shell guarantees first tier support for Linux, macOS and Windows, and the
-behavior is equivalent on each of these systems.
+Koshka supports Linux, macOS, and Windows as first-tier platforms and provides
+equivalent behavior on all three.
 .PP
 The grammar is the same on every operating system. An unquoted backslash is an
 escape on Windows. A native Windows path therefore uses a quoted backslash, an
@@ -72,7 +72,8 @@ Without
 .BR \-s ,
 .B \-\-lint
 analyzes each command string in occurrence order, followed by every file
-operand. Lint operation is noninteractive and completes every selected input.
+operand. Linting is noninteractive and continues until every selected input has
+been analyzed.
 Under
 .BR \-s ,
 standard input is analyzed and a file operand becomes a positional parameter.
@@ -170,22 +171,21 @@ The editor starts this mode and associates it with
 .BR *.bash ,
 and
 .BR *.kosh .
-The server supplies diagnostics, quick fixes, completion, navigation, command
+The server provides diagnostics, quick fixes, completion, navigation, command
 information, semantic tokens, a document outline, and rename. A fix-all action
-applies every non-conflicting safe fix in the open document. Completion in
-command position offers the shell keywords, the builtins, the bundled
-utilities, the functions and the aliases of the document, and the commands on
-the active PATH.
-A keyword item is a keyword to the client and every other item is a function.
-A command item carries the name it completes, and the help text of that command
-is produced when the client resolves the item, so only the highlighted item
-costs a fork.
+applies every non-conflicting safe fix in the open document. At command
+position, completion includes shell keywords, builtins, bundled utilities,
+functions and aliases defined in the document, and commands from the active
+PATH.
+The client receives keyword items as keywords and all other items as functions.
+Each command item contains the completed name. The client requests its help text
+when it resolves the item. Only the highlighted item requires a fork.
 .PP
-The server also recognizes embedded shell regions in the host formats described
+The server recognizes embedded shell regions in the host formats described
 under
 .BR --lint .
-Every language feature is limited to those regions. Host syntax is left to the
-editor's host language service.
+Language features operate only inside those regions. The editor's host language
+service handles the host syntax.
 The outline is a tree of
 the function definitions and the variable assignments in the document. An
 assignment inside a function body is a child of that function, and one name
@@ -203,32 +203,31 @@ assigned again in the same body is one outline row. A name bound by
 .BR getopts ,
 .BR printf " " \-v ,
 or an arithmetic assignment is a variable assignment too. Hover over a variable
-reports the assignment nearest above the cursor together with its folded value.
-A name that carries no folded value is described by what bound it, such as a
-loop word, a field read from input, or the result of an arithmetic expression.
-The earlier assignments in the same document are listed below it, and an
-assignment that does not run on every path is marked. A name the shell itself
-defines carries its description from the builtin variable catalog. Hover over a
-function shows the definition body in the form
-.B declare \-f
-prints. Hover over a command the document does not define reports the external
-help text. A builtin is answered first, then a program on the active PATH, and
-the bundled utility answers only for a name PATH does not hold, which is the
-order an ordinary command word resolves in. Markdown content is used when the
-client advertises it.
-A variable, a function, and an alias are renamed across the open document. A
+reports the nearest preceding assignment and its folded value. If the assignment
+has no folded value, hover describes its source, such as a loop word, a field
+read from input, or an arithmetic expression. Earlier assignments in the same
+document are listed below it. An assignment that does not run on every path is
+marked. A shell-defined variable uses the description from the builtin variable
+catalog. Hover over a function shows its definition body as printed by
+.BR "declare \-f" .
+Hover over a command the document does not define reports the external
+help text. External help follows ordinary command lookup order. A builtin is
+checked first, followed by a program on the active PATH, then a bundled utility
+when PATH has no matching program. Markdown is used when the client advertises
+support for it.
+Rename updates variables, functions, and aliases throughout the open document. A
 read written as
 .B $name
 or
 .B ${name}
-keeps its sigils and braces, and only the name bytes are replaced. A command
-name is renamed only when the document defines it, so a builtin, a bundled
-utility, and a program on the active PATH are refused. A new variable name
-holds letters, digits, and underscores and never opens with a digit. A new
-command name holds no shell metacharacter. The mood is
-selected from a recognized shebang first, then from the client language
-identifier, then from a recognized document extension. An unrecognized document
-uses the
+keeps its sigils and braces. Only the name bytes are replaced. A command can be
+renamed only when the document defines it as a function or alias. Builtins,
+bundled utilities, and programs on the active PATH cannot be renamed. A new
+variable name may contain letters, digits, and underscores, but may not begin
+with a digit. A new command name may not contain shell metacharacters. A
+recognized shebang selects the mood first. If there is no recognized shebang,
+the client language identifier selects it, followed by a recognized document
+extension. An unrecognized document uses the
 .B kosh
 mood. This option does not accept file operands,
 .BR \-c ,
@@ -380,9 +379,10 @@ Named files are updated with safe lint fixes under
 .BR \-\-lint ,
 or with formatted source under
 .BR \-\-format .
-The two modes may be combined. Each changed file is replaced atomically after
-its contents and identity are checked again. File modes and symbolic links are
-retained. Another hard link keeps the prior inode. Standard input,
+The two modes may be combined. Before a changed file is replaced atomically, its
+contents and identity are checked again. File modes and symbolic links are
+retained. Other hard links continue to refer to the previous inode. Standard
+input,
 .BR \-s ,
 .BR \-i ,
 .BR \-c ,
@@ -400,8 +400,8 @@ suppression from
 .B \-\-no\-diagnostics
 and
 .B \-\-no\-annoying\-diagnostics
-is overridden. Every startup file is skipped, and the report is free of the
-aliases, functions, and search path of the invoking session.
+is overridden. Every startup file is skipped. Aliases, functions, and the search
+path from the invoking session do not affect the report.
 .PP
 A named input is detected from its path, extension, and recognizable content.
 Shell commands are extracted from GitHub Actions, Gitea Actions, Forgejo
@@ -486,10 +486,9 @@ The short version is displayed. The shell then exits.
 The syntax tree is printed before each command runs.
 .TP
 .B \-\-optimizer\-diagnostics
-The analysis prepass decisions are traced. Every folded and eliminated node is
-reported as an analysis diagnostic, and the closing line is a count of the
-eliminated statements. The rows are lenient, and a compatibility mood reports
-them only under
+Analysis prepass decisions are reported. Each folded or eliminated node produces
+a lenient analysis diagnostic. The final line reports the number of eliminated
+statements. A compatibility mood reports these diagnostics only under
 .BR \-WW .
 .TP
 .BR \-E ", " \-\-show\-exit\-code
@@ -648,9 +647,9 @@ privileged option suppresses ENV and BASH_ENV processing. Restricted mode is
 visible while startup files run, but its restrictions become active only after
 startup finishes.
 .PP
-Mood-derived pipefail and failglob settings remain disabled while startup files
-run. An explicit command-line nounset setting remains active. The selected mood
-strictness is applied after startup finishes.
+Settings for pipefail and failglob that come from the mood remain disabled while
+startup files run. An explicit command-line nounset setting remains active. The
+selected mood's strictness takes effect after startup finishes.
 .PP
 Missing optional files, custom rc files, and BASH_ENV files are skipped. An
 existing custom rc or BASH_ENV file that cannot be read produces a diagnostic
@@ -801,21 +800,21 @@ descriptor named by var.
 .PP
 A diagnostic inside a tab-stripped here-document carries no source caret.
 .SH COMMAND EXECUTION
-Command lookup checks functions, builtins, remembered command paths, PATH, and
-enabled koshkit fallback according to the active mood and options. Execution and
-the
+Command lookup checks functions, builtins, cached program paths, PATH, and
+bundled koshkit commands when the active mood and options enable them. Running a
+command or using the
 .B hash
-builtin remember a resolved program path. A PATH directory membership change
-discards every remembered path.
+builtin caches its resolved program path. A change to the contents of any PATH
+directory clears every cached path.
 .PP
 A command path ending in a directory separator fails with status 126 when the
 typed target is not a directory. Components are resolved in order. An
 unavailable path is reported through its first unavailable component. The caret
 covers that component.
 .PP
-Executable-format fallback starts a fresh evaluator with the command
-environment and command argument zero. Caller variables, functions, and traps
-do not leak into it. Each complete top-level command runs before the next one is
+Executable-format fallback starts a new evaluator with the command environment
+and command argument zero. It does not inherit the caller's variables,
+functions, or traps. Each complete top-level command runs before the next one is
 parsed.
 .PP
 PIPESTATUS is updated after every foreground command. It contains the status of
@@ -911,11 +910,12 @@ and
 .BI \-\-scp\-command= COMMAND
 options replace ssh and scp. COMMAND is split at literal spaces.
 .PP
-The candidate identity is validated before the target is replaced. A handled
-failure restores the prior file or symlink and removes transaction files.
-Concurrent transactions are serialized, and an interrupted one is recovered by
-the next. A failure before the remote transaction starts cannot alter the
-installed target. An unusable partial upload may remain.
+The uploaded candidate is validated before the target is replaced. A failure
+handled by the transaction restores the previous file or symlink and removes
+transaction files. Transactions run one at a time. The next transaction
+recovers an interrupted transaction. A failure before the remote transaction
+starts leaves the installed target unchanged. An unusable partial upload may
+remain.
 .TP
 .B bench
 Commands are sampled through
@@ -934,10 +934,9 @@ options control output, direct execution, sample count, and the millisecond
 budget.
 .TP
 .B z
-The current directory is changed to a directory selected from the frecency
+The z builtin changes the current directory to one selected from the frecency
 store. Operands form one case-insensitive substring query. Visit count and
-recency determine the ranking. With no operand, the current directory is
-changed to the home directory.
+recency determine the ranking. With no operand, z changes to the home directory.
 .SS Compatibility forms
 .TP
 .B set
@@ -1107,13 +1106,13 @@ and
 options are accepted without effect.
 .TP
 .B local
-The name is restricted to the running function. The attribute letters
+The name is local to the running function. The
 .BR \-a ,
 .BR \-A ,
 .BR \-i ,
 and
 .B \-x
-carry the same meaning they carry for declare, and
+attributes have the same meanings as for declare. The
 .BR \-l ,
 .BR \-n ,
 .BR \-r ,
@@ -1182,14 +1181,14 @@ The
 .BI "\-V " varname
 option stores the candidates in the named indexed array and writes nothing to
 standard output. An invalid name is a usage error. An associative or read-only
-target is refused. A generator that matches nothing still leaves the array empty
-and returns one. The
+target is rejected. A generator that matches no candidates leaves the array
+empty and returns one. The
 .BI "\-P " prefix
 and
 .BI "\-S " suffix
-options are attached to each candidate after the word prefix test and the
+options add text to each candidate after word prefix matching and
 .B \-X
-filter are applied.
+filtering.
 .SH KOSHKIT UTILITIES
 The
 .B koshkit
@@ -1204,9 +1203,11 @@ form prints the utility names one per line.
 .PP
 The bundled set contains basename, bc, cal, calc, cat, chgrp, chmod, chown,
 cksum, cmp, comm, cp, csplit, cut, date, df, dirname, du, env, expand, expr,
-file, find, flock, fold, fuser, getconf, grep, head, id, killall, link, ln, locale,
-logger, logname, ls, make, man, mkdir, mkfifo, more, mv, nice, nl, nohup, nproc,
-od, paste, pathchk, pkill, pr, ps, readlink, realpath, renice, rm, rmdir, sed, seq, sleep,
+file, find, flock, fold, fuser, getconf, grep, head, id, killall, link, ln,
+locale, logger, logname, ls, make, man, mkdir, mkfifo, more, mv, nice, nl,
+nohup, nproc, od, paste, pathchk, pkill, pr, ps, readlink, realpath, renice, rm,
+rmdir,
+sed, seq, sleep,
 sort, split, strings, stty, tabs, tail, tee, timeout, touch, tput, tr, tsort,
 tty, uname, unexpand, uniq, unlink, wc, which, who, whoami, xargs, and yes.
 .PP
@@ -1468,7 +1469,7 @@ Standard input is copied to output files. The
 option appends.
 .TP
 .B timeout
-A command is supervised for a suffixed duration. The
+A command runs with a time limit. The duration accepts a suffix. The
 .BR \-s ,
 .BR \-\-signal ,
 .BR \-k ,
@@ -1540,12 +1541,12 @@ smart-case and subsequence matches. An empty command position includes
 keywords, builtins, functions, aliases, koshkit utilities, and programs from
 PATH. An exact prefix ranks before a subsequence match.
 .PP
-Completion handles quoted separators, command substitutions, and here-document
-bodies when it selects the command segment at the cursor. Quoted, escaped,
-variable, and tilde directory prefixes retain their typed form. An explicit Tab
-at command position offers executable files and directories. Syntax
-highlighting distinguishes syntax, commands, flags, variables, paths, globs,
-and invalid input.
+Completion identifies the command segment at the cursor across quoted
+separators, command substitutions, and here-document bodies. Directory prefixes
+that use quotes, escapes, variables, or tildes retain their typed form. An
+explicit Tab at command position offers executable files and directories.
+Syntax highlighting distinguishes syntax, commands, flags, variables, paths,
+globs, and invalid input.
 .PP
 Each vi line begins in insert mode. Escape enters command mode. Command mode
 supports motions, counted operators, named registers, change repeat, and visual
@@ -1580,10 +1581,10 @@ Ctrl-V enters multi-cursor mode in emacs mode. Up and Down extend the span. A
 typed byte is inserted at every cursor. Backspace erases at every cursor.
 Ctrl-G leaves the mode.
 .SH JOB CONTROL
-An asynchronous pipeline job owns every stage. POSIX stages share one process
-group. The final stage supplies $!, the ordinary pipeline status, and the
-primary job identity. Pipefail may replace that status with the rightmost
-failing stage.
+Every stage of an asynchronous pipeline belongs to one job. POSIX stages share
+one process group. The final stage determines $!, the ordinary pipeline status,
+and the primary job identity. With pipefail, the rightmost failing stage may
+determine the status.
 .PP
 A stopped stage is recorded even when it is not the final one. The
 .B wait
@@ -1610,14 +1611,14 @@ An analysis diagnostic may include a ShellCheck identifier. A native analysis
 diagnostic carries no identifier.
 .PP
 In the default mood, strict and lenient findings reject the script. Annoying
-findings remain warnings. The annoying tier contains additional safety checks
-and style findings that can produce excessive reports in existing scripts.
+findings remain warnings. The annoying tier contains additional safety and style
+checks that can produce many reports in existing scripts.
 .PP
-Whole-script dataflow findings are strict, so a read of a name the script never
-assigns, a call that passes no arguments to a function that reads them, and a
-call that runs before its function is defined all reject the script in the
-default mood. A read name that resembles an assigned name is reported with that
-assignment as a detail location.
+Whole-script dataflow findings are strict. In the default mood, a script is
+rejected when it reads a name that it never assigns, calls a function that reads
+arguments without passing any, or calls a function before defining it. If an
+unassigned name resembles an assigned name, that assignment is shown as a detail
+location.
 .PP
 A comment of the form
 .B # shellcheck disable=SC2086,unquoted-command-substitution
@@ -1736,17 +1737,18 @@ These values identify the invocation path, version, build commit, build mode,
 and build host distribution and kernel.
 .TP
 .B KOSH_GIT_BRANCH
-The repository containing the working directory supplies the branch name. A
-detached head supplies a short commit hash. A directory outside a repository
-supplies an empty value. An assignment overrides detection.
+For a working directory inside a repository, the value contains the branch
+name. A detached HEAD produces a short commit hash. The value is empty outside a
+repository. An assignment overrides detection.
 .TP
 .BR KOSH_GIT_AHEAD ", " KOSH_GIT_BEHIND
-The repository supplies the unpushed and unpulled commit counts for the current
-branch against its upstream. Both are empty outside a repository, with no
-upstream configured, or when the count is zero. The common up-to-date case is
-resolved from the filesystem without forking. A divergent branch forks
+The values contain the unpushed and unpulled commit counts relative to the
+current branch's upstream. Both are empty outside a repository, when no upstream
+is configured, or when the count is zero. When the branch is up to date, kosh
+determines this from the filesystem without forking. For a divergent branch, it
+runs
 .B git rev-list --count
-to count each direction.
+once per direction.
 .TP
 .B KOSH_IDENTITY
 The read-only exported value is the lowercase CRC-32 identity of the running
@@ -1799,7 +1801,7 @@ mood.
 The array contains groups from the last [[ ... =~ ... ]] match.
 .TP
 .BR BASH ", " BASH_VERSION ", " BASH_VERSINFO
-These values advertise a Bash identity. They are seeded when the runtime mood
+These values report a Bash identity. They are initialized when the runtime mood
 or an initialized mood is
 .B bash
 or
@@ -1851,9 +1853,9 @@ and
 .B bash
 moods accept Bash syntax in addition to POSIX syntax. The
 .B bash-posix
-mood selects Bash syntax with POSIX option identity. The
+mood uses Bash syntax with the POSIX option enabled. The
 .B sh
-mood selects the supported dash-compatible behavior.
+mood uses the supported dash-compatible behavior.
 .PP
 The 0b arithmetic prefix is an implementation extension. Bash writes the same
 value with a 2# prefix. The

@@ -4,64 +4,96 @@
 
 0.1.0 has been released! See the [Release Blog Post](https://fennec.support/scribbles/shell-release).
 
-**The project was renamed in 0.2.0.** The `shit` is now `kosh`, `shitbox` is
-`koshkit`, and every prefix is changed to `kosh` or `KOSH_`. I got over the
-funny name. Thanks.
+**The project was renamed in 0.2.0.** `shit` became `kosh`, `shitbox` became
+`koshkit`, and all prefixes now use `kosh` or `KOSH_`. I got over the funny
+name. Thanks.
 
 ---
 
 **Koshka** is the Russian word for a cat.
 
-**Koshka** is an interpreter, interactive shell, formatter and a language
-server, with first tier support for Windows, Linux and macOS, fully compatible
-with Bash 5.3 and Dash.
+**Koshka** is an interpreter, an interactive shell, a formatter, and a language
+server. Windows, Linux, and macOS receive first-tier support. Koshka is fully
+compatible with Bash 5.3 and Dash.
 
-Koshka contains ~300 built-in shellcheck diagnostics. It is usually 5x faster
-than bash, or ~100x+ faster than shellcheck, which makes it exceptionally
-friendly to coding agents or strict environments where Bash is still used.
+Koshka includes about 300 built-in ShellCheck diagnostics. It is usually five
+times faster than Bash and more than 100 times faster than ShellCheck. This
+speed makes it useful for coding agents and strict environments that still use
+Bash.
 
-| Koshka analyzing 20K-line shell script in ~0.05s |
+| Koshka analyzes a 20,000-line shell script in about 0.05 seconds |
 | :-: | 
 | ![](assets/demo.gif) |
 
+Besides shell scripts, Koshka is able to analyze common supported formats for
+mistakes in Bash code, including the following:
+
+- GitHub Actions, Gitea Actions, Forgejo Actions, and GitLab CI.
+- CircleCI, Azure Pipelines, Bitbucket Pipelines, Buildkite, Travis CI, Google
+  Cloud Build, Drone, and Woodpecker.
+- Ansible, Dockerfile, Containerfile, Compose, and Kubernetes files.
+- Makefiles, Justfiles, Taskfiles, and RPM spec files.
+- Markdown files, `package.json` scripts, VS Code tasks, and Dev Container
+  files.
+
 ## What
 
-`kosh` is the **koshka**'s binary.
+`kosh` is the **Koshka** binary.
 
-**Koshka** aims to be a complete, faster and portable Shellcheck and Bash
-replacement. The shell guarantees first tier support for Linux, macOS and
-Windows, preserving equivalent behavior on either of these systems.
+**Koshka** aims to be a complete, faster, portable replacement for ShellCheck
+and Bash. Linux, macOS, and Windows receive first-tier support with equivalent
+behavior on all three systems.
 
-The shell is designed to work without absolutely no config whatsoever.
-**Koshka**'s Linux binary is static and it does not use C++'s STL. **Koshka**
-also can work without coreutils, using it's own utilities.
+The shell works without any configuration. The Linux binary is static and does
+not use the C++ standard library. **Koshka** can use its own utilities when
+coreutils is unavailable.
 
-**The project is in early stage**. There's no guarantee that it will not blow
-your computer up. Bug reports are greatly appreciated.
+**The project is at an early stage.** It may still blow up your computer. Bug
+reports are welcome.
 
-## Three shells in a trenchcoat
+## Shell linter, formatter, and language server
 
-[See the manual page](docs/kosh.1) for a fuller explanation:
+`kosh --lint` checks complete Bash and POSIX shell syntax with about 300
+built-in ShellCheck and native diagnostics. It reads shell source from standard
+input, `-c` command strings, or multiple files.
+
+In host files, the linter analyzes only embedded `sh`, `bash`, or `kosh`
+regions while rejecting unsupported files.
+
+ShellCheck disable comments accept diagnostic numbers and Koshka diagnostic
+names. With named files, `--apply` writes non-conflicting safe fixes and reports
+the remaining diagnostics.
+
+`kosh --format` formats standard input or one named file without running it.
+It uses two-space indentation and wraps at safe token boundaries within 80
+columns. Here-document bodies and inline comments are preserved. Use `--apply`
+to update named files atomically.
+
+The formatting style cannot be configured.
+
+`kosh --language-server` communicates over standard input and output. It
+provides diagnostics, quick fixes, completion, navigation, command help,
+semantic tokens, a document outline, and rename support.
+
+The language server recognizes the same embedded shell regions as the linter.
+The editor's host language service handles the surrounding syntax.
+
+## Interactive shell and command interpreter
+
+For more details, see the [manual page](docs/kosh.1).
+
 ```bash
 $ man docs/kosh.1
 ```
 
-**Koshka** runs in four modes, called moods, across three shell identities. ZSH
-has similar idea behind it's `emulate` builtin.
+**Koshka** runs in four moods across three shell identities. Zsh provides a
+similar feature through its `emulate` builtin.
 
 The default `kosh` mood is a strict superset of Bash with analysis and
 optimization enabled. The other moods are `bash`, `bash-posix`, and `sh`. The
 `bash-posix` mood provides Bash behavior with its POSIX mode enabled.
 
-Before it runs a command, **Koshka** analyzes and optimizes the complete script.
-The catalog includes about 100 checks derived from ShellCheck and about a dozen
-native analysis checks.
-
-`kosh --lint` behaves like shellcheck, but several magnitudes faster.
-
-`kosh --format` formats the code. There's no customization as of now.
-
-`kosh --language-server` launches language server on stdin.
+Before running a command, **Koshka** analyzes and optimizes the complete script.
 
 The `--mood` option, or `-M`, selects `kosh`, `bash`, `bash-posix`, or `sh`.
 The default is `kosh`. A binary symlinked as `sh`, `dash`, or `bash` selects
@@ -78,23 +110,22 @@ setting is preserved.
 The `--init-moods` option, or `-L`, accepts a comma-separated list of moods whose
 startup files will be used. Its default value is the selected mood.
 
-The `KOSH_FLAGS` environment variable specifies default flags. A flag on the
-command line still wins.
+The `KOSH_FLAGS` environment variable sets default flags. Command-line flags
+override them.
 
 When `KOSH_FLAGS` or the command line contains an invalid flag or argument, a
 login shell skips its startup files and opens a rescue session.
 
-## Additional furballs
+### Additional furballs
 
-The interactive mode is inspired by
-[fish](https://github.com/fish-shell/fish-shell). Shell provides syntax
+The interactive mode takes inspiration from
+[fish](https://github.com/fish-shell/fish-shell). It provides syntax
 highlighting, word movement, editing controls, UTF-8 support, display-width
 handling for wide characters, multiline editing, history search, and persistent
-history. `kosh` does not depend on readline, so it's config is not used.
+history. `kosh` does not use readline, so readline configuration is ignored.
 
-**Koshka** has more than 50 builtins, and each builtin supports `--help`. These
-include Bash and POSIX builtins. The additional builtins include the following
-commands.
+**Koshka** has more than 50 builtins, including Bash and POSIX builtins. Every
+builtin supports `--help`. Additional builtins include the following commands.
 
 - `z` is a port of [zoxide](https://github.com/ajeetdsouza/zoxide).
 - `bench` provides built-in benchmark infrastructure inspired by Performance
@@ -112,14 +143,17 @@ The `koshkit` builtin bundles a BusyBox-style set of small core utilities.
 a terminal. Shell extensions and known shell shebangs select the source. The
 output omits underline attributes.
 
+Koshka also implements arbitrary precision arithmetic, including floats, in
+`calc` builtin and in the default mood.
+
 # Development
 
 This software began as a late April Fools' joke. It is written from scratch in a
 macro-heavy C++23 dialect and is compiled with `-nostdlib++`. The executable
 links only to the C library.
 
-Development occurs on `staging`, and the branch may be broken. The `master`
-branch should pass all tests.
+Development happens on `staging`. The branch may be broken. The `master` branch
+should pass all tests.
 
 ## Prerequisites
 
@@ -152,9 +186,9 @@ optional comparison rows. The coverage report needs `llvm-profdata` and
 Clang 18 or later.
 
 Each cross-compilation target needs its matching toolchain. Zig builds the Zig
-targets and cross-compiles release binaries to Linux. MinGW-w64 targets Windows,
-osxcross with a macOS SDK targets Darwin arm64, and `cosmoc++` builds the
-Cosmopolitan modes.
+targets and cross-compiles Linux release binaries. MinGW-w64 builds Windows
+targets. Osxcross with a macOS SDK builds Darwin arm64 targets. `cosmoc++` builds
+the Cosmopolitan modes.
 
 The `MODE` variable controls the build type.
 
@@ -172,10 +206,10 @@ A non-Windows host cross-compiles `TARGET=Windows_NT` with MinGW. A non-Darwin
 host cross-compiles `TARGET=Darwin ARCH=arm64` with osxcross. Linux is a native
 target.
 
-The `$CXXFLAGS` environment variable appends flags to the build commands.
+The `CXXFLAGS` environment variable appends flags to the build commands.
 
-Build with GNU Make as shown below. Make uses every available logical CPU and
-shares its bounded job pool with recursive builds.
+Build with GNU Make. Make uses every available logical CPU and shares its
+bounded job pool with recursive builds.
 
 ```bash
 $ make MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
@@ -201,31 +235,3 @@ $ make uninstall
 
 The running binary can install itself on an SSH target with `assimilate
 user@host`.
-
-## Roadmap
-
-Is it usable?
-
-- [x] Programs run.
-- [x] Linux and Windows are supported.
-- [x] Logical sequences are supported with `&&`, `||`, and `;`.
-- [x] Pipes are supported.
-- [x] Redirections are supported with `>` and `<`.
-- [x] Shell expansions are supported with `?`, `[...]`, `*`, and `~`.
-- [x] Escapes are supported.
-- [x] Environment variables are supported.
-- [x] Numeric expressions are supported.
-
-Is it good?
-
-- [x] Background jobs are supported.
-- [x] Scripting constructs include flow-control keywords.
-- [x] Blocks and functions are supported.
-- [x] The shell supports `sh` scripts.
-
-Is it exceptional?
-
-- [x] The shell supports Bash scripts.
-- [x] ShellCheck-style warnings are built in.
-- [x] Koshkit replaces common Unix programs that are absent from Windows.
-- [x] Arbitrary-precision numeric expressions are supported.

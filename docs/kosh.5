@@ -2,15 +2,16 @@
 .SH NAME
 kosh \- shell startup configuration files
 .SH DESCRIPTION
-The startup configuration files contain shell commands. Each file is parsed
-with the grammar of the mood whose startup chain selected it. The files have no
-separate section, directive, key, or value syntax.
+The startup configuration files contain shell commands. The startup chain
+selects each file for a mood. The file is parsed with that mood's grammar. There
+is no separate syntax for sections, directives, keys, or values.
 .PP
 Commands, comments, quoting, expansion, redirection, functions, and builtins use
 the syntax defined by
 .BR kosh (1).
-Startup discovery, loading order, suppression, and error handling are also
-defined there.
+See
+.BR kosh (1)
+for startup discovery, loading order, suppression, and error handling.
 .SH FILES
 .TP
 .I /etc/koshrc
@@ -45,9 +46,9 @@ This is the default user configuration file for an interactive non-login Bash
 mood.
 .TP
 .I /usr/share/bash-completion/bash_completion
-This file supplies Bash programmable completion when the preceding Bash startup
-chain sourced an rc file. An existing default completion specification or
-BASH_COMPLETION_VERSINFO suppresses this file.
+This file supplies Bash programmable completion if the Bash startup chain has
+already sourced an rc file. It is skipped if a default completion specification
+or BASH_COMPLETION_VERSINFO already exists.
 .PP
 The
 .BR \-\-rcfile ,
@@ -55,9 +56,9 @@ The
 .BR ENV ,
 and
 .B BASH_ENV
-interfaces may select another pathname. Their conditions and expansion rules
-are defined in
-.BR kosh (1).
+may select a different file. See
+.BR kosh (1)
+for their conditions and expansion rules.
 .SH SYNTAX
 The complete file is shell source. LF and CRLF terminate a line. A CRLF pair is
 one newline. A lone carriage return remains source text.
@@ -72,9 +73,9 @@ or request another startup chain with
 Recursive initialization of a mood already being sourced is skipped.
 .SH ERRORS
 A missing optional file, custom rc file, or BASH_ENV file is skipped. An
-existing custom rc or BASH_ENV file that cannot be read produces a diagnostic
-and is skipped. An unreadable ENV file is skipped without that diagnostic.
-Syntax and execution errors use the ordinary shell diagnostics defined by
+existing custom rc or BASH_ENV file is skipped with a diagnostic if it cannot
+be read. An unreadable ENV file is skipped without a diagnostic. Syntax and
+execution errors produce the ordinary shell diagnostics described in
 .BR kosh (1).
 .SH SEE ALSO
 .BR kosh (1)
