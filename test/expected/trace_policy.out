@@ -1,6 +1,7 @@
 named traces=0 errors=1
 stdin traces=0 errors=1
 eval traces=2 errors=1
+long-command traces=2 errors=1
 substitution traces=2 errors=1 parents=2 sites=1
 nested substitution traces=2 errors=1 parents=2 sites=1
 pattern traces=2 errors=1 sites=1

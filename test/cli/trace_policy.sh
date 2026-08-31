@@ -18,6 +18,11 @@ printf 'eval traces=%s errors=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
     "$(printf '%s\n' "$out" | grep -c 'error:')"
 
+out=$("$BIN" --command "eval 'no_such_long_eval_xyz'" 2>&1)
+printf 'long-command traces=%s errors=%s\n' \
+    "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \
+    "$(printf '%s\n' "$out" | grep -c 'error:')"
+
 out=$("$BIN" --no-diagnostics -c 'echo $(no_such_substitution_xyz)' 2>&1)
 printf 'substitution traces=%s errors=%s parents=%s sites=%s\n' \
     "$(printf '%s\n' "$out" | grep -Ec 'trace:')" \

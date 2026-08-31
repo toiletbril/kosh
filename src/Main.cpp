@@ -916,18 +916,18 @@ static fn kosh_main(int argc, char **argv) -> int
         LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
         {
-          /* The consumed -c is the Nth -c token, where N is how many
+          /* The consumed command is the Nth command option, where N is how many
              commands FLAG_COMMAND has handed out so far. */
           let const consumed_command_index = FLAG_COMMAND.value_position();
-          usize seen_dash_c_count = 0;
+          usize seen_command_count = 0;
           usize flag_offset = 0;
           for (int a = 0; a < parse_argc; a++) {
             let const token_length = std::strlen(parse_argv[a]);
             const koshka::StringView token{parse_argv[a], token_length};
             let const quoted_length = koshka::shell_quoted_arg_length(token);
-            if (token == "-c") {
-              seen_dash_c_count++;
-              if (seen_dash_c_count == consumed_command_index &&
+            if (token == "-c" || token == "--command") {
+              seen_command_count++;
+              if (seen_command_count == consumed_command_index &&
                   a + 1 < parse_argc)
               {
                 const usize argument_length =
