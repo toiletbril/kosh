@@ -1,7 +1,7 @@
 # make MODE=dbg/rel/prof/cosmo/cosmo_dbg
 MODE ?= dbg
 TARGET ?= # Linux/Windows_NT/Darwin
-ARCH ?= $(shell uname -m) # TODO: arm64/x86_64
+ARCH ?= $(shell uname -m)
 
 ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp \
 	PlatformPosixFilesystem.cpp PlatformPosixProcess.cpp PlatformWin32.cpp \
@@ -9,21 +9,23 @@ ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp \
 SOURCES := $(filter-out $(ROUTED_SOURCES),$(wildcard *.cpp))
 HEADERS := $(wildcard *.hpp)
 
-DIRS := $(wildcard */.)
+SOURCE_DIRECTORIES := $(wildcard */.)
 
 SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
 # The host OS, Windows_NT on Windows and the uname elsewhere.
 ifeq ($(OS), Windows_NT)
-HOST_OS := Windows_NT
+HOST_OPERATING_SYSTEM := Windows_NT
 else
-HOST_OS := $(shell uname -s)
+HOST_OPERATING_SYSTEM := $(shell uname -s)
 endif
+
+IS_ANDROID_HOST := $(if $(findstring Android,$(shell uname -o 2>/dev/null)),1,0)
 
 # Windows_NT/Linux/Darwin
 ifeq ($(TARGET),)
-TARGET := $(HOST_OS)
+TARGET := $(HOST_OPERATING_SYSTEM)
 endif
 
 # Validate TARGET
@@ -39,71 +41,65 @@ ifeq ($(TARGET), Windows_NT)
 REGEX_SOURCES := regcomp regerror regexec tre-mem
 endif
 
-ifneq ($(TARGET), $(HOST_OS))
-ifneq ($(TARGET), Windows_NT)
-ifneq ($(TARGET), Darwin)
-ifneq ($(TARGET), Linux)
-$(error Cross-compilation to '$(TARGET)' from '$(HOST_OS)' is not supported)
-endif
-endif
-endif
-endif
-
 ifeq ($(TARGET), Linux)
-ifneq ($(HOST_OS), Linux)
+ifneq ($(HOST_OPERATING_SYSTEM), Linux)
 ifneq ($(MODE), rel)
 $(error Linux cross-compilation only supports MODE=rel)
 endif
-ifeq ($(ARCH), arm64)
-LINUX_ZIG_ARCH := aarch64
-else ifeq ($(ARCH), aarch64)
-LINUX_ZIG_ARCH := aarch64
+ifneq ($(filter arm64 aarch64,$(ARCH)),)
+LINUX_TARGET_ARCHITECTURE := aarch64
 else ifeq ($(ARCH), x86_64)
-LINUX_ZIG_ARCH := x86_64
+LINUX_TARGET_ARCHITECTURE := x86_64
 else
 $(error Linux cross-compilation does not support ARCH='$(ARCH)')
 endif
-LINUX_CROSS_COMPILATION := 1
+IS_LINUX_CROSS_COMPILATION := 1
 endif
 endif
 
-ifeq ($(LINUX_CROSS_COMPILATION), 1)
-OBJ_DIR := o/$(TARGET)/$(LINUX_ZIG_ARCH)/$(MODE)
+SHOULD_LINK_STATIC_LINUX := 0
+ifeq ($(TARGET), Linux)
+ifneq ($(IS_ANDROID_HOST), 1)
+SHOULD_LINK_STATIC_LINUX := 1
+endif
+endif
+
+ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
+OBJ_DIR ?= o/$(TARGET)/$(LINUX_TARGET_ARCHITECTURE)/$(MODE)
 else
-OBJ_DIR := o/$(TARGET)/$(MODE)
+OBJ_DIR ?= o/$(TARGET)/$(MODE)
 endif
+OBJECT_DIRECTORY := $(OBJ_DIR)
 
-REGEX_OBJECTS := $(REGEX_SOURCES:%=$(OBJ_DIR)/vendor/regex/%.o)
-OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(REGEX_OBJECTS)
-DEPS := $(OBJECTS:.o=.d)
+REGEX_OBJECTS := $(REGEX_SOURCES:%=$(OBJECT_DIRECTORY)/vendor/regex/%.o)
+OBJECTS := $(SOURCES:%.cpp=$(OBJECT_DIRECTORY)/%.o) $(REGEX_OBJECTS)
+DEPENDENCY_FILES := $(OBJECTS:.o=.d)
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)
-OUT := ../kosh$(MODE_SUFFIX).com
+OUTPUT_PATH := ../kosh$(MODE_SUFFIX).com
 else ifeq ($(TARGET), Windows_NT)
-OUT := ../kosh$(MODE_SUFFIX).exe
+OUTPUT_PATH := ../kosh$(MODE_SUFFIX).exe
 else
-OUT := ../kosh$(MODE_SUFFIX)
+OUTPUT_PATH := ../kosh$(MODE_SUFFIX)
 endif
 
-LINKED_OUT := $(OUT)
+LINKED_OUTPUT_PATH := $(OUTPUT_PATH)
 ifeq ($(MODE), rel)
 ifneq ($(TARGET), Windows_NT)
-LINKED_OUT := $(OBJ_DIR)/kosh
+LINKED_OUTPUT_PATH := $(OBJECT_DIRECTORY)/kosh
 endif
 endif
 
 # Cosmopolitan/Clang.
-CXX_ORIGIN := $(origin CXX)
-ifeq ($(MODE), cosmo)
-CXX := cosmoc++
-else ifeq ($(MODE), cosmo_dbg)
+CXX_VARIABLE_ORIGIN := $(origin CXX)
+ifneq ($(filter cosmo cosmo_dbg,$(MODE)),)
 CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
-ifeq ($(CXX_ORIGIN), default)
+ifeq ($(CXX_VARIABLE_ORIGIN), default)
 CXX := clang++
 endif
-else ifeq ($(CXX_ORIGIN), default)
+else ifeq ($(CXX_VARIABLE_ORIGIN), default)
 CXX := clang++
 endif
 
@@ -114,19 +110,21 @@ CXX := x86_64-w64-mingw32-g++
 endif
 endif
 
+ifeq ($(TARGET), Windows_NT)
 WINDOWS_COMPILER_TARGET := $(shell $(CXX) -dumpmachine 2>/dev/null)
-WINDOWS_GNU_ABI := $(or $(findstring mingw,$(WINDOWS_COMPILER_TARGET)),\
+IS_WINDOWS_GNU_ABI := $(or $(findstring mingw,$(WINDOWS_COMPILER_TARGET)),\
 	$(findstring windows-gnu,$(WINDOWS_COMPILER_TARGET)))
+endif
 
 ifeq ($(TARGET), Linux)
-ifneq ($(HOST_OS), Linux)
-CXX := zig c++ -target $(LINUX_ZIG_ARCH)-linux-musl
+ifneq ($(HOST_OPERATING_SYSTEM), Linux)
+CXX := zig c++ -target $(LINUX_TARGET_ARCHITECTURE)-linux-musl
 endif
 endif
 
 ifeq ($(TARGET), Darwin)
-ifneq ($(HOST_OS), Darwin)
-ifeq ($(CXX_ORIGIN), default)
+ifneq ($(HOST_OPERATING_SYSTEM), Darwin)
+ifeq ($(CXX_VARIABLE_ORIGIN), default)
 ifeq ($(ARCH), x86_64)
 $(error x86_64 Darwin build is not supported)
 else
@@ -142,48 +140,53 @@ LIBC_INFO := cosmopolitan libc
 else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
 LIBC_INFO := cosmopolitan libc
-else ifeq ($(LINUX_CROSS_COMPILATION), 1)
-OS_INFO := Linux $(LINUX_ZIG_ARCH) cross
+else ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
+OS_INFO := Linux $(LINUX_TARGET_ARCHITECTURE) cross
 else
 OS_INFO := $(shell test -f /etc/os-release && . /etc/os-release 2>/dev/null; printf '%s%s' "$${PRETTY_NAME:+$$PRETTY_NAME }" "$$(uname -rvom 2>/dev/null || echo '<no uname>')")
 endif
+OPERATING_SYSTEM_INFORMATION := $(OS_INFO)
 
 ifndef LIBC_INFO
 ifeq ($(TARGET), Windows_NT)
-ifneq ($(WINDOWS_GNU_ABI),)
+ifneq ($(IS_WINDOWS_GNU_ABI),)
 LIBC_INFO := mingw msvcrt
 else
 LIBC_INFO := msvc
 endif
 else ifeq ($(TARGET), Darwin)
 LIBC_INFO := Apple libSystem
-else ifneq ($(TARGET), $(HOST_OS))
+else ifeq ($(IS_ANDROID_HOST), 1)
+LIBC_INFO := Android bionic
+else ifneq ($(TARGET), $(HOST_OPERATING_SYSTEM))
 LIBC_INFO := zig musl libc++
 else
 LIBC_INFO := $(shell getconf GNU_LIBC_VERSION 2>/dev/null || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | head -n 1; } || echo 'unknown libc')
 endif
 endif
+LIBC_INFORMATION := $(LIBC_INFO)
 
 COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
 
 # Remember CXXFLAGS passed to us from CLI.
 ENVCXXFLAGS := $(CXXFLAGS)
+USER_CXXFLAGS := $(ENVCXXFLAGS)
 CXXFLAGS := # nothing
 
-encode_metadata = $(1)
+encode_build_metadata = $(1)
 ifneq ($(filter cosmo cosmo_dbg,$(MODE)),)
-empty :=
-space := $(empty) $(empty)
-encode_metadata = $(subst $(space),\\040,$(1))
+EMPTY_STRING :=
+SPACE := $(EMPTY_STRING) $(EMPTY_STRING)
+encode_build_metadata = $(subst $(SPACE),\\040,$(1))
 endif
 
-DEFINES := \
-	-DKOSH_COMPILER_COMMAND="\"$(call encode_metadata,$(CXX))\"" \
-	-DKOSH_LIBC="\"$(call encode_metadata,$(LIBC_INFO))\"" \
-	-DKOSH_OS_INFO="\"$(call encode_metadata,$(OS_INFO))\"" \
-	-DKOSH_COMMIT_HASH="\"$(call encode_metadata,$(COMMIT_HASH))\"" \
-	-DKOSH_BUILD_MODE="\"$(call encode_metadata,$(MODE))\"" \
-	-DKOSH_ENVCXXFLAGS="\"$(call encode_metadata,$(ENVCXXFLAGS))\""
+BUILD_DEFINITIONS := \
+	-DKOSH_COMPILER_COMMAND="\"$(call encode_build_metadata,$(CXX))\"" \
+	-DKOSH_LIBC="\"$(call encode_build_metadata,$(LIBC_INFORMATION))\"" \
+	-DKOSH_OS_INFO="\"$(call encode_build_metadata,$(OPERATING_SYSTEM_INFORMATION))\"" \
+	-DKOSH_COMMIT_HASH="\"$(call encode_build_metadata,$(COMMIT_HASH))\"" \
+	-DKOSH_BUILD_MODE="\"$(call encode_build_metadata,$(MODE))\"" \
+	-DKOSH_ENVCXXFLAGS="\"$(call encode_build_metadata,$(USER_CXXFLAGS))\""
 
 CXXFLAGS := \
 	-Wall \
@@ -202,10 +205,10 @@ CXXFLAGS := \
 	-fno-semantic-interposition \
 	-Wno-unknown-pragmas \
 	-fno-strict-aliasing \
-	$(DEFINES) \
-	$(ENVCXXFLAGS)
+	$(BUILD_DEFINITIONS) \
+	$(USER_CXXFLAGS)
 
-ifeq ($(LINUX_CROSS_COMPILATION), 1)
+ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
 CXXFLAGS += -Wno-date-time
 endif
 
@@ -213,16 +216,17 @@ ifeq ($(TARGET), Linux)
 CXXFLAGS += -Wl,-Bsymbolic
 endif
 
-LINK_LIBS := # nothing
+LINK_LIBRARIES := # nothing
 
 ifeq ($(TARGET), Windows_NT)
-ifeq ($(WINDOWS_GNU_ABI),)
-LINK_LIBS += --rtlib=compiler-rt
+ifeq ($(IS_WINDOWS_GNU_ABI),)
+LINK_LIBRARIES += --rtlib=compiler-rt
 endif
 endif
 
+AVAILABLE_LLD := $(shell command -v ld.lld 2>/dev/null || command -v lld 2>/dev/null)
 ifeq ($(TARGET), Windows_NT)
-ifneq ($(shell command -v ld.lld 2>/dev/null || command -v lld 2>/dev/null),)
+ifneq ($(AVAILABLE_LLD),)
 USE_LD := -fuse-ld=lld
 else
 USE_LD :=
@@ -233,11 +237,12 @@ else ifeq ($(TARGET), Darwin)
 USE_LD :=
 else ifneq ($(shell command -v mold 2>/dev/null),)
 USE_LD := -fuse-ld=mold
-else ifneq ($(shell command -v ld.lld 2>/dev/null || command -v lld 2>/dev/null),)
+else ifneq ($(AVAILABLE_LLD),)
 USE_LD := -fuse-ld=lld
 else
 USE_LD :=
 endif
+LINKER_SELECTION_FLAG := $(USE_LD)
 
 # MODE=rel
 ifeq ($(MODE), rel)
@@ -249,18 +254,18 @@ CXXFLAGS += \
 ifneq ($(TARGET), Windows_NT)
 ifneq ($(TARGET), Darwin)
 CXXFLAGS += -flto
-else ifeq ($(HOST_OS), Darwin)
+else ifeq ($(HOST_OPERATING_SYSTEM), Darwin)
 CXXFLAGS += -flto
 endif
 endif
 ifeq ($(TARGET), Linux)
-ifeq ($(LINUX_CROSS_COMPILATION), 1)
+ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
 CXXFLAGS += -static
-else
+else ifeq ($(SHOULD_LINK_STATIC_LINUX), 1)
 CXXFLAGS += \
 	-static-pie \
 	-nostdlib++
-LINK_LIBS += -lsupc++
+LINK_LIBRARIES += -lsupc++
 endif
 endif
 # MODE=dbg
@@ -307,19 +312,22 @@ CXXFLAGS += \
 	-flto
 ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += \
-	-static-pie \
 	-O3 \
 	-U_FORTIFY_SOURCE \
 	-D_FORTIFY_SOURCE=2
+ifeq ($(SHOULD_LINK_STATIC_LINUX), 1)
+CXXFLAGS += -static-pie
+endif
 else
 CXXFLAGS += \
 	-O2
 endif
 ifeq ($(TARGET), Linux)
-CXXFLAGS += \
-	-nostdlib++ \
-	-finstrument-functions
-LINK_LIBS += -lsupc++
+CXXFLAGS += -finstrument-functions
+ifeq ($(SHOULD_LINK_STATIC_LINUX), 1)
+CXXFLAGS += -nostdlib++
+LINK_LIBRARIES += -lsupc++
+endif
 endif
 else ifeq ($(MODE), cov)
 COVERAGE_PROFILE_DIRECTORY := $(abspath ../coverage/profraw)
@@ -331,10 +339,12 @@ CXXFLAGS += \
 	"-fprofile-instr-generate=$(COVERAGE_PROFILE_DIRECTORY)/kosh-%p.profraw" \
 	-fcoverage-mapping
 ifeq ($(TARGET), Linux)
+ifeq ($(SHOULD_LINK_STATIC_LINUX), 1)
 CXXFLAGS += \
 	-static-pie \
 	-nostdlib++
-LINK_LIBS += -lsupc++
+LINK_LIBRARIES += -lsupc++
+endif
 endif
 else
 $(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cov", "cosmo", "cosmo_dbg")
@@ -343,12 +353,14 @@ endif
 ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-pthread
-LINK_LIBS += -lpthread
+ifneq ($(IS_ANDROID_HOST), 1)
+LINK_LIBRARIES += -lpthread
+endif
 endif
 
 # Missing Windows libraries.
 ifeq ($(TARGET), Windows_NT)
-LINK_LIBS += \
+LINK_LIBRARIES += \
 	-luserenv \
 	-ladvapi32 \
 	-lrstrtmgr
@@ -357,29 +369,29 @@ endif
 ifeq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-Wno-unknown-pragmas
-ifneq ($(WINDOWS_GNU_ABI),)
+ifneq ($(IS_WINDOWS_GNU_ABI),)
 CXXFLAGS += \
 		-mconsole \
 		-static \
 		-static-libgcc \
 		-static-libstdc++
-LINK_LIBS += -municode
+LINK_LIBRARIES += -municode
 else
-LINK_LIBS += -Wl,/entry:wmainCRTStartup
+LINK_LIBRARIES += -Wl,/entry:wmainCRTStartup
 endif
 endif
 
-REGEX_CFLAGS = $(filter-out -std=c++23 -fno-rtti,$(CXXFLAGS)) -std=c11 \
+REGEX_COMPILER_FLAGS := $(filter-out -std=c++23 -fno-rtti,$(CXXFLAGS)) -std=c11 \
 	-I../vendor/regex
 
 # A bare `make` builds the shell, the same as `make kosh`, rather than the first
 # object the rules below would otherwise name as the default goal.
 .DEFAULT_GOAL := kosh
 
-COMMIT_HASH_STAMP := $(OBJ_DIR)/.commit-hash
+COMMIT_HASH_STAMP := $(OBJECT_DIRECTORY)/.commit-hash
 COMMIT_HASH_OBJECTS := \
-	$(OBJ_DIR)/Cli.o \
-	$(OBJ_DIR)/Main.o
+	$(OBJECT_DIRECTORY)/Cli.o \
+	$(OBJECT_DIRECTORY)/Main.o
 STORED_COMMIT_HASH := $(shell cat $(COMMIT_HASH_STAMP) 2>/dev/null)
 
 force_commit_hash:
@@ -398,44 +410,46 @@ $(COMMIT_HASH_STAMP): force_commit_hash | dirs
 
 $(COMMIT_HASH_OBJECTS): $(COMMIT_HASH_STAMP)
 
-# Every object is built into $(OBJ_DIR), so its directory tree must exist first.
+# Every object is built into $(OBJECT_DIRECTORY), so its directory tree must exist first.
 # The order-only prerequisite creates it before any compile, so a plain
 # `make MODE=rel` from a clean tree works without first running the kosh target.
 $(OBJECTS): | dirs
 
-$(OBJ_DIR)/%.o: %.cpp Makefile
+$(OBJECT_DIRECTORY)/%.o: %.cpp Makefile
 	printf "\tCompiling %-42s $@... %-12s\r" $< ' '
-	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
-$(OBJ_DIR)/vendor/regex/%.o: ../vendor/regex/%.c Makefile
+$(OBJECT_DIRECTORY)/vendor/regex/%.o: ../vendor/regex/%.c Makefile
 	printf "\tCompiling %-42s $@... %-12s\r" $< ' '
-	$(CXX) $(REGEX_CFLAGS) -x c -MMD -MP -c $< -o $(CWD)$@
+	$(CXX) $(REGEX_COMPILER_FLAGS) -x c -MMD -MP -c $< -o $@
 
 # Linking.
-$(LINKED_OUT): $(OBJECTS)
-	printf "\tLinking $(LINKED_OUT)... %-64s\r" ' '
+$(LINKED_OUTPUT_PATH): $(OBJECTS)
+	printf "\tLinking $(LINKED_OUTPUT_PATH)... %-64s\r" ' '
 ifeq ($(TARGET), Windows_NT)
-	cd $(OBJ_DIR) && $(CXX) $(CXXFLAGS) $(USE_LD) \
-		$(patsubst $(OBJ_DIR)/%,%,$(OBJECTS)) $(LINK_LIBS) \
+	cd $(OBJECT_DIRECTORY) && $(CXX) $(CXXFLAGS) $(LINKER_SELECTION_FLAG) \
+		$(patsubst $(OBJECT_DIRECTORY)/%,%,$(OBJECTS)) $(LINK_LIBRARIES) \
 		-o $(abspath $@)
 else
-	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
+	$(CXX) $(CXXFLAGS) $(LINKER_SELECTION_FLAG) $(OBJECTS) $(LINK_LIBRARIES) -o $@
 endif
 
-dirs: $(DIRS)
-	mkdir -p $(OBJ_DIR)/
-	for source_dir in $(DIRS); do mkdir -p $(OBJ_DIR)/$$source_dir; done
+dirs: $(SOURCE_DIRECTORIES)
+	mkdir -p $(OBJECT_DIRECTORY)/
+	for source_directory in $(SOURCE_DIRECTORIES); do \
+		mkdir -p $(OBJECT_DIRECTORY)/$$source_directory; \
+	done
 ifneq ($(REGEX_SOURCES),)
-	mkdir -p $(OBJ_DIR)/vendor/regex
+	mkdir -p $(OBJECT_DIRECTORY)/vendor/regex
 endif
 ifeq ($(MODE), cov)
 	mkdir -p "$(COVERAGE_PROFILE_DIRECTORY)"
 endif
 
 kosh: dirs
-	$(MAKE) $(LINKED_OUT)
-ifneq ($(LINKED_OUT), $(OUT))
-	cp $(LINKED_OUT) $(OUT)
+	$(MAKE) $(LINKED_OUTPUT_PATH)
+ifneq ($(LINKED_OUTPUT_PATH), $(OUTPUT_PATH))
+	cp $(LINKED_OUTPUT_PATH) $(OUTPUT_PATH)
 endif
 
 # INSTALL_MOOD_SYMLINKS="sh bash dash".
@@ -447,10 +461,10 @@ man5dir ?= $(PREFIX)/share/man/man5
 bashcompdir ?= $(PREFIX)/share/bash-completion/completions
 INSTALL_MOOD_SYMLINKS ?=
 
-REL_BINARY := ../kosh
-MANPAGE := ../docs/kosh.1
-MANPAGE5 := ../docs/kosh.5
-BASH_COMPLETION := ../completions/kosh.bash
+RELEASE_BINARY := ../kosh
+COMMAND_MANPAGE := ../docs/kosh.1
+CONFIGURATION_MANPAGE := ../docs/kosh.5
+BASH_COMPLETION_FILE := ../completions/kosh.bash
 
 install:
 ifeq ($(TARGET), Windows_NT)
@@ -460,10 +474,10 @@ else
 	$(MAKE) MODE=rel kosh
 	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(mandir)" \
 		"$(DESTDIR)$(man5dir)" "$(DESTDIR)$(bashcompdir)"
-	install -m 755 $(REL_BINARY) "$(DESTDIR)$(bindir)/kosh"
-	install -m 644 $(MANPAGE) "$(DESTDIR)$(mandir)/kosh.1"
-	install -m 644 $(MANPAGE5) "$(DESTDIR)$(man5dir)/kosh.5"
-	install -m 644 $(BASH_COMPLETION) "$(DESTDIR)$(bashcompdir)/kosh"
+	install -m 755 $(RELEASE_BINARY) "$(DESTDIR)$(bindir)/kosh"
+	install -m 644 $(COMMAND_MANPAGE) "$(DESTDIR)$(mandir)/kosh.1"
+	install -m 644 $(CONFIGURATION_MANPAGE) "$(DESTDIR)$(man5dir)/kosh.5"
+	install -m 644 $(BASH_COMPLETION_FILE) "$(DESTDIR)$(bashcompdir)/kosh"
 	for mood in $(INSTALL_MOOD_SYMLINKS); do \
 		ln -sf kosh "$(DESTDIR)$(bindir)/$$mood"; \
 	done
@@ -502,4 +516,4 @@ clean:
 
 .PHONY: dirs force_commit_hash force_commit_hash_objects kosh install uninstall tidy fmt clean
 
--include $(DEPS)
+-include $(DEPENDENCY_FILES)
