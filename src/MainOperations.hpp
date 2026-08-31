@@ -56,16 +56,30 @@ static fn run_debug_completion_driver(StringView driver_line,
         parsed_cursor.value() <= driver_line.length)
       driver_cursor = static_cast<usize>(parsed_cursor.value());
   }
+
+  let const lexical_scan_byte_count_before =
+      completion::debug_shell_lexical_scan_byte_count();
   let const driver_result = completion::complete(
       driver_line, driver_cursor, context, Path::current_directory(),
       completion::completion_mode::Listing);
   let listing = String{heap_allocator()};
+
   for (let const &candidate : driver_result.candidates) {
     listing += candidate.view();
     listing += '\n';
   }
+
+  if (os::get_environment_variable("KOSH_TEST_COMPLETION_STATS").has_value()) {
+    listing += "lexical-scan-bytes=";
+    listing += String::from(completion::debug_shell_lexical_scan_byte_count() -
+                                lexical_scan_byte_count_before,
+                            heap_allocator());
+    listing += '\n';
+  }
+
   print(listing);
   flush();
+
   return 0;
 }
 

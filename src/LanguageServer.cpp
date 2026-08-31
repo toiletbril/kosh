@@ -687,9 +687,17 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
       document->shell_source(), *cursor, m_context, base_directory,
       completion::completion_mode::Listing, &document_function_names, true);
   let response = String{"["};
+  let text_edit_prefix = String{heap_allocator()};
 
   for (usize index = 0; index < result.candidates.count(); index++) {
-    if (index != 0) response.push(',');
+    if (index != 0) {
+      response.push(',');
+    } else {
+      text_edit_prefix.append("{\"range\":");
+      append_protocol_range(text_edit_prefix, *document, result.token_start,
+                            result.token_end, m_encoding);
+      text_edit_prefix.append(",\"newText\":");
+    }
     let const &candidate = result.candidates[index];
     response.append("{\"label\":");
     append_json_string(response, candidate.view());
@@ -720,8 +728,9 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
       response.push('}');
     }
     response.append(",\"textEdit\":");
-    append_text_edit(response, *document, result.token_start, result.token_end,
-                     candidate.view());
+    response.append(text_edit_prefix.view());
+    append_json_string(response, candidate.view());
+    response.push('}');
     response.push('}');
   }
   response.push(']');

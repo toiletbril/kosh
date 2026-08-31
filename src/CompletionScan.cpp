@@ -1120,6 +1120,15 @@ fn advance_shell_lexical_state(StringView source, usize end,
   };
 
   while (i < end) {
+    if (target != nullptr && target->should_stop_at_token_boundary &&
+        i >= target->cursor && !state.is_in_heredoc && !state.is_in_comment &&
+        state.quote == 0 && state.frames.count() == target->frame_depth &&
+        is_active_token_boundary(source, i))
+    {
+      target->range.end = i;
+      break;
+    }
+
     if (state.is_in_heredoc) {
       let const &heredoc = state.pending_heredocs[state.active_heredoc_index];
       let line_end = i;
@@ -1511,10 +1520,15 @@ fn command_substitution_range(StringView line, usize cursor) throws
   let target = shell_lexical_scan_target{
       cursor, completion_command_range{0, line.length}
   };
-  advance_shell_lexical_state(line, line.length, state, &target);
+
+  advance_shell_lexical_state(line, cursor, state, &target);
   for (usize frame_index = 0; frame_index < state.frames.count(); frame_index++)
     consider_shell_lexical_frame(state.frames[frame_index], line.length,
                                  frame_index + 1, &target);
+
+  target.should_stop_at_token_boundary = true;
+  advance_shell_lexical_state(line, line.length, state, &target);
+
   return target.range;
 }
 

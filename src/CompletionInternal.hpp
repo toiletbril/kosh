@@ -57,6 +57,8 @@ struct path_token
 pure fn quoted_run_end(StringView line, usize position) wontthrow -> usize;
 pure fn find_token_bounds(StringView line, usize cursor) wontthrow
     -> token_bounds;
+pure fn is_active_token_boundary(StringView line, usize position) wontthrow
+    -> bool;
 pure fn is_in_command_position(StringView line, usize token_start) wontthrow
     -> bool;
 pure fn command_segment_start(StringView line, usize cursor) wontthrow -> usize;
@@ -145,6 +147,7 @@ struct shell_lexical_scan_target
   usize cursor;
   completion_command_range range;
   usize frame_depth{0};
+  bool should_stop_at_token_boundary{false};
 };
 
 fn advance_shell_lexical_state(

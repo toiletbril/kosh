@@ -76,3 +76,28 @@ line="$prefix)"
 KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
     "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
     --debug-complete-at "$line" </dev/null
+
+echo "== a short prefix does not scan a large suffix:"
+suffix=
+for ((suffix_index = 0; suffix_index < 2048; suffix_index++)); do
+  suffix+=' ignored'
+done
+prefix='echo $(probecmd a'
+result=$(KOSH_TEST_COMPLETION_STATS=1 \
+    KOSH_TEST_COMPLETE_CURSOR=${#prefix} \
+    "$BIN" -c 'complete -W "alpha beta gamma" probecmd' \
+    --debug-complete-at "$prefix$suffix" </dev/null)
+candidate=${result%%$'\n'*}
+statistics=${result##*$'\n'}
+scanned_byte_count=${statistics#lexical-scan-bytes=}
+case $scanned_byte_count in
+'' | *[!0-9]*) is_scanned_byte_count_valid=false ;;
+*) is_scanned_byte_count_valid=true ;;
+esac
+if [[ $candidate == alpha && $statistics == lexical-scan-bytes=* &&
+      $is_scanned_byte_count_valid == true &&
+      $scanned_byte_count -le 64 ]]; then
+  echo bounded
+else
+  echo unbounded
+fi

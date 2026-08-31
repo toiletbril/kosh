@@ -71,8 +71,8 @@ static pure fn is_token_boundary(char c) wontthrow -> bool
   return is_word_separator(c) || is_command_separator(c);
 }
 
-static pure fn is_active_token_boundary(StringView line,
-                                        usize position) wontthrow -> bool
+pure fn is_active_token_boundary(StringView line, usize position) wontthrow
+    -> bool
 {
   let const c = line[position];
   if (!is_token_boundary(c)) return false;
