@@ -437,7 +437,7 @@ endif
 dirs: $(SOURCE_DIRECTORIES)
 	mkdir -p $(OBJECT_DIRECTORY)/
 	for source_directory in $(SOURCE_DIRECTORIES); do \
-		mkdir -p $(OBJECT_DIRECTORY)/$$source_directory; \
+		mkdir -p "$(OBJECT_DIRECTORY)/$$source_directory"; \
 	done
 ifneq ($(REGEX_SOURCES),)
 	mkdir -p $(OBJECT_DIRECTORY)/vendor/regex

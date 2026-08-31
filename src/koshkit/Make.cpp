@@ -385,6 +385,9 @@ struct makefile
 static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
                               ArrayList<make_source_document> &sources,
                               usize first_source_position) throws -> void;
+static fn make_expansion_end(StringView text, usize start_position,
+                             ArrayList<char> &close_stack) throws
+    -> Maybe<usize>;
 
 /* This runs on the raw recipe before the $(NAME) expansion, and a $$ escape is
    carried through untouched so the later expansion collapses it to a single $
@@ -1626,24 +1629,11 @@ static fn expand(EvalContext &cxt, makefile &mk, StringView text,
     if (text[text_position] == '$' && text_position + 1 < text.length &&
         (text[text_position + 1] == '(' || text[text_position + 1] == '{'))
     {
-      close_stack.clear();
-      close_stack.push(text[text_position + 1] == '(' ? ')' : '}');
-      usize close_position = text_position + 2;
-      while (close_position < text.length && !close_stack.is_empty()) {
-        if (text[close_position] == '$' && close_position + 1 < text.length &&
-            (text[close_position + 1] == '(' ||
-             text[close_position + 1] == '{'))
-        {
-          close_stack.push(text[close_position + 1] == '(' ? ')' : '}');
-          close_position++;
-        } else if (text[close_position] == close_stack.back()) {
-          close_stack.pop_back();
-          if (close_stack.is_empty()) break;
-        }
-        close_position++;
-      }
-      if (!close_stack.is_empty())
+      let const expansion_end =
+          make_expansion_end(text, text_position, close_stack);
+      if (!expansion_end.has_value())
         throw Error{"The make variable reference is unterminated"};
+      let const close_position = *expansion_end;
 
       let const expression = text.substring_of_length(
           text_position + 2, close_position - (text_position + 2));
@@ -1840,11 +1830,10 @@ struct make_logical_line
   SourceLocation source_span;
 };
 
-static fn join_continuations(const make_source_document &document,
+static fn join_continuations(StringView source, u32 source_name_index,
                              Allocator allocator) throws
     -> ArrayList<make_logical_line>
 {
-  let const source = document.source.view();
   let const physical = utils::split_lines(source, allocator, true);
   ArrayList<make_logical_line> logical{allocator};
   usize i = 0;
@@ -1878,11 +1867,41 @@ static fn join_continuations(const make_source_document &document,
 
     logical.push(make_logical_line{
         steal(line), SourceLocation{source_start, source_end - source_start,
-                                    document.source_name_index}
+                                    source_name_index}
     });
     i++;
   }
   return logical;
+}
+
+static fn make_expansion_end(StringView text, usize start_position,
+                             ArrayList<char> &close_stack) throws
+    -> Maybe<usize>
+{
+  if (start_position + 1 >= text.length || text[start_position] != '$' ||
+      (text[start_position + 1] != '(' && text[start_position + 1] != '{'))
+    return None;
+
+  close_stack.clear();
+  close_stack.push(text[start_position + 1] == '(' ? ')' : '}');
+  usize position = start_position + 2;
+
+  while (position < text.length && !close_stack.is_empty()) {
+    if (text[position] == '$' && position + 1 < text.length &&
+        (text[position + 1] == '(' || text[position + 1] == '{'))
+    {
+      close_stack.push(text[position + 1] == '(' ? ')' : '}');
+      position += 2;
+      continue;
+    }
+    if (text[position] == close_stack.back()) {
+      close_stack.pop_back();
+      if (close_stack.is_empty()) return position;
+    }
+    position++;
+  }
+
+  return None;
 }
 
 static fn leading_word(StringView text) wontthrow -> StringView
@@ -1894,6 +1913,26 @@ static fn leading_word(StringView text) wontthrow -> StringView
   while (end < text.length && !is_blank(text[end]))
     end++;
   return text.substring_of_length(start, end - start);
+}
+
+static fn makefile_without_comment(StringView line, Allocator allocator) throws
+    -> String
+{
+  let uncommented = String{allocator};
+
+  for (usize line_position = 0; line_position < line.length; line_position++) {
+    if (line[line_position] == '\\' && line_position + 1 < line.length &&
+        line[line_position + 1] == '#')
+    {
+      uncommented.push('#');
+      line_position++;
+      continue;
+    }
+    if (line[line_position] == '#') break;
+    uncommented.push(line[line_position]);
+  }
+
+  return uncommented;
 }
 
 /* The comma split honors nested parentheses. */
@@ -1991,8 +2030,10 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
   ArrayList<make_source_frame> source_frames{cxt.scratch_allocator()};
   for (usize source_position = sources.count();
        source_position > first_source_position; source_position--)
-    source_frames.push(make_source_frame{join_continuations(
-        sources[source_position - 1], cxt.scratch_allocator())});
+    source_frames.push(make_source_frame{
+        join_continuations(sources[source_position - 1].source.view(),
+                           sources[source_position - 1].source_name_index,
+                           cxt.scratch_allocator())});
   SourceLocation active_source_span;
   try {
     while (!source_frames.is_empty()) {
@@ -2022,20 +2063,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
         continue;
       }
 
-      String uncommented{cxt.scratch_allocator()};
-      for (usize line_position = 0; line_position < line.length;
-           line_position++)
-      {
-        if (line[line_position] == '\\' && line_position + 1 < line.length &&
-            line[line_position + 1] == '#')
-        {
-          uncommented += '#';
-          line_position++;
-          continue;
-        }
-        if (line[line_position] == '#') break;
-        uncommented += line[line_position];
-      }
+      let uncommented = makefile_without_comment(line, cxt.scratch_allocator());
       line = uncommented.view();
 
       let const trimmed = trim(line);
@@ -2162,7 +2190,9 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
               make_source_document{steal(*included_source),
                                    intern_source_name(include_path.view())});
           source_frames.push(make_source_frame{
-              join_continuations(sources.back(), cxt.scratch_allocator()),
+              join_continuations(sources.back().source.view(),
+                                 sources.back().source_name_index,
+                                 cxt.scratch_allocator()),
               include_depth});
         }
         continue;
@@ -3100,6 +3130,252 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
 }
 
 } /* namespace */
+
+fn parse_makefile_shell_sources(StringView source, Allocator allocator) throws
+    -> ArrayList<make_shell_source_range>
+{
+  let ranges = ArrayList<make_shell_source_range>{allocator};
+  let const logical_lines = join_continuations(source, 0, allocator);
+  bool has_current_rule = false;
+  usize define_depth = 0;
+
+  for (let const &logical : logical_lines) {
+    let const line = logical.text.view();
+    let const trimmed_line = trim(line);
+    let const directive = leading_word(trimmed_line);
+
+    if (define_depth != 0) {
+      if (directive == "define")
+        define_depth++;
+      else if (directive == "endef")
+        define_depth--;
+      continue;
+    }
+
+    if (!line.is_empty() && line[0] == '\t') {
+      if (has_current_rule) {
+        usize start_position = logical.source_span.position + 1;
+        let const end_position = static_cast<usize>(
+            logical.source_span.position + logical.source_span.length);
+        while (start_position < end_position &&
+               (source[start_position] == '@' ||
+                source[start_position] == '-' || source[start_position] == '+'))
+          start_position++;
+        if (start_position < end_position)
+          ranges.push(make_shell_source_range{start_position, end_position,
+                                              make_shell_source_kind::Recipe});
+      }
+      continue;
+    }
+
+    let const uncommented = makefile_without_comment(line, allocator);
+    let const statement = trim(uncommented.view());
+    if (statement.is_empty()) {
+      has_current_rule = false;
+      continue;
+    }
+
+    let const statement_directive = leading_word(statement);
+    if (statement_directive == "define") {
+      define_depth = 1;
+      has_current_rule = false;
+      continue;
+    }
+    if (CONDITIONAL_DIRECTIVES.contains(statement_directive) ||
+        statement_directive == "else" || statement_directive == "endif" ||
+        statement_directive == "include")
+    {
+      has_current_rule = false;
+      continue;
+    }
+
+    let const colon = rule_colon(statement);
+    let const equals = statement.find_character('=');
+    if (colon.has_value() && (!equals.has_value() || *colon < *equals)) {
+      let const after_colon = statement.substring(*colon + 1);
+      if (is_target_variable_assignment(after_colon)) {
+        has_current_rule = false;
+        continue;
+      }
+
+      has_current_rule = true;
+      let const raw_line = source.substring_of_length(
+          logical.source_span.position, logical.source_span.length);
+      let const raw_colon = rule_colon(raw_line);
+      if (!raw_colon.has_value()) continue;
+      let const semicolon =
+          raw_line.substring(*raw_colon + 1).find_character(';');
+      if (!semicolon.has_value()) continue;
+      usize start_position =
+          logical.source_span.position + *raw_colon + 2 + *semicolon;
+      let const end_position = static_cast<usize>(logical.source_span.position +
+                                                  logical.source_span.length);
+      while (start_position < end_position &&
+             (source[start_position] == ' ' || source[start_position] == '\t'))
+        start_position++;
+      if (start_position < end_position)
+        ranges.push(make_shell_source_range{start_position, end_position,
+                                            make_shell_source_kind::Recipe});
+      continue;
+    }
+
+    if (equals.has_value()) has_current_rule = false;
+  }
+
+  let const recipe_range_count = ranges.count();
+  let const do_is_inside_recipe = [&](usize source_position) {
+    usize lower = 0;
+    usize upper = recipe_range_count;
+
+    while (lower < upper) {
+      let const middle = lower + (upper - lower) / 2;
+      let const &range = ranges[middle];
+      if (source_position < range.start_position)
+        upper = middle;
+      else if (source_position >= range.end_position)
+        lower = middle + 1;
+      else
+        return true;
+    }
+
+    return false;
+  };
+  let close_stack = ArrayList<char>{allocator};
+  usize position = 0;
+  bool is_comment = false;
+
+  while (position + 1 < source.length) {
+    if (source[position] == '\n') {
+      is_comment = false;
+      position++;
+      continue;
+    }
+    if (is_comment) {
+      position++;
+      continue;
+    }
+    if (source[position] == '#' && !do_is_inside_recipe(position) &&
+        (position == 0 || source[position - 1] != '\\'))
+    {
+      is_comment = true;
+      position++;
+      continue;
+    }
+    if (source[position] != '$') {
+      position++;
+      continue;
+    }
+    if (source[position + 1] == '$') {
+      position += 2;
+      continue;
+    }
+
+    let const expansion_end = make_expansion_end(source, position, close_stack);
+    if (!expansion_end.has_value()) {
+      position++;
+      continue;
+    }
+
+    let const expression_start = position + 2;
+    usize name_end = expression_start;
+    while (name_end < *expansion_end && !is_blank(source[name_end]) &&
+           source[name_end] != ',')
+      name_end++;
+    if (source.substring_of_length(expression_start,
+                                   name_end - expression_start) == "shell" &&
+        name_end < *expansion_end && is_blank(source[name_end]))
+    {
+      usize body_start = name_end;
+      while (body_start < *expansion_end && is_blank(source[body_start]))
+        body_start++;
+      if (!do_is_inside_recipe(body_start) && body_start < *expansion_end)
+        ranges.push(make_shell_source_range{
+            body_start, *expansion_end, make_shell_source_kind::ShellFunction});
+      position = *expansion_end + 1;
+      continue;
+    }
+    position += 2;
+  }
+
+  ranges.sort([](const make_shell_source_range &left,
+                 const make_shell_source_range &right) {
+    return left.start_position < right.start_position;
+  });
+
+  return ranges;
+}
+
+fn makefile_shell_analysis_source(StringView source,
+                                  const make_shell_source_range &range) throws
+    -> String
+{
+  let analysis_source = String{heap_allocator()};
+  analysis_source.reserve(source.length);
+  let close_stack = ArrayList<char>{heap_allocator()};
+  usize position = 0;
+  usize line_start_position = 0;
+  char quote_byte = '\0';
+  bool is_escaped = false;
+
+  while (position < source.length) {
+    let const byte = source[position];
+    if (position < range.start_position || position >= range.end_position) {
+      analysis_source.push(byte == '\n' ? '\n' : ' ');
+      if (byte == '\n') line_start_position = position + 1;
+      position++;
+      continue;
+    }
+    if (byte != '$' || position + 1 >= range.end_position) {
+      if (position >= range.start_position) {
+        if (is_escaped) {
+          is_escaped = false;
+        } else if (byte == '\\' && quote_byte != '\'') {
+          is_escaped = true;
+        } else if (quote_byte == '\0' && (byte == '\'' || byte == '"')) {
+          quote_byte = byte;
+        } else if (byte == quote_byte) {
+          quote_byte = '\0';
+        }
+      }
+      analysis_source.push(byte);
+      if (byte == '\n') line_start_position = position + 1;
+      position++;
+      continue;
+    }
+    if (source[position + 1] == '$') {
+      analysis_source.append(" $");
+      position += 2;
+      continue;
+    }
+
+    let const expansion_end = make_expansion_end(source, position, close_stack);
+    let const end_position =
+        expansion_end.has_value() && *expansion_end < range.end_position
+            ? *expansion_end
+            : position + 1;
+    let const line_prefix = source.substring_of_length(
+        line_start_position, position - line_start_position);
+    let const trimmed_prefix = trim(line_prefix);
+    let const is_for_word_list =
+        trimmed_prefix.starts_with("for ") &&
+        line_prefix.find_substring(" in ").has_value() &&
+        end_position - position >= 2;
+    let const placeholder_length = is_for_word_list ? usize{3} : usize{2};
+    analysis_source.append(is_for_word_list     ? "x y"
+                           : quote_byte == '\0' ? ": "
+                                                : "x ");
+    for (usize masked_position = position + placeholder_length;
+         masked_position <= end_position; masked_position++)
+    {
+      let const byte = source[masked_position] == '\n' ? '\n' : ' ';
+      analysis_source.push(byte);
+      if (byte == '\n') line_start_position = masked_position + 1;
+    }
+    position = end_position + 1;
+  }
+
+  return analysis_source;
+}
 
 Make::Make() = default;
 

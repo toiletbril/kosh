@@ -230,6 +230,25 @@ fn util_names() throws -> const ArrayList<String> &;
 fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>;
 
+enum class make_shell_source_kind : u8
+{
+  Recipe,
+  ShellFunction,
+};
+
+struct make_shell_source_range
+{
+  usize start_position;
+  usize end_position;
+  make_shell_source_kind kind;
+};
+
+fn parse_makefile_shell_sources(StringView source, Allocator allocator) throws
+    -> ArrayList<make_shell_source_range>;
+fn makefile_shell_analysis_source(StringView source,
+                                  const make_shell_source_range &range) throws
+    -> String;
+
 /* The koshkit builtin passes 1 for `koshkit ls` and 0 for a bare-name
    invocation. */
 fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index,

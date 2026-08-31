@@ -45,9 +45,22 @@ EOF
 
 cat > "$root/Makefile" <<'EOF'
 SHELL := /bin/bash
+OBJECTS = \
+	MAKE_CONTINUATION_TOKEN \
+	MAKE_CONTINUATION_SECOND
+SHELL_RESULT := $(shell printf '%s\n' "$$MAKE_SHELL_EMBEDDED"; missing_make_shell_executable)
+# COMMENT_RESULT := $(shell missing_make_comment_executable)
+define TEMPLATE
+	missing_make_define_executable
+endef
 all:
+	@for item in one; do \
+	  printf '%s\n' "$$item"; \
+	done
+	$(MAKE) -C subdir
 	printf '%s\n' "$$MAKE_EMBEDDED" "$(MAKE_ONLY)" "$@"
 	missing_make_executable
+inline: ; printf '%s\n' "$$MAKE_INLINE_EMBEDDED"; missing_make_inline_executable
 EOF
 
 cat > "$root/package.json" <<'EOF'
@@ -235,8 +248,16 @@ makefile=$(printf '%s' "$make_output" | \
   grep -c "The variable 'MAKE_EMBEDDED'")
 make_missing=$(printf '%s' "$make_output" | \
   grep -c "The command 'missing_make_executable' was not found")
+make_inline=$(printf '%s' "$make_output" | \
+  grep -c "The variable 'MAKE_INLINE_EMBEDDED'")
+make_inline_missing=$(printf '%s' "$make_output" | \
+  grep -c "The command 'missing_make_inline_executable' was not found")
+make_shell=$(printf '%s' "$make_output" | \
+  grep -c "The variable 'MAKE_SHELL_EMBEDDED'")
+make_shell_missing=$(printf '%s' "$make_output" | \
+  grep -c "The command 'missing_make_shell_executable' was not found")
 make_host=$(printf '%s' "$make_output" | \
-  grep -Ec "MAKE_ONLY|positional parameter")
+  grep -Ec "MAKE_ONLY|MAKE_CONTINUATION|missing_make_comment_executable|missing_make_define_executable|positional parameter|Unterminated for")
 set -- $(count_variable_and_missing_executable PACKAGE_EMBEDDED \
   missing_package_executable "$root/package.json")
 package=$1
@@ -289,6 +310,10 @@ printf 'github=%s markdown=%s container=%s make=%s package=%s\n' \
   "$github" "$markdown" "$container" "$makefile" "$package"
 printf 'github-host=%s\n' "$github_host"
 printf 'make-host=%s\n' "$make_host"
+printf 'make-inline=%s make-inline-missing=%s\n' \
+  "$make_inline" "$make_inline_missing"
+printf 'make-shell=%s make-shell-missing=%s\n' \
+  "$make_shell" "$make_shell_missing"
 printf 'gitea=%s forgejo=%s gitlab=%s ansible=%s compose=%s cloud-build=%s\n' \
   "$gitea" "$forgejo" "$gitlab" "$ansible" "$compose" "$cloud_build"
 printf 'circle=%s azure=%s bitbucket=%s buildkite=%s travis=%s kubernetes=%s\n' \

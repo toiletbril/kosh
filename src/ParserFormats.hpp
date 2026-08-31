@@ -80,6 +80,7 @@ struct parser_format_fragment
   mimic_mood mood{mimic_mood::Posix};
   parser_format_codec codec{parser_format_codec::Direct};
   bool should_silence_unresolved_commands{false};
+  bool should_select_end{false};
   usize host_start{0};
   usize host_end{0};
   usize indent_length{0};
@@ -215,7 +216,8 @@ fn parser_format_add_fragment(
     parsed_format_document &document, StringView host_source, usize host_start,
     usize host_end, mimic_mood mood,
     parser_format_codec codec = parser_format_codec::Direct,
-    usize indent_length = 0) throws -> void;
+    usize indent_length = 0,
+    Maybe<String> prepared_analysis_source = None) throws -> void;
 fn parser_format_add_indented_fragment(parsed_format_document &document,
                                        StringView host_source, usize host_start,
                                        usize host_end, usize indent_length,

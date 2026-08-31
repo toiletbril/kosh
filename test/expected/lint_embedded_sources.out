@@ -1,6 +1,8 @@
 github=1 markdown=1 container=1 make=1 package=1
 github-host=0
 make-host=0
+make-inline=1 make-inline-missing=1
+make-shell=1 make-shell-missing=1
 gitea=1 forgejo=1 gitlab=1 ansible=1 compose=1 cloud-build=1
 circle=1 azure=1 bitbucket=1 buildkite=1 travis=1 kubernetes=1
 drone=1 woodpecker=1 taskfile=1 justfile=1 rpm=1

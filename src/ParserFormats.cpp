@@ -271,14 +271,17 @@ static fn make_analysis_source(StringView host_source, usize host_start,
 fn parser_format_add_fragment(parsed_format_document &document,
                               StringView host_source, usize host_start,
                               usize host_end, mimic_mood mood,
-                              parser_format_codec codec,
-                              usize indent_length) throws -> void
+                              parser_format_codec codec, usize indent_length,
+                              Maybe<String> prepared_analysis_source) throws
+    -> void
 {
   if (host_start >= host_end || host_end > host_source.length) return;
 
   let fragment = parser_format_fragment{};
   fragment.analysis_source =
-      make_analysis_source(host_source, host_start, host_end);
+      prepared_analysis_source.has_value()
+          ? prepared_analysis_source.take()
+          : make_analysis_source(host_source, host_start, host_end);
   fragment.shell_source = String{
       host_source.substring_of_length(host_start, host_end - host_start)};
   fragment.mood = mood;
@@ -651,7 +654,10 @@ pure fn parser_format_fragment_at(const parsed_format_document &document,
     let const &fragment = document.fragments[middle];
     if (host_position < fragment.host_start) {
       upper = middle;
-    } else if (host_position >= fragment.host_end) {
+    } else if (host_position > fragment.host_end ||
+               (host_position == fragment.host_end &&
+                !fragment.should_select_end))
+    {
       lower = middle + 1;
     } else {
       return middle;

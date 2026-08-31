@@ -16,6 +16,7 @@ completion-help-subcommand=ok
 completion-help-subcommand-flag=ok
 completion-man-subcommand=ok
 completion-man-subcommand-flag=ok
+completion-make-shell=ok
 completion-document-function-after=ok
 completion-document-function-before=ok
 completion-bare-koshkit=ok
