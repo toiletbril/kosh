@@ -857,7 +857,8 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
       }
 
       u64 region_address = 0;
-      for (;;) {
+      loop
+      {
         struct proc_regionwithpathinfo region{};
         if (::proc_pidinfo(pid, PROC_PIDREGIONPATHINFO, region_address, &region,
                            sizeof(region)) != sizeof(region))

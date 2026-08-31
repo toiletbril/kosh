@@ -711,7 +711,8 @@ fn check_shebang(AnalysisContext &actx, StringView source,
   let shell_argument_location = interpreter_location;
   let has_split_string_flag = false;
 
-  for (;;) {
+  loop
+  {
     let const word = reader.read_next_word();
     if (word.is_empty()) break;
 
