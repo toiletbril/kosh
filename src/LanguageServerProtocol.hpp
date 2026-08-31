@@ -650,12 +650,14 @@ class Document
 {
 public:
   Document(StringView document_uri, StringView document_language,
-           StringView source, i64 document_version) throws
+           StringView source, i64 document_version,
+           Maybe<Path> document_path = None) throws
       : uri(document_uri),
         language_id(document_language),
         normalized_source(source),
         version(document_version),
         analysis_source(heap_allocator()),
+        path(steal(document_path)),
         line_starts(heap_allocator()),
         diagnostics(heap_allocator()),
         auxiliary_diagnostics(heap_allocator()),
@@ -795,13 +797,18 @@ public:
     if (path.has_value()) path_view = path->text().view();
     format = parse_format_document(parser_format_input{
         normalized_source.view(), path_view, language_id.view()});
+    if (!format.is_host_format) {
+      analysis_source = String{heap_allocator()};
+      return;
+    }
     analysis_source =
         parser_format_analysis_source(format, normalized_source.view());
   }
 
   pure fn shell_source() const wontthrow -> StringView
   {
-    return analysis_source.view();
+    return format.is_host_format ? analysis_source.view()
+                                 : normalized_source.view();
   }
 
   pure fn fragment_at(usize position) const wontthrow -> Maybe<usize>

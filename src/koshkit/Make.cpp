@@ -3310,14 +3310,14 @@ fn makefile_shell_analysis_source(StringView source,
     -> String
 {
   let analysis_source = String{heap_allocator()};
-  analysis_source.reserve(source.length);
+  analysis_source.reserve(range.end_position);
   let close_stack = ArrayList<char>{heap_allocator()};
   usize position = 0;
   usize line_start_position = 0;
   char quote_byte = '\0';
   bool is_escaped = false;
 
-  while (position < source.length) {
+  while (position < range.end_position) {
     let const byte = source[position];
     if (position < range.start_position || position >= range.end_position) {
       analysis_source.push(byte == '\n' ? '\n' : ' ');

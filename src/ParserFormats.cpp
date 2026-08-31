@@ -256,9 +256,9 @@ static fn make_analysis_source(StringView host_source, usize host_start,
                                usize host_end) throws -> String
 {
   let analysis_source = String{heap_allocator()};
-  analysis_source.reserve(host_source.length);
+  analysis_source.reserve(host_end);
 
-  for (usize position = 0; position < host_source.length; position++) {
+  for (usize position = 0; position < host_end; position++) {
     let byte = host_source[position];
     if (byte != '\n' && (position < host_start || position >= host_end))
       byte = ' ';
@@ -577,9 +577,8 @@ fn parser_format_add_json_fragment(parsed_format_document &document,
   }
   fragment.shell_source = steal(decoded);
   let masked = String{heap_allocator()};
-  masked.reserve(source.length);
-  for (usize host_position = 0; host_position < source.length; host_position++)
-  {
+  masked.reserve(end);
+  for (usize host_position = 0; host_position < end; host_position++) {
     let byte = source[host_position];
     if (host_position < start || host_position >= end)
       byte = byte == '\n' ? '\n' : ' ';

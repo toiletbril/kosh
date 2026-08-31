@@ -707,6 +707,17 @@ fn ArithmeticValue::compare(const ArithmeticValue &other,
 
 fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
 {
+  if (!is_promoted()) {
+    let const value = inline_value();
+    if (value >= INT64_MIN && value <= INT64_MAX) {
+      char buffer[32];
+      let const text = utils::int_to_text_into(static_cast<i64>(value), buffer,
+                                               sizeof(buffer));
+
+      return String{allocator, text};
+    }
+  }
+
   let chunks = ArrayList<u64>{allocator};
   constexpr u64 DECIMAL_CHUNK_BASE = 10000000000000000000ULL;
 
@@ -733,16 +744,18 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
   if (chunks.is_empty()) {
     digits.push('0');
   } else {
-    let length = static_cast<usize>(
-        std::snprintf(buffer, sizeof(buffer), "%llu",
-                      static_cast<unsigned long long>(chunks.back())));
-    digits.append(StringView{buffer, length});
+    digits.append(
+        utils::uint_to_text_into(chunks.back(), buffer, sizeof(buffer)));
 
     for (usize index = chunks.count() - 1; index > 0; index--) {
-      length = static_cast<usize>(
-          std::snprintf(buffer, sizeof(buffer), "%019llu",
-                        static_cast<unsigned long long>(chunks[index - 1])));
-      digits.append(StringView{buffer, length});
+      let const chunk =
+          utils::uint_to_text_into(chunks[index - 1], buffer, sizeof(buffer));
+
+      for (usize padding_length = chunk.length; padding_length < 19;
+           padding_length++)
+        digits.push('0');
+
+      digits.append(chunk);
     }
   }
 

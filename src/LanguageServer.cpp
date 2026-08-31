@@ -362,11 +362,11 @@ fn Server::open_document(const JsonValue *params) throws -> Document *
     existing->mood = mood_for(*existing);
     return existing;
   }
-  let document = Document{*uri, *language_id, *text, document_version};
-  document.path = decode_file_uri(*uri);
+  let document_path = decode_file_uri(*uri);
+  let document = Document{*uri, *language_id, *text, document_version,
+                          steal(document_path)};
   if (document.path.has_value())
     document.canonical_path = os::canonical_path(*document.path);
-  document.rebuild_format();
   document.mood = mood_for(document);
   m_documents.push(steal(document));
 
