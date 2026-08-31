@@ -187,7 +187,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "complete" "-p" "completion-command"]
   [CompoundListCondition, None]
-    [Assign release=$TEST_TEMP_DIRECTORY/subshell-state/release-$BASHPID]
+    [SimpleCommand "export" "release=$TEST_TEMP_DIRECTORY/subshell-state/release-$BASHPID"]
   [CompoundListCondition, None]
     [WhileLoop]
       [CompoundList]
@@ -719,6 +719,9 @@
 ]
 [Word
   Unquoted "completion-command"
+]
+[Word
+  Unquoted "export"
 ]
 [Word
   Unquoted "release="

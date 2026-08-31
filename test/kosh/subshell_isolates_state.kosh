@@ -48,7 +48,7 @@ complete -p completion-command
 completion_output=$(complete -W substitution completion-command)
 complete -p completion-command
 
-release=$TEST_TEMP_DIRECTORY/subshell-state/release-$BASHPID
+export release=$TEST_TEMP_DIRECTORY/subshell-state/release-$BASHPID
 while [ ! -e "$release" ]; do koshkit sleep 0.01; done &
 parent_background=$!
 ( while [ ! -e "$release" ]; do koshkit sleep 0.01; done & : )
