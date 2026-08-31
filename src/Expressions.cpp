@@ -485,6 +485,10 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
   /* A trapped signal runs its action here at the command boundary. */
   if (os::SIGNAL_PENDING) cxt.run_pending_traps();
   cxt.add_evaluated_expression();
+  if (is_compound_command()) {
+    let const command = static_cast<const CompoundCommand *>(this);
+    if (command->is_async()) return command->evaluate_async(cxt);
+  }
   return evaluate_impl(cxt);
 }
 
@@ -1231,6 +1235,8 @@ fn Expression::append_presence_tested_command_names(
 }
 
 fn Expression::is_simple_command() const wontthrow -> bool { return false; }
+
+fn Expression::is_compound_command() const wontthrow -> bool { return false; }
 
 fn Expression::is_dummy() const wontthrow -> bool { return false; }
 
@@ -2067,8 +2073,6 @@ pure fn Command::local_vars() const wontthrow
 }
 
 fn Command::is_assignment() const wontthrow -> bool { return false; }
-
-fn Command::is_compound_command() const wontthrow -> bool { return false; }
 
 /* A plain command node carries no redirect target of its own, so the default
    reports that. A node that does take a target overrides this. */

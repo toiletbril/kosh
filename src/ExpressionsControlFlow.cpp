@@ -24,6 +24,67 @@ CompoundCommand::CompoundCommand(SourceLocation location)
     : Command(steal(location))
 {}
 
+fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
+{
+  let const source = cxt.current_source();
+  let command_text = StringView{};
+  if (source != nullptr) {
+    let command_end_position =
+        source_location().position + source_location().length;
+    if (source_end_position() > command_end_position)
+      command_end_position = source_end_position();
+    command_text = source->view().substring_of_length(
+        source_location().position,
+        command_end_position - source_location().position);
+  }
+
+  let const launch = os::launch_compound_stage(
+      command_text, None, None, None, cxt.mood(), source_location(),
+      source != nullptr ? source->view() : StringView{},
+      os::process_group_mode::NewBackground);
+  let const child = launch.child;
+
+  if (launch.should_evaluate_child) {
+    i32 status = 1;
+    try {
+      cxt.enter_subshell();
+      status = static_cast<i32>(evaluate_impl(cxt));
+      if (cxt.has_pending_control_flow() &&
+          cxt.pending_control_flow().kind == control_flow::Kind::Exit)
+      {
+        status = static_cast<i32>(cxt.pending_control_flow().value);
+      }
+    } catch (const BrokenPipeExit &) {
+      status = KOSH_BROKEN_PIPE_EXIT_STATUS;
+    } catch (const ErrorWithLocation &e) {
+      koshka::show_message(
+          e.to_string(source != nullptr ? source->view() : StringView{}, &cxt));
+      status = static_cast<i32>(e.command_status());
+    } catch (const Error &e) {
+      koshka::show_message(e.to_string());
+      status = static_cast<i32>(e.command_status());
+    } catch (...) {
+      LOG(Debug, "the compound command child swallowed an unknown error");
+    }
+    koshka::flush();
+    os::exit_process_immediately(status);
+  }
+
+  let const process_id = os::process_id_of(child);
+  cxt.set_last_background_pid(process_id);
+  let command = String{command_text};
+  command += " &";
+  let const id = cxt.register_job(child, command.view(), process_id);
+  if (cxt.shell_is_interactive()) {
+    koshka::print_error(
+        "[" + String::from(id, heap_allocator()) + "] " +
+        String::from(static_cast<u64>(process_id), heap_allocator()) + "\n");
+  }
+
+  cxt.publish_single_pipe_status(0);
+  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+}
+
 fn CompoundCommand::is_compound_command() const wontthrow -> bool
 {
   return true;

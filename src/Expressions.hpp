@@ -687,6 +687,7 @@ public:
   virtual fn to_ast_string(usize layer = 0) const throws -> String;
 
   virtual fn is_simple_command() const wontthrow -> bool;
+  virtual fn is_compound_command() const wontthrow -> bool;
   virtual fn is_dummy() const wontthrow -> bool;
 
   /* The typed-node downcasts the optimizer rules use to match a node without
@@ -839,7 +840,6 @@ public:
   pure fn time_location() const wontthrow -> SourceLocation;
 
   virtual fn is_assignment() const wontthrow -> bool;
-  virtual fn is_compound_command() const wontthrow -> bool;
 
   /* The default throws the unsupported error, only a node that takes a target
      overrides it. */
@@ -1118,6 +1118,8 @@ class CompoundCommand : public Command
 {
 public:
   CompoundCommand(SourceLocation location);
+
+  fn evaluate_async(EvalContext &cxt) const throws -> i64;
 
   fn is_compound_command() const wontthrow -> bool override;
 
