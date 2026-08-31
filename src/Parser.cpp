@@ -1147,19 +1147,6 @@ enum class command_position_word : u8
   Select,
 };
 
-static consteval fn command_position_words()
-{
-  static constexpr static_string_entry<command_position_word> ENTRIES[] = {
-      {SSK("{"),      command_position_word::BraceOpen  },
-      {SSK("}"),      command_position_word::BraceClose },
-      {SSK("[["),     command_position_word::Conditional},
-      {SSK("select"), command_position_word::Select     },
-  };
-  return StaticStringMap{ENTRIES};
-}
-
-static constexpr auto COMMAND_POSITION_WORDS = command_position_words();
-
 /* Returns a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position starts a compound
    command. */
@@ -1202,26 +1189,42 @@ hot fn Parser::parse_simple_command() throws -> Command *
     Token *token = m_lexer.peek_shell_token();
     ASSERT(token != nullptr);
 
-    if (args_accumulator.is_empty() && local_vars.count() == 0 &&
-        array_args.is_empty() && redirections.is_empty())
-    {
+    if (!source_location) {
       let position_word = command_position_word::None;
       if (let const *text = get_unquoted_word_text(token); text != nullptr) {
-        if (let const found = COMMAND_POSITION_WORDS.find(text->view());
-            found.has_value())
-          position_word = *found;
+        let const view = text->view();
+        if (!view.is_empty()) {
+          switch (view[0]) {
+          case '{':
+            if (view.length == 1)
+              position_word = command_position_word::BraceOpen;
+            break;
+          case '}':
+            if (view.length == 1)
+              position_word = command_position_word::BraceClose;
+            break;
+          case '[':
+            if (view.length == 2 && view[1] == '[')
+              position_word = command_position_word::Conditional;
+            break;
+          case 's':
+            if (view.length == 6 && view == "select")
+              position_word = command_position_word::Select;
+            break;
+          default: break;
+          }
+        }
       }
 
       /* A standalone '{' opens a brace group, a standalone '}' closes one, both
          arriving as words. A '}' with no open group is left for the caller. */
-      if (position_word == command_position_word::BraceOpen) {
+      switch (position_word) {
+      case command_position_word::BraceOpen:
         return attach_trailing_redirections(parse_brace_group());
-      }
-      if (position_word == command_position_word::BraceClose) return nullptr;
-
-      /* The sh mood is POSIX, where [[ is not a keyword, so the conditional is
-         rejected there. */
-      if (position_word == command_position_word::Conditional) {
+      case command_position_word::BraceClose: return nullptr;
+      case command_position_word::Conditional:
+        /* The sh mood is POSIX, where [[ is not a keyword, so the conditional
+           is rejected there. */
         if (m_lexer.is_posix_mode()) {
           throw ErrorWithLocation{token->source_location(),
                                   "The [[ conditional is a bash extension that "
@@ -1229,14 +1232,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
                                   "provide"};
         }
         return attach_trailing_redirections(parse_conditional_command());
-      }
-
-      /* select is not a reserved word in the lexer, so it is matched on the
-         text in bash mode. */
-      if (position_word == command_position_word::Select &&
-          m_lexer.is_bash_compatible())
-      {
-        return attach_trailing_redirections(parse_select());
+      case command_position_word::Select:
+        /* Select is not a reserved word in the lexer, so it is matched on the
+           text in bash mode. */
+        if (m_lexer.is_bash_compatible())
+          return attach_trailing_redirections(parse_select());
+        break;
+      case command_position_word::None: break;
       }
 
       switch (token->kind()) {

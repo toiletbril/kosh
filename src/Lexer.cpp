@@ -455,24 +455,28 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *token{};
-  if (let const ch = chop_character(); ch != lexer::CEOF) [[likely]] {
-    if (lexer::is_shell_sentinel(ch)) {
-      /* A < or > opens a process substitution only when a ( follows with no
-         space. */
-      if ((ch == '<' || ch == '>') && chop_character(1) == '(') {
-        token = lex_process_substitution(ch);
-      } else {
-        token = lex_sentinel();
-      }
-    } else if (!lexer::is_whitespace(ch)) [[likely]] {
-      token = lex_identifier();
-    } else [[unlikely]] {
-      throw ErrorWithLocationAndDetails{
-          here(m_cursor_position, 1), "Unexpected character",
-          "the character is not valid in an unquoted word here"};
-    }
-  } else {
+  let const ch = chop_character();
+  switch (ch) {
+  case lexer::CEOF:
     token = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
+    break;
+  case '<':
+  case '>':
+    token = chop_character(1) == '(' ? lex_process_substitution(ch)
+                                     : lex_sentinel();
+    break;
+  case '\n':
+  case '|':
+  case '(':
+  case ')':
+  case '&':
+  case ';': token = lex_sentinel(); break;
+  case ' ':
+  case '\t':
+    throw ErrorWithLocationAndDetails{
+        here(m_cursor_position, 1), "Unexpected character",
+        "the character is not valid in an unquoted word here"};
+  default: token = lex_identifier(); break;
   }
 
   ASSERT(token != nullptr);
@@ -494,15 +498,22 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
 
     /* A backslash before a newline continues the line and both bytes vanish. A
        backslash before any other byte is left for the identifier lexer. */
-    if (byte == '\\' && chop_character(i + 1) == '\n') {
-      i += 2;
-      continue;
-    }
+    switch (byte) {
+    case '\\':
+      if (chop_character(i + 1) == '\n') {
+        i += 2;
+        continue;
+      }
+      break;
     /* The newline is left in place so it still terminates the command. */
-    if (byte == '#') {
+    case '#': {
       let const comment_start = i;
-      while (chop_character(i) != '\n' && chop_character(i) != lexer::CEOF)
+      loop
+      {
+        let const comment_byte = chop_character(i);
+        if (comment_byte == '\n' || comment_byte == lexer::CEOF) break;
         i++;
+      }
       /* The comment is classified whether or not a command is claiming
          directives, since the analysis stage reports a misplaced directive that
          no command would claim. The leading byte compare rejects an ordinary
@@ -532,6 +543,8 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
         }
       }
       continue;
+    }
+    default: break;
     }
     break;
   }
@@ -1459,7 +1472,8 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
       inner += c;
       continue;
     }
-    if (c == '\\') {
+    switch (c) {
+    case '\\': {
       inner += c;
       let const escaped = chop_character(byte_count);
       if (escaped != lexer::CEOF) {
@@ -1468,23 +1482,23 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
       }
       continue;
     }
-    if (c == '\'' || c == '"') {
+    case '\'':
+    case '"':
       quote = c;
       inner += c;
       continue;
-    }
-    if (c == '(') {
+    case '(':
       depth++;
       inner += c;
       continue;
-    }
-    if (c == ')') {
+    case ')':
       depth--;
       if (depth == 0) break;
       inner += c;
       continue;
+    default: inner += c; continue;
     }
-    inner += c;
+    break;
   }
 
   LOG(Debug, "capturing a process substitution of %zu bytes", byte_count);

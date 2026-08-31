@@ -19,11 +19,12 @@ fn parse_justfile_format(const parser_format_input &input,
                   !parser_format_has_substring(line, ":=");
       continue;
     }
-    if (!is_recipe || line.trim_blanks().is_empty()) continue;
+    if (!is_recipe) continue;
     usize shell_start = 0;
     while (shell_start < line.length &&
            (line[shell_start] == ' ' || line[shell_start] == '\t'))
       shell_start++;
+    if (shell_start == line.length) continue;
     if (shell_start < line.length && line[shell_start] == '@') shell_start++;
     parser_format_add_fragment(document, input.source, line_start + shell_start,
                                line_start + line.length, mood);

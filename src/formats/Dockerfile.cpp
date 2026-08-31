@@ -2,26 +2,70 @@
 
 namespace koshka {
 
-static pure fn docker_instruction(StringView line, StringView wanted,
-                                  usize &content_position) wontthrow -> bool
+enum class docker_instruction_kind : u8
+{
+  None,
+  Shell,
+  Run,
+  Command,
+  Entrypoint,
+  Healthcheck,
+};
+
+static pure fn docker_instruction(StringView line,
+                                  usize &content_position) wontthrow
+    -> docker_instruction_kind
 {
   usize position = 0;
   while (position < line.length &&
          (line[position] == ' ' || line[position] == '\t'))
     position++;
-  if (position + wanted.length > line.length ||
-      !parser_format_ascii_equal(
-          line.substring_of_length(position, wanted.length), wanted))
-    return false;
-  position += wanted.length;
-  if (position < line.length && line[position] != ' ' && line[position] != '\t')
-    return false;
+
+  let const instruction_start = position;
+  while (position < line.length && line[position] != ' ' &&
+         line[position] != '\t')
+    position++;
+  let const instruction =
+      line.substring_of_length(instruction_start, position - instruction_start);
+  let kind = docker_instruction_kind::None;
+  if (!instruction.is_empty()) {
+    switch (instruction[0]) {
+    case 'C':
+    case 'c':
+      if (parser_format_ascii_equal(instruction, "CMD"))
+        kind = docker_instruction_kind::Command;
+      break;
+    case 'E':
+    case 'e':
+      if (parser_format_ascii_equal(instruction, "ENTRYPOINT"))
+        kind = docker_instruction_kind::Entrypoint;
+      break;
+    case 'H':
+    case 'h':
+      if (parser_format_ascii_equal(instruction, "HEALTHCHECK"))
+        kind = docker_instruction_kind::Healthcheck;
+      break;
+    case 'R':
+    case 'r':
+      if (parser_format_ascii_equal(instruction, "RUN"))
+        kind = docker_instruction_kind::Run;
+      break;
+    case 'S':
+    case 's':
+      if (parser_format_ascii_equal(instruction, "SHELL"))
+        kind = docker_instruction_kind::Shell;
+      break;
+    default: break;
+    }
+  }
+  if (kind == docker_instruction_kind::None) return kind;
+
   while (position < line.length &&
          (line[position] == ' ' || line[position] == '\t'))
     position++;
   content_position = position;
 
-  return true;
+  return kind;
 }
 
 fn parse_dockerfile_format(const parser_format_input &input,
@@ -33,7 +77,8 @@ fn parse_dockerfile_format(const parser_format_input &input,
     let const line_start = position;
     let const line = input.source.next_line(position);
     usize content_position = 0;
-    if (docker_instruction(line, "SHELL", content_position)) {
+    let const instruction = docker_instruction(line, content_position);
+    if (instruction == docker_instruction_kind::Shell) {
       let const shell = line.substring(content_position);
       if (parser_format_has_substring(shell, "bash"))
         mood = mimic_mood::Bash;
@@ -45,15 +90,15 @@ fn parse_dockerfile_format(const parser_format_input &input,
     }
 
     bool is_shell_instruction =
-        docker_instruction(line, "RUN", content_position) ||
-        docker_instruction(line, "CMD", content_position) ||
-        docker_instruction(line, "ENTRYPOINT", content_position);
-    if (!is_shell_instruction &&
-        docker_instruction(line, "HEALTHCHECK", content_position))
-    {
+        instruction == docker_instruction_kind::Run ||
+        instruction == docker_instruction_kind::Command ||
+        instruction == docker_instruction_kind::Entrypoint;
+    if (instruction == docker_instruction_kind::Healthcheck) {
       let const remainder = line.substring(content_position);
       usize command_position = 0;
-      if (docker_instruction(remainder, "CMD", command_position)) {
+      if (docker_instruction(remainder, command_position) ==
+          docker_instruction_kind::Command)
+      {
         content_position += command_position;
         is_shell_instruction = true;
       }

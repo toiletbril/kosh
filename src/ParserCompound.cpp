@@ -50,9 +50,9 @@ hot fn Parser::parse_if() throws -> Command *
 
     Token *after = m_lexer.next_shell_token();
     ASSERT(after != nullptr);
-    if (after->kind() == Token::Kind::Elif) {
-      continue;
-    } else if (after->kind() == Token::Kind::Else) {
+    switch (after->kind()) {
+    case Token::Kind::Elif: continue;
+    case Token::Kind::Else: {
       otherwise = parse_command_list(token_kind_mask(Token::Kind::Fi));
       Token *fi_token = m_lexer.next_shell_token();
       ASSERT(fi_token != nullptr);
@@ -63,14 +63,16 @@ hot fn Parser::parse_if() throws -> Command *
       end_position = fi_token->source_location().position +
                      fi_token->source_location().length;
       break;
-    } else if (after->kind() == Token::Kind::Fi) {
+    }
+    case Token::Kind::Fi:
       end_position =
           after->source_location().position + after->source_location().length;
       break;
-    } else {
+    default:
       throw_unterminated(location, "Unterminated if", m_lexer.source(), "fi",
                          after->source_location());
     }
+    break;
   }
 
   let node =
@@ -187,8 +189,8 @@ fn Parser::parse_optional_in_clause_words(
     }
     if (word->kind() != Token::Kind::Word) {
       /* A non-keyword separator or operator ends the list. */
+      if (!(word->flags() & Token::Flag::Keyword)) break;
       let const raw = word->raw_string();
-      if (!KEYWORDS.find(raw.view()).has_value()) break;
       m_lexer.advance_past_last_peek();
       words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
                                      word->source_location()));
@@ -230,11 +232,12 @@ hot fn Parser::parse_for() throws -> Command *
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
-  if (name_token->kind() != Token::Kind::Word) {
+  if (name_token->kind() != Token::Kind::Word &&
+      (name_token->flags() & Token::Flag::Keyword))
+  {
     let const raw = name_token->raw_string();
-    if (KEYWORDS.find(raw.view()).has_value())
-      name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
-                                       name_token->source_location());
+    name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
+                                     name_token->source_location());
   }
   if (name_token->kind() != Token::Kind::Word) {
     /* A (( in the name slot under POSIX mode is the bash C-style loop in a mode
@@ -313,11 +316,12 @@ hot fn Parser::parse_select() throws -> Command *
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
-  if (name_token->kind() != Token::Kind::Word) {
+  if (name_token->kind() != Token::Kind::Word &&
+      (name_token->flags() & Token::Flag::Keyword))
+  {
     let const raw = name_token->raw_string();
-    if (KEYWORDS.find(raw.view()).has_value())
-      name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
-                                       name_token->source_location());
+    name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
+                                     name_token->source_location());
   }
   if (name_token->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{name_token->source_location(),
@@ -394,13 +398,14 @@ hot fn Parser::parse_case() throws -> Command *
     word = word_token_from_assignment(m_lexer.arena(),
                                       static_cast<Assignment *>(word));
   } else if (word->kind() != Token::Kind::Word) {
-    let const raw = word->raw_string();
-    if (KEYWORDS.find(raw.view()).has_value())
+    if (word->flags() & Token::Flag::Keyword) {
+      let const raw = word->raw_string();
       word = word_token_from_raw(m_lexer.arena(), raw.view(),
                                  word->source_location());
-    else
+    } else {
       throw ErrorWithLocation{word->source_location(),
                               "Expected a word to match on after 'case'"};
+    }
   }
 
   while (m_lexer.peek_shell_token()->kind() == Token::Kind::Newline)
@@ -454,7 +459,7 @@ hot fn Parser::parse_case() throws -> Command *
         let const pattern_location = pattern->source_location();
         let const text = m_lexer.source().substring_of_length(
             pattern_location.position, pattern_location.length);
-        if (KEYWORDS.find(text).has_value()) {
+        if (pattern->flags() & Token::Flag::Keyword) {
           pattern =
               word_token_from_raw(m_lexer.arena(), text, pattern_location);
         } else {
@@ -603,22 +608,18 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
   ASSERT(second->kind() == Token::Kind::LeftParen);
 
   let const body_start_position = second->source_location().position + 1;
-  usize body_end_position;
   usize depth = 0;
   loop
   {
     Token *t = m_lexer.next_shell_token();
     ASSERT(t != nullptr);
-    if (t->kind() == Token::Kind::EndOfFile) {
+    switch (t->kind()) {
+    case Token::Kind::EndOfFile:
       throw ErrorWithLocationAndDetails{open->source_location(),
                                         "Unterminated '(('",
                                         t->source_location(), "expected '))'"};
-    }
-    if (t->kind() == Token::Kind::LeftParen) {
-      depth++;
-      continue;
-    }
-    if (t->kind() == Token::Kind::RightParen) {
+    case Token::Kind::LeftParen: depth++; continue;
+    case Token::Kind::RightParen: {
       if (depth > 0) {
         depth--;
         continue;
@@ -629,18 +630,18 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
           closing->source_location().position ==
               t->source_location().position + 1)
       {
-        body_end_position = t->source_location().position;
         m_lexer.advance_past_last_peek();
-        break;
+        return m_lexer.source().substring_of_length(
+            body_start_position,
+            t->source_location().position - body_start_position);
       }
       throw ErrorWithLocationAndDetails{open->source_location(),
                                         "Unterminated '(('",
                                         t->source_location(), "expected '))'"};
     }
+    default: continue;
+    }
   }
-
-  return m_lexer.source().substring_of_length(
-      body_start_position, body_end_position - body_start_position);
 }
 
 hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
@@ -674,13 +675,17 @@ hot fn Parser::parse_c_style_for(const SourceLocation &location,
   usize depth = 0;
   for (usize i = 0; i < header.length; i++) {
     let const c = header[i];
-    if (c == '(') {
-      depth++;
-    } else if (c == ')') {
+    switch (c) {
+    case '(': depth++; break;
+    case ')':
       if (depth > 0) depth--;
-    } else if (c == ';' && depth == 0) {
+      break;
+    case ';':
+      if (depth != 0) break;
       if (separator_count < 2) separators[separator_count] = i;
       separator_count++;
+      break;
+    default: break;
     }
   }
   if (separator_count != 2) {

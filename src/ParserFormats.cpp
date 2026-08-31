@@ -53,16 +53,7 @@ DEFINE_PARSER_FORMAT(DevContainerFormat, DevContainer,
 pure fn parser_format_has_substring(StringView source,
                                     StringView wanted) wontthrow -> bool
 {
-  if (wanted.length > source.length) return false;
-
-  for (usize position = 0; position + wanted.length <= source.length;
-       position++)
-  {
-    if (source.substring_of_length(position, wanted.length) == wanted)
-      return true;
-  }
-
-  return false;
+  return source.find_substring(wanted).has_value();
 }
 
 pure fn parser_format_filename(StringView path) wontthrow -> StringView
@@ -82,6 +73,7 @@ pure fn parser_format_ascii_equal(StringView left, StringView right) wontthrow
   for (usize position = 0; position < left.length; position++) {
     let left_byte = left[position];
     let right_byte = right[position];
+    if (left_byte == right_byte) continue;
     if (left_byte >= 'A' && left_byte <= 'Z') left_byte += 'a' - 'A';
     if (right_byte >= 'A' && right_byte <= 'Z') right_byte += 'a' - 'A';
     if (left_byte != right_byte) return false;
@@ -336,9 +328,12 @@ static pure fn yaml_key_match(StringView line, const StringView *keys,
     while (position < line.length && line[position] == ' ')
       position++;
   }
+  if (position >= line.length) return false;
 
   for (usize key_index = 0; key_index < key_count; key_index++) {
     let const key = keys[key_index];
+    if (key.is_empty()) continue;
+    if (line[position] != key[0]) continue;
     if (position + key.length >= line.length) continue;
     if (line.substring_of_length(position, key.length) != key) continue;
     if (line[position + key.length] != ':') continue;
@@ -422,10 +417,23 @@ static pure fn workflow_shell_mood(StringView value) wontthrow
 {
   if (!value.is_empty() && (value[0] == '\'' || value[0] == '"'))
     value = value.substring(1);
-  if (value.starts_with("bash")) return mimic_mood::Bash;
-  if (value.starts_with("sh") || value.starts_with("dash"))
-    return mimic_mood::Posix;
-  if (value.starts_with("kosh")) return mimic_mood::Default;
+  if (value.is_empty()) return None;
+
+  switch (value[0]) {
+  case 'b':
+    if (value.starts_with("bash")) return mimic_mood::Bash;
+    break;
+  case 'd':
+    if (value.starts_with("dash")) return mimic_mood::Posix;
+    break;
+  case 's':
+    if (value.starts_with("sh")) return mimic_mood::Posix;
+    break;
+  case 'k':
+    if (value.starts_with("kosh")) return mimic_mood::Default;
+    break;
+  default: break;
+  }
 
   return None;
 }
@@ -609,6 +617,7 @@ fn parser_format_extract_json_keys(parsed_format_document &document,
     if (position >= source.length) break;
     let const key = source.substring_of_length(key_start, position - key_start);
     position++;
+    if (key.is_empty()) continue;
     while (position < source.length &&
            (source[position] == ' ' || source[position] == '\t' ||
             source[position] == '\n' || source[position] == '\r'))
@@ -618,6 +627,8 @@ fn parser_format_extract_json_keys(parsed_format_document &document,
 
     const parser_format_json_key *matched_key = nullptr;
     for (usize key_index = 0; key_index < key_count; key_index++) {
+      if (keys[key_index].name.is_empty()) continue;
+      if (key[0] != keys[key_index].name[0]) continue;
       if (key != keys[key_index].name) continue;
       matched_key = &keys[key_index];
       break;
@@ -670,11 +681,9 @@ fn parser_format_encode(const parser_format_fragment &fragment,
                         StringView replacement) throws -> Maybe<String>
 {
   let encoded = String{heap_allocator()};
-  if (fragment.codec == parser_format_codec::Direct) {
-    encoded.append(replacement);
-    return encoded;
-  }
-  if (fragment.codec == parser_format_codec::JsonString) {
+  switch (fragment.codec) {
+  case parser_format_codec::Direct: encoded.append(replacement); return encoded;
+  case parser_format_codec::JsonString:
     for (usize position = 0; position < replacement.length; position++) {
       switch (replacement[position]) {
       case '\\': encoded.append("\\\\"); break;
@@ -686,6 +695,7 @@ fn parser_format_encode(const parser_format_fragment &fragment,
       }
     }
     return encoded;
+  case parser_format_codec::Indented: break;
   }
 
   usize position = 0;

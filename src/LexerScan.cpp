@@ -72,17 +72,25 @@ pure fn balanced_scan_delimiter_end(StringView source, usize position) wontthrow
       if (byte == quote) quote = 0;
       continue;
     }
-    if (byte == '\\' && position + 1 < source.length) {
-      position += 2;
-      continue;
-    }
-    if (byte == '\'' || byte == '"') {
+    switch (byte) {
+    case '\\': position += position + 1 < source.length ? 2 : 1; continue;
+    case '\'':
+    case '"':
       quote = byte;
       position++;
       continue;
+    case ' ':
+    case '\t':
+    case '\n':
+    case '|':
+    case '(':
+    case ')':
+    case '&':
+    case ';':
+    case '<':
+    case '>': return position;
+    default: position++; continue;
     }
-    if (is_whitespace(byte) || is_shell_sentinel(byte)) break;
-    position++;
   }
 
   return position;
