@@ -57,7 +57,8 @@ if [ "$!" = "$parent_background" ]; then
 else
   echo background-pid-leaked
 fi
-if [ "$(jobs -p | koshkit wc -l)" -eq 1 ]; then
+jobs -p > "$release.jobs"
+if [ "$(koshkit wc -l < "$release.jobs")" -eq 1 ]; then
   echo jobs-restored
 else
   echo jobs-leaked

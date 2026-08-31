@@ -223,10 +223,12 @@
         [CompoundListCondition, None]
           [SimpleCommand "echo" "background-pid-leaked"]
   [CompoundListCondition, None]
+    [SimpleCommand "jobs" "-p"]
+  [CompoundListCondition, None]
     [IfClause]
       [CompoundList]
         [CompoundListCondition, None]
-          [SimpleCommand "[" "$(jobs -p | koshkit wc -l)" "-eq" "1" "]"]
+          [SimpleCommand "[" "$(koshkit wc -l < "$release.jobs")" "-eq" "1" "]"]
       [CompoundList]
         [CompoundListCondition, None]
           [SimpleCommand "echo" "jobs-restored"]
@@ -842,13 +844,23 @@
   Unquoted "fi"
 ]
 [Word
+  Unquoted "jobs"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "release"
+  DoubleQuoted ".jobs"
+]
+[Word
   Unquoted "if"
 ]
 [Word
   Unquoted "["
 ]
 [Word
-  CommandSubstitution "jobs -p | koshkit wc -l"
+  CommandSubstitution "koshkit wc -l < "$release.jobs""
 ]
 [Word
   Unquoted "-eq"
