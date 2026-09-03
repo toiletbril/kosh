@@ -1,291 +1,237 @@
-# Koshka project notes
+# Koshka project rules
 
-## Documentation ownership
+## Project
+
+Koshka is a C and C++ shell. Speed is the defining goal. The interactive editor
+is vendored under `src/toiletline`.
 
 Never modify README.md without explicit approval.
 
-`docs/kosh.1` owns invocation, options, moods, shell syntax, runtime behavior,
-builtins, interactive behavior, diagnostics, environment variables, startup
-processing, and runtime files. `docs/kosh.5` owns startup file identity and
-file format behavior. A new flag, mood, builtin, or renamed option updates
-`docs/kosh.1` and `completions/kosh.bash`. A configuration change also updates
-`docs/kosh.5`. An architecture or contributor workflow change updates this
-file.
+`docs/kosh.1` owns invocation, options, moods, syntax, runtime behavior,
+builtins, diagnostics, environment variables, startup, and runtime files.
+`docs/kosh.5` owns startup file identity and format. New or renamed flags,
+moods, and builtins update `docs/kosh.1` and `completions/kosh.bash`.
+Configuration changes also update `docs/kosh.5`. Architecture and workflow
+changes update this file.
 
-The project is a C++ and C command shell. Speed is the defining goal. The
-interactive editor is vendored under `src/toiletline`.
+## Code
 
-## Build and test
+- Use `let` and `let const` for deduced locals. Literal counters keep an integer
+  type. Functions use `fn name(...) throws -> ret`.
+- Compare pointers with `nullptr`. Do not use pointer truthiness.
+- Boolean names start with `is_`, `should_`, `was_`, `did_`, or `has_`. Counts
+  end with `_count`. Measurements name their unit. Lambdas start with `do_`.
+  Accessors start with `get_` or `set_`.
+- Free structs and enums use lower snake case. Classes and nested types use
+  camel case. File operations accept `Path`.
+- Prefer names to comments. C and C++ comments use `/* ... */`. Brace conditions
+  containing `&&` or `||`. Separate logical blocks, loops, and returns with blank
+  lines.
+- Use a static table for three or more name comparisons and a switch for hot
+  leading-byte dispatch. Static name tables use `consteval StaticStringMap` or
+  `StaticStringSet` with SSK keys and derived byte and length filters.
+- Search for an existing owner, helper, parser, container, and dependency first.
+  New abstractions, file splits, file merges, and dependency upgrades require
+  approval. Per-executor state passes through `EvalContext` and constructors.
 
-The top-level Makefile delegates to `src/Makefile` and supplies the configured
-logical processor count. Prefer a make target to a direct compiler command.
+## Architecture
 
-`make MODE=rel` builds `./kosh`. `make MODE=dbg` builds `./kosh-dbg` with
-AddressSanitizer and UndefinedBehaviorSanitizer. `make MODE=cov` builds
-`./kosh-cov`. The default mode is debug. `make clean` owns artifact removal.
-Never remove `./kosh` directly.
+- `src/Main.cpp` owns flags, startup, scripts, and the interactive loop.
+  `src/Lexer.cpp` creates tokens. `src/Parser.cpp` creates the syntax tree.
+  `src/Optimizer.cpp` folds constants and dead branches.
+- Evaluation is split across `src/Eval.cpp` and the `Eval` sources. Expression
+  families live in the `Expressions` sources. Shared helpers are declared in
+  `src/ExpressionsInternal.hpp`.
+- Owned source normalizes CRLF before lexing, analysis, evaluation, and
+  diagnostics. A lone carriage return remains data.
+- Analysis streams one top-level and-or chain in two passes. The first gathers
+  suppressions, scopes, directive spans, and parse errors. The second uses
+  `AnalysisUnitStream` and `analyze_ast`, then releases the arena span.
+  `top_level_sibling_carry` keeps cross-unit data. `FUNCTION_ARENA` stays null.
+- Runtime state owns moods, diagnostics, strictness marks, and shell options.
+  Explicit nounset, pipefail, failglob, and extended-arithmetic states survive
+  mood changes. Explicit `set --mood` clears the level from `-W`, `-WW`, or
+  `-WWW`.
+- Eval snapshots keep shell and shopt state, directories, the working directory,
+  and the file creation mask. Restricted behavior uses one context state.
+  BASHPID identifies forked evaluators. `$$` identifies the original shell.
+- An asynchronous pipeline job owns and reaps every stage. POSIX stages share a
+  process group. The last stage owns status and job output. Stream writes retry
+  partial writes and reject zero-length writes while bytes remain.
+- Recheck mutable runtime state after any startup file that can change it.
 
-Run `make test` for the main and completion suites. Run `make bench` for the
-benchmark. The completion suite requires the debug binary. Wrap an interactive
-launch in a timeout.
+## Platform
 
-The `refill` target regenerates goldens. `REFILL` limits regeneration to named
-tests. Read every regenerated golden before accepting it. Every golden lives
-directly under `test/expected` and has a unique test name.
-
-Make discovers test inputs and platform skips. Each runner owns its setup,
-output, comparison, refill behavior, and cleanup. Runner output is stored under
-`.test-work/results`. Auxiliary test shell scripts use two-space indentation.
-
-The native and CLI runners accept test names. A bare `NAME` or `cli_NAME` target
-runs one test through its normal runner. The native runner suppresses noisy
-diagnostics outside the canonical `shellcheck_static_*` tests.
-
-Every koshkit rm test uses `--dry-run`. Temporary cleanup uses the system rm
-after a nonempty path check. The bashdiff and mimicrydiff comparisons require
-Bash 5.3 or newer. Set `BASHP` to a modern Bash on macOS.
-
-## Code conventions
-
-Use `let` and `let const` for deduced locals. A literal counter keeps an explicit
-integer type. Functions use `fn name(...) throws -> ret`.
-
-Compare pointers with `nullptr`. Do not use pointer truthiness. A boolean name
-begins with `is_`, `should_`, `was_`, `did_`, or `has_`. A count ends in
-`_count`. A measured number ends in a suffix such as `_length`, `_depth`, or
-`_position`. A variable-bound lambda begins with `do_`. An accessor begins with
-`get_` or `set_`.
-
-Free structs and enums use lower snake case. Classes and nested types use camel
-case. File operations accept `Path`.
-
-A clear name replaces an explanatory comment. C and C++ comments use
-`/* ... */`. An if condition containing `&&` or `||` uses braces. Blank lines
-separate logical blocks and surround loops and returns.
-
-Three or more name comparisons use a static table. A hot leading-byte dispatch
-uses a switch. A static name table uses `consteval StaticStringMap` or
-`StaticStringSet` with SSK keys. Their constructors derive the leading-byte and
-length prefilter from the table.
-
-Search for an existing function, parser, or helper before adding logic. New
-abstractions, file splits, file merges, and dependency upgrades require
-approval. Per-executor state passes through `EvalContext` and constructors.
-
-## Front end and evaluation
-
-`src/Main.cpp` drives flags, startup processing, scripts, and the interactive
-loop. `src/Lexer.cpp` creates tokens. `src/Parser.cpp` creates the syntax tree.
-`src/Optimizer.cpp` folds constants and removes dead branches. Evaluation is
-split across `src/Eval.cpp` and the `Eval` prefixed sources. Expressions are
-split by command family across the `Expressions` sources. Shared helpers are
-declared in `src/ExpressionsInternal.hpp`.
-
-Owned shell source normalizes CRLF before lexing, analysis, evaluation, and
-diagnostics. A lone carriage return remains data.
-
-Analysis-only runs stream one top-level and-or chain at a time in two passes.
-The first pass gathers suppressions, scopes, directive spans, and parse errors.
-The second pass sends each unit through `AnalysisUnitStream` and `analyze_ast`,
-then releases its arena span. `top_level_sibling_carry` preserves the owned data
-needed by checks across unit boundaries. `FUNCTION_ARENA` stays null during
-streaming analysis.
-
-Runtime state owns the mood, diagnostic controls, strictness marks, and shell
-options. An explicit nounset, pipefail, or failglob setting survives a mood
-change. An explicit `set --mood` clears the diagnostic level selected by `-W`,
-`-WW`, or `-WWW`.
-
-Eval snapshots retain shell and shopt state, the directory stack, the working
-directory, and the file creation mask. Restricted behavior reads one shared
-context state. Forked evaluators report their current process through BASHPID,
-while `$$` retains the original shell process.
-
-An asynchronous pipeline job owns every stage process. POSIX stages share one
-process group. The final stage remains primary for status and job output. Job
-operations retain and reap every stage. Standard stream writes retry partial
-writes and reject a zero-length write while bytes remain.
-
-## Platform boundary
-
-`src/Platform.cpp` selects the implementation. POSIX and Windows behavior lives
-in their matching platform sources. Platform headers, calls, types, and macros
-stay behind `src/Platform.hpp` and the `os` wrappers.
-
-Every wrapper that rebinds a standard descriptor increments the descriptor
-epoch. Cached color decisions are refreshed against that epoch. Fork-backed
-launches, process groups, filesystem operations, and processor counts also pass
-through platform wrappers.
+- `src/Platform.cpp` selects POSIX or Windows code. Platform headers, calls,
+  types, and macros stay behind `src/Platform.hpp` and `os` wrappers.
+- Descriptor-rebinding wrappers increment the descriptor epoch. Cached color
+  decisions refresh against it. Forks, process groups, filesystems, and processor
+  counts also use platform wrappers.
 
 ## Completion and language server
 
-`src/Completion.cpp` drives completion. The `Completion` prefixed sources own
-manpage, scan, highlight, syntax, path, and cache work. Completion,
-highlighting, diagnostics, and koshkit cat share the tolerant scanner and
-semantic roles. Completion, highlighting, and command lookup share directory
-indexes.
+- `src/Completion.cpp` drives the `Completion` scan, highlight, syntax, path,
+  manpage, and cache sources.
+- Completion, highlighting, diagnostics, and koshkit cat share the tolerant
+  scanner and semantic roles. Completion, highlighting, and command lookup
+  share directory indexes.
+- Command completion reads keywords, builtins, bundled utilities, functions,
+  aliases, and PATH. `KEYWORD_ENTRIES` is the sole keyword catalog.
+- The language server wraps completion in `begin_explicit_completion` and loads
+  command documentation lazily. Mood selection checks the shebang, language
+  identifier, then extension. `shellscript` selects bash.
+- `analyze_ast` optionally collects `analysis_symbol_records` for hover,
+  outline, definition, and rename. Ordinary analysis passes null. Assignment
+  records cover ordinary, builtin, loop, arithmetic, read, mapfile, getopts,
+  printf, and declaration binders. Function records keep body spans.
+- Rename uses semantic spans from the open document. Variable edits preserve
+  sigils and braces. Command edits require a local function or alias definition.
+  Variable names use `word_is_plain_identifier`. Command names use
+  `word_is_function_name`.
+- `src/ShellVariables.hpp` owns dynamic variables. Completion and hover respect
+  the mood. Bare koshkit completion works in the default mood and with the
+  koshkit option.
 
-Command completion reads keywords, builtins, bundled utilities, functions,
-aliases, and the active PATH. `KEYWORD_ENTRIES` is the single keyword source.
-The language server wraps completion in `begin_explicit_completion` and resolves
-command documentation lazily.
+## Diagnostics and storage
 
-A document mood is selected from a recognized shebang, then the client language
-identifier, then the extension. The `shellscript` identifier selects bash.
+- `DiagnosticsCatalog.cpp` owns analysis diagnostics.
+  `DiagnosticsDispatch.cpp` owns command dispatch. Other `Diagnostics` sources
+  own grouped checks. `SimpleCommand::analyze` builds one `command_lint_input`.
+  Whole-script checks run once after `analyze_ast`.
+- A leading ShellCheck disable applies to the file. Other disables apply to the
+  next complete and-or command. A numeric code suppresses all variants. An exact
+  slug suppresses one. Parser and runtime errors remain enabled.
+- `SourceLocation` stores 32-bit position, length, and interned source index.
+  Syntax nodes store end positions separately. Diagnostics and LINENO share a
+  line index.
+- Small types stay in light headers. Shared behavior stays on the value type.
+  `ArrayList::find` returns `Maybe<usize>`. Membership uses
+  `find().has_value()`.
+- `Allocator` is one tagged word for pooled heap, bump arena, or fake storage.
+  Only heap storage is freed. Ownership queries identify a specific arena.
+- `ArrayList` allocates on first growth and stores 32-bit length and capacity.
+  `String` has inline storage and an exact first heap allocation. Use
+  `SparseList` for almost-empty member lists.
+- Bump arenas register destructors for nontrivial objects. Use
+  `is_arena_destructor_noop` only when reachable resources have arena lifetime
+  or need no cleanup. Destructor chunks hold 128 records first and 64 KiB later.
+- `WordSegment` is 32 bytes on 64-bit targets. Two 32-bit units hold its span,
+  kind, and flags. Parsed text, cache data, flattened values, and segment lists
+  move into the token arena. Runtime copies own heap storage. Parsed word tokens
+  need no destructor record.
+- Segment caches hold substitution, arithmetic, folded results, and lifetime
+  identities. Parsed caches use syntax or function arenas. Runtime copies use
+  the heap. Lifetime checks reject data after arena reuse.
 
-`analyze_ast` can collect `analysis_symbol_records`. The language server uses
-them for hover, outline, definition, and rename. Ordinary analysis leaves the
-out-param null. Assignment records include ordinary, builtin, loop, arithmetic,
-read, mapfile, getopts, printf, and declaration binders. Function records retain
-body spans.
+## Build and tests
 
-Rename uses semantic highlight spans from the open document. Variable edits
-preserve sigils and braces. Command edits require a function or alias definition
-in the document. Variable names use `word_is_plain_identifier`. Command names
-use `word_is_function_name`.
+- Prefer make targets. The top Makefile delegates to `src/Makefile` and supplies
+  the processor count. `make MODE=rel` builds `./kosh`. `make MODE=dbg` builds
+  `./kosh-dbg` with AddressSanitizer and UndefinedBehaviorSanitizer.
+  `make MODE=cov` builds `./kosh-cov`. Debug is the default. `make clean` owns
+  removal. Never remove `./kosh` directly.
+- `make test` runs main and completion suites. `make bench` runs benchmarks.
+  Completion tests require debug. Bound interactive and long-running commands.
+- `refill` regenerates goldens. `REFILL` selects source stems. Goldens live
+  directly under `test/expected` and have unique names. Read every changed line.
+- Make discovers inputs and platform skips. Runners own setup, output,
+  comparison, refill, and cleanup. Results are under `.test-work/results`.
+  Auxiliary test shell scripts use two-space indentation.
+- Run bare `NAME` and `cli_NAME` targets through `make -C test`. The native
+  runner suppresses incidental diagnostics outside `shellcheck_static_*` tests.
+- Koshkit rm tests use `--dry-run`. Cleanup uses the system rm after a nonempty
+  path check. Bashdiff and mimicrydiff need Bash 5.3 or newer. Set `BASHP` to a
+  modern Bash on macOS.
 
-`src/ShellVariables.hpp` owns the dynamic variable catalog. Variable completion
-and hover respect the active mood. Bare koshkit utility completion is available
-in the default mood and when the koshkit option is enabled.
+## Workflow
 
-## Diagnostics and locations
+- Read and state the matching guidance before planning, editing, review, prose,
+  and commits. Resolve guides separately. Review matching entries in
+  [MISTAKES.md](MISTAKES.md) before repeating an action.
+- Use parallel read-only research for broad work. Keep scopes disjoint. Validate
+  task names and arguments. Wait at least ten seconds.
+- Resolve files, tools, services, interpreters, options, streams, test targets,
+  cleanup, and expected statuses before use. Recheck CLI options after checkout.
+  Run independent probes independently.
+- Bound searches by matches and bytes. Use current nonoverlapping excerpts.
+  Use literal ripgrep patterns. Put `--` before dash-leading patterns. Enable
+  PCRE2 only when required.
+- Quote shell source, use `-c` for source, put `--` before dash-leading operands,
+  order redirections from creation to use, and capture status or PIPESTATUS
+  before another command changes it.
+- Edit with apply_patch. Use one file and concern per patch. Copy current anchors
+  and preserve escaping. Inspect failed patches. Reread after formatting or
+  concurrent work. Apply only nonempty changes.
+- Print the required before-and-after table after each edit batch.
 
-`DiagnosticsCatalog.cpp` owns each analysis diagnostic. `DiagnosticsDispatch.cpp`
-owns command dispatch. The other `Diagnostics` sources own grouped checks.
-`SimpleCommand::analyze` gathers one `command_lint_input`, and whole-script
-findings run once at the end of `analyze_ast`.
+## Implementation
 
-ShellCheck disable comments apply to the complete file when leading, or to the
-next complete and-or command otherwise. A numeric code suppresses every variant
-under that code. An exact slug suppresses one variant. Parser and runtime errors
-are unaffected.
+- Search the owner and all callers. Inspect declarations, linkage, enums,
+  helpers, containers, packed keys, and formatters. Copy iteration syntax from
+  the same type.
+- Complete interface, type, field, and container migrations across all uses and
+  aggregate initializers before compiling. Check overloads, result types,
+  parameter use, widths, local scope, and switch case scopes.
+- Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
+  lengths, optionals, and static evidence. Install restoration guards before
+  mutation.
+- Handle zero and empty containers before indexed access. Check saturated
+  accumulators before subtraction. Narrow values only at command-status edges.
+- Order packed fields by alignment and assert important sizes. Use the project
+  Bitset or integer masks for fixed boolean tables.
+- Inspect the syntax tree before changing control-flow ownership. Cover every
+  evaluator and cache path. Use nonconstant fixtures for uncertain branches.
+- Remove obsolete branches, fields, flags, and writes. Keep valid comments.
 
-A `SourceLocation` contains a 32-bit position, length, and source name index.
-Source names are interned for the life of the run. Syntax nodes keep their end
-position separately. Diagnostics and LINENO share one cached line index.
+## Make
 
-## Values and allocation
+- Place conditionals and immediate expansions after their variables. Assign
+  deferred tools after parse-time probes.
+- Preserve argument zero and input origin when parsing MAKEFLAGS. Exclude parent
+  bookkeeping and assignments from operands. Recipe exports use macro
+  precedence.
+- The first ordinary target, including included text, remains the default.
+  Repeated makefiles do not replace it.
+- Inference preserves explicit rule identity and its own first prerequisite.
+  Use POSIX recipe syntax unless syntax mood is under test.
 
-Small types live in lightweight headers. Shared value behavior belongs on the
-value type. `ArrayList::find` returns `Maybe<usize>`. Membership checks use
-`find().has_value()`.
+## Validation
 
-An `Allocator` is one tagged word for the pooled heap, a bump arena, or fake
-storage. Allocation dispatches on its kind. Only heap storage is freed. The
-ownership query identifies storage held by a specific bump arena.
+- Locate the owner, runner, input, golden, and environment. Run a failing
+  regression before a behavior fix. Native tests need a placeholder golden
+  before REFILL.
+- Rebuild the required mode. Verify platform, mode, and revision when relevant.
+  Compile release after changing assertion-only locals.
+- Run owners sharing result paths sequentially. Use finite workloads,
+  event-based synchronization, bounded polling, and preserved session ids.
+- Assert exact streams, statuses, punctuation, source, carets, and log arguments.
+  Use distinct fixture names.
+- Use explicit koshkit dispatch unless bare lookup is under test. Koshkit rm
+  uses `--dry-run`.
+- Language server probes initialize first, redirect the emitter, drain output,
+  and keep final status. Debug completion and highlighting receive source through
+  their debug option without `-c`.
+- Poll long work to its final exit. A full suite passes only after every shard
+  finishes and no partial failure artifact remains.
 
-`ArrayList` allocates on first growth and uses 32-bit length and capacity.
-`String` has inline storage and uses an exact first heap allocation. `SparseList`
-is used for member lists that are almost always empty.
+## Performance and finish
 
-A bump arena registers destructors for nontrivial objects unless the type
-declares `is_arena_destructor_noop`. The marker is valid only when every
-reachable resource has arena lifetime or needs no cleanup. Destructor records
-use a 128-record first chunk and fixed 64 KiB later chunks.
-
-`WordSegment` is 32 bytes on 64-bit targets. Its source span, kind, and flags are
-packed into two 32-bit units. Parsed text, cache metadata, flattened values, and
-segment lists move into the token arena before token construction. Runtime
-copies retain heap ownership. Parsed word token destructors therefore need no
-registration.
-
-A segment evaluation cache holds substitution, arithmetic, folded result, and
-lifetime identities. Parsed caches use the syntax or function arena. Runtime
-copies use the heap. Lifetime checks reject stale cache contents after arena
-reuse.
-
-## Finishing a change
-
-- Record workflow mistakes in [MISTAKES.md](MISTAKES.md). Add one durable
-  prevention rule here for each distinct cause.
-- Offer parallel read-only agents before repository research. Reapply this gate
-  after a continuation.
-- Read and state the matching guidance before each planning, editing, review,
-  or commit phase. Reuse a current reading until its contents may have changed.
-- Use the approved edit tool for source and text changes. Shell commands may
-  inspect files and output only.
-- Resolve files, guidance, tools, interpreters, and test targets before using
-  them. Optional tools require explicit executable and service readiness checks.
-- Match a container build target to the container architecture before fetching
-  its toolchain.
-- Keep one bounded container or cache volume across repeated package validation
-  commands, then remove the exact verified resource.
-- Use the simplest bounded probe that preserves the input. Quote command syntax
-  safely, place options before path separators, and run independent probes
-  independently.
-- Order dependent redirections from descriptor creation to descriptor use.
-- Use literal ripgrep patterns unless `--pcre2` is explicitly enabled for a
-  pattern that requires lookaround.
-- Limit transcript searches by record count and output bytes. Read-only reviews
-  must stream results without creating artifacts.
-- Confirm that each replacement differs, and copy exact anchors from the latest
-  inspection. Split large, mixed, or previously failed patches into small
-  verified edits.
-- Print the required change table after each edit batch.
-- Complete type and container migrations across every use before compiling.
-  Search the whole source tree for each removed field before compiling.
-  Locate every positional aggregate initializer before reordering fields.
-  Verify overloads, constructor inputs, conditional result types, and old API
-  references. Verify that every named parameter in a new shared definition is
-  used. Copy iteration syntax from an existing use of the same type.
-- Keep borrowed views within the lifetime of their owners. Prove source spans,
-  offsets, lengths, and static evidence at the contract required by the code.
-- Verify that each reused local remains in scope at every new call site.
-- Copy shared helper names and signatures from their declarations before the
-  first call site is compiled.
-- Inspect the printed syntax tree before changing control-flow ownership. Use
-  nonconstant fixtures when testing uncertain branches.
-- Search for an existing shared path before changing a shared owner. Adapter
-  changes must trace their current delegate first.
-- Keep agent scopes disjoint. Do not inspect or edit a scope under active
-  review, and use only the current session's supported coordination methods.
-- Validate every required coordination argument before sending or retrying a
-  task.
-- Locate the owning runner and input type before running a focused test. Run
-  cwd-sensitive scripts through that runner. Add and observe the failing
-  canonical regression before a behavior patch is applied. The failing test
-  command must finish before source editing begins.
-- Rebuild the required debug, release, or coverage artifact before testing it.
-  Verify its mode and embedded revision when build invalidation matters.
-- Regenerate only the owning goldens, read every changed line, and update exact
-  shape assertions with the behavior they cover.
-- Normalize generated REFILL name lists to spaces and exclude fixtures whose
-  runtime dependencies are unavailable on the current platform.
-- Use distinct fixture names that cannot trigger unrelated diagnostics. Check
-  every logging placeholder against its argument.
-- Validate protocol encoders and profilers on a small payload. Language server
-  probes must initialize first, redirect the complete emitter, drain output,
-  and preserve the final process status.
-- Debug completion and highlighting probes pass source only to their debug
-  option. They do not add `-c`.
-- Poll every long-running command until the response contains its final exit
-  code. Missing displayed session metadata does not prove completion.
-- Bound interactive and long-running workloads with an operating-system
-  timeout. Validate report paths and all final reporting branches before an
-  expensive run.
-- Verify platform tool interfaces and sanitizer support before invoking them.
-  Force-sign every relinked macOS workload binary.
-- Use a bounded temporary directory. Validate every cleanup target, use the
-  system removal command without force only when the environment permits it.
-  Select a reviewed patch or a recoverable Trash path before issuing a cleanup
-  command when direct removal is filtered.
-- A readiness poll must yield between probes and enforce a wall-time-scale
-  ceiling.
-- Make conditionals and immediate variables must follow every variable they
-  inspect or expand.
-- Separate implementation extensions from POSIX conformance claims in user
-  documentation.
-- Use the release binary for performance comparisons. Clear inherited jobserver
-  flags before forcing serial submakes.
-- Enable the benchmark's explicit nonzero handling before timing a workload
-  that is expected to fail.
-- Check the expected status of every workload before launching a benchmark
-  batch.
-- Benchmark timeouts wrap the measured process directly.
-- Check commit subject length and the active git identity before committing.
-- Format changed files, run focused and full tests, inspect regenerated goldens
-  and the complete diff, run `git diff --check`, and confirm that README.md is
-  untouched. Commit completed work, and never push or create external artifacts
-  without an explicit request.
-- A full suite passes only after every shard finishes and no partial failure
-  artifact remains.
+- Verify executables, services, interfaces, sanitizers, timing, platforms, and
+  fallbacks. A Docker client does not prove daemon readiness. Match container
+  toolchains to architecture. Force-sign relinked macOS workload binaries.
+- Use isolated bounded temporary directories. Verify cleanup targets. Use a
+  reviewed patch or Trash when direct removal is filtered. Deinitialize
+  temporary worktree submodules before removal.
+- Use `MODE=rel` for every performance make command. Clear inherited jobserver
+  flags before serial submakes. Resolve benchmark inputs, options, and statuses.
+  Enable nonzero handling for expected failures. Run bench through `-c`.
+  Benchmark timeouts wrap the measured process directly.
+- Validate profilers on a small payload and bound full workloads. Let the
+  command runner capture output.
+- Record mistakes in [MISTAKES.md](MISTAKES.md) and add one general prevention
+  rule here for each distinct cause.
+- Format changes. Run focused and full bounded tests. Inspect goldens, the full
+  diff, untracked files, and `git diff --check`. Confirm README.md is untouched.
+- Verify git identity. Keep commit subjects within the limit and bodies within
+  72 columns. Commit locally. Never push or create external artifacts without
+  an explicit request.

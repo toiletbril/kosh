@@ -133,7 +133,7 @@ FLAG(OPTIMIZER_DIAGNOSTICS, Bool, '\0', "show-optimizer-diagnostics", Debug,
      "Trace the optimizer prepass and report every folded and eliminated node "
      "as an analysis diagnostic.");
 FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
-     "Print exit code after each executed command.");
+     "Show diagnostics for every non-zero exit code.");
 FLAG(ESCAPE_MAP, Bool, 'R', "show-lexed-words", Debug,
      "Print escape bitmap after each parsed command.");
 FLAG(

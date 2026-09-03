@@ -1005,6 +1005,15 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
   bool did_source_bash_rc = false;
   bool did_source_bash_env = false;
   for (let flavor : moods) {
+    let const should_consider_bash_env =
+        flavor == mimic_mood::Bash &&
+        !context.shell_option_state(shell_option_id::Privileged) &&
+        !context.startup_finished() && !did_source_bash_env;
+    if (!is_login_shell && !should_be_interactive && !should_consider_bash_env)
+    {
+      continue;
+    }
+
     /* A mood already on the sourcing stack is skipped, so a set --init-moods
        inside the rc this is sourcing cannot recurse to overflow. */
     if (context.init_mood_sourcing(flavor)) {

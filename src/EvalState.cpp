@@ -631,7 +631,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
                                      m_associative_values,
                                      m_sparse_array_values,
                                      m_sparse_array_names,
-                                     m_shopt_options,
+                                     m_shopt_option_overrides,
+                                     m_shopt_option_values,
                                      m_functions,
                                      m_aliases,
                                      m_positional_params,
@@ -679,7 +680,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_associative_values = steal(snapshot.associative_values);
   m_sparse_array_values = steal(snapshot.sparse_array_values);
   m_sparse_array_names = steal(snapshot.sparse_array_names);
-  m_shopt_options = steal(snapshot.shopt_options);
+  m_shopt_option_overrides = snapshot.shopt_option_overrides;
+  m_shopt_option_values = snapshot.shopt_option_values;
   m_functions = steal(snapshot.functions);
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);

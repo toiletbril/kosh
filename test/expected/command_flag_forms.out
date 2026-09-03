@@ -5,7 +5,11 @@ trailer
 rc=0
 empty-command-rc=0
 show-exit-code success is quiet
+show-exit-code help describes diagnostics
 show-exit-code reports a located continued failure
 show-exit-code reports before errexit
 show-exit-code reports guarded failures once
 show-exit-code follows the effective pipeline status
+show-exit-code reports fatal pipefail as an error
+runtime show-exit-code survives the terminal command
+runtime reports survive the terminal command

@@ -44,10 +44,10 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
     return execute_builtin(steal(ec), cxt);
   }
 
-  /* The terminal external command may replace the shell in place when it is the
-     last command, not in a subshell, and no EXIT trap is pending. */
-  let const can_replace_shell =
-      cxt.terminal_exec_allowed() && !cxt.in_subshell() && !cxt.has_exit_trap();
+  let const can_replace_shell = cxt.terminal_exec_allowed() &&
+                                !cxt.in_subshell() && !cxt.has_exit_trap() &&
+                                !cxt.show_exit_code() && !cxt.stats_enabled() &&
+                                !cxt.memory_stats_enabled();
 
   /* Mimicry runs the script in-process, a background command keeps its fork.
    */

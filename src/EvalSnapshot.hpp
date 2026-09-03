@@ -45,7 +45,8 @@ struct eval_state_snapshot
   StringMap<String> associative_values;
   StringMap<String> sparse_array_values;
   HashSet sparse_array_names;
-  StringMap<bool> shopt_options;
+  u64 shopt_option_overrides;
+  u64 shopt_option_values;
   StringMap<FunctionBodyHandle> functions;
   StringMap<String> aliases;
   ArrayList<String> positional_params;

@@ -1093,17 +1093,25 @@ fn unset_environment_variable(StringView key) throws -> void
 
 fn signal_internal_diagnostic() wontthrow -> void {}
 
-fn environment_names() throws -> ArrayList<String>
+fn for_each_environment_name(opaque *context,
+                             environment_name_callback callback) throws -> void
 {
-  ArrayList<String> names{heap_allocator()};
-  if (environ == nullptr) return names;
+  if (environ == nullptr) return;
   for (char **entry = environ; *entry != nullptr; entry++) {
     StringView pair{*entry};
     let const equals = pair.find_character('=');
     let const name =
         equals.has_value() ? pair.substring_of_length(0, *equals) : pair;
-    names.push(String{name});
+    callback(context, name);
   }
+}
+
+fn environment_names() throws -> ArrayList<String>
+{
+  ArrayList<String> names{heap_allocator()};
+  for_each_environment_name(&names, [](opaque *context, StringView name) {
+    static_cast<ArrayList<String> *>(context)->push(String{name});
+  });
   return names;
 }
 

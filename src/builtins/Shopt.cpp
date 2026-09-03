@@ -131,6 +131,7 @@ constexpr PackedStringKey SHOPT_OPTION_KEYS[] = {
     SSK("xpg_echo"),
 };
 constexpr StaticStringSet SHOPT_OPTIONS{SHOPT_OPTION_KEYS};
+static_assert(countof(SHOPT_OPTION_KEYS) <= 64);
 
 pure fn is_known_shopt_option(StringView name) wontthrow -> bool
 {
@@ -174,6 +175,13 @@ fn shopt_reusable_line(StringView name, bool on, bool as_set_option,
 }
 
 } /* namespace */
+
+pure fn shopt_option_index(StringView name) wontthrow -> Maybe<u8>
+{
+  let const index = SHOPT_OPTIONS.find_index(name);
+  if (!index.has_value()) return None;
+  return Maybe<u8>{static_cast<u8>(*index)};
+}
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {

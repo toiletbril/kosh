@@ -1931,7 +1931,9 @@ fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
 
   let const is_command = symbol->role == highlight_role::resolved_command ||
                          symbol->role == highlight_role::partial_command ||
-                         symbol->role == highlight_role::unknown_command;
+                         symbol->role == highlight_role::unknown_command ||
+                         (symbol->role == highlight_role::keyword &&
+                          search_builtin(symbol->text.view()).has_value());
   if (!is_command) return send_result(id, "null");
   if (definition_of(*document, *symbol).has_value())
     return send_result(id, "null");

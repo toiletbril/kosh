@@ -209,36 +209,44 @@ hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
       break;
     }
 
+    /* POSIX exempts set -e for a command that is an operand of && or || and not
+       the last of the and-or list, and for a command the ! reserved word
+       negates. */
+    const bool has_pending_control_flow = cxt.has_pending_control_flow();
+    const bool was_command_failure_uncaught =
+        !has_pending_control_flow && !cxt.in_condition() && did_execute &&
+        !n->is_negated() && is_end_of_and_or_chain && ret.status != 0 &&
+        ret.status != NOTHING_WAS_EXECUTED &&
+        !ret.has(status_flag::ErrResolved);
+    const bool is_fatal_exit = cxt.error_exit() && was_command_failure_uncaught;
+
     if (cxt.show_exit_code() && did_execute && ret.status != 0 &&
         ret.status != NOTHING_WAS_EXECUTED &&
         !ret.has(status_flag::ExitCodeReported))
     {
-      let message = String{cxt.scratch_allocator(), "nonzero exit code: "};
+      let message = String{cxt.scratch_allocator(), "Non-zero exit code ("};
       message += String::from(ret.status, cxt.scratch_allocator());
-      cxt.show_runtime_error_at(n->command()->source_location(),
-                                message.view());
+      message += ')';
+      if (is_fatal_exit) {
+        cxt.show_runtime_error_at(n->command()->source_location(),
+                                  message.view());
+      } else {
+        cxt.show_runtime_warning_at(n->command()->source_location(),
+                                    message.view(), {}, true);
+      }
       ret.set(status_flag::ExitCodeReported);
     }
 
     /* A break, continue, return, or exit inside a node stops the rest of the
        list and unwinds to the boundary that consumes it. */
-    if (cxt.has_pending_control_flow()) break;
-
-    /* POSIX exempts set -e for a command that is an operand of && or || and not
-       the last of the and-or list, and for a command the ! reserved word
-       negates. */
-    const bool was_command_failure_uncaught =
-        !cxt.in_condition() && did_execute && !n->is_negated() &&
-        is_end_of_and_or_chain && ret.status != 0 &&
-        ret.status != NOTHING_WAS_EXECUTED &&
-        !ret.has(status_flag::ErrResolved);
+    if (has_pending_control_flow) break;
 
     if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
       cxt.set_last_exit_status(ret.status);
       if (cxt.should_run_err_trap()) cxt.run_named_trap(StringView{"ERR", 3});
     }
 
-    if (cxt.error_exit() && was_command_failure_uncaught) {
+    if (is_fatal_exit) {
       cxt.set_last_exit_status(ret.status);
       if (cxt.in_subshell()) {
         cxt.request_exit(ret.status, source_location());

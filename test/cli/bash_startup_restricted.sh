@@ -130,6 +130,17 @@ if [ "${IS_NONDEBUG_BUILD:-0}" != 1 ]; then
 fi
 printf 'no-completion-bootstrap=%s\n' "$output"
 
+output=ok
+if [ "${IS_NONDEBUG_BUILD:-0}" != 1 ]; then
+  "$BIN" -X info --debug-logging-file "$directory/noninteractive.log" \
+    -c true >/dev/null 2>&1
+  if grep -F 'sourcing the startup files for the kosh mood' \
+    "$directory/noninteractive.log" >/dev/null 2>&1; then
+    output=broken
+  fi
+fi
+printf 'noninteractive-empty-startup=%s\n' "$output"
+
 printf 'printf env:' > "$directory/env"
 printf 'printf expanded:' > "$directory/env0"
 printf 'printf body' > "$directory/script"

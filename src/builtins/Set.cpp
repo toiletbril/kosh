@@ -195,7 +195,7 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
     {shell_option_id::ShowExitCode,
      set_option_behavior::Stored,
      '\0', "show-exit-code",
-     "Print the exit code after each command.", {},
+     "Show diagnostics for every non-zero exit code.", {},
      false, false},
     {shell_option_id::Count,
      set_option_behavior::WarningLevel,

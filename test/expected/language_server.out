@@ -69,6 +69,7 @@ action-start-cursor=ok
 action-end-cursor=ok
 action-adjacent-range=ok
 builtin-help=ok
+builtin-keyword-help=ok
 utility-help=ok
 posix-mood-utility-help=ok
 path-shadows-utility=ok

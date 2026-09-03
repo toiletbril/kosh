@@ -855,6 +855,9 @@ fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;
 fn signal_internal_diagnostic() wontthrow -> void;
 
+using environment_name_callback = void (*)(opaque *, StringView);
+fn for_each_environment_name(opaque *context,
+                             environment_name_callback callback) throws -> void;
 fn environment_names() throws -> ArrayList<String>;
 
 fn is_child_process() wontthrow -> bool;

@@ -919,11 +919,11 @@ fn signal_internal_diagnostic() wontthrow -> void
   CloseHandle(marker);
 }
 
-fn environment_names() -> ArrayList<String>
+fn for_each_environment_name(opaque *context,
+                             environment_name_callback callback) throws -> void
 {
-  ArrayList<String> names{heap_allocator()};
   wchar_t *block = GetEnvironmentStringsW();
-  if (block == nullptr) return names;
+  if (block == nullptr) return;
   defer { FreeEnvironmentStringsW(block); };
 
   for (wchar_t *entry = block; *entry != L'\0';) {
@@ -936,12 +936,19 @@ fn environment_names() -> ArrayList<String>
       while (name_length < pair_length && entry[name_length] != L'=')
         name_length++;
       let name = wide_to_utf8(entry, name_length, heap_allocator());
-      if (name.has_value()) names.push(name.take());
+      if (name.has_value()) callback(context, name->view());
     }
 
     entry += pair_length + 1;
   }
+}
 
+fn environment_names() -> ArrayList<String>
+{
+  ArrayList<String> names{heap_allocator()};
+  for_each_environment_name(&names, [](opaque *context, StringView name) {
+    static_cast<ArrayList<String> *>(context)->push(String{name});
+  });
   return names;
 }
 

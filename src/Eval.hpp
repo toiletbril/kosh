@@ -39,6 +39,7 @@ struct substring_bounds
 fn compute_substring_bounds(i64 value_count, i64 offset, Maybe<i64> length,
                             substring_subject subject) throws
     -> substring_bounds;
+pure fn shopt_option_index(StringView name) wontthrow -> Maybe<u8>;
 
 class EvalContext
 {
@@ -615,7 +616,9 @@ public:
      form takes a finer location inside that command. */
   cold fn show_runtime_warning(StringView message) wontthrow -> void;
   cold fn show_runtime_warning_at(SourceLocation location, StringView message,
-                                  StringView note = {}) wontthrow -> void;
+                                  StringView note = {},
+                                  bool should_ignore_disabled = false) wontthrow
+      -> void;
   cold fn show_runtime_error_at(SourceLocation location,
                                 StringView message) wontthrow -> void;
   /* The location of the $name or ${name spelling inside the command being
@@ -941,18 +944,25 @@ public:
     return m_runtime.mood != mimic_mood::Posix;
   }
 
-  /* The bash shopt option states, set and read by the shopt builtin. A name
-     with no entry reads its bash default through shopt_default_is_on. */
   fn set_shopt_option(StringView name, bool enabled) throws -> void
   {
-    m_shopt_options.set(name, enabled);
+    let const index = shopt_option_index(name);
+    ASSERT(index.has_value(), "unknown shopt option");
+    let const mask = u64{1} << *index;
+    m_shopt_option_overrides |= mask;
+    if (enabled)
+      m_shopt_option_values |= mask;
+    else
+      m_shopt_option_values &= ~mask;
   }
   pure fn is_shopt_enabled(StringView name) const wontthrow -> bool
   {
     if (name == "restricted_shell") return is_restricted_shell();
-    /* A name never set falls back to the bash default table. */
-    const bool *value = m_shopt_options.find(name);
-    if (value != nullptr) return *value;
+    let const index = shopt_option_index(name);
+    if (!index.has_value()) return false;
+    let const mask = u64{1} << *index;
+    if ((m_shopt_option_overrides & mask) != 0)
+      return (m_shopt_option_values & mask) != 0;
     return shopt_default_is_on(name);
   }
   /* Whether bash ships the named shopt option enabled, the miss fallback for
@@ -1293,7 +1303,8 @@ protected:
      dense gap. The name still reads as indexed. */
   StringMap<String> m_sparse_array_values{heap_allocator()};
   HashSet m_sparse_array_names{heap_allocator()};
-  StringMap<bool> m_shopt_options{heap_allocator()};
+  u64 m_shopt_option_overrides{0};
+  u64 m_shopt_option_values{0};
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
      hot loop with a constant regex compiles it once and reuses it. */
   StringMap<CompiledRegex> m_regex_cache{heap_allocator()};

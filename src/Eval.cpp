@@ -38,8 +38,10 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
 
-  for (let const &name : os::environment_names())
-    m_exported_names.add(name.view());
+  os::for_each_environment_name(&m_exported_names,
+                                [](opaque *context, StringView name) {
+                                  static_cast<HashSet *>(context)->add(name);
+                                });
 }
 
 EvalContext::~EvalContext() { reset_runtime_diagnostic_highlight_cache(); }
@@ -414,11 +416,11 @@ cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
   show_runtime_warning_at(m_current_location, message);
 }
 
-cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
-                                             StringView message,
-                                             StringView note) wontthrow -> void
+cold fn EvalContext::show_runtime_warning_at(
+    SourceLocation location, StringView message, StringView note,
+    bool should_ignore_disabled) wontthrow -> void
 {
-  if (diagnostics_disabled()) return;
+  if (diagnostics_disabled() && !should_ignore_disabled) return;
   let const trace_location = location;
   /* The stamped view may outlive its buffer once the defining command's sources
      are freed, so a windowed resolution swaps in the definition copy's owned

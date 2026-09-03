@@ -124,9 +124,9 @@ public:
     }
   }
 
-  hot mustuse fn contains(StringView text) const wontthrow -> bool
+  hot mustuse fn find_index(StringView text) const wontthrow -> Maybe<usize>
   {
-    if (!prefilter.might_contain(text)) return false;
+    if (!prefilter.might_contain(text)) return None;
     let const wanted = PackedStringKey::from_view(text);
 
     usize low = 0;
@@ -139,8 +139,15 @@ public:
         high = middle;
     }
 
-    return low < Count && keys[low] == wanted &&
-           text.count() == keys[low].packed_length();
+    if (low < Count && keys[low] == wanted &&
+        text.count() == keys[low].packed_length())
+      return low;
+    return None;
+  }
+
+  hot mustuse fn contains(StringView text) const wontthrow -> bool
+  {
+    return find_index(text).has_value();
   }
 };
 
