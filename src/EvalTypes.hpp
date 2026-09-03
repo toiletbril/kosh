@@ -46,6 +46,29 @@ enum class return_handling : u8
   Reject,
 };
 
+enum class status_flag : u32
+{
+  ErrResolved = 1U << 0,
+};
+
+struct status_result
+{
+  i32 status{0};
+  u32 flags{0};
+
+  pure fn has(status_flag flag) const wontthrow -> bool
+  {
+    return (flags & static_cast<u32>(flag)) != 0;
+  }
+
+  fn set(status_flag flag) wontthrow -> void
+  {
+    flags |= static_cast<u32>(flag);
+  }
+};
+
+static_assert(sizeof(status_result) == 8);
+
 enum class restricted_path_use : u8
 {
   Command,

@@ -372,6 +372,12 @@ public:
 
   fn run_named_trap(StringView condition) throws -> void;
   pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
+  pure fn should_run_err_trap() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::Errtrace) ||
+           (m_function_call_depth == 0 && m_subshell_depth == 0 &&
+            m_substitution_depth == 0);
+  }
 
   /* Run the action of every signal whose flag the handler set, at the command
      boundary. A re-entrancy guard keeps a triggered signal from nesting. */
@@ -551,7 +557,7 @@ public:
      seed, so the -W downgrade leaves it fatal. */
   fn set_error_unset_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.was_error_unset_set_explicitly = enabled;
+    m_runtime.set_error_unset_set_explicitly(enabled);
   }
   /* Mark a warning suppressed or not for the span of a construct. */
   fn set_warning_suppressed(suppressible_warning which, bool enabled) wontthrow
@@ -621,7 +627,7 @@ public:
      than a mood seed, so a later mood switch leaves it in place. */
   fn set_pipefail_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.was_pipefail_set_explicitly = enabled;
+    m_runtime.set_pipefail_set_explicitly(enabled);
   }
 
   fn set_no_clobber(bool enabled) wontthrow -> void;
@@ -642,7 +648,7 @@ public:
   }
   fn set_extended_arithmetic_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.was_extended_arithmetic_set_explicitly = enabled;
+    m_runtime.set_extended_arithmetic_set_explicitly(enabled);
   }
   fn set_koshkit(bool enabled) wontthrow -> void;
   pure fn koshkit() const wontthrow -> bool;
@@ -656,7 +662,7 @@ public:
      a mood seed, so the -W downgrade leaves it fatal. */
   fn set_failglob_explicit(bool enabled) wontthrow -> void
   {
-    m_runtime.was_failglob_set_explicitly = enabled;
+    m_runtime.set_failglob_set_explicitly(enabled);
   }
   /* True while a test or [ command expands its arguments, so an unmatched glob
      there stays a silent literal and the probe answers false rather than
@@ -761,12 +767,12 @@ public:
   fn apply_strictness_for_mood() wontthrow -> void
   {
     let const strict = m_runtime.mood == mimic_mood::Default;
-    if (!m_runtime.was_error_unset_set_explicitly)
+    if (!m_runtime.was_error_unset_set_explicitly())
       set_error_unset(strict && !is_completion_function_running());
-    if (!m_runtime.was_pipefail_set_explicitly) set_pipefail(strict);
-    if (!m_runtime.was_failglob_set_explicitly)
+    if (!m_runtime.was_pipefail_set_explicitly()) set_pipefail(strict);
+    if (!m_runtime.was_failglob_set_explicitly())
       set_failglob(strict && !is_completion_function_running());
-    if (!m_runtime.was_extended_arithmetic_set_explicitly)
+    if (!m_runtime.was_extended_arithmetic_set_explicitly())
       set_extended_arithmetic(strict);
   }
 
@@ -777,10 +783,10 @@ public:
     let const previous = RuntimeState::capture(*this);
     m_runtime.mood = defining_runtime.mood;
     set_warning_level(defining_runtime.warning_level);
-    m_runtime.is_diagnostics_disabled =
-        defining_runtime.is_diagnostics_disabled;
-    m_runtime.is_annoying_diagnostics_enabled =
-        defining_runtime.is_annoying_diagnostics_enabled;
+    m_runtime.set_diagnostics_disabled(
+        defining_runtime.is_diagnostics_disabled());
+    m_runtime.set_annoying_diagnostics_enabled(
+        defining_runtime.is_annoying_diagnostics_enabled());
     apply_strictness_for_mood();
     return function_runtime_state{previous,
                                   RuntimeState::capture(*this),
@@ -835,31 +841,31 @@ public:
     m_runtime.shell_options = merged_options;
     if (m_shell_option_mutations.touched_since(
             shell_option_id::Nounset, state.shell_option_mutation_revision))
-      m_runtime.was_error_unset_set_explicitly =
-          finished.was_error_unset_set_explicitly;
+      m_runtime.set_error_unset_set_explicitly(
+          finished.was_error_unset_set_explicitly());
     if (m_shell_option_mutations.touched_since(
             shell_option_id::Pipefail, state.shell_option_mutation_revision))
-      m_runtime.was_pipefail_set_explicitly =
-          finished.was_pipefail_set_explicitly;
+      m_runtime.set_pipefail_set_explicitly(
+          finished.was_pipefail_set_explicitly());
     if (m_shell_option_mutations.touched_since(
             shell_option_id::Failglob, state.shell_option_mutation_revision))
-      m_runtime.was_failglob_set_explicitly =
-          finished.was_failglob_set_explicitly;
+      m_runtime.set_failglob_set_explicitly(
+          finished.was_failglob_set_explicitly());
     if (m_shell_option_mutations.touched_since(
             shell_option_id::ExtendedArithmetic,
             state.shell_option_mutation_revision))
-      m_runtime.was_extended_arithmetic_set_explicitly =
-          finished.was_extended_arithmetic_set_explicitly;
+      m_runtime.set_extended_arithmetic_set_explicitly(
+          finished.was_extended_arithmetic_set_explicitly());
     if (state.mood_mutation_revision != m_mood_mutation_revision)
       m_runtime.mood = finished.mood;
     if (state.warning_mutation_revision != m_warning_mutation_revision)
       m_runtime.warning_level = finished.warning_level;
     if (state.diagnostics_mutation_revision != m_diagnostics_mutation_revision)
-      m_runtime.is_diagnostics_disabled = finished.is_diagnostics_disabled;
+      m_runtime.set_diagnostics_disabled(finished.is_diagnostics_disabled());
     if (state.annoying_diagnostics_mutation_revision !=
         m_annoying_diagnostics_mutation_revision)
-      m_runtime.is_annoying_diagnostics_enabled =
-          finished.is_annoying_diagnostics_enabled;
+      m_runtime.set_annoying_diagnostics_enabled(
+          finished.is_annoying_diagnostics_enabled());
   }
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
@@ -1303,7 +1309,7 @@ protected:
   /* A byte-indexed table that answers whether a character is a field separator
      in one load, instead of scanning IFS per byte. It is rebuilt whenever IFS
      changes. */
-  bool m_field_separator_table[256]{};
+  Bitset m_field_separator_table{heap_allocator()};
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
 

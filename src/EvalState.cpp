@@ -955,22 +955,22 @@ pure fn EvalContext::memory_stats_enabled() const wontthrow -> bool
 
 fn EvalContext::set_diagnostics_disabled(bool disabled) wontthrow -> void
 {
-  m_runtime.is_diagnostics_disabled = disabled;
+  m_runtime.set_diagnostics_disabled(disabled);
 }
 
 pure fn EvalContext::diagnostics_disabled() const wontthrow -> bool
 {
-  return m_runtime.is_diagnostics_disabled;
+  return m_runtime.is_diagnostics_disabled();
 }
 
 fn EvalContext::set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void
 {
-  m_runtime.is_annoying_diagnostics_enabled = enabled;
+  m_runtime.set_annoying_diagnostics_enabled(enabled);
 }
 
 pure fn EvalContext::annoying_diagnostics_enabled() const wontthrow -> bool
 {
-  return m_runtime.is_annoying_diagnostics_enabled;
+  return m_runtime.is_annoying_diagnostics_enabled();
 }
 
 fn EvalContext::set_login_shell(bool enabled) wontthrow -> void

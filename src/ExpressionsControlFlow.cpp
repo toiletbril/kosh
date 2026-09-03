@@ -136,7 +136,12 @@ fn IfClause::can_evaluate_in_process_substitution(
                                                            active_functions);
 }
 
-cold fn IfClause::to_string() const throws -> String { return "IfClause"; }
+cold fn IfClause::to_string() const throws -> String
+{
+  let result = String{"IfClause"};
+  append_ast_execution_flags(result);
+  return result;
+}
 
 cold fn IfClause::to_ast_string(usize layer) const throws -> String
 {
@@ -159,6 +164,12 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
 
 hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+hot fn IfClause::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
   cxt.set_terminal_exec_allowed(false);
   let const can_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
@@ -166,7 +177,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (m_is_fully_eliminated && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated if as a no-op");
     cxt.publish_single_pipe_status(1);
-    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+    return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
   /* An index past the last branch means every condition failed, so the else
@@ -176,10 +187,10 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
         "running the folded if branch %zu of %zu without testing conditions",
         *m_folded_branch, m_branches.count());
     if (*m_folded_branch < m_branches.count())
-      return m_branches[*m_folded_branch].body->evaluate(cxt);
-    if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+      return m_branches[*m_folded_branch].body->evaluate_status(cxt);
+    if (m_otherwise != nullptr) return m_otherwise->evaluate_status(cxt);
     cxt.publish_single_pipe_status(1);
-    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+    return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
   for (let const &[ condition, body ] : m_branches) {
@@ -193,13 +204,14 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       condition_status = condition->evaluate(cxt);
     }
 
-    if (cxt.has_pending_control_flow()) return condition_status;
-    if (condition_status == 0) return body->evaluate(cxt);
+    if (cxt.has_pending_control_flow())
+      return {static_cast<i32>(condition_status), 0};
+    if (condition_status == 0) return body->evaluate_status(cxt);
   }
 
-  if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+  if (m_otherwise != nullptr) return m_otherwise->evaluate_status(cxt);
 
-  SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+  return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
 }
 
 fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
@@ -341,7 +353,9 @@ WhileLoop::~WhileLoop() = default;
 
 cold fn WhileLoop::to_string() const throws -> String
 {
-  return m_is_until ? "UntilLoop" : "WhileLoop";
+  let result = String{m_is_until ? "UntilLoop" : "WhileLoop"};
+  append_ast_execution_flags(result);
+  return result;
 }
 
 cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
@@ -387,6 +401,12 @@ hot fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
 
 hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
 
@@ -401,7 +421,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       can_skip_condition_commands)
   {
     cxt.publish_single_pipe_status(m_is_until ? 0 : 1);
-    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+    return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
   cxt.enter_loop();
@@ -410,7 +430,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const redirect_fd_mark = cxt.mark_loop_redirect_fds();
   defer { cxt.cleanup_loop_redirect_fds(redirect_fd_mark); };
 
-  i64 ret = 0;
+  status_result result{};
   loop
   {
     i64 condition_status;
@@ -429,11 +449,12 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
         m_is_until ? (condition_status != 0) : (condition_status == 0);
     if (!should_run_body) break;
 
-    ret = m_body->evaluate(cxt);
+    result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
-  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
+  cxt.set_last_exit_status(result.status);
+  return result;
 }
 
 fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
@@ -545,7 +566,9 @@ SelectLoop::~SelectLoop() = default;
 
 cold fn SelectLoop::to_string() const throws -> String
 {
-  return "SelectLoop \"" + m_variable_name + "\"";
+  let result = "SelectLoop \"" + m_variable_name + "\"";
+  append_ast_execution_flags(result);
+  return result;
 }
 
 cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
@@ -558,6 +581,12 @@ cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
 
 fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
   ASSERT(m_body != nullptr);
 
   cxt.set_terminal_exec_allowed(false);
@@ -565,7 +594,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
-  if (values.is_empty()) return 0;
+  if (values.is_empty()) return {};
 
   LOG(Debug, "the select loop offers %zu choices for '%.*s'", values.count(),
       static_cast<int>(m_variable_name.length), m_variable_name.data);
@@ -576,7 +605,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const redirect_fd_mark = cxt.mark_loop_redirect_fds();
   defer { cxt.cleanup_loop_redirect_fds(redirect_fd_mark); };
 
-  i64 ret = 0;
+  status_result result{};
   bool should_reprint_menu = true;
   loop
   {
@@ -602,7 +631,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
        the way a terminal end-of-file does. */
     if (!input) {
       koshka::print("\n");
-      ret = 1;
+      result.status = 1;
       break;
     }
 
@@ -627,11 +656,12 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       cxt.set_shell_variable(m_variable_name, "");
     }
 
-    ret = m_body->evaluate(cxt);
+    result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
-  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
+  cxt.set_last_exit_status(result.status);
+  return result;
 }
 
 ForLoop::ForLoop(SourceLocation location, SourceLocation variable_location,
@@ -651,6 +681,7 @@ cold fn ForLoop::to_string() const throws -> String
   let result = String{"ForLoop \""};
   result += m_variable_name;
   result += "\"";
+  append_ast_execution_flags(result);
   return result;
 }
 
@@ -666,13 +697,19 @@ cold fn ForLoop::to_ast_string(usize layer) const throws -> String
 
 hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
   ASSERT(m_body != nullptr);
 
   cxt.set_terminal_exec_allowed(false);
 
   if (m_is_fully_eliminated) {
     cxt.publish_single_pipe_status(0);
-    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+    return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
   cxt.set_current_location(source_location());
@@ -704,14 +741,15 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const redirect_fd_mark = cxt.mark_loop_redirect_fds();
   defer { cxt.cleanup_loop_redirect_fds(redirect_fd_mark); };
 
-  i64 ret = 0;
+  status_result result{};
   for (let const &value : values) {
     cxt.set_shell_variable(m_variable_name, value);
-    ret = m_body->evaluate(cxt);
+    result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
-  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
+  cxt.set_last_exit_status(result.status);
+  return result;
 }
 
 fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
@@ -887,7 +925,12 @@ CaseClause::CaseClause(SourceLocation location, const Token *word,
 
 CaseClause::~CaseClause() = default;
 
-cold fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
+cold fn CaseClause::to_string() const throws -> String
+{
+  let result = String{"CaseClause"};
+  append_ast_execution_flags(result);
+  return result;
+}
 
 cold fn CaseClause::to_ast_string(usize layer) const throws -> String
 {
@@ -902,6 +945,12 @@ cold fn CaseClause::to_ast_string(usize layer) const throws -> String
 }
 
 fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  return evaluate_status_impl(cxt).status;
+}
+
+fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
 {
   ASSERT(m_word != nullptr);
 
@@ -969,7 +1018,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* A ;& fall-through runs the next arm body without matching it, and a ;;&
      resumes matching at the arms past the one that just ran. */
-  i64 result = 0;
+  status_result result{};
   bool did_run_a_body = false;
   usize i = 0;
   while (i < m_items.count()) {
@@ -984,8 +1033,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     loop
     {
       ASSERT(m_items[i].body != nullptr);
-      result = m_items[i].body->evaluate(cxt);
-      cxt.set_last_exit_status(static_cast<i32>(result));
+      result = m_items[i].body->evaluate_status(cxt);
+      cxt.set_last_exit_status(result.status);
       did_run_a_body = true;
       if (cxt.has_pending_control_flow()) return result;
 
@@ -1217,7 +1266,12 @@ fn BraceGroup::can_evaluate_in_process_substitution(
          m_body->can_evaluate_in_process_substitution(cxt, active_functions);
 }
 
-cold fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
+cold fn BraceGroup::to_string() const throws -> String
+{
+  let result = String{"BraceGroup"};
+  append_ast_execution_flags(result);
+  return result;
+}
 
 cold fn BraceGroup::to_ast_string(usize layer) const throws -> String
 {
@@ -1230,16 +1284,22 @@ cold fn BraceGroup::to_ast_string(usize layer) const throws -> String
 
 fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+fn BraceGroup::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
   ASSERT(m_body != nullptr);
 
   cxt.set_terminal_exec_allowed(false);
 
   if (m_is_fully_eliminated) {
     cxt.publish_single_pipe_status(0);
-    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+    return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
-  return m_body->evaluate(cxt);
+  return m_body->evaluate_status(cxt);
 }
 
 fn BraceGroup::analyze(AnalysisContext &actx,

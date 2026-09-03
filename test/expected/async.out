@@ -10,6 +10,11 @@
       [SimpleCommand "echo" "1"]
       [SimpleCommand "cat"]
   [CompoundListCondition, None]
+    [ForLoop "item", Async]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "unreachable"]
+  [CompoundListCondition, None]
     [SimpleCommand "wait"]
 [Word
   Unquoted "echo"
@@ -34,6 +39,27 @@
 ]
 [Word
   Unquoted "cat"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "item"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreachable"
+]
+[Word
+  Unquoted "done"
 ]
 [Word
   Unquoted "wait"

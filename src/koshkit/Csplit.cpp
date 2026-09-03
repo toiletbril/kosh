@@ -112,10 +112,9 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
   usize current_line = 0;
   u64 output_index = 0;
   let output_paths = ArrayList<String>{cxt.scratch_allocator()};
-  bool did_finish = false;
   defer
   {
-    if (!did_finish && !FLAG_CSPLIT_KEEP.is_enabled())
+    if (!FLAG_CSPLIT_KEEP.is_enabled())
       for (let const &path : output_paths)
         unused(os::remove_file(path.view()));
   };
@@ -245,7 +244,7 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
                          current_line, lines.count(),
                          FLAG_CSPLIT_SILENT.is_enabled(), output_paths))
     return 1;
-  did_finish = true;
+  output_paths.clear();
   return 0;
 }
 

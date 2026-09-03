@@ -214,7 +214,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A heredoc on the standard input passes its staged descriptor through this
      slot, and the guard closes it on any path that does not hand it off. */
   Maybe<os::descriptor> redirect_in_fd;
-  bool was_redirect_in_fd_handed_off = false;
   /* The standard fds are routed in source order so a later 2>&1 copies the
      descriptor its source points at now rather than the one a deferred slot
      would place last. */
@@ -227,9 +226,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   };
   defer
   {
-    if (!was_redirect_in_fd_handed_off && redirect_in_fd) {
-      os::close_fd(*redirect_in_fd);
-    }
+    if (redirect_in_fd) os::close_fd(*redirect_in_fd);
   };
 
   /* Set true just before a redirection resource failure throws, so the catch
@@ -633,7 +630,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       dup_saved_descriptors.push(saved);
       os::close_fd(*redirect_in_fd);
       redirect_in_fd = koshka::None;
-      was_redirect_in_fd_handed_off = true;
       if (!saved.is_dup2_ok)
         throw ErrorWithLocation{source_location(), "Bad file descriptor"};
     }
@@ -687,9 +683,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         (definition_info->defining_runtime.mood != cxt.mood() ||
          definition_info->defining_runtime.warning_level !=
              cxt.warning_level() ||
-         definition_info->defining_runtime.is_diagnostics_disabled !=
+         definition_info->defining_runtime.is_diagnostics_disabled() !=
              cxt.diagnostics_disabled() ||
-         definition_info->defining_runtime.is_annoying_diagnostics_enabled !=
+         definition_info->defining_runtime.is_annoying_diagnostics_enabled() !=
              cxt.annoying_diagnostics_enabled());
     Maybe<function_runtime_state> saved_runtime_state = None;
     if (needs_state_swap) {
@@ -776,8 +772,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The exec context now owns and closes the staged input descriptor. The
      stdout and stderr redirects already took effect on the real shell fds. */
-  if (redirect_in_fd) ec.in_fd = redirect_in_fd;
-  was_redirect_in_fd_handed_off = true;
+  if (redirect_in_fd) ec.in_fd = redirect_in_fd.take();
 
   let const ret = utils::execute_context(
       steal(ec), cxt,

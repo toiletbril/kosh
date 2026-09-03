@@ -677,6 +677,7 @@ public:
   pure fn source_end_position() const wontthrow -> usize;
   fn set_source_end_position(usize position) wontthrow -> void;
   fn evaluate(EvalContext &cxt) const throws -> i64;
+  fn evaluate_status(EvalContext &cxt) const throws -> status_result;
 
   Expression(const Expression &) = delete;
   Expression(Expression &&) noexcept = delete;
@@ -731,6 +732,8 @@ public:
 
 protected:
   virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
+  virtual fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result;
 
   SourceLocation m_location;
   /* This sits in the hole the twelve-byte location leaves, and a source beyond
@@ -849,11 +852,31 @@ public:
   virtual fn redirect_to(usize d, String &f, bool duplicate) throws -> void;
 
 protected:
-  bool m_is_async{false};
-  bool m_is_negated{false};
-  bool m_is_timed{false};
-  bool m_is_time_posix_format{false};
-  bool m_should_time_report_rss{false};
+  fn append_ast_execution_flags(String &label) const throws -> void;
+
+  enum class ExecutionFlag : u8
+  {
+    Async = 1U << 0,
+    Negated = 1U << 1,
+    Timed = 1U << 2,
+    TimePosixFormat = 1U << 3,
+    TimeReportRss = 1U << 4,
+  };
+
+  pure fn has_execution_flag(ExecutionFlag flag) const wontthrow -> bool
+  {
+    return (m_execution_flags & static_cast<u8>(flag)) != 0;
+  }
+  fn set_execution_flag(ExecutionFlag flag, bool enabled = true) wontthrow
+      -> void
+  {
+    if (enabled)
+      m_execution_flags |= static_cast<u8>(flag);
+    else
+      m_execution_flags &= static_cast<u8>(~static_cast<u8>(flag));
+  }
+
+  u8 m_execution_flags{0};
   /* The keyword is always the literal `time` in the source the command itself
      is stamped with, so the length and the source name are recovered and only
      the position is retained. */
@@ -1044,6 +1067,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   Kind m_kind;
   const Command *m_cmd;
@@ -1079,6 +1104,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   ArrayList<const CompoundListCondition *> m_nodes{heap_allocator()};
 };
@@ -1171,6 +1198,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   ArrayList<if_branch> m_branches{heap_allocator()};
   const Expression *m_otherwise;
@@ -1204,6 +1233,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   const Expression *m_condition;
   const Expression *m_body;
@@ -1232,6 +1263,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   /* The name is a slice of the arena that holds this node. */
   StringView m_variable_name;
@@ -1271,6 +1304,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   const Token *m_word;
   ArrayList<case_item> m_items{heap_allocator()};
@@ -1292,6 +1327,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   const Expression *m_body;
 };
@@ -1389,6 +1426,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   /* The source position of the first byte of the init clause, so each clause
      base is recovered from the lengths that precede it. */
@@ -1428,6 +1467,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   /* The name is a slice of the arena that holds this node. */
   StringView m_variable_name;
@@ -1451,6 +1492,8 @@ public:
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_status_impl(EvalContext &cxt) const throws
+      -> status_result override;
 
   const Command *m_child;
   SparseList<Redirection> m_redirections{};

@@ -68,11 +68,17 @@ cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 
 hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
   ASSERT(m_nodes.count() > 0);
 
-  static const i64 NOTHING_WAS_EXECUTED = -256;
+  static const i32 NOTHING_WAS_EXECUTED = -256;
 
-  i64 ret = NOTHING_WAS_EXECUTED;
+  status_result ret{NOTHING_WAS_EXECUTED, 0};
 
   /* Only the last node yields the list's status, so a terminal exec rides into
      that node alone. */
@@ -130,14 +136,14 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         !is_end_of_and_or_chain || n->is_negated();
     /* In bash mood an evaluation error fails the command and the list goes on,
        while a script-fatal error still aborts the run. */
-    let const do_run_node = [&]() throws -> i64 {
+    let const do_run_node = [&]() throws -> status_result {
       if (should_ignore_errexit) cxt.enter_condition();
       defer
       {
         if (should_ignore_errexit) cxt.leave_condition();
       };
       try {
-        return n->evaluate(cxt);
+        return n->evaluate_status(cxt);
       } catch (const InterruptErrorWithLocation &) {
         throw;
       } catch (ErrorWithLocation &error) {
@@ -164,7 +170,9 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
           }
           error.set_rendered();
         }
-        SET_AND_RETURN_EXIT_STATUS(cxt, error.command_status());
+        return {static_cast<i32>(
+                    set_and_return_exit_status(cxt, error.command_status())),
+                0};
       } catch (const ErrorBase &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) {
           throw;
@@ -175,7 +183,9 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         const String *source = cxt.current_source();
         show_message(error.to_string(
             source != nullptr ? source->view() : StringView{}, &cxt));
-        SET_AND_RETURN_EXIT_STATUS(cxt, error.command_status());
+        return {static_cast<i32>(
+                    set_and_return_exit_status(cxt, error.command_status())),
+                0};
       }
     };
     switch (n->kind()) {
@@ -185,14 +195,14 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
       break;
 
     case CompoundListCondition::Kind::Or:
-      if (ret != 0) {
+      if (ret.status != 0) {
         ret = do_run_node();
         did_execute = true;
       }
       break;
 
     case CompoundListCondition::Kind::And:
-      if (ret == 0) {
+      if (ret.status == 0) {
         ret = do_run_node();
         did_execute = true;
       }
@@ -208,24 +218,30 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
        negates. */
     const bool was_command_failure_uncaught =
         !cxt.in_condition() && did_execute && !n->is_negated() &&
-        is_end_of_and_or_chain && ret != 0 && ret != NOTHING_WAS_EXECUTED;
+        is_end_of_and_or_chain && ret.status != 0 &&
+        ret.status != NOTHING_WAS_EXECUTED &&
+        !ret.has(status_flag::ErrResolved);
 
     if (was_command_failure_uncaught && !cxt.is_posix_mode()) {
-      cxt.set_last_exit_status(static_cast<i32>(ret));
-      cxt.run_named_trap(StringView{"ERR", 3});
+      cxt.set_last_exit_status(ret.status);
+      if (cxt.should_run_err_trap()) cxt.run_named_trap(StringView{"ERR", 3});
     }
 
     if (cxt.error_exit() && was_command_failure_uncaught) {
-      cxt.set_last_exit_status(static_cast<i32>(ret));
+      cxt.set_last_exit_status(ret.status);
       if (cxt.in_subshell()) {
-        cxt.request_exit(ret, source_location());
+        cxt.request_exit(ret.status, source_location());
         break;
       }
-      utils::quit(static_cast<i32>(ret), utils::farewell_policy::Goodbye);
+      utils::quit(ret.status, utils::farewell_policy::Goodbye);
     }
+
+    if (did_execute && ret.status != 0) ret.set(status_flag::ErrResolved);
   }
 
-  return ret == NOTHING_WAS_EXECUTED ? 0 : ret;
+  if (ret.status == NOTHING_WAS_EXECUTED) ret.status = 0;
+
+  return ret;
 }
 
 CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
@@ -283,6 +299,12 @@ cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
 hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
     -> i64
 {
+  return evaluate_status_impl(cxt).status;
+}
+
+hot fn CompoundListCondition::evaluate_status_impl(
+    EvalContext &cxt) const throws -> status_result
+{
   ASSERT(m_cmd != nullptr);
   cxt.begin_command_evaluation();
 
@@ -301,7 +323,7 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
     start_nanos = os::monotonic_nanos();
   }
 
-  let status = m_cmd->evaluate(cxt);
+  let result = m_cmd->evaluate_status(cxt);
 
   if (m_cmd->is_timed()) {
     let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
@@ -327,11 +349,11 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
 
   /* A pipeline prefixed with ! reports the inverse of its status. */
   if (m_cmd->is_negated()) {
-    status = (status == 0) ? 1 : 0;
-    cxt.set_last_exit_status(static_cast<i32>(status));
+    result.status = (result.status == 0) ? 1 : 0;
+    cxt.set_last_exit_status(result.status);
   }
 
-  return status;
+  return result;
 }
 
 Pipeline::Pipeline(SourceLocation location) : Command(steal(location)) {}
@@ -354,7 +376,7 @@ fn Pipeline::append_command(const Command *node) throws -> void
 cold fn Pipeline::to_string() const throws -> String
 {
   let s = String{"Pipeline"};
-  if (is_async()) s += ", Async";
+  append_ast_execution_flags(s);
   return s;
 }
 

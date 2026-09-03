@@ -15,3 +15,11 @@ trap 'echo R' RETURN
 f
 echo "rc=$?"
 trap - RETURN
+echo "== GUARDED LOOP =="
+set --mood bash
+trap 'echo unexpected' ERR
+for item in one two; do
+  false && echo unreachable
+done
+echo "rc=$?"
+trap - ERR

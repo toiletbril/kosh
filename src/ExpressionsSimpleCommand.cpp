@@ -300,7 +300,9 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 cold fn AssignCommand::to_string() const throws -> String
 {
-  return "Assign " + m_assignment->to_ast_string();
+  let result = "Assign " + m_assignment->to_ast_string();
+  append_ast_execution_flags(result);
+  return result;
 }
 
 fn AssignCommand::can_evaluate_in_process_substitution(
@@ -713,7 +715,7 @@ cold fn SimpleCommand::to_string() const throws -> String
       s += "\"";
     }
   }
-  if (is_async()) s += ", Async";
+  append_ast_execution_flags(s);
 
   return s;
 }

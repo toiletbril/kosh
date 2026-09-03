@@ -476,13 +476,10 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
 
 hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
-  /* The check runs before every node, so a running command stops promptly and
-     control returns to the prompt. */
   if (os::INTERRUPT_REQUESTED) {
     os::INTERRUPT_REQUESTED = 0;
     throw InterruptErrorWithLocation{source_location()};
   }
-  /* A trapped signal runs its action here at the command boundary. */
   if (os::SIGNAL_PENDING) cxt.run_pending_traps();
   cxt.add_evaluated_expression();
   if (is_compound_command()) {
@@ -500,6 +497,42 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
     }
     throw;
   }
+}
+
+hot flatten fn Expression::evaluate_status(EvalContext &cxt) const throws
+    -> status_result
+{
+  /* The check runs before every node, so a running command stops promptly and
+     control returns to the prompt. */
+  if (os::INTERRUPT_REQUESTED) {
+    os::INTERRUPT_REQUESTED = 0;
+    throw InterruptErrorWithLocation{source_location()};
+  }
+  /* A trapped signal runs its action here at the command boundary. */
+  if (os::SIGNAL_PENDING) cxt.run_pending_traps();
+  cxt.add_evaluated_expression();
+  if (is_compound_command()) {
+    let const command = static_cast<const CompoundCommand *>(this);
+    if (command->is_async())
+      return {static_cast<i32>(command->evaluate_async(cxt)), 0};
+  }
+  try {
+    return evaluate_status_impl(cxt);
+  } catch (InterruptErrorWithLocation &error) {
+    let const location = error.location();
+    if (location.position == 0 && location.length == 0 &&
+        location.source_name_index == 0)
+    {
+      error.set_location(source_location());
+    }
+    throw;
+  }
+}
+
+fn Expression::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
+{
+  return {static_cast<i32>(evaluate_impl(cxt)), 0};
 }
 
 fn Expression::operator delete(opaque *pointer) wontthrow -> void
@@ -2040,24 +2073,44 @@ cold fn IfStatement::to_ast_string(usize layer) const throws -> String
 
 Command::Command(SourceLocation location) : Expression(steal(location)) {}
 
-fn Command::make_async() wontthrow -> void { m_is_async = true; }
+fn Command::make_async() wontthrow -> void
+{
+  set_execution_flag(ExecutionFlag::Async);
+}
 
-pure fn Command::is_async() const wontthrow -> bool { return m_is_async; }
+pure fn Command::is_async() const wontthrow -> bool
+{
+  return has_execution_flag(ExecutionFlag::Async);
+}
 
-fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
+fn Command::append_ast_execution_flags(String &label) const throws -> void
+{
+  if (is_async()) label += ", Async";
+}
 
-pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
+fn Command::set_negated() wontthrow -> void
+{
+  set_execution_flag(ExecutionFlag::Negated);
+}
+
+pure fn Command::is_negated() const wontthrow -> bool
+{
+  return has_execution_flag(ExecutionFlag::Negated);
+}
 
 fn Command::set_timed(bool posix_format, bool should_report_rss,
                       SourceLocation location) wontthrow -> void
 {
-  m_is_timed = true;
-  m_is_time_posix_format = posix_format;
-  m_should_time_report_rss = should_report_rss;
+  set_execution_flag(ExecutionFlag::Timed);
+  set_execution_flag(ExecutionFlag::TimePosixFormat, posix_format);
+  set_execution_flag(ExecutionFlag::TimeReportRss, should_report_rss);
   m_time_position = location.position;
 }
 
-pure fn Command::is_timed() const wontthrow -> bool { return m_is_timed; }
+pure fn Command::is_timed() const wontthrow -> bool
+{
+  return has_execution_flag(ExecutionFlag::Timed);
+}
 
 pure fn Command::time_location() const wontthrow -> SourceLocation
 {
@@ -2069,12 +2122,12 @@ pure fn Command::time_location() const wontthrow -> SourceLocation
 
 pure fn Command::time_uses_posix_format() const wontthrow -> bool
 {
-  return m_is_time_posix_format;
+  return has_execution_flag(ExecutionFlag::TimePosixFormat);
 }
 
 pure fn Command::should_time_report_rss() const wontthrow -> bool
 {
-  return m_should_time_report_rss;
+  return has_execution_flag(ExecutionFlag::TimeReportRss);
 }
 
 fn Command::set_local_vars(ArrayList<PrefixAssignment> &&vars) throws -> void

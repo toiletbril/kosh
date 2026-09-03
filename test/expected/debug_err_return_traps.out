@@ -37,6 +37,23 @@
     [SimpleCommand "echo" "rc=$?"]
   [CompoundListCondition, None]
     [SimpleCommand "trap" "-" "RETURN"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== GUARDED LOOP =="]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "bash"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo unexpected" "ERR"]
+  [CompoundListCondition, None]
+    [ForLoop "item"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+        [CompoundListCondition, &&]
+          [SimpleCommand "echo" "unreachable"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "ERR"]
 [Word
   Unquoted "echo"
 ]
@@ -158,6 +175,76 @@
 [Word
   Unquoted "RETURN"
 ]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== GUARDED LOOP =="
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "bash"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "echo unexpected"
+]
+[Word
+  Unquoted "ERR"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "item"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreachable"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "ERR"
+]
 == DEBUG ==
 D
 one
@@ -170,4 +257,6 @@ E
 body
 R
 rc=7
+== GUARDED LOOP ==
+rc=1
 [Code 0]

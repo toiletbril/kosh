@@ -66,33 +66,33 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const should_reclaim =
       cxt.shell_is_interactive() && os::shell_has_controlling_terminal();
-  let should_reclaim_after_wait = should_reclaim && job->process_group_id > 0;
+  let const should_reclaim_after_wait =
+      should_reclaim && job->process_group_id > 0;
+  let const do_resume_job = [&]() throws {
+    if (job->state == job::State::Stopped) {
+      if (const Maybe<i32> cont = os::signal_number_from_name("CONT")) {
+        if (job->is_primary_process_active) os::signal_process(job->pid, *cont);
+        for (let const process : job->earlier_pipeline_processes)
+          os::signal_process(process, *cont);
+      }
+      job->state = job::State::Running;
+    }
+  };
+
+  let was_stopped = false;
+  i32 status;
   if (should_reclaim_after_wait) {
     LOG(Debug,
         "fg will give the terminal to process group %lld before it resumes job "
         "%d",
         static_cast<long long>(job->process_group_id), job->id);
     os::give_controlling_terminal_to_process_group(job->process_group_id);
-  }
-  defer
-  {
-    if (should_reclaim_after_wait) os::reclaim_controlling_terminal();
-  };
-
-  if (job->state == job::State::Stopped) {
-    if (const Maybe<i32> cont = os::signal_number_from_name("CONT")) {
-      if (job->is_primary_process_active) os::signal_process(job->pid, *cont);
-      for (let const process : job->earlier_pipeline_processes)
-        os::signal_process(process, *cont);
-    }
-    job->state = job::State::Running;
-  }
-
-  let was_stopped = false;
-  let const status = cxt.wait_for_job_processes(*job, &was_stopped);
-  if (should_reclaim_after_wait) {
-    os::reclaim_controlling_terminal();
-    should_reclaim_after_wait = false;
+    defer { os::reclaim_controlling_terminal(); };
+    do_resume_job();
+    status = cxt.wait_for_job_processes(*job, &was_stopped);
+  } else {
+    do_resume_job();
+    status = cxt.wait_for_job_processes(*job, &was_stopped);
   }
 
   if (was_stopped) {

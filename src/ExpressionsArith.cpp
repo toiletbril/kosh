@@ -29,7 +29,9 @@ ConditionalCommand::~ConditionalCommand() = default;
 
 cold fn ConditionalCommand::to_string() const throws -> String
 {
-  return "ConditionalCommand";
+  let result = String{"ConditionalCommand"};
+  append_ast_execution_flags(result);
+  return result;
 }
 
 cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
@@ -501,8 +503,9 @@ cold fn ArithmeticCommand::to_string() const throws -> String
 
 cold fn ArithmeticCommand::to_ast_string(usize layer) const throws -> String
 {
-  return indent_for_layer(layer) + "[" + to_string() + " \"" + m_expression +
-         "\"]";
+  let label = to_string() + " \"" + m_expression + "\"";
+  append_ast_execution_flags(label);
+  return indent_for_layer(layer) + "[" + label + "]";
 }
 
 static pure fn is_blank_clause(StringView text) wontthrow -> bool
@@ -647,12 +650,20 @@ cold fn CStyleForLoop::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
   let const pad = indent_for_layer(layer);
-  return pad + "[" + to_string() + " \"" + m_init + ";" + m_condition + ";" +
-         m_step + "\"]\n" + pad + EXPRESSION_AST_INDENT +
+  let label =
+      to_string() + " \"" + m_init + ";" + m_condition + ";" + m_step + "\"";
+  append_ast_execution_flags(label);
+  return pad + "[" + label + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
 
 fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  return evaluate_status_impl(cxt).status;
+}
+
+fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
 {
   ASSERT(m_body != nullptr);
 
@@ -663,7 +674,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (m_is_fully_eliminated && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
     cxt.publish_single_pipe_status(0);
-    SET_AND_RETURN_EXIT_STATUS(cxt, 0);
+    return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
   cxt.set_current_location(source_location());
@@ -690,7 +701,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
         m_condition, cache.tokens, cache.is_tokenized, cache.is_simple);
   };
 
-  i64 ret = 0;
+  status_result result{};
   /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (condition_is_blank ||
          (m_folded_condition.has_value() && can_skip_condition_commands
@@ -699,7 +710,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
                      : *m_folded_condition != 0)
               : do_evaluate_condition()))
   {
-    ret = m_body->evaluate(cxt);
+    result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
@@ -710,7 +721,8 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
           m_step, cache.tokens, cache.is_tokenized, cache.is_simple);
     }
   }
-  SET_AND_RETURN_EXIT_STATUS(cxt, ret);
+  cxt.set_last_exit_status(result.status);
+  return result;
 }
 
 fn CStyleForLoop::analyze(AnalysisContext &actx,
@@ -804,7 +816,12 @@ Subshell::~Subshell() = default;
 
 fn Subshell::as_subshell() const wontthrow -> const Subshell * { return this; }
 
-cold fn Subshell::to_string() const throws -> String { return "Subshell"; }
+cold fn Subshell::to_string() const throws -> String
+{
+  let result = String{"Subshell"};
+  append_ast_execution_flags(result);
+  return result;
+}
 
 cold fn Subshell::to_ast_string(usize layer) const throws -> String
 {
@@ -1069,6 +1086,7 @@ cold fn FunctionDefinition::to_string() const throws -> String
   let result = String{"FunctionDefinition \""};
   result += StringView{m_name};
   result += "\"";
+  append_ast_execution_flags(result);
   return result;
 }
 
@@ -1230,7 +1248,9 @@ RedirectedCommand::~RedirectedCommand() = default;
 
 cold fn RedirectedCommand::to_string() const throws -> String
 {
-  return "RedirectedCommand";
+  let result = String{"RedirectedCommand"};
+  append_ast_execution_flags(result);
+  return result;
 }
 
 cold fn RedirectedCommand::to_ast_string(usize layer) const throws -> String
@@ -1268,6 +1288,12 @@ fn RedirectedCommand::analyze(AnalysisContext &actx,
 }
 
 fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  return evaluate_status_impl(cxt).status;
+}
+
+fn RedirectedCommand::evaluate_status_impl(EvalContext &cxt) const throws
+    -> status_result
 {
   ASSERT(m_child != nullptr);
 
@@ -1352,8 +1378,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
-  let const result = m_child->evaluate(cxt);
-  return result;
+  return m_child->evaluate_status(cxt);
 }
 
 UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)

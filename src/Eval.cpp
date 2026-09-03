@@ -154,10 +154,9 @@ fn EvalContext::set_field_separators(StringView value) throws -> void
   LOG(Debug, "caching %zu field separator bytes", value.length);
   /* The table is built before m_field_separators is touched, since value may
      alias the buffer the assignment below rewrites. */
-  for (usize i = 0; i < 256; i++)
-    m_field_separator_table[i] = false;
+  m_field_separator_table.reset(256);
   for (usize i = 0; i < value.length; i++)
-    m_field_separator_table[static_cast<u8>(value.data[i])] = true;
+    m_field_separator_table.set(static_cast<u8>(value.data[i]));
   if (value.data != m_field_separators.data()) {
     m_field_separators.clear();
     m_field_separators.append(value);
@@ -536,7 +535,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
 
   let const should_demote = strict_diagnostics_are_warnings();
   if (error_unset() &&
-      (m_runtime.was_error_unset_set_explicitly || !should_demote) &&
+      (m_runtime.was_error_unset_set_explicitly() || !should_demote) &&
       !is_warning_suppressed(suppressible_warning::UnsetTestOperand))
   {
     let const message = "Unable to expand '" + String{name} +

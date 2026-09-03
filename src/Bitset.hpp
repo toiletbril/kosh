@@ -53,6 +53,28 @@ public:
            0;
   }
 
+  hot fn set(usize index, bool value = true) wontthrow -> void
+  {
+    ASSERT(index < m_length, "bit index is past the end");
+    let const mask = u64{1} << (index % BITS_PER_WORD);
+    let &word = m_words[index / BITS_PER_WORD];
+    if (value)
+      word |= mask;
+    else
+      word &= ~mask;
+  }
+
+  fn reset(usize bit_count) throws -> void
+  {
+    m_words.clear();
+    m_length = 0;
+    let const word_count =
+        bit_count / BITS_PER_WORD + (bit_count % BITS_PER_WORD != 0 ? 1 : 0);
+    for (usize i = 0; i < word_count; i++)
+      m_words.push(0);
+    m_length = bit_count;
+  }
+
   mustuse pure fn count() const wontthrow -> usize { return m_length; }
   mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
 

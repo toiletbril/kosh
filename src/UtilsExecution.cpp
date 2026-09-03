@@ -212,18 +212,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   }
 
   LOG(Debug, "waiting for the foreground child to finish");
-  let should_reclaim_after_wait = is_foreground_job;
-  if (should_reclaim_after_wait) os::give_controlling_terminal_to(p);
-  defer
-  {
-    if (should_reclaim_after_wait) os::reclaim_controlling_terminal();
-  };
   let was_stopped = false;
-  const i32 foreground_status = os::wait_and_monitor_process(
-      p, is_foreground_job ? &was_stopped : nullptr);
-  if (should_reclaim_after_wait) {
-    os::reclaim_controlling_terminal();
-    should_reclaim_after_wait = false;
+  i32 foreground_status;
+  if (is_foreground_job) {
+    os::give_controlling_terminal_to(p);
+    defer { os::reclaim_controlling_terminal(); };
+    foreground_status = os::wait_and_monitor_process(p, &was_stopped);
+  } else {
+    foreground_status = os::wait_and_monitor_process(p);
   }
   if (was_stopped) {
     const i32 id = cxt.register_stopped_job(p, command, foreground_status,
