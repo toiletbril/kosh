@@ -170,6 +170,12 @@ public:
 #define steal        std::move
 #define mustuse      [[nodiscard]]
 
+#if defined __has_cpp_attribute && __has_cpp_attribute(no_unique_address)
+#define notunique [[no_unique_address]]
+#else
+#define notunique
+#endif
+
 #define fn   auto
 #define let  auto
 #define loop for (;;)

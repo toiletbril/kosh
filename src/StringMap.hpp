@@ -202,7 +202,7 @@ private:
     State state{Empty};
     u64 hash{0};
     String key{};
-    [[no_unique_address]] Value value{};
+    notunique Value value{};
   };
 
   static constexpr usize NO_INDEX = static_cast<usize>(-1);
