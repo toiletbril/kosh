@@ -9,6 +9,8 @@ echo "== command position through sudo:"
 "$BIN" --debug-complete-at 'sudo expor' </dev/null
 echo "== inner builtin args through env and an assignment:"
 "$BIN" --debug-complete-at 'env FOO=bar set -o no' </dev/null
+echo "== command position through time options:"
+"$BIN" --debug-complete-at 'time -p -R expor' </dev/null
 echo "== command position through timeout:"
 "$BIN" --debug-complete-at 'timeout -s TERM 1 expor' </dev/null
 echo "== quoted and escaped timeout options stay transparent:"

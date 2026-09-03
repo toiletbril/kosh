@@ -40,3 +40,9 @@ COMP_WORDS=(koshkit whoami --h)
 COMP_CWORD=2
 _koshkit_complete
 printf 'whoami-help=<%s>\n' "${COMPREPLY[0]}"
+
+if complete -p time | grep -q -- '-R'; then
+  echo time-completion=registered
+else
+  echo time-completion=missing
+fi

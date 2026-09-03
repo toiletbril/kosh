@@ -497,6 +497,7 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
   bool should_negate_pending = false;
   bool should_time_pending = false;
   bool is_time_posix_format = false;
+  bool should_time_report_rss = false;
   SourceLocation time_location{};
   Maybe<usize> active_shellcheck_suppression{};
 
@@ -513,8 +514,11 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
       should_negate_pending = false;
     }
     if (should_time_pending) {
-      pending->set_timed(is_time_posix_format, time_location);
+      pending->set_timed(is_time_posix_format, should_time_report_rss,
+                         time_location);
       should_time_pending = false;
+      is_time_posix_format = false;
+      should_time_report_rss = false;
     }
     compound_list->append_node(m_lexer.arena().create<CompoundListCondition>(
         at->source_location(), next_cond, pending));
@@ -564,16 +568,31 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
         if (!is_first_source_command)
           active_shellcheck_suppression = m_shellcheck_suppressions.count() - 1;
       }
+      const Token *leading_command_token = nullptr;
       if (maybe_time->kind() == Token::Kind::Time) {
         time_location = maybe_time->source_location();
         m_lexer.advance_past_last_peek();
-        should_time_pending = true;
-        Token *maybe_posix = m_lexer.peek_shell_token();
-        if (is_unquoted_word(maybe_posix, "-p") ||
-            is_unquoted_word(maybe_posix, "--posix"))
+        Token *maybe_option = m_lexer.peek_shell_token();
+        if (m_lexer.mood() == mimic_mood::Default &&
+            is_unquoted_word(maybe_option, "--help"))
         {
-          m_lexer.advance_past_last_peek();
-          is_time_posix_format = true;
+          leading_command_token = maybe_time;
+        } else {
+          should_time_pending = true;
+          loop
+          {
+            if (is_unquoted_word(maybe_option, "-p") ||
+                is_unquoted_word(maybe_option, "--posix"))
+            {
+              is_time_posix_format = true;
+            } else if (is_unquoted_word(maybe_option, "-R")) {
+              should_time_report_rss = true;
+            } else {
+              break;
+            }
+            m_lexer.advance_past_last_peek();
+            maybe_option = m_lexer.peek_shell_token();
+          }
         }
       }
       Token *maybe_negation = m_lexer.peek_shell_token();
@@ -582,7 +601,7 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
         m_lexer.advance_past_last_peek();
         should_negate_pending = true;
       }
-      lhs = parse_simple_command();
+      lhs = parse_simple_command(leading_command_token);
     } else {
       should_parse_command = true;
     }
@@ -1150,7 +1169,8 @@ enum class command_position_word : u8
 /* Returns a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position starts a compound
    command. */
-hot fn Parser::parse_simple_command() throws -> Command *
+hot fn Parser::parse_simple_command(const Token *leading_token) throws
+    -> Command *
 {
   Maybe<SourceLocation> source_location;
   let const arena_allocator = bump_allocator(m_lexer.arena());
@@ -1158,6 +1178,11 @@ hot fn Parser::parse_simple_command() throws -> Command *
   let local_vars = ArrayList<PrefixAssignment>{heap_allocator()};
   let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
   let redirections = ArrayList<expressions::Redirection>{heap_allocator()};
+
+  if (leading_token != nullptr) {
+    source_location = leading_token->source_location();
+    args_accumulator.push(leading_token);
+  }
 
   let const do_build_command = [&]() -> Command * {
     if (!source_location) return nullptr;

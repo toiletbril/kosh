@@ -92,3 +92,8 @@ globstar
 -n
 -r
 -s
+== time flags:
+--help
+--posix
+-R
+-p

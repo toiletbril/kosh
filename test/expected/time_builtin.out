@@ -1,0 +1,6 @@
+runtime-mood-rss=2
+kosh-rss=1
+zero-rss=1
+builtin-rss=1
+posix-real=1 posix-rss=1
+bash-custom=1 bash-rss=1

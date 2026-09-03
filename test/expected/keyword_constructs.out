@@ -20,6 +20,8 @@ esac	keyword
 function	keyword
 f	function-name
 time	keyword
+-p	flag
+-R	flag
 then	invalid-syntax
 done	invalid-syntax
 fi	invalid-syntax

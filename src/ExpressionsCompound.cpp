@@ -296,10 +296,8 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
   double user_before = 0.0;
   double system_before = 0.0;
   u64 start_nanos = 0;
-  u64 rss_before = 0;
   if (m_cmd->is_timed()) {
     os::children_cpu_seconds(user_before, system_before);
-    rss_before = os::children_peak_rss_bytes();
     start_nanos = os::monotonic_nanos();
   }
 
@@ -315,15 +313,11 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
         static_cast<double>(elapsed_nanos) / 1000000000.0;
     let const user_cpu = user_after - user_before;
     let const system_cpu = system_after - system_before;
-    let const peak_rss_bytes = rss_after > rss_before ? rss_after : 0;
 
-    /* The -p form prints the posix report and ignores TIMEFORMAT. Otherwise a
-       set TIMEFORMAT drives the format, an empty value prints nothing, and an
-       unset value keeps the pretty default. */
     let const time_format = cxt.get_variable_value("TIMEFORMAT");
     let const report = utils::format_time_report(
-        m_cmd->time_uses_posix_format(), time_format, real_seconds, user_cpu,
-        system_cpu, peak_rss_bytes);
+        m_cmd->time_uses_posix_format(), m_cmd->should_time_report_rss(),
+        time_format, real_seconds, user_cpu, system_cpu, rss_after);
 
     if (!report.is_empty()) {
       print_error(report);

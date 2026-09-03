@@ -994,6 +994,17 @@ control the annoying tier, the analysis stage, extended arithmetic, and bundled
 command lookup. A command substitution restores every set option when it
 finishes.
 .TP
+.B "time [\-p|\-\-posix] [\-R] command [argument ...]"
+The command or pipeline is timed. The
+.B \-p
+and
+.B \-\-posix
+options select the POSIX report. The default report includes the peak resident
+set size when the platform supplies a nonzero value. The
+.B \-R
+option always adds the same row, including when TIMEFORMAT selects a custom or
+empty report.
+.TP
 .B enable
 Every builtin remains enabled. The
 .BR \-d ,

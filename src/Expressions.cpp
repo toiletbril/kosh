@@ -2048,11 +2048,12 @@ fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
 
 pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
-fn Command::set_timed(bool posix_format, SourceLocation location) wontthrow
-    -> void
+fn Command::set_timed(bool posix_format, bool should_report_rss,
+                      SourceLocation location) wontthrow -> void
 {
   m_is_timed = true;
   m_is_time_posix_format = posix_format;
+  m_should_time_report_rss = should_report_rss;
   m_time_position = location.position;
 }
 
@@ -2069,6 +2070,11 @@ pure fn Command::time_location() const wontthrow -> SourceLocation
 pure fn Command::time_uses_posix_format() const wontthrow -> bool
 {
   return m_is_time_posix_format;
+}
+
+pure fn Command::should_time_report_rss() const wontthrow -> bool
+{
+  return m_should_time_report_rss;
 }
 
 fn Command::set_local_vars(ArrayList<PrefixAssignment> &&vars) throws -> void

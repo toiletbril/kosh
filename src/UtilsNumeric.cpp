@@ -82,8 +82,8 @@ fn format_minutes_seconds(double seconds) throws -> String
   return String{buffer};
 }
 
-fn format_time_report_posix(double real_seconds, double user_seconds,
-                            double system_seconds) throws -> String
+static fn format_time_report_posix(double real_seconds, double user_seconds,
+                                   double system_seconds) throws -> String
 {
   char buffer[64];
   let report = String{heap_allocator()};
@@ -99,9 +99,8 @@ fn format_time_report_posix(double real_seconds, double user_seconds,
   return report;
 }
 
-fn format_time_report_pretty(double real_seconds, double user_seconds,
-                             double system_seconds, u64 peak_rss_bytes) throws
-    -> String
+static fn format_time_report_pretty(double real_seconds, double user_seconds,
+                                    double system_seconds) throws -> String
 {
   const double cpu_percent =
       real_seconds > 0.0
@@ -116,17 +115,12 @@ fn format_time_report_pretty(double real_seconds, double user_seconds,
   std::snprintf(buffer, sizeof(buffer), "  cpu    %.0f%%\n", cpu_percent);
   report += buffer;
 
-  if (peak_rss_bytes > 0)
-    report += "  rss    " +
-              koshkit::format_human_size(peak_rss_bytes, heap_allocator()) +
-              "\n";
-
   return report;
 }
 
-fn format_time_report_custom(StringView format, double real_seconds,
-                             double user_seconds, double system_seconds) throws
-    -> String
+static fn format_time_report_custom(StringView format, double real_seconds,
+                                    double user_seconds,
+                                    double system_seconds) throws -> String
 {
   let report = String{heap_allocator()};
 
@@ -210,20 +204,33 @@ fn format_time_report_custom(StringView format, double real_seconds,
   return report;
 }
 
-fn format_time_report(bool should_use_posix_format,
+fn format_time_report(bool should_use_posix_format, bool should_report_rss,
                       const Maybe<String> &time_format, double real_seconds,
                       double user_seconds, double system_seconds,
                       u64 peak_rss_bytes) throws -> String
 {
-  if (should_use_posix_format)
-    return format_time_report_posix(real_seconds, user_seconds, system_seconds);
-  if (!time_format.has_value())
-    return format_time_report_pretty(real_seconds, user_seconds, system_seconds,
-                                     peak_rss_bytes);
-  if (time_format->is_empty()) return String{heap_allocator()};
+  let report = String{heap_allocator()};
+  let const should_use_pretty_format =
+      !should_use_posix_format && !time_format.has_value();
 
-  return format_time_report_custom(time_format->view(), real_seconds,
-                                   user_seconds, system_seconds);
+  if (should_use_posix_format) {
+    report =
+        format_time_report_posix(real_seconds, user_seconds, system_seconds);
+  } else if (should_use_pretty_format) {
+    report =
+        format_time_report_pretty(real_seconds, user_seconds, system_seconds);
+  } else if (!time_format->is_empty()) {
+    report = format_time_report_custom(time_format->view(), real_seconds,
+                                       user_seconds, system_seconds);
+  }
+
+  if (should_report_rss || (should_use_pretty_format && peak_rss_bytes > 0)) {
+    report += "  rss    " +
+              koshkit::format_human_size(peak_rss_bytes, heap_allocator()) +
+              "\n";
+  }
+
+  return report;
 }
 
 /* A newline offset table cached on one source, keyed on the source pointer and

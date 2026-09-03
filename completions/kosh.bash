@@ -134,6 +134,7 @@ _kosh_fc_complete()
 }
 
 complete -F _kosh_fc_complete fc
+complete -c -W '--help --posix -p -R' time
 
 _koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date \
 df dirname du env expand expr file find flock fold fuser getconf grep head id killall link ln locale \

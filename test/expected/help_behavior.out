@@ -4,3 +4,5 @@
        |       ^~~~
 note: Run `help` with no operand to list every builtin.
 rc=1
+== time routes help to its builtin:
+rc=0

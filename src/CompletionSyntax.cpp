@@ -262,6 +262,8 @@ pure fn is_in_command_position(StringView line, usize token_start) wontthrow
     return token_start == *managed_start;
   }
 
+  let const is_active_option =
+      token_start < line.length && line[token_start] == '-';
   let i = token_start;
   loop
   {
@@ -277,9 +279,9 @@ pure fn is_in_command_position(StringView line, usize token_start) wontthrow
     while (word_start > 0 && !is_word_separator(line[word_start - 1]) &&
            !is_command_separator(line[word_start - 1]))
       word_start--;
-    if (!is_transparent_command_prefix(
-            line.substring_of_length(word_start, i - word_start)))
-      return false;
+    let const word = line.substring_of_length(word_start, i - word_start);
+    if (is_active_option && word == "time") return false;
+    if (!is_transparent_command_prefix(word)) return false;
     i = word_start;
   }
 }
@@ -314,6 +316,7 @@ fn command_word_of(StringView line) wontthrow -> StringView
       i = k + 1;
     }
   }
+  let time_command = StringView{};
   loop
   {
     i = skip_blanks(line, i);
@@ -321,7 +324,12 @@ fn command_word_of(StringView line) wontthrow -> StringView
     while (i < line.length && line[i] != ' ' && line[i] != '\t')
       i++;
     let const word = line.substring_of_length(start, i - start);
-    if (word.is_empty() || !is_transparent_command_prefix(word)) return word;
+    if (word.is_empty()) return time_command;
+    if (word == "time") {
+      time_command = word;
+    } else if (!is_transparent_command_prefix(word)) {
+      return word;
+    }
   }
 }
 

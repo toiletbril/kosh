@@ -7,12 +7,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("command [argument ...]");
+HELP_SYNOPSIS_DECL("[-p|--posix] [-R] command [argument ...]");
 
 HELP_DESCRIPTION_DECL(
     "The time builtin runs a command and reports how long it took.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(TIME_POSIX, Bool, 'p', "posix", "Use the POSIX time report.");
+FLAG(TIME_RSS, Bool, 'R', "", "Always add the peak resident set size.");
 
 REGISTER_BUILTIN_FLAGS(Time);
 
@@ -24,25 +26,24 @@ pure fn Time::kind() const wontthrow -> Builtin::Kind { return Kind::Time; }
 
 cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  ASSERT(!ec.args().is_empty());
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
-  if (ec.args().count() > 1 && ec.args()[1] == "--help") {
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
-  }
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (ec.args().count() < 2) return 0;
+  ASSERT(!args.is_empty());
+
+  if (args.count() < 2) return 0;
 
   let command = String{cxt.scratch_allocator()};
-  for (usize i = 1; i < ec.args().count(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     if (i > 1) command.push(' ');
-    command.append(ec.args()[i].view());
+    command.append(args[i].view());
   }
 
   LOG(Debug, "time running command '%s' under the clock", command.c_str());
 
   double user_before = 0, system_before = 0;
   os::children_cpu_seconds(user_before, system_before);
-  let const rss_before = os::children_peak_rss_bytes();
 
   /* The tail-exec optimization would replace the shell process on the final
      command, so the report would never print. The flag is cleared around the
@@ -65,13 +66,11 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
   let const user_cpu = user_after - user_before;
   let const system_cpu = system_after - system_before;
-  let const peak_rss_bytes = rss_after > rss_before ? rss_after : 0;
 
-  /* An empty TIMEFORMAT prints nothing, an unset value keeps the pretty
-     default. */
   let const time_format = cxt.get_variable_value("TIMEFORMAT");
   let const report = utils::format_time_report(
-      false, time_format, real_seconds, user_cpu, system_cpu, peak_rss_bytes);
+      FLAG_TIME_POSIX.is_enabled(), FLAG_TIME_RSS.is_enabled(), time_format,
+      real_seconds, user_cpu, system_cpu, rss_after);
 
   if (!report.is_empty()) {
     koshka::print_error(report);

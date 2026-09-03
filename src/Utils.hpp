@@ -207,20 +207,11 @@ fn uint_to_text_into(u64 value, char *buffer, usize buffer_size) wontthrow
 
 fn format_minutes_seconds(double seconds) throws -> String;
 
-fn format_time_report_posix(double real_seconds, double user_seconds,
-                            double system_seconds) throws -> String;
-fn format_time_report_pretty(double real_seconds, double user_seconds,
-                             double system_seconds, u64 peak_rss_bytes) throws
-    -> String;
-
 /* The bash conversions are honored, %%, a literal percent, %[p][l]R, %[p][l]U,
    and %[p][l]S for the real, user, and system seconds, and %P for the cpu busy
    percent, where p is a precision from zero to six and l selects the minutes
    form. */
-fn format_time_report_custom(StringView format, double real_seconds,
-                             double user_seconds, double system_seconds) throws
-    -> String;
-fn format_time_report(bool should_use_posix_format,
+fn format_time_report(bool should_use_posix_format, bool should_report_rss,
                       const Maybe<String> &time_format, double real_seconds,
                       double user_seconds, double system_seconds,
                       u64 peak_rss_bytes) throws -> String;

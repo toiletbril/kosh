@@ -29,3 +29,5 @@ echo "== read flags:"
 "$BIN" --debug-complete-at 'read -' </dev/null
 echo "== fc flags:"
 "$BIN" --debug-complete-at 'fc -' </dev/null
+echo "== time flags:"
+"$BIN" --debug-complete-at 'builtin time -' </dev/null

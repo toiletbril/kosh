@@ -11,6 +11,8 @@ noexec
 noglob
 notify
 nounset
+== command position through time options:
+export
 == command position through timeout:
 export
 == quoted and escaped timeout options stay transparent:

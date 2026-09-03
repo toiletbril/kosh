@@ -834,9 +834,11 @@ public:
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
 
-  fn set_timed(bool posix_format, SourceLocation location) wontthrow -> void;
+  fn set_timed(bool posix_format, bool should_report_rss,
+               SourceLocation location) wontthrow -> void;
   pure fn is_timed() const wontthrow -> bool;
   pure fn time_uses_posix_format() const wontthrow -> bool;
+  pure fn should_time_report_rss() const wontthrow -> bool;
   pure fn time_location() const wontthrow -> SourceLocation;
 
   virtual fn is_assignment() const wontthrow -> bool;
@@ -851,6 +853,7 @@ protected:
   bool m_is_negated{false};
   bool m_is_timed{false};
   bool m_is_time_posix_format{false};
+  bool m_should_time_report_rss{false};
   /* The keyword is always the literal `time` in the source the command itself
      is stamped with, so the length and the source name are recovered and only
      the position is retained. */

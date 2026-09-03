@@ -7,7 +7,7 @@ tab=$(printf '\t')
     grep -E "${tab}keyword$"
 
 "$BIN" --debug-highlight-at \
-    'case x in y) :;; esac; [[ -n x ]]; function f { :; }; time echo hi' |
+    'case x in y) :;; esac; [[ -n x ]]; function f { :; }; time -p -R echo hi' |
     grep -E "${tab}(keyword|function-name|flag)$"
 
 "$BIN" --debug-highlight-at 'then; done; fi; esac; do echo a; in foo' |

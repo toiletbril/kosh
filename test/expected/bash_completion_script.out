@@ -14,3 +14,4 @@ rm-flags=<-r -R -f -i --dry-run>
 tail-flags=<-n -c>
 which-flags=<-a --all -q --quiet>
 whoami-help=<--help>
+time-completion=registered

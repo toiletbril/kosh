@@ -88,7 +88,8 @@ private:
   fn close_analysis_scope(usize scope_mark) throws
       -> ArrayList<analysis_scope_definition>;
 
-  mustuse fn parse_simple_command() throws -> Command *;
+  mustuse fn parse_simple_command(const Token *leading_token = nullptr) throws
+      -> Command *;
 
   fn recover_to_next_statement() throws -> void;
 

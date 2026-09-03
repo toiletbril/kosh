@@ -977,6 +977,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
   let pending_heredocs =
       ArrayList<heredoc_pending_highlight>{bump_allocator(HIGHLIGHT_ARENA)};
   let is_command_position = true;
+  let is_time_option_pending = false;
   let highlight_command_word = StringView{};
   let expecting_in = false;
   let for_variable_pending = false;
@@ -1023,6 +1024,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       if (c == '\n') {
         do_commit_pending_assignments();
         is_command_position = true;
+        is_time_option_pending = false;
         highlight_command_word = StringView{};
         i++;
         if (!pending_heredocs.is_empty()) {
@@ -1155,6 +1157,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
           (has_opener || (has_separator && !has_redirect)))
       {
         is_command_position = true;
+        is_time_option_pending = false;
         highlight_command_word = StringView{};
         expecting_in = false;
       }
@@ -1355,6 +1358,15 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
       return highlight_role::unknown_command;
     };
 
+    if (is_command_position && is_time_option_pending) {
+      if (word == "-p" || word == "--posix" || word == "-R" || word == "--help")
+      {
+        do_push(word_start, word_end, highlight_role::flag);
+        continue;
+      }
+      is_time_option_pending = false;
+    }
+
     if (!is_command_position && word.length > 1 && word[0] == '-') {
       do_push(word_start, word_end, highlight_role::flag);
       continue;
@@ -1551,6 +1563,7 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
                 keyword_ok ? highlight_role::keyword
                            : highlight_role::invalid_syntax);
         is_command_position = is_next_command;
+        is_time_option_pending = word == "time";
         if (should_expect_in) expecting_in = true;
         if (should_expect_for_variable) for_variable_pending = true;
         continue;
