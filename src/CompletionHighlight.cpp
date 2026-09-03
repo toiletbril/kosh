@@ -1369,7 +1369,20 @@ fn scan_highlight_range(StringView line, usize begin, usize end,
 
     if (!is_command_position && word.length > 1 && word[0] == '-') {
       do_push(word_start, word_end, highlight_role::flag);
+      if (highlight_command_word == "koshkit")
+        highlight_command_word = StringView{};
       continue;
+    }
+
+    if (!is_command_position && highlight_command_word == "koshkit") {
+      highlight_command_word = StringView{};
+      if (plain && !is_assignment) {
+        do_push(word_start, word_end,
+                koshkit::find_util(word).has_value()
+                    ? highlight_role::resolved_command
+                    : highlight_role::unknown_command);
+        continue;
+      }
     }
 
     if (is_assignment && is_command_position) {

@@ -50,4 +50,3 @@ note: Quote the expansion to keep one argument.
 testhome/a:testhome/b:testhome
 testhome/only
 testhome/x:testhome/y
-[Code 0]

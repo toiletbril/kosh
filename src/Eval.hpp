@@ -616,6 +616,8 @@ public:
   cold fn show_runtime_warning(StringView message) wontthrow -> void;
   cold fn show_runtime_warning_at(SourceLocation location, StringView message,
                                   StringView note = {}) wontthrow -> void;
+  cold fn show_runtime_error_at(SourceLocation location,
+                                StringView message) wontthrow -> void;
   /* The location of the $name or ${name spelling inside the command being
      evaluated. The statement location is the fallback when it is not found. */
   pure fn locate_variable_reference(StringView name) const wontthrow
@@ -1194,6 +1196,8 @@ public:
       -> String;
 
   pure fn should_echo() const wontthrow -> bool;
+  fn write_xtrace(StringView command) throws -> void;
+  fn write_xtrace(const ArrayList<String> &args) throws -> void;
   fn set_echo(bool enabled) wontthrow -> void
   {
     m_runtime.set_option(shell_option_id::Verbose, enabled);
@@ -1309,7 +1313,7 @@ protected:
   /* A byte-indexed table that answers whether a character is a field separator
      in one load, instead of scanning IFS per byte. It is rebuilt whenever IFS
      changes. */
-  Bitset m_field_separator_table{heap_allocator()};
+  u64 m_field_separator_bits[4]{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
 

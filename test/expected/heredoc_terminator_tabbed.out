@@ -20,4 +20,3 @@
        |      ^~~
 note: Write `<<-` in place of `<<` to strip the leading tabs.
 before
-[Code 0]

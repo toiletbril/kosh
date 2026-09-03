@@ -154,9 +154,12 @@ fn EvalContext::set_field_separators(StringView value) throws -> void
   LOG(Debug, "caching %zu field separator bytes", value.length);
   /* The table is built before m_field_separators is touched, since value may
      alias the buffer the assignment below rewrites. */
-  m_field_separator_table.reset(256);
-  for (usize i = 0; i < value.length; i++)
-    m_field_separator_table.set(static_cast<u8>(value.data[i]));
+  for (u64 &bits : m_field_separator_bits)
+    bits = 0;
+  for (usize i = 0; i < value.length; i++) {
+    let const byte = static_cast<u8>(value.data[i]);
+    m_field_separator_bits[byte >> 6] |= u64{1} << (byte & 63);
+  }
   if (value.data != m_field_separators.data()) {
     m_field_separators.clear();
     m_field_separators.append(value);
@@ -165,7 +168,8 @@ fn EvalContext::set_field_separators(StringView value) throws -> void
 
 hot pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
 {
-  return m_field_separator_table[static_cast<u8>(c)];
+  let const byte = static_cast<u8>(c);
+  return (m_field_separator_bits[byte >> 6] & (u64{1} << (byte & 63))) != 0;
 }
 
 fn EvalContext::guard_restricted_path(StringView path,
@@ -440,6 +444,34 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     if (!m_source_frames.is_empty()) print_source_backtrace(trace_location);
   } catch (...) {
     LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
+  }
+}
+
+cold fn EvalContext::show_runtime_error_at(SourceLocation location,
+                                           StringView message) wontthrow -> void
+{
+  let const trace_location = location;
+  try {
+    let const resolved_source = resolve_render_source(location);
+    usize line_offset = 0;
+    if (resolved_source.is_windowed) {
+      location.position = static_cast<u32>(
+          resolved_source.to_render_position(location.position));
+      location.source_name_index = resolved_source.source_name_index;
+      line_offset = resolved_source.line_offset;
+    }
+    if (resolved_source.text == nullptr ||
+        location.position > resolved_source.text->count())
+    {
+      show_message(Error{message}.to_string());
+      return;
+    }
+    let error = ErrorWithLocation{location, message};
+    error.set_line_offset(line_offset);
+    show_message(error.to_string(resolved_source.text->view(), this));
+    if (!m_source_frames.is_empty()) print_source_backtrace(trace_location);
+  } catch (...) {
+    LOG(Debug, "formatting a runtime error failed, the error is swallowed");
   }
 }
 

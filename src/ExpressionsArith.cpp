@@ -671,7 +671,7 @@ fn CStyleForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   let const can_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
-  if (m_is_fully_eliminated && can_skip_condition_commands) {
+  if (is_fully_eliminated() && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated c-style for as a no-op");
     cxt.publish_single_pipe_status(0);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};

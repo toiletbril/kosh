@@ -10,4 +10,3 @@
 2:1: error: The command 'xyzzy_undefined' was not found.
      2 |  xy\
        |  ^~~
-[Code 127]

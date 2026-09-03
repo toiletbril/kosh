@@ -282,4 +282,3 @@ herestring ()
 { cat; } <<< here
 keyword () 
 { for i in 1 2; do :; done; } >/dev/null
-[Code 0]

@@ -30,4 +30,3 @@ before
 note: Probe for matches with compgen -G '*.zzz_no_such_glob' or relax with set +o failglob.
 *.zzz_no_such_glob
 not-reached
-[Code 0]

@@ -13,4 +13,3 @@
        |       ^~~~~~~~~
 note: Probe for matches with compgen -G 'data/*/*' or relax with set +o failglob.
 data/*/*
-[Code 0]

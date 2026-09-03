@@ -57,4 +57,3 @@ persist=42
 nested=inner
 split a b c
 joined=[x y z]
-[Code 0]

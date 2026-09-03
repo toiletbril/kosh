@@ -219,7 +219,7 @@ warm_metrics=$(metric_line "$d/tab-typescript" 3) || {
     exit 1
 }
 case $warm_metrics in
-    *' preprompt-stats=0 preprompt-reads=0 preprompt-sorts=0 preprompt-probes=0 preprompt-resolutions=0 preprompt-history-loads=0 '*) ;;
+    *' preprompt-stats=0 preprompt-reads=0 preprompt-sorts=0 preprompt-probes=0 preprompt-resolutions=0 '*) ;;
     *) exit 1 ;;
 esac
 test "$(metric_field "$warm_metrics" stats)" -eq 0 || exit 1

@@ -497,7 +497,9 @@ statements. A compatibility mood reports these diagnostics only under
 .BR \-WW .
 .TP
 .BR \-E ", " \-\-show\-exit\-code
-The exit status is printed after each command.
+A located error is printed when a command returns a non-zero status. A
+successful command prints nothing. The error is printed before errexit exits,
+and a pipeline reports its effective status after pipefail is applied.
 .TP
 .BR \-R ", " \-\-show\-lexed\-words
 The escape bitmap is printed after each parsed command.
@@ -638,6 +640,7 @@ or
 mood sources the first readable file among /etc/bash/bashrc and
 /etc/bash.bashrc. It then sources the custom rc file or ~/.bashrc. Unless a
 default completion specification or BASH_COMPLETION_VERSINFO already exists,
+and unless completion is disabled,
 /usr/share/bash-completion/bash_completion is sourced after the rc file.
 .PP
 A noninteractive

@@ -1,4 +1,4 @@
 #!/bin/env kosh
-awk '{print}' /proc/self/fd/3 3<<EOF
+cat 3<<EOF <&3
 body
 EOF

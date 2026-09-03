@@ -102,12 +102,12 @@ fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
 
 fn CompoundCommand::set_fully_eliminated() const wontthrow -> void
 {
-  m_is_fully_eliminated = true;
+  set_execution_flag(ExecutionFlag::FullyEliminated);
 }
 
 pure fn CompoundCommand::is_fully_eliminated() const wontthrow -> bool
 {
-  return m_is_fully_eliminated;
+  return has_execution_flag(ExecutionFlag::FullyEliminated);
 }
 
 IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
@@ -174,7 +174,7 @@ hot fn IfClause::evaluate_status_impl(EvalContext &cxt) const throws
   let const can_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
 
-  if (m_is_fully_eliminated && can_skip_condition_commands) {
+  if (is_fully_eliminated() && can_skip_condition_commands) {
     LOG(Debug, "running the fully eliminated if as a no-op");
     cxt.publish_single_pipe_status(1);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
@@ -417,7 +417,7 @@ hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   let const can_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
-  if ((m_folded_to_skip || m_is_fully_eliminated) &&
+  if ((m_folded_to_skip || is_fully_eliminated()) &&
       can_skip_condition_commands)
   {
     cxt.publish_single_pipe_status(m_is_until ? 0 : 1);
@@ -707,7 +707,7 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   cxt.set_terminal_exec_allowed(false);
 
-  if (m_is_fully_eliminated) {
+  if (is_fully_eliminated()) {
     cxt.publish_single_pipe_status(0);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
@@ -735,6 +735,19 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
       static_cast<int>(m_variable_name.length), m_variable_name.data,
       values.count());
 
+  let loop_trace = String{cxt.scratch_allocator()};
+  if (cxt.should_echo_expanded()) {
+    loop_trace += "for ";
+    loop_trace.append(m_variable_name);
+    if (m_has_in_clause) {
+      loop_trace += " in";
+      if (!m_words.is_empty()) {
+        loop_trace.push(' ');
+        loop_trace += utils::merge_tokens_to_string(m_words);
+      }
+    }
+  }
+
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
 
@@ -743,6 +756,7 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   status_result result{};
   for (let const &value : values) {
+    cxt.write_xtrace(loop_trace.view());
     cxt.set_shell_variable(m_variable_name, value);
     result = m_body->evaluate_status(cxt);
     if (cxt.no_exec()) break;
@@ -1294,7 +1308,7 @@ fn BraceGroup::evaluate_status_impl(EvalContext &cxt) const throws
 
   cxt.set_terminal_exec_allowed(false);
 
-  if (m_is_fully_eliminated) {
+  if (is_fully_eliminated()) {
     cxt.publish_single_pipe_status(0);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }

@@ -31,4 +31,3 @@
        |  ^~~~~~~~~~~~~
 note: Replace it with ${hello-} if empty expansion is desired.
 1
-[Code 0]

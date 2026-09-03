@@ -202,7 +202,7 @@ private:
     State state{Empty};
     u64 hash{0};
     String key{};
-    Value value{};
+    [[no_unique_address]] Value value{};
   };
 
   static constexpr usize NO_INDEX = static_cast<usize>(-1);
@@ -259,7 +259,7 @@ private:
     if (m_count + m_tombstones + 1 <= maximum_occupied) return result;
 
     if (m_count + 1 > maximum_occupied) {
-      if (m_capacity > SIZE_MAX / 2) [[unlikely]]
+      if (m_capacity > UINT32_MAX / 2) [[unlikely]]
         throw std::bad_alloc{};
       rehash(m_capacity * 2);
     } else {
@@ -301,6 +301,8 @@ private:
 
   cold fn rehash(usize new_capacity) throws -> void
   {
+    if (new_capacity > UINT32_MAX) [[unlikely]]
+      throw std::bad_alloc{};
     let const fresh_slots = m_allocator.alloc_array<slot>(new_capacity);
     usize constructed_count = 0;
     try {
@@ -356,8 +358,8 @@ private:
     }
 
     m_slots = fresh_slots;
-    m_capacity = new_capacity;
-    m_count = fresh_count;
+    m_capacity = static_cast<u32>(new_capacity);
+    m_count = static_cast<u32>(fresh_count);
     m_tombstones = 0;
 
     for (usize i = 0; i < old_capacity; i++)
@@ -378,9 +380,9 @@ private:
 
   Allocator m_allocator;
   slot *m_slots{nullptr};
-  usize m_capacity{0};
-  usize m_count{0};
-  usize m_tombstones{0};
+  u32 m_capacity{0};
+  u32 m_count{0};
+  u32 m_tombstones{0};
 };
 
 } /* namespace koshka */

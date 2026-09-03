@@ -19,6 +19,8 @@ echo "== nproc flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit nproc -' </dev/null
 echo "== cat flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit cat --s' </dev/null
+echo "== date format directives through koshkit:"
+"$BIN" --debug-complete-at 'koshkit date +' </dev/null
 echo "== koshkit own flags:"
 "$BIN" --debug-complete-at 'koshkit --' </dev/null
 echo "== bare utility flags under set -o koshkit:"

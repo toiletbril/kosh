@@ -13,4 +13,3 @@
        |       ^~~
 note: Probe for matches with compgen -G '**' or relax with set +o failglob.
 **
-[Code 0]

@@ -1229,4 +1229,3 @@ note: Write `swallowed=$(printf)` to store its output, or quote the name.
        |    ^~~~~~~~~
 note: Write `pager=$(cat)` to store its output, or quote the name.
 Encountered 69 warnings.
-[Code 0]

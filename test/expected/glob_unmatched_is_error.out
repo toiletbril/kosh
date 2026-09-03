@@ -12,4 +12,3 @@
        |       ^~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'a*.zzznomatch' or relax with set +o failglob.
 a*.zzznomatch
-[Code 0]

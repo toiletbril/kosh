@@ -596,18 +596,22 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     }
   };
 
-  let const do_append_unquoted_run = [&word, this](StringView run) {
-    if (!word.segments.is_empty() &&
-        word.segments.back().kind == WordSegment::Kind::UnquotedText)
+  let const do_append_run = [&word, this](WordSegment::Kind kind,
+                                          StringView run) {
+    if (!word.segments.is_empty() && word.segments.back().kind == kind &&
+        kind != WordSegment::Kind::VariableReference)
     {
       word.segments.back().text.append(run);
     } else {
       word.segments.push(WordSegment{
-          WordSegment::Kind::UnquotedText,
-          SegmentText{bump_allocator(arena()), run},
-          false
+          kind, SegmentText{bump_allocator(arena()), run},
+           false
       });
     }
+  };
+
+  let const do_append_unquoted_run = [&do_append_run](StringView run) {
+    do_append_run(WordSegment::Kind::UnquotedText, run);
   };
 
   let const do_word_is_plain_array_name = [&word]() -> bool {
@@ -728,8 +732,16 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                                          SegmentText{}, false});
         quote_char.reset();
       } else {
-        do_append_char(WordSegment::Kind::LiteralText, ch);
+        let const run_start = byte_count;
+        while (chop_character(byte_count) != '\'' &&
+               chop_character(byte_count) != lexer::CEOF)
+          byte_count++;
+        do_append_run(
+            WordSegment::Kind::LiteralText,
+            m_source.substring_of_length(m_cursor_position + run_start,
+                                         byte_count - run_start));
         did_quote_enclose_content = true;
+        continue;
       }
       byte_count++;
       continue;
@@ -771,6 +783,21 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     }
 
     if (is_in_double_quotes) did_quote_enclose_content = true;
+
+    if (is_in_double_quotes && ch != '\\' && ch != '$' && ch != '`') {
+      let const run_start = byte_count;
+      while (true) {
+        let const next = chop_character(byte_count);
+        if (next == lexer::CEOF || next == '"' || next == '\\' || next == '$' ||
+            next == '`')
+          break;
+        byte_count++;
+      }
+      do_append_run(WordSegment::Kind::DoubleQuotedText,
+                    m_source.substring_of_length(m_cursor_position + run_start,
+                                                 byte_count - run_start));
+      continue;
+    }
 
     if (!quote_char.has_value() && lexer::is_string_quote(ch)) {
       relative_last_quote_position = byte_count;
@@ -819,8 +846,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
                                          SegmentText{}, false});
         } else {
-          for (usize k = 0; k < decoded.count(); k++)
-            do_append_char(WordSegment::Kind::LiteralText, decoded[k]);
+          do_append_run(WordSegment::Kind::LiteralText, decoded.view());
         }
 
         word.segments.back().was_ansi_c_quoted = true;
@@ -1143,15 +1169,16 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                                                 expansion_start + 2,
                                             expansion_segment.text.count());
       } else if (lexer::is_variable_name_start(next)) {
-        let name = String{heap_allocator()};
-        while (lexer::is_variable_name(next = chop_character(byte_count))) {
-          name += next;
+        let const name_start = byte_count;
+        while (lexer::is_variable_name(chop_character(byte_count)))
           byte_count++;
-        }
+        let const name = m_source.substring_of_length(
+            m_cursor_position + name_start, byte_count - name_start);
         word.segments.push(WordSegment{
             WordSegment::Kind::VariableReference,
-            SegmentText{bump_allocator(arena()), name.view()},
-            is_in_double_quotes, true
+            SegmentText{bump_allocator(arena()), name},
+            is_in_double_quotes,
+            true
         });
         word.segments.back().set_source_span(m_cursor_position +
                                                  expansion_start + 1,
@@ -1253,10 +1280,10 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   let const actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length);
 
-  let const is_cache_in_function_arena = m_arena == FUNCTION_ARENA;
-  for (let &segment : word.segments)
-    segment.is_substitution_cache_in_function_arena =
-        is_cache_in_function_arena;
+  if (m_arena == FUNCTION_ARENA) {
+    for (let &segment : word.segments)
+      segment.is_substitution_cache_in_function_arena = true;
+  }
 
   if (m_should_collect_debug_words &&
       m_cursor_position != m_last_collected_word_position)

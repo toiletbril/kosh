@@ -51,4 +51,3 @@ note: Replace it with ${never_a-} if empty expansion is desired.
 first=
 second=
 done
-[Code 0]

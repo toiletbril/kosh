@@ -23,4 +23,3 @@ Encountered 2 warnings.
        |             ^~~~
 note: Replace it with ${VAR-} if empty expansion is desired.
 
-[Code 0]

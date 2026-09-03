@@ -95,4 +95,3 @@ note: Replace it with ${b-} if empty expansion is desired.
      7 |  : a${b}c$d
        |          ^~
 note: Replace it with ${d-} if empty expansion is desired.
-[Code 0]

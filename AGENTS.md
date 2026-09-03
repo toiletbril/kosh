@@ -213,6 +213,7 @@ reuse.
 - Use the simplest bounded probe that preserves the input. Quote command syntax
   safely, place options before path separators, and run independent probes
   independently.
+- Order dependent redirections from descriptor creation to descriptor use.
 - Use literal ripgrep patterns unless `--pcre2` is explicitly enabled for a
   pattern that requires lookaround.
 - Limit transcript searches by record count and output bytes. Read-only reviews
@@ -222,11 +223,14 @@ reuse.
   verified edits.
 - Print the required change table after each edit batch.
 - Complete type and container migrations across every use before compiling.
+  Search the whole source tree for each removed field before compiling.
+  Locate every positional aggregate initializer before reordering fields.
   Verify overloads, constructor inputs, conditional result types, and old API
   references. Verify that every named parameter in a new shared definition is
   used. Copy iteration syntax from an existing use of the same type.
 - Keep borrowed views within the lifetime of their owners. Prove source spans,
   offsets, lengths, and static evidence at the contract required by the code.
+- Verify that each reused local remains in scope at every new call site.
 - Copy shared helper names and signatures from their declarations before the
   first call site is compiled.
 - Inspect the printed syntax tree before changing control-flow ownership. Use
@@ -243,11 +247,15 @@ reuse.
   Verify its mode and embedded revision when build invalidation matters.
 - Regenerate only the owning goldens, read every changed line, and update exact
   shape assertions with the behavior they cover.
+- Normalize generated REFILL name lists to spaces and exclude fixtures whose
+  runtime dependencies are unavailable on the current platform.
 - Use distinct fixture names that cannot trigger unrelated diagnostics. Check
   every logging placeholder against its argument.
 - Validate protocol encoders and profilers on a small payload. Language server
   probes must initialize first, redirect the complete emitter, drain output,
   and preserve the final process status.
+- Debug completion and highlighting probes pass source only to their debug
+  option. They do not add `-c`.
 - Poll every long-running command until the response contains its final exit
   code. Missing displayed session metadata does not prove completion.
 - Bound interactive and long-running workloads with an operating-system
@@ -267,6 +275,7 @@ reuse.
   documentation.
 - Use the release binary for performance comparisons. Clear inherited jobserver
   flags before forcing serial submakes.
+- Benchmark timeouts wrap the measured process directly.
 - Check commit subject length and the active git identity before committing.
 - Format changed files, run focused and full tests, inspect regenerated goldens
   and the complete diff, run `git diff --check`, and confirm that README.md is

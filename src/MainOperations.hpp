@@ -659,9 +659,6 @@ static fn run_script_contents(
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
-    if (context.show_exit_code())
-      print("[Code " + String::from(exit_code, heap_allocator()) + "]\n");
-
     if (context.stats_enabled()) {
       print(context.make_stats_string());
       print("\n");
@@ -1042,7 +1039,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
 
   /* The bash programmable completion loads once after a bash rc sourced, so it
      parses under the bash grammar. */
-  if (did_source_bash_rc) {
+  if (did_source_bash_rc && !FLAG_NO_COMPLETION.is_enabled()) {
     LOG(Info, "bootstrapping the bash programmable completion");
     ensure_bash_completion_loaded(context, ast_arena);
   }

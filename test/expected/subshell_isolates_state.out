@@ -936,5 +936,4 @@ complete -W 'parent' completion-command
 background-pid-restored
 jobs-restored
 done
-[Code 0]
 PARENT

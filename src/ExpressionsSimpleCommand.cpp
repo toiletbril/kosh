@@ -255,6 +255,13 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
+    if (cxt.should_echo_expanded()) {
+      let trace = String{cxt.scratch_allocator(), m_assignment->key().view()};
+      trace += m_assignment->is_append() ? "+=" : "=";
+      append_shell_quoted_arg(trace, value.view());
+      cxt.write_xtrace(trace.view());
+    }
+
     let const key_view = m_assignment->key().view();
     if (let const bracket = key_view.find_character('[');
         bracket.has_value() && key_view[key_view.length - 1] == ']')

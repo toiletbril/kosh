@@ -65,7 +65,7 @@ ifeq ($(OS), Windows_NT)
 SHELL := $(BIN)
 endif
 
-BIN_FLAGS := -AER
+BIN_FLAGS := -AR
 FAILED_LIST := failed.diff
 export BIN_FLAGS DIFF_FLAGS FAILED_LIST TEST_JOBS
 export TEST_SHELL := $(SHELL)

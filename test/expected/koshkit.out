@@ -30,6 +30,44 @@ mv
 --ignore
 == cat flags through koshkit:
 --syntax-highlighting
+== date format directives through koshkit:
++%%
++%A
++%B
++%C
++%D
++%F
++%G
++%H
++%I
++%M
++%R
++%S
++%T
++%U
++%V
++%W
++%X
++%Y
++%Z
++%a
++%b
++%c
++%d
++%e
++%g
++%h
++%j
++%m
++%n
++%p
++%r
++%t
++%u
++%w
++%x
++%y
++%z
 == koshkit own flags:
 --assimilate
 --help

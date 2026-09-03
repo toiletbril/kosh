@@ -49,6 +49,7 @@ enum class return_handling : u8
 enum class status_flag : u32
 {
   ErrResolved = 1U << 0,
+  ExitCodeReported = 1U << 1,
 };
 
 struct status_result
@@ -121,10 +122,10 @@ struct conditional_element
     Greater,
   };
 
-  Kind kind;
   const Token *word{nullptr};
-  bool is_bare_unquoted{false};
   Maybe<SourceLocation> location;
+  Kind kind;
+  bool is_bare_unquoted{false};
 };
 
 pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool;
@@ -204,15 +205,15 @@ struct job
     Done,
   };
 
-  i32 id;
-  os::process pid;
   ArrayList<os::process> earlier_pipeline_processes{heap_allocator()};
   String command{heap_allocator()};
-  State state{State::Running};
-  i32 last_status{0};
-  i32 stopped_status{0};
   i64 process_id{0};
   i64 process_group_id{0};
+  i32 id;
+  os::process pid;
+  i32 last_status{0};
+  i32 stopped_status{0};
+  State state{State::Running};
   bool is_primary_process_active{true};
   bool has_unreported_state_change{false};
 };

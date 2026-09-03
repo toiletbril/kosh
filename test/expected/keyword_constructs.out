@@ -60,3 +60,6 @@ cat	resolved-command
 	heredoc
 _ACEOF	heredoc-delimiter
 echo	resolved-command
+ls	resolved-command
+koshkit-missing-utility	unknown-command
+--help	flag

@@ -94,4 +94,3 @@ in: 2
 in: 3
 after restore: [outer]
 fresh leaked: [no]
-[Code 0]

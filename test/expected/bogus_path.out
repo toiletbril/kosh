@@ -12,4 +12,3 @@
        |       ^~~~~~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'data/*/doesnotexist' or relax with set +o failglob.
 data/*/doesnotexist
-[Code 0]

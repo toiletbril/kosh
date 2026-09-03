@@ -1109,4 +1109,3 @@ note: Write the file redirect and `2>&1` separately under a `sh` shebang.
 note: Name the file explicitly under a `sh` shebang.
 Encountered 61 warnings.
 done
-[Code 0]

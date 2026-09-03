@@ -19,4 +19,3 @@
        |  ^~~~~~~~~~~~~~~
 note: Probe for matches with compgen -G 'does_not_exist*' or relax with set +o failglob.
 is_escaped* word does_not_exist*
-[Code 0]

@@ -56,4 +56,3 @@ nomatch_*
 note: Probe for matches with compgen -G 'a*.zzznomatch' or relax with set +o failglob.
 a*.zzznomatch literal
 failglob       	off
-[Code 0]

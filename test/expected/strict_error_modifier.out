@@ -93,4 +93,3 @@ bash=1
      8 |  (echo "${nope?posix message}")
        |        ^~~~~~~~~~~~~~~~~~~~~~~
 posix=2
-[Code 0]

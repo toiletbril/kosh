@@ -127,12 +127,12 @@ struct variable_assignment_record
 {
   String name;
   Maybe<String> literal_value;
-  bool is_conditional{false};
-  bool is_append{false};
-  bool is_array{false};
   usize position{0};
   usize length{0};
   assignment_binder binder{assignment_binder::Assignment};
+  bool is_conditional{false};
+  bool is_append{false};
+  bool is_array{false};
 };
 
 enum class variable_occurrence_kind : u8
@@ -147,10 +147,10 @@ struct variable_occurrence_record
   String name;
   usize position{0};
   usize length{0};
+  usize function_definition_index{~usize{0}};
   variable_occurrence_kind kind{variable_occurrence_kind::Reference};
   bool is_unresolved{false};
   bool is_unused{false};
-  usize function_definition_index{~usize{0}};
   bool has_resolved_function_path{false};
   bool has_unresolved_function_path{false};
   bool has_inherited_function_path{false};
@@ -861,13 +861,14 @@ protected:
     Timed = 1U << 2,
     TimePosixFormat = 1U << 3,
     TimeReportRss = 1U << 4,
+    FullyEliminated = 1U << 5,
   };
 
   pure fn has_execution_flag(ExecutionFlag flag) const wontthrow -> bool
   {
     return (m_execution_flags & static_cast<u8>(flag)) != 0;
   }
-  fn set_execution_flag(ExecutionFlag flag, bool enabled = true) wontthrow
+  fn set_execution_flag(ExecutionFlag flag, bool enabled = true) const wontthrow
       -> void
   {
     if (enabled)
@@ -876,7 +877,7 @@ protected:
       m_execution_flags &= static_cast<u8>(~static_cast<u8>(flag));
   }
 
-  u8 m_execution_flags{0};
+  mutable u8 m_execution_flags{0};
   /* The keyword is always the literal `time` in the source the command itself
      is stamped with, so the length and the source name are recovered and only
      the position is retained. */
@@ -1157,9 +1158,6 @@ public:
 
   fn set_fully_eliminated() const wontthrow -> void;
   pure fn is_fully_eliminated() const wontthrow -> bool;
-
-protected:
-  mutable bool m_is_fully_eliminated{false};
 };
 
 struct if_branch

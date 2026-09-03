@@ -209,6 +209,17 @@ hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
       break;
     }
 
+    if (cxt.show_exit_code() && did_execute && ret.status != 0 &&
+        ret.status != NOTHING_WAS_EXECUTED &&
+        !ret.has(status_flag::ExitCodeReported))
+    {
+      let message = String{cxt.scratch_allocator(), "nonzero exit code: "};
+      message += String::from(ret.status, cxt.scratch_allocator());
+      cxt.show_runtime_error_at(n->command()->source_location(),
+                                message.view());
+      ret.set(status_flag::ExitCodeReported);
+    }
+
     /* A break, continue, return, or exit inside a node stops the rest of the
        list and unwinds to the boundary that consumes it. */
     if (cxt.has_pending_control_flow()) break;
@@ -660,6 +671,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       throw ErrorWithLocation{e->source_location(),
                               "A pipeline stage expanded to no command to run"};
     }
+    cxt.write_xtrace(stage_args);
 
     /* A stage whose command does not resolve becomes a no-op context that
        closes its pipe to give the next stage EOF. */

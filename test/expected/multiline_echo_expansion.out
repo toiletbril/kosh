@@ -12,4 +12,3 @@
        |  ^~~~~
 note: Probe for matches with compgen -G 'word*' or relax with set +o failglob.
 word*
-[Code 0]

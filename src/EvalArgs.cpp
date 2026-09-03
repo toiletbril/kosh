@@ -1,4 +1,5 @@
 #include "Arena.hpp"
+#include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -774,38 +775,47 @@ hot fn EvalContext::process_args(
     }
   }
 
-  /* The first character of PS4 is repeated once per enclosing subshell before
-     the whole prefix, so the default '+ ' shows '++ ' in a substitution.
-     BASH_XTRACEFD steers the trace to a descriptor, falling back to standard
-     error when unset or unparsable. */
-  if (should_echo_expanded()) {
-    let trace = String{scratch_allocator()};
-    let const ps4 = get_variable_value("PS4").value_or(String{"+ "});
-    if (!ps4.is_empty()) {
-      for (usize i = 0; i < m_subshell_depth; i++)
-        trace.push(ps4[0]);
-      trace.append(ps4.view());
-    }
-    trace.append(utils::merge_args_to_string(expanded_args));
-    trace.push('\n');
+  return expanded_args;
+}
 
-    Maybe<i64> xtrace_fd;
-    if (Maybe<String> xtrace_fd_value = get_variable_value("BASH_XTRACEFD");
-        xtrace_fd_value.has_value())
-    {
-      let const parsed = xtrace_fd_value->view().to<i64>();
-      if (!parsed.is_error() && parsed.value() >= 0) {
-        xtrace_fd = parsed.value();
-      }
-    }
+fn EvalContext::write_xtrace(StringView command) throws -> void
+{
+  if (!should_echo_expanded()) return;
 
-    if (xtrace_fd.has_value())
-      (void) os::write_to_numbered_fd(*xtrace_fd, trace.data(), trace.length());
-    else
-      koshka::print_error(trace);
+  let trace = String{scratch_allocator()};
+  let const ps4 = get_variable_value("PS4").value_or(String{"+ "});
+  if (!ps4.is_empty()) {
+    for (usize i = 0; i < m_subshell_depth; i++)
+      trace.push(ps4[0]);
+    trace.append(ps4.view());
+  }
+  trace.append(command);
+  trace.push('\n');
+
+  Maybe<i64> xtrace_fd;
+  if (Maybe<String> xtrace_fd_value = get_variable_value("BASH_XTRACEFD");
+      xtrace_fd_value.has_value())
+  {
+    let const parsed = xtrace_fd_value->view().to<i64>();
+    if (!parsed.is_error() && parsed.value() >= 0) xtrace_fd = parsed.value();
   }
 
-  return expanded_args;
+  if (xtrace_fd.has_value())
+    (void) os::write_to_numbered_fd(*xtrace_fd, trace.data(), trace.length());
+  else
+    koshka::print_error(trace);
+}
+
+fn EvalContext::write_xtrace(const ArrayList<String> &args) throws -> void
+{
+  if (!should_echo_expanded()) return;
+
+  let command = String{scratch_allocator()};
+  for (usize i = 0; i < args.count(); i++) {
+    if (i > 0) command.push(' ');
+    append_shell_quoted_arg(command, args[i].view());
+  }
+  write_xtrace(command.view());
 }
 
 } /* namespace koshka */

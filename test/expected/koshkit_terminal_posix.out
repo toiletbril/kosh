@@ -331,4 +331,3 @@ xterm terminal
     28 |  koshkit stty -a </dev/null
        |  ^~~~~~~~~~~~~~~
 stty-notty=1
-[Code 0]

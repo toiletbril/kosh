@@ -21,4 +21,3 @@ Encountered 2 warnings.
 2:6: error: Builtin `exit`: 'hello world' is not a numeric exit status.
      2 |  exit "hello world" "hello world"
        |       ^~~~~~~~~~~~~
-[Code 2]

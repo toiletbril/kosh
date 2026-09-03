@@ -98,4 +98,3 @@ note: Use a `case`, or the `[[ ]]` form for the pattern.
 Encountered 3 warnings.
 quoted_glob_folds
 unquoted_glob_no_fold
-[Code 0]

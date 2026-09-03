@@ -165,4 +165,3 @@ true is a shell builtin
 18:1: error: Builtin `type`: The command 'nonexistent_xyz' was not found.
     18 |  type nonexistent_xyz
        |  ^~~~~~~~~~~~~~~~~~~~
-[Code 1]

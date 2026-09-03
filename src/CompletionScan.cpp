@@ -23,6 +23,13 @@ namespace completion {
 static usize DEBUG_SHELL_LEXICAL_SCAN_BYTE_COUNT = 0;
 #endif
 
+static constexpr StringView DATE_FORMAT_CANDIDATES[] = {
+    "+%%", "+%a", "+%A", "+%b", "+%B", "+%c", "+%C", "+%d", "+%D", "+%e",
+    "+%F", "+%g", "+%G", "+%h", "+%H", "+%I", "+%j", "+%m", "+%M", "+%n",
+    "+%p", "+%r", "+%R", "+%S", "+%t", "+%T", "+%u", "+%U", "+%V", "+%w",
+    "+%W", "+%x", "+%X", "+%y", "+%Y", "+%z", "+%Z",
+};
+
 static fn previous_settled_word(StringView line, usize token_start) wontthrow
     -> StringView
 {
@@ -685,6 +692,15 @@ fn complete_from_builtin_flags(StringView line, StringView token,
       {
         for (let const entry_type : {"d", "f", "l"})
           do_push_matching(entry_type);
+        if (!candidates.is_empty()) return candidates;
+        return None;
+      }
+
+      if (*util_for_flags == koshkit::Utility::Kind::Date &&
+          token.starts_with("+"))
+      {
+        for (let const candidate : DATE_FORMAT_CANDIDATES)
+          do_push_matching(candidate);
         if (!candidates.is_empty()) return candidates;
         return None;
       }

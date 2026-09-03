@@ -817,4 +817,3 @@ note: Update the variable before forming the redirect path.
        |    ^~~~~~~~~~~~~
 note: Write `runner=$(printf)` to store its output, or quote the name.
 Encountered 43 warnings.
-[Code 0]

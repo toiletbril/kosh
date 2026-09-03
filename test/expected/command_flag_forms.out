@@ -2,5 +2,9 @@ one
 two
 equals-form
 trailer
-[Code 0]
 rc=0
+show-exit-code success is quiet
+show-exit-code reports a located continued failure
+show-exit-code reports before errexit
+show-exit-code reports guarded failures once
+show-exit-code follows the effective pipeline status

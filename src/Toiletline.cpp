@@ -805,10 +805,7 @@ fn get_input(const String &prompt) -> input_result
       utils::debug_executable_probe_count();
   let const preprompt_program_path_candidate_count_before =
       utils::debug_program_path_candidate_count();
-  let const preprompt_history_buffer_load_count_before =
-      ::itl_g_debug_history_buffer_load_count;
 #endif
-  unused(::itl_history_ensure_read_buffer());
 #if !defined NDEBUG
   let const preprompt_directory_stat_count =
       utils::debug_directory_stat_count() -
@@ -825,9 +822,6 @@ fn get_input(const String &prompt) -> input_result
   let const preprompt_program_path_candidate_count =
       utils::debug_program_path_candidate_count() -
       preprompt_program_path_candidate_count_before;
-  let const preprompt_history_buffer_load_count =
-      ::itl_g_debug_history_buffer_load_count -
-      preprompt_history_buffer_load_count_before;
 #endif
   HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
   HIGHLIGHT_STYLED_UNDERLINES_ENABLED =
@@ -912,9 +906,6 @@ fn get_input(const String &prompt) -> input_result
                              koshka::heap_allocator()) +
         " preprompt-resolutions=" +
         koshka::String::from(preprompt_program_path_candidate_count,
-                             koshka::heap_allocator()) +
-        " preprompt-history-loads=" +
-        koshka::String::from(preprompt_history_buffer_load_count,
                              koshka::heap_allocator()) +
         " cwd=" +
         koshka::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -

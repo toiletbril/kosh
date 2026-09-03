@@ -926,9 +926,9 @@ fn AnalysisContext::note_variable_assignment_record(
   }
 
   symbol_records->assignments.push(variable_assignment_record{
-      String{name}, steal(literal_value), is_conditional, is_append,
-      value_word == nullptr, location.position, location.length,
-      assignment_binder::Assignment});
+      String{name}, steal(literal_value), location.position, location.length,
+      assignment_binder::Assignment, is_conditional, is_append,
+      value_word == nullptr});
 }
 
 fn AnalysisContext::note_variable_binding_record(StringView name,
@@ -944,8 +944,8 @@ fn AnalysisContext::note_variable_binding_record(StringView name,
   if (symbol_records == nullptr) return;
 
   symbol_records->assignments.push(variable_assignment_record{
-      String{name}, None, is_conditional, false, false, location.position,
-      location.length, binder});
+      String{name}, None, location.position, location.length, binder,
+      is_conditional, false, false});
 }
 
 fn AnalysisContext::note_variable_occurrence(StringView name,
@@ -1036,9 +1036,9 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
   if (symbol_records == nullptr) return;
 
   symbol_records->variable_occurrences.push(variable_occurrence_record{
-      String{name}, location.position, location.length, kind,
-      occurrence_is_unresolved, occurrence_is_unused, function_definition_index,
-      false, false, has_inherited_function_path});
+      String{name}, location.position, location.length,
+      function_definition_index, kind, occurrence_is_unresolved,
+      occurrence_is_unused, false, false, has_inherited_function_path});
 }
 
 fn AnalysisContext::apply_called_function(

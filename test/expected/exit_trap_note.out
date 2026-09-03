@@ -19,7 +19,6 @@
   Unquoted "hello"
 ]
 hello
-[Code 0]
 1:7: warning: The glob pattern 'nonexistent_zzz_glob_*.tmp' matched no file, it expands to its literal text, which is rarely intended.
      1 |  rm -f nonexistent_zzz_glob_*.tmp
        |        ^~~~~~~~~~~~~~~~~~~~~~~~~~

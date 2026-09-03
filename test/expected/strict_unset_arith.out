@@ -30,4 +30,3 @@ before
 note: Replace it with ${nope-} if empty expansion is desired.
 1
 not-reached
-[Code 0]

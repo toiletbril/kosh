@@ -37,4 +37,3 @@ eval:1:1: error: The command 'badcmd_xyzzy' was not found.
        |  ^~~~~~~~~~~~~~~~~~~
 eval set x=5
 evaluated
-[Code 0]

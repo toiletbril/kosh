@@ -464,6 +464,27 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       value_ref = steal(appended);
     }
   };
+  let const do_trace_assignment = [&](StringView name, bool is_append,
+                                      StringView value) throws -> void {
+    if (!cxt.should_echo_expanded()) return;
+    let trace = String{cxt.scratch_allocator(), name};
+    trace += is_append ? "+=" : "=";
+    append_shell_quoted_arg(trace, value);
+    cxt.write_xtrace(trace.view());
+  };
+  let const do_trace_array_assignment =
+      [&](const array_builtin_assignment &assignment,
+          const ArrayList<String> &values) throws -> void {
+    if (!cxt.should_echo_expanded()) return;
+    let trace = String{cxt.scratch_allocator(), assignment.name.view()};
+    trace += assignment.is_append ? "+=(" : "=(";
+    for (usize i = 0; i < values.count(); i++) {
+      if (i > 0) trace.push(' ');
+      append_shell_quoted_arg(trace, values[i].view());
+    }
+    trace.push(')');
+    cxt.write_xtrace(trace.view());
+  };
 
   /* An expansion may drop every word. A command-less line still carries its
      assignments, which persist in the current shell. */
@@ -471,6 +492,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (let const &var : m_local_vars) {
       let const name = var.get_name();
       let value = cxt.expand_word_for_assignment(var.get_value());
+      do_trace_assignment(name, var.is_append(), value.view());
       if (var.is_append()) do_apply_append(name, value);
       cxt.set_shell_variable(name, value);
       if (cxt.export_all()) {
@@ -487,6 +509,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       ArrayList<String> values =
           cxt.process_args(assignment.elements, argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);
+      do_trace_array_assignment(assignment, values);
       cxt.assign_indexed_array_elements(assignment.name, values,
                                         assignment.is_append);
     }
@@ -549,6 +572,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     } catch (const Error &e) {
       relocate_error(e, source_location());
     }
+    do_trace_assignment(name, var.is_append(), expanded_value.view());
     if (var.is_append()) do_apply_append(name, expanded_value);
 
     /* A special builtin keeps the assignment outside the bash mood, so it
@@ -588,6 +612,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       cxt.set_field_separators(expanded_value.view());
     }
   }
+  cxt.write_xtrace(program_args);
   defer
   {
     /* The restore runs newest first, so a name spelled more than once restores
@@ -826,6 +851,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       ArrayList<String> values =
           cxt.process_args(assignment.elements, argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);
+      do_trace_array_assignment(assignment, values);
       if (is_associative_request) {
         /* A bare element with no bracketed key becomes a key with an empty
            value. */

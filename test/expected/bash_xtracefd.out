@@ -9,3 +9,23 @@ hi
 == an unparsable BASH_XTRACEFD falls back to stderr:
 + echo hi
 + set +x
+== assignments, arrays, loops, and redirections trace by syntax owner:
++ scalar=value
++ scalar+=tail
++ arr=(one 'two three')
++ empty=()
++ arr+=(four)
++ PFX=value
++ printf '%s\n' ok
+ok
++ for i in a b
++ : a
++ for i in a b
++ : b
++ printf done
++ set +x
+== BlueBomb dependency arrays stay intact:
++ deps=(unzip wget)
++ empty=()
++ managers=(pacman apt-get apt brew)
++ set +x

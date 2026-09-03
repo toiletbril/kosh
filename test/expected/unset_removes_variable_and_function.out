@@ -72,4 +72,3 @@ hello
 8:1: error: Builtin `type`: The command 'f' was not found.
      8 |  type f
        |  ^~~~~~
-[Code 1]

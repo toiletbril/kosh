@@ -64,4 +64,3 @@
      3 |  echo b 2>&1 >/dev/null
        |               ^~~~~~~~~
 note: Put the file redirect first as in `>file 2>&1`.
-[Code 0]

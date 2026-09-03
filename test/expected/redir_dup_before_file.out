@@ -53,4 +53,3 @@ note: Put the file redirect first as in `>file 2>&1`.
 this-is-stderr
 file-has-only-stdout:
 this-is-stdout
-[Code 0]

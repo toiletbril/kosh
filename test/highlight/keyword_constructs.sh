@@ -40,3 +40,10 @@ cat <<-"DONE"
 body
 _ACEOF
 echo tail' | grep -E "${tab}(heredoc|heredoc-delimiter|resolved-command)$"
+
+koshkit_result=$("$BIN" --debug-highlight-at \
+    'koshkit ls -l; koshkit koshkit-missing-utility value; koshkit --help')
+printf '%s\n' "$koshkit_result" | grep -Fx "ls${tab}resolved-command"
+printf '%s\n' "$koshkit_result" |
+    grep -Fx "koshkit-missing-utility${tab}unknown-command"
+printf '%s\n' "$koshkit_result" | grep -Fx -- "--help${tab}flag"

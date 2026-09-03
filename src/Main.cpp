@@ -1075,7 +1075,8 @@ static fn kosh_main(int argc, char **argv) -> int
         run_prompt_command(context, ast_arena);
 
         if (!did_seed_interactive_path_map && !is_rescue_mode &&
-            !FLAG_NO_COMPLETION.is_enabled())
+            !FLAG_NO_COMPLETION.is_enabled() &&
+            !FLAG_NO_SYNTAX_HIGHLIGHTING.is_enabled())
         {
           context.get_program_resolver().initialize_path_map();
           did_seed_interactive_path_map = true;

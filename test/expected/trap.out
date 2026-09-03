@@ -175,5 +175,4 @@ cleared_by_number
 trap -- 'echo got_term' TERM
 set_by_number
 trap -- 'printf "quoted=<%s>\n" "a'\''b"' EXIT
-[Code 0]
 quoted=<a'b>

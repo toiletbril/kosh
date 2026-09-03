@@ -488,4 +488,3 @@ end
     31 |  totally-nonexistent-command
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 rc=127
-[Code 0]

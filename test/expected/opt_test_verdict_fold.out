@@ -221,4 +221,3 @@ eq_true
 neq_true
 one_op_true
 zero_op_false
-[Code 0]
