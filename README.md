@@ -12,18 +12,16 @@ name. Thanks.
 
 **Koshka** is the Russian word for a cat.
 
-**Koshka** is an interpreter, an interactive shell, a formatter, and a language
-server. Windows, Linux, and macOS receive first-tier support. Koshka is fully
+**Koshka** is an absurdly fast and tiny cross-platform interpreter, an
+interactive shell, a formatter, and a language server. Koshka is fully
 compatible with Bash 5.3 and Dash.
 
 Koshka includes about 300 built-in ShellCheck diagnostics. It is usually five
-times faster than Bash and more than 100 times faster than ShellCheck. This
-speed makes it useful for coding agents and strict environments that still use
-Bash.
+times faster than Bash and more than 100 times faster than ShellCheck.
 
-| Koshka analyzes a 20,000-line shell script in about 0.05 seconds |
+| Koshka analyzes a 400,000-line shell script in about 1,5 seconds |
 | :-: | 
-| ![](assets/demo.gif) |
+| ![](assets/lint-demo.gif) |
 
 Besides shell scripts, Koshka is able to analyze common supported formats for
 mistakes in Bash code, including the following:
@@ -36,24 +34,28 @@ mistakes in Bash code, including the following:
 - Markdown files, `package.json` scripts, VS Code tasks, and Dev Container
   files.
 
+| Koshka provides instant shell diagnostics for Scripts, Dockerfiles, GitHub CI, Ansible via LSP |
+| :-: | 
+| ![](assets/lsp-demo.gif) |
+
 ## What
 
 `kosh` is the **Koshka** binary.
 
-**Koshka** aims to be a complete, faster, portable replacement for ShellCheck
-and Bash. Linux, macOS, and Windows receive first-tier support with equivalent
-behavior on all three systems.
+**Koshka** aims to be a complete, fast, portable replacement for ShellCheck and
+Bash. Linux, macOS, and Windows are first-tier support platforms with
+equivalent behavior on all three systems.
 
-The shell works without any configuration. The Linux binary is static and does
-not use the C++ standard library. **Koshka** can use its own utilities when
-coreutils is unavailable.
+The shell is designed to work sensibly without any configuration. The Linux
+binary is static and does not use the C++ standard library. **Koshka** can use
+its own utilities when coreutils are unavailable. 
 
 **The project is at an early stage.** It may still blow up your computer. Bug
 reports are welcome.
 
 ## Shell linter, formatter, and language server
 
-`kosh --lint` checks complete Bash and POSIX shell syntax with about 300
+`kosh --lint` checks complete Bash and POSIX shell syntax and about 300
 built-in ShellCheck and native diagnostics. It reads shell source from standard
 input, `-c` command strings, or multiple files.
 
@@ -61,17 +63,16 @@ In host files, the linter analyzes only embedded `sh`, `bash`, or `kosh`
 regions while rejecting unsupported files.
 
 ShellCheck disable comments accept diagnostic numbers and Koshka diagnostic
-names. With named files, `--apply` writes non-conflicting safe fixes and reports
-the remaining diagnostics.
+names. With files, `--apply` writes non-conflicting safe fixes and reports the
+remaining diagnostics.
 
-`kosh --format` formats standard input or one named file without running it.
-It uses two-space indentation and wraps at safe token boundaries within 80
-columns. Here-document bodies and inline comments are preserved. Use `--apply`
-to update named files atomically.
+`kosh --format` formats standard input or one named file without running it. It
+uses two-space indentation and wraps at safe token boundaries within 80
+columns. Use `--apply` to overwrite files with new formatting.
 
 The formatting style cannot be configured.
 
-`kosh --language-server` communicates over standard input and output. It
+`kosh --as-language-server` communicates over standard input and output. It
 provides diagnostics, quick fixes, completion, navigation, command help,
 semantic tokens, a document outline, and rename support.
 
@@ -86,7 +87,7 @@ For more details, see the [manual page](docs/kosh.1).
 $ man docs/kosh.1
 ```
 
-**Koshka** runs in four moods across three shell identities. Zsh provides a
+**Koshka** runs win four moods across three shell identities. Zsh provides a
 similar feature through its `emulate` builtin.
 
 The default `kosh` mood is a strict superset of Bash with analysis and
@@ -139,11 +140,7 @@ The `koshkit` builtin bundles a BusyBox-style set of small core utilities.
 - Process utilities include `killall`, `pkill`, `ps`, `timeout`, and `nproc`.
 - Minimal implementations of `calc` and `make` are included.
 
-`koshkit cat --syntax-highlighting` colors shell files when standard output is
-a terminal. Shell extensions and known shell shebangs select the source. The
-output omits underline attributes.
-
-Koshka also implements arbitrary precision arithmetic, including floats, in
+**Koshka** also implements arbitrary precision arithmetic, including floats, in
 `calc` builtin and in the default mood.
 
 # Development
@@ -208,9 +205,6 @@ target.
 
 The `CXXFLAGS` environment variable appends flags to the build commands.
 
-Build with GNU Make. Make uses every available logical CPU and shares its
-bounded job pool with recursive builds.
-
 ```bash
 $ make MODE=<rel/prof/dbg/cov/cosmo/cosmo_dbg>
 $ make MODE=rel TARGET=Windows_NT
@@ -233,5 +227,5 @@ $ make install
 $ make uninstall
 ```
 
-The running binary can install itself on an SSH target with `assimilate
-user@host`.
+Assuming the same arch and target, the running binary can install itself on an
+SSH target with a builtin command: `assimilate user@host`.
