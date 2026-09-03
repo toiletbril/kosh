@@ -189,7 +189,7 @@ fn Parser::parse_optional_in_clause_words(
     }
     if (word->kind() != Token::Kind::Word) {
       /* A non-keyword separator or operator ends the list. */
-      if (!(word->flags() & Token::Flag::Keyword)) break;
+      if (!token_kind_is_keyword(word->kind())) break;
       let const raw = word->raw_string();
       m_lexer.advance_past_last_peek();
       words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
@@ -233,7 +233,7 @@ hot fn Parser::parse_for() throws -> Command *
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
   if (name_token->kind() != Token::Kind::Word &&
-      (name_token->flags() & Token::Flag::Keyword))
+      token_kind_is_keyword(name_token->kind()))
   {
     let const raw = name_token->raw_string();
     name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
@@ -317,7 +317,7 @@ hot fn Parser::parse_select() throws -> Command *
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
   if (name_token->kind() != Token::Kind::Word &&
-      (name_token->flags() & Token::Flag::Keyword))
+      token_kind_is_keyword(name_token->kind()))
   {
     let const raw = name_token->raw_string();
     name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
@@ -398,7 +398,7 @@ hot fn Parser::parse_case() throws -> Command *
     word = word_token_from_assignment(m_lexer.arena(),
                                       static_cast<Assignment *>(word));
   } else if (word->kind() != Token::Kind::Word) {
-    if (word->flags() & Token::Flag::Keyword) {
+    if (token_kind_is_keyword(word->kind())) {
       let const raw = word->raw_string();
       word = word_token_from_raw(m_lexer.arena(), raw.view(),
                                  word->source_location());
@@ -459,7 +459,7 @@ hot fn Parser::parse_case() throws -> Command *
         let const pattern_location = pattern->source_location();
         let const text = m_lexer.source().substring_of_length(
             pattern_location.position, pattern_location.length);
-        if (pattern->flags() & Token::Flag::Keyword) {
+        if (token_kind_is_keyword(pattern->kind())) {
           pattern =
               word_token_from_raw(m_lexer.arena(), text, pattern_location);
         } else {
@@ -772,16 +772,16 @@ hot fn Parser::parse_conditional_command() throws -> Command *
     using Kind = conditional_element::Kind;
     switch (t->kind()) {
     case Token::Kind::DoubleAmpersand:
-      elements.push({nullptr, None, Kind::And, false});
+      elements.push({nullptr, {}, Kind::And, false});
       break;
     case Token::Kind::DoublePipe:
-      elements.push({nullptr, None, Kind::Or, false});
+      elements.push({nullptr, {}, Kind::Or, false});
       break;
     case Token::Kind::LeftParen:
-      elements.push({nullptr, None, Kind::OpenParen, false});
+      elements.push({nullptr, {}, Kind::OpenParen, false});
       break;
     case Token::Kind::RightParen:
-      elements.push({nullptr, None, Kind::CloseParen, false});
+      elements.push({nullptr, {}, Kind::CloseParen, false});
       break;
     case Token::Kind::Less:
       elements.push({nullptr, t->source_location(), Kind::Less, false});
@@ -795,10 +795,10 @@ hot fn Parser::parse_conditional_command() throws -> Command *
           static_cast<tokens::WordToken *>(t)->word().plain_literal_kind() ==
           Word::PlainLiteral::PlainUnquotedOneSegment;
       if (is_unquoted_word(t, "!")) {
-        elements.push({nullptr, None, Kind::Not, false});
+        elements.push({nullptr, {}, Kind::Not, false});
         break;
       }
-      elements.push({t, None, Kind::Operand, is_bare_unquoted});
+      elements.push({t, {}, Kind::Operand, is_bare_unquoted});
 
       if (is_unquoted_word(t, "=~")) {
         Token *peek = m_lexer.peek_shell_token();
@@ -876,12 +876,14 @@ hot fn Parser::parse_conditional_command() throws -> Command *
           elements.push(
               {tokens::create_word_token(m_lexer.arena(), regex_location,
                                          steal(regex_word)),
-               None, Kind::Operand, false});
+               {},
+               Kind::Operand,
+               false});
         }
       }
       break;
     }
-    default: elements.push({t, None, Kind::Operand, false}); break;
+    default: elements.push({t, {}, Kind::Operand, false}); break;
     }
   }
 

@@ -1,6 +1,6 @@
 2:6: error: Unterminated $'...' string.
-     2 |  echo $'abc
-       |       ^~~~~
-2:11: details:
-     2 |  echo $'abc
-       |            ^ expected ' here.
+     2 |  echo $'abc\
+       |       ^~~~~~
+2:12: details:
+     2 |  echo $'abc\
+       |             ^ expected ' here.

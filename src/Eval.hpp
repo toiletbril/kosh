@@ -740,15 +740,6 @@ public:
     return m_has_execution_string;
   }
 
-  fn set_cli_invocation(String text) wontthrow -> void
-  {
-    m_cli_invocation = steal(text);
-  }
-  pure fn cli_invocation() const wontthrow -> const String &
-  {
-    return m_cli_invocation;
-  }
-
   fn set_current_command(String text) throws -> void
   {
     m_current_command = steal(text);
@@ -1324,7 +1315,6 @@ protected:
   String m_last_argument{heap_allocator()};
   String m_execution_string{heap_allocator()};
   bool m_has_execution_string{false};
-  String m_cli_invocation{heap_allocator()};
   String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
   ArrayList<String> m_positional_params{heap_allocator()};

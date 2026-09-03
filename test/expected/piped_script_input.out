@@ -1,2 +1,4 @@
 piped-script
 rc=0
+empty-stdin-rc=0
+unterminated-ansi-backslash-rc=1

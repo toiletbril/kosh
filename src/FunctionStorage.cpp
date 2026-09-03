@@ -5,6 +5,7 @@
 namespace koshka {
 
 static function_body_storage *LIVE_FUNCTION_STORAGES = nullptr;
+static constexpr usize INITIAL_FUNCTION_ARENA_SIZE = 16 * 1024;
 
 function_body_storage::function_body_storage(BumpArena *owned_arena)
     : arena(owned_arena)
@@ -70,7 +71,7 @@ fn FunctionBodyHandle::create() throws -> FunctionBodyHandle
 {
   let const arena_storage = heap_allocator().alloc_array<BumpArena>(1);
   try {
-    new (arena_storage) BumpArena{};
+    new (arena_storage) BumpArena{INITIAL_FUNCTION_ARENA_SIZE};
   } catch (...) {
     heap_allocator().free_array(arena_storage, 1);
     throw;

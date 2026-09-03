@@ -123,10 +123,12 @@ struct conditional_element
   };
 
   const Token *word{nullptr};
-  Maybe<SourceLocation> location;
+  SourceLocation location{};
   Kind kind;
   bool is_bare_unquoted{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(conditional_element) == 24);
 
 pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool;
 pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool;
@@ -184,17 +186,19 @@ struct local_binding
   String name;
   Maybe<String> previous_value;
   Maybe<ArrayList<String>> previous_indexed_array;
-  bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
   ArrayList<usize> previous_sparse_indices{heap_allocator()};
   ArrayList<String> previous_sparse_values{heap_allocator()};
+  bool previous_was_associative{false};
   bool previous_was_integer{false};
   /* The read-only mark, so a local -r marks only this scope and the caller's
      later reassignment is not rejected. */
   bool previous_was_readonly{false};
   bool previous_was_exported{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(local_binding) == 256);
 
 struct job
 {

@@ -6,6 +6,11 @@ echo "$FOO and more"
 
 
 x=a; x+=bc; echo "$x"; n+=z; echo "$n"
+newline_assignment=one
+background_assignment=two &
+true && and_assignment=three
+false || or_assignment=four
+echo separators-ok
 
 # A lone assignment expands its value before it resets the status, so a $? in
 # the value reads the prior command's status the way bash does. The assignment

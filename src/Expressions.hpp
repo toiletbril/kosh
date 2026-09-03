@@ -127,13 +127,15 @@ struct variable_assignment_record
 {
   String name;
   Maybe<String> literal_value;
-  usize position{0};
-  usize length{0};
+  u32 position{0};
+  u32 length{0};
   assignment_binder binder{assignment_binder::Assignment};
   bool is_conditional{false};
   bool is_append{false};
   bool is_array{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(variable_assignment_record) == 136);
 
 enum class variable_occurrence_kind : u8
 {
@@ -145,8 +147,8 @@ enum class variable_occurrence_kind : u8
 struct variable_occurrence_record
 {
   String name;
-  usize position{0};
-  usize length{0};
+  u32 position{0};
+  u32 length{0};
   usize function_definition_index{~usize{0}};
   variable_occurrence_kind kind{variable_occurrence_kind::Reference};
   bool is_unresolved{false};
@@ -155,6 +157,8 @@ struct variable_occurrence_record
   bool has_unresolved_function_path{false};
   bool has_inherited_function_path{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(variable_occurrence_record) == 80);
 
 struct assignment_index_storage;
 

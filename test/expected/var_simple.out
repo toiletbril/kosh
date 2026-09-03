@@ -18,6 +18,20 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$n"]
   [CompoundListCondition, None]
+    [Assign newline_assignment=one]
+  [CompoundListCondition, None]
+    [Assign background_assignment=two, Async]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, &&]
+    [Assign and_assignment=three]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, ||]
+    [Assign or_assignment=four]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "separators-ok"]
+  [CompoundListCondition, None]
     [SimpleCommand "false"]
   [CompoundListCondition, None]
     [Assign x=$?]
@@ -182,6 +196,30 @@
 ]
 [Word
   Variable "n"
+]
+[Word
+  Unquoted "newline_assignment=one"
+]
+[Word
+  Unquoted "background_assignment=two"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "and_assignment=three"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "or_assignment=four"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "separators-ok"
 ]
 [Word
   Unquoted "false"
@@ -522,20 +560,20 @@ note: Quote the expansion to keep one argument.
      4 |  echo ${FOO}
        |       ^~~~~~
 note: Quote the expansion to keep one argument.
-46:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
-    46 |  echo $Y
+51:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
+    51 |  echo $Y
        |       ^~
 note: Quote the expansion to keep one argument.
-54:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
-    54 |  echo $X
+59:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
+    59 |  echo $X
        |       ^~
 note: Quote the expansion to keep one argument.
-58:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
-    58 |  echo $NOPE end
+63:6: warning: An unquoted variable can split into words and expand globs. (SC2086)
+    63 |  echo $NOPE end
        |       ^~~~~
 note: Quote the expansion to keep one argument.
-60:7: warning: An unquoted variable can split into words and expand globs. (SC2086)
-    60 |  echo a${NOPE}b
+65:7: warning: An unquoted variable can split into words and expand globs. (SC2086)
+    65 |  echo a${NOPE}b
        |        ^~~~~~~
 note: Quote the expansion to keep one argument.
 Encountered 6 warnings.
@@ -544,6 +582,7 @@ bar
 bar and more
 abc
 z
+separators-ok
 after_false=1
 after_true=0
 after_exit7=7

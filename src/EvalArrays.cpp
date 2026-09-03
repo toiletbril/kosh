@@ -549,9 +549,10 @@ fn EvalContext::declare_local(StringView name) throws -> void
 
   m_local_scopes[m_local_scope_depth - 1].push(local_binding{
       String{name}, steal(previous_value), steal(previous_array),
-      previous_was_associative, steal(previous_keys), steal(previous_values),
+      steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
-      previous_was_integer, previous_was_readonly, previous_was_exported});
+      previous_was_associative, previous_was_integer, previous_was_readonly,
+      previous_was_exported});
 
   /* The live array forms are cleared so a local array starts empty. The scalar
      value is left in place, so a value-less local keeps the caller's value. */

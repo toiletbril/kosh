@@ -113,6 +113,23 @@ printf 'norc=%s rcfile=%s init-file=%s aliases=%s/%s login=%s tilde=%s privilege
   "$norc" "$rcfile" "$init_file" "$last_alias" "$last_rcfile" "$login" "$tilde" \
   "$privileged_rc" "$privileged_env" "$unreadable_rc"
 
+output=ok
+if [ "${IS_NONDEBUG_BUILD:-0}" != 1 ]; then
+  "$BIN" --mood bash -i -X debug \
+    --debug-logging-file "$directory/completion.log" --rcfile /dev/null \
+    </dev/null >/dev/null 2>&1 || :
+  grep -F 'bootstrapping the bash programmable completion' \
+    "$directory/completion.log" >/dev/null 2>&1 || output=broken
+  "$BIN" --mood bash -i --no-completion -X debug \
+    --debug-logging-file "$directory/no-completion.log" --rcfile /dev/null \
+    </dev/null >/dev/null 2>&1 || :
+  if grep -F 'bootstrapping the bash programmable completion' \
+    "$directory/no-completion.log" >/dev/null 2>&1; then
+    output=broken
+  fi
+fi
+printf 'no-completion-bootstrap=%s\n' "$output"
+
 printf 'printf env:' > "$directory/env"
 printf 'printf expanded:' > "$directory/env0"
 printf 'printf body' > "$directory/script"

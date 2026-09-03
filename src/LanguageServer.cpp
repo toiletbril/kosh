@@ -504,7 +504,7 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
       Lexer{document.shell_source(), m_ast_arena, false, filename,
             m_context.mood()}
   };
-  parser.set_should_collect_analysis_scopes(true);
+  parser.set_should_collect_analysis_metadata(true);
   let rendered_errors = ArrayList<String>{heap_allocator()};
   let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
   let followed_paths = HashSet{heap_allocator()};

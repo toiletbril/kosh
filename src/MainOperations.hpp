@@ -125,6 +125,15 @@ static fn run_debug_toiletline_allocation_driver() throws -> i32
 
 static fn run_debug_arena_lifetime_driver() throws -> i32
 {
+  struct destructor_probe
+  {
+    explicit destructor_probe(usize &run_count) : run_count{&run_count} {}
+    ~destructor_probe() noexcept { (*run_count)++; }
+
+    usize *run_count;
+  };
+
+  usize destructor_run_count = 0;
   let arena = BumpArena{};
 
   unused(arena.allocate(1, 1));
@@ -164,6 +173,33 @@ static fn run_debug_arena_lifetime_driver() throws -> i32
       "\nreset-reused=" +
       String::from(arena.is_lifetime_valid(reused_lifetime), heap_allocator()) +
       "\n");
+
+  let const destructor_mark = arena.mark();
+  for (usize index = 0; index < 127; index++)
+    unused(arena.create<destructor_probe>(destructor_run_count));
+  let const capacity_at_127 = arena.destructor_capacity();
+  unused(arena.create<destructor_probe>(destructor_run_count));
+  let const capacity_at_128 = arena.destructor_capacity();
+  unused(arena.create<destructor_probe>(destructor_run_count));
+  let const capacity_at_129 = arena.destructor_capacity();
+  arena.release(destructor_mark);
+  arena.reset();
+  let const capacity_after_reset = arena.destructor_capacity();
+  for (usize index = 0; index < 129; index++)
+    unused(arena.create<destructor_probe>(destructor_run_count));
+  let const capacity_after_reuse = arena.destructor_capacity();
+  arena.reset();
+  let const capacity_after_second_reset = arena.destructor_capacity();
+  print(
+      "destructor-capacity=" + String::from(capacity_at_127, heap_allocator()) +
+      "/" + String::from(capacity_at_128, heap_allocator()) + "/" +
+      String::from(capacity_at_129, heap_allocator()) +
+      "\ndestructor-reset-capacity=" +
+      String::from(capacity_after_reset, heap_allocator()) + "/" +
+      String::from(capacity_after_reuse, heap_allocator()) + "/" +
+      String::from(capacity_after_second_reset, heap_allocator()) +
+      "\ndestructors-run=" +
+      String::from(destructor_run_count, heap_allocator()) + "\n");
   flush();
   return 0;
 }
@@ -391,7 +427,7 @@ static fn run_script_contents(
     bool should_require_shebang = true,
     bool should_silence_unresolved_commands = false) -> int
 {
-  i32 exit_code = EXIT_FAILURE;
+  i32 exit_code = EXIT_SUCCESS;
 
   try {
     defer { context.end_command(); };
@@ -469,7 +505,7 @@ static fn run_script_contents(
           Lexer{script_contents.view(), ast_arena, false, filename,
                 context.mood()}
       };
-      scan_parser.set_should_collect_analysis_scopes(true);
+      scan_parser.set_should_collect_analysis_metadata(true);
 
       let const scan_mark = ast_arena.mark();
       loop
@@ -499,7 +535,7 @@ static fn run_script_contents(
           Lexer{script_contents.view(), ast_arena, context.show_lexed_words(),
                 filename, context.mood()}
       };
-      p.set_should_collect_analysis_scopes(run_analysis);
+      p.set_should_collect_analysis_metadata(run_analysis);
 
       ast = p.construct_ast(parse_errors, &context, diagnostic_sink);
 
@@ -684,6 +720,7 @@ static fn run_script_contents(
                     ? static_cast<i32>(e.command_status())
                     : (context.is_posix_mode() ? 2 : EXIT_FAILURE);
   } catch (const std::exception &e) {
+    exit_code = EXIT_FAILURE;
     show_message(
         "Uncaught exception while executing the AST. Aborting the command.");
     show_message("Last system message: '" + os::last_system_error_message() +

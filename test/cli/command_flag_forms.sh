@@ -3,6 +3,8 @@ unset KOSH_FLAGS
 "$BIN" --command='echo equals-form'
 "$BIN" -E -c 'echo trailer'
 echo "rc=$?"
+"$BIN" --no-init-files -c ''
+echo "empty-command-rc=$?"
 
 success_output=$("$BIN" --no-diagnostics -E -c ':' 2>&1)
 [ -z "$success_output" ] || exit 1

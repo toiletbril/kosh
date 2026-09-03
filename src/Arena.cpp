@@ -30,6 +30,13 @@ fn bump_arena_owns(const BumpArena *arena, const opaque *pointer) wontthrow
 
 BumpArena::BumpArena() : m_arena_incarnation{NEXT_ARENA_INCARNATION++} {}
 
+BumpArena::BumpArena(usize initial_block_size)
+    : m_arena_incarnation{NEXT_ARENA_INCARNATION++}
+{
+  ASSERT(initial_block_size > 0);
+  add_block(initial_block_size, initial_block_size);
+}
+
 BumpArena::~BumpArena()
 {
   run_destructors_down_to(0);
@@ -41,21 +48,29 @@ BumpArena::~BumpArena()
 
 fn BumpArena::push_destructor(pending_destructor pending) throws -> void
 {
-  let const chunk_index = m_destructor_count / DESTRUCTORS_PER_CHUNK;
+  usize chunk_index = 0;
+  usize position_in_chunk = m_destructor_count;
+  if (m_destructor_count >= FIRST_DESTRUCTOR_CHUNK_COUNT) {
+    let const later_position =
+        m_destructor_count - FIRST_DESTRUCTOR_CHUNK_COUNT;
+    chunk_index = 1 + later_position / DESTRUCTORS_PER_CHUNK;
+    position_in_chunk = later_position % DESTRUCTORS_PER_CHUNK;
+  }
 
   if (chunk_index == m_destructor_chunks.count()) [[unlikely]] {
+    let const chunk_count =
+        chunk_index == 0 ? FIRST_DESTRUCTOR_CHUNK_COUNT : DESTRUCTORS_PER_CHUNK;
     let const chunk =
-        heap_allocator().alloc_array<pending_destructor>(DESTRUCTORS_PER_CHUNK);
+        heap_allocator().alloc_array<pending_destructor>(chunk_count);
     try {
       m_destructor_chunks.push(chunk);
     } catch (...) {
-      heap_allocator().free_array(chunk, DESTRUCTORS_PER_CHUNK);
+      heap_allocator().free_array(chunk, chunk_count);
       throw;
     }
   }
 
-  m_destructor_chunks[chunk_index][m_destructor_count % DESTRUCTORS_PER_CHUNK] =
-      pending;
+  m_destructor_chunks[chunk_index][position_in_chunk] = pending;
   m_destructor_count++;
 }
 
@@ -63,9 +78,15 @@ fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
 {
   while (m_destructor_count > first) {
     m_destructor_count--;
-    let const &pending =
-        m_destructor_chunks[m_destructor_count / DESTRUCTORS_PER_CHUNK]
-                           [m_destructor_count % DESTRUCTORS_PER_CHUNK];
+    usize chunk_index = 0;
+    usize position_in_chunk = m_destructor_count;
+    if (m_destructor_count >= FIRST_DESTRUCTOR_CHUNK_COUNT) {
+      let const later_position =
+          m_destructor_count - FIRST_DESTRUCTOR_CHUNK_COUNT;
+      chunk_index = 1 + later_position / DESTRUCTORS_PER_CHUNK;
+      position_in_chunk = later_position % DESTRUCTORS_PER_CHUNK;
+    }
+    let const &pending = m_destructor_chunks[chunk_index][position_in_chunk];
     pending.run(pending.object);
   }
 }
@@ -75,15 +96,18 @@ cold fn BumpArena::release_destructor_chunks(usize kept_chunk_count) wontthrow
     -> void
 {
   while (m_destructor_chunks.count() > kept_chunk_count) {
-    heap_allocator().free_array(m_destructor_chunks.back(),
-                                DESTRUCTORS_PER_CHUNK);
+    let const chunk_count = m_destructor_chunks.count() == 1
+                                ? FIRST_DESTRUCTOR_CHUNK_COUNT
+                                : DESTRUCTORS_PER_CHUNK;
+    heap_allocator().free_array(m_destructor_chunks.back(), chunk_count);
     m_destructor_chunks.pop_back();
   }
 }
 
-cold fn BumpArena::add_block(usize minimum_size) throws -> void
+cold fn BumpArena::add_block(usize minimum_size, usize preferred_size) throws
+    -> void
 {
-  let size = DEFAULT_BLOCK_SIZE;
+  let size = preferred_size;
   if (minimum_size > size) size = minimum_size;
 
   let const base = static_cast<u8 *>(std::malloc(size));
@@ -127,7 +151,7 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> opaque *
       m_current_index++;
     }
 
-    add_block(size + alignment);
+    add_block(size + alignment, DEFAULT_BLOCK_SIZE);
     m_current_index = m_blocks.count() - 1;
   }
 }
@@ -170,17 +194,19 @@ fn BumpArena::register_lifetime() throws -> LifetimeIdentity
 {
   u32 slot_position = m_first_free_lifetime_slot;
   if (slot_position == UINT32_MAX) {
+    if (m_lifetime_slots.count() >= UINT32_MAX) throw std::bad_alloc{};
     slot_position = static_cast<u32>(m_lifetime_slots.count());
     m_lifetime_slots.push(lifetime_slot{});
   } else {
+    ASSERT(m_lifetime_slots[slot_position].next_free_position != slot_position,
+           "a free lifetime slot cannot point to itself");
     m_first_free_lifetime_slot =
         m_lifetime_slots[slot_position].next_free_position;
   }
 
   let &slot = m_lifetime_slots[slot_position];
   slot.payload_end = mark();
-  slot.next_free_position = UINT32_MAX;
-  slot.is_active = true;
+  slot.next_free_position = slot_position;
   slot.incarnation++;
   m_active_lifetime_slots.push(slot_position);
   return LifetimeIdentity{m_arena_incarnation, slot_position, slot.incarnation};
@@ -194,7 +220,8 @@ pure fn BumpArena::is_lifetime_valid(LifetimeIdentity identity) const wontthrow
     return false;
 
   let const &slot = m_lifetime_slots[identity.slot_position];
-  return slot.is_active && slot.incarnation == identity.slot_incarnation;
+  return slot.next_free_position == identity.slot_position &&
+         slot.incarnation == identity.slot_incarnation;
 }
 
 fn BumpArena::release(Mark saved) wontthrow -> void
@@ -213,7 +240,6 @@ fn BumpArena::release(Mark saved) wontthrow -> void
          slot.payload_end.used_in_block <= saved.used_in_block))
       break;
 
-    slot.is_active = false;
     slot.next_free_position = m_first_free_lifetime_slot;
     m_first_free_lifetime_slot = slot_position;
     m_active_lifetime_slots.pop_back();
@@ -241,7 +267,6 @@ cold fn BumpArena::reset() wontthrow -> void
 
   for (let const slot_position : m_active_lifetime_slots) {
     let &slot = m_lifetime_slots[slot_position];
-    slot.is_active = false;
     slot.next_free_position = m_first_free_lifetime_slot;
     m_first_free_lifetime_slot = slot_position;
   }

@@ -1,2 +1,2 @@
 #!/bin/env kosh
-echo $'abc
+echo $'abc\

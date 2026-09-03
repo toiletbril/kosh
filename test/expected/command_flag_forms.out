@@ -3,6 +3,7 @@ two
 equals-form
 trailer
 rc=0
+empty-command-rc=0
 show-exit-code success is quiet
 show-exit-code reports a located continued failure
 show-exit-code reports before errexit

@@ -181,7 +181,7 @@ is used for member lists that are almost always empty.
 A bump arena registers destructors for nontrivial objects unless the type
 declares `is_arena_destructor_noop`. The marker is valid only when every
 reachable resource has arena lifetime or needs no cleanup. Destructor records
-use fixed 64 KiB chunks.
+use a 128-record first chunk and fixed 64 KiB later chunks.
 
 `WordSegment` is 32 bytes on 64-bit targets. Its source span, kind, and flags are
 packed into two 32-bit units. Parsed text, cache metadata, flattened values, and
@@ -239,6 +239,8 @@ reuse.
   changes must trace their current delegate first.
 - Keep agent scopes disjoint. Do not inspect or edit a scope under active
   review, and use only the current session's supported coordination methods.
+- Validate every required coordination argument before sending or retrying a
+  task.
 - Locate the owning runner and input type before running a focused test. Run
   cwd-sensitive scripts through that runner. Add and observe the failing
   canonical regression before a behavior patch is applied. The failing test
@@ -275,6 +277,10 @@ reuse.
   documentation.
 - Use the release binary for performance comparisons. Clear inherited jobserver
   flags before forcing serial submakes.
+- Enable the benchmark's explicit nonzero handling before timing a workload
+  that is expected to fail.
+- Check the expected status of every workload before launching a benchmark
+  batch.
 - Benchmark timeouts wrap the measured process directly.
 - Check commit subject length and the active git identity before committing.
 - Format changed files, run focused and full tests, inspect regenerated goldens

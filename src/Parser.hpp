@@ -53,6 +53,12 @@ public:
     return m_lexer.take_heredoc_terminator_misses();
   }
 
+  fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
+  {
+    m_should_collect_analysis_metadata = should_collect;
+    m_should_collect_analysis_scopes = should_collect;
+    m_lexer.set_should_collect_analysis_metadata(should_collect);
+  }
   fn set_should_collect_analysis_scopes(bool should_collect) wontthrow -> void
   {
     m_should_collect_analysis_scopes = should_collect;
@@ -72,6 +78,7 @@ private:
   usize m_command_depth{0};
   bool m_should_stop_after_top_level_unit{false};
   bool m_has_parsed_source_command{false};
+  bool m_should_collect_analysis_metadata{false};
   bool m_should_collect_analysis_scopes{false};
   ArrayList<shellcheck_suppression> m_shellcheck_suppressions{heap_allocator()};
 

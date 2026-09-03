@@ -579,13 +579,10 @@ class Token
 public:
   enum class Kind : u8
   {
-    Invalid,
-
     /* Significant symbols */
     RightParen,
     LeftParen,
     RightBracket,
-    LeftBracket,
 
     EndOfFile,
     Newline,
@@ -594,7 +591,6 @@ public:
     SemicolonAmpersand,
     DoubleSemicolonAmpersand,
     Dot,
-    Dollar,
 
     /* Values */
     Word,
@@ -632,8 +628,6 @@ public:
     Then,
     Else,
     Fi,
-    Echo,
-    Exit,
     Elif,
     When,
     While,
@@ -647,21 +641,6 @@ public:
     Function,
   };
 
-  using Flags = u8;
-
-  enum Flag : uint8_t
-  {
-    /* clang-format off */
-    Sentinel       = 0,
-    Value          = 1,
-    UnaryOperator  = 1 << 1,
-    BinaryOperator = 1 << 2,
-    Special        = 1 << 3,
-    Keyword        = 1 << 4,
-    CompoundList   = 1 << 5,
-    /* clang-format on */
-  };
-
   Token() = delete;
   virtual ~Token() = default;
 
@@ -671,7 +650,6 @@ public:
   Token &operator=(Token &&) noexcept = delete;
 
   virtual fn kind() const wontthrow -> Kind = 0;
-  virtual fn flags() const wontthrow -> Flags = 0;
   virtual fn raw_string() const throws -> String = 0;
 
   virtual fn raw_view() const wontthrow -> Maybe<StringView>;
@@ -711,6 +689,11 @@ inline constexpr static_string_entry<Token::Kind> KEYWORD_ENTRIES[] = {
 
 inline constexpr StaticStringMap KEYWORDS{KEYWORD_ENTRIES};
 
+pure inline fn token_kind_is_keyword(Token::Kind kind) wontthrow -> bool
+{
+  return kind >= Token::Kind::If && kind <= Token::Kind::Function;
+}
+
 const ArrayList<String> &keyword_names() throws;
 
 /* clang-format off */
@@ -747,7 +730,6 @@ namespace tokens {
     t(SourceLocation location);                                                \
                                                                                \
     Kind kind() const wontthrow override;                                      \
-    Flags flags() const wontthrow override;                                    \
     String raw_string() const throws override;                                 \
     Maybe<StringView> raw_view() const wontthrow override;                     \
   }
@@ -783,7 +765,6 @@ TOKEN_STRUCT(TripleLess);
 TOKEN_STRUCT(Dot);
 TOKEN_STRUCT(LeftParen);
 TOKEN_STRUCT(RightParen);
-TOKEN_STRUCT(LeftBracket);
 TOKEN_STRUCT(RightBracket);
 
 class Assignment : public Token
@@ -794,7 +775,6 @@ public:
   Assignment(SourceLocation location, String key, Word value, bool is_append);
 
   fn kind() const wontthrow -> Kind override;
-  fn flags() const wontthrow -> Flags override;
 
   fn raw_string() const throws -> String override;
 
@@ -817,7 +797,6 @@ public:
   WordToken(SourceLocation location, Word word);
 
   fn kind() const wontthrow -> Kind override;
-  fn flags() const wontthrow -> Flags override;
 
   fn raw_string() const throws -> String override;
   fn raw_view() const wontthrow -> Maybe<StringView> override;
@@ -857,88 +836,27 @@ static_assert(sizeof(usize) != 8 || sizeof(ExpandedWordToken) == 80);
 fn create_word_token(BumpArena &arena, SourceLocation location,
                      Word word) throws -> WordToken *;
 
-class Operator : public Token
-{
-public:
-  Operator(SourceLocation location);
-
-  virtual fn binary_left_associative() const wontthrow -> bool;
-
-  virtual fn left_precedence() const wontthrow -> u8;
-  virtual fn construct_binary_expression(const Expression *lhs,
-                                         const Expression *rhs) const throws
-      -> Expression *;
-
-  virtual fn unary_precedence() const wontthrow -> u8;
-  virtual fn construct_unary_expression(const Expression *rhs) const throws
-      -> Expression *;
-};
-
-#define OPERATOR_TOKEN_STRUCT_COMMON(t)                                        \
-public:                                                                        \
-  t(SourceLocation location);                                                  \
-                                                                               \
-  Kind kind() const wontthrow override;                                        \
-  Flags flags() const wontthrow override;                                      \
-  String raw_string() const throws override;                                   \
-  Maybe<StringView> raw_view() const wontthrow override
-
-#define BINARY_OPERATOR_TOKEN_STRUCT_MEMBERS                                   \
-  u8 left_precedence() const wontthrow override;                               \
-  Expression *construct_binary_expression(                                     \
-      const Expression *lhs, const Expression *rhs) const throws override
-
-#define UNARY_OPERATOR_TOKEN_STRUCT_MEMBERS                                    \
-  u8 unary_precedence() const wontthrow override;                              \
-  Expression *construct_unary_expression(const Expression *rhs)                \
-      const throws override
-
-#define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
-  class t : public Operator                                                    \
-  {                                                                            \
-    OPERATOR_TOKEN_STRUCT_COMMON(t);                                           \
-    BINARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                      \
-    UNARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                       \
-  }
-
-UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
-UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
-
-#define UNARY_OPERATOR_TOKEN_STRUCT(t)                                         \
-  class t : public Operator                                                    \
-  {                                                                            \
-    OPERATOR_TOKEN_STRUCT_COMMON(t);                                           \
-    UNARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                       \
-  }
-
-UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
-UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
-
-#define BINARY_OPERATOR_TOKEN_STRUCT(t)                                        \
-  class t : public Operator                                                    \
-  {                                                                            \
-    OPERATOR_TOKEN_STRUCT_COMMON(t);                                           \
-    BINARY_OPERATOR_TOKEN_STRUCT_MEMBERS;                                      \
-  }
-
-BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);
-BINARY_OPERATOR_TOKEN_STRUCT(DoubleAmpersand);
-BINARY_OPERATOR_TOKEN_STRUCT(DoublePipe);
-
-BINARY_OPERATOR_TOKEN_STRUCT(Slash);
-BINARY_OPERATOR_TOKEN_STRUCT(Percent);
-BINARY_OPERATOR_TOKEN_STRUCT(Asterisk);
-BINARY_OPERATOR_TOKEN_STRUCT(Greater);
-BINARY_OPERATOR_TOKEN_STRUCT(DoubleGreater);
-BINARY_OPERATOR_TOKEN_STRUCT(GreaterEquals);
-BINARY_OPERATOR_TOKEN_STRUCT(Less);
-BINARY_OPERATOR_TOKEN_STRUCT(DoubleLess);
-BINARY_OPERATOR_TOKEN_STRUCT(LessEquals);
-BINARY_OPERATOR_TOKEN_STRUCT(Pipe);
-BINARY_OPERATOR_TOKEN_STRUCT(Cap);
-BINARY_OPERATOR_TOKEN_STRUCT(Equals);
-BINARY_OPERATOR_TOKEN_STRUCT(DoubleEquals);
-BINARY_OPERATOR_TOKEN_STRUCT(ExclamationEquals);
+TOKEN_STRUCT(Plus);
+TOKEN_STRUCT(Minus);
+TOKEN_STRUCT(Tilde);
+TOKEN_STRUCT(ExclamationMark);
+TOKEN_STRUCT(Ampersand);
+TOKEN_STRUCT(DoubleAmpersand);
+TOKEN_STRUCT(DoublePipe);
+TOKEN_STRUCT(Slash);
+TOKEN_STRUCT(Percent);
+TOKEN_STRUCT(Asterisk);
+TOKEN_STRUCT(Greater);
+TOKEN_STRUCT(DoubleGreater);
+TOKEN_STRUCT(GreaterEquals);
+TOKEN_STRUCT(Less);
+TOKEN_STRUCT(DoubleLess);
+TOKEN_STRUCT(LessEquals);
+TOKEN_STRUCT(Pipe);
+TOKEN_STRUCT(Cap);
+TOKEN_STRUCT(Equals);
+TOKEN_STRUCT(DoubleEquals);
+TOKEN_STRUCT(ExclamationEquals);
 
 } /* namespace tokens */
 

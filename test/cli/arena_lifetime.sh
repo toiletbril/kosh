@@ -11,7 +11,7 @@ done
 ' 2>&1)
 function_line=$(printf '%s\n' "$report" | grep '^Function arenas:')
 case $function_line in
-  *' blocks 1, '*) echo 'function-redefinition=bounded' ;;
+  *'reserved 16384, blocks 1, '*) echo 'function-redefinition=bounded' ;;
   *) echo 'function-redefinition=unbounded' ;;
 esac
 

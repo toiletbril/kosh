@@ -3,7 +3,6 @@
 #include "Arena.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
-#include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Trace.hpp"
@@ -595,63 +594,41 @@ fn SegmentText::append(StringView other) throws -> void
 
 namespace tokens {
 
-#define KEYWORD_TOKEN_DECLS(t, s)                                              \
+#define TOKEN_DECLS(t, s)                                                      \
   t::t(SourceLocation location) : Token(steal(location)) {}                    \
   Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow { return Token::Flag::Keyword; }     \
   String t::raw_string() const throws { return s; }                            \
   Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
 
-KEYWORD_TOKEN_DECLS(If, "if");
-KEYWORD_TOKEN_DECLS(Then, "then");
-KEYWORD_TOKEN_DECLS(Else, "else");
-KEYWORD_TOKEN_DECLS(Elif, "elif");
-KEYWORD_TOKEN_DECLS(Fi, "fi");
-KEYWORD_TOKEN_DECLS(For, "for");
-KEYWORD_TOKEN_DECLS(While, "while");
-KEYWORD_TOKEN_DECLS(Until, "until");
-KEYWORD_TOKEN_DECLS(Do, "do");
-KEYWORD_TOKEN_DECLS(Done, "done");
-KEYWORD_TOKEN_DECLS(Case, "case");
-KEYWORD_TOKEN_DECLS(When, "when");
-KEYWORD_TOKEN_DECLS(Esac, "esac");
-KEYWORD_TOKEN_DECLS(Time, "time");
-KEYWORD_TOKEN_DECLS(Function, "function");
-
-#define SENTINEL_TOKEN_DECLS_COMPOUND(t, s)                                    \
-  t::t(SourceLocation location) : Token(steal(location)) {}                    \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow                                      \
-  {                                                                            \
-    return Token::Flag::Sentinel | Token::Flag::CompoundList;                  \
-  }                                                                            \
-  String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
-
-SENTINEL_TOKEN_DECLS_COMPOUND(Newline, "newline");
-SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
-
-#define SENTINEL_TOKEN_DECLS(t, s)                                             \
-  t::t(SourceLocation location) : Token(steal(location)) {}                    \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow { return Token::Flag::Sentinel; }    \
-  String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
-
-SENTINEL_TOKEN_DECLS(EndOfFile, "end of input");
-SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
-SENTINEL_TOKEN_DECLS(SemicolonAmpersand, ";&");
-SENTINEL_TOKEN_DECLS(DoubleSemicolonAmpersand, ";;&");
-SENTINEL_TOKEN_DECLS(AmpersandGreater, "&>");
-SENTINEL_TOKEN_DECLS(AmpersandDoubleGreater, "&>>");
-SENTINEL_TOKEN_DECLS(PipeAmpersand, "|&");
-SENTINEL_TOKEN_DECLS(TripleLess, "<<<");
-SENTINEL_TOKEN_DECLS(Dot, ".");
-
-SENTINEL_TOKEN_DECLS(LeftParen, "(");
-SENTINEL_TOKEN_DECLS(RightParen, ")");
-SENTINEL_TOKEN_DECLS(LeftBracket, "{");
-SENTINEL_TOKEN_DECLS(RightBracket, "}");
+TOKEN_DECLS(If, "if");
+TOKEN_DECLS(Then, "then");
+TOKEN_DECLS(Else, "else");
+TOKEN_DECLS(Elif, "elif");
+TOKEN_DECLS(Fi, "fi");
+TOKEN_DECLS(For, "for");
+TOKEN_DECLS(While, "while");
+TOKEN_DECLS(Until, "until");
+TOKEN_DECLS(Do, "do");
+TOKEN_DECLS(Done, "done");
+TOKEN_DECLS(Case, "case");
+TOKEN_DECLS(When, "when");
+TOKEN_DECLS(Esac, "esac");
+TOKEN_DECLS(Time, "time");
+TOKEN_DECLS(Function, "function");
+TOKEN_DECLS(Newline, "newline");
+TOKEN_DECLS(Semicolon, ";");
+TOKEN_DECLS(EndOfFile, "end of input");
+TOKEN_DECLS(DoubleSemicolon, ";;");
+TOKEN_DECLS(SemicolonAmpersand, ";&");
+TOKEN_DECLS(DoubleSemicolonAmpersand, ";;&");
+TOKEN_DECLS(AmpersandGreater, "&>");
+TOKEN_DECLS(AmpersandDoubleGreater, "&>>");
+TOKEN_DECLS(PipeAmpersand, "|&");
+TOKEN_DECLS(TripleLess, "<<<");
+TOKEN_DECLS(Dot, ".");
+TOKEN_DECLS(LeftParen, "(");
+TOKEN_DECLS(RightParen, ")");
+TOKEN_DECLS(RightBracket, "}");
 
 Assignment::Assignment(SourceLocation location, String key, Word value,
                        bool is_append)
@@ -662,11 +639,6 @@ Assignment::Assignment(SourceLocation location, String key, Word value,
 fn Assignment::kind() const wontthrow -> Token::Kind
 {
   return Token::Kind::Assignment;
-}
-
-fn Assignment::flags() const wontthrow -> Token::Flags
-{
-  return Token::Flag::Special;
 }
 
 fn Assignment::raw_string() const throws -> String
@@ -729,11 +701,6 @@ fn WordToken::raw_string() const throws -> String
 fn WordToken::kind() const wontthrow -> Token::Kind
 {
   return Token::Kind::Word;
-}
-
-fn WordToken::flags() const wontthrow -> Token::Flags
-{
-  return Token::Flag::Value;
 }
 
 pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }
@@ -806,98 +773,27 @@ fn create_word_token(BumpArena &arena, SourceLocation location,
   return arena.create<ExpandedWordToken>(steal(location), steal(word));
 }
 
-Operator::Operator(SourceLocation location) : Token(steal(location)) {}
-
-fn Operator::left_precedence() const wontthrow -> u8 { return 0; }
-
-fn Operator::unary_precedence() const wontthrow -> u8 { return 0; }
-
-fn Operator::binary_left_associative() const wontthrow -> bool { return true; }
-
-fn Operator::construct_binary_expression(const Expression *lhs,
-                                         const Expression *rhs) const throws
-    -> Expression *
-{
-  unused(lhs);
-  unused(rhs);
-  unreachable("Invalid binary operator construction of type %d", ENUM(kind()));
-}
-
-fn Operator::construct_unary_expression(const Expression *rhs) const throws
-    -> Expression *
-{
-  unused(rhs);
-  unreachable("Invalid unary operator construction of type %d", ENUM(kind()));
-}
-
-#define OPERATOR_TOKEN_DECLS(t, s, token_flags)                                \
-  t::t(SourceLocation location) : Operator(steal(location)) {}                 \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
-  Token::Flags t::flags() const wontthrow { return token_flags; }              \
-  String t::raw_string() const throws { return s; }                            \
-  Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
-
-#define BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)                         \
-  u8 t::left_precedence() const wontthrow { return bp; }                       \
-  Expression *t::construct_binary_expression(                                  \
-      const Expression *lhs, const Expression *rhs) const throws               \
-  {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                              \
-    return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
-  }
-
-#define UNARY_OPERATOR_TOKEN_DECLS_BODY(t, up, uexpr)                          \
-  u8 t::unary_precedence() const wontthrow { return up; }                      \
-  Expression *t::construct_unary_expression(const Expression *rhs)             \
-      const throws                                                             \
-  {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                              \
-    return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
-  }
-
-#define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
-  OPERATOR_TOKEN_DECLS(                                                        \
-      t, s, Token::Flag::BinaryOperator | Token::Flag::UnaryOperator)          \
-  BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)                               \
-  UNARY_OPERATOR_TOKEN_DECLS_BODY(t, up, uexpr)
-
-BINARY_UNARY_OPERATOR_TOKEN_DECLS(Plus, "+", 13, 11, Unnegate, Add);
-BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
-
-#define BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(t, s, bp, bexpr)                  \
-  OPERATOR_TOKEN_DECLS(                                                        \
-      t, s, Token::Flag::BinaryOperator | Token::Flag::CompoundList)           \
-  BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)
-
-#define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
-  OPERATOR_TOKEN_DECLS(t, s, Token::Flag::BinaryOperator)                      \
-  BINARY_OPERATOR_TOKEN_DECLS_BODY(t, bp, bexpr)
-
-BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(DoublePipe, "||", 4, LogicalOr);
-BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(Ampersand, "&", 7, BinaryAnd);
-BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(DoubleAmpersand, "&&", 4, LogicalAnd);
-
-BINARY_OPERATOR_TOKEN_DECLS(Slash, "/", 12, Divide);
-BINARY_OPERATOR_TOKEN_DECLS(Asterisk, "*", 12, Multiply);
-BINARY_OPERATOR_TOKEN_DECLS(Percent, "%", 12, Module);
-BINARY_OPERATOR_TOKEN_DECLS(Greater, ">", 8, GreaterThan);
-BINARY_OPERATOR_TOKEN_DECLS(DoubleGreater, ">>", 8, RightShift);
-BINARY_OPERATOR_TOKEN_DECLS(GreaterEquals, ">=", 8, GreaterOrEqual);
-BINARY_OPERATOR_TOKEN_DECLS(Less, "<", 8, LessThan);
-BINARY_OPERATOR_TOKEN_DECLS(DoubleLess, "<<", 8, LeftShift);
-BINARY_OPERATOR_TOKEN_DECLS(LessEquals, "<=", 8, LessOrEqual);
-BINARY_OPERATOR_TOKEN_DECLS(Pipe, "|", 5, BinaryOr);
-BINARY_OPERATOR_TOKEN_DECLS(Cap, "^", 9, Xor);
-BINARY_OPERATOR_TOKEN_DECLS(Equals, "=", 3, BinaryDummyExpression);
-BINARY_OPERATOR_TOKEN_DECLS(DoubleEquals, "==", 3, Equal);
-BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
-
-#define UNARY_OPERATOR_TOKEN_DECLS(t, s, up, uexpr)                            \
-  OPERATOR_TOKEN_DECLS(t, s, Token::Flag::UnaryOperator)                       \
-  UNARY_OPERATOR_TOKEN_DECLS_BODY(t, up, uexpr)
-
-UNARY_OPERATOR_TOKEN_DECLS(ExclamationMark, "!", 13, LogicalNot);
-UNARY_OPERATOR_TOKEN_DECLS(Tilde, "~", 13, BinaryComplement);
+TOKEN_DECLS(Plus, "+");
+TOKEN_DECLS(Minus, "-");
+TOKEN_DECLS(DoublePipe, "||");
+TOKEN_DECLS(Ampersand, "&");
+TOKEN_DECLS(DoubleAmpersand, "&&");
+TOKEN_DECLS(Slash, "/");
+TOKEN_DECLS(Asterisk, "*");
+TOKEN_DECLS(Percent, "%");
+TOKEN_DECLS(Greater, ">");
+TOKEN_DECLS(DoubleGreater, ">>");
+TOKEN_DECLS(GreaterEquals, ">=");
+TOKEN_DECLS(Less, "<");
+TOKEN_DECLS(DoubleLess, "<<");
+TOKEN_DECLS(LessEquals, "<=");
+TOKEN_DECLS(Pipe, "|");
+TOKEN_DECLS(Cap, "^");
+TOKEN_DECLS(Equals, "=");
+TOKEN_DECLS(DoubleEquals, "==");
+TOKEN_DECLS(ExclamationEquals, "!=");
+TOKEN_DECLS(ExclamationMark, "!");
+TOKEN_DECLS(Tilde, "~");
 
 } /* namespace tokens */
 

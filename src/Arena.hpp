@@ -11,6 +11,7 @@ class BumpArena
 {
 public:
   BumpArena();
+  explicit BumpArena(usize initial_block_size);
   ~BumpArena();
 
   BumpArena(const BumpArena &) = delete;
@@ -48,7 +49,10 @@ public:
   fn destructor_count() const wontthrow -> usize { return m_destructor_count; }
   fn destructor_capacity() const wontthrow -> usize
   {
-    return m_destructor_chunks.count() * DESTRUCTORS_PER_CHUNK;
+    if (m_destructor_chunks.is_empty()) return 0;
+
+    return FIRST_DESTRUCTOR_CHUNK_COUNT +
+           (m_destructor_chunks.count() - 1) * DESTRUCTORS_PER_CHUNK;
   }
   fn bytes_capacity() const wontthrow -> usize
   {
@@ -115,8 +119,9 @@ private:
     Mark payload_end;
     u32 incarnation{0};
     u32 next_free_position{UINT32_MAX};
-    bool is_active{false};
   };
+
+  static_assert(sizeof(usize) != 8 || sizeof(lifetime_slot) == 32);
 
   struct pending_destructor
   {
@@ -125,9 +130,9 @@ private:
   };
 
   static constexpr usize DEFAULT_BLOCK_SIZE = 64 * 1024;
-  /* One chunk is 64 KiB, the largest block the heap pool keeps on a free list.
-     A registry of two million entries grows by appending a chunk, and no
-     doubling copies the entries already registered. */
+  static constexpr usize FIRST_DESTRUCTOR_CHUNK_COUNT = 128;
+  /* Later chunks are 64 KiB, the largest block the heap pool keeps on a free
+     list. The first chunk holds 128 records for small arenas. */
   static constexpr usize DESTRUCTORS_PER_CHUNK =
       DEFAULT_BLOCK_SIZE / sizeof(pending_destructor);
 
@@ -148,7 +153,7 @@ private:
      the blocks it reclaimed are handed out again. */
   usize m_current_index{0};
 
-  fn add_block(usize minimum_size) throws -> void;
+  fn add_block(usize minimum_size, usize preferred_size) throws -> void;
   fn push_destructor(pending_destructor pending) throws -> void;
   /* Run and drop every registered destructor from the index down to first, in
      reverse of registration so an object tears down before the one it followed.

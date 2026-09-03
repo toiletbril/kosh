@@ -794,51 +794,33 @@ fn exit() -> void
 
 fn get_input(const String &prompt) -> input_result
 {
+  let completion_base_directory = koshka::Maybe<Path>{};
+  let completion_storage =
+      koshka::Maybe<koshka::completion::completion_result>{};
 #if !defined NDEBUG
-  let const preprompt_directory_stat_count_before =
-      utils::debug_directory_stat_count();
-  let const preprompt_directory_read_count_before =
-      utils::debug_directory_read_count();
-  let const preprompt_directory_sort_count_before =
-      utils::debug_directory_sort_count();
-  let const preprompt_executable_probe_count_before =
-      utils::debug_executable_probe_count();
-  let const preprompt_program_path_candidate_count_before =
-      utils::debug_program_path_candidate_count();
+  let const cwd_capture_count_before = DEBUG_COMPLETION_CWD_CAPTURE_COUNT;
 #endif
+  if (completion_is_enabled()) {
+    HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
+    HIGHLIGHT_STYLED_UNDERLINES_ENABLED =
+        colors::terminal_supports_styled_underlines();
+    completion_base_directory = Path::current_directory();
+    completion_storage = koshka::completion::completion_result{
+        koshka::ArrayList<koshka::String>{koshka::heap_allocator()},
+        koshka::StringMap<koshka::String>{koshka::heap_allocator()},
+        koshka::String{koshka::heap_allocator()},
+        0,
+        0,
+        0,
+        0,
+        0,
+        false};
+    COMPLETION_BASE_DIRECTORY = &*completion_base_directory;
+    COMPLETION_RESULT = &*completion_storage;
 #if !defined NDEBUG
-  let const preprompt_directory_stat_count =
-      utils::debug_directory_stat_count() -
-      preprompt_directory_stat_count_before;
-  let const preprompt_directory_read_count =
-      utils::debug_directory_read_count() -
-      preprompt_directory_read_count_before;
-  let const preprompt_directory_sort_count =
-      utils::debug_directory_sort_count() -
-      preprompt_directory_sort_count_before;
-  let const preprompt_executable_probe_count =
-      utils::debug_executable_probe_count() -
-      preprompt_executable_probe_count_before;
-  let const preprompt_program_path_candidate_count =
-      utils::debug_program_path_candidate_count() -
-      preprompt_program_path_candidate_count_before;
+    DEBUG_COMPLETION_CWD_CAPTURE_COUNT++;
 #endif
-  HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
-  HIGHLIGHT_STYLED_UNDERLINES_ENABLED =
-      colors::terminal_supports_styled_underlines();
-  let const completion_base_directory = Path::current_directory();
-  let completion_result = koshka::completion::completion_result{
-      koshka::ArrayList<koshka::String>{koshka::heap_allocator()},
-      koshka::StringMap<koshka::String>{koshka::heap_allocator()},
-      koshka::String{koshka::heap_allocator()},
-      0,
-      0,
-      0,
-      0,
-      0,
-      false};
-  COMPLETION_BASE_DIRECTORY = &completion_base_directory;
-  COMPLETION_RESULT = &completion_result;
+  }
 #if !defined NDEBUG
   let const append_refresh_count_before = ::itl_g_debug_append_refresh_count;
   let const full_refresh_count_before = ::itl_g_debug_full_refresh_count;
@@ -848,7 +830,6 @@ fn get_input(const String &prompt) -> input_result
   let const history_scan_count_before = ::itl_g_debug_ghost_history_scan_count;
   let const history_buffer_load_count_before =
       ::itl_g_debug_history_buffer_load_count;
-  let const cwd_capture_count_before = DEBUG_COMPLETION_CWD_CAPTURE_COUNT++;
   let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
   let const directory_stat_count_before = utils::debug_directory_stat_count();
@@ -891,21 +872,6 @@ fn get_input(const String &prompt) -> input_result
         " history-loads=" +
         koshka::String::from(::itl_g_debug_history_buffer_load_count -
                                  history_buffer_load_count_before,
-                             koshka::heap_allocator()) +
-        " preprompt-stats=" +
-        koshka::String::from(preprompt_directory_stat_count,
-                             koshka::heap_allocator()) +
-        " preprompt-reads=" +
-        koshka::String::from(preprompt_directory_read_count,
-                             koshka::heap_allocator()) +
-        " preprompt-sorts=" +
-        koshka::String::from(preprompt_directory_sort_count,
-                             koshka::heap_allocator()) +
-        " preprompt-probes=" +
-        koshka::String::from(preprompt_executable_probe_count,
-                             koshka::heap_allocator()) +
-        " preprompt-resolutions=" +
-        koshka::String::from(preprompt_program_path_candidate_count,
                              koshka::heap_allocator()) +
         " cwd=" +
         koshka::String::from(DEBUG_COMPLETION_CWD_CAPTURE_COUNT -

@@ -18,18 +18,20 @@ run_editor()
 {
     transcript=$1
     columns=${2-80}
+    EDITOR_OPTIONS=${EDITOR_OPTIONS-}
+    export EDITOR_OPTIONS
     script_error=$transcript.script-error
     recorder_status=0
     if [ "$script_style" = gnu ]; then
         "$script_command" -q -c \
-            "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
+            "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\" \${EDITOR_OPTIONS-}" \
             "$transcript" >/dev/null 2>"$script_error" || recorder_status=$?
     elif [ -n "$expect_command" ]; then
         TRANSCRIPT="$transcript" COLUMNS="$columns" "$expect_command" -c '
             set timeout 10
             log_user 0
             log_file -noappend $env(TRANSCRIPT)
-            spawn -noecho /bin/sh -c "/bin/stty cols $env(COLUMNS) rows 24; exec \"$env(BIN)\" -i --rcfile \"$env(RCFILE)\""
+            spawn -noecho /bin/sh -c "/bin/stty cols $env(COLUMNS) rows 24; exec \"$env(BIN)\" -i --rcfile \"$env(RCFILE)\" $env(EDITOR_OPTIONS)"
             set editor_pid [exp_pid]
             set wall_timeout [after 30000 {
                 puts stderr "editor recorder exceeded 30 seconds"
@@ -71,7 +73,7 @@ run_editor()
         ' >/dev/null 2>"$script_error" || recorder_status=$?
     else
         "$script_command" -q /dev/null /bin/sh -c \
-            "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\"" \
+            "/bin/stty cols $columns rows 24; exec \"\$BIN\" -i --rcfile \"\$RCFILE\" \${EDITOR_OPTIONS-}" \
             >"$transcript" 2>"$script_error" || recorder_status=$?
     fi
     if [ "$recorder_status" -ne 0 ]; then
@@ -181,6 +183,32 @@ test "$(metric_field "$path_metrics" serializations)" -le 6 || exit 1
 case $path_metrics in *' materialized=0'*) ;; *) exit 1 ;; esac
 echo 'PATH ghost completion stays bounded while typing'
 
+send_unhighlighted_input()
+{
+    wait_for_editor "$d/unhighlighted-ready" || exit 1
+    printf 'probe\n'
+    sleep 0.2
+    printf 'probe-\t\n'
+    sleep 0.2
+    printf 'exit 0\n'
+    sleep 0.5
+}
+
+send_unhighlighted_input | TERM=xterm-256color PATH="$d/path" \
+    EDITOR_OPTIONS=--no-syntax-highlighting KOSH_TEST_EDITOR_STATS=1 \
+    EDITOR_READY_FILE="$d/unhighlighted-ready" \
+    KOSH_HISTORY="$d/unhighlighted-history" BIN="$BIN" \
+    run_editor "$d/unhighlighted-typescript" || exit 1
+
+unhighlighted_metrics=$(metric_line "$d/unhighlighted-typescript" 1) || exit 1
+test "$(metric_field "$unhighlighted_metrics" stats)" -eq 0 || exit 1
+test "$(metric_field "$unhighlighted_metrics" reads)" -eq 0 || exit 1
+test "$(metric_field "$unhighlighted_metrics" sorts)" -eq 0 || exit 1
+test "$(metric_field "$unhighlighted_metrics" probes)" -eq 0 || exit 1
+test "$(metric_field "$unhighlighted_metrics" resolutions)" -eq 0 || exit 1
+strings "$d/unhighlighted-typescript" | grep -q probe-alpha || exit 1
+echo 'disabled highlighting defers PATH work until TAB'
+
 tab_unrelated_index=0
 while [ "$tab_unrelated_index" -lt 32 ]; do
     printf '#!/bin/sh\n' > "$d/path/unrelated-command-$tab_unrelated_index"
@@ -218,10 +246,6 @@ warm_metrics=$(metric_line "$d/tab-typescript" 3) || {
         /bin/cat "$d/tab-typescript.script-error"
     exit 1
 }
-case $warm_metrics in
-    *' preprompt-stats=0 preprompt-reads=0 preprompt-sorts=0 preprompt-probes=0 preprompt-resolutions=0 '*) ;;
-    *) exit 1 ;;
-esac
 test "$(metric_field "$warm_metrics" stats)" -eq 0 || exit 1
 test "$(metric_field "$warm_metrics" reads)" -eq 0 || exit 1
 test "$(metric_field "$warm_metrics" sorts)" -eq 0 || exit 1
@@ -256,6 +280,7 @@ history_metrics=$(metric_line "$d/history-typescript" 2) || exit 1
 history_entry_scan_count=$(metric_field "$history_metrics" history-scans)
 test "$history_entry_scan_count" -ge 32 || exit 1
 test "$history_entry_scan_count" -le 33 || exit 1
+case $history_short_metrics in *' history-loads=1 '*) ;; *) exit 1 ;; esac
 case $history_metrics in *' history-loads=0 '*) ;; *) exit 1 ;; esac
 history_short_scan_count=$(metric_field "$history_short_metrics" scans)
 history_scan_count=$(metric_field "$history_metrics" scans)

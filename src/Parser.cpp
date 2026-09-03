@@ -236,6 +236,19 @@ hot pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
   }
 }
 
+hot pure static fn is_compound_list_separator(Token::Kind kind) wontthrow
+    -> bool
+{
+  switch (kind) {
+  case Token::Kind::Newline:
+  case Token::Kind::Semicolon:
+  case Token::Kind::Ampersand:
+  case Token::Kind::DoubleAmpersand:
+  case Token::Kind::DoublePipe: return true;
+  default: return false;
+  }
+}
+
 flatten fn Parser::construct_ast() throws -> Expression *
 {
   return parse_command_list(0);
@@ -243,9 +256,11 @@ flatten fn Parser::construct_ast() throws -> Expression *
 
 fn Parser::construct_next_top_level_ast() throws -> Expression *
 {
-  m_lexer.set_should_collect_shellcheck_directives(true);
+  if (m_should_collect_analysis_metadata)
+    m_lexer.set_should_collect_shellcheck_directives(true);
   let const first_token = m_lexer.peek_shell_token();
-  m_lexer.set_should_collect_shellcheck_directives(false);
+  if (m_should_collect_analysis_metadata)
+    m_lexer.set_should_collect_shellcheck_directives(false);
   if (first_token->kind() == Token::Kind::EndOfFile) return nullptr;
 
   m_should_stop_after_top_level_unit = true;
@@ -374,7 +389,8 @@ cold fn Parser::construct_ast(
     /* An unterminated quote or here-document is raised by the token read
        itself, so the scan for the next command records it and stops. */
     Token *token = nullptr;
-    m_lexer.set_should_collect_shellcheck_directives(true);
+    if (m_should_collect_analysis_metadata)
+      m_lexer.set_should_collect_shellcheck_directives(true);
     try {
       token = m_lexer.peek_shell_token();
     } catch (const ErrorWithLocationAndDetails &e) {
@@ -382,7 +398,8 @@ cold fn Parser::construct_ast(
     } catch (const ErrorWithLocation &e) {
       record_parse_error(e, errors, context, diagnostic_sink);
     }
-    m_lexer.set_should_collect_shellcheck_directives(false);
+    if (m_should_collect_analysis_metadata)
+      m_lexer.set_should_collect_shellcheck_directives(false);
     if (token == nullptr) break;
 
     last_location = token->source_location();
@@ -429,7 +446,8 @@ cold fn Parser::construct_next_top_level_ast(
   loop
   {
     Token *token = nullptr;
-    m_lexer.set_should_collect_shellcheck_directives(true);
+    if (m_should_collect_analysis_metadata)
+      m_lexer.set_should_collect_shellcheck_directives(true);
     try {
       token = m_lexer.peek_shell_token();
     } catch (const ErrorWithLocationAndDetails &e) {
@@ -437,7 +455,8 @@ cold fn Parser::construct_next_top_level_ast(
     } catch (const ErrorWithLocation &e) {
       record_parse_error(e, errors, context, diagnostic_sink);
     }
-    m_lexer.set_should_collect_shellcheck_directives(false);
+    if (m_should_collect_analysis_metadata)
+      m_lexer.set_should_collect_shellcheck_directives(false);
 
     if (token == nullptr || token->kind() == Token::Kind::EndOfFile)
       return nullptr;
@@ -530,44 +549,50 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
       /* A leading time keyword times the command or pipeline that follows. bash
          allows it before the ! negation, and -p or --posix selects the POSIX
          report. */
-      let const should_collect_directives =
-          next_cond == CompoundListCondition::Kind::None;
-      m_lexer.set_should_collect_shellcheck_directives(
-          should_collect_directives);
-      Token *maybe_time = m_lexer.peek_shell_token();
-      let directives = m_lexer.take_shellcheck_directives();
-      m_lexer.set_should_collect_shellcheck_directives(false);
-      ASSERT(maybe_time != nullptr);
-      while (!directives.is_empty() &&
-             maybe_time->kind() == Token::Kind::Newline)
-      {
-        m_lexer.advance_past_last_peek();
-        m_lexer.set_should_collect_shellcheck_directives(true);
+      Token *maybe_time = nullptr;
+      if (m_should_collect_analysis_metadata) {
+        let const should_collect_directives =
+            next_cond == CompoundListCondition::Kind::None;
+        m_lexer.set_should_collect_shellcheck_directives(
+            should_collect_directives);
         maybe_time = m_lexer.peek_shell_token();
-        let following_directives = m_lexer.take_shellcheck_directives();
+        let directives = m_lexer.take_shellcheck_directives();
         m_lexer.set_should_collect_shellcheck_directives(false);
-        for (let const &directive : following_directives)
-          directives.push(directive);
+        while (!directives.is_empty() &&
+               maybe_time->kind() == Token::Kind::Newline)
+        {
+          m_lexer.advance_past_last_peek();
+          m_lexer.set_should_collect_shellcheck_directives(true);
+          maybe_time = m_lexer.peek_shell_token();
+          let following_directives = m_lexer.take_shellcheck_directives();
+          m_lexer.set_should_collect_shellcheck_directives(false);
+          for (let const &directive : following_directives)
+            directives.push(directive);
+        }
+        let const is_source_command =
+            maybe_time->kind() != Token::Kind::Newline &&
+            maybe_time->kind() != Token::Kind::EndOfFile;
+        let const is_first_source_command =
+            is_source_command && !m_has_parsed_source_command;
+        if (is_source_command) m_has_parsed_source_command = true;
+        if (!directives.is_empty()) {
+          let const source = m_lexer.source();
+          let selectors = ArrayList<shellcheck_selector>{heap_allocator()};
+          for (let const &directive : directives)
+            collect_shellcheck_selectors(source, directive, selectors);
+          m_shellcheck_suppressions.push(shellcheck_suppression{
+              maybe_time->source_location().position,
+              is_first_source_command ? static_cast<usize>(-1)
+                                      : maybe_time->source_location().position,
+              steal(selectors)});
+          if (!is_first_source_command)
+            active_shellcheck_suppression =
+                m_shellcheck_suppressions.count() - 1;
+        }
+      } else {
+        maybe_time = m_lexer.peek_shell_token();
       }
-      let const is_source_command =
-          maybe_time->kind() != Token::Kind::Newline &&
-          maybe_time->kind() != Token::Kind::EndOfFile;
-      let const is_first_source_command =
-          is_source_command && !m_has_parsed_source_command;
-      if (is_source_command) m_has_parsed_source_command = true;
-      if (!directives.is_empty()) {
-        let const source = m_lexer.source();
-        let selectors = ArrayList<shellcheck_selector>{heap_allocator()};
-        for (let const &directive : directives)
-          collect_shellcheck_selectors(source, directive, selectors);
-        m_shellcheck_suppressions.push(shellcheck_suppression{
-            maybe_time->source_location().position,
-            is_first_source_command ? static_cast<usize>(-1)
-                                    : maybe_time->source_location().position,
-            steal(selectors)});
-        if (!is_first_source_command)
-          active_shellcheck_suppression = m_shellcheck_suppressions.count() - 1;
-      }
+      ASSERT(maybe_time != nullptr);
       const Token *leading_command_token = nullptr;
       if (maybe_time->kind() == Token::Kind::Time) {
         time_location = maybe_time->source_location();
@@ -1397,7 +1422,7 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
       }
 
       if (local_vars.count() == 0 &&
-          (next->flags() & Token::Flag::CompoundList ||
+          (is_compound_list_separator(next->kind()) ||
            next->kind() == Token::Kind::EndOfFile ||
            is_compound_terminator(next->kind())))
       {

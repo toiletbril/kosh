@@ -115,6 +115,10 @@ public:
 
   fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
       -> void;
+  fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
+  {
+    m_should_collect_analysis_metadata = should_collect;
+  }
   fn take_shellcheck_directives() throws
       -> ArrayList<shellcheck_directive_span>;
   fn take_shellcheck_directive_spans() throws
@@ -157,6 +161,7 @@ protected:
   usize m_last_collected_word_position{static_cast<usize>(-1)};
 
   bool m_last_shell_token_was_newline{false};
+  bool m_should_collect_analysis_metadata{false};
   bool m_should_collect_shellcheck_directives{false};
   ArrayList<shellcheck_directive_span> m_pending_shellcheck_directives{
       heap_allocator()};

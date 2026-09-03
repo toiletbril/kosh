@@ -388,6 +388,10 @@ static fn kosh_main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
+  if (koshka::Maybe<int> code =
+          koshka::print_help_or_version_status(program_path))
+    return *code;
+
   /* A basename of sh or dash selects POSIX mode and a basename of bash selects
      bash mode, so a symlink named after a system shell behaves like it. */
   usize program_basename_start = 0;
@@ -438,10 +442,6 @@ static fn kosh_main(int argc, char **argv) -> int
       : session_mood == koshka::mimic_mood::Bash      ? "bash"
       : session_mood == koshka::mimic_mood::BashPosix ? "bash-posix"
                                                       : "default");
-
-  if (koshka::Maybe<int> code =
-          koshka::print_help_or_version_status(program_path))
-    return *code;
 
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
      convention, the same mark -l sets. */
@@ -635,7 +635,7 @@ static fn kosh_main(int argc, char **argv) -> int
   /* A script file or a -c run takes its first operand as $0 and the rest as the
      arguments, while an interactive or -s shell keeps the shell name as $0 and
      takes every operand as a positional parameter. */
-  let shell_name = program_path.clone();
+  let shell_name = steal(program_path);
   let positional_params =
       koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
 
@@ -667,12 +667,14 @@ static fn kosh_main(int argc, char **argv) -> int
                                     FLAG_EXPAND_VERBOSE.is_enabled(),
                                     should_be_interactive,
                                     FLAG_ERROR_EXIT.is_enabled(),
-                                    shell_name.clone(),
+                                    steal(shell_name),
                                     steal(positional_params)};
 
   koshka::utils::set_quit_context(&context);
 
-  context.set_cli_invocation(koshka::join_command_line(parse_argc, parse_argv));
+  let cli_invocation = koshka::String{koshka::heap_allocator()};
+  if (should_execute_commands || should_read_files)
+    cli_invocation = koshka::join_command_line(parse_argc, parse_argv);
 
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_show_ast(FLAG_AST.is_enabled());
@@ -986,7 +988,7 @@ static fn kosh_main(int argc, char **argv) -> int
                     operand_location, "Unable to " + verb + " `" +
                                           file_name.view() +
                                           "` because the file is a directory"}
-                    .to_string(context.cli_invocation().view(), &context));
+                    .to_string(cli_invocation.view(), &context));
             if (!FLAG_LINT.is_enabled()) {
               koshka::utils::quit(126, koshka::utils::farewell_policy::Goodbye);
             }
@@ -1010,12 +1012,12 @@ static fn kosh_main(int argc, char **argv) -> int
               if (hint.is_empty()) {
                 koshka::show_message(
                     koshka::ErrorWithLocation{operand_location, message}
-                        .to_string(context.cli_invocation().view(), &context));
+                        .to_string(cli_invocation.view(), &context));
               } else {
                 koshka::show_message(
                     koshka::ErrorWithLocationAndDetails{operand_location,
                                                         message, hint.view()}
-                        .to_string(context.cli_invocation().view(), &context));
+                        .to_string(cli_invocation.view(), &context));
               }
               if (!FLAG_LINT.is_enabled()) {
                 koshka::utils::quit(127,
@@ -1214,8 +1216,7 @@ static fn kosh_main(int argc, char **argv) -> int
 
     if (root_frame_call_site.has_value() && !should_suppress_root_source_trace)
     {
-      context.push_root_source_frame(&context.cli_invocation(),
-                                     *root_frame_call_site,
+      context.push_root_source_frame(&cli_invocation, *root_frame_call_site,
                                      FLAG_COMMAND.count() <= 1);
     }
     defer

@@ -375,7 +375,9 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
     let const is_delimiter = (delimiter == stripped);
     did_find_delimiter = did_find_delimiter || is_delimiter;
 
-    if (!is_delimiter && !has_near_miss && line_length > delimiter.length) {
+    if (m_should_collect_analysis_metadata && !is_delimiter && !has_near_miss &&
+        line_length > delimiter.length)
+    {
       usize content_start = line_offset;
       usize content_end = line_offset + line_length;
       while (content_start < content_end && (m_source[content_start] == ' ' ||
@@ -514,11 +516,7 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
         if (comment_byte == '\n' || comment_byte == lexer::CEOF) break;
         i++;
       }
-      /* The comment is classified whether or not a command is claiming
-         directives, since the analysis stage reports a misplaced directive that
-         no command would claim. The leading byte compare rejects an ordinary
-         comment before anything is read. */
-      {
+      if (m_should_collect_analysis_metadata) {
         let comment = m_source.substring_of_length(
             m_cursor_position + comment_start, i - comment_start);
         usize content_position = 1;
@@ -817,7 +815,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
          quotes the $' is literal, so bash leaves "$'x'" as the three bytes. */
       if (next == '\'' && bash_additions_enabled() && !is_in_double_quotes) {
         byte_count++;
-        let ansi_body = String{heap_allocator()};
+        let const ansi_body_start = byte_count;
         loop
         {
           let const c = chop_character(byte_count);
@@ -829,17 +827,17 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           }
           byte_count++;
           if (c == '\'') break;
-          ansi_body.push(c);
           if (c == '\\') {
             let const escaped = chop_character(byte_count);
-            if (escaped == lexer::CEOF) break;
-            byte_count++;
-            ansi_body.push(escaped);
+            if (escaped != lexer::CEOF) byte_count++;
           }
         }
 
         let decoded = String{heap_allocator()};
-        utils::decode_ansi_c_escapes(decoded, ansi_body.view());
+        utils::decode_ansi_c_escapes(
+            decoded,
+            m_source.substring_of_length(m_cursor_position + ansi_body_start,
+                                         byte_count - ansi_body_start - 1));
 
         /* An empty $'' still produces one empty field, the way '' and "" do. */
         if (decoded.is_empty()) {
@@ -868,7 +866,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
            of $( (cmd) ). */
         if (chop_character(byte_count) == '(') {
           byte_count++;
-          let arithmetic = String{heap_allocator()};
+          let const arithmetic_start = byte_count;
           usize group_depth = 0;
           loop
           {
@@ -883,27 +881,22 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                $(...) are copied as balanced units so a ) inside them is text.
              */
             if (c == '\\') {
-              arithmetic += c;
               byte_count++;
               let const escaped = chop_character(byte_count);
               if (escaped != lexer::CEOF) {
-                arithmetic += escaped;
                 byte_count++;
               }
             } else if (c == '\'' || c == '"') {
               let const quote = c;
-              arithmetic += c;
               byte_count++;
               loop
               {
                 let const q = chop_character(byte_count);
                 if (q == lexer::CEOF) break;
-                arithmetic += q;
                 byte_count++;
                 if (quote == '"' && q == '\\') {
                   let const escaped = chop_character(byte_count);
                   if (escaped != lexer::CEOF) {
-                    arithmetic += escaped;
                     byte_count++;
                   }
                   continue;
@@ -911,18 +904,15 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                 if (q == quote) break;
               }
             } else if (c == '`') {
-              arithmetic += c;
               byte_count++;
               loop
               {
                 let const b = chop_character(byte_count);
                 if (b == lexer::CEOF) break;
-                arithmetic += b;
                 byte_count++;
                 if (b == '\\') {
                   let const escaped = chop_character(byte_count);
                   if (escaped != lexer::CEOF) {
-                    arithmetic += escaped;
                     byte_count++;
                   }
                   continue;
@@ -930,9 +920,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                 if (b == '`') break;
               }
             } else if (c == '$' && chop_character(byte_count + 1) == '(') {
-              arithmetic += c;
               byte_count++;
-              arithmetic += chop_character(byte_count);
               byte_count++;
               usize paren_depth = 1;
               char nested_quote = 0;
@@ -940,13 +928,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
               {
                 let const p = chop_character(byte_count);
                 if (p == lexer::CEOF) break;
-                arithmetic += p;
                 byte_count++;
                 if (nested_quote != 0) {
                   if (nested_quote == '"' && p == '\\') {
                     let const escaped = chop_character(byte_count);
                     if (escaped != lexer::CEOF) {
-                      arithmetic += escaped;
                       byte_count++;
                     }
                     continue;
@@ -957,7 +943,6 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                 if (p == '\\') {
                   let const escaped = chop_character(byte_count);
                   if (escaped != lexer::CEOF) {
-                    arithmetic += escaped;
                     byte_count++;
                   }
                   continue;
@@ -973,23 +958,23 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
               }
             } else if (c == '(') {
               group_depth++;
-              arithmetic += c;
               byte_count++;
             } else if (c == ')' && group_depth > 0) {
               group_depth--;
-              arithmetic += c;
               byte_count++;
             } else if (c == ')' && chop_character(byte_count + 1) == ')') {
               byte_count += 2;
               break;
             } else {
-              arithmetic += c;
               byte_count++;
             }
           }
           word.segments.push(WordSegment{
               WordSegment::Kind::ArithmeticExpansion,
-              SegmentText{bump_allocator(arena()), arithmetic.view()},
+              SegmentText{bump_allocator(arena()),
+                          m_source.substring_of_length(
+                              m_cursor_position + arithmetic_start,
+                          byte_count - arithmetic_start - 2)},
               is_in_double_quotes
           });
           word.segments.back().set_source_span(
@@ -1018,7 +1003,6 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             m_cursor_position + expansion_start, byte_count - expansion_start);
       } else if (next == '{') {
         byte_count++;
-        let name = String{heap_allocator()};
         /* A ${ followed by whitespace is the bash 5.3 funsub, a command body
            run in the current shell. The leading whitespace drops. */
         bool is_function_substitution = false;
@@ -1030,6 +1014,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             probe = chop_character(byte_count);
           }
         }
+        let const name_start = byte_count;
         /* Only a nested ${ raises the depth, so a bare { does not, matching
            dash. A nested $(...), backtick, quote, or escape shields its }. */
         usize brace_depth = 1;
@@ -1047,41 +1032,33 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
           if (quote == '\'') {
             if (c == '\'') quote = 0;
-            name += c;
             continue;
           }
           if (c == '\\') {
-            name += c;
             let const escaped = chop_character(byte_count);
             if (escaped != lexer::CEOF) {
               byte_count++;
-              name += escaped;
             }
             continue;
           }
           if (quote == '"') {
             if (c == '"') quote = 0;
-            name += c;
             continue;
           }
           if (c == '\'' || c == '"') {
             quote = c;
-            name += c;
             continue;
           }
           if (c == '`') {
-            name += c;
             loop
             {
               let const b = chop_character(byte_count);
               if (b == lexer::CEOF) break;
               byte_count++;
-              name += b;
               if (b == '\\') {
                 let const escaped = chop_character(byte_count);
                 if (escaped != lexer::CEOF) {
                   byte_count++;
-                  name += escaped;
                 }
                 continue;
               }
@@ -1090,8 +1067,6 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
             continue;
           }
           if (c == '$' && chop_character(byte_count) == '(') {
-            name += c;
-            name += chop_character(byte_count);
             byte_count++;
             usize paren_depth = 1;
             char nested_quote = 0;
@@ -1100,13 +1075,11 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
               let const p = chop_character(byte_count);
               if (p == lexer::CEOF) break;
               byte_count++;
-              name += p;
               if (nested_quote != 0) {
                 if (nested_quote == '"' && p == '\\') {
                   let const escaped = chop_character(byte_count);
                   if (escaped != lexer::CEOF) {
                     byte_count++;
-                    name += escaped;
                   }
                   continue;
                 }
@@ -1117,7 +1090,6 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
                 let const escaped = chop_character(byte_count);
                 if (escaped != lexer::CEOF) {
                   byte_count++;
-                  name += escaped;
                 }
                 continue;
               }
@@ -1134,8 +1106,6 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           }
           if (c == '$' && chop_character(byte_count) == '{') {
             brace_depth++;
-            name += c;
-            name += chop_character(byte_count);
             byte_count++;
             continue;
           }
@@ -1143,21 +1113,20 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
              close the substitution. */
           if (c == '{' && is_function_substitution) {
             brace_depth++;
-            name += c;
             continue;
           }
           if (c == '}') {
             brace_depth--;
             if (brace_depth == 0) break;
-            name += c;
             continue;
           }
-          name += c;
         }
+        let const name = m_source.substring_of_length(
+            m_cursor_position + name_start, byte_count - name_start - 1);
         word.segments.push(WordSegment{
             is_function_substitution ? WordSegment::Kind::FunctionSubstitution
                                      : WordSegment::Kind::VariableReference,
-            SegmentText{bump_allocator(arena()), name.view()},
+            SegmentText{bump_allocator(arena()), name},
             is_in_double_quotes
         });
         let &expansion_segment = word.segments.back();

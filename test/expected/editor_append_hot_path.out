@@ -1,5 +1,6 @@
 single-row typing uses incremental refresh
 PATH ghost completion stays bounded while typing
+disabled highlighting defers PATH work until TAB
 TAB validation ends before the next key
 repeated warm TAB and absolute PATH perform no PATH work after cd
 rejected history prefixes scan once without walking PATH

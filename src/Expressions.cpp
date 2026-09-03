@@ -1579,7 +1579,7 @@ fn analyze_followed_source(AnalysisContext &actx,
       Lexer{contents->view(), *AST_ARENA, false, canonical_path->text().view(),
             actx.eval_context->mood()}
   };
-  parser.set_should_collect_analysis_scopes(true);
+  parser.set_should_collect_analysis_metadata(true);
 
   let parse_errors = ArrayList<String>{heap_allocator()};
   let const child_diagnostic_start =
