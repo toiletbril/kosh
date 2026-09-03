@@ -495,6 +495,8 @@ public:
             try {
               result =
                   arith_apply_binop(kind, lhs, rhs, is_exact, arena, bc_scale);
+            } catch (const ErrorWithLocation &) {
+              throw;
             } catch (const ErrorBase &error) {
               fail_span(rhs_start, pos, error.message().view(),
                         error.detail_message());
@@ -831,6 +833,8 @@ public:
                 "This function requires an integer value");
     try {
       return ArithmeticValue::integer_part(argument, arena).checked_i64();
+    } catch (const ErrorWithLocation &) {
+      throw;
     } catch (const ErrorBase &error) {
       fail_span(argument.start, argument.end, error.message().view(),
                 error.detail_message());
@@ -2085,7 +2089,7 @@ fn EvalContext::evaluate_arithmetic(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   let const value = evaluate_arithmetic_value(this, expression, expression_base,
                                               is_exact, m_scratch_arena);
   return is_exact ? value.checked_i64() : value.wrapped_i64();
@@ -2097,7 +2101,7 @@ fn EvalContext::evaluate_arithmetic_text(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   let const value = evaluate_arithmetic_value(this, expression, expression_base,
                                               is_exact, m_scratch_arena);
   return value.to_string(heap_allocator());
@@ -2109,7 +2113,7 @@ fn EvalContext::evaluate_calculator_arithmetic_text(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   const SourceLocation synthetic_base{0, 0};
   let const base =
       expression_base != nullptr ? expression_base : &synthetic_base;
@@ -2134,7 +2138,7 @@ fn EvalContext::evaluate_arithmetic_nonzero(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   return !evaluate_arithmetic_value(this, expression, expression_base, is_exact,
                                     m_scratch_arena)
               .is_zero();
@@ -2145,7 +2149,7 @@ fn EvalContext::compare_arithmetic(StringView left, StringView right) throws
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   let const left_value =
       evaluate_arithmetic_value(this, left, nullptr, is_exact, m_scratch_arena);
   let const right_value = evaluate_arithmetic_value(this, right, nullptr,
@@ -2216,7 +2220,7 @@ fn EvalContext::evaluate_arithmetic_cached_text(
     cache.arithmetic_lifetime = cache_arena->register_lifetime();
   }
 
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   if (is_exact && cache.arith->has_exact_constant_text) {
     return String{scratch_allocator(), cache.arith->exact_constant_text.view()};
   }
@@ -2285,7 +2289,7 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   let const value = evaluate_arithmetic_cached_value(
       this, expression, tokens, is_tokenized, is_simple, source_location,
       is_exact, m_scratch_arena);
@@ -2298,7 +2302,7 @@ fn EvalContext::evaluate_arithmetic_cached_clause_nonzero(
 {
   let const scratch = scratch_mark();
   defer { scratch_release(scratch); };
-  let const is_exact = mood() == mimic_mood::Default;
+  let const is_exact = is_extended_arithmetic_enabled();
   return !evaluate_arithmetic_cached_value(
               this, expression, tokens, is_tokenized, is_simple,
               source_location, is_exact, m_scratch_arena)

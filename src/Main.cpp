@@ -27,7 +27,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file> [argument ...]",
                    "[-OPTIONS] -c <script1> [-c <script2> ...] [argument ...]",
                    "[-OPTIONS] (--lint [--format] | --format) [--apply] [file ...]",
-                   "[-OPTIONS] --language-server");
+                   "[-OPTIONS] --as-language-server");
 /* clang-format on */
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
@@ -71,7 +71,7 @@ FLAG(RESTRICTED, Bool, 'r', "restricted", Bash,
      "Start a restricted shell after the startup files finish.");
 FLAG(PRIVILEGED, Bool, 'p', "privileged", Bash,
      "Run privileged, suppressing BASH_ENV. Unequal ids skip startup files.");
-FLAG(CLEAN, Bool, '\0', "clean", Kosh,
+FLAG(CLEAN, Bool, 'Q', "no-init-files", Kosh,
      "Start clean, reading no startup file and setting a minimal PATH.");
 FLAG(POSIX_COMPAT, Bool, '\0', "posix", Bash,
      "Run in bash POSIX mode, equivalent to --mood bash-posix.");
@@ -83,11 +83,11 @@ FLAG(MOOD, String, 'M', "mood", Compat,
 FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
      "Source the startup files for each listed mood, in order, comma separated "
      "or by repeating the flag. Defaults to --mood.");
-FLAG(MIMICRY, Bool, 'I', "mimicry", Compat,
+FLAG(MIMICRY, Bool, 'I', "enable-mimicry", Compat,
      "Mimic the shell a script's shebang names, running a known shell shebang "
      "in-process in the matching mode.");
 FLAG(DUMB, Bool, '\0', "dumb", Compat,
-     "Make the shell extremely dumb. Equivalent to --mood sh -T "
+     "Make the shell extremely dumb. Equivalent to --mood sh --no-completion "
      "--no-diagnostics.");
 
 FLAG(LINT, Bool, '\0', "lint", Auxiliary,
@@ -97,7 +97,7 @@ FLAG(FORMAT, Bool, '\0', "format", Auxiliary,
      "Format shell input without running it. Read one file or standard input.");
 FLAG(APPLY, Bool, '\0', "apply", Auxiliary,
      "Apply lint fixes or formatted output to named files.");
-FLAG(LANGUAGE_SERVER, Bool, '\0', "language-server", Auxiliary,
+FLAG(LANGUAGE_SERVER, Bool, '\0', "as-language-server", Auxiliary,
      "Run the shell language server over standard input and standard output.");
 FLAG(WARNINGS, RepeatedBool, 'W', "", Kosh,
      "In the default mood, demote annoying, lenient, then strict diagnostics "
@@ -123,10 +123,13 @@ FLAG(NO_SYNTAX_HIGHLIGHTING, Bool, '\0', "no-syntax-highlighting", Kosh,
 FLAG(ENABLE_KOSHKIT, Bool, '\0', "enable-koshkit", Kosh,
      "Resolve the bundled koshkit utility names such as ls and mkdir directly "
      "as commands, the same as set -o koshkit.");
+FLAG(EXTENDED_ARITHMETIC, Bool, '\0', "enable-extended-arithmetic", Kosh,
+     "Use arbitrary-precision integers and finite decimal values, the same as "
+     "set -o extended-arithmetic.");
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
-FLAG(OPTIMIZER_DIAGNOSTICS, Bool, '\0', "optimizer-diagnostics", Debug,
+FLAG(OPTIMIZER_DIAGNOSTICS, Bool, '\0', "show-optimizer-diagnostics", Debug,
      "Trace the optimizer prepass and report every folded and eliminated node "
      "as an analysis diagnostic.");
 FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
@@ -232,7 +235,7 @@ static fn kosh_main(int argc, char **argv) -> int
       kosh_flags.has_value() && !kosh_flags->is_empty())
   {
     static constexpr koshka::PackedStringKey IGNORED_KOSH_FLAG_KEYS[] = {
-        SSK("--apply"), SSK("--format"), SSK("--language-server")};
+        SSK("--apply"), SSK("--format"), SSK("--as-language-server")};
     static constexpr koshka::StaticStringSet IGNORED_KOSH_FLAGS{
         IGNORED_KOSH_FLAG_KEYS};
     let const view = kosh_flags->view();
@@ -327,8 +330,6 @@ static fn kosh_main(int argc, char **argv) -> int
     koshka::os::set_environment_variable("NO_COLOR", "1");
   }
 
-  /* --clean resets PATH to a minimal default before the context seeds its
-     variables from the environment. */
   if (FLAG_CLEAN.is_enabled()) {
     koshka::os::set_environment_variable("PATH", "/usr/bin:/bin");
   }
@@ -470,7 +471,7 @@ static fn kosh_main(int argc, char **argv) -> int
        !file_names.is_empty()))
   {
     koshka::show_message(
-        "The '--language-server' option does not accept '-s', '-i', "
+        "The '--as-language-server' option does not accept '-s', '-i', "
         "'--lint', '--format', '--apply', '-c', or file operands.");
     return 2;
   }
@@ -693,6 +694,10 @@ static fn kosh_main(int argc, char **argv) -> int
      variables such as $BASH_VERSION on the /etc/profile path. The session
      strictness is applied at the seam below once the config has loaded. */
   context.set_mood(session_mood);
+  context.set_extended_arithmetic(session_mood == koshka::mimic_mood::Default ||
+                                  FLAG_EXTENDED_ARITHMETIC.is_enabled());
+  if (FLAG_EXTENDED_ARITHMETIC.is_enabled())
+    context.set_extended_arithmetic_explicit(true);
   /* The CLI -u is the user's own ask, so the -W downgrade leaves it fatal and
      the mood seam keeps it on. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());

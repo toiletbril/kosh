@@ -632,6 +632,18 @@ public:
   pure fn no_glob() const wontthrow -> bool;
   fn set_no_exec(bool enabled) wontthrow -> void;
   pure fn no_exec() const wontthrow -> bool;
+  fn set_extended_arithmetic(bool enabled) wontthrow -> void
+  {
+    m_runtime.set_option(shell_option_id::ExtendedArithmetic, enabled);
+  }
+  pure fn is_extended_arithmetic_enabled() const wontthrow -> bool
+  {
+    return m_runtime.option_is_enabled(shell_option_id::ExtendedArithmetic);
+  }
+  fn set_extended_arithmetic_explicit(bool enabled) wontthrow -> void
+  {
+    m_runtime.was_extended_arithmetic_set_explicitly = enabled;
+  }
   fn set_koshkit(bool enabled) wontthrow -> void;
   pure fn koshkit() const wontthrow -> bool;
   pure fn koshkit_utilities_are_reachable() const wontthrow -> bool
@@ -746,9 +758,6 @@ public:
     return m_make_shell_suppressed;
   }
 
-  /* Seed the nounset, pipefail, and failglob strictness from the active mood.
-     An explicit set -u, set -o pipefail, or set -o failglob is the script's own
-     ask, so it survives the mood switch untouched. */
   fn apply_strictness_for_mood() wontthrow -> void
   {
     let const strict = m_runtime.mood == mimic_mood::Default;
@@ -757,6 +766,8 @@ public:
     if (!m_runtime.was_pipefail_set_explicitly) set_pipefail(strict);
     if (!m_runtime.was_failglob_set_explicitly)
       set_failglob(strict && !is_completion_function_running());
+    if (!m_runtime.was_extended_arithmetic_set_explicitly)
+      set_extended_arithmetic(strict);
   }
 
   friend class RuntimeState;
@@ -805,6 +816,8 @@ public:
       changed_options |= RuntimeState::option_mask(shell_option_id::Nounset);
       changed_options |= RuntimeState::option_mask(shell_option_id::Pipefail);
       changed_options |= RuntimeState::option_mask(shell_option_id::Failglob);
+      changed_options |=
+          RuntimeState::option_mask(shell_option_id::ExtendedArithmetic);
     }
     for (u8 option = 0; option < static_cast<u8>(shell_option_id::Count);
          option++)
@@ -832,6 +845,11 @@ public:
             shell_option_id::Failglob, state.shell_option_mutation_revision))
       m_runtime.was_failglob_set_explicitly =
           finished.was_failglob_set_explicitly;
+    if (m_shell_option_mutations.touched_since(
+            shell_option_id::ExtendedArithmetic,
+            state.shell_option_mutation_revision))
+      m_runtime.was_extended_arithmetic_set_explicitly =
+          finished.was_extended_arithmetic_set_explicitly;
     if (state.mood_mutation_revision != m_mood_mutation_revision)
       m_runtime.mood = finished.mood;
     if (state.warning_mutation_revision != m_warning_mutation_revision)

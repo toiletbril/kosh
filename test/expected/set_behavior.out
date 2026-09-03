@@ -28,6 +28,7 @@ physical       	off
 functrace      	off
 pipefail       	on
 failglob       	on
+extended-arithmetic	on
 koshkit        	off
 vi             	off
 emacs          	off

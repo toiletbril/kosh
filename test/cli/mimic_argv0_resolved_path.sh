@@ -11,7 +11,7 @@ EOF
 chmod +x "$bin/argv0probe"
 output=$(env -u PATH \
     "$TEST_PATH_ENVIRONMENT_NAME=$bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    "$BIN" -I -c 'argv0probe')
+    "$BIN" --enable-mimicry -c 'argv0probe')
 status=$?
 printf '%s\n' "$output" | sed 's|\\|/|g' | sed "s|$bin|BINDIR|"
 rm -rf "$bin"

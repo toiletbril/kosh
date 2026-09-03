@@ -5,3 +5,6 @@ unset KOSH_FLAGS
 "$BIN" -c 'h=0xff; b=0b101; echo $((h + b)) $((h * 2))'
 "$BIN" -c 'v=0x7fffffffffffffff; echo $((v + 1))'
 echo "rc=$?"
+"$BIN" --mood bash --enable-extended-arithmetic -c \
+  'v=18446744073709551616; echo $((v + 1))'
+echo "extended-rc=$?"

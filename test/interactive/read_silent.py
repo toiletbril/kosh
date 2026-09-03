@@ -33,7 +33,7 @@ if pid == 0:
         "read -r -p VISIBLE_PROMPT visible; "
         "[ \"$visible\" = visible-value ] && printf 'VISIBLE_OK\\n'"
     )
-    os.execv(binary, [binary, "--clean", "-c", command])
+    os.execv(binary, [binary, "--no-init-files", "-c", command])
 
 secret_prompt = read_until(master, b"SECRET_PROMPT", 3)
 os.write(master, b"hidden-secret\n")

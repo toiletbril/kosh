@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Platform.hpp"
 #include "Utils.hpp"
 
 namespace koshka::arithmetic_internal {
@@ -15,13 +16,21 @@ struct alignas(u64) ArithmeticValue::Storage
 
 namespace {
 
+alwaysinline fn throw_if_arithmetic_interrupted() throws -> void
+{
+  if (os::INTERRUPT_REQUESTED)
+    throw InterruptErrorWithLocation{SourceLocation{}};
+}
+
 fn make_zero_limbs(usize count, Allocator allocator) throws -> ArrayList<u64>
 {
   let limbs = ArrayList<u64>{allocator};
   limbs.reserve(count);
 
-  for (usize index = 0; index < count; index++)
+  for (usize index = 0; index < count; index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     limbs.push(0);
+  }
 
   return limbs;
 }
@@ -55,6 +64,7 @@ fn add_limbs(const ArrayList<u64> &left, const ArrayList<u64> &right,
   u64 carry = 0;
 
   for (usize index = 0; index < result_count; index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const left_limb = index < left.count() ? left[index] : 0;
     let const right_limb = index < right.count() ? right[index] : 0;
     let const sum = static_cast<u128>(left_limb) + right_limb + carry;
@@ -77,6 +87,7 @@ fn subtract_limbs(const ArrayList<u64> &left, const ArrayList<u64> &right,
   u64 borrow = 0;
 
   for (usize index = 0; index < left.count(); index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const right_limb = index < right.count() ? right[index] : 0;
     let const subtrahend = right_limb + borrow;
     let const did_subtrahend_wrap = subtrahend < right_limb;
@@ -90,12 +101,13 @@ fn subtract_limbs(const ArrayList<u64> &left, const ArrayList<u64> &right,
 }
 
 fn subtract_limbs_in_place(ArrayList<u64> &left,
-                           const ArrayList<u64> &right) wontthrow -> void
+                           const ArrayList<u64> &right) throws -> void
 {
   ASSERT(compare_limbs(left, right) >= 0);
   u64 borrow = 0;
 
   for (usize index = 0; index < left.count(); index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const right_limb = index < right.count() ? right[index] : 0;
     let const subtrahend = right_limb + borrow;
     let const did_subtrahend_wrap = subtrahend < right_limb;
@@ -117,9 +129,11 @@ fn multiply_limbs(const ArrayList<u64> &left, const ArrayList<u64> &right,
   let result = make_zero_limbs(left.count() + right.count(), allocator);
 
   for (usize left_index = 0; left_index < left.count(); left_index++) {
+    throw_if_arithmetic_interrupted();
     u64 carry = 0;
 
     for (usize right_index = 0; right_index < right.count(); right_index++) {
+      if ((right_index & 1023u) == 0) throw_if_arithmetic_interrupted();
       let const result_index = left_index + right_index;
       let const product =
           static_cast<u128>(left[left_index]) * right[right_index] +
@@ -174,6 +188,7 @@ fn multiply_add_small(ArrayList<u64> &limbs, u64 multiplier, u64 addend) throws
   u64 carry = addend;
 
   for (usize index = 0; index < limbs.count(); index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const product = static_cast<u128>(limbs[index]) * multiplier + carry;
     limbs[index] = static_cast<u64>(product);
     carry = static_cast<u64>(product >> 64u);
@@ -208,11 +223,12 @@ fn get_scaled_magnitude(const ArithmeticValue &value, u32 decimal_scale,
   return magnitude;
 }
 
-fn divide_small(ArrayList<u64> &limbs, u64 divisor) wontthrow -> u64
+fn divide_small(ArrayList<u64> &limbs, u64 divisor) throws -> u64
 {
   u64 remainder = 0;
 
   for (usize index = limbs.count(); index > 0; index--) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     limbs[index - 1] =
         os::divide_u128_by_u64(remainder, limbs[index - 1], divisor, remainder);
   }
@@ -256,6 +272,7 @@ fn magnitude_divide(const ArrayList<u64> &dividend,
   remainder.clear();
 
   for (usize bit_position = bit_count; bit_position > 0; bit_position--) {
+    if ((bit_position & 1023u) == 0) throw_if_arithmetic_interrupted();
     shift_left_one(remainder);
     let const source_position = bit_position - 1;
     let const source_limb = source_position / 64;
@@ -293,6 +310,7 @@ fn shift_magnitude_left(const ArrayList<u64> &source, usize bit_count,
   u64 carry = 0;
 
   for (usize index = 0; index < source.count(); index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     if (partial_bits == 0) {
       result[index + whole_limbs] = source[index];
       continue;
@@ -322,6 +340,7 @@ fn shift_magnitude_right(const ArrayList<u64> &source, usize bit_count,
   for (usize source_index = source.count(); source_index > whole_limbs;
        source_index--)
   {
+    if ((source_index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const limb = source[source_index - 1];
     let const result_index = source_index - 1 - whole_limbs;
     if (partial_bits == 0) {
@@ -556,6 +575,7 @@ fn ArithmeticValue::parse(StringView text, u32 radix, BumpArena &arena) throws
     usize position = 0;
 
     while (position < body.length) {
+      throw_if_arithmetic_interrupted();
       let const chunk_length = position == 0 ? first_chunk_length : usize{19};
       u64 chunk = 0;
 
@@ -573,6 +593,7 @@ fn ArithmeticValue::parse(StringView text, u32 radix, BumpArena &arena) throws
   }
 
   for (usize index = 0; index < body.length; index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const byte = body[index];
     i32 digit = -1;
     if (byte >= '0' && byte <= '9')
@@ -611,6 +632,7 @@ fn ArithmeticValue::parse_decimal(StringView text, BumpArena &arena) throws
   let has_decimal_point = false;
 
   for (usize index = 0; index < body.length; index++) {
+    if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
     let const byte = body[index];
     if (byte == '.') {
       has_decimal_point = true;
@@ -722,11 +744,13 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
   constexpr u64 DECIMAL_CHUNK_BASE = 10000000000000000000ULL;
 
   for (usize limb_position = limb_count(); limb_position > 0; limb_position--) {
+    throw_if_arithmetic_interrupted();
     u64 carry = limb_at(limb_position - 1);
 
     for (usize chunk_position = 0; chunk_position < chunks.count();
          chunk_position++)
     {
+      if ((chunk_position & 1023u) == 0) throw_if_arithmetic_interrupted();
       u64 remainder = 0;
       carry = os::divide_u128_by_u64(chunks[chunk_position], carry,
                                      DECIMAL_CHUNK_BASE, remainder);
@@ -1008,6 +1032,7 @@ fn ArithmeticValue::power(const ArithmeticValue &base,
       ArithmeticValue::add(base, ArithmeticValue{}, generation_arenas[0]);
 
   while (remaining > 0) {
+    throw_if_arithmetic_interrupted();
     let const next_position = 1 - generation_position;
     generation_arenas[next_position].reset();
     let next_result =
@@ -1056,6 +1081,7 @@ fn ArithmeticValue::square_root(const ArithmeticValue &value, u32 decimal_scale,
 
   loop
   {
+    throw_if_arithmetic_interrupted();
     let const next_position = 1 - estimate_position;
     iteration_arenas[next_position].reset();
     let const quotient =

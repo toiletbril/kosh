@@ -20,7 +20,7 @@ vim.treesitter.language.register("bash", {
   "shit",
 })
 vim.lsp.config("kosh", {
-  cmd = { "kosh", "--language-server" },
+  cmd = { "kosh", "--as-language-server" },
   filetypes = {
     "sh",
     "bash",

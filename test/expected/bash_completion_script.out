@@ -1,7 +1,8 @@
 <a b>
 <a*star>
 release-debug-flags=0
-language-server=<--language-server>
+as-language-server=<--as-language-server>
+extended-arithmetic=<--enable-extended-arithmetic>
 calc-flags=<-i --interactive -p --pipe>
 head-flags=<-n -c>
 killall-flags=<-s --signal -l --list>

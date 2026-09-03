@@ -15,10 +15,15 @@ COMP_CWORD=1
 _kosh_complete
 printf 'release-debug-flags=%s\n' "${#COMPREPLY[@]}"
 
-COMP_WORDS=(kosh --language)
+COMP_WORDS=(kosh --as-language)
 COMP_CWORD=1
 _kosh_complete
-printf 'language-server=<%s>\n' "${COMPREPLY[0]}"
+printf 'as-language-server=<%s>\n' "${COMPREPLY[0]}"
+
+COMP_WORDS=(kosh --enable-extended)
+COMP_CWORD=1
+_kosh_complete
+printf 'extended-arithmetic=<%s>\n' "${COMPREPLY[0]}"
 
 printf 'calc-flags=<%s>\n' "$(_koshkit_util_flags calc)"
 printf 'head-flags=<%s>\n' "$(_koshkit_util_flags head)"

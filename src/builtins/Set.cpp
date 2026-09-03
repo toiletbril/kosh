@@ -163,6 +163,8 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      '\0', "failglob",
      "Fail a command whose glob matches nothing.", {},
      true},
+    {shell_option_id::ExtendedArithmetic, set_option_behavior::Stored, '\0',
+     "extended-arithmetic", "Use arbitrary-precision integers and finite decimal values."},
     {shell_option_id::Koshkit, set_option_behavior::Stored, '\0', "koshkit",
      "Resolve the bundled koshkit utility names directly as commands."},
     {shell_option_id::Vi,
@@ -501,12 +503,15 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
   case set_option_behavior::Login:
   case set_option_behavior::Rcfile: unreachable("Startup fact was applied");
   }
-  if (option.id == shell_option_id::Nounset)
-    cxt.set_error_unset_explicit(enable);
-  else if (option.id == shell_option_id::Failglob)
-    cxt.set_failglob_explicit(enable);
-  else if (option.id == shell_option_id::Pipefail)
-    cxt.set_pipefail_explicit(enable);
+  switch (option.id) {
+  case shell_option_id::Nounset: cxt.set_error_unset_explicit(enable); break;
+  case shell_option_id::Failglob: cxt.set_failglob_explicit(enable); break;
+  case shell_option_id::Pipefail: cxt.set_pipefail_explicit(enable); break;
+  case shell_option_id::ExtendedArithmetic:
+    cxt.set_extended_arithmetic_explicit(enable);
+    break;
+  default: break;
+  }
 }
 
 fn list_options(const EvalContext &cxt) throws -> String

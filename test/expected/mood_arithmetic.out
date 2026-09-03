@@ -307,6 +307,38 @@
     [ArithmeticCommand "big"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "big_status=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "== extended arithmetic option:"]
+  [CompoundListCondition, None]
+    [ForLoop "arithmetic_mood"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "--mood" "$arithmetic_mood"]
+        [CompoundListCondition, None]
+          [IfClause]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [ConditionalCommand]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "echo" "$arithmetic_mood=on"]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "echo" "$arithmetic_mood=off"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "bash"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "extended-arithmetic"]
+  [CompoundListCondition, None]
+    [Assign big=18446744073709551616]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "enabled=$((big + 1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--mood" "default"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "extended-arithmetic"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "disabled=$((big + 1))"]
 [Word
   Unquoted "echo"
 ]
@@ -1234,6 +1266,136 @@
   DoubleQuoted "big_status="
   Variable "?"
 ]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "== extended arithmetic option:"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "arithmetic_mood"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "default"
+]
+[Word
+  Unquoted "bash"
+]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Variable "arithmetic_mood"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "extended-arithmetic"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "arithmetic_mood"
+  DoubleQuoted "=on"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "arithmetic_mood"
+  DoubleQuoted "=off"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "bash"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "extended-arithmetic"
+]
+[Word
+  Unquoted "big=18446744073709551616"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "enabled="
+  ArithmeticExpansion "big + 1"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--mood"
+]
+[Word
+  Unquoted "default"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "extended-arithmetic"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "disabled="
+  ArithmeticExpansion "big + 1"
+]
 31:23: warning: An unquoted variable can split into words and expand globs. (SC2086)
     31 |  echo $((y = 7)); echo $y
        |                        ^~
@@ -1407,4 +1569,10 @@ backoff=0
 18446744073709551617
 18446744073709551621
 big_status=0
+== extended arithmetic option:
+default=on
+bash=off
+sh=off
+enabled=18446744073709551617
+disabled=1
 [Code 0]

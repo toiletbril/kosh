@@ -42,16 +42,16 @@ _kosh_complete()
   local long_flags="--version --short-version --help --interactive --stdin \
 --command --error-exit --no-glob --one-command --verbose --xtrace --export-all \
 --no-clobber --no-exec --no-unset --login --rcfile --init-file --norc \
---restricted --privileged --clean --posix --mood \
---init-moods --mimicry --dumb --lint --format --apply --language-server --list-diagnostics \
+--restricted --privileged --no-init-files --posix --mood \
+--init-moods --enable-mimicry --dumb --lint --format --apply --as-language-server --list-diagnostics \
 --no-diagnostics --no-annoying-diagnostics --no-init-diagnostics --no-traces --no-completion --no-syntax-highlighting \
---enable-koshkit \
+--enable-koshkit --enable-extended-arithmetic \
 --show-ast \
---optimizer-diagnostics --show-exit-code --show-lexed-words --show-stats --show-memory \
+--show-optimizer-diagnostics --show-exit-code --show-lexed-words --show-stats --show-memory \
 "
 
   local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -r -p -M -L -I -W -WW -WWW \
--T -A -E -R"
+-Q -T -A -E -R"
 
   if [[ $current_word == --* ]]; then
     _kosh_compgen -W "$long_flags" -- "$current_word"
@@ -93,7 +93,7 @@ _kosh_set_complete()
   local option_names="allexport export-all notify errexit error-exit noglob no-glob \
 hashall keyword monitor noexec no-exec nounset no-unset verbose xtrace braceexpand \
 noclobber no-clobber errtrace physical functrace pipefail failglob koshkit vi emacs \
-posix show-ast show-lexed-words show-exit-code mimicry annoying-diagnostics \
+posix show-ast show-lexed-words show-exit-code mimicry extended-arithmetic annoying-diagnostics \
 show-stats no-diagnostics show-memory login rcfile"
   local switches="--help --options --mood --init-moods -o +o -M -L \
 -a -b -e -f -h -k -m -n -u -v -x -B -C -E -P -T -A -R -W -WW -WWW -I -S -G \

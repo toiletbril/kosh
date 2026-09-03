@@ -25,7 +25,7 @@ frame()
   frame '{"jsonrpc":"2.0","method":"exit"}'
 } > "$directory/input"
 
-output=$("$BIN" --language-server < "$directory/input")
+output=$("$BIN" --as-language-server < "$directory/input")
 status=$?
 printf 'status=%s\n' "$status"
 

@@ -7,7 +7,7 @@ trap '[ -n "$root" ] && /bin/rm -rf "$root"' EXIT
 help_output=$("$BIN" --help 2>&1)
 printf 'help-status=%s\n' "$?"
 case $help_output in
-*'AUXILIARY OPTIONS'*'--lint'*'--format'*'--apply'*'--language-server'*)
+*'AUXILIARY OPTIONS'*'--lint'*'--format'*'--apply'*'--as-language-server'*)
   printf 'help-auxiliary=yes\n'
   ;;
 *) printf 'help-auxiliary=no\n' ;;

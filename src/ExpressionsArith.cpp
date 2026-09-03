@@ -694,7 +694,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* An empty condition is always true, the way for ((;;)) loops forever. */
   while (condition_is_blank ||
          (m_folded_condition.has_value() && can_skip_condition_commands
-              ? (cxt.mood() == mimic_mood::Default
+              ? (cxt.is_extended_arithmetic_enabled()
                      ? m_is_exact_folded_condition_nonzero
                      : *m_folded_condition != 0)
               : do_evaluate_condition()))

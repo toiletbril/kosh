@@ -135,7 +135,7 @@ output=$(BASH_ENV="$directory/env" "$BIN" --mood bash-posix -c 'printf body')
 printf 'bash-env-posix=%s\n' "$output"
 output=$(BASH_ENV="$directory/env" "$BIN" --mood kosh -c 'printf body')
 printf 'bash-env-kosh=%s\n' "$output"
-output=$(BASH_ENV="$directory/env" "$BIN" --mood bash --clean -c 'printf body')
+output=$(BASH_ENV="$directory/env" "$BIN" --mood bash -Q -c 'printf body')
 printf 'bash-env-clean=%s\n' "$output"
 output=$(BASH_ENV="$directory/env" \
   "$BIN" --mood bash --privileged -c 'printf body')

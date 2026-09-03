@@ -294,7 +294,7 @@ chmod +x "$act_program" "$man_program" \
 output=$(MANROOT="$directory/man" MANPATH="$directory/man" \
   env -u PATH \
   "$TEST_PATH_ENVIRONMENT_NAME=$directory/bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-  "$BIN" --language-server < "$directory/input")
+  "$BIN" --as-language-server < "$directory/input")
 status=$?
 printf 'status=%s\n' "$status"
 check_contains initialize '"positionEncoding":"utf-8"'
@@ -475,7 +475,7 @@ carriage_return=$(printf '\r')
   frame '{"jsonrpc":"2.0","method":"exit"}'
 } | env -u PATH \
   "$TEST_PATH_ENVIRONMENT_NAME=$path_refresh_bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-  "$BIN" --language-server | {
+  "$BIN" --as-language-server | {
   while read_server_frame; do
     case $server_frame_body in
     *'"id":201,'*)
@@ -502,9 +502,9 @@ carriage_return=$(printf '\r')
   done
 }
 
-KOSH_FLAGS=--language-server "$BIN" -c 'echo environment-filtered'
+KOSH_FLAGS=--as-language-server "$BIN" -c 'echo environment-filtered'
 
-"$BIN" --language-server script.sh > "$directory/conflict-out" 2>&1
+"$BIN" --as-language-server script.sh > "$directory/conflict-out" 2>&1
 conflict_status=$?
 printf 'conflict-status=%s\n' "$conflict_status"
 case $(cat "$directory/conflict-out") in
@@ -528,7 +528,7 @@ utf16_output=$(
     frame '{"jsonrpc":"2.0","id":10,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/utf16-action.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":12}},"context":{"diagnostics":[],"only":["quickfix"]}}}'
     frame '{"jsonrpc":"2.0","id":7,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 case $utf16_output in
 *'"positionEncoding":"utf-16"'*'"id":6,"result":{"data":[0,0,3,0,0]}'*)
@@ -581,7 +581,7 @@ markdown_output=$(
     frame '{"jsonrpc":"2.0","id":72,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/hover-markdown.sh"},"position":{"line":7,"character":1}}}'
     frame '{"jsonrpc":"2.0","id":73,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 case $markdown_output in
 *'"id":71,"result":{"contents":{"kind":"markdown","value":"```shell\nname=two\n```\nValue: two\n\nEarlier assignments:\n\n- line 2: `name=one`"}'*)
@@ -603,7 +603,7 @@ unsupported_output=$(
     frame '{"jsonrpc":"2.0","id":31,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/unsupported.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":10}},"context":{"diagnostics":[]}}}'
     frame '{"jsonrpc":"2.0","id":32,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 case $unsupported_output in
 *'codeActionProvider'*) printf 'unsupported-capability=present\n' ;;
@@ -622,7 +622,7 @@ limited_output=$(
     frame '{"jsonrpc":"2.0","id":42,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/limited.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":10}},"context":{"diagnostics":[],"only":["source.fixAll.kosh"]}}}'
     frame '{"jsonrpc":"2.0","id":43,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 case $limited_output in
 *'"codeActionKinds":["quickfix"]'*'"id":41,"result":[{"title":"Replace'*'"id":42,"result":[]'*)
@@ -642,7 +642,7 @@ malformed_output=$(
     frame '{"jsonrpc":"2.0","id":51,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///tmp/malformed.sh"},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":10}},"context":{"diagnostics":[]}}}'
     frame '{"jsonrpc":"2.0","id":52,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 case $malformed_output in
 *'codeActionProvider'*) printf 'malformed-actions=present\n' ;;
@@ -659,7 +659,7 @@ unterminated_output=$(
     frame '{"jsonrpc":"2.0","id":63,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/unterminated.sh"},"options":{"tabSize":2,"insertSpaces":true}}}'
     frame '{"jsonrpc":"2.0","id":64,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 unterminated_status=$?
 printf 'unterminated-status=%s\n' "$unterminated_status"
@@ -683,7 +683,7 @@ shift_output=$(
     frame '{"jsonrpc":"2.0","id":71,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/shift.sh"},"position":{"line":3,"character":2}}}'
     frame '{"jsonrpc":"2.0","id":72,"method":"shutdown","params":null}'
     frame '{"jsonrpc":"2.0","method":"exit"}'
-  } | "$BIN" --language-server
+  } | "$BIN" --as-language-server
 )
 case $shift_output in
 *'"id":71,"result":{"uri":"file:///tmp/shift.sh","range":{"start":{"line":2,'*)
@@ -693,5 +693,5 @@ case $shift_output in
 esac
 
 frame '{"jsonrpc":"2.0","method":"exit"}' |
-  "$BIN" --language-server > /dev/null
+  "$BIN" --as-language-server > /dev/null
 printf 'exit-without-shutdown-status=%s\n' "$?"

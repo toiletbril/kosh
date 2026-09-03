@@ -1486,7 +1486,7 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
                                     throws -> Maybe<String> {
     let argv = ArrayList<String>{heap_allocator()};
     argv.push(String{m_context.shell_executable_path()});
-    argv.push(String{"--clean"});
+    argv.push(String{"--no-init-files"});
     argv.push(String{"-c"});
     argv.push(steal(help_source));
     let output = os::capture_program_output(argv, INFORMATION_TIMEOUT_NANOS);

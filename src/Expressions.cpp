@@ -489,7 +489,17 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
     let const command = static_cast<const CompoundCommand *>(this);
     if (command->is_async()) return command->evaluate_async(cxt);
   }
-  return evaluate_impl(cxt);
+  try {
+    return evaluate_impl(cxt);
+  } catch (InterruptErrorWithLocation &error) {
+    let const location = error.location();
+    if (location.position == 0 && location.length == 0 &&
+        location.source_name_index == 0)
+    {
+      error.set_location(source_location());
+    }
+    throw;
+  }
 }
 
 fn Expression::operator delete(opaque *pointer) wontthrow -> void

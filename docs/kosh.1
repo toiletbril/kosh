@@ -39,7 +39,7 @@ formatter and language server
 .I file ...
 .br
 .B kosh
-.B \-\-language\-server
+.B \-\-as\-language\-server
 .SH DESCRIPTION
 .B kosh
 is the Koshka shell executable. It is an interpreter, interactive shell and a
@@ -141,7 +141,7 @@ The
 .BR \-\-format ,
 .BR \-\-apply ,
 and
-.B \-\-language\-server
+.B \-\-as\-language\-server
 options are also discarded.
 .PP
 A dash-prefixed invocation name whose options cannot be parsed enters rescue
@@ -163,7 +163,7 @@ Commands are read from standard input.
 .BR \-i ", " \-\-interactive
 Interactive operation is requested.
 .TP
-.B \-\-language\-server
+.B \-\-as\-language\-server
 The language server protocol is run over standard input and standard output.
 The editor starts this mode and associates it with
 .BR *.sh ,
@@ -267,14 +267,14 @@ Startup files for each listed mood are sourced in order. LIST accepts
 comma-separated names. The option may be repeated. The selected runtime mood
 is used when the option is omitted.
 .TP
-.BR \-I ", " \-\-mimicry
+.BR \-I ", " \-\-enable\-mimicry
 A script with a recognized shell shebang runs under the corresponding mood.
 The current diagnostic setting is retained.
 .TP
 .B \-\-dumb
 The options
 .BR "\-\-mood sh" ,
-.BR \-T ,
+.BR \-\-no\-completion ,
 and
 .B \-\-no\-diagnostics
 are applied. Color is disabled.
@@ -288,7 +288,7 @@ only when this option is present. The state is exposed through
 and
 .BR "set \-o privileged" .
 .TP
-.B \-\-clean
+.BR \-Q ", " \-\-no\-init\-files
 No startup file is read. PATH is set to /usr/bin:/bin.
 .TP
 .BR \-\-init\-file " " \fIFILE\fR ", " \-\-rcfile " " \fIFILE\fR
@@ -465,11 +465,16 @@ Tab completion and ghost text are disabled.
 .TP
 .B \-\-no\-syntax\-highlighting
 Syntax coloring and ghost text are disabled. Tab completion remains enabled.
-.SS Koshkit
+.SS Extensions
 .TP
 .B \-\-enable\-koshkit
 Bundled utility names resolve directly as commands. The option is equivalent to
 .BR "set \-o koshkit" .
+.TP
+.B \-\-enable\-extended\-arithmetic
+Arbitrary-precision integers and finite decimal values are enabled. The option
+is equivalent to
+.BR "set \-o extended\-arithmetic" .
 .SS Information
 .TP
 .B \-\-help
@@ -485,7 +490,7 @@ The short version is displayed. The shell then exits.
 .BR \-A ", " \-\-show\-ast
 The syntax tree is printed before each command runs.
 .TP
-.B \-\-optimizer\-diagnostics
+.B \-\-show\-optimizer\-diagnostics
 Analysis prepass decisions are reported. Each folded or eliminated node produces
 a lenient analysis diagnostic. The final line reports the number of eliminated
 statements. A compatibility mood reports these diagnostics only under
@@ -563,8 +568,8 @@ remaining inputs are analyzed.
 .SH MOODS
 The
 .B kosh
-mood enables strict checks, pipefail, failglob, nounset, and analysis by
-default. The
+mood enables strict checks, pipefail, failglob, nounset, extended arithmetic,
+and analysis by default. The
 .B bash
 mood accepts Bash extensions with analysis disabled by default. The
 .B sh
@@ -576,8 +581,9 @@ files.
 An explicit
 .BR "set \-u" ,
 .BR "set \-o pipefail" ,
+.BR "set \-o failglob" ,
 or
-.B set \-o failglob
+.B set \-o extended\-arithmetic
 survives a later mood change. The command
 .B set \-o posix
 selects
@@ -748,11 +754,14 @@ re-evaluated as an arithmetic expression. Nested subscripts such as a[b[c]] are
 resolved from the inner expression outward. An empty (( )) command returns one.
 An empty $(( )) expansion produces zero.
 .PP
-The default mood evaluates integers with arbitrary precision. Compatibility
-moods use signed 64-bit arithmetic with wrapping operations. The default mood
-also accepts finite base-10 decimal literals. Addition and subtraction use the
-larger operand scale. Multiplication adds the operand scales. Division and
-remainder use the larger operand scale and truncate toward zero.
+The
+.B extended\-arithmetic
+option uses arbitrary-precision integers and accepts finite base-10 decimal
+literals. It is enabled by default only in the default mood. When the option is
+disabled, signed 64-bit arithmetic uses wrapping operations. Addition and
+subtraction use the larger operand scale. Multiplication adds the operand
+scales. Division and remainder use the larger operand scale and truncate toward
+zero.
 .PP
 A standalone expression with decimal integer literals on both sides of ^ may
 report that ^ is bitwise XOR and suggest ** for exponentiation. Expressions
@@ -978,10 +987,12 @@ and
 forms control the diagnostic level. The options
 .BR annoying-diagnostics ,
 .BR no-diagnostics ,
+.BR extended-arithmetic ,
 and
 .B koshkit
-control the annoying tier, the analysis stage, and bundled command lookup. A
-command substitution restores every set option when it finishes.
+control the annoying tier, the analysis stage, extended arithmetic, and bundled
+command lookup. A command substitution restores every set option when it
+finishes.
 .TP
 .B enable
 Every builtin remains enabled. The
@@ -1669,7 +1680,7 @@ These variables select startup files under the conditions in
 .TP
 .B PATH
 The value is a colon-separated command search path. The
-.B \-\-clean
+.B \-\-no\-init\-files
 option resets it to /usr/bin:/bin.
 .TP
 .BR HOME ", " PWD ", " OLDPWD ", " CDPATH
