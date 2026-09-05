@@ -859,6 +859,7 @@ fn kosh_main(int argc, char **argv) -> int
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() && !FLAG_LINT.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
   koshka::Maybe<usize> history_event_number = koshka::None;
+  koshka::Maybe<koshka::String> last_history_search_word = koshka::None;
 
   /* The path map is reset rather than seeded here, since the eager scan pays
      off only in interactive mode. */
@@ -1296,7 +1297,8 @@ fn kosh_main(int argc, char **argv) -> int
     {
       try {
         let expanded = koshka::expand_interactive_history(
-            script_contents.view(), history_event_number, context);
+            script_contents.view(), history_event_number,
+            last_history_search_word, context);
         if (expanded.has_value()) {
           koshka::show_message(expanded->view());
           script_contents = expanded.take();

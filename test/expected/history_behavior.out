@@ -36,5 +36,6 @@ recall ok
 fc replacement ok
 search casefold ok
 history expansion ok
+history words ok
 history option ok
 ignoreeof ok

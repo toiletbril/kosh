@@ -1028,6 +1028,28 @@ option expands interactive history references. The supported references are
 .BR !?text? ,
 and
 .BR !# .
+An event reference accepts the word designators
+.BR :^ ,
+.BR :$ ,
+.BR :* ,
+.BR :N ,
+.BR :N-M ,
+.BR :-M ,
+.BR :N* ,
+.BR :N-$ ,
+and
+.BR :N- .
+The colon may be omitted before
+.BR ^ ,
+.BR $ ,
+.BR * ,
+and
+.BR % .
+The
+.B %
+designator selects the word matched by the most recent
+.B !?text?
+search, including a search on an earlier input line.
 Single-quoted and backslash-escaped references remain literal. Both options are
 enabled by default in an interactive shell and disabled in a noninteractive
 shell.

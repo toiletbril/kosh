@@ -871,11 +871,233 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   context.set_last_command_duration_nanos(saved_command_duration_nanos);
 }
 
+static fn history_control_operator_byte_length(StringView source,
+                                               usize position) wontthrow
+    -> usize
+{
+  let const byte = source[position];
+  let const next_byte = position + 1 < source.length ? source[position + 1] : 0;
+  let const third_byte =
+      position + 2 < source.length ? source[position + 2] : 0;
+
+  switch (byte) {
+  case ';':
+    if (next_byte == ';') return third_byte == '&' ? 3 : 2;
+    return next_byte == '&' ? 2 : 1;
+  case '&':
+    if (next_byte == '>' && third_byte == '>') return 3;
+    return next_byte == '&' || next_byte == '>' ? 2 : 1;
+  case '|': return next_byte == '|' || next_byte == '&' ? 2 : 1;
+  case '<':
+    if (next_byte == '<') return third_byte == '<' || third_byte == '-' ? 3 : 2;
+    return next_byte == '>' || next_byte == '&' ? 2 : 1;
+  case '>':
+    return next_byte == '>' || next_byte == '|' || next_byte == '&' ? 2 : 1;
+  default: return 1;
+  }
+}
+
+static fn next_history_word(StringView source, usize &position) throws
+    -> Maybe<StringView>
+{
+  while (position < source.length && is_ascii_whitespace(source[position]))
+    position++;
+  if (position >= source.length || source[position] == '#') return None;
+
+  let const start_position = position;
+  let const first_byte = source[position];
+  let const is_process_substitution =
+      (first_byte == '<' || first_byte == '>') &&
+      position + 1 < source.length && source[position + 1] == '(';
+  if (lexer::is_shell_sentinel(first_byte) && !is_process_substitution) {
+    position += history_control_operator_byte_length(source, position);
+  } else {
+    char quote_byte = 0;
+    while (position < source.length) {
+      let const byte = source[position];
+      if (byte == '\\' && quote_byte != '\'' && position + 1 < source.length) {
+        position += 2;
+        continue;
+      }
+      if (quote_byte != 0) {
+        position++;
+        if (byte == quote_byte) quote_byte = 0;
+        continue;
+      }
+      if (byte == '\'' || byte == '"' || byte == '`') {
+        quote_byte = byte;
+        position++;
+        continue;
+      }
+
+      char closing_byte = 0;
+      if (byte == '$' && position + 1 < source.length &&
+          (source[position + 1] == '(' || source[position + 1] == '{'))
+      {
+        closing_byte = source[position + 1] == '(' ? ')' : '}';
+      } else if ((lexer::is_extglob_operator(byte) || byte == '<' ||
+                  byte == '>') &&
+                 position + 1 < source.length && source[position + 1] == '(')
+      {
+        closing_byte = ')';
+      }
+      if (closing_byte != 0) {
+        let const end_position = lexer::scan_balanced_shell_region(
+            source, position + 2, closing_byte);
+        position = end_position.value_or(source.length);
+        continue;
+      }
+      if (is_ascii_whitespace(byte) || lexer::is_shell_sentinel(byte)) break;
+      position++;
+    }
+  }
+
+  return source.substring_of_length(start_position, position - start_position);
+}
+
+static fn find_history_search_word(StringView command, StringView needle) throws
+    -> Maybe<StringView>
+{
+  usize position = 0;
+  while (position < command.length) {
+    let const word = next_history_word(command, position);
+    if (!word.has_value()) break;
+    if (word->find_substring(needle).has_value()) return word;
+  }
+
+  return None;
+}
+
+cold [[noreturn]] static fn
+throw_bad_history_word_specifier(StringView spelling) throws -> void
+{
+  let message = String{spelling};
+  message += ": bad word specifier";
+  throw Error{message.view()};
+}
+
+static fn select_history_words(StringView command, StringView designator,
+                               StringView spelling,
+                               Maybe<StringView> search_word,
+                               String &selected) throws -> StringView
+{
+  if (designator.is_empty()) throw_bad_history_word_specifier(spelling);
+  if (designator == "%") {
+    if (!search_word.has_value()) throw_bad_history_word_specifier(spelling);
+    return *search_word;
+  }
+
+  usize word_count = 0;
+  usize scan_position = 0;
+  while (scan_position < command.length) {
+    if (!next_history_word(command, scan_position).has_value()) break;
+    word_count++;
+  }
+
+  usize first_word_index = 0;
+  usize end_word_index = word_count;
+
+  if (designator == "^") {
+    first_word_index = 1;
+    end_word_index = 2;
+  } else if (designator == "$") {
+    if (word_count == 0) throw_bad_history_word_specifier(spelling);
+    first_word_index = word_count - 1;
+  } else if (designator == "*") {
+    first_word_index = word_count > 0 ? 1 : 0;
+  } else {
+    usize separator_position = 0;
+    let const is_zero_based_range = designator[0] == '-';
+    if (is_zero_based_range) {
+      separator_position = 0;
+    } else {
+      while (separator_position < designator.length &&
+             lexer::is_number(designator[separator_position]))
+        separator_position++;
+      let const parsed =
+          designator.substring_of_length(0, separator_position).to<u64>();
+      if (parsed.is_error() || parsed.value() > static_cast<u64>(SIZE_MAX))
+        throw_bad_history_word_specifier(spelling);
+      first_word_index = static_cast<usize>(parsed.value());
+      end_word_index = first_word_index + 1;
+    }
+
+    if (separator_position < designator.length) {
+      let const separator_byte = designator[separator_position++];
+      if (separator_byte == '*') {
+        end_word_index = word_count;
+      } else if (separator_byte == '-') {
+        if (separator_position == designator.length) {
+          end_word_index = word_count > 0 ? word_count - 1 : 0;
+        } else if (designator[separator_position] == '$' &&
+                   separator_position + 1 == designator.length)
+        {
+          end_word_index = word_count;
+        } else {
+          let const parsed = designator.substring(separator_position).to<u64>();
+          if (parsed.is_error() || parsed.value() >= static_cast<u64>(SIZE_MAX))
+            throw_bad_history_word_specifier(spelling);
+          end_word_index = static_cast<usize>(parsed.value()) + 1;
+        }
+      } else {
+        throw_bad_history_word_specifier(spelling);
+      }
+    }
+  }
+
+  if (first_word_index > end_word_index || end_word_index > word_count)
+    throw_bad_history_word_specifier(spelling);
+
+  scan_position = 0;
+  usize word_index = 0;
+  if (end_word_index == first_word_index + 1) {
+    while (scan_position < command.length) {
+      let const word = next_history_word(command, scan_position);
+      if (!word.has_value()) break;
+      if (word_index == first_word_index) return *word;
+      word_index++;
+    }
+    throw_bad_history_word_specifier(spelling);
+  }
+
+  usize selected_byte_length = 0;
+  scan_position = 0;
+  word_index = 0;
+  while (scan_position < command.length) {
+    let const word = next_history_word(command, scan_position);
+    if (!word.has_value()) break;
+    if (word_index >= first_word_index && word_index < end_word_index) {
+      if (selected_byte_length > 0) selected_byte_length++;
+      selected_byte_length += word->length;
+    }
+    word_index++;
+  }
+
+  selected.reserve(selected_byte_length);
+  scan_position = 0;
+  word_index = 0;
+  while (scan_position < command.length) {
+    let const word = next_history_word(command, scan_position);
+    if (!word.has_value()) break;
+    if (word_index >= first_word_index && word_index < end_word_index) {
+      if (!selected.is_empty()) selected.push(' ');
+      selected.append(*word);
+    }
+    word_index++;
+  }
+
+  return selected.view();
+}
+
 static fn expand_interactive_history(StringView source,
                                      Maybe<usize> accepted_event_number,
+                                     Maybe<String> &last_history_search_word,
                                      EvalContext &context) throws
     -> Maybe<String>
 {
+  let const scratch_mark = context.scratch_mark();
+  defer { context.scratch_release(scratch_mark); };
+
   bool is_single_quoted = false;
   bool is_double_quoted = false;
   bool did_expand = false;
@@ -884,9 +1106,9 @@ static fn expand_interactive_history(StringView source,
 
   let const do_terminate_designator = [](char byte) wontthrow -> bool {
     return is_ascii_whitespace(byte) || byte == ':' || byte == '"' ||
-           byte == '\'' || byte == '\\' || byte == '=' || byte == ';' ||
-           byte == '&' || byte == '|' || byte == '(' || byte == ')' ||
-           byte == '<' || byte == '>';
+           byte == '\'' || byte == '\\' || byte == ';' || byte == '&' ||
+           byte == '|' || byte == '(' || byte == ')' || byte == '<' ||
+           byte == '>';
   };
 
   for (usize position = 0; position < source.length; position++) {
@@ -908,7 +1130,7 @@ static fn expand_interactive_history(StringView source,
 
     let const next_byte = source[position + 1];
     if (is_ascii_whitespace(next_byte) || next_byte == '=' ||
-        next_byte == '"' || next_byte == '\'')
+        next_byte == '"' || next_byte == '\'' || next_byte == '(')
     {
       continue;
     }
@@ -924,9 +1146,17 @@ static fn expand_interactive_history(StringView source,
           copied_position, position - copied_position));
       replacement = current_line.view();
     } else {
-      if (next_byte == '!') {
+      let search_word = Maybe<StringView>{};
+      if (last_history_search_word.has_value())
+        search_word = last_history_search_word->view();
+      bool has_implicit_word_designator = false;
+      if (next_byte == '!' || next_byte == ':' || next_byte == '^' ||
+          next_byte == '$' || next_byte == '*' || next_byte == '%')
+      {
         selected_event = toiletline::relative_history_event(
             context.scratch_allocator(), 1, accepted_event_number);
+        has_implicit_word_designator = next_byte != '!';
+        if (has_implicit_word_designator) reference_end_position--;
       } else if (next_byte == '?') {
         let close_position = source.find_substring("?", reference_end_position);
         if (!close_position.has_value()) close_position = source.length;
@@ -937,10 +1167,29 @@ static fn expand_interactive_history(StringView source,
                                      : *close_position;
         selected_event = toiletline::containing_history_event(
             context.scratch_allocator(), needle, accepted_event_number);
+        if (selected_event.has_value()) {
+          let const matched_word =
+              find_history_search_word(selected_event->command.view(), needle);
+          if (matched_word.has_value()) {
+            last_history_search_word =
+                String{heap_allocator(), matched_word.value()};
+            search_word = last_history_search_word->view();
+          }
+        }
       } else {
-        while (reference_end_position < source.length &&
-               !do_terminate_designator(source[reference_end_position]))
-          reference_end_position++;
+        if (lexer::is_number(next_byte)) {
+          while (reference_end_position < source.length &&
+                 lexer::is_number(source[reference_end_position]))
+            reference_end_position++;
+        } else if (next_byte == '-') {
+          while (reference_end_position < source.length &&
+                 lexer::is_number(source[reference_end_position]))
+            reference_end_position++;
+        } else {
+          while (reference_end_position < source.length &&
+                 !do_terminate_designator(source[reference_end_position]))
+            reference_end_position++;
+        }
         let const designator = source.substring_of_length(
             position + 1, reference_end_position - position - 1);
         if (designator.length > 1 && designator[0] == '-' &&
@@ -965,9 +1214,65 @@ static fn expand_interactive_history(StringView source,
         }
       }
 
-      if (selected_event.has_value())
+      if (selected_event.has_value()) {
         replacement = selected_event->command.view();
-      else {
+        let const selector_start_position = reference_end_position;
+        usize selector_end_position = selector_start_position;
+        if (selector_end_position < source.length &&
+            source[selector_end_position] == ':')
+          selector_end_position++;
+        if (selector_end_position < source.length &&
+            (lexer::is_number(source[selector_end_position]) ||
+             source[selector_end_position] == '^' ||
+             source[selector_end_position] == '$' ||
+             source[selector_end_position] == '*' ||
+             source[selector_end_position] == '%' ||
+             source[selector_end_position] == '-'))
+        {
+          if (source[selector_end_position] == '^' ||
+              source[selector_end_position] == '$' ||
+              source[selector_end_position] == '*' ||
+              source[selector_end_position] == '%')
+          {
+            selector_end_position++;
+          } else {
+            if (source[selector_end_position] == '-') selector_end_position++;
+            while (selector_end_position < source.length &&
+                   lexer::is_number(source[selector_end_position]))
+              selector_end_position++;
+            if (selector_end_position < source.length &&
+                (source[selector_end_position] == '*' ||
+                 source[selector_end_position] == '-'))
+            {
+              selector_end_position++;
+              if (selector_end_position < source.length &&
+                  source[selector_end_position] == '$')
+                selector_end_position++;
+              else
+                while (selector_end_position < source.length &&
+                       lexer::is_number(source[selector_end_position]))
+                  selector_end_position++;
+            }
+          }
+          let const designator_start_position =
+              source[selector_start_position] == ':'
+                  ? selector_start_position + 1
+                  : selector_start_position;
+          replacement = select_history_words(
+              replacement,
+              source.substring_of_length(designator_start_position,
+                                         selector_end_position -
+                                             designator_start_position),
+              source.substring_of_length(selector_start_position,
+                                         selector_end_position -
+                                             selector_start_position),
+              search_word, current_line);
+          reference_end_position = selector_end_position;
+        } else if (has_implicit_word_designator && next_byte != ':') {
+          throw_bad_history_word_specifier(
+              source.substring_of_length(position + 1, 1));
+        }
+      } else {
         let message = String{source.substring_of_length(
             position, reference_end_position - position)};
         message += ": event not found";

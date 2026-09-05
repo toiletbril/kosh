@@ -182,6 +182,8 @@ changes update this file.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
+- Resolve build artifact paths from the active target before passing them to
+  stat, debuggers, or inspection tools.
 - Compatibility fixtures use a stable peer-file operand when that operand is
   printed. The runner may pass the main input through different path forms to
   the shell under test and the reference shell.
@@ -195,6 +197,8 @@ changes update this file.
   separator, and paths. Put `--` before dash-leading patterns. Enable PCRE2
   only when required. Resolve wildcard paths before searching, and pass only
   existing matches. Run independent searches independently.
+- Run an expected no-match search as its own command, since its status must not
+  stop later checks.
 - Quote shell source, use `-c` for source, put `--` before dash-leading operands,
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
@@ -285,6 +289,8 @@ changes update this file.
 - Locate the owner, runner, input, golden, and environment. Run a failing
   regression before a behavior fix. Native tests need a placeholder golden
   before REFILL.
+- Verify that a capability-gated test ran its active branch. A skip summary is
+  not coverage.
 - Rebuild the required mode. Verify platform, mode, and revision when relevant.
   Compile release after changing assertion-only locals.
 - Run owners sharing result paths sequentially. Use finite workloads,

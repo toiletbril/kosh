@@ -40,13 +40,27 @@ KOSH_HISTORY="$d/hist" "$BIN" -c \
 # TL_HISTORY_MAX_SIZE once parsed the ring modulo as (x % 1024) * 4, so past 4096
 # entries the up arrow recalled a stale older line. The editor needs a tty, so
 # the run skips when script or the target terminal handles cannot provide one.
-if ! BIN="$BIN" script -qec \
-  'exec "$BIN" -c "test -t 0 && test -t 1"' \
-  /dev/null >/dev/null 2>&1; then
+script_mode=
+if script -qec true /dev/null >/dev/null 2>&1; then
+  script_mode=gnu
+elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
+  script_mode=bsd
+fi
+run_interactive()
+{
+  if [ "$script_mode" = gnu ]; then
+    script -qec "$1" /dev/null 2>/dev/null
+  else
+    script -q /dev/null /bin/sh -c "$1" 2>/dev/null
+  fi
+}
+if [ -z "$script_mode" ] || ! BIN="$BIN" run_interactive \
+  'exec "$BIN" -c "test -t 0 && test -t 1"' >/dev/null 2>&1; then
   echo "recall ok"
   echo "fc replacement ok"
   echo "search casefold ok"
   echo "history expansion ok"
+  echo "history words ok"
   echo "history option ok"
   echo "ignoreeof ok"
   exit 0
@@ -54,6 +68,7 @@ fi
 hist=$dir/recall
 search_hist=$dir/search
 expansion_hist=$dir/expansion
+word_designator_history_path=$dir/words
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -92,7 +107,7 @@ out=$({
 } |
   BIN="$BIN" READY="$ready" KOSH_HISTORY="$hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null) ||
+    run_interactive 'exec "$BIN" -i --rcfile /dev/null') ||
   exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 case "$out" in
@@ -113,7 +128,7 @@ out=$({
 } |
   BIN="$BIN" READY="$ready" KOSH_HISTORY="$search_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i --rcfile /dev/null' /dev/null 2>/dev/null) ||
+    run_interactive 'exec "$BIN" -i --rcfile /dev/null') ||
   exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 case "$out" in
@@ -133,8 +148,7 @@ out=$({
 } |
   BIN="$BIN" READY="$ready" KOSH_HISTORY="$expansion_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i -M bash --rcfile /dev/null' \
-      /dev/null 2>/dev/null) || exit 1
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 case "$out" in
 *HISTORY_EXPANSION_MARKER*PUNCTUATION_HISTORY_MARKER*'event not found'*'<!!>'*)
@@ -143,7 +157,51 @@ case "$out" in
   else
     echo "history expansion ok"
   fi
+  ;;
 *) echo "history expansion broken" ;;
+esac
+
+printf '%s\n' 'marker alpha beta gamma needle' \
+  'marker <(printf x) tail' > "$word_designator_history_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready \
+    'set -- !1:0; printf "W0=%s,%s\\n" "$#" "$1"\r' \
+    'set -- !1^; printf "WF=%s,%s\\n" "$#" "$1"\r' \
+    'set -- !1:2; printf "WN=%s,%s\\n" "$#" "$1"\r' \
+    'set -- !1$; printf "WL=%s,%s\\n" "$#" "$1"\r' \
+    'set -- !1*; printf "WA=%s,%s,%s\\n" "$#" "$1" "$4"\r' \
+    'set -- !1:1-2; printf "WR=%s,%s,%s\\n" "$#" "$1" "$2"\r' \
+    'set -- !1:-2; printf "WR0=%s,%s,%s\\n" "$#" "$1" "$3"\r' \
+    'set -- !1:2*; printf "WRS=%s,%s,%s\\n" "$#" "$1" "$3"\r' \
+    'set -- !1:2-$; printf "WRD=%s,%s,%s\\n" "$#" "$1" "$3"\r' \
+    'set -- !1:2-; printf "WRL=%s,%s,%s\\n" "$#" "$1" "$2"\r' \
+    'set -- !?gamma?:%; printf "WP=%s,%s\\n" "$#" "$1"\r' \
+    'echo unrelated one two three\r' \
+    'printf "WPP=<%s>\\n" "!%"\r' \
+    'printf "WPS=<%s>\\n" "!2:^"\r' \
+    'printf "WPT=<%s>\\n" "!2:2"\r' \
+    'printf "WINHIBIT=<%s>\\n" "!("\r' \
+    '!marker=tail\r' \
+    'false\r' \
+    '!1:99\r' \
+    'printf "WSTATUS=%s\\n" "$?"\r' \
+    'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$word_designator_history_path" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+case "$out" in
+*'W0=1,marker'*'WF=1,alpha'*'WN=1,beta'*'WL=1,needle'*\
+*'WA=4,alpha,needle'*'WR=2,alpha,beta'*'WR0=3,marker,beta'*\
+*'WRS=3,beta,needle'*'WRD=3,beta,needle'*'WRL=2,beta,gamma'*'WP=1,gamma'*\
+*'WPP=<gamma>'*'WPS=<<(printf x)>'*'WPT=<tail>'*'WINHIBIT=<!(>'*\
+*'!marker=tail: event not found'*':99: bad word specifier'*'WSTATUS=1'*)
+  echo "history words ok" ;;
+*) echo "history words broken" ;;
 esac
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"
@@ -157,8 +215,8 @@ out=$({
   BIN="$BIN" READY="$ready" KOSH_HISTORY="$stderr_hist" \
     HISTORY_STDERR_LOG="$stderr_log" HISTORY_STDERR_RC="$stderr_rc" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i -M bash --rcfile "$HISTORY_STDERR_RC"' \
-      /dev/null 2>/dev/null) || exit 1
+    run_interactive \
+      'exec "$BIN" -i -M bash --rcfile "$HISTORY_STDERR_RC"') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 if grep -q '^echo echo STDERR_HISTORY_MARKER$' "$stderr_log"; then
   :
@@ -176,8 +234,7 @@ out=$({
 } |
   BIN="$BIN" READY="$ready" KOSH_HISTORY="$disabled_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i -M bash --rcfile /dev/null' \
-      /dev/null 2>/dev/null) || exit 1
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 if grep -q OMITTED_HISTORY_MARKER "$disabled_hist"; then
   echo "history option broken"
@@ -195,8 +252,8 @@ out=$({
   BIN="$BIN" READY="$ready" KOSH_HISTORY="$ignoreeof_hist" \
     IGNOREEOF_RC="$ignoreeof_rc" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    script -qec 'exec "$BIN" -i -M bash --rcfile "$IGNOREEOF_RC"' \
-      /dev/null 2>/dev/null) || exit 1
+    run_interactive 'exec "$BIN" -i -M bash --rcfile "$IGNOREEOF_RC"') ||
+  exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 warning_count=$(printf '%s\n' "$out" |
   grep -c 'Use "exit" to leave the shell.')
