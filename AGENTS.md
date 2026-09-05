@@ -187,13 +187,16 @@ changes update this file.
 - Reduce a bounded platform probe to one verified command. Confirm its mood,
   option defaults, output order, and final status before writing the golden.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
-  Use literal ripgrep patterns. Put `--` before dash-leading patterns. Enable
-  PCRE2 only when required. Resolve wildcard paths before searching, and pass
-  only existing matches. Run independent searches independently.
+  Use literal ripgrep patterns. Put every ripgrep option before the pattern,
+  separator, and paths. Put `--` before dash-leading patterns. Enable PCRE2
+  only when required. Resolve wildcard paths before searching, and pass only
+  existing matches. Run independent searches independently.
 - Quote shell source, use `-c` for source, put `--` before dash-leading operands,
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
+- Keep Bash's `$(< file)` fast file read as the substitution's only command.
+  Append a sentinel before the read when trailing newlines must be preserved.
 - Pass generated text through a literal `printf` format when the text contains
   percent conversions.
 - Test a replacement regular expression against exact representative input
