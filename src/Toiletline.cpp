@@ -466,7 +466,8 @@ static fn find_history_event(koshka::Allocator allocator,
                              koshka::Maybe<usize> before_event_number,
                              Match do_match) -> koshka::Maybe<history_event>
 {
-  if (!history_read() || ::itl_g_history_count == 0) return koshka::None;
+  if (::itl_g_history_path == nullptr && !history_read()) return koshka::None;
+  if (::itl_g_history_count == 0) return koshka::None;
   if (!::itl_history_ensure_read_buffer()) return koshka::None;
 
   let const first_number =
