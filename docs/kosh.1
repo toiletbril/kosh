@@ -1050,7 +1050,56 @@ The
 designator selects the word matched by the most recent
 .B !?text?
 search, including a search on an earlier input line.
-Single-quoted and backslash-escaped references remain literal. Both options are
+An event or word reference accepts the pathname modifiers
+.BR :h ,
+.BR :t ,
+.BR :r ,
+and
+.BR :e .
+They select the directory, final component, name without its final suffix, and
+final suffix. The
+.BI :s/ old / new /
+modifier replaces the first literal match.
+.B :gs
+and
+.B :as
+replace every match, while
+.B :Gs
+replaces the first match in each word. The delimiter after
+.B s
+may be any byte, and its final occurrence may be omitted at the end of the
+input line. An unescaped ampersand in the replacement inserts the matched text.
+The
+.B :&
+modifier repeats the previous substitution, including one from an earlier
+input line. The
+.BR :g& ,
+.BR :a& ,
+and
+.B :G&
+forms apply the corresponding scope. An empty old text reuses the previous
+substitution text. It reuses the latest
+.B !?text?
+search text when no previous substitution exists.
+.PP
+The
+.B :q
+modifier quotes the selected text as one shell argument. The
+.B :x
+modifier splits the text at blanks and newlines and quotes each resulting
+argument. The
+.B :p
+modifier prints and records the expanded input without executing it. A leading
+.BI ^ old ^ new ^
+performs the first substitution on the previous event. The final caret may be
+omitted. Text after the final caret remains in the expanded input, and a
+modifier may follow it directly.
+.PP
+Single-quoted and backslash-escaped references remain literal. A reference
+immediately before a closing double quote also remains literal. A comment
+marker at the start of a word prevents expansion through the end of the line.
+An event, word, modifier, or substitution error prevents execution and history
+recording and preserves the previous exit status. Both history options are
 enabled by default in an interactive shell and disabled in a noninteractive
 shell.
 .PP

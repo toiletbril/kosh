@@ -37,5 +37,6 @@ fc replacement ok
 search casefold ok
 history expansion ok
 history words ok
+history modifiers ok
 history option ok
 ignoreeof ok

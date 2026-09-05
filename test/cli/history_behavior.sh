@@ -56,19 +56,16 @@ run_interactive()
 }
 if [ -z "$script_mode" ] || ! BIN="$BIN" run_interactive \
   'exec "$BIN" -c "test -t 0 && test -t 1"' >/dev/null 2>&1; then
-  echo "recall ok"
-  echo "fc replacement ok"
-  echo "search casefold ok"
-  echo "history expansion ok"
-  echo "history words ok"
-  echo "history option ok"
-  echo "ignoreeof ok"
-  exit 0
+  echo "interactive history coverage requires a usable script terminal" >&2
+  exit 1
 fi
 hist=$dir/recall
 search_hist=$dir/search
 expansion_hist=$dir/expansion
 word_designator_history_path=$dir/words
+modifier_history_path=$dir/modifiers
+modifier_print_path=$dir/modifier-print
+modifier_stderr_log=$dir/modifier-stderr
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -87,7 +84,10 @@ send_input_when_ready()
   [ -s "$ready" ] || return 1
   sleep 0.25
   for key_sequence in "$@"; do
-    printf '%b' "$key_sequence" || return 1
+    if ! printf '%b' "$key_sequence"; then
+      printf 'failed interactive input: %s\n' "$key_sequence" >&2
+      return 1
+    fi
     sleep 0.05 || return 1
   done
   sleep 0.25
@@ -202,6 +202,104 @@ case "$out" in
 *'!marker=tail: event not found'*':99: bad word specifier'*'WSTATUS=1'*)
   echo "history words ok" ;;
 *) echo "history words broken" ;;
+esac
+
+printf '%s\n' 'echo /aa/bb/name.tar.gz' \
+  'printf "SUB=<%s,%s>\\n" oldold oldold' \
+  'printf ARG=%s two words' \
+  'printf P_EXECUTED > "$HISTORY_P_MARKER"' \
+  'echo SHOULD_NOT_EXPAND' 'echo alpha needle omega' \
+  'echo quick old old' > "$modifier_history_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready \
+    '!?needle?:p\r' \
+    '!?needle?:s//X/:p\r' \
+    '!6:p\r' \
+    '^^Y\r' \
+    '^Y^Z^ tail\r' \
+    '^Z^W^:p\r' \
+    '!7:s/old/new/\r' \
+    'printf "H=<%s>\\n" "!1:$:h"\r' \
+    'printf "T=<%s>\\n" "!1:$:t"\r' \
+    'printf "R=<%s>\\n" "!1:$:r"\r' \
+    'printf "E=<%s>\\n" "!1:$:e"\r' \
+    '!2:s/old/new/\r' \
+    '!2:&\r' \
+    '!2:gs/old/new/\r' \
+    '!2:as/old/new/\r' \
+    '!2:Gs/old/new/\r' \
+    '!2:g&\r' \
+    'set -- !3:*:q; printf "Q=%s,<%s>,<%s>\\n" "$#" "$1" "${2-unset}"\r' \
+    'set -- !3:*:x; printf "X=%s,<%s>,<%s>\\n" "$#" "$1" "$2"\r' \
+    '!4:p\r' \
+    'printf "AFTER_P\\n"\r' \
+    'printf "SQ=<%s>\\n" '\''!!'\''\r' \
+    'printf "AQ=<%s>\\n" $'\''!!'\''\r' \
+    'printf "ES=<%s>\\n" \\!\\!\r' \
+    'printf "DQ=<%s>\\n" "!"\r' \
+    'echo COMMENT_OK # !5\r' \
+    'false # DUPLICATE_HISTORY_MARKER\r' \
+    '!!:p\r' \
+    'printf "PSTATUS=%s\\n" "$?"\r' \
+    'false\r' \
+    '!2:z\r' \
+    'printf "ZMSTATUS=%s\\n" "$?"\r' \
+    'false\r' \
+    '!2:s/MISSING/repl/\r' \
+    'printf "SMSTATUS=%s\\n" "$?"\r' \
+    'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$modifier_history_path" \
+    HISTORY_P_MARKER="$modifier_print_path" \
+    MODIFIER_STDERR_LOG="$modifier_stderr_log" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive \
+      'exec "$BIN" -i -M bash --rcfile /dev/null 2>"$MODIFIER_STDERR_LOG"') ||
+  exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+case "$out" in
+*'alpha Y omega'*'alpha Z omega tail'*'quick new old'*'H=</aa/bb>'*\
+*'T=<name.tar.gz>'*\
+*'R=</aa/bb/name.tar>'*'E=<.gz>'*'SUB=<newold,oldold>'*\
+*'SUB=<newold,oldold>'*'SUB=<newnew,newnew>'*'SUB=<newnew,newnew>'*\
+*'SUB=<newold,newold>'*'SUB=<newnew,newnew>'*\
+*'Q=1,<ARG=%s two words>,<unset>'*\
+*'X=3,<ARG=%s>,<two>'*'AFTER_P'*'SQ=<!!>'*'AQ=<!!>'*'ES=<!!>'*\
+*'DQ=<!>'*'COMMENT_OK'*'PSTATUS=1'*'ZMSTATUS=1'*'SMSTATUS=1'*)
+  case "$out" in
+  *SHOULD_NOT_EXPAND*|*'alpha W omega tail'*)
+    echo "history modifier execution broken"
+    ;;
+  *)
+    if [ -e "$modifier_print_path" ]; then
+      echo "history print modifier broken"
+    elif [ "$(grep -c '^false # DUPLICATE_HISTORY_MARKER$' \
+      "$modifier_history_path")" -ne 2 ]; then
+      echo "history duplicate recording broken"
+    elif grep -q -e ':z' -e MISSING "$modifier_history_path"; then
+      echo "history modifier error recording broken"
+    elif ! grep -qx 'printf P_EXECUTED > "$HISTORY_P_MARKER"' \
+      "$modifier_stderr_log" ||
+      ! grep -qx 'echo alpha W omega tail' "$modifier_stderr_log" ||
+      ! grep -qx 'z: unrecognized history modifier' "$modifier_stderr_log" ||
+      ! grep -qx ':s/MISSING/repl/: substitution failed' \
+        "$modifier_stderr_log"; then
+      printf 'history modifier diagnostics:\n%.4096s\n' \
+        "$(cat "$modifier_stderr_log")" >&2
+      echo "history modifier diagnostic stream broken"
+    else
+      echo "history modifiers ok"
+    fi
+    ;;
+  esac
+  ;;
+*)
+  printf 'history modifier output:\n%.4096s\n' "$out" >&2
+  echo "history modifiers broken"
+  ;;
 esac
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"

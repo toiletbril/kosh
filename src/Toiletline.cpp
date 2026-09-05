@@ -548,7 +548,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   defer { ITL_STRING_FREE(entry); };
   if (!::itl_string_from_bytes(entry, command.data, command.length))
     return koshka::None;
-  if (!::itl_history_append_to_file(entry, false)) return koshka::None;
+  if (!::itl_history_append_to_file(entry, false, true)) return koshka::None;
 
   return ::itl_g_last_history_event_number;
 }

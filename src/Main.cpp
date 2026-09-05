@@ -859,7 +859,7 @@ fn kosh_main(int argc, char **argv) -> int
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() && !FLAG_LINT.is_enabled();
   i32 exit_code = EXIT_SUCCESS;
   koshka::Maybe<usize> history_event_number = koshka::None;
-  koshka::Maybe<koshka::String> last_history_search_word = koshka::None;
+  koshka::history_expansion_state history_expansion_state{};
 
   /* The path map is reset rather than seeded here, since the eager scan pays
      off only in interactive mode. */
@@ -1291,6 +1291,7 @@ fn kosh_main(int argc, char **argv) -> int
       koshka::utils::quit(EXIT_FAILURE);
     }
 
+    bool should_execute_history_expansion = true;
     if (context.shell_is_interactive() &&
         context.shell_option_state(koshka::shell_option_id::Histexpand) &&
         !script_contents.is_empty())
@@ -1298,13 +1299,14 @@ fn kosh_main(int argc, char **argv) -> int
       try {
         let expanded = koshka::expand_interactive_history(
             script_contents.view(), history_event_number,
-            last_history_search_word, context);
+            history_expansion_state, context);
         if (expanded.has_value()) {
-          koshka::show_message(expanded->view());
-          script_contents = expanded.take();
+          koshka::show_message(expanded->command.view());
+          script_contents = steal(expanded->command);
+          should_execute_history_expansion = expanded->should_execute;
         }
       } catch (const koshka::Error &error) {
-        koshka::show_message(error.to_string());
+        koshka::show_message(error.message().view());
         continue;
       }
     }
@@ -1316,6 +1318,7 @@ fn kosh_main(int argc, char **argv) -> int
       history_event_number =
           toiletline::history_append_event(script_contents.view());
     }
+    if (!should_execute_history_expansion) continue;
 
     /* A Ctrl-C used to clear the input line must not abort the command about to
        run, so a pending interrupt is dropped here. */

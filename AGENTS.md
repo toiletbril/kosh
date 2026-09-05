@@ -182,6 +182,9 @@ changes update this file.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
+- Inspect the reported source line before diagnosing a shell error.
+- Use parallel tool calls for independent reads. Do not join them with shell
+  command separators.
 - Resolve build artifact paths from the active target before passing them to
   stat, debuggers, or inspection tools.
 - Compatibility fixtures use a stable peer-file operand when that operand is
@@ -192,6 +195,8 @@ changes update this file.
   unfamiliar make target recipe before invoking it.
 - Reduce a bounded platform probe to one verified command. Confirm its mood,
   option defaults, output order, and final status before writing the golden.
+- Reduce a high-volume fixture to its failing section before enabling shell
+  xtrace.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
   Use literal ripgrep patterns. Put every ripgrep option before the pattern,
   separator, and paths. Put `--` before dash-leading patterns. Enable PCRE2
@@ -340,6 +345,7 @@ changes update this file.
   rule here for each distinct cause.
 - Format changes. Run focused and full bounded tests. Inspect goldens, the full
   diff, untracked files, and `git diff --check`. Confirm README.md is untouched.
+- Inspect vendored formatting rules before formatting a touched vendor file.
 - Verify git identity. Keep commit subjects within the limit and bodies within
   72 columns. Commit locally. Never push or create external artifacts without
   an explicit request.

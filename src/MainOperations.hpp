@@ -1089,20 +1089,371 @@ static fn select_history_words(StringView command, StringView designator,
   return selected.view();
 }
 
+struct history_substitution
+{
+  String old_text;
+  String replacement_text;
+};
+
+struct history_expansion_state
+{
+  Maybe<String> last_search_word{};
+  Maybe<history_substitution> last_substitution{};
+};
+
+enum class history_substitution_scope : u8
+{
+  First,
+  All,
+  FirstPerWord,
+};
+
+cold [[noreturn]] static fn
+throw_history_modifier_error(StringView spelling, StringView reason) throws
+    -> void
+{
+  let message = String{spelling};
+  message += ": ";
+  message += reason;
+  throw Error{message.view()};
+}
+
+static pure fn apply_history_path_modifier(StringView text,
+                                           char modifier) wontthrow
+    -> StringView
+{
+  if (modifier == 'h' || modifier == 't') {
+    for (usize position = text.length; position > 0; position--) {
+      if (text[position - 1] != '/') continue;
+      let const separator_position = position - 1;
+      if (modifier == 't') return text.substring(position);
+      if (separator_position == 0) return text.substring_of_length(0, 1);
+      return text.substring_of_length(0, separator_position);
+    }
+    return text;
+  }
+
+  usize component_start_position = 0;
+  for (usize position = text.length; position > 0; position--) {
+    if (text[position - 1] == '/') {
+      component_start_position = position;
+      break;
+    }
+  }
+  for (usize position = text.length; position > component_start_position;
+       position--)
+  {
+    if (text[position - 1] != '.') continue;
+    let const extension_position = position - 1;
+    return modifier == 'r' ? text.substring_of_length(0, extension_position)
+                           : text.substring(extension_position);
+  }
+
+  return text;
+}
+
+static fn parse_history_substitution_field(StringView source, usize &position,
+                                           char delimiter, Allocator allocator,
+                                           bool *did_find_delimiter) throws
+    -> String
+{
+  let field = String{allocator};
+  if (did_find_delimiter != nullptr) *did_find_delimiter = false;
+  while (position < source.length) {
+    let const byte = source[position++];
+    if (byte == delimiter) {
+      if (did_find_delimiter != nullptr) *did_find_delimiter = true;
+      break;
+    }
+    if (byte == '\\' && position < source.length &&
+        source[position] == delimiter)
+    {
+      field.push(source[position++]);
+      continue;
+    }
+    field.push(byte);
+  }
+
+  return field;
+}
+
+static fn append_history_substitution_replacement(String &output,
+                                                  StringView replacement,
+                                                  StringView matched) throws
+    -> void
+{
+  for (usize position = 0; position < replacement.length; position++) {
+    let const byte = replacement[position];
+    if (byte == '\\' && position + 1 < replacement.length &&
+        replacement[position + 1] == '&')
+    {
+      output.push('&');
+      position++;
+    } else if (byte == '&') {
+      output.append(matched);
+    } else {
+      output.push(byte);
+    }
+  }
+}
+
+static fn apply_history_substitution(StringView text, StringView old_text,
+                                     StringView replacement,
+                                     history_substitution_scope scope,
+                                     String &output) throws -> bool
+{
+  if (old_text.is_empty()) return false;
+
+  output.clear();
+  output.reserve(text.length);
+  bool did_replace = false;
+  usize copied_position = 0;
+
+  if (scope == history_substitution_scope::FirstPerWord) {
+    usize word_scan_position = 0;
+    while (word_scan_position < text.length) {
+      let const word = next_history_word(text, word_scan_position);
+      if (!word.has_value()) break;
+      let const match_position = word->find_substring(old_text);
+      if (!match_position.has_value()) continue;
+      let const absolute_match_position =
+          static_cast<usize>(word->data - text.data) + *match_position;
+      output.append(text.substring_of_length(
+          copied_position, absolute_match_position - copied_position));
+      append_history_substitution_replacement(output, replacement, old_text);
+      copied_position = absolute_match_position + old_text.length;
+      did_replace = true;
+    }
+  } else {
+    usize search_position = 0;
+    while (search_position <= text.length) {
+      let const match_position = text.find_substring(old_text, search_position);
+      if (!match_position.has_value()) break;
+      output.append(text.substring_of_length(
+          copied_position, *match_position - copied_position));
+      append_history_substitution_replacement(output, replacement, old_text);
+      copied_position = *match_position + old_text.length;
+      search_position = copied_position;
+      did_replace = true;
+      if (scope == history_substitution_scope::First) break;
+    }
+  }
+
+  if (!did_replace) return false;
+  output.append(text.substring(copied_position));
+  return true;
+}
+
+static fn quote_history_words(StringView text, bool should_split,
+                              String &output) throws -> void
+{
+  output.clear();
+  if (!should_split) {
+    append_shell_quoted_arg(output, text, true);
+    return;
+  }
+
+  usize position = 0;
+  while (position < text.length) {
+    let const word = text.next_ascii_whitespace_word(position);
+    if (word.is_empty()) break;
+    if (!output.is_empty()) output.push(' ');
+    append_shell_quoted_arg(output, word, true);
+  }
+}
+
+static pure fn resolve_history_substitution_old_text(
+    StringView old_text, const history_expansion_state &state) wontthrow
+    -> StringView
+{
+  if (!old_text.is_empty()) return old_text;
+  if (state.last_substitution.has_value())
+    return state.last_substitution->old_text.view();
+  if (state.last_search_word.has_value()) return state.last_search_word->view();
+  return {};
+}
+
+static fn apply_history_modifiers(StringView source, usize &position,
+                                  StringView selected,
+                                  history_expansion_state &state,
+                                  Allocator allocator, String &first_buffer,
+                                  String &second_buffer,
+                                  bool &should_execute) throws -> StringView
+{
+  bool should_use_first_buffer = true;
+  while (position < source.length && source[position] == ':') {
+    let const modifier_start_position = position++;
+    if (position >= source.length)
+      throw_history_modifier_error(":", "unrecognized history modifier");
+
+    let scope = history_substitution_scope::First;
+    bool has_substitution_scope = false;
+    if (source[position] == 'g' || source[position] == 'a' ||
+        source[position] == 'G')
+    {
+      has_substitution_scope = true;
+      scope = source[position] == 'G' ? history_substitution_scope::FirstPerWord
+                                      : history_substitution_scope::All;
+      position++;
+      if (position >= source.length)
+        throw_history_modifier_error(
+            source.substring(modifier_start_position + 1),
+            "unrecognized history modifier");
+    }
+
+    let const modifier = source[position++];
+    if (has_substitution_scope && modifier != 's' && modifier != '&')
+      throw_history_modifier_error(
+          source.substring_of_length(modifier_start_position + 1,
+                                     position - modifier_start_position - 1),
+          "unrecognized history modifier");
+    if (modifier == 'h' || modifier == 't' || modifier == 'r' ||
+        modifier == 'e')
+    {
+      selected = apply_history_path_modifier(selected, modifier);
+      continue;
+    }
+    if (modifier == 'p') {
+      should_execute = false;
+      continue;
+    }
+
+    let &output = should_use_first_buffer ? first_buffer : second_buffer;
+    should_use_first_buffer = !should_use_first_buffer;
+    if (modifier == 'q' || modifier == 'x') {
+      quote_history_words(selected, modifier == 'x', output);
+      selected = output.view();
+      continue;
+    }
+
+    StringView old_text{};
+    StringView replacement{};
+    let parsed_old_text = String{allocator};
+    let parsed_replacement = String{allocator};
+    if (modifier == 's') {
+      if (position >= source.length)
+        throw_history_modifier_error("s", "unrecognized history modifier");
+      let const delimiter = source[position++];
+      bool has_old_delimiter = false;
+      parsed_old_text = parse_history_substitution_field(
+          source, position, delimiter, allocator, &has_old_delimiter);
+      if (!has_old_delimiter)
+        throw_history_modifier_error(
+            source.substring_of_length(modifier_start_position,
+                                       position - modifier_start_position),
+            "substitution failed");
+      parsed_replacement = parse_history_substitution_field(
+          source, position, delimiter, allocator, nullptr);
+      old_text =
+          resolve_history_substitution_old_text(parsed_old_text.view(), state);
+      replacement = parsed_replacement.view();
+    } else if (modifier == '&') {
+      if (!state.last_substitution.has_value())
+        throw_history_modifier_error(
+            source.substring_of_length(modifier_start_position,
+                                       position - modifier_start_position),
+            "substitution failed");
+      old_text = state.last_substitution->old_text.view();
+      replacement = state.last_substitution->replacement_text.view();
+    } else {
+      throw_history_modifier_error(source.substring_of_length(position - 1, 1),
+                                   "unrecognized history modifier");
+    }
+
+    if (!apply_history_substitution(selected, old_text, replacement, scope,
+                                    output))
+    {
+      throw_history_modifier_error(
+          source.substring_of_length(modifier_start_position,
+                                     position - modifier_start_position),
+          "substitution failed");
+    }
+    selected = output.view();
+    if (modifier == 's') {
+      let next_substitution = history_substitution{
+          String{heap_allocator(), old_text   },
+          String{heap_allocator(), replacement}
+      };
+      state.last_substitution = steal(next_substitution);
+    }
+  }
+
+  return selected;
+}
+
+struct interactive_history_expansion
+{
+  String command;
+  bool should_execute;
+};
+
 static fn expand_interactive_history(StringView source,
                                      Maybe<usize> accepted_event_number,
-                                     Maybe<String> &last_history_search_word,
+                                     history_expansion_state &state,
                                      EvalContext &context) throws
-    -> Maybe<String>
+    -> Maybe<interactive_history_expansion>
 {
   let const scratch_mark = context.scratch_mark();
   defer { context.scratch_release(scratch_mark); };
 
   bool is_single_quoted = false;
   bool is_double_quoted = false;
+  bool is_at_word_start = true;
   bool did_expand = false;
+  bool should_execute = true;
   usize copied_position = 0;
   let expanded = String{heap_allocator()};
+
+  if (!source.is_empty() && source[0] == '^') {
+    let const selected_event = toiletline::relative_history_event(
+        context.scratch_allocator(), 1, accepted_event_number);
+    if (!selected_event.has_value()) throw Error{"!!: event not found"};
+
+    usize substitution_position = 1;
+    bool has_old_delimiter = false;
+    let const old_text = parse_history_substitution_field(
+        source, substitution_position, '^', context.scratch_allocator(),
+        &has_old_delimiter);
+    let const replacement =
+        parse_history_substitution_field(source, substitution_position, '^',
+                                         context.scratch_allocator(), nullptr);
+    let const effective_old_text =
+        resolve_history_substitution_old_text(old_text.view(), state);
+    let quick_spelling = String{context.scratch_allocator(), ":s"};
+    quick_spelling.append(source);
+    if (!has_old_delimiter)
+      throw_history_modifier_error(quick_spelling.view(),
+                                   "substitution failed");
+
+    let substituted = String{context.scratch_allocator()};
+    if (!apply_history_substitution(
+            selected_event->command.view(), effective_old_text,
+            replacement.view(), history_substitution_scope::First, substituted))
+    {
+      throw_history_modifier_error(quick_spelling.view(),
+                                   "substitution failed");
+    }
+    let next_substitution = history_substitution{
+        String{heap_allocator(), effective_old_text},
+        String{heap_allocator(), replacement.view()}
+    };
+    state.last_substitution = steal(next_substitution);
+
+    let first_modifier_buffer = String{context.scratch_allocator()};
+    let second_modifier_buffer = String{context.scratch_allocator()};
+    let selected = substituted.view();
+    if (substitution_position < source.length &&
+        source[substitution_position] == ':')
+    {
+      selected = apply_history_modifiers(
+          source, substitution_position, selected, state,
+          context.scratch_allocator(), first_modifier_buffer,
+          second_modifier_buffer, should_execute);
+    }
+    expanded.append(selected);
+    expanded.append(source.substring(substitution_position));
+    return interactive_history_expansion{steal(expanded), should_execute};
+  }
 
   let const do_terminate_designator = [](char byte) wontthrow -> bool {
     return is_ascii_whitespace(byte) || byte == ':' || byte == '"' ||
@@ -1113,17 +1464,30 @@ static fn expand_interactive_history(StringView source,
 
   for (usize position = 0; position < source.length; position++) {
     let const byte = source[position];
+    if (!is_single_quoted && !is_double_quoted && byte == '#' &&
+        is_at_word_start)
+    {
+      break;
+    }
     if (byte == '\'' && !is_double_quoted) {
       is_single_quoted = !is_single_quoted;
+      is_at_word_start = false;
       continue;
     }
     if (byte == '"' && !is_single_quoted) {
       is_double_quoted = !is_double_quoted;
+      is_at_word_start = false;
       continue;
     }
     if (byte == '\\' && !is_single_quoted && position + 1 < source.length) {
+      is_at_word_start = false;
       position++;
       continue;
+    }
+    if (!is_single_quoted && !is_double_quoted) {
+      is_at_word_start = is_ascii_whitespace(byte) || byte == ';' ||
+                         byte == '&' || byte == '|' || byte == '(' ||
+                         byte == ')' || byte == '<' || byte == '>';
     }
     if (byte != '!' || is_single_quoted || position + 1 >= source.length)
       continue;
@@ -1139,6 +1503,8 @@ static fn expand_interactive_history(StringView source,
     StringView replacement{};
     let selected_event = Maybe<toiletline::history_event>{};
     let current_line = String{context.scratch_allocator()};
+    let first_modifier_buffer = String{context.scratch_allocator()};
+    let second_modifier_buffer = String{context.scratch_allocator()};
 
     if (next_byte == '#') {
       current_line.append(expanded.view());
@@ -1147,8 +1513,8 @@ static fn expand_interactive_history(StringView source,
       replacement = current_line.view();
     } else {
       let search_word = Maybe<StringView>{};
-      if (last_history_search_word.has_value())
-        search_word = last_history_search_word->view();
+      if (state.last_search_word.has_value())
+        search_word = state.last_search_word->view();
       bool has_implicit_word_designator = false;
       if (next_byte == '!' || next_byte == ':' || next_byte == '^' ||
           next_byte == '$' || next_byte == '*' || next_byte == '%')
@@ -1171,9 +1537,9 @@ static fn expand_interactive_history(StringView source,
           let const matched_word =
               find_history_search_word(selected_event->command.view(), needle);
           if (matched_word.has_value()) {
-            last_history_search_word =
+            state.last_search_word =
                 String{heap_allocator(), matched_word.value()};
-            search_word = last_history_search_word->view();
+            search_word = state.last_search_word->view();
           }
         }
       } else {
@@ -1272,6 +1638,10 @@ static fn expand_interactive_history(StringView source,
           throw_bad_history_word_specifier(
               source.substring_of_length(position + 1, 1));
         }
+        replacement = apply_history_modifiers(
+            source, reference_end_position, replacement, state,
+            context.scratch_allocator(), first_modifier_buffer,
+            second_modifier_buffer, should_execute);
       } else {
         let message = String{source.substring_of_length(
             position, reference_end_position - position)};
@@ -1291,7 +1661,7 @@ static fn expand_interactive_history(StringView source,
 
   if (!did_expand) return None;
   expanded.append(source.substring(copied_position));
-  return expanded;
+  return interactive_history_expansion{steal(expanded), should_execute};
 }
 
 enum class startup_file_requirement : u8
