@@ -85,9 +85,12 @@ fn containing_history_event(koshka::Allocator allocator, StringView text,
   return koshka::None;
 }
 
-fn history_append_event(StringView command) -> koshka::Maybe<usize>
+fn history_append_event(StringView command,
+                        history_duplicate_policy duplicate_policy)
+    -> koshka::Maybe<usize>
 {
   unused(command);
+  unused(duplicate_policy);
   return koshka::None;
 }
 

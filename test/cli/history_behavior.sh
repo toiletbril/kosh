@@ -66,6 +66,7 @@ word_designator_history_path=$dir/words
 modifier_history_path=$dir/modifiers
 modifier_print_path=$dir/modifier-print
 modifier_stderr_log=$dir/modifier-stderr
+filter_history_path=$dir/filter-history
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -301,6 +302,60 @@ case "$out" in
   echo "history modifiers broken"
   ;;
 esac
+
+printf 'echo FILTER_BASE\n' > "$filter_history_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready \
+    'HISTCONTROL=ignorespace:ignoredups:unknown\r' \
+    ' echo SPACE_FILTER_MARKER\r' \
+    'echo DUP_FILTER_MARKER\r' \
+    'echo DUP_FILTER_MARKER\r' \
+    'HISTCONTROL=ignoreboth\r' \
+    ' echo BOTH_SPACE_FILTER_MARKER\r' \
+    'echo BOTH_DUP_FILTER_MARKER\r' \
+    'echo BOTH_DUP_FILTER_MARKER\r' \
+    'HISTCONTROL=erasedups\r' \
+    'echo ERASE_FILTER_MARKER\r' \
+    'echo KEEP_BETWEEN_FILTER_MARKER\r' \
+    'echo ERASE_FILTER_MARKER\r' \
+    'HISTCONTROL=\r' \
+    'HISTIGNORE='\''echo GLOB_*:&:echo @(EXT_ONE|EXT_TWO)'\''\r' \
+    'echo GLOB_FILTER_MARKER\r' \
+    'echo prefix GLOB_FILTER_MARKER\r' \
+    'echo AMP_FILTER_MARKER\r' \
+    'echo AMP_FILTER_MARKER\r' \
+    'echo EXT_ONE\r' \
+    'shopt -s extglob\r' \
+    'echo EXT_TWO\r' \
+    'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$filter_history_path" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+if [ "$(grep -c '^ echo SPACE_FILTER_MARKER$' "$filter_history_path")" -eq 0 ] &&
+  [ "$(grep -c '^echo DUP_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^ echo BOTH_SPACE_FILTER_MARKER$' \
+    "$filter_history_path")" -eq 0 ] &&
+  [ "$(grep -c '^echo BOTH_DUP_FILTER_MARKER$' \
+    "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo ERASE_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo KEEP_BETWEEN_FILTER_MARKER$' \
+    "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo GLOB_FILTER_MARKER$' "$filter_history_path")" -eq 0 ] &&
+  [ "$(grep -c '^echo prefix GLOB_FILTER_MARKER$' \
+    "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo AMP_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo EXT_ONE$' "$filter_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo EXT_TWO$' "$filter_history_path")" -eq 0 ]; then
+  echo "history filtering ok"
+else
+  printf 'history filter file:\n%.4096s\n' "$(cat "$filter_history_path")" >&2
+  echo "history filtering broken"
+fi
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"
 printf 'exec 2>"$HISTORY_STDERR_LOG"\n' > "$stderr_rc"

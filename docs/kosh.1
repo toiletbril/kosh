@@ -1817,6 +1817,27 @@ The value supplies default command-line options.
 .B KOSH_HISTORY
 The value names the command history file. The default is ~/.kosh_history.
 .TP
+.B HISTCONTROL
+The value is a colon-separated list of filters for commands added to history.
+.B ignorespace
+omits a command whose first byte is a space.
+.B ignoredups
+omits a command equal to the newest stored event.
+.B ignoreboth
+enables both filters.
+.B erasedups
+removes every older event equal to the command before storing it. Unknown and
+empty fields have no effect.
+.TP
+.B HISTIGNORE
+The value is a colon-separated list of shell patterns. A command is omitted when
+its first physical line matches a complete pattern. Extended patterns follow the
+current
+.B extglob
+setting. An unescaped pattern consisting only of
+.B &
+matches the newest stored event. A backslash quotes the following pattern byte.
+.TP
 .BR FCEDIT ", " EDITOR
 These variables select the editor used by
 .BR fc .

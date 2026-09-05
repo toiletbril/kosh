@@ -67,7 +67,17 @@ prefixed_history_event(koshka::Allocator allocator, StringView prefix,
 koshka::Maybe<history_event> containing_history_event(
     koshka::Allocator allocator, StringView text,
     koshka::Maybe<usize> before_event_number = koshka::None);
-koshka::Maybe<usize> history_append_event(StringView command);
+enum class history_duplicate_policy : u8
+{
+  Allow,
+  IgnoreConsecutive,
+  ErasePrevious,
+  IgnoreConsecutiveAndErasePrevious,
+};
+koshka::Maybe<usize>
+history_append_event(StringView command,
+                     history_duplicate_policy duplicate_policy =
+                         history_duplicate_policy::Allow);
 bool history_rewrite_event(usize number, StringView expected,
                            StringView replacement);
 bool history_rewrite_event(usize number, StringView expected,

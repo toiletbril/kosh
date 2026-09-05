@@ -38,5 +38,6 @@ search casefold ok
 history expansion ok
 history words ok
 history modifiers ok
+history filtering ok
 history option ok
 ignoreeof ok

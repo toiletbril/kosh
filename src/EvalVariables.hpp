@@ -213,6 +213,13 @@ inline constexpr static_string_entry<shell_variable_description>
         {SSK("HISTSIZE"),
          {"The value bounds the number of retained history events.",
           shell_variable_fact::Plain}                                         },
+        {SSK("HISTCONTROL"),
+         {"The value is a colon-separated list of history filters.",
+          shell_variable_fact::NotPosix}                                      },
+        {SSK("HISTIGNORE"),
+         {"The value is a colon-separated list of complete-command patterns "
+          "excluded from history.",
+          shell_variable_fact::NotPosix}                                      },
         {SSK("GLOBIGNORE"),
          {"The value is a colon-separated list of patterns a glob result "
           "excludes.",
