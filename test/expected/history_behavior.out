@@ -4,8 +4,8 @@ search casefold ok
 history expansion ok
 history words ok
 history modifiers ok
-history filtering ok
+history storage ok
 multiline history ok
-histappend ok
+history size ok
 history option ok
 ignoreeof ok

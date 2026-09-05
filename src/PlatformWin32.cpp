@@ -1049,6 +1049,17 @@ fn apply_terminal_settings(descriptor terminal,
   return {terminal_settings_apply_kind::Success, 0};
 }
 
+fn has_environment_variable(StringView key) -> bool
+{
+  let const wide_key = utf8_to_wide(key, heap_allocator());
+  if (!wide_key.has_value()) return false;
+
+  SetLastError(ERROR_SUCCESS);
+  let const required_size =
+      GetEnvironmentVariableW(wide_key->begin(), nullptr, 0);
+  return required_size != 0 || GetLastError() != ERROR_ENVVAR_NOT_FOUND;
+}
+
 fn get_environment_variable(StringView key) -> Maybe<String>
 {
   let const wide_key = utf8_to_wide(key, heap_allocator());

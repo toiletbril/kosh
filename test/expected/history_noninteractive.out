@@ -50,9 +50,14 @@ rc=0
 0
 == concurrent history stores preserve both records ==
 2
-== growing HISTSIZE does not restore discarded entries ==
+== running shells reload history written by another instance ==
+    1  shared-event
+== KOSH_HISTORY_SIZE controls the visible retained window ==
     4  four
     5  five
+    1  one
+    2  two
+    3  three
     4  four
     5  five
 == a stored multiline event keeps its submitted shape ==

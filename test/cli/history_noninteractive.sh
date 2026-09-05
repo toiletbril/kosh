@@ -17,7 +17,7 @@ cleanup()
 trap cleanup EXIT
 
 printf 'echo one\nls\ncd /tmp\ngit status\n' > "$dir/hist"
-export KOSH_HISTORY="$dir/hist"
+export KOSH_HISTORY_FILE="$dir/hist"
 echo "== the numbered list prints every entry =="
 "$BIN" -c 'history'
 echo "== a trailing count prints only the most recent entries =="
@@ -51,17 +51,17 @@ echo "== history -r rejects invalid data without changing the list =="
 printf 'tail' > "$dir/unterminated"
 printf 'next\n' > "$dir/next"
 echo "== history -r separates an unterminated backing record =="
-KOSH_HISTORY="$dir/unterminated" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/unterminated" "$BIN" --no-init-files -c \
   'history -r "$1"; history' history-test "$dir/next"
 
 : > "$dir/empty"
 echo "== an empty import creates a missing backing file =="
-KOSH_HISTORY="$dir/empty-backing" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/empty-backing" "$BIN" --no-init-files -c \
   'history -r "$1"; echo "rc=$?"' history-test "$dir/empty"
 
 printf '\377\n' > "$dir/high-byte"
 echo "== history accepts high bytes as file data =="
-KOSH_HISTORY="$dir/high-byte-backing" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/high-byte-backing" "$BIN" --no-init-files -c \
   'history -r "$1"; echo "rc=$?"; history | koshkit wc -l' history-test \
   "$dir/high-byte"
 
@@ -73,28 +73,50 @@ while [ "$byte_count" -lt 4096 ]; do
 done
 printf '\n' >> "$dir/oversized"
 echo "== an oversized decoded record is omitted =="
-KOSH_HISTORY="$dir/oversized" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/oversized" "$BIN" --no-init-files -c \
   'history | koshkit wc -l'
 
 : > "$dir/concurrent"
 echo "== concurrent history stores preserve both records =="
-KOSH_HISTORY="$dir/concurrent" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/concurrent" "$BIN" --no-init-files -c \
   'history -s first' &
 first_pid=$!
-KOSH_HISTORY="$dir/concurrent" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/concurrent" "$BIN" --no-init-files -c \
   'history -s second' &
 second_pid=$!
 wait "$first_pid"
 wait "$second_pid"
-KOSH_HISTORY="$dir/concurrent" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/concurrent" "$BIN" --no-init-files -c \
   'history | koshkit wc -l'
 
+: > "$dir/synchronized"
+echo "== running shells reload history written by another instance =="
+KOSH_HISTORY_FILE="$dir/synchronized" "$BIN" --no-init-files -c \
+  'printf ready > "$1"; while [ ! -e "$2" ]; do :; done; history' \
+  history-sync "$dir/sync-ready" "$dir/sync-go" > "$dir/sync-output" &
+reader_pid=$!
+attempt_count=0
+while [ ! -e "$dir/sync-ready" ] && [ "$attempt_count" -lt 500 ]; do
+  sleep 0.01
+  attempt_count=$((attempt_count + 1))
+done
+if [ ! -e "$dir/sync-ready" ]; then
+  : > "$dir/sync-go"
+  wait "$reader_pid"
+  exit 1
+fi
+KOSH_HISTORY_FILE="$dir/synchronized" "$BIN" --no-init-files -c \
+  'history -s shared-event'
+: > "$dir/sync-go"
+wait "$reader_pid"
+cat "$dir/sync-output"
+
 printf 'one\ntwo\nthree\nfour\nfive\n' > "$dir/limit"
-echo "== growing HISTSIZE does not restore discarded entries =="
-KOSH_HISTORY="$dir/limit" "$BIN" --no-init-files -c \
-  'HISTSIZE=2; history; HISTSIZE=5; history'
+echo "== KOSH_HISTORY_SIZE controls the visible retained window =="
+KOSH_HISTORY_FILE="$dir/limit" "$BIN" --no-init-files -c \
+  'KOSH_HISTORY_SIZE=2; history; KOSH_HISTORY_SIZE=5; history'
 
 : > "$dir/multiline"
 echo "== a stored multiline event keeps its submitted shape =="
-KOSH_HISTORY="$dir/multiline" "$BIN" --no-init-files -c \
+KOSH_HISTORY_FILE="$dir/multiline" "$BIN" --no-init-files -c \
   "history -s \$'line one\\nline two'; history"

@@ -59,7 +59,8 @@ static fn extend_history_contents_hash(u64 hash, StringView contents) -> u64
 
 static fn resolve_no_editor_history_path() -> Maybe<Path>
 {
-  if (let const override_path = os::get_environment_variable("KOSH_HISTORY");
+  if (let const override_path =
+          os::get_environment_variable("KOSH_HISTORY_FILE");
       override_path.has_value() && !override_path->is_empty())
   {
     return Path{override_path->view()};
@@ -322,45 +323,6 @@ static fn replace_history_file(const Path &path, StringView original,
   return scan_no_editor_history(path, replacement);
 }
 
-static fn erase_previous_no_editor_history_events(StringView command) -> bool
-{
-  let const path = resolve_no_editor_history_path();
-  if (!path.has_value()) return false;
-  let contents = read_no_editor_history_contents(*path, true);
-  if (!contents.has_value() || contents->is_empty())
-    return contents.has_value();
-  let &state = get_no_editor_history_state();
-  if (state.record_byte_offsets.is_empty()) return true;
-
-  let rewritten = String{heap_allocator()};
-  let const first_retained_number =
-      state.total_count - state.record_byte_offsets.count() + 1;
-  usize byte_offset = 0;
-  usize copied_offset = 0;
-  usize number = 0;
-  bool is_valid = true;
-  bool did_remove = false;
-  history_record_span span{};
-  let decoded = String{heap_allocator()};
-  while (next_history_record(contents->view(), byte_offset, span, is_valid)) {
-    number++;
-    if (number < first_retained_number) continue;
-    if (!decode_history_record(decoded, contents->view(), span)) return false;
-    if (decoded.view() != command) continue;
-
-    if (!did_remove) rewritten.reserve(contents->count());
-    rewritten.append(contents->substring_of_length(
-        copied_offset, span.start_byte_offset - copied_offset));
-    copied_offset = span.end_byte_offset;
-    did_remove = true;
-  }
-  if (!is_valid) return false;
-  if (!did_remove) return true;
-  rewritten.append(contents->substring(copied_offset));
-  return replace_history_file(*path, contents->view(), rewritten.view(),
-                              ".kosh_history_erasedups");
-}
-
 template <class Match>
 static fn find_no_editor_history_event(Allocator allocator,
                                        Maybe<usize> before_event_number,
@@ -395,26 +357,6 @@ static fn find_no_editor_history_event(Allocator allocator,
   return None;
 }
 
-static fn newest_no_editor_history_event_equals(const Path &path,
-                                                StringView command)
-    -> Maybe<bool>
-{
-  let contents = read_no_editor_history_contents(path, true);
-  if (!contents.has_value()) return None;
-  let &state = get_no_editor_history_state();
-  if (state.record_byte_offsets.is_empty()) return false;
-
-  usize byte_offset = get_history_record_byte_offset(
-      state, state.record_byte_offsets.count() - 1);
-  bool is_valid = true;
-  history_record_span span{};
-  if (!next_history_record(contents->view(), byte_offset, span, is_valid))
-    return None;
-  let decoded = String{heap_allocator()};
-  if (!decode_history_record(decoded, contents->view(), span)) return None;
-  return decoded.view() == command;
-}
-
 static fn rewrite_no_editor_history_event(usize wanted_number,
                                           StringView expected,
                                           const ArrayList<String> &replacements)
@@ -422,6 +364,11 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
 {
   let const path = resolve_no_editor_history_path();
   if (!path.has_value()) return false;
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { os::release_process_lock(lock.take()); };
   let contents = read_no_editor_history_contents(*path, false);
   if (!contents.has_value()) return false;
   let &state = get_no_editor_history_state();
@@ -497,6 +444,11 @@ fn history_clear() -> bool
 {
   let const path = history_path();
   if (!path.has_value()) return false;
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = koshka::Path{"."};
+  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { koshka::os::release_process_lock(lock.take()); };
   let opened = koshka::os::open_file_descriptor(
       path->text().view(), koshka::os::file_open_mode::Truncate);
   if (!opened.has_value()) return false;
@@ -606,9 +558,7 @@ fn containing_history_event(koshka::Allocator allocator, StringView text,
       });
 }
 
-fn history_append_event(StringView command,
-                        history_duplicate_policy duplicate_policy)
-    -> koshka::Maybe<usize>
+fn history_append_event(StringView command) -> koshka::Maybe<usize>
 {
   if (command.is_empty() ||
       command.length > koshka::internal::NO_EDITOR_HISTORY_ENTRY_MAX_BYTE_COUNT)
@@ -627,29 +577,13 @@ fn history_append_event(StringView command,
 
   let const path = history_path();
   if (!path.has_value()) return koshka::None;
-  let const should_erase_previous =
-      duplicate_policy == history_duplicate_policy::ErasePrevious ||
-      duplicate_policy ==
-          history_duplicate_policy::IgnoreConsecutiveAndErasePrevious;
-  let const should_ignore_consecutive =
-      duplicate_policy == history_duplicate_policy::IgnoreConsecutive ||
-      duplicate_policy ==
-          history_duplicate_policy::IgnoreConsecutiveAndErasePrevious;
-  if (should_ignore_consecutive) {
-    let const is_newest_equal =
-        koshka::internal::newest_no_editor_history_event_equals(*path, command);
-    if (!is_newest_equal.has_value() || *is_newest_equal) return koshka::None;
-  }
-  if (should_erase_previous &&
-      !koshka::internal::erase_previous_no_editor_history_events(command))
-  {
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return koshka::None;
+  defer { os::release_process_lock(lock.take()); };
+  if (!koshka::internal::ensure_no_editor_history_loaded(*path, true))
     return koshka::None;
-  }
-  if (!should_ignore_consecutive && !should_erase_previous &&
-      !koshka::internal::ensure_no_editor_history_loaded(*path, true))
-  {
-    return koshka::None;
-  }
 
   let &state = koshka::internal::get_no_editor_history_state();
   let const had_unterminated_record =
@@ -710,13 +644,7 @@ fn initialize() -> void
       "This build has no line editor, use '-c', '-s', or a file argument"};
 }
 
-fn exit(bool should_append_history, usize history_size_limit,
-        usize history_file_size_limit) -> void
-{
-  unused(should_append_history);
-  unused(history_size_limit);
-  unused(history_file_size_limit);
-}
+fn exit(usize history_size_limit) -> void { unused(history_size_limit); }
 
 fn set_title(StringView title) -> void { unused(title); }
 

@@ -146,6 +146,9 @@ private:
       DEFAULT_BLOCK_SIZE / sizeof(pending_destructor);
 
   ArrayList<block> m_blocks{heap_allocator()};
+  /* Every block above this index is empty, so a release rewinds the index and
+     the blocks it reclaimed are handed out again. */
+  usize m_current_index{0};
   /* The half-open address range covering every live block. A pointer outside it
      belongs to no block, so the ownership scan is skipped. The range only ever
      widens while blocks are added, and it stays conservative after a reset. */
@@ -158,9 +161,6 @@ private:
   usize m_reset_generation{0};
   u32 m_arena_incarnation{0};
   u32 m_first_free_lifetime_slot{UINT32_MAX};
-  /* Every block above this index is empty, so a release rewinds the index and
-     the blocks it reclaimed are handed out again. */
-  usize m_current_index{0};
 
   fn add_block(usize minimum_size, usize preferred_size) throws -> void;
   fn push_destructor(pending_destructor pending) throws -> void;

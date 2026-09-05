@@ -1,5 +1,8 @@
 == an inherited SHELL is preserved, not clobbered:
 preserved
+== environment names follow platform case rules:
+shell-case-preserved
+bash-case-cleared
 == an unset SHELL is seeded with the invocation path:
 seeded-invocation
 == BASH names the invocation symlink while SHELL stays inherited:

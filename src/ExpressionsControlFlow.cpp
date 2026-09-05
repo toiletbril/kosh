@@ -364,15 +364,16 @@ fn IfClause::as_if_clause() const wontthrow -> const IfClause * { return this; }
 
 WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
                      const Expression *body, bool is_until)
-    : CompoundCommand(steal(location)), m_condition(condition), m_body(body),
-      m_is_until(is_until)
-{}
+    : CompoundCommand(steal(location)), m_condition(condition), m_body(body)
+{
+  set_execution_flag(ExecutionFlag::UntilLoop, is_until);
+}
 
 WhileLoop::~WhileLoop() = default;
 
 cold fn WhileLoop::to_string() const throws -> String
 {
-  let result = String{m_is_until ? "UntilLoop" : "WhileLoop"};
+  let result = String{is_until() ? "UntilLoop" : "WhileLoop"};
   append_ast_execution_flags(result);
   return result;
 }
@@ -432,15 +433,17 @@ hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
 
   cxt.set_terminal_exec_allowed(false);
 
-  LOG(Debug, "entering the %s loop%s", m_is_until ? "until" : "while",
-      m_folded_to_skip ? ", folded to skip the body" : "");
+  let const is_until_loop = is_until();
+  let const is_folded_to_skip = this->is_folded_to_skip();
+  LOG(Debug, "entering the %s loop%s", is_until_loop ? "until" : "while",
+      is_folded_to_skip ? ", folded to skip the body" : "");
 
   let const can_skip_condition_commands =
       !cxt.has_debug_trap() && !cxt.should_echo_expanded();
-  if ((m_folded_to_skip || is_fully_eliminated()) &&
+  if ((is_folded_to_skip || is_fully_eliminated()) &&
       can_skip_condition_commands)
   {
-    cxt.publish_single_pipe_status(m_is_until ? 0 : 1);
+    cxt.publish_single_pipe_status(is_until_loop ? 0 : 1);
     return {static_cast<i32>(set_and_return_exit_status(cxt, 0)), 0};
   }
 
@@ -466,7 +469,7 @@ hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
     }
 
     let const should_run_body =
-        m_is_until ? (condition_status != 0) : (condition_status == 0);
+        is_until_loop ? (condition_status != 0) : (condition_status == 0);
     if (!should_run_body) break;
 
     result = m_body->evaluate_status(cxt);
@@ -515,7 +518,7 @@ fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   actx.is_inside_loop_condition = was_inside_loop_condition;
   actx.has_input_reading_loop_condition = prior_loop_condition_reads_input;
 
-  if (m_is_until) {
+  if (is_until()) {
     actx.tested_command_names = saved_tested_command_names.clone();
     m_condition->append_presence_tested_command_names(
         actx, actx.tested_command_names, false);
@@ -553,16 +556,19 @@ pure fn WhileLoop::condition() const wontthrow -> const Expression *
   return m_condition;
 }
 
-pure fn WhileLoop::is_until() const wontthrow -> bool { return m_is_until; }
+pure fn WhileLoop::is_until() const wontthrow -> bool
+{
+  return has_execution_flag(ExecutionFlag::UntilLoop);
+}
 
 fn WhileLoop::set_folded_to_skip() const wontthrow -> void
 {
-  m_folded_to_skip = true;
+  set_execution_flag(ExecutionFlag::FoldedLoopToSkip);
 }
 
 pure fn WhileLoop::is_folded_to_skip() const wontthrow -> bool
 {
-  return m_folded_to_skip;
+  return has_execution_flag(ExecutionFlag::FoldedLoopToSkip);
 }
 
 fn WhileLoop::as_while_loop() const wontthrow -> const WhileLoop *

@@ -13,6 +13,7 @@
 #include "Formatter.hpp"
 #include "Koshkit.hpp"
 #include "LanguageServerProtocol.hpp"
+#include "Utils.hpp"
 
 namespace koshka::language_server {
 
@@ -1946,7 +1947,13 @@ fn Server::hover(const JsonValue *id, const JsonValue *params) throws -> bool
   if (!is_command) return send_result(id, "null");
   if (definition_of(*document, *symbol).has_value())
     return send_result(id, "null");
-  let const information = command_information(symbol->text.view());
+  let information = command_information(symbol->text.view());
+  if (!information.has_value()) {
+    let const decoded =
+        utils::decode_shell_word(symbol->text.view(), heap_allocator(), true);
+    if (!decoded.opaque_ranges.is_empty()) return send_result(id, "null");
+    information = command_information(decoded.text.view());
+  }
   if (!information.has_value()) return send_result(id, "null");
   let text = String{heap_allocator()};
   append_hover_block(text, information->view(), m_supports_markdown_hover,

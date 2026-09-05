@@ -84,7 +84,7 @@ private:
 
   Lexer m_lexer;
 
-  usize m_command_depth{0};
+  u16 m_command_depth{0};
   bool m_should_stop_after_top_level_unit{false};
   bool m_has_parsed_source_command{false};
   bool m_should_collect_analysis_metadata{false};

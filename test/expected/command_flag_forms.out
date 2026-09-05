@@ -12,4 +12,5 @@ show-exit-code reports guarded failures once
 show-exit-code follows the effective pipeline status
 show-exit-code reports fatal pipefail as an error
 runtime show-exit-code survives the terminal command
+runtime show-exit-code reports errexit as an error
 runtime reports survive the terminal command

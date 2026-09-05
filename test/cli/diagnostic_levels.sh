@@ -194,13 +194,13 @@ send_runtime_input()
 }
 if "$script_command" --version >/dev/null 2>&1; then
   send_runtime_input | TERM=xterm-256color NO_COLOR= \
-    KOSH_HISTORY="$temporary_directory/history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$temporary_directory/history" BIN="$BIN" \
     "$script_command" -q -c \
     '/bin/stty cols 100 rows 24; exec "$BIN" -M bash -i --rcfile /dev/null' \
     "$temporary_directory/typescript" >/dev/null 2>&1
 else
   send_runtime_input | TERM=xterm-256color NO_COLOR= \
-    KOSH_HISTORY="$temporary_directory/history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$temporary_directory/history" BIN="$BIN" \
     "$script_command" -q "$temporary_directory/typescript" /bin/sh -c \
     '/bin/stty cols 100 rows 24; exec "$BIN" -M bash -i --rcfile /dev/null' \
     >/dev/null 2>&1

@@ -299,8 +299,16 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
     return;
   }
   LOG(Info, "clearing the bash identity variables for a non-bash mood");
-  force_unset_shell_variable("BASH_VERSION");
-  force_unset_shell_variable("BASH");
+  if (lookup_shell_variable("BASH_VERSION") != nullptr ||
+      os::has_environment_variable("BASH_VERSION"))
+  {
+    force_unset_shell_variable("BASH_VERSION");
+  }
+  if (lookup_shell_variable("BASH") != nullptr ||
+      os::has_environment_variable("BASH"))
+  {
+    force_unset_shell_variable("BASH");
+  }
 }
 
 fn EvalContext::materialize_kosh_identity() const throws -> Maybe<String>

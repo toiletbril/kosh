@@ -273,7 +273,7 @@ fi
 
 START_TIME=$(date +%s)
 SUITE_STATUS=0
-rm -f "$FAILED_LIST" "$KOSH_HISTORY" "$KOSH_DIRECTORY_HISTORY"
+rm -f "$FAILED_LIST" "$KOSH_HISTORY_FILE" "$KOSH_DIRECTORY_HISTORY"
 test -n "$PWD/.test-work" && rm -rf "$PWD/.test-work"
 
 if [ "$SUITE_STATUS" -eq 0 ]; then

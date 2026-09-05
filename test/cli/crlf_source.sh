@@ -37,6 +37,10 @@ lone_carriage_return=$(printf 'a\rb')
 "$BIN" -c 'value=$1; printf "lone=%s\n" "${#value}"' crlf-driver \
     "$lone_carriage_return"
 
+execution_string=$(printf '[ "$BASH_EXECUTION_STRING" = "$1" ] || exit 1\r\necho execution-string=exact\r\n_')
+execution_string=${execution_string%_}
+"$BIN" --mood bash -c "$execution_string" crlf-driver "$execution_string"
+
 invalid_script="$dir/invalid.kosh"
 printf 'echo first\r\nmissing_crlf_probe\r\n' > "$invalid_script"
 diagnostic=$("$BIN" "$invalid_script" 2>&1) && exit 1

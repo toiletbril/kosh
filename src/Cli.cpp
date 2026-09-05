@@ -188,11 +188,10 @@ pure fn FlagManyStrings::get_location(usize i) const wontthrow -> SourceLocation
   return m_locations[i];
 }
 
-fn FlagManyStrings::next() throws -> StringView
+fn FlagManyStrings::take_next() wontthrow -> String
 {
   ASSERT(m_value_position < m_values.count());
-  let const &value = m_values[m_value_position++];
-  return value.view();
+  return steal(m_values[m_value_position++]);
 }
 
 pure fn FlagManyStrings::at_end() const wontthrow -> bool

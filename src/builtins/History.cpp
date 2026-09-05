@@ -73,6 +73,11 @@ static fn append_contents_into_history(EvalContext &cxt,
 {
   let const backing = toiletline::history_path();
   if (!backing.has_value()) return false;
+  let parent = backing->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { os::release_process_lock(lock.take()); };
 
   bool needs_separator = false;
   if (backing->exists()) {
@@ -207,7 +212,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   toiletline::set_history_limit(
-      cxt.get_history_limit("HISTSIZE", static_cast<usize>(-1)));
+      cxt.get_history_limit("KOSH_HISTORY_SIZE", 4096));
 
   let did_maintain_list = false;
 

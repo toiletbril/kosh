@@ -1077,6 +1077,12 @@ fn normalize_program_name(String &program_name) throws -> program_name_info
 }
 #endif /* !COSMO */
 
+fn has_environment_variable(StringView key) throws -> bool
+{
+  const String key_string{key};
+  return std::getenv(key_string.c_str()) != nullptr;
+}
+
 fn get_environment_variable(StringView key) throws -> Maybe<String>
 {
   LOG(All, "reading the environment variable '%.*s'",

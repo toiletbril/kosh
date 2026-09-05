@@ -87,12 +87,7 @@ else
 OUTPUT_PATH := ../kosh$(MODE_SUFFIX)
 endif
 
-LINKED_OUTPUT_PATH := $(OUTPUT_PATH)
-ifeq ($(MODE), rel)
-ifneq ($(TARGET), Windows_NT)
-LINKED_OUTPUT_PATH := $(OBJECT_DIRECTORY)/kosh
-endif
-endif
+LINKED_OUTPUT_PATH := $(OBJECT_DIRECTORY)/$(notdir $(OUTPUT_PATH))
 
 # Cosmopolitan/Clang.
 CXX_VARIABLE_ORIGIN := $(origin CXX)

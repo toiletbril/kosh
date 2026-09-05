@@ -265,6 +265,7 @@ fn kosh_main(int argc, char **argv) -> int
   }
 
   if (!kosh_flags_tokens.is_empty() && argc > 0) {
+    spliced_argv.reserve(static_cast<usize>(argc) + kosh_flags_tokens.count());
     spliced_argv.push(argv[0]);
     for (let const &token : kosh_flags_tokens)
       spliced_argv.push(token.c_str());
@@ -281,11 +282,7 @@ fn kosh_main(int argc, char **argv) -> int
      prompt rather than exiting and locking the user out. The lockout-risk case
      is marked by a dash-prefixed argv[0], a bare - or -bash, so rescue is
      offered only there and any other invocation keeps the usage exit. */
-  let const invocation_path =
-      argc > 0 ? koshka::Path{koshka::StringView{argv[0]}} : koshka::Path{};
-  let const invocation_name = invocation_path.filename();
-  const bool is_login_invocation =
-      !invocation_name.is_empty() && invocation_name[0] == '-';
+  let const is_login_invocation = argc > 0 && argv[0][0] == '-';
 
   bool is_rescue_mode = false;
   let const do_enter_rescue = [&]() {
@@ -551,8 +548,6 @@ fn kosh_main(int argc, char **argv) -> int
     }
   }
 
-  if (init_moods.is_empty()) init_moods.push(session_mood);
-
   /* A shell with unequal ids skips config controlled by the real user. */
   let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || has_elevated_identity;
@@ -648,6 +643,8 @@ fn kosh_main(int argc, char **argv) -> int
   let shell_name = steal(program_path);
   let positional_params =
       koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+  let const should_retain_file_names =
+      should_read_files || FLAG_FORMAT.is_enabled();
 
   usize first_param_index = 0;
   if (FLAG_LINT.is_enabled() && should_read_files) {
@@ -655,16 +652,18 @@ fn kosh_main(int argc, char **argv) -> int
   } else if ((should_read_files || should_execute_commands) &&
              !file_names.is_empty())
   {
-    shell_name = file_names[0].clone();
+    shell_name =
+        should_retain_file_names ? file_names[0].clone() : steal(file_names[0]);
     first_param_index = 1;
   }
 
   positional_params.reserve(file_names.count() - first_param_index);
-  for (usize i = first_param_index; i < file_names.count(); i++)
-    positional_params.push(koshka::String{
-        koshka::heap_allocator(),
-        koshka::StringView{file_names[i].data(), file_names[i].count()}
-    });
+  for (usize i = first_param_index; i < file_names.count(); i++) {
+    if (should_retain_file_names)
+      positional_params.push(file_names[i].clone());
+    else
+      positional_params.push(steal(file_names[i]));
+  }
 
   koshka::os::unset_environment_variable("KOSH_IDENTITY");
   let inherited_bootstrap = koshka::os::take_subshell_bootstrap();
@@ -777,20 +776,32 @@ fn kosh_main(int argc, char **argv) -> int
 
   /* BASH names the path used to invoke this shell, the symlink spelling such as
      /usr/local/bin/bash when kosh is symlinked to bash. */
-  context.set_shell_executable_path(executable_path);
+  context.set_shell_executable_path(steal(executable_path));
+  let const shell_executable_path = context.shell_executable_path();
   context.mark_exported("KOSH_IDENTITY");
   context.mark_readonly("KOSH_IDENTITY");
   /* SHELL is owned by login, getty, or the display manager, so an inherited
      value is left untouched. Only a shell that received no SHELL seeds its own
      invocation path. */
-  if (!koshka::os::get_environment_variable("SHELL").has_value())
-    context.set_shell_variable("SHELL", executable_path);
+  if (!koshka::os::has_environment_variable("SHELL"))
+    context.set_shell_variable("SHELL", shell_executable_path);
   context.set_shell_variable("PWD", koshka::Path::current_directory().text());
-  context.set_shell_variable("KOSH", executable_path);
+  context.set_shell_variable("KOSH", shell_executable_path);
   context.set_shell_variable("KOSH_VERSION", KOSH_VERSION_STRING);
   context.set_shell_variable("KOSH_COMMIT", KOSH_COMMIT_HASH);
   context.set_shell_variable("KOSH_BUILD_MODE", KOSH_BUILD_MODE);
   context.set_shell_variable("KOSH_OS", KOSH_OS_INFO);
+  if (context.lookup_shell_variable("KOSH_HISTORY_FILE") == nullptr) {
+    if (let const history_path = toiletline::history_path();
+        history_path.has_value())
+    {
+      context.set_shell_variable("KOSH_HISTORY_FILE", history_path->text());
+    }
+  }
+  if (context.lookup_shell_variable("KOSH_HISTORY_SIZE") == nullptr)
+    context.set_shell_variable("KOSH_HISTORY_SIZE", "4096");
+  context.mark_exported("KOSH_HISTORY_FILE");
+  context.mark_exported("KOSH_HISTORY_SIZE");
 
   /* A bash session, a bash-posix session, or a bash flavor in the init list
      advertises BASH_VERSION so a bash rc detects it. */
@@ -834,20 +845,13 @@ fn kosh_main(int argc, char **argv) -> int
      their defaults in every run. PS3 is left unset, since the select loop
      falls back to its own default. */
   if (should_be_interactive) {
-    if (!koshka::os::get_environment_variable("PS1").has_value())
+    if (!koshka::os::has_environment_variable("PS1"))
       context.set_shell_variable("PS1", toiletline::default_prompt_template());
-
-    if (should_seed_bash_identity) {
-      if (context.lookup_shell_variable("HISTSIZE") == nullptr)
-        context.set_shell_variable("HISTSIZE", "500");
-      if (context.lookup_shell_variable("HISTFILESIZE") == nullptr)
-        context.set_shell_variable("HISTFILESIZE", "500");
-    }
   }
 
-  if (!koshka::os::get_environment_variable("PS2").has_value())
+  if (!koshka::os::has_environment_variable("PS2"))
     context.set_shell_variable("PS2", "> ");
-  if (!koshka::os::get_environment_variable("PS4").has_value())
+  if (!koshka::os::has_environment_variable("PS4"))
     context.set_shell_variable("PS4", "+ ");
 
   /* COLUMNS and LINES carry the terminal size so a config that divides by
@@ -915,8 +919,13 @@ fn kosh_main(int argc, char **argv) -> int
       context.set_diagnostics_disabled(true);
       context.set_warning_level(0);
     }
-    koshka::source_init_moods(context, ast_arena, init_moods, is_login_shell,
-                              should_be_interactive);
+    if (!init_moods.is_empty() || is_login_shell || should_be_interactive ||
+        session_mood == koshka::mimic_mood::Bash)
+    {
+      if (init_moods.is_empty()) init_moods.push(session_mood);
+      koshka::source_init_moods(context, ast_arena, init_moods, is_login_shell,
+                                should_be_interactive);
+    }
     if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
       context.set_diagnostics_disabled(saved_diagnostics_disabled);
       context.set_warning_level(saved_warning_level);
@@ -998,9 +1007,8 @@ fn kosh_main(int argc, char **argv) -> int
 
         should_quit = true;
       } else if (should_execute_commands && !FLAG_COMMAND.at_end()) {
-        koshka::StringView command_view = FLAG_COMMAND.next();
-        script_contents = koshka::String{command_view};
-        context.set_execution_string(command_view);
+        script_contents = FLAG_COMMAND.take_next();
+        context.set_execution_string(script_contents.view());
         LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
         {
@@ -1202,7 +1210,7 @@ fn kosh_main(int argc, char **argv) -> int
                                       ? toiletline::edit_mode::Vi
                                       : toiletline::edit_mode::Emacs);
         toiletline::set_history_limit(
-            context.get_history_limit("HISTSIZE", static_cast<usize>(-1)));
+            context.get_history_limit("KOSH_HISTORY_SIZE", 4096));
 
         loop
         {
@@ -1324,12 +1332,8 @@ fn kosh_main(int argc, char **argv) -> int
         context.shell_option_state(koshka::shell_option_id::History) &&
         !script_contents.is_empty())
     {
-      let const duplicate_policy = koshka::interactive_history_duplicate_policy(
-          script_contents.view(), context);
-      history_event_number = duplicate_policy.has_value()
-                                 ? toiletline::history_append_event(
-                                       script_contents.view(), *duplicate_policy)
-                                 : koshka::Maybe<usize>{koshka::None};
+      history_event_number =
+          toiletline::history_append_event(script_contents.view());
     }
     if (!should_execute_history_expansion) continue;
 

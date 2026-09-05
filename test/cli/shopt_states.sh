@@ -106,7 +106,10 @@ checkhash_second=$TEST_TEMP_DIRECTORY/checkhash-second
 mkdir -p "$checkhash_first" "$checkhash_second"
 printf '#!/bin/sh\nprintf "first\\n"\n/bin/mv "$0" "$0.off"\n' > "$checkhash_first/checkhash-probe"
 printf '#!/bin/sh\nprintf "second\\n"\n' > "$checkhash_second/checkhash-probe"
-chmod +x "$checkhash_first/checkhash-probe" "$checkhash_second/checkhash-probe"
+printf '#!/bin/sh\nprintf "rehash first\\n"\n' > "$checkhash_first/rehash-probe"
+printf '#!/bin/sh\nprintf "rehash second\\n"\n' > "$checkhash_second/rehash-probe.off"
+chmod +x "$checkhash_first/checkhash-probe" "$checkhash_second/checkhash-probe" \
+  "$checkhash_first/rehash-probe" "$checkhash_second/rehash-probe.off"
 echo "== checkhash controls cached command validation:"
 "$BIN" --mood bash --no-init-files --no-diagnostics -c '
 PATH=$1:$2
@@ -118,4 +121,13 @@ checkhash-probe
 printf "on=%s\n" "$?"
 hash -R
 printf "rehash=%s\n" "$?"
+' kosh "$checkhash_first" "$checkhash_second"
+echo "== hash -R rebuilds the PATH index:"
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+PATH=$1:$2
+rehash-probe
+koshkit mv "$1/rehash-probe" "$1/rehash-probe.off"
+koshkit mv "$2/rehash-probe.off" "$2/rehash-probe"
+hash -R
+rehash-probe
 ' kosh "$checkhash_first" "$checkhash_second"

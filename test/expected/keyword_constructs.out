@@ -63,3 +63,6 @@ echo	resolved-command
 ls	resolved-command
 koshkit-missing-utility	unknown-command
 --help	flag
+"cat"	resolved-command
+koshkit\-missing-escaped	unknown-command
+koshkit static operands are classified

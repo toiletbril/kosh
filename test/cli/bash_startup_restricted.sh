@@ -275,7 +275,9 @@ output=$("$rbash" -c \
 printf 'rbash-identity=%s\n' "$output"
 
 separator=
-for name in SHELL PATH HISTFILE ENV BASH_ENV; do
+for name in SHELL PATH ENV BASH_ENV KOSH_HISTORY_FILE KOSH_HISTORY_SIZE \
+  KOSH_CALC_HISTORY KOSH_DIRECTORY_HISTORY
+do
   "$BIN" --mood bash --restricted -c "$name=blocked" >/dev/null 2>&1
   printf '%s%s=%s' "$separator" "$name" "$?"
   separator=' '

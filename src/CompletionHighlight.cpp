@@ -1397,6 +1397,25 @@ fn internal::scan_highlight_range(
                     : highlight_role::unknown_command);
         continue;
       }
+      if (!is_assignment) {
+        bool has_opaque_expansion = false;
+        for (let const &inner : word_spans) {
+          if (inner.role != highlight_role::string) {
+            has_opaque_expansion = true;
+            break;
+          }
+        }
+        if (!has_opaque_expansion) {
+          let const decoded =
+              utils::decode_shell_word(word, bump_allocator(HIGHLIGHT_ARENA));
+          word_spans.clear();
+          do_push(word_start, word_end,
+                  koshkit::find_util(decoded.text.view()).has_value()
+                      ? highlight_role::resolved_command
+                      : highlight_role::unknown_command);
+          continue;
+        }
+      }
     }
 
     if (is_assignment && is_command_position) {

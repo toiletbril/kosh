@@ -81,6 +81,8 @@ mv
 -l
 == bare utility names in the default mood:
 whoami
+== bare utility flags in the default mood:
+-A
 == bare utility names stay hidden in bash mood:
 == bare utility names appear after set -o koshkit:
 whoami

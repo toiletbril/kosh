@@ -50,6 +50,14 @@ runtime_option_output=$("$BIN" --no-diagnostics -c 'set -o show-exit-code; "$1" 
 [ "$(printf '%s\n' "$runtime_option_output" | grep -c 'warning: Non-zero exit code (7)')" -eq 1 ] || exit 1
 echo "runtime show-exit-code survives the terminal command"
 
+runtime_errexit_output=$(
+  "$BIN" --no-diagnostics -c 'set -o show-exit-code; set -e; false' 2>&1
+)
+runtime_errexit_status=$?
+[ "$runtime_errexit_status" -eq 1 ] || exit 1
+[ "$(printf '%s\n' "$runtime_errexit_output" | grep -c 'error: Non-zero exit code (1)')" -eq 1 ] || exit 1
+echo "runtime show-exit-code reports errexit as an error"
+
 runtime_stats_output=$("$BIN" --no-diagnostics -c 'set -o show-stats; "$1" --no-diagnostics -c ":"' kosh-test "$BIN" 2>&1)
 [ "$?" -eq 0 ] || exit 1
 printf '%s\n' "$runtime_stats_output" | grep -F '[Stats' >/dev/null || exit 1

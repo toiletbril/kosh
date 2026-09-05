@@ -55,3 +55,6 @@ off=127
 second
 on=0
 rehash=0
+== hash -R rebuilds the PATH index:
+rehash first
+rehash second

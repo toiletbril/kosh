@@ -15,6 +15,26 @@ SHELL="$inherited_shell" EXPECTED_SHELL="$inherited_shell" "$BIN" -c '
     if [ "$normalized_shell" = "$normalized_expected_shell" ]; then echo preserved; else echo "clobbered to $SHELL"; fi
 '
 
+echo "== environment names follow platform case rules:"
+shell_environment_name=SHELL
+bash_environment_name=BASH
+bash_version_environment_name=BASH_VERSION
+if [ "${OS-}" = Windows_NT ]; then
+    shell_environment_name=Shell
+    bash_environment_name=Bash
+    bash_version_environment_name=Bash_Version
+fi
+env -u SHELL "$shell_environment_name=$inherited_shell" \
+    EXPECTED_SHELL="$inherited_shell" "$BIN" -c '
+    normalized_shell=$(printf "%s\n" "$SHELL" | koshkit tr "\\" "/")
+    normalized_expected_shell=$(printf "%s\n" "$EXPECTED_SHELL" | koshkit tr "\\" "/")
+    [ "$normalized_shell" = "$normalized_expected_shell" ] && echo shell-case-preserved
+'
+env "$bash_environment_name=inherited" \
+    "$bash_version_environment_name=inherited" "$BIN" -c '
+    [ -z "${BASH+x}" ] && [ -z "${BASH_VERSION+x}" ] && echo bash-case-cleared
+'
+
 echo "== an unset SHELL is seeded with the invocation path:"
 (unset SHELL
  "$BIN" -c 'if [ "$SHELL" = "$0" ]; then echo seeded-invocation; else echo "seeded $SHELL not $0"; fi')

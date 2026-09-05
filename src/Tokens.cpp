@@ -185,7 +185,7 @@ hot fn Word::to_literal_string() const throws -> String
   return result;
 }
 
-pure fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
+fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
 {
   if (!m_has_cached_plain_kind) {
     m_cached_plain_kind = optimizer::classify_plain_literal(*this);

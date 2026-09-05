@@ -21,8 +21,14 @@ namespace koshka {
 
 namespace {
 
-constexpr const char *RESTRICTED_READONLY_NAMES[] = {
-    "SHELL", "PATH", "HISTFILE", "ENV", "BASH_ENV"};
+constexpr const char *RESTRICTED_READONLY_NAMES[] = {"SHELL",
+                                                     "PATH",
+                                                     "ENV",
+                                                     "BASH_ENV",
+                                                     "KOSH_HISTORY_FILE",
+                                                     "KOSH_HISTORY_SIZE",
+                                                     "KOSH_CALC_HISTORY",
+                                                     "KOSH_DIRECTORY_HISTORY"};
 constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS"};
 
 } /* namespace */

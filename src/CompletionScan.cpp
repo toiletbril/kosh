@@ -673,7 +673,8 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
       } else if (let const second = second_word_of(line); second.has_value()) {
         util_for_flags = koshkit::find_util(*second);
       }
-    } else if (!completes_shell_binary && context.koshkit() &&
+    } else if (!completes_shell_binary &&
+               context.koshkit_utilities_are_reachable() &&
                context.get_program_resolver().get_status(command) ==
                    ProgramResolver::Status::Missing)
     {

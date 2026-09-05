@@ -3,7 +3,7 @@
 # shellcheck disable=SC2154
 d=$TEST_TEMP_DIRECTORY/fc
 koshkit mkdir -p "$d"
-export KOSH_HISTORY=$d/history
+export KOSH_HISTORY_FILE=$d/history
 
 seed_fc_history()
 {

@@ -26,14 +26,6 @@
 
 namespace toiletline {
 
-enum class history_duplicate_policy : u8
-{
-  Allow,
-  IgnoreConsecutive,
-  ErasePrevious,
-  IgnoreConsecutiveAndErasePrevious,
-};
-
 enum class edit_mode : u8
 {
   Emacs,
@@ -344,7 +336,7 @@ struct input_result
 
 static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
-static constexpr char KOSH_HISTORY_FILE[] = ".kosh_history";
+static constexpr char DEFAULT_HISTORY_FILE[] = ".kosh_history";
 
 static fn resolve_history_path(StringView env_name, StringView default_file)
     -> koshka::Maybe<koshka::Path>
@@ -365,7 +357,7 @@ static constexpr char KOSH_CALC_HISTORY_FILE[] = ".kosh_calc_history";
 
 static fn history_file_path() -> koshka::Maybe<koshka::Path>
 {
-  return resolve_history_path("KOSH_HISTORY", KOSH_HISTORY_FILE);
+  return resolve_history_path("KOSH_HISTORY_FILE", DEFAULT_HISTORY_FILE);
 }
 
 static fn calc_history_file_path() -> koshka::Maybe<koshka::Path>
@@ -420,6 +412,11 @@ fn history_clear() -> bool
 {
   let const path = history_file_path();
   if (!path.has_value()) return false;
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { os::release_process_lock(lock.take()); };
   let opened = koshka::os::open_file_descriptor(
       path->text().view(), koshka::os::file_open_mode::Truncate);
   if (!opened.has_value()) return false;
@@ -448,7 +445,7 @@ fn history_events(koshka::Allocator allocator)
     -> koshka::ArrayList<history_event>
 {
   let events = koshka::ArrayList<history_event>{allocator};
-  if (::itl_g_history_path == nullptr && !history_read()) return events;
+  if (!history_read()) return events;
   if (::itl_g_history_count == 0) return events;
   if (!::itl_history_ensure_read_buffer()) return events;
 
@@ -480,7 +477,7 @@ static fn find_history_event(koshka::Allocator allocator,
                              koshka::Maybe<usize> before_event_number,
                              Match do_match) -> koshka::Maybe<history_event>
 {
-  if (::itl_g_history_path == nullptr && !history_read()) return koshka::None;
+  if (!history_read()) return koshka::None;
   if (::itl_g_history_count == 0) return koshka::None;
   if (!::itl_history_ensure_read_buffer()) return koshka::None;
 
@@ -548,78 +545,7 @@ fn containing_history_event(koshka::Allocator allocator, StringView text,
                             });
 }
 
-static fn newest_history_event_equals(StringView command) -> bool
-{
-  if (!history_read() || ::itl_g_history_count == 0 ||
-      !::itl_history_ensure_read_buffer())
-  {
-    return false;
-  }
-
-  char decoded[ITL_STRING_MAX_LEN + 1];
-  usize decoded_size = 0;
-  let const newest_offset =
-      ::itl_history_index_to_offset(::itl_g_history_count - 1);
-  return ::itl_history_decode_entry_buffered(newest_offset, decoded,
-                                             sizeof(decoded), &decoded_size) &&
-         StringView{decoded, decoded_size} == command;
-}
-
-static fn erase_previous_history_events(StringView command) -> bool
-{
-  let const path = history_file_path();
-  if (!path.has_value() || !history_read()) return false;
-  if (::itl_g_history_count == 0) return true;
-  if (!::itl_history_ensure_read_buffer()) return false;
-
-  let const contents = path->read_entire_file();
-  if (!contents.has_value()) return false;
-  let rewritten = String{koshka::heap_allocator()};
-  rewritten.reserve(contents->count());
-  rewritten.append(
-      contents->substring_of_length(0, ::itl_history_index_to_offset(0)));
-
-  bool did_remove = false;
-  char decoded[ITL_STRING_MAX_LEN + 1];
-  for (usize index = 0; index < ::itl_g_history_count; index++) {
-    let const start_offset = ::itl_history_index_to_offset(index);
-    let const end_offset = index + 1 < ::itl_g_history_count
-                               ? ::itl_history_index_to_offset(index + 1)
-                               : contents->count();
-    usize decoded_size = 0;
-    if (!::itl_history_decode_entry_buffered(start_offset, decoded,
-                                             sizeof(decoded), &decoded_size))
-    {
-      return false;
-    }
-    if (StringView{decoded, decoded_size} == command) {
-      did_remove = true;
-      continue;
-    }
-    rewritten.append(
-        contents->substring_of_length(start_offset, end_offset - start_offset));
-  }
-
-  if (!did_remove) return true;
-  let replacement_path = os::write_to_named_temp_file(
-      path->parent(), ".kosh_history_erasedups", rewritten.view());
-  if (!replacement_path.has_value()) return false;
-  defer { unused(os::remove_file(replacement_path->text().view())); };
-
-  let const current_contents = path->read_entire_file();
-  if (!current_contents.has_value() ||
-      current_contents->view() != contents->view())
-  {
-    return false;
-  }
-  if (!os::rename_path(replacement_path->text().view(), path->text().view()))
-    return false;
-  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
-}
-
-fn history_append_event(StringView command,
-                        history_duplicate_policy duplicate_policy)
-    -> koshka::Maybe<usize>
+fn history_append_event(StringView command) -> koshka::Maybe<usize>
 {
   if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES) {
     return koshka::None;
@@ -627,29 +553,18 @@ fn history_append_event(StringView command,
 
   let const path = history_file_path();
   if (!path.has_value()) return koshka::None;
-  if (::itl_g_history_path == nullptr) unused(::tl_history_load(path->c_str()));
-
-  let const should_erase_previous =
-      duplicate_policy == history_duplicate_policy::ErasePrevious ||
-      duplicate_policy ==
-          history_duplicate_policy::IgnoreConsecutiveAndErasePrevious;
-  if (duplicate_policy ==
-          history_duplicate_policy::IgnoreConsecutiveAndErasePrevious &&
-      newest_history_event_equals(command))
-  {
-    return koshka::None;
-  }
-  if (should_erase_previous && !erase_previous_history_events(command))
-    return koshka::None;
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return koshka::None;
+  defer { os::release_process_lock(lock.take()); };
+  unused(::tl_history_load(path->c_str()));
 
   itl_string_t *entry = ::itl_string_alloc();
   defer { ITL_STRING_FREE(entry); };
   if (!::itl_string_from_bytes(entry, command.data, command.length))
     return koshka::None;
-  let const should_allow_duplicate =
-      duplicate_policy != history_duplicate_policy::IgnoreConsecutive;
-  if (!::itl_history_append_to_file(entry, false, should_allow_duplicate))
-    return koshka::None;
+  if (!::itl_history_append_to_file(entry, false, true)) return koshka::None;
 
   return ::itl_g_last_history_event_number;
 }
@@ -674,7 +589,13 @@ fn history_rewrite_event(usize number, StringView expected,
     -> bool
 {
   let const path = history_file_path();
-  if (!path.has_value() || !history_read()) return false;
+  if (!path.has_value()) return false;
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { os::release_process_lock(lock.take()); };
+  if (!history_read()) return false;
   if (::itl_g_history_count == 0) return false;
 
   let const first_number =
@@ -939,8 +860,7 @@ fn initialize() -> void
   }
 }
 
-static fn compact_history_file(usize entry_limit,
-                               bool should_skip_if_within_limit) -> bool
+static fn compact_history_file(usize entry_limit) -> bool
 {
   let const path = history_file_path();
   if (!path.has_value()) return true;
@@ -952,10 +872,7 @@ static fn compact_history_file(usize entry_limit,
 
   ::tl_set_history_limit(entry_limit);
   if (!history_read()) return false;
-  if (should_skip_if_within_limit && ::itl_g_history_total_count <= entry_limit)
-  {
-    return true;
-  }
+  if (::itl_g_history_total_count <= entry_limit) return true;
 
   let contents = String{koshka::heap_allocator()};
   if (!::itl_history_ensure_read_buffer() && ::itl_g_history_count != 0)
@@ -989,15 +906,9 @@ static fn compact_history_file(usize entry_limit,
   return ::tl_history_load(path->c_str()) == TL_SUCCESS;
 }
 
-fn exit(bool should_append_history, usize history_size_limit,
-        usize history_file_size_limit) -> void
+fn exit(usize history_size_limit) -> void
 {
-  let const retained_limit = should_append_history
-                                 ? history_file_size_limit
-                                 : (history_size_limit < history_file_size_limit
-                                        ? history_size_limit
-                                        : history_file_size_limit);
-  if (!compact_history_file(retained_limit, should_append_history)) {
+  if (!compact_history_file(history_size_limit)) {
     koshka::Error error{"Toiletline: Could not save history: " +
                         koshka::os::last_system_error_message()};
     koshka::show_message(error.to_string());
@@ -1059,6 +970,7 @@ fn get_input(const String &prompt) -> input_result
   let const program_path_candidate_count_before =
       utils::debug_program_path_candidate_count();
 #endif
+  unused(history_read());
   ::itl_g_last_history_event_number = 0;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   COMPLETION_BASE_DIRECTORY = nullptr;

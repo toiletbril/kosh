@@ -150,7 +150,7 @@ send_typing_input()
 
 send_typing_input | TERM=xterm-256color PATH="$d/path" \
     KOSH_TEST_EDITOR_STATS=1 EDITOR_READY_FILE="$d/typing-ready" \
-    KOSH_HISTORY="$d/typing-history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$d/typing-history" BIN="$BIN" \
     run_editor "$d/typing-typescript" || exit 1
 
 append_metrics=$(metric_line "$d/typing-typescript" 1) || {
@@ -197,7 +197,7 @@ send_unhighlighted_input()
 send_unhighlighted_input | TERM=xterm-256color PATH="$d/path" \
     EDITOR_OPTIONS=--no-syntax-highlighting KOSH_TEST_EDITOR_STATS=1 \
     EDITOR_READY_FILE="$d/unhighlighted-ready" \
-    KOSH_HISTORY="$d/unhighlighted-history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$d/unhighlighted-history" BIN="$BIN" \
     run_editor "$d/unhighlighted-typescript" || exit 1
 
 unhighlighted_metrics=$(metric_line "$d/unhighlighted-typescript" 1) || exit 1
@@ -232,7 +232,7 @@ printf '%s\n' \
     "PROMPT_COMMAND='printf \"ready\\\\n\" >> \"\$EDITOR_READY_FILE\"'" \
     > "$d/tab-rc"
 send_tab_input | PATH="$d/path" KOSH_TEST_EDITOR_STATS=1 \
-    EDITOR_READY_FILE="$d/tab-ready" KOSH_HISTORY="$d/tab-history" \
+    EDITOR_READY_FILE="$d/tab-ready" KOSH_HISTORY_FILE="$d/tab-history" \
     RCFILE="$d/tab-rc" BIN="$BIN" run_editor "$d/tab-typescript" || exit 1
 
 tab_metrics=$(metric_line "$d/tab-typescript" 1) || exit 1
@@ -272,7 +272,7 @@ send_history_input()
 
 send_history_input | TERM=xterm-256color PATH="$d/path" \
     EDITOR_READY_FILE="$d/history-ready" KOSH_TEST_EDITOR_STATS=1 \
-    KOSH_HISTORY="$d/miss-history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$d/miss-history" BIN="$BIN" \
     run_editor "$d/history-typescript" || exit 1
 
 history_short_metrics=$(metric_line "$d/history-typescript" 1) || exit 1
@@ -307,7 +307,7 @@ send_startup_input()
 
 send_startup_input | TERM=xterm-256color NO_COLOR= PATH="$d/startup-before" \
     EDITOR_READY_FILE="$d/startup-ready" STARTUP_AFTER="$d/startup-after" \
-    KOSH_TEST_EDITOR_STATS=1 KOSH_HISTORY="$d/startup-history" \
+    KOSH_TEST_EDITOR_STATS=1 KOSH_HISTORY_FILE="$d/startup-history" \
     RCFILE="$d/startup-rc" BIN="$BIN" run_editor "$d/startup-typescript" || exit 1
 
 startup_metrics=$(metric_line "$d/startup-typescript" 1) || exit 1
@@ -342,7 +342,7 @@ send_menu_input()
 send_menu_input | ASAN_OPTIONS=detect_stack_use_after_return=1 \
     EDITOR_READY_FILE="$d/menu-ready" MANPATH= \
     PATH="$d/menu-bin${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    KOSH_HISTORY="$d/menu-history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$d/menu-history" BIN="$BIN" \
     run_editor "$d/menu-typescript" 100 || exit 1
 
 strings "$d/menu-typescript" | \
@@ -377,7 +377,7 @@ send_quoted_input()
 }
 
 send_quoted_input | EDITOR_READY_FILE="$d/quoted-ready" \
-    KOSH_HISTORY="$d/quoted-history" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$d/quoted-history" BIN="$BIN" \
     run_editor "$d/quoted-typescript" || exit 1
 
 for quoted_expected_output in \
@@ -422,7 +422,7 @@ printf '%s\n' \
     > "$d/navigation-rc"
 send_navigation_input | TERM=xterm-256color \
     EDITOR_READY_FILE="$d/navigation-ready" \
-    KOSH_HISTORY="$d/navigation-history" RCFILE="$d/navigation-rc" BIN="$BIN" \
+    KOSH_HISTORY_FILE="$d/navigation-history" RCFILE="$d/navigation-rc" BIN="$BIN" \
     run_editor "$d/navigation-typescript" || exit 1
 
 for navigation_expected_output in \
@@ -454,7 +454,7 @@ unset NO_COLOR
 send_mixed_path_input | TERM=xterm-256color \
     EDITOR_READY_FILE="$d/mixed-ready" \
     PATH="$d/mixed-path${TEST_PATH_SEPARATOR}${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" \
-    KOSH_TEST_EDITOR_STATS=1 KOSH_HISTORY="$d/mixed-history" BIN="$BIN" \
+    KOSH_TEST_EDITOR_STATS=1 KOSH_HISTORY_FILE="$d/mixed-history" BIN="$BIN" \
     run_editor "$d/mixed-typescript" || exit 1
 
 mixed_metrics=$(metric_line "$d/mixed-typescript" 2) || exit 1

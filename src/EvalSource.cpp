@@ -89,7 +89,7 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   fallback_context.set_current_source(
       current_source(), String{heap_allocator(), current_origin().view()});
   fallback_context.m_mimicry_depth = m_mimicry_depth;
-  fallback_context.set_shell_executable_path(shell_executable_path());
+  fallback_context.set_shell_executable_path(String{shell_executable_path()});
   fallback_context.set_koshkit(koshkit());
   fallback_context.set_mimicry(mimicry());
   fallback_context.set_warning_level(warning_level());
@@ -224,11 +224,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   };
 
   m_runtime.mood = mode;
-  m_runtime.set_option(shell_option_id::Restricted, false);
-  m_is_restricted_shell = false;
-  let const do_restore_restricted_shell = [&]() {
-    m_is_restricted_shell = was_restricted_shell;
-  };
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
   m_is_script_run = true;
@@ -384,7 +379,6 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     m_mimicry_depth--;
     should_leave_mimicry = false;
     do_restore_fds();
-    do_restore_restricted_shell();
     if (error) {
       if (is_interrupt) throw InterruptErrorWithLocation{previous_location};
 

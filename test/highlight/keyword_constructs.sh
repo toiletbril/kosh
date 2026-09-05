@@ -42,8 +42,12 @@ _ACEOF
 echo tail' | grep -E "${tab}(heredoc|heredoc-delimiter|resolved-command)$"
 
 koshkit_result=$("$BIN" --debug-highlight-at \
-    'koshkit ls -l; koshkit koshkit-missing-utility value; koshkit --help')
+    'koshkit ls -l; koshkit koshkit-missing-utility value; koshkit --help; koshkit "cat"; koshkit koshkit\-missing-escaped')
 printf '%s\n' "$koshkit_result" | grep -Fx "ls${tab}resolved-command"
 printf '%s\n' "$koshkit_result" |
     grep -Fx "koshkit-missing-utility${tab}unknown-command"
 printf '%s\n' "$koshkit_result" | grep -Fx -- "--help${tab}flag"
+printf '%s\n' "$koshkit_result" | grep -Fx '"cat"'"${tab}resolved-command"
+printf '%s\n' "$koshkit_result" |
+    grep -Fx "koshkit\\-missing-escaped${tab}unknown-command"
+echo "koshkit static operands are classified"

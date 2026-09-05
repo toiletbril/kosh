@@ -876,6 +876,10 @@ protected:
     TimePosixFormat = 1U << 3,
     TimeReportRss = 1U << 4,
     FullyEliminated = 1U << 5,
+    UntilLoop = 1U << 6,
+    /* A while true stays unfolded, since the loop is infinite and still runs.
+     */
+    FoldedLoopToSkip = 1U << 7,
   };
 
   pure fn has_execution_flag(ExecutionFlag flag) const wontthrow -> bool
@@ -1250,10 +1254,6 @@ protected:
 
   const Expression *m_condition;
   const Expression *m_body;
-  bool m_is_until;
-
-  /* A while true stays unfolded, since the loop is infinite and still runs. */
-  mutable bool m_folded_to_skip{false};
 };
 
 class ForLoop : public CompoundCommand

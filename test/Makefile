@@ -76,7 +76,7 @@ FAILED_LIST := failed.diff
 export BIN_FLAGS DIFF_FLAGS FAILED_LIST TEST_JOBS
 export TEST_SHELL := $(SHELL)
 
-export KOSH_HISTORY := $(CURDIR)/.test_history
+export KOSH_HISTORY_FILE := $(CURDIR)/.test_history
 export KOSH_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
 ifeq ($(TARGET), Windows_NT)
 export TEST_SYSTEM_PATH := .test-work/system-path
@@ -94,7 +94,7 @@ export PATH := $(CURDIR)/bin$(TEST_HOST_PATH_SEPARATOR)$(PATH)
 		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-kosh-test.sh $*
 
 clean:
-	@rm -f $(FAILED_LIST) $(KOSH_HISTORY) $(KOSH_DIRECTORY_HISTORY)
+	@rm -f $(FAILED_LIST) $(KOSH_HISTORY_FILE) $(KOSH_DIRECTORY_HISTORY)
 	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
 
 test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)

@@ -41,11 +41,9 @@ word_designator_history_path=$dir/words
 modifier_history_path=$dir/modifiers
 modifier_print_path=$dir/modifier-print
 modifier_stderr_log=$dir/modifier-stderr
-filter_history_path=$dir/filter-history
+storage_history_path=$dir/storage-history
 multiline_history_path=$dir/multiline-history
-histappend_off_path=$dir/histappend-off
-histappend_on_path=$dir/histappend-on
-histfilesize_path=$dir/histfilesize
+history_size_path=$dir/history-size
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -85,7 +83,7 @@ out=$({
     'fc -s -1\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i --rcfile /dev/null') ||
   exit 1
@@ -106,7 +104,7 @@ out=$({
   send_input_when_ready '\022' 'mixed_history_marker' '\r' '\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$search_hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$search_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i --rcfile /dev/null') ||
   exit 1
@@ -126,7 +124,7 @@ out=$({
     'printf "<%s>\\n" !!\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$expansion_hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$expansion_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
@@ -170,7 +168,7 @@ out=$({
     'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$word_designator_history_path" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$word_designator_history_path" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
@@ -232,7 +230,7 @@ out=$({
     'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$modifier_history_path" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$modifier_history_path" \
     HISTORY_P_MARKER="$modifier_print_path" \
     MODIFIER_STDERR_LOG="$modifier_stderr_log" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
@@ -282,61 +280,25 @@ case "$out" in
   ;;
 esac
 
-printf 'echo FILTER_BASE\n' > "$filter_history_path"
+printf 'echo STORAGE_BASE\n' > "$storage_history_path"
 rm -f "$ready"
 rm -f "$input_status"
 out=$({
-  send_input_when_ready \
-    'HISTCONTROL=ignorespace:ignoredups:unknown\r' \
-    ' echo SPACE_FILTER_MARKER\r' \
-    'echo DUP_FILTER_MARKER\r' \
-    'echo DUP_FILTER_MARKER\r' \
-    'HISTCONTROL=ignoreboth\r' \
-    ' echo BOTH_SPACE_FILTER_MARKER\r' \
-    'echo BOTH_DUP_FILTER_MARKER\r' \
-    'echo BOTH_DUP_FILTER_MARKER\r' \
-    'HISTCONTROL=erasedups\r' \
-    'echo ERASE_FILTER_MARKER\r' \
-    'echo KEEP_BETWEEN_FILTER_MARKER\r' \
-    'echo ERASE_FILTER_MARKER\r' \
-    'HISTCONTROL=\r' \
-    'HISTIGNORE='\''echo GLOB_*:&:echo @(EXT_ONE|EXT_TWO)'\''\r' \
-    'echo GLOB_FILTER_MARKER\r' \
-    'echo prefix GLOB_FILTER_MARKER\r' \
-    'echo AMP_FILTER_MARKER\r' \
-    'echo AMP_FILTER_MARKER\r' \
-    'echo EXT_ONE\r' \
-    'shopt -s extglob\r' \
-    'echo EXT_TWO\r' \
-    'HISTIGNORE='\''echo COLON\:MARKER'\''\r' \
-    'echo COLON:MARKER\r' \
-    'exit\r'
+  send_input_when_ready ' echo SPACE_STORAGE_MARKER\r' \
+    'echo DUP_STORAGE_MARKER\r' 'echo DUP_STORAGE_MARKER\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$filter_history_path" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$storage_history_path" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
-if [ "$(grep -c '^ echo SPACE_FILTER_MARKER$' "$filter_history_path")" -eq 0 ] &&
-  [ "$(grep -c '^echo DUP_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^ echo BOTH_SPACE_FILTER_MARKER$' \
-    "$filter_history_path")" -eq 0 ] &&
-  [ "$(grep -c '^echo BOTH_DUP_FILTER_MARKER$' \
-    "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo ERASE_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo KEEP_BETWEEN_FILTER_MARKER$' \
-    "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo GLOB_FILTER_MARKER$' "$filter_history_path")" -eq 0 ] &&
-  [ "$(grep -c '^echo prefix GLOB_FILTER_MARKER$' \
-    "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo AMP_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo EXT_ONE$' "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo EXT_TWO$' "$filter_history_path")" -eq 0 ] &&
-  [ "$(grep -c '^echo COLON:MARKER$' "$filter_history_path")" -eq 0 ]; then
-  echo "history filtering ok"
+if [ "$(grep -c '^ echo SPACE_STORAGE_MARKER$' "$storage_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo DUP_STORAGE_MARKER$' "$storage_history_path")" -eq 2 ]; then
+  echo "history storage ok"
 else
-  printf 'history filter file:\n%.4096s\n' "$(cat "$filter_history_path")" >&2
-  echo "history filtering broken"
+  printf 'history storage file:\n%.4096s\n' \
+    "$(cat "$storage_history_path")" >&2
+  echo "history storage broken"
 fi
 
 : > "$multiline_history_path"
@@ -358,7 +320,7 @@ out=$({
     'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$multiline_history_path" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$multiline_history_path" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
@@ -377,67 +339,27 @@ else
   echo "multiline history broken"
 fi
 
-printf 'APPEND_OFF_BASE\n' > "$histappend_off_path"
+printf 'HISTORY_SIZE_BASE\n' > "$history_size_path"
 rm -f "$ready"
 rm -f "$input_status"
 out=$({
-  send_input_when_ready 'HISTSIZE=2\r' 'HISTFILESIZE=500\r' \
-    'shopt -u histappend\r' 'echo APPEND_OFF_ONE\r' \
-    'echo APPEND_OFF_TWO\r' 'exit\r'
+  send_input_when_ready 'KOSH_HISTORY_SIZE=2\r' 'echo HISTORY_SIZE_ONE\r' \
+    'echo HISTORY_SIZE_TWO\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$histappend_off_path" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$history_size_path" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
 
-printf 'APPEND_ON_BASE\n' > "$histappend_on_path"
-rm -f "$ready"
-rm -f "$input_status"
-out=$({
-  send_input_when_ready 'HISTSIZE=2\r' 'HISTFILESIZE=500\r' \
-    'shopt -s histappend\r' 'echo APPEND_ON_ONE\r' \
-    'echo APPEND_ON_TWO\r' 'exit\r'
-  printf '%s\n' "$?" > "$input_status"
-} |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$histappend_on_path" \
-    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
-[ "$(cat "$input_status")" = 0 ] || exit 1
-
-printf 'HISTFILESIZE_BASE\n' > "$histfilesize_path"
-rm -f "$ready"
-rm -f "$input_status"
-out=$({
-  send_input_when_ready 'HISTSIZE=500\r' 'HISTFILESIZE=2\r' \
-    'shopt -s histappend\r' 'echo HISTFILESIZE_ONE\r' \
-    'echo HISTFILESIZE_TWO\r' 'exit\r'
-  printf '%s\n' "$?" > "$input_status"
-} |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$histfilesize_path" \
-    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
-    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
-[ "$(cat "$input_status")" = 0 ] || exit 1
-
-if [ "$(wc -l < "$histappend_off_path")" -eq 2 ] &&
-  ! grep -q APPEND_OFF_BASE "$histappend_off_path" &&
-  grep -q '^echo APPEND_OFF_TWO$' "$histappend_off_path" &&
-  grep -q '^exit$' "$histappend_off_path" &&
-  grep -q '^APPEND_ON_BASE$' "$histappend_on_path" &&
-  grep -q '^echo APPEND_ON_ONE$' "$histappend_on_path" &&
-  grep -q '^echo APPEND_ON_TWO$' "$histappend_on_path" &&
-  [ "$(wc -l < "$histfilesize_path")" -eq 2 ] &&
-  grep -q '^echo HISTFILESIZE_TWO$' "$histfilesize_path" &&
-  grep -q '^exit$' "$histfilesize_path"; then
-  echo "histappend ok"
+if [ "$(wc -l < "$history_size_path")" -eq 2 ] &&
+  grep -q '^echo HISTORY_SIZE_TWO$' "$history_size_path" &&
+  grep -q '^exit$' "$history_size_path"; then
+  echo "history size ok"
 else
-  printf 'histappend off file:\n%.2048s\n' \
-    "$(cat "$histappend_off_path")" >&2
-  printf 'histappend on file:\n%.2048s\n' \
-    "$(cat "$histappend_on_path")" >&2
-  printf 'HISTFILESIZE file:\n%.2048s\n' \
-    "$(cat "$histfilesize_path")" >&2
-  echo "histappend broken"
+  printf 'history size file:\n%.2048s\n' \
+    "$(cat "$history_size_path")" >&2
+  echo "history size broken"
 fi
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"
@@ -448,7 +370,7 @@ out=$({
   send_input_when_ready 'echo !!\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$stderr_hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$stderr_hist" \
     HISTORY_STDERR_LOG="$stderr_log" HISTORY_STDERR_RC="$stderr_rc" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive \
@@ -468,7 +390,7 @@ out=$({
     'echo OMITTED_HISTORY_MARKER\r' 'set -o history\r' 'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$disabled_hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$disabled_hist" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
@@ -485,7 +407,7 @@ out=$({
   send_input_when_ready '\004' 'echo EOF_RESET_MARKER\r' '\004' '\004'
   printf '%s\n' "$?" > "$input_status"
 } |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY="$ignoreeof_hist" \
+  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$ignoreeof_hist" \
     IGNOREEOF_RC="$ignoreeof_rc" \
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile "$IGNOREEOF_RC"') ||

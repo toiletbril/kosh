@@ -15,6 +15,16 @@ echo combined
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "both"]
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "embedded"]
 # heading
 
 text
+
+```sh
+echo embedded
+```
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "embedded"]

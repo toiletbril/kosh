@@ -413,9 +413,9 @@ public:
 
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
 
-  fn set_shell_executable_path(StringView path) throws -> void
+  fn set_shell_executable_path(String path) wontthrow -> void
   {
-    m_shell_executable_path = String{heap_allocator(), path};
+    m_shell_executable_path = steal(path);
   }
   pure fn shell_executable_path() const wontthrow -> StringView
   {

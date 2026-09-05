@@ -24,7 +24,7 @@ runtime-restricted=flagsno-shopt
 restricted-shopt-normal=0:0:1
 restricted-shopt-fixed=0:0
 rbash-identity=flagsshopt
-SHELL=1 PATH=1 HISTFILE=1 ENV=1 BASH_ENV=1
+SHELL=1 PATH=1 ENV=1 BASH_ENV=1 KOSH_HISTORY_FILE=1 KOSH_HISTORY_SIZE=1 KOSH_CALC_HISTORY=1 KOSH_DIRECTORY_HISTORY=1
 1 1 1 1 1 1 1 1 1 1 1 1 0
 unexport=0:0 unexport-value=1
 unexport-dynamic=dynamic unexport-function=1:0 unexport-invalid=1
@@ -37,5 +37,5 @@ subshell-restore=cd=0
 associative-local-restore=old
 sparse-local-restore=old
 z=status=1 cwd=0
-executed=script-cd=0
+executed=script-cd=1
 sourced=script-cd=1

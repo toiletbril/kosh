@@ -220,7 +220,7 @@ public:
   pure fn get_position(usize i) const wontthrow -> usize;
   pure fn get_location(usize i) const wontthrow -> SourceLocation;
 
-  fn next() throws -> StringView;
+  fn take_next() wontthrow -> String;
   pure fn at_end() const wontthrow -> bool;
   pure fn value_position() const wontthrow -> usize { return m_value_position; }
 

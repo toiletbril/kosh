@@ -206,23 +206,6 @@ inline constexpr static_string_entry<shell_variable_description>
          {"The value names the editor fc uses, and it takes precedence over "
           "EDITOR.",
           shell_variable_fact::Plain}                                         },
-        {SSK("HISTFILE"),
-         {"The value names the command history file. A restricted shell "
-          "refuses to change it.",
-          shell_variable_fact::Plain}                                         },
-        {SSK("HISTSIZE"),
-         {"The value bounds the number of retained history events.",
-          shell_variable_fact::Plain}                                         },
-        {SSK("HISTFILESIZE"),
-         {"The value bounds the number of events saved in the history file.",
-          shell_variable_fact::NotPosix}                                      },
-        {SSK("HISTCONTROL"),
-         {"The value is a colon-separated list of history filters.",
-          shell_variable_fact::NotPosix}                                      },
-        {SSK("HISTIGNORE"),
-         {"The value is a colon-separated list of complete-command patterns "
-          "excluded from history.",
-          shell_variable_fact::NotPosix}                                      },
         {SSK("GLOBIGNORE"),
          {"The value is a colon-separated list of patterns a glob result "
           "excludes.",
@@ -287,9 +270,12 @@ inline constexpr static_string_entry<shell_variable_description>
         {SSK("KOSH_FLAGS"),
          {"The value supplies default command-line options.",
           shell_variable_fact::Plain}                                         },
-        {SSK("KOSH_HISTORY"),
+        {SSK("KOSH_HISTORY_FILE"),
          {"The value names the command history file, and the default is "
           "~/.kosh_history.",
+          shell_variable_fact::Plain}                                         },
+        {SSK("KOSH_HISTORY_SIZE"),
+         {"The value bounds the number of retained history events.",
           shell_variable_fact::Plain}                                         },
         {SSK("KOSH_CALC_HISTORY"),
          {"The value names the interactive calc history file.",

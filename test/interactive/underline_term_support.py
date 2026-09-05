@@ -41,7 +41,7 @@ def render_highlighted_line(term):
             fcntl.ioctl(1, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 240, 0, 0))
             os.environ["TERM"] = term
             os.environ["HOME"] = directory
-            os.environ["KOSH_HISTORY"] = os.path.join(directory, "history")
+            os.environ["KOSH_HISTORY_FILE"] = os.path.join(directory, "history")
             os.environ.pop("NO_COLOR", None)
             os.environ.pop("PALETTE_UNSET", None)
             os.execv(binary, [binary, "--norc"])

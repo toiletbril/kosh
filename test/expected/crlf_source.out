@@ -8,4 +8,5 @@ eval-one
 eval-two
 fallback
 lone=3
+execution-string=exact
 diagnostic=clean

@@ -4,7 +4,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "mkdir" "-p" "$d"]
   [CompoundListCondition, None]
-    [SimpleCommand "export" "KOSH_HISTORY=$d/history"]
+    [SimpleCommand "export" "KOSH_HISTORY_FILE=$d/history"]
   [CompoundListCondition, None]
     [FunctionDefinition "seed_fc_history"]
       [BraceGroup]
@@ -240,7 +240,7 @@
   Unquoted "export"
 ]
 [Word
-  Unquoted "KOSH_HISTORY="
+  Unquoted "KOSH_HISTORY_FILE="
   Variable "d"
   Unquoted "/history"
 ]

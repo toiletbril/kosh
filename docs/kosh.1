@@ -667,8 +667,8 @@ and is skipped. An unreadable ENV file is skipped without that diagnostic. See
 .BR kosh (5)
 for the startup file format.
 .SH RESTRICTED SHELL
-A restricted shell rejects directory changes and changes to SHELL, PATH,
-HISTFILE, ENV, and BASH_ENV. A command name may not contain a directory
+A restricted shell rejects directory changes and changes to SHELL, PATH, ENV,
+and BASH_ENV. A command name may not contain a directory
 separator. A source operand, history path, and
 .B hash \-p
 path may not contain a directory separator.
@@ -1103,14 +1103,10 @@ recording and preserves the previous exit status. Both history options are
 enabled by default in an interactive shell and disabled in a noninteractive
 shell.
 .PP
-Each submitted multiline command is stored as one history event. Embedded
-newlines are preserved when the event is recalled.
-.PP
-The
-.B histappend
-option keeps appended session entries when the interactive shell exits. When it
-is disabled, the retained list replaces the history file. HISTSIZE bounds the
-retained list, and HISTFILESIZE bounds the file after either exit mode.
+Each submitted command is appended to the shared history immediately. Running
+shell instances reload the file before recall, search, and listing. A multiline
+command is stored as one event, and its embedded newlines are preserved.
+KOSH_HISTORY_SIZE bounds the retained history and defaults to 4096.
 .PP
 The
 .B ignoreeof
@@ -1823,34 +1819,12 @@ NO_COLOR disables color.
 .B KOSH_FLAGS
 The value supplies default command-line options.
 .TP
-.B KOSH_HISTORY
+.B KOSH_HISTORY_FILE
 The value names the command history file. The default is ~/.kosh_history.
 .TP
-.BR HISTSIZE ", " HISTFILESIZE
-HISTSIZE bounds the number of events retained for recall and listing.
-HISTFILESIZE bounds the number saved when an interactive shell exits. Both
-values default to 500 in an interactive Bash mood.
-.TP
-.B HISTCONTROL
-The value is a colon-separated list of filters for commands added to history.
-.B ignorespace
-omits a command whose first byte is a space.
-.B ignoredups
-omits a command equal to the newest stored event.
-.B ignoreboth
-enables both filters.
-.B erasedups
-removes every older event equal to the command before storing it. Unknown and
-empty fields have no effect.
-.TP
-.B HISTIGNORE
-The value is a colon-separated list of shell patterns. A command is omitted when
-its first physical line matches a complete pattern. Extended patterns follow the
-current
-.B extglob
-setting. An unescaped pattern consisting only of
-.B &
-matches the newest stored event. A backslash quotes the following pattern byte.
+.B KOSH_HISTORY_SIZE
+The value bounds the number of history events retained for recall, listing, and
+storage. The default is 4096.
 .TP
 .BR FCEDIT ", " EDITOR
 These variables select the editor used by

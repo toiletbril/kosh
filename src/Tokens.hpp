@@ -565,7 +565,7 @@ public:
     PlainUnquotedOneSegment,
   };
 
-  pure fn plain_literal_kind() const wontthrow -> PlainLiteral;
+  fn plain_literal_kind() const wontthrow -> PlainLiteral;
 
   fn constant_value() const throws -> StringView;
 
