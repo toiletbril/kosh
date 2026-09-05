@@ -53,6 +53,20 @@ fn util_names() throws -> const ArrayList<String> &
   return names;
 }
 
+fn print_environment(const ExecContext &ec, EvalContext &cxt) throws -> void
+{
+  unused(cxt.materialize_kosh_identity());
+  let output = String{cxt.scratch_allocator()};
+  for (let const &name : os::environment_names()) {
+    let const value = os::get_environment_variable(name.view());
+    output += name.view();
+    output += '=';
+    if (value.has_value()) output += value->view();
+    output += '\n';
+  }
+  ec.print_to_stdout(output);
+}
+
 fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
             const ArrayList<String> &args,
             const ArrayList<SourceLocation> &arg_locations) throws -> i32

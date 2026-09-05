@@ -94,6 +94,7 @@ changes update this file.
   share directory indexes.
 - Command completion reads keywords, builtins, bundled utilities, functions,
   aliases, and PATH. `KEYWORD_ENTRIES` is the sole keyword catalog.
+- Static koshkit completion names stay alphabetically sorted.
 - The language server wraps completion in `begin_explicit_completion` and loads
   command documentation lazily. Mood selection checks the shebang, language
   identifier, then extension. `shellscript` selects bash.
@@ -199,8 +200,9 @@ changes update this file.
 - Edit with apply_patch when available. Otherwise, use the exact-edit tool after
   reading the target. Use one file, concern, and operation per path in each
   patch. Copy current anchors and escaping. Restore deleted code from the exact
-  diff. Inspect failed patches, reread after formatting or concurrent work, and
-  apply only nonempty changes.
+  diff. Check every multi-file patch boundary before applying it. Inspect failed
+  patches, reread after formatting or concurrent work, and apply only nonempty
+  changes.
 - Before a bulk mechanical rewrite, count every known input form and make the
   transformation idempotent when files may already contain the target form.
 - Copy platform argument types, helper namespaces, and ownership transfers from

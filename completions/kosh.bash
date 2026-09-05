@@ -139,7 +139,7 @@ complete -c -W '--help --posix -p -R' time
 
 _koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date \
 df dirname du env expand expr file find flock fold fuser getconf grep head id killall link ln locale \
-logger logname ls make man mkdir mkfifo more mv nice nl nohup nproc od paste pathchk pkill pr ps \
+logger logname ls make man mkdir mkfifo more mv nice nl nohup nproc od paste pathchk pkill pr printenv ps \
 readlink realpath renice rm rmdir sed seq sleep sort split strings stty tabs tail tee timeout touch tput \
 tr tsort tty uname unexpand uniq unlink wc which who whoami xargs yes"
 

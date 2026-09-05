@@ -1,0 +1,9 @@
+--- selected values ---
+one
+
+status=1
+--- complete environment ---
+KOSH_PRINTENV_A=one
+status=0
+--- missing value ---
+status=1

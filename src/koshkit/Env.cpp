@@ -49,21 +49,6 @@ static fn is_assignment(StringView text) wontthrow -> bool
   return true;
 }
 
-static fn print_environment(const ExecContext &ec, EvalContext &cxt) throws
-    -> void
-{
-  unused(cxt.materialize_kosh_identity());
-  let output = String{cxt.scratch_allocator()};
-  for (let const &name : os::environment_names()) {
-    let const value = os::get_environment_variable(name.view());
-    output += name.view();
-    output += '=';
-    if (value.has_value()) output += value->view();
-    output += '\n';
-  }
-  ec.print_to_stdout(output);
-}
-
 Env::Env() = default;
 
 pure fn Env::kind() const wontthrow -> Utility::Kind { return Kind::Env; }

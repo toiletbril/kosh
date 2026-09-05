@@ -58,6 +58,7 @@ public:
     Sleep,
     Timeout,
     Env,
+    Printenv,
     Yes,
     Pkill,
     Killall,
@@ -157,6 +158,7 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("sleep"),    Utility::Kind::Sleep   },
     {SSK("timeout"),  Utility::Kind::Timeout },
     {SSK("env"),      Utility::Kind::Env     },
+    {SSK("printenv"), Utility::Kind::Printenv},
     {SSK("yes"),      Utility::Kind::Yes     },
     {SSK("pkill"),    Utility::Kind::Pkill   },
     {SSK("killall"),  Utility::Kind::Killall },
@@ -332,6 +334,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Sleep);                                                               \
   U_CASE(Timeout);                                                             \
   U_CASE(Env);                                                                 \
+  U_CASE(Printenv);                                                            \
   U_CASE(Yes);                                                                 \
   U_CASE(Pkill);                                                               \
   U_CASE(Killall);                                                             \
@@ -430,6 +433,7 @@ UTILITY_STRUCT(Uniq);
 UTILITY_STRUCT(Sleep);
 UTILITY_STRUCT(Timeout);
 UTILITY_STRUCT(Env);
+UTILITY_STRUCT(Printenv);
 UTILITY_STRUCT(Yes);
 UTILITY_STRUCT(Pkill);
 UTILITY_STRUCT(Killall);
@@ -504,6 +508,7 @@ enum class removal_mode : u8
 fn remove_path(StringView path, removal_mode mode) throws -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
+fn print_environment(const ExecContext &ec, EvalContext &cxt) throws -> void;
 
 struct input_descriptor
 {
