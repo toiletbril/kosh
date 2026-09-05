@@ -5,7 +5,8 @@
  * This file evaluates compound lists, and-or conditions, and pipelines. It
  * owns pipeline stage setup, compound-stage children, asynchronous job
  * registration, pipe status collection, negation, errexit handling, and
- * result propagation.
+ * result propagation. The split confines pipeline process machinery outside
+ * branch and loop behavior.
  */
 
 #include "Arena.hpp"

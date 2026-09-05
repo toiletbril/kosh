@@ -5,7 +5,8 @@
  * This file performs command-specific static analysis for simple commands. It
  * classifies operands, tracks assignments and generated paths, applies
  * builtin argument rules, checks quoting and portability, and records command
- * presence tests.
+ * presence tests. The split keeps the command-policy pass outside
+ * simple-command storage and execution.
  */
 
 #include "Arena.hpp"

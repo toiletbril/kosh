@@ -4,7 +4,8 @@
  *
  * This file implements pathname expansion, recursive globstar traversal,
  * tolerant glob expansion, and tilde expansion. Segment masks distinguish
- * active pattern bytes from quoted or literal text.
+ * active pattern bytes from quoted or literal text. The split confines
+ * filesystem traversal and pattern expansion outside general word expansion.
  */
 
 #include "Arena.hpp"

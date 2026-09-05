@@ -4,7 +4,8 @@
  *
  * This file implements brace expansion, word-to-argument processing,
  * assignment argument handling, field generation, and xtrace rendering. It
- * converts parsed words into the final argument vectors used by commands.
+ * converts parsed words into the final argument vectors used by commands. The
+ * split keeps argument formation separate from segment and parameter expansion.
  */
 
 #include "Arena.hpp"

@@ -4,7 +4,8 @@
  *
  * This file owns the evaluator job table and implements background process
  * registration, pipeline ownership, job lookup, waiting, status updates, and
- * job notifications. It also stores monitor and notification option state.
+ * job notifications. It also stores monitor and notification option state. The
+ * split keeps process lifetime and job bookkeeping separate from evaluation.
  */
 
 #include "Common.hpp"

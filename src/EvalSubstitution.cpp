@@ -5,7 +5,8 @@
  * This file implements command, process, redirect, and function substitution.
  * It captures output, manages pipes and children, preserves nested source
  * frames, isolates evaluator state when required, and cleans up outstanding
- * substitutions.
+ * substitutions. The split confines process lifetimes and stream handling
+ * outside the word-expansion coordinator.
  */
 
 #include "Arena.hpp"

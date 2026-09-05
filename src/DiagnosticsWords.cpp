@@ -5,7 +5,8 @@
  * This file analyzes command words and operands after token collection. It
  * checks arithmetic, expansion portability, quoting, globbing, command-word
  * shapes, and command-specific operand patterns while recording assignment
- * targets.
+ * targets. The split keeps per-word traversal separate from command dispatch
+ * and whole-source dataflow checks.
  */
 
 #include "DiagnosticsChecksInternal.hpp"

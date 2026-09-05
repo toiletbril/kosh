@@ -4,7 +4,9 @@
  *
  * This file ranks completion candidates and coordinates command, filesystem,
  * glob, variable, user, and extension-aware completion. It owns common
- * matching and candidate construction used by contextual providers.
+ * matching and candidate construction used by contextual providers. The split
+ * keeps provider-independent ranking separate from contextual scanning,
+ * highlighting, and documentation discovery.
  */
 
 #include "Completion.hpp"

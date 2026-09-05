@@ -5,7 +5,8 @@
  * This file expands parsed word segments into scalar values and command
  * fields. It coordinates parameter, command, arithmetic, tilde, pathname,
  * brace, quote, assignment, case-pattern, and word-list expansion while
- * preserving segment masks and cache ownership.
+ * preserving segment masks and cache ownership. The split provides one
+ * coordinator above the specialized expansion sources.
  */
 
 #include "Arena.hpp"

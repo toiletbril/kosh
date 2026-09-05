@@ -5,7 +5,8 @@
  * This file parses and evaluates source text, sourced files, heredoc bodies,
  * and scripts delegated to compatibility shells. It owns source isolation,
  * mood initialization, retained syntax trees, path resolution, and fallback
- * execution.
+ * execution. The split confines recursive source lifetimes and compatibility
+ * delegation outside ordinary evaluator operations.
  */
 
 #include "Arena.hpp"

@@ -4,7 +4,8 @@
  *
  * This file implements diagnostics selected by a resolved command identifier
  * and literal operands. It checks command-name misuse, command-specific
- * arguments, traps, declaration spelling, and portability constraints.
+ * arguments, traps, declaration spelling, and portability constraints. The
+ * split keeps command policy separate from generic word and source checks.
  */
 
 #include "DiagnosticsChecksInternal.hpp"

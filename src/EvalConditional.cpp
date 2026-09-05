@@ -4,7 +4,9 @@
  *
  * This file evaluates conditional command operands and operators, including
  * file tests, string tests, numeric comparisons, glob matching, and regular
- * expressions. EvalContext caches compiled regular expressions used here.
+ * expressions. EvalContext caches compiled regular expressions used here. The
+ * split confines test policy and regular-expression lifetimes outside general
+ * evaluator state.
  */
 
 #include "Builtin.hpp"

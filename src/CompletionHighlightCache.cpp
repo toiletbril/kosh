@@ -4,7 +4,8 @@
  *
  * This file converts semantic scans into highlight spans and maintains
  * checkpoints for incremental multiline rescanning. It also renders ranges
- * and validates cached diagnostics after source changes.
+ * and validates cached diagnostics after source changes. The split confines
+ * mutable cache state and rendering above the semantic classifier.
  */
 
 #include "Arena.hpp"

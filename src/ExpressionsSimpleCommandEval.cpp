@@ -5,7 +5,8 @@
  * This file implements the hot simple-command execution path. It expands
  * aliases, prefix assignments, command words, arguments, and arrays, resolves
  * the command, applies redirections, dispatches builtins or programs, and
- * reports the resulting status.
+ * reports the resulting status. The split keeps hot dispatch outside
+ * simple-command storage, formatting, analysis, and redirection construction.
  */
 
 #include "Arena.hpp"

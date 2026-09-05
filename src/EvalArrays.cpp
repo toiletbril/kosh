@@ -4,7 +4,8 @@
  *
  * This file implements indexed, sparse, and associative shell arrays. It owns
  * assignment, lookup, removal, subscripting, key collection, local bindings,
- * and scalar or array expansion through the common variable interface.
+ * and scalar or array expansion through the common variable interface. The
+ * split confines aggregate storage rules outside scalar variable lookup.
  */
 
 #include "Arena.hpp"

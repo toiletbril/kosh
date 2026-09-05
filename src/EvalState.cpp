@@ -5,7 +5,8 @@
  * This file implements mutable evaluator state, including shell options,
  * control flow, source frames, recursion limits, loop resources, status
  * values, snapshots, and restoration. It also owns the framed bootstrap state
- * used by fresh subshell evaluators.
+ * used by fresh subshell evaluators. The split keeps state transitions and
+ * transport serialization separate from expression execution.
  */
 
 #include "Arena.hpp"

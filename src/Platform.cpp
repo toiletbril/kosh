@@ -2,10 +2,11 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file assembles the selected POSIX or Win32 backend. It implements
- * platform-independent process ownership, pending signal state, descriptor
- * epochs and complete reads, regular expressions, wide-integer division, file
- * creation masks, and CRC32C dispatch.
+ * This file is the single platform translation unit. It selects and includes
+ * the POSIX or Win32 source fragments so the build compiles one native backend.
+ * It also implements shared process ownership, pending signal state,
+ * descriptor epochs and complete reads, regular expressions, wide-integer
+ * division, file creation masks, and CRC32C dispatch.
  */
 
 #include "Platform.hpp"

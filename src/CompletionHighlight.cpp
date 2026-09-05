@@ -5,7 +5,8 @@
  * This file performs tolerant semantic highlighting of commands, keywords,
  * variables, expansions, redirections, heredocs, and path operands. It owns
  * construct transitions and command resolution used to assign highlight
- * roles.
+ * roles. The split keeps semantic classification separate from incremental
+ * span caching and terminal rendering.
  */
 
 #include "Arena.hpp"

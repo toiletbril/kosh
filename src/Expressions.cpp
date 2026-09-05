@@ -5,7 +5,8 @@
  * This file implements common expression and command bases, analysis
  * diagnostics, variable dataflow, assignment indexes, source-following
  * analysis, and shared syntax helpers. It also provides analyze_ast and the
- * common command execution flags.
+ * common command execution flags. The split keeps behavior shared by every
+ * syntax node outside the specialized expression sources.
  */
 
 #include "Expressions.hpp"

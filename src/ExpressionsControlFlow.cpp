@@ -5,7 +5,8 @@
  * This file implements asynchronous compound commands, if clauses, loops,
  * case clauses, and brace groups. It applies break, continue, return,
  * redirection, folding, and branch dataflow semantics across control-flow
- * nodes.
+ * nodes. The split keeps branch and loop behavior separate from pipeline
+ * process machinery.
  */
 
 #include "Arena.hpp"

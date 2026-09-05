@@ -4,7 +4,9 @@
  *
  * This file implements parameter expansion operators for default values,
  * assignments, errors, lengths, substrings, trimming, replacement, quoting,
- * and case changes. The same operators apply to scalar and array values.
+ * and case changes. The same operators apply to scalar and array values. The
+ * split keeps parameter syntax and transformations outside the word-expansion
+ * coordinator.
  */
 
 #include "Arena.hpp"

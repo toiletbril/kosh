@@ -4,7 +4,9 @@
  *
  * This file tokenizes and evaluates shell arithmetic expressions, variable
  * operands, assignments, calculator expressions, and bc expressions. It also
- * owns cached runtime arithmetic and constant arithmetic evaluation.
+ * owns cached runtime arithmetic and constant arithmetic evaluation. The split
+ * keeps arithmetic grammar separate from word expansion and promoted numeric
+ * storage.
  */
 
 #include "Common.hpp"
