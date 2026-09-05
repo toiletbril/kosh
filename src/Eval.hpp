@@ -694,6 +694,12 @@ public:
   fn mark_integer(StringView name) throws -> void;
   fn unmark_integer(StringView name) throws -> void;
   fn is_integer_variable(StringView name) const wontthrow -> bool;
+  fn mark_lowercase(StringView name) throws -> void;
+  fn unmark_lowercase(StringView name) throws -> void;
+  fn is_lowercase_variable(StringView name) const wontthrow -> bool;
+  fn mark_uppercase(StringView name) throws -> void;
+  fn unmark_uppercase(StringView name) throws -> void;
+  fn is_uppercase_variable(StringView name) const wontthrow -> bool;
   /* The appended expression is parenthesized so its precedence stays
      self-contained. */
   fn append_integer_expression(String &joined,
@@ -1759,8 +1765,7 @@ protected:
 
   fn install_trap_dispositions() throws -> void;
 
-  HashSet m_readonly_names{heap_allocator()};
-  HashSet m_integer_names{heap_allocator()};
+  StringMap<u8> m_variable_attributes{heap_allocator()};
   StringMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed.
    */
@@ -1789,6 +1794,12 @@ protected:
      local on function return where a throw from a noexcept defer would
      terminate the shell. */
   fn assign_variable(StringView name, StringView value) throws -> void;
+
+  pure fn variable_attributes(StringView name) const wontthrow -> u8;
+  fn set_variable_attribute(StringView name, variable_attribute attribute,
+                            bool is_enabled) throws -> void;
+  fn apply_variable_case(StringView name, String &value) const wontthrow
+      -> void;
 
   fn force_unset_shell_variable(StringView name) throws -> void;
   /* The unset peel, the bash upvar semantics. A local declared by a caller

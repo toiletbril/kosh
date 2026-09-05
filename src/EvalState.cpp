@@ -655,8 +655,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
                                      steal(working_directory),
                                      os::get_file_creation_mask(),
                                      m_traps,
-                                     m_readonly_names,
-                                     m_integer_names,
+                                     m_variable_attributes,
                                      m_exported_names,
                                      m_environment_undo_log.count(),
                                      RuntimeState::capture(*this),
@@ -736,8 +735,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_detached_job_processes = steal(snapshot.detached_job_processes);
   m_next_job_id = snapshot.next_job_id;
 
-  m_readonly_names = steal(snapshot.readonly_names);
-  m_integer_names = steal(snapshot.integer_names);
+  m_variable_attributes = steal(snapshot.variable_attributes);
   m_exported_names = steal(snapshot.exported_names);
 
   /* A signal the subshell trapped that the parent does not is returned to
@@ -993,13 +991,15 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   for (let const &stored_name : names) {
     let const name = stored_name.view();
     let const is_integer = is_integer_variable(name);
+    let const is_lowercase = is_lowercase_variable(name);
+    let const is_uppercase = is_uppercase_variable(name);
     let const is_read_only = is_readonly(name);
     let const is_exported_value = is_exported(name);
     let const *indexed = lookup_indexed_array(name);
     let const is_associative = is_associative_array(name);
     let const value = get_variable_value(name);
     if (indexed == nullptr && !is_associative && is_exported_value &&
-        !is_integer && !is_read_only)
+        !is_integer && !is_lowercase && !is_uppercase && !is_read_only)
     {
       let const environment_value = os::get_environment_variable(name);
       if (environment_value.has_value()) continue;
@@ -1009,9 +1009,11 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
               : indexed != nullptr ? "declare -a"
                                    : "declare -";
     if (is_integer) source.push('i');
+    if (is_lowercase) source.push('l');
+    if (is_uppercase) source.push('u');
     if (is_exported_value) source.push('x');
-    if (indexed == nullptr && !is_associative && !is_integer &&
-        !is_exported_value)
+    if (indexed == nullptr && !is_associative && !is_integer && !is_lowercase &&
+        !is_uppercase && !is_exported_value)
     {
       source.push('-');
     }

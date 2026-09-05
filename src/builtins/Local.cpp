@@ -26,10 +26,13 @@ FLAG(LOCAL_INDEXED, Bool, 'a', "", "Declare an indexed array.");
 FLAG(LOCAL_ASSOCIATIVE, Bool, 'A', "", "Declare an associative array.");
 FLAG(LOCAL_INTEGER, Bool, 'i', "",
      "Mark an integer whose every assignment evaluates as arithmetic.");
-FLAG(LOCAL_LOWERCASE, Bool, 'l', "", "Accepted without effect.");
+FLAG(LOCAL_LOWERCASE, Bool, 'l', "",
+     "Convert every assigned value to lowercase in this scope.");
 FLAG(LOCAL_NAMEREF, Bool, 'n', "", "Accepted without effect.");
-FLAG(LOCAL_READONLY, Bool, 'r', "", "Accepted without effect.");
-FLAG(LOCAL_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
+FLAG(LOCAL_READONLY, Bool, 'r', "",
+     "Make the local variable read-only after its initial assignment.");
+FLAG(LOCAL_UPPERCASE, Bool, 'u', "",
+     "Convert every assigned value to uppercase in this scope.");
 FLAG(LOCAL_EXPORT, Bool, 'x', "",
      "Export the local into the environment, visible to a child process.");
 
@@ -58,6 +61,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   bool should_make_indexed = false;
   bool should_make_associative = false;
   bool should_mark_integer = false;
+  bool should_mark_lowercase = false;
+  bool should_mark_readonly = false;
+  bool should_mark_uppercase = false;
   bool should_mark_export = false;
   usize first_name = 1;
   for (; first_name < args.count(); first_name++) {
@@ -74,10 +80,10 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'a': should_make_indexed = true; break;
       case 'A': should_make_associative = true; break;
       case 'i': should_mark_integer = true; break;
+      case 'l': should_mark_lowercase = true; break;
+      case 'r': should_mark_readonly = true; break;
+      case 'u': should_mark_uppercase = true; break;
       case 'x': should_mark_export = true; break;
-      case 'r':
-      case 'l':
-      case 'u':
       case 'n': break;
       default: {
         let invalid = String{heap_allocator()};
@@ -89,6 +95,11 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       }
     }
+  }
+
+  if (should_mark_lowercase && should_mark_uppercase) {
+    should_mark_lowercase = false;
+    should_mark_uppercase = false;
   }
 
   i32 status = 0;
@@ -132,6 +143,8 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         name, !cxt.is_bash_compatible() ||
                   cxt.is_shopt_enabled(shopt_option_id::LocalvarInherit));
     if (should_mark_integer) cxt.mark_integer(name);
+    if (should_mark_lowercase) cxt.mark_lowercase(name);
+    if (should_mark_uppercase) cxt.mark_uppercase(name);
 
     if (should_make_associative) {
       cxt.declare_associative_array(name);
@@ -162,6 +175,8 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                        .value_or(String{heap_allocator()})
                                        .view());
     }
+
+    if (should_mark_readonly) cxt.mark_readonly(name);
   }
 
   return status;

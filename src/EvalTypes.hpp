@@ -85,6 +85,14 @@ enum class restricted_path_use : u8
   Hash,
 };
 
+enum class variable_attribute : u8
+{
+  Readonly = 1U << 0,
+  Integer = 1U << 1,
+  Lowercase = 1U << 2,
+  Uppercase = 1U << 3,
+};
+
 /* A candidate argument after variable expansion and field splitting. The
    parallel mask marks which characters may act as glob metacharacters. */
 struct glob_field
@@ -197,11 +205,8 @@ struct local_binding
   ArrayList<String> previous_associative_values{heap_allocator()};
   ArrayList<usize> previous_sparse_indices{heap_allocator()};
   ArrayList<String> previous_sparse_values{heap_allocator()};
+  u8 previous_attributes{0};
   bool previous_was_associative{false};
-  bool previous_was_integer{false};
-  /* The read-only mark, so a local -r marks only this scope and the caller's
-     later reassignment is not rejected. */
-  bool previous_was_readonly{false};
   bool previous_was_exported{false};
 };
 

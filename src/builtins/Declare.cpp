@@ -35,12 +35,16 @@ FLAG(DECLARE_GLOBAL, Bool, 'g', "", "Accepted without effect.");
 FLAG(DECLARE_INTEGER, Bool, 'i', "",
      "Mark an integer whose every assignment evaluates as arithmetic. The +i "
      "form removes the mark.");
-FLAG(DECLARE_LOWERCASE, Bool, 'l', "", "Accepted without effect.");
+FLAG(DECLARE_LOWERCASE, Bool, 'l', "",
+     "Convert every assigned value to lowercase. The +l form removes the "
+     "attribute.");
 FLAG(DECLARE_NAMEREF, Bool, 'n', "", "Accepted without effect.");
 FLAG(DECLARE_PRINT, Bool, 'p', "", "Print the matching declarations.");
 FLAG(DECLARE_READONLY, Bool, 'r', "", "Accepted without effect.");
 FLAG(DECLARE_TRACE, Bool, 't', "", "Accepted without effect.");
-FLAG(DECLARE_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
+FLAG(DECLARE_UPPERCASE, Bool, 'u', "",
+     "Convert every assigned value to uppercase. The +u form removes the "
+     "attribute.");
 FLAG(DECLARE_EXPORT, Bool, 'x', "", "Mark the variable for the environment.");
 
 REGISTER_BUILTIN_FLAGS(Declare);
@@ -69,6 +73,10 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let should_print = false;
   let should_mark_integer_attribute = false;
   let should_unmark_integer_attribute = false;
+  let should_mark_lowercase_attribute = false;
+  let should_unmark_lowercase_attribute = false;
+  let should_mark_uppercase_attribute = false;
+  let should_unmark_uppercase_attribute = false;
   let should_mark_readonly = false;
   let should_restrict_to_functions = false;
   let should_print_function_names_only = false;
@@ -98,6 +106,18 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         else
           should_mark_integer_attribute = true;
         break;
+      case 'l':
+        if (is_remove_form)
+          should_unmark_lowercase_attribute = true;
+        else
+          should_mark_lowercase_attribute = true;
+        break;
+      case 'u':
+        if (is_remove_form)
+          should_unmark_uppercase_attribute = true;
+        else
+          should_mark_uppercase_attribute = true;
+        break;
       case 'f': should_restrict_to_functions = true; break;
       case 'F':
         should_restrict_to_functions = true;
@@ -111,8 +131,6 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'g': should_be_global = true; break;
       /* The remaining attribute letters carry no backing behavior yet and are
          accepted so a script that sets them keeps running. */
-      case 'l':
-      case 'u':
       case 'n':
       case 't': break;
       default: {
@@ -132,6 +150,13 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     report_soft_builtin_error(ec, cxt, ec.source_location(),
                               "'-a' and '-A' cannot be used together");
     return 2;
+  }
+
+  if (should_mark_lowercase_attribute && should_mark_uppercase_attribute) {
+    should_mark_lowercase_attribute = false;
+    should_mark_uppercase_attribute = false;
+    should_unmark_lowercase_attribute = true;
+    should_unmark_uppercase_attribute = true;
   }
 
   /* A missing name turns the status to 1, silently for -F the way bash answers
@@ -187,7 +212,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       let line = String{cxt.scratch_allocator(), "declare -a"};
       if (cxt.is_integer_variable(name)) line += 'i';
+      if (cxt.is_lowercase_variable(name)) line += 'l';
       if (cxt.is_readonly(name)) line += 'r';
+      if (cxt.is_uppercase_variable(name)) line += 'u';
       line += ' ';
       line.append(name);
       line += "=(";
@@ -211,7 +238,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const values = cxt.associative_values(name);
       let line = String{cxt.scratch_allocator(), "declare -A"};
       if (cxt.is_integer_variable(name)) line += 'i';
+      if (cxt.is_lowercase_variable(name)) line += 'l';
       if (cxt.is_readonly(name)) line += 'r';
+      if (cxt.is_uppercase_variable(name)) line += 'u';
       line += ' ';
       line.append(name);
       line += "=(";
@@ -230,7 +259,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (const Maybe<String> value = cxt.get_variable_value(name)) {
       let attribute = String{cxt.scratch_allocator(), "-"};
       if (cxt.is_integer_variable(name)) attribute += 'i';
+      if (cxt.is_lowercase_variable(name)) attribute += 'l';
       if (cxt.is_readonly(name)) attribute += 'r';
+      if (cxt.is_uppercase_variable(name)) attribute += 'u';
       if (os::get_environment_variable(name).has_value()) attribute += 'x';
       if (attribute.count() == 1) attribute += '-';
       let line = String{cxt.scratch_allocator(), "declare "};
@@ -244,9 +275,14 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return true;
     }
 
-    if (cxt.is_integer_variable(name)) {
-      let line = String{cxt.scratch_allocator(), "declare -i"};
+    if (cxt.is_integer_variable(name) || cxt.is_lowercase_variable(name) ||
+        cxt.is_uppercase_variable(name))
+    {
+      let line = String{cxt.scratch_allocator(), "declare -"};
+      if (cxt.is_integer_variable(name)) line += 'i';
+      if (cxt.is_lowercase_variable(name)) line += 'l';
       if (cxt.is_readonly(name)) line += 'r';
+      if (cxt.is_uppercase_variable(name)) line += 'u';
       if (cxt.is_exported(name)) line += 'x';
       line += ' ';
       line.append(name);
@@ -272,6 +308,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         return false;
       }
       if (should_mark_integer_attribute && !cxt.is_integer_variable(name)) {
+        return false;
+      }
+      if (should_mark_lowercase_attribute && !cxt.is_lowercase_variable(name)) {
+        return false;
+      }
+      if (should_mark_uppercase_attribute && !cxt.is_uppercase_variable(name)) {
         return false;
       }
       if (should_make_indexed && cxt.lookup_indexed_array(name) == nullptr) {
@@ -350,7 +392,10 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    if ((should_mark_integer_attribute || should_unmark_integer_attribute) &&
+    if ((should_mark_integer_attribute || should_unmark_integer_attribute ||
+         should_mark_lowercase_attribute || should_unmark_lowercase_attribute ||
+         should_mark_uppercase_attribute ||
+         should_unmark_uppercase_attribute) &&
         cxt.is_readonly(name))
     {
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
@@ -385,6 +430,10 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        adds on this command the way bash applies the integer mark first. */
     if (should_mark_integer_attribute) cxt.mark_integer(name);
     if (should_unmark_integer_attribute) cxt.unmark_integer(name);
+    if (should_unmark_lowercase_attribute) cxt.unmark_lowercase(name);
+    if (should_unmark_uppercase_attribute) cxt.unmark_uppercase(name);
+    if (should_mark_lowercase_attribute) cxt.mark_lowercase(name);
+    if (should_mark_uppercase_attribute) cxt.mark_uppercase(name);
 
     LOG(All, "declare applying attributes to '%.*s'",
         static_cast<int>(name.length), name.data);

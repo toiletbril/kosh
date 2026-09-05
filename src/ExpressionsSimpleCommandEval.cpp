@@ -833,6 +833,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     let is_associative_request = false;
     let should_mark_integer = false;
     let should_unmark_integer = false;
+    let should_mark_lowercase = false;
+    let should_unmark_lowercase = false;
+    let should_mark_uppercase = false;
+    let should_unmark_uppercase = false;
     if (is_declare || is_local) {
       for (let const arg : m_args) {
         let const text = arg->raw_string();
@@ -851,8 +855,22 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
             should_mark_integer = text.view()[0] == '-';
             should_unmark_integer = text.view()[0] == '+';
           }
+          if (text.view().find_character('l').has_value()) {
+            should_mark_lowercase = text.view()[0] == '-';
+            should_unmark_lowercase = text.view()[0] == '+';
+          }
+          if (text.view().find_character('u').has_value()) {
+            should_mark_uppercase = text.view()[0] == '-';
+            should_unmark_uppercase = text.view()[0] == '+';
+          }
         }
       }
+    }
+    if (should_mark_lowercase && should_mark_uppercase) {
+      should_mark_lowercase = false;
+      should_mark_uppercase = false;
+      should_unmark_lowercase = true;
+      should_unmark_uppercase = true;
     }
     for (let const &assignment : m_array_args) {
       if (is_local || is_function_local) {
@@ -860,6 +878,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
       if (should_mark_integer) cxt.mark_integer(assignment.name);
       if (should_unmark_integer) cxt.unmark_integer(assignment.name);
+      if (should_unmark_lowercase) cxt.unmark_lowercase(assignment.name);
+      if (should_unmark_uppercase) cxt.unmark_uppercase(assignment.name);
+      if (should_mark_lowercase) cxt.mark_lowercase(assignment.name);
+      if (should_mark_uppercase) cxt.mark_uppercase(assignment.name);
       ArrayList<String> values =
           cxt.process_args(assignment.elements, argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);

@@ -309,12 +309,12 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
 
 fn EvalContext::mark_readonly(StringView name) throws -> void
 {
-  m_readonly_names.add(name);
+  set_variable_attribute(name, variable_attribute::Readonly, true);
 }
 
 fn EvalContext::unmark_readonly(StringView name) throws -> void
 {
-  m_readonly_names.remove(name);
+  set_variable_attribute(name, variable_attribute::Readonly, false);
 }
 
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
@@ -322,17 +322,23 @@ fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
   if (restricted_enforcement_active())
     for (let const restricted_name : RESTRICTED_READONLY_NAMES)
       if (name == restricted_name) return true;
-  return m_readonly_names.contains(name);
+  return (variable_attributes(name) &
+          static_cast<u8>(variable_attribute::Readonly)) != 0;
 }
 
 fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
-  out.reserve(m_readonly_names.count() + countof(RESTRICTED_READONLY_NAMES));
-  m_readonly_names.for_each([&](StringView name) { out.push_managed(name); });
+  out.reserve(m_variable_attributes.count() +
+              countof(RESTRICTED_READONLY_NAMES));
+  m_variable_attributes.for_each([&](StringView name, u8 attributes) {
+    if ((attributes & static_cast<u8>(variable_attribute::Readonly)) != 0)
+      out.push_managed(name);
+  });
   if (restricted_enforcement_active())
     for (let const restricted_name : RESTRICTED_READONLY_NAMES)
-      if (!m_readonly_names.contains(restricted_name))
+      if ((variable_attributes(restricted_name) &
+           static_cast<u8>(variable_attribute::Readonly)) == 0)
         out.push_managed(restricted_name);
   out.sort();
   return out;
@@ -340,17 +346,85 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
 
 fn EvalContext::mark_integer(StringView name) throws -> void
 {
-  m_integer_names.add(name);
+  set_variable_attribute(name, variable_attribute::Integer, true);
 }
 
 fn EvalContext::unmark_integer(StringView name) throws -> void
 {
-  m_integer_names.remove(name);
+  set_variable_attribute(name, variable_attribute::Integer, false);
 }
 
 fn EvalContext::is_integer_variable(StringView name) const wontthrow -> bool
 {
-  return m_integer_names.contains(name);
+  return (variable_attributes(name) &
+          static_cast<u8>(variable_attribute::Integer)) != 0;
+}
+
+fn EvalContext::mark_lowercase(StringView name) throws -> void
+{
+  set_variable_attribute(name, variable_attribute::Uppercase, false);
+  set_variable_attribute(name, variable_attribute::Lowercase, true);
+}
+
+fn EvalContext::unmark_lowercase(StringView name) throws -> void
+{
+  set_variable_attribute(name, variable_attribute::Lowercase, false);
+}
+
+fn EvalContext::is_lowercase_variable(StringView name) const wontthrow -> bool
+{
+  return (variable_attributes(name) &
+          static_cast<u8>(variable_attribute::Lowercase)) != 0;
+}
+
+fn EvalContext::mark_uppercase(StringView name) throws -> void
+{
+  set_variable_attribute(name, variable_attribute::Lowercase, false);
+  set_variable_attribute(name, variable_attribute::Uppercase, true);
+}
+
+fn EvalContext::unmark_uppercase(StringView name) throws -> void
+{
+  set_variable_attribute(name, variable_attribute::Uppercase, false);
+}
+
+fn EvalContext::is_uppercase_variable(StringView name) const wontthrow -> bool
+{
+  return (variable_attributes(name) &
+          static_cast<u8>(variable_attribute::Uppercase)) != 0;
+}
+
+pure fn EvalContext::variable_attributes(StringView name) const wontthrow -> u8
+{
+  let const *attributes = m_variable_attributes.find(name);
+  return attributes != nullptr ? *attributes : 0;
+}
+
+fn EvalContext::set_variable_attribute(StringView name,
+                                       variable_attribute attribute,
+                                       bool is_enabled) throws -> void
+{
+  let attributes = variable_attributes(name);
+  let const mask = static_cast<u8>(attribute);
+  if (is_enabled)
+    attributes |= mask;
+  else
+    attributes &= static_cast<u8>(~mask);
+
+  if (attributes == 0)
+    m_variable_attributes.erase(name);
+  else
+    m_variable_attributes.set(name, attributes);
+}
+
+fn EvalContext::apply_variable_case(StringView name,
+                                    String &value) const wontthrow -> void
+{
+  let const attributes = variable_attributes(name);
+  if ((attributes & static_cast<u8>(variable_attribute::Lowercase)) != 0)
+    value.lowercase_ascii();
+  else if ((attributes & static_cast<u8>(variable_attribute::Uppercase)) != 0)
+    value.uppercase_ascii();
 }
 
 fn EvalContext::append_integer_expression(String &joined,

@@ -62,11 +62,9 @@ struct eval_state_snapshot
   os::DirectoryReference working_directory;
   u32 file_creation_mask;
   StringMap<String> traps;
-  /* The read-only and integer name sets ride the snapshot too, so a readonly or
-     a declare -i inside a subshell dies with the child rather than leaking its
-     mark to the parent. */
-  HashSet readonly_names;
-  HashSet integer_names;
+  /* Variable attributes ride the snapshot, so a declaration inside a
+     subshell does not leak its marks to the parent. */
+  StringMap<u8> variable_attributes;
   HashSet exported_names;
   /* The length of the environment undo log when the snapshot was taken, the
      point restore_state rewinds the process environment back to. */

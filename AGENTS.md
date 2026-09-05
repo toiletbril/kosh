@@ -27,7 +27,7 @@ changes update this file.
 - Prefer names to comments. C and C++ comments use `/* ... */`. Brace conditions
   containing `&&` or `||`. Separate logical blocks, loops, and returns with blank
   lines.
-- Every project-owned C and C++ file starts with the boxed top-level license
+- Every project-owned C and C++ file starts with the top-level license
   notice and a sentence naming that file's responsibility. Do not add it to
   vendored files.
 - Use a static table for three or more name comparisons and a switch for hot

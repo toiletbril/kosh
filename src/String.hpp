@@ -121,6 +121,14 @@ public:
         byte = static_cast<char>(byte - 'A' + 'a');
     }
   }
+  hot fn uppercase_ascii() wontthrow -> void
+  {
+    for (usize position = 0; position < m_length; position++) {
+      let &byte = m_data[position];
+      if (byte >= 'a' && byte <= 'z')
+        byte = static_cast<char>(byte - 'a' + 'A');
+    }
+  }
   hot fn assign_lowercase_ascii(StringView text) throws -> void
   {
     clear();

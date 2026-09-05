@@ -1116,8 +1116,16 @@ an associative array by
 .BR \-A ,
 an arithmetic integer by
 .BR \-i ,
+lowercase conversion by
+.BR \-l ,
+read-only assignment by
+.BR \-r ,
+uppercase conversion by
+.BR \-u ,
 and an exported name by
 .BR \-x .
+The plus forms remove the integer and case-conversion attributes. Lowercase
+and uppercase conversion cancel each other when both are requested.
 The
 .B \-f
 and
@@ -1127,12 +1135,8 @@ only its name. The
 .B \-p
 option prints the matching declarations. The
 .BR \-g ,
-.BR \-l ,
 .BR \-n ,
-.BR \-r ,
-.BR \-t ,
-and
-.B \-u
+.B \-t
 options are accepted without effect.
 .TP
 .B local
@@ -1140,15 +1144,14 @@ The name is local to the running function. The
 .BR \-a ,
 .BR \-A ,
 .BR \-i ,
+.BR \-l ,
+.BR \-r ,
+.BR \-u ,
 and
 .B \-x
 attributes have the same meanings as for declare. The
-.BR \-l ,
-.BR \-n ,
-.BR \-r ,
-and
-.B \-u
-are accepted without effect.
+.B \-n
+option is accepted without effect.
 .TP
 .B readonly
 Each named variable is marked read-only. The

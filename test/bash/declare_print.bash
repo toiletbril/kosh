@@ -120,6 +120,33 @@ typeset -i m=3
 m+=4
 echo "typeset=$m"
 
+declare -l lower=AbC
+lower=DeF
+declare -p lower
+declare -u upper=Abc
+upper+=dEf
+declare -p upper
+declare -la lower_array=(AA Bb)
+lower_array[1]=CC
+declare -p lower_array
+declare -lA lower_map
+lower_map[K]=AA
+declare -p lower_map
+declare +l lower
+lower=GhI
+declare -p lower
+declare -lu neutral=AbC
+declare -p neutral
+case_local() {
+  local -l low=AbC
+  local -u high=AbC
+  printf 'local_case=%s:%s\n' "$low" "$high"
+}
+case_local
+( readonly_local() { local -r fixed=one; fixed=two; }; readonly_local ) \
+  2>/dev/null
+echo "local_readonly_status=$?"
+
 # declare -F answers function existence by status and prints bare names, the
 # bare form lists declare -f lines, and a cloned definition evals back.
 f() { echo body; }

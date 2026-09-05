@@ -238,6 +238,13 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     return;
   }
 
+  if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]] {
+    let adjusted = String{scratch_allocator(), value};
+    apply_variable_case(name, adjusted);
+    assign_variable(name, adjusted.view());
+    return;
+  }
+
   assign_variable(name, value);
 }
 
@@ -284,7 +291,7 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
-  m_integer_names.remove(name);
+  m_variable_attributes.erase(name);
 }
 
 fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
@@ -325,14 +332,15 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     m_indexed_arrays.erase(binding.name.view());
   let const was_restricted = restricted_enforcement_active();
   m_runtime.set_option(shell_option_id::Restricted, false);
-  m_readonly_names.remove(binding.name.view());
+  m_variable_attributes.erase(binding.name.view());
   defer
   {
     m_runtime.set_option(shell_option_id::Restricted, was_restricted);
-    if (binding.previous_was_readonly)
-      m_readonly_names.add(binding.name.view());
+    if (binding.previous_attributes != 0)
+      m_variable_attributes.set(binding.name.view(),
+                                binding.previous_attributes);
     else
-      m_readonly_names.remove(binding.name.view());
+      m_variable_attributes.erase(binding.name.view());
   };
   clear_sparse_array(binding.name.view());
   for (usize i = 0; i < binding.previous_sparse_indices.count(); i++)
@@ -344,11 +352,6 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
       set_associative_element(binding.name.view(),
                               binding.previous_associative_keys[k].view(),
                               binding.previous_associative_values[k].view());
-  if (binding.previous_was_integer)
-    m_integer_names.add(binding.name.view());
-  else
-    m_integer_names.remove(binding.name.view());
-
   if (binding.previous_was_exported) {
     m_exported_names.add(binding.name.view());
     if (binding.previous_value.has_value())
@@ -366,6 +369,9 @@ fn EvalContext::set_indexed_array(StringView name,
       static_cast<int>(name.length), name.data, values.count());
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+  if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]]
+    for (let &value : values)
+      apply_variable_case(name, value);
   m_shell_variables.erase(name);
   clear_sparse_array(name);
   m_indexed_arrays.set(name, steal(values));
@@ -405,6 +411,9 @@ fn EvalContext::append_indexed_array(StringView name,
         values.count(), static_cast<int>(name.length), name.data);
     if (is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
+    if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]]
+      for (let &value : values)
+        apply_variable_case(name, value);
     m_shell_variables.erase(name);
     for (let &element : values)
       existing->push(steal(element));

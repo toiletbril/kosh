@@ -212,6 +212,13 @@ fn EvalContext::set_array_element(StringView name, usize index,
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
+  let adjusted = String{scratch_allocator()};
+  if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]] {
+    adjusted.append(value);
+    apply_variable_case(name, adjusted);
+    value = adjusted.view();
+  }
+
   /* The dense run holds the contiguous prefix from index zero, and any element
      past its end lives in the sparse map keyed by index, so a gap is not
      padded. A first write promotes an existing scalar to element zero. */
@@ -381,6 +388,13 @@ fn EvalContext::set_associative_element(StringView name, StringView key,
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
+  let adjusted = String{scratch_allocator()};
+  if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]] {
+    adjusted.append(value);
+    apply_variable_case(name, adjusted);
+    value = adjusted.view();
+  }
+
   if (!is_associative_array(name)) {
     m_associative_names.add(name);
     m_shell_variables.erase(name);
@@ -537,13 +551,9 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
     }
   }
 
-  /* A fresh local drops the integer attribute. An inherited local keeps it.
-     The saved flag restores the caller's state when the scope ends. */
-  let const previous_was_integer = is_integer_variable(name);
-  if (previous_was_integer && !should_inherit_value) unmark_integer(name);
-
-  let const previous_was_readonly = is_readonly(name);
-  if (previous_was_readonly) unmark_readonly(name);
+  let const previous_attributes = variable_attributes(name);
+  if (!should_inherit_value) m_variable_attributes.erase(name);
+  unmark_readonly(name);
 
   /* The export mark is left in place, so a plain local keeps any inherited
      export until the body reassigns the name. */
@@ -561,8 +571,7 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
       String{name}, steal(previous_value), steal(previous_array),
       steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
-      previous_was_associative, previous_was_integer, previous_was_readonly,
-      previous_was_exported});
+      previous_attributes, previous_was_associative, previous_was_exported});
 
   if (!should_inherit_value) {
     force_unset_shell_variable(name);
