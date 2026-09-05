@@ -740,6 +740,8 @@ fn kosh_main(int argc, char **argv) -> int
   context.set_source_traces_enabled(!FLAG_NO_TRACES.is_enabled());
   context.set_shell_option_state(koshka::shell_option_id::Privileged,
                                  FLAG_PRIVILEGED.is_enabled());
+  context.set_shell_option_state(koshka::shell_option_id::Onecmd,
+                                 FLAG_ONE_COMMAND.is_enabled());
   context.set_login_shell(is_login_shell);
   context.set_custom_rcfile(koshka::selected_rcfile().has_value());
   if (is_restricted_shell) context.request_restricted_shell();
@@ -1320,7 +1322,9 @@ fn kosh_main(int argc, char **argv) -> int
 
     /* A child process reaches here when its exec() failed and printed the error
        itself. */
-    if (should_quit || koshka::os::is_child_process() ||
+    if (should_quit ||
+        context.shell_option_state(koshka::shell_option_id::Onecmd) ||
+        koshka::os::is_child_process() ||
         (!FLAG_LINT.is_enabled() && FLAG_ERROR_EXIT.is_enabled() &&
          exit_code != 0))
     {

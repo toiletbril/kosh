@@ -689,7 +689,12 @@ static fn run_script_contents(
           context.set_terminal_exec_allowed(was_terminal_exec_allowed &&
                                             execution_parser.is_at_end());
           exit_code = static_cast<int>(unit->evaluate(context));
-          if (context.has_pending_control_flow()) break;
+          if (context.has_pending_control_flow() ||
+              (context.shell_option_state(shell_option_id::Onecmd) &&
+               !context.has_execution_string()))
+          {
+            break;
+          }
         }
       } else {
         exit_code = static_cast<int>(ast->evaluate(context));

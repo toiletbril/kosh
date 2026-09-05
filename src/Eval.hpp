@@ -100,6 +100,7 @@ enum class shell_option_id : u8
   ShowExitCode,
   ShowStats,
   ShowMemory,
+  Onecmd,
   Count,
 };
 

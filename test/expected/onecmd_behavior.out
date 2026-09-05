@@ -1,0 +1,8 @@
+== stdin reads one top-level command:
+one
+== a command string runs as one input command:
+one
+two
+== a script can enable onecmd while reading:
+== the option is queryable:
+onecmd         	on
