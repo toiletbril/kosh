@@ -159,6 +159,8 @@ changes update this file.
 - Quote shell source, use `-c` for source, put `--` before dash-leading operands,
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it.
+- Pass generated text through a literal `printf` format when the text contains
+  percent conversions.
 - Edit with apply_patch. Use one file and concern per patch. Copy current anchors
   and preserve escaping. Inspect failed patches. Reread after formatting or
   concurrent work. Apply only nonempty changes.

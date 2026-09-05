@@ -68,6 +68,7 @@ measure_command() {
   fi
 
   TIMING=$(<"$TIME_OUTPUT")
+  TIMING=${TIMING%$'\r'}
   if [[ ! $TIMING =~ ^[0-9]+[.][0-9]{3}$ ]]; then
     echo "benchmark command produced an invalid timing '$TIMING'" >&2
     return 1
