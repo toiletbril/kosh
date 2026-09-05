@@ -22,7 +22,7 @@ echo "--- ls -l sym (mode nlink size name) ---"
 # Linux always reports a symlink as mode 0777, while macOS stores the real
 # symlink permissions, so the meaningless symlink mode field is folded to the
 # Linux form before the row is trimmed.
-"$BIN" -c 'koshkit ls -l sym' | sed 's/^l[rwxsStT-]\{9\}/lrwxrwxrwx/' | awk '{print $1, $2, $5, $NF}'
+"$BIN" -c 'koshkit ls -l sym' | sed 's/^l[rwxsStT-]\{9\}/lrwxrwxrwx/; s/^\([^[:space:]]*\)[[:space:]][[:space:]]*\([^[:space:]]*\)[[:space:]][[:space:]]*[^[:space:]]*[[:space:]][[:space:]]*[^[:space:]]*[[:space:]][[:space:]]*\([^[:space:]]*\).*[^[:space:]][[:space:]][[:space:]]*\([^[:space:]]*\)$/\1 \2 \3 \4/'
 echo "--- ls after operations ---"
 "$BIN" -c 'koshkit ls'
 printf 'old\n' > cp-target.txt

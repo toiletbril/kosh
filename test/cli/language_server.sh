@@ -16,7 +16,9 @@ read_server_frame()
   header=${header%"$carriage_return"}
   server_frame_length=${header#Content-Length: }
   IFS= read -r separator || return 1
-  server_frame_body=$(dd bs=1 count="$server_frame_length" 2>/dev/null)
+  server_frame_body=$(
+    "$BIN" -c 'koshkit head -c "$1"' frame-reader "$server_frame_length"
+  )
 }
 
 check_contains()

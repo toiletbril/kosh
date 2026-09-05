@@ -192,6 +192,10 @@ changes update this file.
   contain backticks.
 - Pass generated text through a literal `printf` format when the text contains
   percent conversions.
+- Test a replacement regular expression against exact representative input
+  before using it in shared fixture normalization.
+- Keep normalization that must visit every line before any sed stage that uses
+  `n`, because the newly read line resumes after that command.
 - Edit with apply_patch when available. Otherwise, use the exact-edit tool after
   reading the target. Use one file, concern, and operation per path in each
   patch. Copy current anchors and escaping. Restore deleted code from the exact
@@ -217,6 +221,8 @@ changes update this file.
   literal symbol search after the edit.
 - Write and read framed fields in identical order. Review both sides together
   whenever a framed format changes.
+- Inspect exact-length stream readers for read-ahead and end-of-file dependence
+  before using them on persistent protocol streams.
 - Parse internal control markers by their complete validated value. Do not infer
   different values from a shared prefix.
 - Verify option defaults against the reference shell. Resolve compact option

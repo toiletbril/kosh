@@ -61,15 +61,16 @@ static fn read_up_to_bytes(os::descriptor fd, u64 max_bytes,
   char buffer[4096];
   while (byte_count < max_bytes) {
     if (os::INTERRUPT_REQUESTED) break;
-    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
+    let const remaining_count = max_bytes - byte_count;
+    let const request_count =
+        remaining_count < sizeof(buffer)
+            ? static_cast<usize>(remaining_count)
+            : sizeof(buffer);
+    let const read_count = os::read_fd(fd, buffer, request_count);
     if (!read_count.has_value()) return None;
     if (*read_count == 0) break;
-    let const remaining_count = max_bytes - byte_count;
-    let const take_count = remaining_count < *read_count
-                               ? static_cast<usize>(remaining_count)
-                               : *read_count;
-    out.append(StringView{buffer, take_count});
-    byte_count += take_count;
+    out.append(StringView{buffer, *read_count});
+    byte_count += *read_count;
   }
 
   return out;

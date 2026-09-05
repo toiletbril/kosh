@@ -9,13 +9,8 @@ export HOME=$dir/home
 real_dir=$(cd "$dir" && pwd -P)
 
 scrub() {
-    sed 's|\\|/|g' | sed "s|$real_dir|D|g; s|$dir|D|g" | awk '
-    /\^~~~$/ {
-        print "       |                            ^~~~"
-        next
-    }
-    { print }
-    '
+  sed 's|\\|/|g' | sed "s|$real_dir|D|g; s|$dir|D|g" |
+    sed 's/^.*\^~~~$/       |                            ^~~~/'
 }
 
 echo "== dirs on an empty stack shows only the current directory:"
