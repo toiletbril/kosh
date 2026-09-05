@@ -1235,7 +1235,8 @@ The
 form prints the utility names one per line.
 .PP
 The bundled set contains basename, bc, cal, calc, cat, chgrp, chmod, chown,
-cksum, cmp, comm, cp, csplit, cut, date, df, dirname, du, env, expand, expr,
+cksum, cmp, comm, cp, csplit, cut, date, df, diff, dirname, du, env, expand,
+expr,
 file, find, flock, fold, fuser, getconf, grep, head, id, killall, link, ln,
 locale, logger, logname, ls, make, man, mkdir, mkfifo, more, mv, nice, nl,
 nohup, nproc, od, paste, pathchk, pkill, pr, printenv, ps, readlink, realpath,
@@ -1287,6 +1288,18 @@ Files and directory trees are copied. The
 .BR \-p ,
 and
 .BR \-v .
+.TP
+.B diff
+Two files are compared line by line. The
+.BR \-u ,
+.BR \-w ,
+.BR \-a ,
+and repeated
+.B \-L
+options select unified output, ignore whitespace, force text input, and set the
+unified header labels. Up to two labels may be supplied. An unlabeled filesystem
+header includes the file modification time. Equal files return zero, different
+files return one, and usage or input errors return two.
 .TP
 .B dirname
 The directory portion of one path is printed.

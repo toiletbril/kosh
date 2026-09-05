@@ -164,6 +164,8 @@ changes update this file.
 - Koshkit rm tests use `--dry-run`. Cleanup uses the system rm after a nonempty
   path check. Bashdiff and mimicrydiff need Bash 5.3 or newer. Set `BASHP` to a
   modern Bash on macOS.
+- Golden comparisons use the resolved host diff on POSIX and koshkit diff on
+  Windows through `test/bin/diff`.
 
 ## Workflow
 
@@ -208,8 +210,9 @@ changes update this file.
 - Copy platform argument types, helper namespaces, and ownership transfers from
   their current declarations before the first compile.
 - Print the required before-and-after table immediately after each edit batch.
-  Do not run another tool before the table is printed. After a resumed session,
-  print any pending table before the first tool call.
+  Do not combine a formatter or another editing command with the next probe,
+  build, or test. Do not run another tool before the table is printed. After a
+  resumed session, print any pending table before the first tool call.
 
 ## Implementation
 

@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "${TEST_USE_KOSHKIT_DIFF:-0}" = 1 ]; then
+  exec "$BIN" -c 'koshkit diff "$@"' diff "$@"
+fi
+
+if [ -z "${TEST_HOST_DIFF-}" ]; then
+  printf 'test diff executable is unavailable\n' >&2
+  exit 2
+fi
+
+exec "$TEST_HOST_DIFF" "$@"

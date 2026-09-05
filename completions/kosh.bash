@@ -138,7 +138,7 @@ complete -W '-r -R -p --help' hash
 complete -c -W '--help --posix -p -R' time
 
 _koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date \
-df dirname du env expand expr file find flock fold fuser getconf grep head id killall link ln locale \
+df diff dirname du env expand expr file find flock fold fuser getconf grep head id killall link ln locale \
 logger logname ls make man mkdir mkfifo more mv nice nl nohup nproc od paste pathchk pkill pr printenv ps \
 readlink realpath renice rm rmdir sed seq sleep sort split strings stty tabs tail tee timeout touch tput \
 tr tsort tty uname unexpand uniq unlink wc which who whoami xargs yes"
@@ -150,6 +150,7 @@ _koshkit_util_flags()
     calc)          echo "-i --interactive -p --pipe" ;;
     cp)            echo "-r -R -f -i -p -v" ;;
     cut)           echo "-b --bytes -c --characters -f --fields -d --delimiter -n --no-split -s --only-delimited" ;;
+    diff)          echo "-u --unified -w --ignore-all-space -a --text -L --label" ;;
     file)          echo "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only" ;;
     ls)            echo "-a -A -1 -l -h" ;;
     nproc)         echo "--all --ignore=" ;;

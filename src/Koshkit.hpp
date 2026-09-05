@@ -81,6 +81,7 @@ public:
     Pathchk,
     Cksum,
     Cmp,
+    Diff,
     Comm,
     Tsort,
     Csplit,
@@ -181,6 +182,7 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("pathchk"),  Utility::Kind::Pathchk },
     {SSK("cksum"),    Utility::Kind::Cksum   },
     {SSK("cmp"),      Utility::Kind::Cmp     },
+    {SSK("diff"),     Utility::Kind::Diff    },
     {SSK("comm"),     Utility::Kind::Comm    },
     {SSK("tsort"),    Utility::Kind::Tsort   },
     {SSK("csplit"),   Utility::Kind::Csplit  },
@@ -357,6 +359,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Pathchk);                                                             \
   U_CASE(Cksum);                                                               \
   U_CASE(Cmp);                                                                 \
+  U_CASE(Diff);                                                                \
   U_CASE(Comm);                                                                \
   U_CASE(Tsort);                                                               \
   U_CASE(Csplit);                                                              \
@@ -456,6 +459,7 @@ UTILITY_STRUCT(Mkfifo);
 UTILITY_STRUCT(Pathchk);
 UTILITY_STRUCT(Cksum);
 UTILITY_STRUCT(Cmp);
+UTILITY_STRUCT(Diff);
 UTILITY_STRUCT(Comm);
 UTILITY_STRUCT(Tsort);
 UTILITY_STRUCT(Csplit);

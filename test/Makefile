@@ -15,6 +15,13 @@ TARGET ?= Windows_NT
 else
 TARGET ?= $(shell uname -s)
 endif
+ifeq ($(TARGET), Windows_NT)
+export TEST_USE_KOSHKIT_DIFF := 1
+WINDOWS_DIFF_BOOTSTRAP := verify_koshkit_diff
+else
+export TEST_USE_KOSHKIT_DIFF := 0
+export TEST_HOST_DIFF := $(shell command -v diff)
+endif
 
 ifeq ($(TARGET), Windows_NT)
 export TEST_PATH_SEPARATOR := ;
@@ -82,7 +89,7 @@ export TEST_UNAME_DIRECTORY := $(shell \
 endif
 export PATH := $(CURDIR)/bin$(TEST_HOST_PATH_SEPARATOR)$(PATH)
 
-%: expected/%.out
+%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' BIN_FLAGS='$(BIN_FLAGS)' DIFF_FLAGS='$(DIFF_FLAGS)' \
 		FAILED_LIST='$(FAILED_LIST)' $(SHELL) run-kosh-test.sh $*
 
@@ -90,26 +97,29 @@ clean:
 	@rm -f $(FAILED_LIST) $(KOSH_HISTORY) $(KOSH_DIRECTORY_HISTORY)
 	@test -n "$(CURDIR)/.test-work" && rm -rf "$(CURDIR)/.test-work"
 
-test: $(BIN)
+test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh all
 
-kosh_tests: $(BIN)
+verify_koshkit_diff: $(BIN)
+	@'$(BIN)' verify-koshkit-diff.sh
+
+kosh_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh kosh
 
-cli_%: expected/%.out
+cli_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh '$(SHELL)' cli/$*.sh
 
-cli_tests: $(BIN)
+cli_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh cli
 
-build_%: expected/%.out
+build_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-build-test.sh '$(SHELL)' build/$*.sh
 
-build_tests: $(BIN)
+build_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh build
 
-completion_%: expected/%.out
+completion_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-completion-test.sh '$(SHELL)' completion/$*.sh
 
 ifeq ($(TARGET), Windows_NT)
@@ -172,15 +182,15 @@ $(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES):
 		"$(patsubst completion_%,completion/%,$@).sh"
 endif
 
-completion_tests: $(BIN)
+completion_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh completion
 
 
-highlight_%: expected/%.out
+highlight_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-highlight-test.sh '$(SHELL)' highlight/$*.sh
 
-highlight_tests: $(BIN)
+highlight_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh highlight
 
 SKIPPED_TEST_NAMES := $(WINDOWS_SKIPPED_TEST_NAMES)
@@ -198,7 +208,7 @@ export SKIPPED_TEST_NAMES SKIPPED_CLI_INPUT SKIPPED_BUILD_INPUT
 export SKIPPED_COMPLETION_INPUT UNREPRESENTABLE_COMPLETION_INPUT
 export SKIP_CLI_ASSIMILATE
 
-diagnostic_tty_test: $(BIN)
+diagnostic_tty_test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh interactive
 
 
@@ -217,7 +227,7 @@ DASH ?= /bin/dash
 
 export BASHP DASH
 
-compatdiff: $(BIN)
+compatdiff: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh compat
 
 dashdiff bashdiff mimicrydiff: compatdiff
@@ -235,7 +245,7 @@ BENCH_SAMPLE_COUNT ?= 1
 DASH_SPEEDUP_REQUIRED ?= 1
 BASH_SPEEDUP_REQUIRED ?= 3
 
-bench: $(BIN)
+bench: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@SCALE='$(SCALE)' BIN='$(BIN)' DASH='$(DASH)' BASHP='$(BASHP)' ZSH='$(ZSH)' \
 		ASH='$(ASH)' YASH='$(YASH)' BENCH='$(BENCH)' \
 		BENCH_BASH='$(BENCH_BASH)' BENCH_KOSH='$(BENCH_KOSH)' PRIMES='$(PRIMES)' \
@@ -246,5 +256,6 @@ bench: $(BIN)
 		BASH_SPEEDUP_REQUIRED='$(BASH_SPEEDUP_REQUIRED)' \
 		$(SHELL) run-bench-test.sh
 
-.PHONY: test clean kosh_tests refill compatdiff dashdiff bashdiff mimicrydiff bench \
-		build_tests completion_tests completion_refill cli_tests highlight_tests
+.PHONY: test clean verify_koshkit_diff kosh_tests refill compatdiff dashdiff \
+		bashdiff mimicrydiff bench build_tests completion_tests completion_refill \
+		cli_tests highlight_tests

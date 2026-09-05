@@ -1,0 +1,964 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\ntwo\nthree\nfour\nfive\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\nTWO\nthree\nfour\nfive\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "left" "left"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "equal=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "--label" "left" "--label" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "unified=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "normal=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a  b\r\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a b\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-w" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "whitespace=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "left"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "left" "-L" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "missing-newline=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "added\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "left" "-L" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "insertion=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "right" "-L" "left" "right" "left"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "deletion=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\0b\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\0c\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "binary=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "koshkit" "diff" "-a" "-u" "-L" "left" "-L" "right" "left" "right"]
+      [SimpleCommand "koshkit" "wc" "-c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "text=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "same\n"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "same\n"]
+      [SimpleCommand "koshkit" "diff" "-" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "stdin=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "pipefail"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "same\n"]
+      [SimpleCommand "koshkit" "diff" "-" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "double-stdin=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "pipefail"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\na\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "b\na\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "left" "-L" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "repeated=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\nthree\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\ntwo\nthree\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "left" "-L" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "middle-insertion=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "right" "-L" "left" "right" "left"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "middle-deletion=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "old-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nold-2\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "new-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nnew-2\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "left" "-L" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "merged-hunks=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "old-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nkeep-7\nold-2\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "new-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nkeep-7\nnew-2\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "-u" "-L" "left" "-L" "right" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "separate-hunks=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "same"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "same"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "left" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "equal-no-newline=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "diff" "absent" "right"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "missing=$?"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\ntwo\nthree\nfour\nfive\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\nTWO\nthree\nfour\nfive\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "equal="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "--label"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "--label"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "unified="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "normal="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a  b\r\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a b\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-w"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "whitespace="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "left"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "right"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "missing-newline="
+  Variable "?"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "added\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "insertion="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "deletion="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\0b\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\0c\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "binary="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "text="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "same\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "same\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "stdin="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "pipefail"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "same\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "double-stdin="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "pipefail"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\na\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "b\na\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "repeated="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\nthree\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\ntwo\nthree\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "middle-insertion="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "middle-deletion="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "old-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nold-2\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "new-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nnew-2\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "merged-hunks="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "old-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nkeep-7\nold-2\n"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "new-1\nkeep-1\nkeep-2\nkeep-3\nkeep-4\nkeep-5\nkeep-6\nkeep-7\nnew-2\n"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "separate-hunks="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "same"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "same"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "left"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "equal-no-newline="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "diff"
+]
+[Word
+  Unquoted "absent"
+]
+[Word
+  Unquoted "right"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "missing="
+  Variable "?"
+]
+equal=0
+--- left
++++ right
+@@ -1,5 +1,5 @@
+ one
+-two
++TWO
+ three
+ four
+ five
+unified=1
+2c2
+< two
+---
+> TWO
+normal=1
+whitespace=0
+--- left
++++ right
+@@ -1 +1 @@
+-left
+\ No newline at end of file
++right
+\ No newline at end of file
+missing-newline=1
+--- left
++++ right
+@@ -0,0 +1 @@
++added
+insertion=1
+--- right
++++ left
+@@ -1 +0,0 @@
+-added
+deletion=1
+Binary files left and right differ
+binary=1
+41
+text=1
+stdin=0
+double-stdin=0
+--- left
++++ right
+@@ -1,2 +1,2 @@
++b
+ a
+-a
+repeated=1
+--- left
++++ right
+@@ -1,2 +1,3 @@
+ one
++two
+ three
+middle-insertion=1
+--- right
++++ left
+@@ -1,3 +1,2 @@
+ one
+-two
+ three
+middle-deletion=1
+--- left
++++ right
+@@ -1,8 +1,8 @@
+-old-1
++new-1
+ keep-1
+ keep-2
+ keep-3
+ keep-4
+ keep-5
+ keep-6
+-old-2
++new-2
+merged-hunks=1
+--- left
++++ right
+@@ -1,4 +1,4 @@
+-old-1
++new-1
+ keep-1
+ keep-2
+ keep-3
+@@ -6,4 +6,4 @@
+ keep-5
+ keep-6
+ keep-7
+-old-2
++new-2
+separate-hunks=1
+equal-no-newline=0
+missing=2
