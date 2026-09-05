@@ -23,8 +23,9 @@ namespace {
 
 constexpr const char *RESTRICTED_READONLY_NAMES[] = {
     "SHELL", "PATH", "HISTFILE", "ENV", "BASH_ENV"};
+constexpr StringView BASH_IMPLICIT_READONLY_NAMES[] = {"BASHOPTS", "SHELLOPTS"};
 
-}
+} /* namespace */
 
 fn EvalContext::register_function(StringView name,
                                   const FunctionBodyHandle &body_storage,
@@ -321,6 +322,9 @@ fn EvalContext::unmark_readonly(StringView name) throws -> void
 
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
+  if (bash_dynamic_variables_enabled())
+    for (let const readonly_name : BASH_IMPLICIT_READONLY_NAMES)
+      if (name == readonly_name) return true;
   if (restricted_enforcement_active())
     for (let const restricted_name : RESTRICTED_READONLY_NAMES)
       if (name == restricted_name) return true;
@@ -332,11 +336,17 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
   out.reserve(m_variable_attributes.count() +
-              countof(RESTRICTED_READONLY_NAMES));
+              countof(RESTRICTED_READONLY_NAMES) +
+              countof(BASH_IMPLICIT_READONLY_NAMES));
   m_variable_attributes.for_each([&](StringView name, u8 attributes) {
     if ((attributes & static_cast<u8>(variable_attribute::Readonly)) != 0)
       out.push_managed(name);
   });
+  if (bash_dynamic_variables_enabled())
+    for (let const readonly_name : BASH_IMPLICIT_READONLY_NAMES)
+      if ((variable_attributes(readonly_name) &
+           static_cast<u8>(variable_attribute::Readonly)) == 0)
+        out.push_managed(readonly_name);
   if (restricted_enforcement_active())
     for (let const restricted_name : RESTRICTED_READONLY_NAMES)
       if ((variable_attributes(restricted_name) &

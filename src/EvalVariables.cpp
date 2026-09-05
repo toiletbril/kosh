@@ -90,6 +90,7 @@ enum class dynamic_var : u8
 
   RANDOM,
   SECONDS,
+  BASHOPTS,
   SHELLOPTS,
   SRANDOM,
   EPOCHSECONDS,
@@ -146,6 +147,7 @@ constexpr static_string_entry<dynamic_variable_info> BASH_DYNAMIC_ENTRIES[] = {
     DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false),
     DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false),
     DYNAMIC_VARIABLE("BASH_MONOSECONDS", BASH_MONOSECONDS, false),
+    DYNAMIC_VARIABLE("BASHOPTS", BASHOPTS, false),
     DYNAMIC_VARIABLE("BASH_SOURCE", BASH_SOURCE, false),
     DYNAMIC_VARIABLE("BASH_SUBSHELL", BASH_SUBSHELL, false),
     DYNAMIC_VARIABLE("BASH_ARGV0", BASH_ARGV0, false),
@@ -371,6 +373,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(static_cast<i64>(std::time(nullptr)) -
                                   m_shell_start_time,
                               heap_allocator());
+        case dynamic_var::BASHOPTS: return enabled_shopt_option_names(*this);
         case dynamic_var::SHELLOPTS: {
           return enabled_shell_option_names(*this);
         }

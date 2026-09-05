@@ -363,7 +363,8 @@ inline constexpr static_string_entry<shell_variable_description>
           shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
         {SSK("SHELLOPTS"),
          {"The value is a colon-separated list of the set options that are on.",
-          shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
+          shell_variable_fact::Dynamic | shell_variable_fact::ReadOnly |
+              shell_variable_fact::BashOnly}                                  },
         {SSK("BASH_SUBSHELL"),
          {"The value is the current subshell nesting depth.",
           shell_variable_fact::Dynamic | shell_variable_fact::BashOnly}       },
@@ -430,7 +431,8 @@ inline constexpr static_string_entry<shell_variable_description>
         {SSK("BASHOPTS"),
          {"The value is a colon-separated list of the shopt options that are "
           "on in bash.",
-          shell_variable_fact::NotPosix | shell_variable_fact::Unmaintained}  },
+          shell_variable_fact::Dynamic | shell_variable_fact::ReadOnly |
+              shell_variable_fact::BashOnly}                                  },
         {SSK("BASH_ALIASES"),
          {"The name is an associative array of the defined aliases in bash.",
           shell_variable_fact::NotPosix | shell_variable_fact::Unmaintained}  },

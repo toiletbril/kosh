@@ -19,6 +19,24 @@ echo "after set: $?"
 shopt -u extglob
 shopt -q extglob
 echo "after unset: $?"
+shopt -u xpg_echo
+case :$BASHOPTS: in
+  *:xpg_echo:*) echo "bashopts-before=on" ;;
+  *) echo "bashopts-before=off" ;;
+esac
+shopt -s xpg_echo
+case :$BASHOPTS: in
+  *:xpg_echo:*) echo "bashopts-after=on" ;;
+  *) echo "bashopts-after=off" ;;
+esac
+(BASHOPTS=changed)
+echo "bashopts-assign=$?"
+unset BASHOPTS
+echo "bashopts-unset=$?"
+case :$BASHOPTS: in
+  *:xpg_echo:*) echo "bashopts-preserved=on" ;;
+  *) echo "bashopts-preserved=off" ;;
+esac
 shopt -s nocaseglob nocasematch
 shopt nocaseglob | tr -s ' \t' ' '
 shopt nocasematch | tr -s ' \t' ' '

@@ -1844,9 +1844,10 @@ id. These names are unavailable in the
 .B sh
 mood.
 .TP
-.BR SHELLOPTS ", " BASH_SUBSHELL ", " BASH_ARGV0 ", " BASH_EXECUTION_STRING ", " BASH_MONOSECONDS
-These values expose shell options, subshell depth, argument zero, the current
-command string, and a monotonic millisecond count. They are unavailable in the
+.BR SHELLOPTS ", " BASHOPTS ", " BASH_SUBSHELL ", " BASH_ARGV0 ", " BASH_EXECUTION_STRING ", " BASH_MONOSECONDS
+These values expose set options, shopt options, subshell depth, argument zero,
+the current command string, and a monotonic millisecond count. The two option
+lists are read-only. These names are unavailable in the
 .B sh
 mood.
 .TP

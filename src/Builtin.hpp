@@ -404,6 +404,7 @@ fn enabled_shell_option_names(const EvalContext &cxt) throws -> String;
 fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String;
 
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &;
+fn enabled_shopt_option_names(const EvalContext &cxt) throws -> String;
 
 fn kosh_binary_flag_list() wontthrow -> const FlagList &;
 

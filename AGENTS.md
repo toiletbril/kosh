@@ -196,6 +196,8 @@ changes update this file.
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
+- Do not use Python, here-documents, sed in-place rewrites, or awk rewrites.
+  Shell text tools remain read-only probes.
 - Keep Bash's `$(< file)` fast file read as the substitution's only command.
   Append a sentinel before the read when trailing newlines must be preserved.
 - Pass generated text through a literal `printf` format when the text contains
@@ -220,6 +222,8 @@ changes update this file.
   Do not combine a formatter or another editing command with the next probe,
   build, or test. Do not run another tool before the table is printed. After a
   resumed session, print any pending table before the first tool call.
+- Inspect the formatter diff before validation. Restore changes to unrelated
+  files that were clean before the formatter ran.
 
 ## Implementation
 
@@ -274,6 +278,8 @@ changes update this file.
 - Assert exact streams, statuses, punctuation, source, carets, and log arguments.
   Use distinct fixture names. CLI fixtures cover runtime output. Native fixtures
   also emit lexer and syntax tree output.
+- Update the matching golden in the same edit when a fixture result label
+  changes.
 - Run ordering assertions against clean state before unrelated entries can
   affect container iteration.
 - Disable unrelated analysis when a probe isolates runtime behavior.

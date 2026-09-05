@@ -231,6 +231,17 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
   return names;
 }
 
+fn enabled_shopt_option_names(const EvalContext &cxt) throws -> String
+{
+  let joined = String{heap_allocator()};
+  for (let const name : SHOPT_OPTION_NAMES) {
+    if (!cxt.is_shopt_enabled(name)) continue;
+    if (!joined.is_empty()) joined.push(':');
+    joined.append(name);
+  }
+  return joined;
+}
+
 Shopt::Shopt() = default;
 
 pure fn Shopt::kind() const wontthrow -> Builtin::Kind { return Kind::Shopt; }
