@@ -46,37 +46,23 @@ pure fn History::kind() const wontthrow -> Builtin::Kind
 static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
                              usize wanted_count) throws -> void
 {
-  let const path = toiletline::history_path();
-  if (!path.has_value()) return;
-
-  let const contents = path->read_entire_file();
-  if (!contents.has_value()) return;
-
-  let const text = contents->view();
-  let lines = ArrayList<StringView>{cxt.scratch_allocator()};
-  usize line_start = 0;
-  for (usize i = 0; i < text.length; i++)
-    if (text[i] == '\n') {
-      lines.push(text.substring_of_length(line_start, i - line_start));
-      line_start = i + 1;
-    }
-
-  if (line_start < text.length) lines.push(text.substring(line_start));
+  let events = toiletline::history_events(cxt.scratch_allocator());
 
   usize first_index = 0;
-  if (wanted_count != 0 && wanted_count < lines.count()) {
-    first_index = lines.count() - wanted_count;
+  if (wanted_count != 0 && wanted_count < events.count()) {
+    first_index = events.count() - wanted_count;
   }
 
   let out = String{cxt.scratch_allocator()};
-  for (usize i = first_index; i < lines.count(); i++) {
+  for (usize i = first_index; i < events.count(); i++) {
     char number_buffer[24];
     let const number = utils::int_to_text_into(
-        static_cast<i64>(i + 1), number_buffer, sizeof(number_buffer));
+        static_cast<i64>(events[i].number), number_buffer,
+        sizeof(number_buffer));
     out.append_repeated(' ', number.length < 5 ? 5 - number.length : 0);
     out.append(number);
     out += "  ";
-    out.append(lines[i]);
+    out.append(events[i].command.view());
     out += '\n';
   }
   ec.print_to_stdout(out);
@@ -191,6 +177,9 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  toiletline::set_history_limit(
+      cxt.get_history_limit("HISTSIZE", static_cast<usize>(-1)));
 
   let did_maintain_list = false;
 

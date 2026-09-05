@@ -559,7 +559,7 @@ public:
     let const *value = lookup_shell_variable(name);
     if (value == nullptr) return fallback;
     let const parsed = value->view().to<i64>();
-    if (parsed.is_error() || parsed.value() < 0) return 0;
+    if (parsed.is_error() || parsed.value() < 0) return fallback;
     return static_cast<usize>(parsed.value());
   }
 

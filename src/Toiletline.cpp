@@ -448,7 +448,8 @@ fn history_events(koshka::Allocator allocator)
     -> koshka::ArrayList<history_event>
 {
   let events = koshka::ArrayList<history_event>{allocator};
-  if (!history_read() || ::itl_g_history_count == 0) return events;
+  if (::itl_g_history_path == nullptr && !history_read()) return events;
+  if (::itl_g_history_count == 0) return events;
   if (!::itl_history_ensure_read_buffer()) return events;
 
   let const first_number =

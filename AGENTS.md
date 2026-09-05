@@ -202,6 +202,7 @@ changes update this file.
   separator, and paths. Put `--` before dash-leading patterns. Enable PCRE2
   only when required. Resolve wildcard paths before searching, and pass only
   existing matches. Run independent searches independently.
+- A command that runs ripgrep must not contain `&&` or `||`.
 - Run an expected no-match search as its own command, since its status must not
   stop later checks.
 - Quote shell source, use `-c` for source, put `--` before dash-leading operands,
