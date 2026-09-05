@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements state evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file implements mutable evaluator state, including shell options,
+ * control flow, source frames, recursion limits, loop resources, status
+ * values, snapshots, and restoration. It also owns the framed bootstrap state
+ * used by fresh subshell evaluators.
  */
 
 #include "Arena.hpp"

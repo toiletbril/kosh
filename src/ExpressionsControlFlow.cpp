@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements control flow expression behavior. It connects
- * syntax-tree analysis and optimization with runtime evaluation and precise
- * source locations.
+ * This file implements asynchronous compound commands, if clauses, loops,
+ * case clauses, and brace groups. It applies break, continue, return,
+ * redirection, folding, and branch dataflow semantics across control-flow
+ * nodes.
  */
 
 #include "Arena.hpp"

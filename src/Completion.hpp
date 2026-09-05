@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements coordination for command completion. It scans
- * tolerant shell input and produces semantic candidates, highlighting,
- * syntax, paths, or command metadata.
+ * This file declares completion results, matching modes, lexical construct
+ * state, highlight spans, and the incremental highlight cache. The editor and
+ * language server share this interface. Individual providers remain private.
  */
 
 #pragma once

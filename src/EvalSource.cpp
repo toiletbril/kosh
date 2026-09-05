@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements source evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file parses and evaluates source text, sourced files, heredoc bodies,
+ * and scripts delegated to compatibility shells. It owns source isolation,
+ * mood initialization, retained syntax trees, path resolution, and fallback
+ * execution.
  */
 
 #include "Arena.hpp"

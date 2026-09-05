@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements analysis simple expression behavior. It connects
- * syntax-tree analysis and optimization with runtime evaluation and precise
- * source locations.
+ * This file performs command-specific static analysis for simple commands. It
+ * classifies operands, tracks assignments and generated paths, applies
+ * builtin argument rules, checks quoting and portability, and records command
+ * presence tests.
  */
 
 #include "Arena.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the text processing utility in
- * koshkit. It owns the utility command semantics and status behavior.
+ * This file implements position lists and tab stops shared by cut, expand,
+ * and unexpand. It parses and merges one-based ranges, tests selected
+ * positions, validates ordered stops, and computes the next tab column.
  */
 
 #include "TextProcessing.hpp"

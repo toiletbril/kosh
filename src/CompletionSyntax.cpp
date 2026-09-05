@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements syntax for command completion. It scans tolerant
- * shell input and produces semantic candidates, highlighting, syntax, paths,
- * or command metadata.
+ * This file interprets command and argument structure around the completion
+ * cursor. It unwraps transparent commands and options, resolves aliases and
+ * command names, and builds words for programmable completion.
  */
 
 #include "Arena.hpp"

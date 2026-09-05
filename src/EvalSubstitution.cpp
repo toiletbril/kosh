@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements substitution evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file implements command, process, redirect, and function substitution.
+ * It captures output, manages pipes and children, preserves nested source
+ * frames, isolates evaluator state when required, and cleans up outstanding
+ * substitutions.
  */
 
 #include "Arena.hpp"

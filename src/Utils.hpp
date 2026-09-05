@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core execution helpers. It provides shared low-level
- * operations for commands, streams, numbers, globbing, and resolution
- * without duplicating policy owners.
+ * This file declares the helper interface implemented across the Utils
+ * sources. It covers word decoding, command execution, stream input, glob
+ * matching, numeric conversion, source positions, directory caches, and
+ * command resolution.
  */
 
 #pragma once

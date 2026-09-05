@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core expression behavior. It connects syntax-tree
- * analysis and optimization with runtime evaluation and precise source
- * locations.
+ * This file declares the shell syntax tree, analysis context, symbol records,
+ * variable dataflow, and every expression and command node. Parser,
+ * optimizer, diagnostics, language server, and evaluator code share this
+ * interface.
  */
 
 #pragma once

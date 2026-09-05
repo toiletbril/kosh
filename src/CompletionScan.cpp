@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements scan for command completion. It scans tolerant shell
- * input and produces semantic candidates, highlighting, syntax, paths, or
- * command metadata.
+ * This file implements contextual completion for process arguments, tool
+ * targets, builtin flags, and programmable specifications. Its tolerant scan
+ * locates active substitutions and maintains construct state without invoking
+ * the full parser.
  */
 
 #include "Arena.hpp"

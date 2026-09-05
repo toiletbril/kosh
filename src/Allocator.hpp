@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements the tagged project allocator. It selects heap,
- * bump-arena, or fake storage while keeping allocation and ownership checks
- * behind one word-sized value.
+ * This file implements the one-word project allocator and process heap pool.
+ * It routes storage through pooled heap, uncached heap, bump-arena, or fake
+ * allocation while preserving alignment and ownership checks.
  */
 
 #pragma once

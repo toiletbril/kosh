@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements simple command eval expression behavior. It connects
- * syntax-tree analysis and optimization with runtime evaluation and precise
- * source locations.
+ * This file implements the hot simple-command execution path. It expands
+ * aliases, prefix assignments, command words, arguments, and arrays, resolves
+ * the command, applies redirections, dispatches builtins or programs, and
+ * reports the resulting status.
  */
 
 #include "Arena.hpp"

@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements path for command completion. It scans tolerant shell
- * input and produces semantic candidates, highlighting, syntax, paths, or
- * command metadata.
+ * This file decodes partial shell paths, expands leading tilde and variable
+ * prefixes, resolves listing directories, and reconstructs quoted candidates.
+ * Filesystem completion and highlighting share these transformation rules.
  */
 
 #include "Arena.hpp"

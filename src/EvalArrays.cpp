@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements arrays evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file implements indexed, sparse, and associative shell arrays. It owns
+ * assignment, lookup, removal, subscripting, key collection, local bindings,
+ * and scalar or array expansion through the common variable interface.
  */
 
 #include "Arena.hpp"

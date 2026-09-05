@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core lexing. It scans shell source into tokens and
- * word segments while preserving byte spans and tolerant recovery.
+ * This file declares the stateful shell lexer, heredoc storage, and shared
+ * lexical predicates. Parsing, formatting, completion, and diagnostics share
+ * the interface. Token construction remains in the lexer sources.
  */
 
 #pragma once

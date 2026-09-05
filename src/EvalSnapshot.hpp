@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements snapshot evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file defines the owned evaluator snapshot used to restore shell state
+ * after isolated execution. It also defines completion specifications and the
+ * move-only regular expression wrapper stored by EvalContext and snapshots.
  */
 
 #pragma once

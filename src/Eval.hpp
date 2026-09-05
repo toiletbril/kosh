@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file declares the evaluator interface, compact runtime option state,
+ * resolved commands, command arguments, execution contexts, and EvalContext
+ * storage. Expressions, builtins, startup, completion, and subshell transport
+ * share these declarations.
  */
 
 #pragma once

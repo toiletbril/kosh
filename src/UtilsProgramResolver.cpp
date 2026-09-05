@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements program resolver execution helpers. It provides
- * shared low-level operations for commands, streams, numbers, globbing, and
- * resolution without duplicating policy owners.
+ * This file implements the shared PATH resolver and directory indexes. It
+ * owns cached listings, directory identity aliases, remembered command paths,
+ * completion indexes, PATH invalidation, and executable search.
  */
 
 #include "Builtin.hpp"

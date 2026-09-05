@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements arithmetic evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file tokenizes and evaluates shell arithmetic expressions, variable
+ * operands, assignments, calculator expressions, and bc expressions. It also
+ * owns cached runtime arithmetic and constant arithmetic evaluation.
  */
 
 #include "Common.hpp"

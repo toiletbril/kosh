@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements execution execution helpers. It provides shared
- * low-level operations for commands, streams, numbers, globbing, and
- * resolution without duplicating policy owners.
+ * This file implements shared command execution and process lifecycle
+ * helpers. It dispatches builtins and programs, constructs pipelines and
+ * jobs, records PIPESTATUS, updates foreground titles, and handles shutdown
+ * and memory reports.
  */
 
 #include "Builtin.hpp"

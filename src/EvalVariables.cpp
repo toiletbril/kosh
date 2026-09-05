@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements variables evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file resolves dynamic shell variables and publishes their metadata to
+ * completion and hover consumers. It computes process, status, call-stack,
+ * random, timing, option, and terminal color values without storing ordinary
+ * variables.
  */
 
 #include "Arena.hpp"

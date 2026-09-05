@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements catalog for shell diagnostics. It detects command and
- * syntax problems and emits stable messages with precise source locations.
+ * This file defines the immutable catalog that maps diagnostic identifiers to
+ * slugs, messages, suggestions, severity tiers, delivery modes, and optional
+ * ShellCheck codes. The static catalog remains outside traversal sources and
+ * the public header.
  */
 
 #include "Diagnostics.hpp"

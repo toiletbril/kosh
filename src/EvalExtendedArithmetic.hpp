@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements extended arithmetic evaluation. It applies the
- * corresponding shell semantics through EvalContext while preserving state,
- * source locations, and allocation ownership.
+ * This file declares the compact ArithmeticValue and radix helpers used by
+ * extended arithmetic. Small values remain inline, while promoted integers
+ * and fixed-scale decimals use arena-owned limb storage.
  */
 
 #pragma once

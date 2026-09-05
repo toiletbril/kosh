@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the ownership utility in
- * koshkit. It owns the utility command semantics and status behavior.
+ * This file implements ownership helpers shared by chown, chgrp, and id. It
+ * resolves numeric and named user and group identifiers, changes ownership
+ * recursively, follows requested symbolic links, and detects directory
+ * cycles.
  */
 
 #include "Ownership.hpp"

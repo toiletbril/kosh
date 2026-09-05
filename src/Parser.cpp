@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core parsing. It consumes lexer tokens and builds
- * syntax-tree nodes while preserving source spans, heredocs, and recovery
- * state.
+ * This file parses simple commands, functions, pipelines, command lists,
+ * redirections, and heredocs into syntax-tree nodes. It also collects parser
+ * diagnostics and analysis scopes. ParserCompound.cpp owns larger recursive
+ * grammar productions.
  */
 
 #include "Parser.hpp"

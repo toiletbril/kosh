@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements source for shell diagnostics. It detects command and
- * syntax problems and emits stable messages with precise source locations.
+ * This file implements source-wide diagnostics outside individual command
+ * nodes. It validates bytes, shebangs, directives, heredoc terminators,
+ * unresolved variable reads, and function definition and argument dataflow.
  */
 
 #include "Builtin.hpp"

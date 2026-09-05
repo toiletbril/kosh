@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements words for shell diagnostics. It detects command and
- * syntax problems and emits stable messages with precise source locations.
+ * This file analyzes command words and operands after token collection. It
+ * checks arithmetic, expansion portability, quoting, globbing, command-word
+ * shapes, and command-specific operand patterns while recording assignment
+ * targets.
  */
 
 #include "DiagnosticsChecksInternal.hpp"

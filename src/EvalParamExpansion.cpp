@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements param expansion evaluation. It applies the
- * corresponding shell semantics through EvalContext while preserving state,
- * source locations, and allocation ownership.
+ * This file implements parameter expansion operators for default values,
+ * assignments, errors, lengths, substrings, trimming, replacement, quoting,
+ * and case changes. The same operators apply to scalar and array values.
  */
 
 #include "Arena.hpp"

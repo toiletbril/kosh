@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements manpage for command completion. It scans tolerant
- * shell input and produces semantic candidates, highlighting, syntax, paths,
- * or command metadata.
+ * This file discovers command options and subcommands from trusted help
+ * output and section one manpages. It owns bounded execution, manpath lookup,
+ * documentation parsing, descriptions, and lazy caches used by this optional
+ * completion path.
  */
 
 #include "Arena.hpp"

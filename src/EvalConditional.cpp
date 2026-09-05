@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements conditional evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file evaluates conditional command operands and operators, including
+ * file tests, string tests, numeric comparisons, glob matching, and regular
+ * expressions. EvalContext caches compiled regular expressions used here.
  */
 
 #include "Builtin.hpp"

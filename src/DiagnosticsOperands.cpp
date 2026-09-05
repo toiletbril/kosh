@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements operands for shell diagnostics. It detects command
- * and syntax problems and emits stable messages with precise source
- * locations.
+ * This file implements operand classifiers shared by test, printf,
+ * redirection, command-name, variable, and parameter-expansion checks. It
+ * centralizes operator and name tables without performing command traversal.
  */
 
 #include "DiagnosticsChecksInternal.hpp"

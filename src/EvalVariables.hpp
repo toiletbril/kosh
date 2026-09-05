@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements variables evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file defines the canonical shell variable catalog used by runtime
+ * lookup, completion, and language server documentation. Each entry records
+ * its description and compact dynamic, array, export, mood, and portability
+ * facts.
  */
 
 #pragma once

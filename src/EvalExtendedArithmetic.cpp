@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements extended arithmetic evaluation. It applies the
- * corresponding shell semantics through EvalContext while preserving state,
- * source locations, and allocation ownership.
+ * This file implements the promoted integer and fixed-scale decimal backend
+ * used by extended arithmetic. It provides limb arithmetic, parsing,
+ * formatting, division, powers, roots, shifts, bitwise operations, and scale
+ * conversion outside the arithmetic parser.
  */
 
 #include "EvalExtendedArithmetic.hpp"

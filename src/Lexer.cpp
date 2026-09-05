@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core lexing. It scans shell source into tokens and
- * word segments while preserving byte spans and tolerant recovery.
+ * This file tokenizes shell source, including quotes, expansions,
+ * assignments, redirections, process substitutions, and heredocs. It owns
+ * the lexer cursor, token lookahead, source locations, and analysis metadata
+ * collection.
  */
 
 #include "Lexer.hpp"

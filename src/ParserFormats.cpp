@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements formats parsing. It consumes lexer tokens and builds
- * syntax-tree nodes while preserving source spans, heredocs, and recovery
- * state.
+ * This file detects host document formats and extracts embedded shell
+ * fragments for analysis and formatting. It maps positions between host and
+ * shell source, handles indentation and JSON string codecs, and applies
+ * formatted replacements to the host document.
  */
 
 #include "ParserFormats.hpp"

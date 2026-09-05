@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the ownership utility in
- * koshkit. It owns the utility command semantics and status behavior.
+ * This file declares user and group resolution and recursive ownership
+ * changes shared by chown, chgrp, and id. The interface keeps identifier
+ * parsing and traversal behavior consistent across those utilities.
  */
 
 #pragma once

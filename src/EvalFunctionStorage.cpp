@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements function storage evaluation. It applies the
- * corresponding shell semantics through EvalContext while preserving state,
- * source locations, and allocation ownership.
+ * This file implements reference-counted storage for a parsed function body,
+ * its source text, definition metadata, and owning arena. The separate handle
+ * lets function tables and snapshots share immutable bodies without copying
+ * syntax trees.
  */
 
 #include "Allocator.hpp"

@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements selection platform behavior. It keeps
- * operating-system types, calls, and value differences behind the shared os
- * interface.
+ * This file declares the shared operating-system interface and selects the
+ * native types used by its POSIX and Win32 implementations. This boundary
+ * keeps platform headers and value conventions out of shell subsystems.
  */
 
 #pragma once

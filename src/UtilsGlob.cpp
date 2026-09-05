@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements glob execution helpers. It provides shared low-level
- * operations for commands, streams, numbers, globbing, and resolution
- * without duplicating policy owners.
+ * This file implements shell glob matching and completion prefix matching. It
+ * handles extended glob groups, repetition, bracket expressions, POSIX
+ * character classes, active-character masks, and smart-case prefixes.
  */
 
 #include "Builtin.hpp"

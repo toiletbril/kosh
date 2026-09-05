@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core parsing. It consumes lexer tokens and builds
- * syntax-tree nodes while preserving source spans, heredocs, and recovery
- * state.
+ * This file declares parser state, syntax-tree entry points, recovery
+ * metadata, and grammar methods shared by the parser sources. Core and
+ * compound parsing use one lexer and one syntax arena through this interface.
  */
 
 #pragma once

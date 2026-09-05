@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements jobs evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file owns the evaluator job table and implements background process
+ * registration, pipeline ownership, job lookup, waiting, status updates, and
+ * job notifications. It also stores monitor and notification option state.
  */
 
 #include "Common.hpp"

@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements highlight cache for command completion. It scans
- * tolerant shell input and produces semantic candidates, highlighting,
- * syntax, paths, or command metadata.
+ * This file converts semantic scans into highlight spans and maintains
+ * checkpoints for incremental multiline rescanning. It also renders ranges
+ * and validates cached diagnostics after source changes.
  */
 
 #include "Arena.hpp"

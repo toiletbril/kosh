@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements glob evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file implements pathname expansion, recursive globstar traversal,
+ * tolerant glob expansion, and tilde expansion. Segment masks distinguish
+ * active pattern bytes from quoted or literal text.
  */
 
 #include "Arena.hpp"

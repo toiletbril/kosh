@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements formats parsing. It consumes lexer tokens and builds
- * syntax-tree nodes while preserving source spans, heredocs, and recovery
- * state.
+ * This file declares host-format detection, embedded fragment storage, source
+ * mapping, codecs, and parser interfaces. The separate interface produces
+ * mapped shell fragments instead of shell syntax-tree nodes.
  */
 
 #pragma once

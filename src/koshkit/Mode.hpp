@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the mode utility in koshkit.
- * It owns the utility command semantics and status behavior.
+ * This file declares the file-mode parser shared by chmod and mkfifo. The
+ * separate interface keeps symbolic and octal semantics consistent between
+ * both utilities.
  */
 
 #pragma once

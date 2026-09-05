@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements assignments for shell diagnostics. It detects command
- * and syntax problems and emits stable messages with precise source
- * locations.
+ * This file implements diagnostics for redirections, test operands, prefix
+ * assignments, assignment values, and case patterns. These checks need parsed
+ * command or syntax-node context beyond an individual word segment.
  */
 
 #include "DiagnosticsChecksInternal.hpp"

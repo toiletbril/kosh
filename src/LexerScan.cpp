@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements scan lexing. It scans shell source into tokens and
- * word segments while preserving byte spans and tolerant recovery.
+ * This file scans balanced shell regions without producing tokens. Lexing,
+ * formatting, and highlighting use the separate scanner to skip nested
+ * substitutions and heredoc bodies without running the full parser.
  */
 
 #include "Arena.hpp"

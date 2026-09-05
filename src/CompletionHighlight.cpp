@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements highlight for command completion. It scans tolerant
- * shell input and produces semantic candidates, highlighting, syntax, paths,
- * or command metadata.
+ * This file performs tolerant semantic highlighting of commands, keywords,
+ * variables, expansions, redirections, heredocs, and path operands. It owns
+ * construct transitions and command resolution used to assign highlight
+ * roles.
  */
 
 #include "Arena.hpp"

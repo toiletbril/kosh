@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements numeric execution helpers. It provides shared
- * low-level operations for commands, streams, numbers, globbing, and
- * resolution without duplicating policy owners.
+ * This file implements numeric and textual conversion helpers. It parses and
+ * formats integers, floating-point values, durations, and time reports,
+ * caches source-line positions, expands leading tildes, and handles ANSI C
+ * quoting.
  */
 
 #include "Builtin.hpp"

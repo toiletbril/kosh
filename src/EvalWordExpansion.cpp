@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements word expansion evaluation. It applies the
- * corresponding shell semantics through EvalContext while preserving state,
- * source locations, and allocation ownership.
+ * This file expands parsed word segments into scalar values and command
+ * fields. It coordinates parameter, command, arithmetic, tilde, pathname,
+ * brace, quote, assignment, case-pattern, and word-list expansion while
+ * preserving segment masks and cache ownership.
  */
 
 #include "Arena.hpp"

@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements functions evaluation. It applies the corresponding
- * shell semantics through EvalContext while preserving state, source
- * locations, and allocation ownership.
+ * This file manages shell function registration and lookup, function source
+ * metadata, traps, and packed variable declaration attributes. It also
+ * exposes function and variable inventories to builtins, completion,
+ * snapshots, and diagnostics.
  */
 
 #include "Common.hpp"

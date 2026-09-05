@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements args evaluation. It applies the corresponding shell
- * semantics through EvalContext while preserving state, source locations,
- * and allocation ownership.
+ * This file implements brace expansion, word-to-argument processing,
+ * assignment argument handling, field generation, and xtrace rendering. It
+ * converts parsed words into the final argument vectors used by commands.
  */
 
 #include "Arena.hpp"

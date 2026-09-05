@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the text processing utility in
- * koshkit. It owns the utility command semantics and status behavior.
+ * This file declares position-range and tab-stop operations shared by cut,
+ * expand, and unexpand. The interface gives those utilities one definition of
+ * range selection and tab advancement.
  */
 
 #pragma once

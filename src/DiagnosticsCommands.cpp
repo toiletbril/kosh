@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements commands for shell diagnostics. It detects command
- * and syntax problems and emits stable messages with precise source
- * locations.
+ * This file implements diagnostics selected by a resolved command identifier
+ * and literal operands. It checks command-name misuse, command-specific
+ * arguments, traps, declaration spelling, and portability constraints.
  */
 
 #include "DiagnosticsChecksInternal.hpp"

@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements compound expression behavior. It connects syntax-tree
- * analysis and optimization with runtime evaluation and precise source
- * locations.
+ * This file evaluates compound lists, and-or conditions, and pipelines. It
+ * owns pipeline stage setup, compound-stage children, asynchronous job
+ * registration, pipe status collection, negation, errexit handling, and
+ * result propagation.
  */
 
 #include "Arena.hpp"

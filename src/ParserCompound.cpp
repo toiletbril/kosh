@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements compound parsing. It consumes lexer tokens and builds
- * syntax-tree nodes while preserving source spans, heredocs, and recovery
- * state.
+ * This file parses if clauses, loops, case statements, groups, subshells,
+ * arithmetic commands, and conditional commands. These recursive grammar
+ * productions are separate from simple-command and pipeline parsing.
  */
 
 #include "Arena.hpp"

@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements core execution helpers. It provides shared low-level
- * operations for commands, streams, numbers, globbing, and resolution
- * without duplicating policy owners.
+ * This file implements general shell helpers without a narrower subsystem
+ * owner. It decodes words, maps missing path components to source spans,
+ * identifies executables, handles signal names, converts UTF-8 text, splits
+ * lines, and formats timestamps.
  */
 
 #include "Utils.hpp"

@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements coordination for shell diagnostics. It detects
- * command and syntax problems and emits stable messages with precise source
- * locations.
+ * This file declares diagnostic identifiers, immutable definitions,
+ * suppressions, heredoc findings, command classifications, and formatting
+ * helpers. Parser, analyzer, command checks, and the catalog share this public
+ * contract.
  */
 
 #pragma once
