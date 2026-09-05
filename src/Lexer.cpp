@@ -213,9 +213,9 @@ Lexer::~Lexer() = default;
 
 fn Lexer::peek_shell_token() throws -> Token *
 {
-  skip_whitespace();
   if (peek_cache_is_live()) return m_peek_cache;
 
+  skip_whitespace();
   Token *const token = lex_shell_token();
   m_peek_cache = token;
 #if !defined NDEBUG
@@ -227,9 +227,10 @@ fn Lexer::peek_shell_token() throws -> Token *
 
 hot fn Lexer::next_shell_token() throws -> Token *
 {
-  skip_whitespace();
+  let const is_peek_cache_live = peek_cache_is_live();
+  if (!is_peek_cache_live) skip_whitespace();
 
-  Token *const token = peek_cache_is_live() ? m_peek_cache : lex_shell_token();
+  Token *const token = is_peek_cache_live ? m_peek_cache : lex_shell_token();
   ASSERT(token != nullptr);
 
   advance_past_last_peek();
