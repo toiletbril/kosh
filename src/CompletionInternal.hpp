@@ -14,7 +14,7 @@ namespace utils {
 struct decoded_shell_word;
 }
 
-namespace completion {
+namespace completion::internal {
 
 extern BumpArena COMPLETION_ARENA;
 extern BumpArena HIGHLIGHT_ARENA;
@@ -88,7 +88,7 @@ pure fn word_is_function_name(StringView word) wontthrow -> bool;
 pure fn word_defines_function(StringView line, usize word_end,
                               usize end) wontthrow -> bool;
 fn advance_shell_keyword_state(StringView word, usize frame_depth,
-                               shell_lexical_state &state) throws
+                               completion::shell_lexical_state &state) throws
     -> Maybe<bool>;
 fn scan_highlight_range(StringView line, usize begin, usize end,
                         EvalContext &context, ArrayList<highlight_span> &spans,
@@ -103,19 +103,21 @@ fn manpage_text_for(StringView page_name, EvalContext &context) throws
     -> StringView;
 fn help_text_of(StringView command, EvalContext &context) throws -> StringView;
 fn complete_from_man_subcommands(StringView line, StringView token,
-                                 usize token_start, completion_mode mode,
+                                 usize token_start,
+                                 completion::completion_mode mode,
                                  EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_manpage(StringView line, StringView token,
-                         completion_mode mode, EvalContext &context,
+                         completion::completion_mode mode, EvalContext &context,
                          StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_help(StringView line, StringView token, usize token_start,
-                      completion_mode mode, EvalContext &context,
+                      completion::completion_mode mode, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_help_subcommands(StringView line, StringView token,
-                                  usize token_start, completion_mode mode,
+                                  usize token_start,
+                                  completion::completion_mode mode,
                                   EvalContext &context,
                                   StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
@@ -123,17 +125,18 @@ fn complete_from_help_subcommands(StringView line, StringView token,
 /* Defined in CompletionScan.cpp. */
 fn complete_from_process_arguments(StringView line, StringView token,
                                    usize token_start,
-                                   completion_mode mode) throws
+                                   completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_tools_with_targets(StringView line, StringView token,
-                                    usize token_start, completion_mode mode,
+                                    usize token_start,
+                                    completion::completion_mode mode,
                                     EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_builtin_flags(StringView line, StringView token,
                                usize token_start, EvalContext &context) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_spec(StringView line, StringView token, usize cursor,
-                      completion_mode mode, EvalContext &context,
+                      completion::completion_mode mode, EvalContext &context,
                       StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>;
 struct completion_command_range
@@ -151,12 +154,12 @@ struct shell_lexical_scan_target
 };
 
 fn advance_shell_lexical_state(
-    StringView source, usize end, shell_lexical_state &state,
+    StringView source, usize end, completion::shell_lexical_state &state,
     shell_lexical_scan_target *target = nullptr) throws -> void;
 
 fn command_substitution_range(StringView line, usize cursor) throws
     -> completion_command_range;
 
-} /* namespace completion */
+} /* namespace completion::internal */
 
 } /* namespace koshka */

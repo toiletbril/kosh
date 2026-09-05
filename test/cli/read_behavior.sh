@@ -92,10 +92,6 @@ printf "continued=%s value=[%s]\n" "$?" "$value"
 : > "$READ_MARKER_DIRECTORY/continuation-release"
 ' 2>/dev/null
 
-if [ "${OS-}" = Windows_NT ]; then
-    echo "invalid=1"
-else
-    "$BIN" -c "read -r -t 0 -u 99 value </dev/null; printf 'invalid=%s\n' \"\$?\""
-fi
+"$BIN" -c "read -r -t 0 -u 99 value <\"$TEST_NULL_DEVICE\"; printf 'invalid=%s\n' \"\$?\""
 
 printf '' | "$BIN" -c "read -r -t 0.1 value; printf 'eof=%s value=[%s]\n' \"\$?\" \"\$value\""

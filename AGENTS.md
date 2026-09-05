@@ -42,6 +42,8 @@ changes update this file.
 - Evaluation is split across `src/Eval.cpp` and the `Eval` sources. Expression
   families live in the `Expressions` sources. Shared helpers are declared in
   `src/ExpressionsInternal.hpp`.
+- Declarations from an `Internal` source use `koshka::internal` or the owning
+  namespace followed by `internal`.
 - Owned source normalizes CRLF before lexing, analysis, evaluation, and
   diagnostics. A lone carriage return remains data.
 - Analysis streams one top-level and-or chain in two passes. The first gathers
@@ -58,12 +60,21 @@ changes update this file.
 - An asynchronous pipeline job owns and reaps every stage. POSIX stages share a
   process group. The last stage owns status and job output. Stream writes retry
   partial writes and reject zero-length writes while bytes remain.
+- A named-pipe server connects before its child evaluates source. Thread launch
+  order is not connection readiness.
+- A parent closes each unused pipe endpoint after CreateProcess so readers can
+  observe EOF when the child exits.
+- Process-substitution cleanup connects and closes an unused named-pipe path
+  before it reaps a child waiting for a client.
+- Windows named-pipe redirections use OPEN_EXISTING for every shell open mode.
 - Recheck mutable runtime state after any startup file that can change it.
 
 ## Platform
 
 - `src/Platform.cpp` selects POSIX or Windows code. Platform headers, calls,
   types, and macros stay behind `src/Platform.hpp` and `os` wrappers.
+- A platform-boundary move preserves each existing platform value unless the
+  value is part of the requested behavior change.
 - Descriptor-rebinding wrappers increment the descriptor epoch. Cached color
   decisions refresh against it. Forks, process groups, filesystems, and processor
   counts also use platform wrappers.
@@ -88,7 +99,7 @@ changes update this file.
   sigils and braces. Command edits require a local function or alias definition.
   Variable names use `word_is_plain_identifier`. Command names use
   `word_is_function_name`.
-- `src/ShellVariables.hpp` owns dynamic variables. Completion and hover respect
+- `src/EvalVariables.hpp` owns dynamic variables. Completion and hover respect
   the mood. Bare koshkit completion works in the default mood and with the
   koshkit option.
 
@@ -108,7 +119,9 @@ changes update this file.
   `ArrayList::find` returns `Maybe<usize>`. Membership uses
   `find().has_value()`.
 - `Allocator` is one tagged word for pooled heap, bump arena, or fake storage.
-  Only heap storage is freed. Ownership queries identify a specific arena.
+  Project code allocates through this API. Only heap storage is freed. Ownership
+  queries identify a specific arena. Raw storage is guarded until throwing
+  construction succeeds.
 - `ArrayList` allocates on first growth and stores 32-bit length and capacity.
   `String` has inline storage and an exact first heap allocation. Use
   `SparseList` for almost-empty member lists.
@@ -137,8 +150,10 @@ changes update this file.
 - Make discovers inputs and platform skips. Runners own setup, output,
   comparison, refill, and cleanup. Results are under `.test-work/results`.
   Auxiliary test shell scripts use two-space indentation.
-- Run bare `NAME` and `cli_NAME` targets through `make -C test`. The native
-  runner suppresses incidental diagnostics outside `shellcheck_static_*` tests.
+- Run bare `NAME`, `cli_NAME`, and completion targets through `make -C test`.
+  Resolve the input and runner first, then pass matching `MODE` and `BIN`
+  values. The native runner suppresses incidental diagnostics outside
+  `shellcheck_static_*` tests.
 - Koshkit rm tests use `--dry-run`. Cleanup uses the system rm after a nonempty
   path check. Bashdiff and mimicrydiff need Bash 5.3 or newer. Set `BASHP` to a
   modern Bash on macOS.
@@ -148,17 +163,22 @@ changes update this file.
 - Read and state the matching guidance before planning, editing, review, prose,
   and commits. Resolve guides separately. Review matching entries in
   [MISTAKES.md](MISTAKES.md) before repeating an action.
+- Resolve the configuration directory before expanding an at-sign guidance
+  path. Do not assume that guidance is stored below the repository.
 - Use parallel read-only research for broad work. Keep scopes disjoint. Validate
   task names and arguments. Wait at least ten seconds.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
+- Run compound host probes through an explicitly verified interpreter. Inspect
+  an unfamiliar make target recipe before invoking it.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
   Use literal ripgrep patterns. Put `--` before dash-leading patterns. Enable
-  PCRE2 only when required.
+  PCRE2 only when required. Run independent searches independently.
 - Quote shell source, use `-c` for source, put `--` before dash-leading operands,
   order redirections from creation to use, and capture status or PIPESTATUS
-  before another command changes it.
+  before another command changes it. Single-quote literal shell arguments that
+  contain backticks.
 - Pass generated text through a literal `printf` format when the text contains
   percent conversions.
 - Edit with apply_patch. Use one file and concern per patch. Copy current anchors
@@ -173,7 +193,10 @@ changes update this file.
   the same type.
 - Complete interface, type, field, and container migrations across all uses and
   aggregate initializers before compiling. Check overloads, result types,
-  parameter use, widths, local scope, and switch case scopes.
+  explicit template instantiations, parameter use, widths, local scope, switch
+  case scopes, and standard helper declarations.
+- Parse internal control markers by their complete validated value. Do not infer
+  different values from a shared prefix.
 - Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
   lengths, optionals, and static evidence. Install restoration guards before
   mutation.
@@ -207,7 +230,14 @@ changes update this file.
 - Run owners sharing result paths sequentially. Use finite workloads,
   event-based synchronization, bounded polling, and preserved session ids.
 - Assert exact streams, statuses, punctuation, source, carets, and log arguments.
-  Use distinct fixture names.
+  Use distinct fixture names. CLI fixtures cover runtime output. Native fixtures
+  also emit lexer and syntax tree output.
+- Disable unrelated analysis when a probe isolates runtime behavior.
+- Trace native creation and open requests before changing platform access,
+  sharing, or security. Verify both payload and status in every direction.
+- Normalize platform branches to the same output before changing a shared
+  golden.
+- Trace each platform child transition before asserting shared subshell state.
 - Use explicit koshkit dispatch unless bare lookup is under test. Koshkit rm
   uses `--dry-run`.
 - Language server probes initialize first, redirect the emitter, drain output,

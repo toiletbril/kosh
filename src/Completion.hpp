@@ -96,15 +96,17 @@ struct shell_lexical_frame
 {
   usize body_start;
   usize group_depth;
-  shell_lexical_frame_kind kind;
-  char parent_quote;
   usize case_depth{0};
   usize array_value_group_depth{0};
+  shell_lexical_frame_kind kind;
+  char parent_quote;
   bool has_seen_case_keyword{false};
   bool is_case_pattern_expected{false};
   bool is_command_position{true};
   bool is_in_array_value{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(shell_lexical_frame) == 40);
 
 struct shell_pending_heredoc
 {
@@ -123,7 +125,8 @@ struct shell_lexical_state
   ArrayList<shell_pending_heredoc> pending_heredocs;
   ArrayList<shell_lexical_construct> constructs;
   HashSet known_function_names;
-  shell_lexical_frame root_frame{0, 0, shell_lexical_frame_kind::command, 0};
+  shell_lexical_frame root_frame{0, 0, 0, 0, shell_lexical_frame_kind::command,
+                                 0};
   usize source_position{0};
   usize active_heredoc_index{0};
   char quote{0};

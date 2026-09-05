@@ -53,8 +53,16 @@ fn EvalContext::get_or_create_diagnostic_highlight_cache() throws
     return m_diagnostic_highlight_cache;
 
   if (m_runtime_diagnostic_highlight_cache == nullptr) {
-    m_runtime_diagnostic_highlight_cache =
-        new completion::shell_highlight_cache{};
+    let const cache =
+        heap_allocator().alloc_array<completion::shell_highlight_cache>(1);
+    if (cache == nullptr) throw std::bad_alloc{};
+    try {
+      m_runtime_diagnostic_highlight_cache =
+          new (cache) completion::shell_highlight_cache{};
+    } catch (...) {
+      heap_allocator().free_array(cache, 1);
+      throw;
+    }
   }
 
   return m_runtime_diagnostic_highlight_cache;
@@ -62,7 +70,9 @@ fn EvalContext::get_or_create_diagnostic_highlight_cache() throws
 
 fn EvalContext::reset_runtime_diagnostic_highlight_cache() wontthrow -> void
 {
-  delete m_runtime_diagnostic_highlight_cache;
+  if (m_runtime_diagnostic_highlight_cache == nullptr) return;
+  m_runtime_diagnostic_highlight_cache->~shell_highlight_cache();
+  heap_allocator().free_array(m_runtime_diagnostic_highlight_cache, 1);
   m_runtime_diagnostic_highlight_cache = nullptr;
 }
 
@@ -955,9 +965,8 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
   let out = ArrayList<String>{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
     let definition = String{heap_allocator(), key};
-    definition.append(StringView{"='", 2});
-    definition.append(value);
-    definition.push('\'');
+    definition.push('=');
+    append_shell_quoted_arg(definition, value.view());
     out.push(steal(definition));
   });
   out.sort();

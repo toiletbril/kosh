@@ -7,7 +7,7 @@
 
 namespace koshka {
 
-namespace expressions {
+namespace expressions::internal {
 
 namespace {
 
@@ -1158,6 +1158,6 @@ fn check_case_option_coverage(AnalysisContext &actx,
   }
 }
 
-} /* namespace expressions */
+} /* namespace expressions::internal */
 
 } /* namespace koshka */

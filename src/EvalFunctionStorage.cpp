@@ -4,15 +4,15 @@
 
 namespace koshka {
 
-static function_body_storage *LIVE_FUNCTION_STORAGES = nullptr;
+static function_body_storage *LIVE_EVAL_FUNCTION_STORAGES = nullptr;
 static constexpr usize INITIAL_FUNCTION_ARENA_SIZE = 16 * 1024;
 
 function_body_storage::function_body_storage(BumpArena *owned_arena)
     : arena(owned_arena)
 {
-  next_live = LIVE_FUNCTION_STORAGES;
+  next_live = LIVE_EVAL_FUNCTION_STORAGES;
   if (next_live != nullptr) next_live->previous_live = this;
-  LIVE_FUNCTION_STORAGES = this;
+  LIVE_EVAL_FUNCTION_STORAGES = this;
 }
 
 function_body_storage::~function_body_storage()
@@ -21,7 +21,7 @@ function_body_storage::~function_body_storage()
   if (previous_live != nullptr)
     previous_live->next_live = next_live;
   else
-    LIVE_FUNCTION_STORAGES = next_live;
+    LIVE_EVAL_FUNCTION_STORAGES = next_live;
   if (next_live != nullptr) next_live->previous_live = previous_live;
 
   let const previous_function_arena = FUNCTION_ARENA;
@@ -141,7 +141,7 @@ pure fn live_function_storage_stats() wontthrow -> function_arena_stats
 {
   function_arena_stats total{};
 
-  for (let const *storage = LIVE_FUNCTION_STORAGES; storage != nullptr;
+  for (let const *storage = LIVE_EVAL_FUNCTION_STORAGES; storage != nullptr;
        storage = storage->next_live)
   {
     let const &arena = *storage->arena;

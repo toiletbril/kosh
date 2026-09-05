@@ -1,0 +1,11 @@
+process=a'b:one:nine:map value:function:first second:child-name:on:dirsalias
+compound=a'b:one:nine:map value:function:first second:child-name:on:dirs
+status-process=1
+status-compound=1
+mood=sh
+restricted-process=yes
+restricted-compound=yes
+identity-process=pid:level:depth:bashpid
+identity-compound=pid:level:depth:bashpid
+external-state=pid:status:depth
+internal-startup=skipped

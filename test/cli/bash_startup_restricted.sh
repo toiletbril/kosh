@@ -174,7 +174,10 @@ output=$(HOME="$directory" BASH_ENV="$directory/env" \
 printf 'bash-env-runtime-privileged=%s\n' "$output"
 output=$(BASH_ENV="$directory" "$BIN" --mood bash -c 'printf body' 2>&1)
 if [ "${OS-}" = Windows_NT ]; then
-  output=ok
+  case "$output" in
+    *"Unable to read startup file"*"body"*) output=ok ;;
+    *) output=broken ;;
+  esac
 else
   case "$output" in
     *"Unable to read startup file"*"Is a directory"*"body"*) output=ok ;;
@@ -186,7 +189,10 @@ printf x > "$directory/not-directory"
 output=$(BASH_ENV="$directory/not-directory/child" \
   "$BIN" --mood bash -c 'printf body' 2>&1)
 if [ "${OS-}" = Windows_NT ]; then
-  output=ok
+  case "$output" in
+    *"Unable to read startup file"*"body"*) output=ok ;;
+    *) output=broken ;;
+  esac
 else
   case "$output" in
     *"Not a directory"*"body"*) output=ok ;;

@@ -178,6 +178,12 @@ fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
          first_info.st_ino == second_info.st_ino;
 }
 
+fn paths_match_for_history(StringView first, StringView second) wontthrow
+    -> bool
+{
+  return first == second;
+}
+
 fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
 {
   const String first_string{first};
@@ -223,11 +229,15 @@ fn path_is_executable(StringView path) wontthrow -> bool
 
 cold fn read_current_directory() throws -> Path
 {
-  /* ERANGE means the buffer is too small, so it doubles. Any other errno ends
-     the loop with an empty path. */
   LOG(Debug, "reading the current working directory");
+  char local_buffer[PATH_MAX];
+  errno = 0;
+  if (::getcwd(local_buffer, sizeof(local_buffer)) != nullptr)
+    return Path{StringView{local_buffer}};
+  if (errno != ERANGE) return Path{};
+
   let buffer = ArrayList<char>{heap_allocator()};
-  usize buffer_size = 4096;
+  usize buffer_size = sizeof(local_buffer) * 2;
   loop
   {
     buffer.reserve(buffer_size);
@@ -316,11 +326,13 @@ cold fn list_directory_typed(StringView dir) throws
 
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
-  char *resolved_path = realpath(path.c_str(), nullptr);
+  let const allocator = uncached_heap_allocator();
+  let resolved_path = allocator.alloc_array<char>(PATH_MAX);
   if (resolved_path == nullptr) return None;
-  Path result{StringView{resolved_path}};
-  free(resolved_path);
-  return result;
+  defer { allocator.free_array(resolved_path, PATH_MAX); };
+  if (realpath(path.c_str(), resolved_path) == nullptr) return None;
+
+  return Path{StringView{resolved_path}};
 }
 
 fn glob_matches(StringView pattern, Allocator allocator) throws

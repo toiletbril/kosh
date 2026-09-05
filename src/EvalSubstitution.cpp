@@ -37,10 +37,6 @@ fn EvalContext::render_contained_substitution_error(
 
 static constexpr usize DRAIN_CHUNK_LENGTH = 4096;
 
-/* The drain thread reads the pipe into its own libc buffer while the inner
-   command writes the other end, so output larger than the pipe buffer cannot
-   deadlock. The buffer is grown with libc realloc because the shared heap
-   pool's free list is single threaded. */
 struct command_substitution_drain_context
 {
   char *data;
@@ -60,11 +56,13 @@ static fn drain_command_substitution_pipe(opaque *raw_context) wontthrow -> void
       while (grown_capacity < drain->length + DRAIN_CHUNK_LENGTH)
         grown_capacity *= 2;
 
-      let grown =
-          static_cast<char *>(std::realloc(drain->data, grown_capacity));
-      if (grown == nullptr) break;
-
-      drain->data = grown;
+      let const allocator = uncached_heap_allocator();
+      try {
+        drain->data = static_cast<char *>(allocator.raw_realloc(
+            drain->data, drain->capacity, grown_capacity, alignof(char)));
+      } catch (...) {
+        break;
+      }
       drain->capacity = grown_capacity;
     }
 
@@ -209,11 +207,15 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   }
   ASSERT(ast != nullptr);
 
+  let bootstrap_source = String{heap_allocator()};
+  if (!os::can_fork_evaluator()) bootstrap_source = subshell_bootstrap_source();
   let const do_launch = [&]() throws -> os::process_substitution_launch {
     try {
       return os::launch_process_substitution(
-          substitution_source.view(), command_writes_the_pipe,
-          is_bash_compatible(), should_print_source_traces());
+          substitution_source.view(), command_writes_the_pipe, mood(),
+          should_print_source_traces(), bootstrap_source.view(), shell_name(),
+          last_exit_status(), os::get_shell_process_id(),
+          get_subshell_depth() + 1);
     } catch (const ErrorBase &error) {
       let const location =
           segment.get_source_location(m_current_location.source_name_index);
@@ -231,25 +233,10 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
     }
   };
 
-  if (!os::can_fork_evaluator()) {
-    let launch = do_launch();
-    ASSERT(launch.is_temporary_file);
-    if (!launch.diagnostic_output.is_empty()) {
-      print_error(launch.diagnostic_output.view());
-      if (launch.has_shell_diagnostic) print_source_backtrace();
-    }
-    m_substitution_temp_files.track(Path{launch.path.view()});
-    return steal(launch.path);
-  }
-
   let launch = do_launch();
-  if (launch.is_temporary_file) {
-    m_substitution_temp_files.track(Path{launch.path.view()});
-    return steal(launch.path);
-  }
-
   if (launch.should_evaluate_child) {
     if (launch.child_close_fd.has_value()) os::close_fd(*launch.child_close_fd);
+    enter_subshell();
     i32 status = 0;
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;
@@ -280,7 +267,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   let const source =
       m_current_source != nullptr ? m_current_source->view() : StringView{};
   m_pending_process_substitutions.push(process_substitution{
-      *launch.retained_fd, launch.child, location, source});
+      *launch.retained_fd, launch.child, launch.cleanup, location, source});
 
   LOG(Debug, "the process substitution is reachable at '%s'",
       launch.path.c_str());
@@ -290,8 +277,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
 fn EvalContext::mark_process_substitutions() const wontthrow
     -> process_substitution_mark
 {
-  return {m_pending_process_substitutions.count(),
-          m_substitution_temp_files.count()};
+  return {m_pending_process_substitutions.count()};
 }
 
 fn EvalContext::cleanup_process_substitutions(
@@ -302,9 +288,10 @@ fn EvalContext::cleanup_process_substitutions(
   for (usize i = mark.pending; i < m_pending_process_substitutions.count(); i++)
   {
     process_substitution &sub = m_pending_process_substitutions[i];
+    os::release_unused_process_substitution(sub.platform_cleanup);
     /* Closing the shell end first sends SIGPIPE to a producer that still has
        output queued, so it ends rather than blocking the wait below. */
-    os::close_fd(sub.shell_fd);
+    if (sub.shell_fd != KOSH_INVALID_FD) os::close_fd(sub.shell_fd);
     try {
       os::reap_process_quietly(sub.child);
     } catch (const Error &e) {
@@ -345,7 +332,6 @@ fn EvalContext::cleanup_process_substitutions(
   while (m_pending_process_substitutions.count() > mark.pending)
     m_pending_process_substitutions.remove(
         m_pending_process_substitutions.count() - 1);
-  m_substitution_temp_files.cleanup_from(mark.temp);
 }
 
 fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
@@ -633,7 +619,8 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     defer
     {
       do_cleanup();
-      std::free(drain_context.data);
+      uncached_heap_allocator().free_array(drain_context.data,
+                                           drain_context.capacity);
     };
 
     koshka::flush();
@@ -672,7 +659,8 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
     if (drain_context.data != nullptr) {
       captured.append(StringView{drain_context.data, drain_context.length});
-      std::free(drain_context.data);
+      uncached_heap_allocator().free_array(drain_context.data,
+                                           drain_context.capacity);
       drain_context.data = nullptr;
     }
 
@@ -808,7 +796,8 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
 
   if (drain_context.data != nullptr) {
     captured.append(StringView{drain_context.data, drain_context.length});
-    std::free(drain_context.data);
+    uncached_heap_allocator().free_array(drain_context.data,
+                                         drain_context.capacity);
   }
 
   if (error) {

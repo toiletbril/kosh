@@ -3,6 +3,8 @@ hi
 == captured at the descriptor:
 + echo hi
 + set +x
+== an external child inherits the numbered descriptor:
+external
 == without BASH_XTRACEFD the trace stays on stderr:
 + echo hi
 + set +x

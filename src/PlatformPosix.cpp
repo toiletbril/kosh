@@ -432,7 +432,7 @@ fn enumerate_users() throws -> ArrayList<String>
   return users;
 }
 
-static const pid_t PARENT_SHELL_PID = getpid();
+static pid_t PARENT_SHELL_PID = getpid();
 
 fn is_stdin_a_tty() wontthrow -> bool { return isatty(KOSH_STDIN); }
 

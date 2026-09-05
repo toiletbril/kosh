@@ -20,6 +20,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 CompoundCommand::CompoundCommand(SourceLocation location)
     : Command(steal(location))
 {}
@@ -38,10 +40,15 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
         command_end_position - source_location().position);
   }
 
+  let bootstrap_source = String{heap_allocator()};
+  if (!os::can_fork_evaluator())
+    bootstrap_source = cxt.subshell_bootstrap_source();
   let const launch = os::launch_compound_stage(
       command_text, None, None, None, cxt.mood(), source_location(),
       source != nullptr ? source->view() : StringView{},
-      os::process_group_mode::NewBackground);
+      os::process_group_mode::NewBackground, 0, bootstrap_source.view(),
+      cxt.shell_name(), cxt.last_exit_status(), os::get_shell_process_id(),
+      cxt.get_subshell_depth() + 1);
   let const child = launch.child;
 
   if (launch.should_evaluate_child) {
@@ -371,7 +378,8 @@ cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-hot fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
+hot fn internal::resolve_loop_control(EvalContext &cxt) throws
+    -> loop_disposition
 {
   if (!cxt.has_pending_control_flow()) return loop_disposition::RunNext;
 

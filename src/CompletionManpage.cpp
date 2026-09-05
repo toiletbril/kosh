@@ -18,6 +18,8 @@ namespace koshka {
 
 namespace completion {
 
+using namespace internal;
+
 struct help_entry
 {
   String name;
@@ -373,7 +375,7 @@ static fn is_first_argument_token(StringView line, usize token_start) wontthrow
 }
 
 /* None when the line has no completed second word or it opens with a dash. */
-fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
+fn internal::second_word_of(StringView line) wontthrow -> Maybe<StringView>
 {
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
@@ -390,9 +392,10 @@ fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
 
 /* The ghost path reads only an already built and validated entry, so a
    keystroke never scans a directory or reads a page. */
-fn complete_from_man_subcommands(StringView line, StringView token,
-                                 usize token_start, completion_mode mode,
-                                 EvalContext &context) throws
+fn internal::complete_from_man_subcommands(StringView line, StringView token,
+                                           usize token_start,
+                                           completion_mode mode,
+                                           EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -601,7 +604,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
    happens once per name for the session. */
 static StringMap<String> MANPAGE_TEXT_CACHE{heap_allocator()};
 
-fn manpage_text_for(StringView page_name, EvalContext &context) throws
+fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
     -> StringView
 {
   if (let const cached = MANPAGE_TEXT_CACHE.find(page_name); cached != nullptr)
@@ -655,9 +658,9 @@ fn manpage_text_for(StringView page_name, EvalContext &context) throws
 
 /* Runs only on an explicit tab and a dash token, so the ghost never forks man.
    None falls through to the spec and files. */
-fn complete_from_manpage(StringView line, StringView token,
-                         completion_mode mode, EvalContext &context,
-                         StringMap<String> &descriptions) throws
+fn internal::complete_from_manpage(StringView line, StringView token,
+                                   completion_mode mode, EvalContext &context,
+                                   StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -770,7 +773,8 @@ static fn help_text_for(ProgramResolver &resolver, StringView command,
    the text keeps its own copy. */
 static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
 
-fn help_text_of(StringView command, EvalContext &context) throws -> StringView
+fn internal::help_text_of(StringView command, EvalContext &context) throws
+    -> StringView
 {
   if (let const cached = HELP_TEXT_CACHE.find(command); cached != nullptr)
     return cached->view();
@@ -1111,9 +1115,10 @@ static fn settled_subcommand_chain(ProgramResolver &resolver,
   return chain;
 }
 
-fn complete_from_help(StringView line, StringView token, usize token_start,
-                      completion_mode mode, EvalContext &context,
-                      StringMap<String> &descriptions) throws
+fn internal::complete_from_help(StringView line, StringView token,
+                                usize token_start, completion_mode mode,
+                                EvalContext &context,
+                                StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1138,10 +1143,9 @@ fn complete_from_help(StringView line, StringView token, usize token_start,
   return matches;
 }
 
-fn complete_from_help_subcommands(StringView line, StringView token,
-                                  usize token_start, completion_mode mode,
-                                  EvalContext &context,
-                                  StringMap<String> &descriptions) throws
+fn internal::complete_from_help_subcommands(
+    StringView line, StringView token, usize token_start, completion_mode mode,
+    EvalContext &context, StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;

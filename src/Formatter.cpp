@@ -1354,8 +1354,8 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 }
 
 fn validate_formatted_source(StringView source, mimic_mood mood,
-                             BumpArena &arena, ArrayList<String> &errors) throws
-    -> bool
+                             BumpArena &arena, ArrayList<String> &errors,
+                             String *ast_output = nullptr) throws -> bool
 {
   let const mark = arena.mark();
   let const function_mark = FUNCTION_ARENA != nullptr
@@ -1369,7 +1369,10 @@ fn validate_formatted_source(StringView source, mimic_mood mood,
   let parser = Parser{
       Lexer{source, arena, false, None, mood}
   };
-  unused(parser.construct_ast(errors, nullptr));
+  let const *ast = parser.construct_ast(errors, nullptr);
+  if (ast_output != nullptr && errors.is_empty()) {
+    *ast_output = ast->to_ast_string();
+  }
 
   return errors.is_empty();
 }
@@ -1377,7 +1380,8 @@ fn validate_formatted_source(StringView source, mimic_mood mood,
 } /* namespace */
 
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
-                       ArrayList<String> &errors) throws -> Maybe<String>
+                       ArrayList<String> &errors, String *ast_output) throws
+    -> Maybe<String>
 {
   let normalized = String{heap_allocator()};
   let source_view = source;
@@ -1387,7 +1391,8 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
     source_view = normalized.view();
   }
 
-  if (!validate_formatted_source(source_view, mood, arena, errors)) return None;
+  if (!validate_formatted_source(source_view, mood, arena, errors, ast_output))
+    return None;
   let const pieces = scan_format_pieces(source_view);
   let formatted = render_format_pieces(pieces);
   let formatted_errors = ArrayList<String>{heap_allocator()};

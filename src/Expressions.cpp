@@ -24,6 +24,8 @@
 
 namespace koshka {
 
+using namespace expressions::internal;
+
 static constexpr StringView BINDER_DESCRIPTIONS[] = {
     "The value is assigned here.",
     "The name takes each word of the loop list in turn.",
@@ -441,7 +443,7 @@ fn VariableOccurrenceStateMap::release_base() wontthrow -> void
   m_base = nullptr;
 }
 
-fn indent_for_layer(usize layer) throws -> String
+fn expressions::internal::indent_for_layer(usize layer) throws -> String
 {
   let pad = String{heap_allocator()};
   for (usize i = 0; i < layer; i++)
@@ -958,7 +960,7 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
 
   if (name.length > 1 && name[0] == '#') name = name.substring(1);
   if (!lexer::word_is_variable_name(name) && !reference_names_positional(name))
-    name = expressions::operand_target_name(name);
+    name = expressions::internal::operand_target_name(name);
   if (name.is_empty()) return;
 
   let const function_definition_index = active_function_definition_index;
@@ -1015,7 +1017,8 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
 
     occurrence_is_unresolved =
         is_unresolved || (state != nullptr && !state->is_definitely_set) ||
-        (state == nullptr && !expressions::is_shell_maintained_variable(name) &&
+        (state == nullptr &&
+         !expressions::internal::is_shell_maintained_variable(name) &&
          !(eval_context != nullptr && eval_context->has_variable_name(name)) &&
          !os::get_environment_variable(name).has_value());
   } else {
@@ -1175,7 +1178,7 @@ fn AnalysisContext::note_function_body_record(StringView name,
 static pure fn assign_form_target_name(StringView expansion_text) wontthrow
     -> StringView
 {
-  let const name = expressions::operand_target_name(expansion_text);
+  let const name = expressions::internal::operand_target_name(expansion_text);
   if (!lexer::word_is_variable_name(name)) return StringView{};
 
   let remainder = expansion_text.substring(name.length);
@@ -1219,7 +1222,7 @@ fn AnalysisContext::note_variable_read(StringView name,
   if (function_local_names.find(name) != nullptr) return;
   if (global_assigned_names.find(name) != nullptr) return;
   if (reads_before_assignment.find(name) != nullptr) return;
-  if (expressions::is_shell_maintained_variable(name)) return;
+  if (expressions::internal::is_shell_maintained_variable(name)) return;
 
   if (eval_context != nullptr &&
       (eval_context->is_exported(name) ||
@@ -1231,7 +1234,7 @@ fn AnalysisContext::note_variable_read(StringView name,
   reads_before_assignment.set(name, location);
 }
 
-cold fn report_command_resolution_error(
+cold fn expressions::internal::report_command_resolution_error(
     EvalContext &cxt, const CommandResolutionErrorWithLocation &e) throws
     -> void
 {
@@ -1241,9 +1244,8 @@ cold fn report_command_resolution_error(
   cxt.print_source_backtrace(e.location());
 }
 
-fn window_function_body_error(EvalContext &cxt,
-                              ErrorWithLocation &error) wontthrow
-    -> Maybe<StringView>
+fn expressions::internal::window_function_body_error(
+    EvalContext &cxt, ErrorWithLocation &error) wontthrow -> Maybe<StringView>
 {
   let const resolved = cxt.resolve_render_source(error.location());
   if (!resolved.is_windowed || resolved.text == nullptr) {
@@ -1342,7 +1344,8 @@ fn Expression::can_evaluate_in_process_substitution(
   return false;
 }
 
-fn static_command_name(const Token *token) throws -> Maybe<StringView>
+fn expressions::internal::static_command_name(const Token *token) throws
+    -> Maybe<StringView>
 {
   ASSERT(token != nullptr);
 
@@ -1369,7 +1372,8 @@ fn static_command_name(const Token *token) throws -> Maybe<StringView>
   return word.constant_value();
 }
 
-fn normalized_relative_executable_path(StringView path) throws -> Maybe<String>
+fn expressions::internal::normalized_relative_executable_path(
+    StringView path) throws -> Maybe<String>
 {
   if (path.is_empty()) return None;
 
@@ -1382,7 +1386,9 @@ fn normalized_relative_executable_path(StringView path) throws -> Maybe<String>
   return normalized;
 }
 
-fn borrowed_token_text(const Token *token, String &storage) throws -> StringView
+fn expressions::internal::borrowed_token_text(const Token *token,
+                                              String &storage) throws
+    -> StringView
 {
   ASSERT(token != nullptr);
 
@@ -1417,8 +1423,8 @@ fn expanded_command_path(StringView name, Allocator allocator) throws -> String
   return String{allocator, name};
 }
 
-fn wrapped_command_index(command_name_id wrapper_id,
-                         const ArrayList<const Token *> &args) throws
+fn expressions::internal::wrapped_command_index(
+    command_name_id wrapper_id, const ArrayList<const Token *> &args) throws
     -> Maybe<usize>
 {
   if (args.count() < 2) return None;
@@ -1455,10 +1461,9 @@ fn wrapped_command_index(command_name_id wrapper_id,
   return None;
 }
 
-fn apply_followed_source_effects(AnalysisContext &actx,
-                                 const followed_source_effects &effects,
-                                 bool should_merge_parent_state,
-                                 bool should_merge_parent_uncertainty) throws
+fn expressions::internal::apply_followed_source_effects(
+    AnalysisContext &actx, const followed_source_effects &effects,
+    bool should_merge_parent_state, bool should_merge_parent_uncertainty) throws
     -> void
 {
   if (should_merge_parent_state) {
@@ -1490,10 +1495,10 @@ fn apply_followed_source_effects(AnalysisContext &actx,
   actx.has_fatal = actx.has_fatal || effects.has_fatal;
 }
 
-fn analyze_followed_source(AnalysisContext &actx,
-                           const ArrayList<const Token *> &args,
-                           usize command_index, bool should_merge_parent_state,
-                           bool should_merge_parent_uncertainty) throws -> bool
+fn expressions::internal::analyze_followed_source(
+    AnalysisContext &actx, const ArrayList<const Token *> &args,
+    usize command_index, bool should_merge_parent_state,
+    bool should_merge_parent_uncertainty) throws -> bool
 {
   if (actx.followed_source_paths == nullptr ||
       actx.followed_source_effects_cache == nullptr ||
@@ -1645,7 +1650,7 @@ fn analyze_followed_source(AnalysisContext &actx,
   return should_merge_parent_state;
 }
 
-fn command_resolves(
+fn expressions::internal::command_resolves(
     StringView name, const SourceLocation &location,
     const AnalysisContext &actx,
     Maybe<utils::unavailable_path_source_component> &unavailable) throws -> bool
@@ -1710,7 +1715,8 @@ enum class bracket_scan_state : u8
    no closing ']' is a literal, so only a '[' that opens a class and never
    closes is malformed. A '[' as the last byte cannot open a class, which is why
    only InsideClass ends malformed. Returns true when malformed. */
-pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool
+pure fn expressions::internal::word_has_malformed_glob_bracket(
+    const Word &word) wontthrow -> bool
 {
   let state = bracket_scan_state::Outside;
 
@@ -1817,17 +1823,19 @@ fn analyze_ast(
       static_cast<u8>(source[1]) == 0xbb && static_cast<u8>(source[2]) == 0xbf)
     actx.report_diagnostic(diagnostic_id::sc1082, SourceLocation{0, 3});
 
-  expressions::check_source_bytes(actx, source);
+  expressions::internal::check_source_bytes(actx, source);
 
   if (parent_analysis_context != nullptr) {
     actx.is_posix_sh_shebang = parent_analysis_context->is_posix_sh_shebang;
   } else {
-    expressions::check_shebang(actx, source, is_named_script_file);
+    expressions::internal::check_shebang(actx, source, is_named_script_file);
   }
 
-  expressions::check_shellcheck_directives(actx, source, directive_spans);
+  expressions::internal::check_shellcheck_directives(actx, source,
+                                                     directive_spans);
 
-  expressions::check_heredoc_terminators(actx, source, heredoc_misses);
+  expressions::internal::check_heredoc_terminators(actx, source,
+                                                   heredoc_misses);
 
   LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
       actx.is_posix_sh_shebang ? "armed" : "off");
@@ -1861,9 +1869,9 @@ fn analyze_ast(
     root->analyze(actx, true);
   }
 
-  expressions::check_command_name_assignments(actx);
-  expressions::check_unassigned_variable_reads(actx);
-  expressions::check_function_argument_dataflow(actx);
+  expressions::internal::check_command_name_assignments(actx);
+  expressions::internal::check_unassigned_variable_reads(actx);
+  expressions::internal::check_function_argument_dataflow(actx);
   if (symbol_records != nullptr)
     resolve_function_occurrence_states(*symbol_records);
 
@@ -1892,8 +1900,10 @@ fn analyze_ast(
 
 namespace expressions {
 
-pure fn analysis_source_text(const AnalysisContext &actx,
-                             const SourceLocation &location) wontthrow
+using namespace internal;
+
+pure fn internal::analysis_source_text(const AnalysisContext &actx,
+                                       const SourceLocation &location) wontthrow
     -> StringView
 {
   if (location.position > actx.source.length ||
@@ -1919,8 +1929,8 @@ pure fn classify_assignment_builtin(StringView name) wontthrow
 
 /* A word segment spans the name and its modifiers, and the sigil and the braces
    around it belong to the expansion a reader sees. */
-pure fn expansion_location_with_sigil(const AnalysisContext &actx,
-                                      SourceLocation location) wontthrow
+pure fn internal::expansion_location_with_sigil(
+    const AnalysisContext &actx, SourceLocation location) wontthrow
     -> SourceLocation
 {
   if (location.length == 0) return location;
@@ -1954,8 +1964,10 @@ pure fn expansion_location_with_sigil(const AnalysisContext &actx,
   return SourceLocation{start, length, location.source_name_index};
 }
 
-fn note_variable_reference(AnalysisContext &actx, const WordSegment &segment,
-                           SourceLocation fallback_location) throws -> void
+fn internal::note_variable_reference(AnalysisContext &actx,
+                                     const WordSegment &segment,
+                                     SourceLocation fallback_location) throws
+    -> void
 {
   let const segment_location =
       segment.get_source_location(fallback_location.source_name_index)
@@ -1967,14 +1979,15 @@ fn note_variable_reference(AnalysisContext &actx, const WordSegment &segment,
   actx.note_positional_reference(segment.text.view(), expansion_location);
 }
 
-fn merge_variable_occurrence_states(
+fn internal::merge_variable_occurrence_states(
     VariableOccurrenceStateMap &merged_states,
     const VariableOccurrenceStateMap &exit_states) throws -> void
 {
   merged_states.merge(exit_states);
 }
 
-pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow
+pure fn internal::location_spanning(SourceLocation first,
+                                    SourceLocation last) wontthrow
     -> SourceLocation
 {
   if (first.length == 0) return last;
@@ -1986,8 +1999,8 @@ pure fn location_spanning(SourceLocation first, SourceLocation last) wontthrow
                         first.source_name_index};
 }
 
-pure fn analysis_source_span(const AnalysisContext &actx,
-                             const Expression &expression) wontthrow
+pure fn internal::analysis_source_span(const AnalysisContext &actx,
+                                       const Expression &expression) wontthrow
     -> StringView
 {
   let const start = expression.source_location().position;
@@ -1998,8 +2011,8 @@ pure fn analysis_source_span(const AnalysisContext &actx,
   return actx.source.substring_of_length(start, end - start);
 }
 
-pure fn arithmetic_reads_external_input(const AnalysisContext &actx,
-                                        StringView expression) wontthrow -> bool
+pure fn internal::arithmetic_reads_external_input(
+    const AnalysisContext &actx, StringView expression) wontthrow -> bool
 {
   for (usize position = 0; position < expression.length;) {
     if (!lexer::is_variable_name_start(expression[position])) {

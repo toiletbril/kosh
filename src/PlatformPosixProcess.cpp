@@ -488,13 +488,21 @@ fn try_fork_job_process() throws -> Maybe<process>
 fn can_fork_evaluator() wontthrow -> bool { return true; }
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               bool bash_compatible,
-                               bool source_traces_enabled) throws
+                               mimic_mood mood, bool source_traces_enabled,
+                               StringView bootstrap_source,
+                               StringView shell_name, i32 previous_exit_status,
+                               i64 shell_process_id,
+                               usize subshell_depth) throws
     -> process_substitution_launch
 {
   unused(source);
-  unused(bash_compatible);
+  unused(mood);
   unused(source_traces_enabled);
+  unused(bootstrap_source);
+  unused(shell_name);
+  unused(previous_exit_status);
+  unused(shell_process_id);
+  unused(subshell_depth);
 
   let const pipe = make_pipe();
   if (!pipe.has_value())
@@ -537,15 +545,27 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
   };
 }
 
+fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
+{
+  unused(cleanup);
+}
+
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
                          mimic_mood mood, SourceLocation location,
                          StringView diagnostic_source,
-                         process_group_mode process_group,
-                         i64 process_group_id) throws -> compound_stage_launch
+                         process_group_mode process_group, i64 process_group_id,
+                         StringView bootstrap_source, StringView shell_name,
+                         i32 previous_exit_status, i64 shell_process_id,
+                         usize subshell_depth) throws -> compound_stage_launch
 {
   unused(source);
   unused(mood);
+  unused(bootstrap_source);
+  unused(shell_name);
+  unused(previous_exit_status);
+  unused(shell_process_id);
+  unused(subshell_depth);
   const process child = fork_compound_stage(
       steal(in_fd), steal(out_fd), steal(err_fd), steal(location),
       diagnostic_source, process_group, process_group_id);
@@ -553,6 +573,11 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
       .child = child,
       .should_evaluate_child = child == 0,
   };
+}
+
+fn take_subshell_bootstrap_source() wontthrow -> String
+{
+  return String{heap_allocator()};
 }
 
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
@@ -976,6 +1001,24 @@ fn system_version_name() throws -> String
   return String{info.version};
 }
 
+fn machine_target_name() throws -> String
+{
+#if defined __APPLE__
+  return machine_type() + "-apple-darwin";
+#else
+  return machine_type() + "-unknown-linux-gnu";
+#endif
+}
+
+fn ostype_name() wontthrow -> StringView
+{
+#if defined __APPLE__
+  return "darwin";
+#else
+  return "linux-gnu";
+#endif
+}
+
 fn executable_machine_name() throws -> String
 {
 #if KOSH_PLATFORM_IS KOSH_PLATFORM_COSMO
@@ -1379,3 +1422,7 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
 } /* namespace os */
 
 } /* namespace koshka */
+
+fn kosh_main(int argc, char **argv) -> int;
+
+fn main(int argc, char **argv) -> int { return kosh_main(argc, argv); }

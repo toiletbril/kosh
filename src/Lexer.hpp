@@ -149,17 +149,16 @@ protected:
   usize m_cached_offset{0};
 
   /* The parser peeks the next token many times before it consumes one, and each
-     peek would otherwise re-lex from the same position. The last token is
-     reused while the cursor has not moved and the arena holding it has not been
-     rewound under it. */
+     peek would otherwise re-lex from the same position. */
   Token *m_peek_cache{nullptr};
-  usize m_peek_cache_position{0};
+#if !defined NDEBUG
   usize m_peek_cache_generation{0};
+#endif
 
-  bool m_should_collect_debug_words{false};
   ArrayList<Word> m_debug_words{heap_allocator()};
   usize m_last_collected_word_position{static_cast<usize>(-1)};
 
+  bool m_should_collect_debug_words{false};
   bool m_last_shell_token_was_newline{false};
   bool m_should_collect_analysis_metadata{false};
   bool m_should_collect_shellcheck_directives{false};

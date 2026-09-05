@@ -18,6 +18,8 @@ namespace koshka {
 
 namespace completion {
 
+using namespace internal;
+
 static pure fn is_word_separator(char c) wontthrow -> bool
 {
   return lexer::is_whitespace(c) || c == '\n';
@@ -42,7 +44,8 @@ static pure fn is_unmatched_closing_paren(StringView line,
   return depth == 0;
 }
 
-pure fn quoted_run_end(StringView line, usize position) wontthrow -> usize
+pure fn internal::quoted_run_end(StringView line, usize position) wontthrow
+    -> usize
 {
   let const opener = line[position];
   if (opener == '\\')
@@ -57,7 +60,8 @@ pure fn quoted_run_end(StringView line, usize position) wontthrow -> usize
   return k < line.length ? k : line.length - 1;
 }
 
-pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
+pure fn internal::token_has_glob_metacharacter(StringView token) wontthrow
+    -> bool
 {
   for (usize i = 0; i < token.length; i++) {
     let const c = token[i];
@@ -71,8 +75,8 @@ static pure fn is_token_boundary(char c) wontthrow -> bool
   return is_word_separator(c) || is_command_separator(c);
 }
 
-pure fn is_active_token_boundary(StringView line, usize position) wontthrow
-    -> bool
+pure fn internal::is_active_token_boundary(StringView line,
+                                           usize position) wontthrow -> bool
 {
   let const c = line[position];
   if (!is_token_boundary(c)) return false;
@@ -90,7 +94,7 @@ pure fn is_active_token_boundary(StringView line, usize position) wontthrow
    quoted or escaped separator stays part of the word. A paren glued to the
    preceding byte is literal. A name like burner (3).log completes without
    opening a subshell. */
-pure fn find_token_bounds(StringView line, usize cursor) wontthrow
+pure fn internal::find_token_bounds(StringView line, usize cursor) wontthrow
     -> token_bounds
 {
   usize start = 0;
@@ -253,8 +257,8 @@ static pure fn timeout_command_start(StringView line) wontthrow -> Maybe<usize>
   }
 }
 
-pure fn is_in_command_position(StringView line, usize token_start) wontthrow
-    -> bool
+pure fn internal::is_in_command_position(StringView line,
+                                         usize token_start) wontthrow -> bool
 {
   if (let const managed_start = timeout_command_start(line);
       managed_start.has_value())
@@ -285,7 +289,7 @@ pure fn is_in_command_position(StringView line, usize token_start) wontthrow
     i = word_start;
   }
 }
-fn command_word_of(StringView line) wontthrow -> StringView
+fn internal::command_word_of(StringView line) wontthrow -> StringView
 {
   if (let const managed_start = timeout_command_start(line);
       managed_start.has_value())
@@ -333,7 +337,8 @@ fn command_word_of(StringView line) wontthrow -> StringView
   }
 }
 
-pure fn command_segment_start(StringView line, usize cursor) wontthrow -> usize
+pure fn internal::command_segment_start(StringView line, usize cursor) wontthrow
+    -> usize
 {
   usize start = 0;
   usize open_paren_depth = 0;
@@ -361,8 +366,8 @@ pure fn command_segment_start(StringView line, usize cursor) wontthrow -> usize
 
 /* Symlinks are left alone so a name that dispatches on its argv[0], such as a
    busybox or rustup link, keeps the surface name the user typed. */
-fn resolve_completion_alias(StringView command, EvalContext &context) throws
-    -> String
+fn internal::resolve_completion_alias(StringView command,
+                                      EvalContext &context) throws -> String
 {
   let name = String{command};
   for (usize depth = 0; depth < 8; depth++) {
@@ -381,8 +386,8 @@ fn resolve_completion_alias(StringView command, EvalContext &context) throws
   return name;
 }
 
-fn resolve_completion_command(StringView command, EvalContext &context) throws
-    -> String
+fn internal::resolve_completion_command(StringView command,
+                                        EvalContext &context) throws -> String
 {
   let name = resolve_completion_alias(command, context);
   let const located = context.get_program_resolver().search(
@@ -402,8 +407,8 @@ fn resolve_completion_command(StringView command, EvalContext &context) throws
   return name;
 }
 
-fn split_completion_words(StringView line, usize cursor, usize &cword) throws
-    -> ArrayList<String>
+fn internal::split_completion_words(StringView line, usize cursor,
+                                    usize &cword) throws -> ArrayList<String>
 {
   let words = ArrayList<String>{completion_allocator()};
   usize i = 0;

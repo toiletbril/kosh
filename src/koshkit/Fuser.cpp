@@ -79,9 +79,8 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-#if defined _WIN32
-    if (FLAG_FUSER_FILESYSTEM.is_enabled() ||
-        os::file_type_letter(file_status.mode) == 'd')
+    if (!os::process_file_query_is_supported(
+            file_status, FLAG_FUSER_FILESYSTEM.is_enabled()))
     {
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[operand_position], args[0].view(),
@@ -89,7 +88,6 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-#endif
 
     let const is_block_device = os::file_type_letter(file_status.mode) == 'b';
     let const should_match_device =

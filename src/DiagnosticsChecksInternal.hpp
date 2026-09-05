@@ -2,7 +2,7 @@
 
 #include "ExpressionsInternal.hpp"
 
-namespace koshka::expressions {
+namespace koshka::expressions::internal {
 
 enum class bracketed_constant_kind : u8
 {
@@ -59,4 +59,4 @@ pure fn arithmetic_assignment_target(StringView expression,
                                      usize equals_position) wontthrow
     -> StringView;
 
-} /* namespace koshka::expressions */
+} /* namespace koshka::expressions::internal */

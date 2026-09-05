@@ -307,11 +307,11 @@ fn append_conversion(String &out, const String &spec, char conv,
       out += buffer;
     } else if (needed > 0) {
       let const size = static_cast<usize>(needed) + 1;
-      char *const heap_buffer = static_cast<char *>(std::malloc(size));
+      char *const heap_buffer = allocator.alloc_array<char>(size);
       if (heap_buffer != nullptr) {
+        defer { allocator.free_array(heap_buffer, size); };
         std::snprintf(heap_buffer, size, format, value);
         out += StringView{heap_buffer, static_cast<usize>(needed)};
-        std::free(heap_buffer);
       }
     }
   };

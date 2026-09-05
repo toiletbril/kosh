@@ -84,6 +84,11 @@ fn get_shell_process_id() wontthrow -> i64
   return static_cast<i64>(PARENT_SHELL_PID);
 }
 
+fn set_shell_process_id(i64 pid) wontthrow -> void
+{
+  PARENT_SHELL_PID = static_cast<decltype(PARENT_SHELL_PID)>(pid);
+}
+
 fn get_file_creation_mask() wontthrow -> u32
 {
   let const previous_mask = KOSH_UMASK(0);

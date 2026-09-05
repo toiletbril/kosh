@@ -15,7 +15,7 @@ public:
   ArithmeticValue() = default;
   explicit ArithmeticValue(i64 value) wontthrow;
 
-  static fn parse(StringView text, u32 radix, BumpArena &arena) throws
+  static fn parse(StringView source, u32 radix, BumpArena &arena) throws
       -> ArithmeticValue;
   static fn parse_decimal(StringView text, BumpArena &arena) throws
       -> ArithmeticValue;

@@ -19,6 +19,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 static pure fn is_process_dynamic_name(StringView text, usize position,
                                        bool is_bash_dynamic) wontthrow -> bool
 {
@@ -486,10 +488,11 @@ reject_restricted_output_redirection(const Redirection &redir,
       "Output redirection is forbidden in a restricted shell"};
 }
 
-fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
-                       const SourceLocation &fallback_location,
-                       bool *open_or_stage_failed,
-                       bool allow_fd_memoization) throws -> resolved_redirection
+fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
+                                 const SourceLocation &fallback_location,
+                                 bool *open_or_stage_failed,
+                                 bool allow_fd_memoization) throws
+    -> resolved_redirection
 {
   if (cxt.restricted_enforcement_active() &&
       (redir.kind == Redirection::Kind::TruncateOutput ||
@@ -615,11 +618,10 @@ fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
                               file_fd, -1, /*is_cached=*/false};
 }
 
-fn allocate_redirection_descriptor(const Redirection &redir,
-                                   const resolved_redirection &resolved,
-                                   EvalContext &cxt,
-                                   const SourceLocation &location,
-                                   bool *open_or_stage_failed) throws -> i32
+fn internal::allocate_redirection_descriptor(
+    const Redirection &redir, const resolved_redirection &resolved,
+    EvalContext &cxt, const SourceLocation &location,
+    bool *open_or_stage_failed) throws -> i32
 {
   if (redir.fd_allocation_name_token == nullptr) return redir.fd;
 

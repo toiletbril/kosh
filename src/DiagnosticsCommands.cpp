@@ -7,7 +7,7 @@
 
 namespace koshka {
 
-namespace expressions {
+namespace expressions::internal {
 
 namespace {
 
@@ -650,6 +650,6 @@ fn check_command_value_lints(AnalysisContext &actx,
   }
 }
 
-} /* namespace expressions */
+} /* namespace expressions::internal */
 
 } /* namespace koshka */

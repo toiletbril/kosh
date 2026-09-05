@@ -1,0 +1,20 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "format"]
+echo format
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lint"]
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "combined"]
+echo combined
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "apply"]
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "both"]
+# heading
+
+text

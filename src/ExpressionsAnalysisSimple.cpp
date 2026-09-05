@@ -24,6 +24,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 namespace {
 
 constexpr PackedStringKey GENERATED_EXECUTABLE_DRIVER_KEYS[] = {
@@ -196,7 +198,7 @@ pure fn reference_is_plain_scalar_name(StringView name) wontthrow -> bool
   return !name.find_character('[').has_value();
 }
 
-cold fn word_is_bare_glob(const Word &word) wontthrow -> bool
+cold fn internal::word_is_bare_glob(const Word &word) wontthrow -> bool
 {
   return word.segments.count() == 1 &&
          word.segments[0].kind == WordSegment::Kind::UnquotedText &&
@@ -226,7 +228,8 @@ cold static fn view_has_brace_expansion(StringView text) wontthrow -> bool
   return false;
 }
 
-cold fn classify_test_operand(const Word &word) wontthrow -> test_operand_shape
+cold fn internal::classify_test_operand(const Word &word) wontthrow
+    -> test_operand_shape
 {
   test_operand_shape shape;
 
@@ -286,7 +289,8 @@ cold fn bare_glob_can_start_with_dash(const Word &word) wontthrow -> bool
   return false;
 }
 
-cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
+cold pure fn internal::view_contains(StringView view,
+                                     StringView needle) wontthrow -> bool
 {
   if (needle.length == 0 || needle.length > view.length) {
     return false;
@@ -326,8 +330,8 @@ cold pure fn substitution_body_is_bare_echo(StringView body) wontthrow -> bool
   return true;
 }
 
-cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
-    -> bool
+cold fn internal::args_have_stdin_operand(
+    const ArrayList<const Token *> &args) throws -> bool
 {
   let storage = String{heap_allocator()};
   for (usize i = 1; i < args.count(); i++) {
@@ -339,7 +343,7 @@ cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
   return false;
 }
 
-fn operand_target_name(StringView text) wontthrow -> StringView
+fn internal::operand_target_name(StringView text) wontthrow -> StringView
 {
   if (text.is_empty() || text[0] == '-') {
     return StringView{};

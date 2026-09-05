@@ -1,7 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
-#include "../NameValueArg.hpp"
 #include "../Trace.hpp"
 
 FLAG_LIST_DECL();

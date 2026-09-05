@@ -20,6 +20,29 @@ fn free_aligned(opaque *pointer) wontthrow -> void;
 
 namespace allocators {
 
+hot inline fn uncached_heap_alloc(usize length, usize alignment) wontthrow
+    -> opaque *
+{
+  if (alignment > alignof(max_align_t)) {
+    if (length > SIZE_MAX - (alignment - 1)) return nullptr;
+    let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
+    return os::allocate_aligned(rounded_length, alignment);
+  }
+
+  return std::malloc(length);
+}
+
+hot inline fn uncached_heap_free(opaque *pointer, usize alignment) wontthrow
+    -> void
+{
+  if (alignment > alignof(max_align_t)) {
+    os::free_aligned(pointer);
+    return;
+  }
+
+  std::free(pointer);
+}
+
 /* A size-classed cache over the C allocator. musl returns a freed page group to
    the kernel at once, so a tight allocate then free of the same size churns
    mmap and munmap once per turn, which dominates the bench on Alpine where
@@ -58,7 +81,11 @@ public:
     }
 
     let const class_index = shift - MIN_CLASS_SHIFT;
-    if (m_counts[class_index] >= MAX_BLOCKS_PER_CLASS) {
+    let const class_length = usize{1} << shift;
+    let const byte_limit = MAX_RETAINED_BYTES_PER_CLASS / class_length;
+    let const class_limit =
+        byte_limit < MAX_BLOCKS_PER_CLASS ? byte_limit : MAX_BLOCKS_PER_CLASS;
+    if (m_counts[class_index] >= class_limit) {
       std::free(pointer);
       return;
     }
@@ -76,6 +103,7 @@ private:
       16; /* the largest pooled block is 64 KiB */
   static constexpr usize CLASS_COUNT = MAX_CLASS_SHIFT - MIN_CLASS_SHIFT + 1;
   static constexpr usize MAX_BLOCKS_PER_CLASS = 512;
+  static constexpr usize MAX_RETAINED_BYTES_PER_CLASS = 64 * 1024;
 
   struct node
   {
@@ -83,7 +111,7 @@ private:
   };
 
   node *m_bins[CLASS_COUNT] = {};
-  u32 m_counts[CLASS_COUNT] = {};
+  u16 m_counts[CLASS_COUNT] = {};
 
   hot static fn class_shift_for(usize length) wontthrow -> usize
   {
@@ -144,11 +172,11 @@ hot inline fn heap_free(opaque *pointer, usize length,
 
 } /* namespace allocators */
 
-/* One tagged word. The three kinds are the pooled heap, a bump arena, and the
-   fake allocator a container carries while it holds no storage. An arena is
-   aligned well past four bytes, so the two low bits carry the kind and the
-   remaining bits carry the arena address. The heap and the fake kind hold no
-   address. */
+/* One tagged word. The four kinds are the pooled heap, uncached heap, a bump
+   arena, and the fake allocator a container carries while it holds no storage.
+   An arena is aligned well past four bytes, so the two low bits carry the kind
+   and the remaining bits carry the arena address. The heap and fake kinds hold
+   no address. */
 class Allocator
 {
 public:
@@ -157,6 +185,7 @@ public:
     Heap = 0,
     Bump = 1,
     Fake = 2,
+    UncachedHeap = 3,
   };
 
   static constexpr uintptr KIND_MASK = 3;
@@ -179,6 +208,7 @@ public:
     case Kind::Heap: return false;
     case Kind::Bump: return bump_arena_owns(get_arena(), pointer);
     case Kind::Fake: return false;
+    case Kind::UncachedHeap: return false;
     }
 
     unreachable("the allocator carries no known kind");
@@ -192,9 +222,39 @@ public:
     case Kind::Bump: return bump_arena_allocate(get_arena(), length, alignment);
     case Kind::Fake:
       unreachable("a container with the fake allocator attempted to allocate");
+    case Kind::UncachedHeap:
+      return allocators::uncached_heap_alloc(length, alignment);
     }
 
     unreachable("the allocator carries no known kind");
+  }
+
+  hot fn raw_realloc(opaque *pointer, usize old_length, usize new_length,
+                     usize alignment) const throws -> opaque *
+  {
+    if (pointer == nullptr) {
+      let const replacement = raw_alloc(new_length, alignment);
+      if (replacement == nullptr && new_length != 0) {
+        throw std::bad_alloc{};
+      }
+      return replacement;
+    }
+    if (new_length == 0) {
+      raw_free(pointer, old_length, alignment);
+      return nullptr;
+    }
+    if (get_kind() == Kind::UncachedHeap && alignment <= alignof(max_align_t)) {
+      let const replacement = std::realloc(pointer, new_length);
+      if (replacement == nullptr) throw std::bad_alloc{};
+      return replacement;
+    }
+
+    let const replacement = raw_alloc(new_length, alignment);
+    if (replacement == nullptr) throw std::bad_alloc{};
+    std::memcpy(replacement, pointer,
+                old_length < new_length ? old_length : new_length);
+    raw_free(pointer, old_length, alignment);
+    return replacement;
   }
 
   flatten fn raw_free(opaque *pointer, usize length,
@@ -202,9 +262,14 @@ public:
   {
     /* An arena hands nothing back, and the fake allocator never handed anything
        out. */
-    if (get_kind() != Kind::Heap) return;
-
-    allocators::heap_free(pointer, length, alignment);
+    switch (get_kind()) {
+    case Kind::Heap: allocators::heap_free(pointer, length, alignment); return;
+    case Kind::UncachedHeap:
+      allocators::uncached_heap_free(pointer, alignment);
+      return;
+    case Kind::Bump:
+    case Kind::Fake: return;
+    }
   }
 
   template <class T>
@@ -248,6 +313,11 @@ inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
 inline fn heap_allocator() wontthrow -> Allocator
 {
   return Allocator{static_cast<uintptr>(Allocator::Kind::Heap)};
+}
+
+inline fn uncached_heap_allocator() wontthrow -> Allocator
+{
+  return Allocator{static_cast<uintptr>(Allocator::Kind::UncachedHeap)};
 }
 
 inline fn fake_allocator() wontthrow -> Allocator

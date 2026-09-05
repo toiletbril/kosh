@@ -420,8 +420,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::HOSTTYPE: return os::machine_type();
         case dynamic_var::GROUPS:
           return String::from(os::get_real_group_id(), heap_allocator());
-        case dynamic_var::MACHTYPE:
-          return os::machine_type() + "-unknown-linux-gnu";
+        case dynamic_var::MACHTYPE: return os::machine_target_name();
         case dynamic_var::OSTYPE:
           return String{heap_allocator(), os::ostype_name()};
         case dynamic_var::FUNCNAME:

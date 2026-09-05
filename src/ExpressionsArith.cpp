@@ -20,6 +20,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 ConditionalCommand::ConditionalCommand(SourceLocation location,
                                        ArrayList<conditional_element> elements)
     : CompoundCommand(steal(location)), m_elements(steal(elements))

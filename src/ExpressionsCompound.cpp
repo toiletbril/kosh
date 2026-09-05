@@ -20,6 +20,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 CompoundList::CompoundList() : Expression({0, 0}) {}
 
 CompoundList::~CompoundList() = default;
@@ -427,6 +429,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   os::descriptor last_stdin = KOSH_INVALID_FD;
   i64 process_group_id = 0;
   let pending_pipe = Maybe<os::Pipe>{};
+  let bootstrap_source = String{heap_allocator()};
+  if (!os::can_fork_evaluator())
+    bootstrap_source = cxt.subshell_bootstrap_source();
 
   /* On a make_pipe or fork failure mid-loop the previous read end and the
      current pipe are closed and every spawned child is waited, then the error
@@ -476,7 +481,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const launch = os::launch_compound_stage(
           stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{},
-          process_group, process_group_id);
+          process_group, process_group_id, bootstrap_source.view(),
+          cxt.shell_name(), cxt.last_exit_status(), os::get_shell_process_id(),
+          cxt.get_subshell_depth() + 1);
       let const child = launch.child;
 
       if (launch.should_evaluate_child) {

@@ -460,6 +460,12 @@ fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool
          first_info.nFileIndexLow == second_info.nFileIndexLow;
 }
 
+fn paths_match_for_history(StringView first, StringView second) wontthrow
+    -> bool
+{
+  return first == second || paths_are_same_file(first, second);
+}
+
 fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool
 {
   let const wide_first = utf8_to_wide(first, heap_allocator());
@@ -631,6 +637,8 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   case file_open_mode::Read: disposition = OPEN_EXISTING; break;
   case file_open_mode::ReadWrite: disposition = OPEN_ALWAYS; break;
   }
+  if (path.starts_with(StringView{"\\\\.\\pipe\\"}))
+    disposition = OPEN_EXISTING;
 
   /* Non-inheritable, execute_program flips it only while spawning the child. */
   SECURITY_ATTRIBUTES att{};

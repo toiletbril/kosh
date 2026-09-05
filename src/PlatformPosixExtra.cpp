@@ -208,8 +208,8 @@ public:
   ~PlatformPerfSession()
   {
     restore();
-    free(start_counters);
-    free(end_counters);
+    uncached_heap_allocator().free_array(start_counters, start_counter_count);
+    uncached_heap_allocator().free_array(end_counters, start_counter_count);
     if (kperfdata_library != nullptr) dlclose(kperfdata_library);
     if (kperf_library != nullptr) dlclose(kperf_library);
   }
@@ -377,9 +377,12 @@ public:
     if (start_counter_count > SIZE_MAX / sizeof(u64)) return false;
 
     start_counters =
-        static_cast<u64 *>(calloc(start_counter_count, sizeof(u64)));
-    end_counters = static_cast<u64 *>(calloc(start_counter_count, sizeof(u64)));
+        uncached_heap_allocator().alloc_array<u64>(start_counter_count);
+    end_counters =
+        uncached_heap_allocator().alloc_array<u64>(start_counter_count);
     if (start_counters == nullptr || end_counters == nullptr) return false;
+    std::memset(start_counters, 0, start_counter_count * sizeof(u64));
+    std::memset(end_counters, 0, start_counter_count * sizeof(u64));
 
     for (usize event_index = 0; event_index < EVENT_COUNT; event_index++) {
       if (counter_map[event_index] >= counter_count) return false;
@@ -1027,6 +1030,15 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
   errno = ENOTSUP;
   return queries[0].query_position;
 #endif
+}
+
+fn process_file_query_is_supported(const file_status &status,
+                                   bool should_match_filesystem) wontthrow
+    -> bool
+{
+  unused(status);
+  unused(should_match_filesystem);
+  return true;
 }
 
 fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws

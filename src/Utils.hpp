@@ -4,7 +4,6 @@
 #include "Common.hpp"
 #include "ErrorOr.hpp"
 #include "Eval.hpp"
-#include "NameValueArg.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"

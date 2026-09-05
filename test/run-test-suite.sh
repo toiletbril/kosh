@@ -37,10 +37,6 @@ for TEST_FILE in cli/*.sh; do
     [ "$TEST_FILE" = cli/assimilate.sh ]; then
     continue
   fi
-  if [ -n "${SKIP_CLI_BASH_XTRACEFD-}" ] && \
-    [ "$TEST_FILE" = cli/bash_xtracefd.sh ]; then
-    continue
-  fi
   if word_is_listed "$TEST_FILE" "$SERIAL_CLI_CANDIDATES"; then
     SERIAL_CLI_INPUT="$SERIAL_CLI_INPUT $TEST_FILE"
   else
@@ -179,10 +175,6 @@ print_platform_skips()
     if [ -n "${SKIP_CLI_ASSIMILATE-}" ]; then
       printf "\t%-64s skipped, remote transaction requires POSIX\n" \
         cli/assimilate.sh
-    fi
-    if [ -n "${SKIP_CLI_BASH_XTRACEFD-}" ]; then
-      printf "\t%-64s skipped, numbered descriptors are unsupported on Windows\n" \
-        cli/bash_xtracefd.sh
     fi
     for TEST_FILE in $SKIPPED_CLI_INPUT; do
       printf "\t%-64s skipped, unsupported Windows backend feature\n" \

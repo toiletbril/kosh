@@ -10,10 +10,10 @@
 #include "Utils.hpp"
 
 #define SET_AND_RETURN_EXIT_STATUS(cxt, status)                                \
-  return ::koshka::expressions::set_and_return_exit_status(                    \
+  return ::koshka::expressions::internal::set_and_return_exit_status(          \
       (cxt), static_cast<i64>(status))
 
-namespace koshka {
+namespace koshka::expressions::internal {
 
 fn indent_for_layer(usize layer) throws -> String;
 fn report_command_resolution_error(
@@ -52,8 +52,6 @@ fn command_resolves(
     Maybe<utils::unavailable_path_source_component> &unavailable) throws
     -> bool;
 pure fn word_has_malformed_glob_bracket(const Word &word) wontthrow -> bool;
-
-namespace expressions {
 
 pure fn analysis_source_text(const AnalysisContext &actx,
                              const SourceLocation &location) wontthrow
@@ -327,6 +325,4 @@ fn check_unassigned_variable_reads(AnalysisContext &actx) throws -> void;
    only agree once both are known, so the comparison waits for the end. */
 fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void;
 
-} /* namespace expressions */
-
-} /* namespace koshka */
+} /* namespace koshka::expressions::internal */

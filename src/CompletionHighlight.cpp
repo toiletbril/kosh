@@ -17,11 +17,13 @@ namespace koshka {
 
 namespace completion {
 
+using namespace internal;
+
 /* Reset at the top of highlight_line so the previous render stays valid until
    the editor drains it. */
-BumpArena HIGHLIGHT_ARENA{};
+BumpArena internal::HIGHLIGHT_ARENA{};
 #if !defined NDEBUG
-usize DEBUG_HIGHLIGHT_INPUT_BYTE_COUNT = 0;
+usize internal::DEBUG_HIGHLIGHT_INPUT_BYTE_COUNT = 0;
 #endif
 
 static fn first_word_resolves(StringView word, EvalContext &context) throws
@@ -165,7 +167,7 @@ static pure fn word_braces_are_literal(StringView word) wontthrow -> bool
 
 /* The shell looks a command word up in the function table before it treats the
    word as a path, so a name such as ble/util/put is a call and not a file. */
-pure fn word_is_function_name(StringView word) wontthrow -> bool
+pure fn internal::word_is_function_name(StringView word) wontthrow -> bool
 {
   if (word.is_empty() || !is_highlight_name_start(word[0])) return false;
 
@@ -178,8 +180,8 @@ pure fn word_is_function_name(StringView word) wontthrow -> bool
   return !has_brace || word_braces_are_literal(word);
 }
 
-pure fn word_defines_function(StringView line, usize word_end,
-                              usize end) wontthrow -> bool
+pure fn internal::word_defines_function(StringView line, usize word_end,
+                                        usize end) wontthrow -> bool
 {
   let i = word_end;
   while (i < end && (line[i] == ' ' || line[i] == '\t'))
@@ -384,8 +386,9 @@ static_assert(every_lexer_keyword_has_a_highlight_spec(),
 
 } /* namespace */
 
-fn advance_shell_keyword_state(StringView word, usize frame_depth,
-                               shell_lexical_state &state) throws -> Maybe<bool>
+fn internal::advance_shell_keyword_state(StringView word, usize frame_depth,
+                                         shell_lexical_state &state) throws
+    -> Maybe<bool>
 {
   let const spec = HIGHLIGHT_KEYWORDS.find(word);
   if (!spec.has_value()) return None;
@@ -954,11 +957,11 @@ static pure fn variable_name_operand_of(StringView word) wontthrow -> StringView
 
 /* A command substitution recurses with its own command-position and construct
    state, so a nested command line colors on its own. */
-fn scan_highlight_range(StringView line, usize begin, usize end,
-                        EvalContext &context, ArrayList<highlight_span> &spans,
-                        HashSet &line_variable_names,
-                        const HashSet *known_function_names,
-                        bool should_stop_at_closing_parenthesis) throws -> usize
+fn internal::scan_highlight_range(
+    StringView line, usize begin, usize end, EvalContext &context,
+    ArrayList<highlight_span> &spans, HashSet &line_variable_names,
+    const HashSet *known_function_names,
+    bool should_stop_at_closing_parenthesis) throws -> usize
 {
   let const do_push = [&](usize start, usize stop, highlight_role role)
                           throws -> void {

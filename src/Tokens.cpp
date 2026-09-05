@@ -9,7 +9,9 @@
 
 namespace koshka {
 
-Token::Token(SourceLocation location) : m_location(steal(location)) {}
+Token::Token(SourceLocation location, Kind kind)
+    : m_location(steal(location)), m_kind(kind)
+{}
 
 pure fn Token::source_location() const wontthrow -> SourceLocation
 {
@@ -595,8 +597,7 @@ fn SegmentText::append(StringView other) throws -> void
 namespace tokens {
 
 #define TOKEN_DECLS(t, s)                                                      \
-  t::t(SourceLocation location) : Token(steal(location)) {}                    \
-  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  t::t(SourceLocation location) : Token(steal(location), Token::Kind::t) {}    \
   String t::raw_string() const throws { return s; }                            \
   Maybe<StringView> t::raw_view() const wontthrow { return StringView{s}; }
 
@@ -632,14 +633,9 @@ TOKEN_DECLS(RightBracket, "}");
 
 Assignment::Assignment(SourceLocation location, String key, Word value,
                        bool is_append)
-    : Token(steal(location)), m_key(steal(key)), m_value(steal(value)),
-      m_is_append(is_append)
+    : Token(steal(location), Token::Kind::Assignment), m_key(steal(key)),
+      m_value(steal(value)), m_is_append(is_append)
 {}
-
-fn Assignment::kind() const wontthrow -> Token::Kind
-{
-  return Token::Kind::Assignment;
-}
 
 fn Assignment::raw_string() const throws -> String
 {
@@ -680,7 +676,7 @@ pure fn borrowed_word_literal(const Word &word) wontthrow -> Maybe<StringView>
 } /* namespace */
 
 WordToken::WordToken(SourceLocation location, Word word)
-    : Token(steal(location)), m_word(steal(word))
+    : Token(steal(location), Token::Kind::Word), m_word(steal(word))
 {}
 
 fn WordToken::raw_view() const wontthrow -> Maybe<StringView>
@@ -696,11 +692,6 @@ fn WordToken::raw_string() const throws -> String
   }
 
   return m_word.to_literal_string();
-}
-
-fn WordToken::kind() const wontthrow -> Token::Kind
-{
-  return Token::Kind::Word;
 }
 
 pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }

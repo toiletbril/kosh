@@ -7,7 +7,7 @@ namespace koshka {
 
 class Token;
 
-namespace parser_internal {
+namespace internal {
 
 template <typename... Kinds>
 consteval fn token_kind_mask(Kinds... kinds) -> u64
@@ -22,6 +22,6 @@ cold [[noreturn]] fn throw_unterminated(const SourceLocation &opener,
                                         StringView keyword,
                                         SourceLocation fallback) throws -> void;
 
-} /* namespace parser_internal */
+} /* namespace internal */
 
 } /* namespace koshka */

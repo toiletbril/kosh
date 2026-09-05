@@ -476,13 +476,22 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
     let const ast = parser.construct_ast();
     ASSERT(ast != nullptr);
-    m_retained_source_asts.push(ast);
+    m_retained_source_asts.reserve(m_retained_source_asts.count() + 1);
+    m_retained_sources.reserve(m_retained_sources.count() + 1);
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow
        jump made inside it can point a caret at the right text after this call
        returns. */
-    let const retained_source = new String{steal(normalized_source)};
+    let const retained_source = heap_allocator().alloc_array<String>(1);
+    if (retained_source == nullptr) throw std::bad_alloc{};
+    try {
+      new (retained_source) String{steal(normalized_source)};
+    } catch (...) {
+      heap_allocator().free_array(retained_source, 1);
+      throw;
+    }
     m_retained_sources.push(retained_source);
+    m_retained_source_asts.push(ast);
     source = retained_source->view();
 
     let const previous_history_recording_root = m_history_recording_root;
@@ -586,8 +595,10 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
     pending_control_flow().location = SourceLocation{};
   }
 
-  for (String *source : m_retained_sources)
-    delete source;
+  for (String *source : m_retained_sources) {
+    source->~String();
+    heap_allocator().free_array(source, 1);
+  }
   m_retained_sources.clear();
 
   /* A just-freed buffer can be reissued at the same address and length, so the

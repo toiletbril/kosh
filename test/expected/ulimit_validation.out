@@ -1,3 +1,5 @@
+all=ok
+pipe=ok
 value=<banana> status=1 unchanged=yes
 value=<-1> status=1 unchanged=yes
 value=<1x> status=1 unchanged=yes

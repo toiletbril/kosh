@@ -324,13 +324,8 @@ static pure fn read_magic_number(const file_magic_rule &rule, StringView bytes,
       rule.byte_count > bytes.length - rule.offset)
     return false;
 
-  value = 0;
-#if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-  __builtin_memcpy(&value, bytes.data + rule.offset, rule.byte_count);
-#else
-  for (usize index = 0; index < rule.byte_count; index++)
-    value = (value << 8) | static_cast<u8>(bytes[rule.offset + index]);
-#endif
+  value =
+      os::read_native_endian_bytes(bytes.data + rule.offset, rule.byte_count);
   value &= rule.mask;
 
   if (rule.kind == file_magic_kind::Signed && rule.byte_count < 8) {

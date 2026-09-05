@@ -165,18 +165,11 @@ fn record_directory_access(StringView directory, Allocator allocator) throws
   if (directory.is_empty()) return;
 
   let entries = read_frecency_store(allocator);
-#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
-  let const directory_path = Path{directory};
-#endif
   let const now = now_epoch_seconds();
   let was_found = false;
   for (let &entry : entries) {
-    let is_same_directory = entry.path.view() == directory;
-#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
-    if (!is_same_directory)
-      is_same_directory =
-          Path{entry.path.view()}.is_same_file_as(directory_path);
-#endif
+    let const is_same_directory =
+        os::paths_match_for_history(entry.path.view(), directory);
     if (is_same_directory) {
       entry.rank += 1;
       entry.last_access = now;

@@ -282,7 +282,12 @@ hidden void *tre_mem_alloc_impl(tre_mem_t mem, int provided,
 /* Frees the memory allocator and all memory allocated with it. */
 hidden void tre_mem_destroy(tre_mem_t mem);
 
-#define xmalloc  malloc
-#define xcalloc  calloc
-#define xfree    free
-#define xrealloc realloc
+void *kosh_regex_allocate(size_t length);
+void *kosh_regex_allocate_zeroed(size_t count, size_t length);
+void *kosh_regex_reallocate(void *pointer, size_t length);
+void kosh_regex_release(void *pointer);
+
+#define xmalloc  kosh_regex_allocate
+#define xcalloc  kosh_regex_allocate_zeroed
+#define xfree    kosh_regex_release
+#define xrealloc kosh_regex_reallocate

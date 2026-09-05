@@ -195,6 +195,15 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
   return names;
 }
 
+fn shopt_reusable_lines(const EvalContext &cxt) throws -> String
+{
+  let lines = String{heap_allocator()};
+  for (let const name : shopt_option_name_list())
+    lines += shopt_reusable_line(name, cxt.is_shopt_enabled(name), false,
+                                 heap_allocator());
+  return lines;
+}
+
 Shopt::Shopt() = default;
 
 pure fn Shopt::kind() const wontthrow -> Builtin::Kind { return Kind::Shopt; }

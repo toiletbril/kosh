@@ -4,6 +4,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "EvalVariablesInternal.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Platform.hpp"
@@ -317,6 +318,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
   bool is_first = true;
   usize stage_index = 0;
+  let bootstrap_source = String{heap_allocator()};
 
   for (ExecContext &ec : ecs) {
     Maybe<os::Pipe> pipe;
@@ -416,7 +418,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                 "SHLVL",
                 "PATH",
                 "NO_COLOR",
-                "KOSH_INTERNAL_SUPPRESS_ROOT_TRACE"};
+                internal::SUPPRESS_ROOT_TRACE};
             for (let const name : RESTORED_ENVIRONMENT_NAMES) {
               let const value = os::get_environment_variable(name);
               if (value.has_value()) {
@@ -450,11 +452,16 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               [&]() { stage_err = stage_out.value_or(KOSH_STDOUT); },
               [&]() { stage_out = stage_err.value_or(KOSH_STDERR); });
           try {
+            if (!os::can_fork_evaluator() && bootstrap_source.is_empty()) {
+              bootstrap_source = cxt.subshell_bootstrap_source();
+            }
             let const launch = os::launch_compound_stage(
                 stage_source.view(), ec.in_fd, stage_out, stage_err, cxt.mood(),
                 ec.source_location(),
                 source != nullptr ? source->view() : StringView{},
-                process_group, process_group_id);
+                process_group, process_group_id, bootstrap_source.view(),
+                cxt.shell_name(), cxt.last_exit_status(),
+                os::get_shell_process_id(), cxt.get_subshell_depth() + 1);
             forked_child = launch.child;
           } catch (...) {
             ec.close_fds();

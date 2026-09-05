@@ -26,6 +26,16 @@ fn EvalContext::enter_subshell() wontthrow -> void
   LOG(Debug, "entered a subshell, depth now %zu", m_subshell_depth);
 }
 
+pure fn EvalContext::get_subshell_depth() const wontthrow -> usize
+{
+  return m_subshell_depth;
+}
+
+fn EvalContext::set_subshell_depth(usize depth) wontthrow -> void
+{
+  m_subshell_depth = depth;
+}
+
 fn EvalContext::leave_subshell() wontthrow -> void
 {
   ASSERT(m_subshell_depth > 0);
@@ -769,6 +779,135 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
   /* The exit status is intentionally not restored, a subshell propagates its
      last command's status to the parent. */
+}
+
+fn EvalContext::subshell_bootstrap_source() const throws -> String
+{
+  let source = String{heap_allocator()};
+  let names = ArrayList<String>{heap_allocator()};
+  variable_names().for_each([&](StringView name) { names.push_managed(name); });
+  names.sort();
+
+  let const do_append_assignment = [&](StringView name, StringView subscript,
+                                       StringView value) throws {
+    source.append(name);
+    source.push('[');
+    append_shell_quoted_arg(source, subscript);
+    source += "]=";
+    append_shell_quoted_arg(source, value);
+    source.push('\n');
+  };
+
+  for (let const &stored_name : names) {
+    let const name = stored_name.view();
+    let const is_integer = is_integer_variable(name);
+    let const is_read_only = is_readonly(name);
+    let const is_exported_value = is_exported(name);
+    let const *indexed = lookup_indexed_array(name);
+    let const is_associative = is_associative_array(name);
+    let const value = get_variable_value(name);
+    if (indexed == nullptr && !is_associative && is_exported_value &&
+        !is_integer && !is_read_only)
+    {
+      let const environment_value = os::get_environment_variable(name);
+      if (value.has_value() && environment_value.has_value() &&
+          value->view() == environment_value->view())
+      {
+        continue;
+      }
+    }
+
+    source += is_associative       ? "declare -A"
+              : indexed != nullptr ? "declare -a"
+                                   : "declare -";
+    if (is_integer) source.push('i');
+    if (is_exported_value) source.push('x');
+    if (indexed == nullptr && !is_associative && !is_integer &&
+        !is_exported_value)
+    {
+      source.push('-');
+    }
+    source.push(' ');
+    source.append(name);
+    if (indexed == nullptr && !is_associative && value.has_value()) {
+      source.push('=');
+      append_shell_quoted_arg(source, value->view());
+    }
+    source.push('\n');
+
+    if (indexed != nullptr || is_associative) {
+      let const subscripts = collect_array_subscripts(name);
+      let const values = collect_array_elements(name);
+      ASSERT(subscripts.count() == values.count());
+      for (usize index = 0; index < subscripts.count(); index++)
+        do_append_assignment(name, subscripts[index].view(),
+                             values[index].view());
+    }
+    if (is_read_only) {
+      source += "readonly ";
+      source.append(name);
+      source.push('\n');
+    }
+  }
+
+  for (let const &name : sorted_function_names()) {
+    let const *function_source = find_function_source(name.view());
+    if (function_source == nullptr || function_source->is_empty()) {
+      continue;
+    }
+    source.append(function_source->view());
+    source.push('\n');
+  }
+  for (let const &definition : alias_definitions()) {
+    source += "alias ";
+    source.append(definition.view());
+    source.push('\n');
+  }
+  traps().for_each([&](StringView condition, const String &action) throws {
+    if (condition == "EXIT") return;
+    source += "trap -- ";
+    append_shell_quoted_arg(source, action.view());
+    source.push(' ');
+    append_shell_quoted_arg(source, condition);
+    source.push('\n');
+  });
+
+  source += "set --";
+  for (let const &parameter : positional_params()) {
+    source.push(' ');
+    append_shell_quoted_arg(source, parameter.view());
+  }
+  source.push('\n');
+
+  let const working_directory = Path::current_directory();
+  if (!directory_stack().is_empty()) {
+    source += "builtin cd -- ";
+    append_shell_quoted_arg(source, directory_stack()[0].view());
+    source.push('\n');
+    for (usize index = 1; index < directory_stack().count(); index++) {
+      source += "pushd ";
+      append_shell_quoted_arg(source, directory_stack()[index].view());
+      source += " >/dev/null\n";
+    }
+    source += "pushd ";
+    append_shell_quoted_arg(source, working_directory.text().view());
+    source += " >/dev/null\n";
+  } else {
+    source += "builtin cd -- ";
+    append_shell_quoted_arg(source, working_directory.text().view());
+    source.push('\n');
+  }
+
+  char mask_text[8];
+  std::snprintf(mask_text, sizeof(mask_text), "%04o",
+                os::get_file_creation_mask());
+  source += "umask ";
+  source += mask_text;
+  source.push('\n');
+  source += shopt_reusable_lines(*this);
+  source += shell_option_reusable_lines(*this);
+  if (is_restricted_shell()) source += "set -r\n";
+  return source;
 }
 
 fn EvalContext::option_flags_string() const throws -> String

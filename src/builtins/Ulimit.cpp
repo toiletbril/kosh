@@ -133,6 +133,9 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                           cxt.scratch_allocator());
       out.push('\n');
     }
+    if (out.is_empty())
+      throw Error{"Unable to read resource limits: " +
+                  os::last_system_error_message()};
     ec.print_to_stdout(out);
     return 0;
   }
@@ -153,7 +156,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   os::resource_limit limit{};
   if (!os::get_resource_limit(resource.kind, limit))
-    throw Error{"Unable to read the resource limit because " +
+    throw Error{"Unable to read the resource limit: " +
                 os::last_system_error_message()};
 
   if (args.count() < 2) {
@@ -199,7 +202,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (!os::set_resource_limit(resource.kind, limit))
-    throw Error{"Unable to set the resource limit because " +
+    throw Error{"Unable to set the resource limit: " +
                 os::last_system_error_message()};
 
   return 0;

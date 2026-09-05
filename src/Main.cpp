@@ -7,6 +7,7 @@
 #include "Diagnostics.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "EvalVariablesInternal.hpp"
 #include "Expressions.hpp"
 #include "Formatter.hpp"
 #include "Koshkit.hpp"
@@ -128,7 +129,7 @@ FLAG(EXTENDED_ARITHMETIC, Bool, '\0', "enable-extended-arithmetic", Kosh,
      "set -o extended-arithmetic.");
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
-     "Print AST before executing each command.");
+     "Print syntax trees before execution and during formatting or linting.");
 FLAG(OPTIMIZER_DIAGNOSTICS, Bool, '\0', "show-optimizer-diagnostics", Debug,
      "Trace the optimizer prepass and report every folded and eliminated node "
      "as an analysis diagnostic.");
@@ -168,7 +169,7 @@ FLAG(DEBUG_TOILETLINE_ALLOCATION, Bool, '\0', "debug-toiletline-allocation",
 
 #include "MainOperations.hpp"
 
-static fn kosh_main(int argc, char **argv) -> int
+fn kosh_main(int argc, char **argv) -> int
 {
   koshka::os::initialize_platform_runtime();
   koshka::os::register_platform_flags(FLAG_LIST);
@@ -657,10 +658,49 @@ static fn kosh_main(int argc, char **argv) -> int
     });
 
   koshka::os::unset_environment_variable("KOSH_IDENTITY");
+  let subshell_bootstrap = koshka::os::take_subshell_bootstrap_source();
+  koshka::Maybe<i32> inherited_exit_status = koshka::None;
+  koshka::Maybe<usize> inherited_subshell_depth = koshka::None;
+  if (!koshka::os::can_fork_evaluator() && !subshell_bootstrap.is_empty()) {
+    if (let const status_text = koshka::os::get_environment_variable(
+            koshka::internal::PREVIOUS_EXIT_STATUS);
+        status_text.has_value())
+    {
+      let const parsed_status = status_text->view().to<i32>();
+      if (!parsed_status.is_error())
+        inherited_exit_status = parsed_status.value();
+      koshka::os::unset_environment_variable(
+          koshka::internal::PREVIOUS_EXIT_STATUS);
+    }
+    if (let const process_id_text = koshka::os::get_environment_variable(
+            koshka::internal::SHELL_PROCESS_ID);
+        process_id_text.has_value())
+    {
+      let const parsed_process_id = process_id_text->view().to<i64>();
+      if (!parsed_process_id.is_error() && parsed_process_id.value() > 0) {
+        koshka::os::set_shell_process_id(parsed_process_id.value());
+      }
+      koshka::os::unset_environment_variable(
+          koshka::internal::SHELL_PROCESS_ID);
+    }
+    if (let const depth_text = koshka::os::get_environment_variable(
+            koshka::internal::SUBSHELL_DEPTH);
+        depth_text.has_value())
+    {
+      let const parsed_depth = depth_text->view().to<u64>();
+      if (!parsed_depth.is_error() &&
+          parsed_depth.value() <= static_cast<u64>(SIZE_MAX))
+      {
+        inherited_subshell_depth = static_cast<usize>(parsed_depth.value());
+      }
+      koshka::os::unset_environment_variable(koshka::internal::SUBSHELL_DEPTH);
+    }
+  }
   let const should_suppress_root_source_trace =
-      koshka::os::get_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE")
+      koshka::os::get_environment_variable(
+          koshka::internal::SUPPRESS_ROOT_TRACE)
           .has_value();
-  koshka::os::unset_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE");
+  koshka::os::unset_environment_variable(koshka::internal::SUPPRESS_ROOT_TRACE);
 
   let context = koshka::EvalContext{FLAG_DISABLE_EXPANSION.is_enabled(),
                                     FLAG_VERBOSE.is_enabled(),
@@ -752,21 +792,24 @@ static fn kosh_main(int argc, char **argv) -> int
 
   /* SHLVL counts shell nesting, incremented and exported so a child shell
      continues the count. */
-  i64 shell_level = 0;
-  if (koshka::Maybe<koshka::String> inherited =
-          koshka::os::get_environment_variable("SHLVL");
-      inherited.has_value())
-  {
-    if (koshka::ErrorOr<i64> parsed_level = inherited->view().to<i64>();
-        !parsed_level.is_error() && parsed_level.value() > 0)
-      shell_level = parsed_level.value();
+  if (!inherited_subshell_depth.has_value()) {
+    i64 shell_level = 0;
+    if (koshka::Maybe<koshka::String> inherited =
+            koshka::os::get_environment_variable("SHLVL");
+        inherited.has_value())
+    {
+      if (koshka::ErrorOr<i64> parsed_level = inherited->view().to<i64>();
+          !parsed_level.is_error() && parsed_level.value() > 0)
+      {
+        shell_level = parsed_level.value();
+      }
+    }
+    constexpr i64 MAX_SHLVL = 999;
+    if (shell_level > MAX_SHLVL) shell_level = 0;
+    koshka::os::set_environment_variable(
+        "SHLVL",
+        koshka::String::from(shell_level + 1, koshka::heap_allocator()));
   }
-  /* An inherited level past the cap is reset so the increment cannot overflow,
-     the way bash bounds SHLVL. */
-  constexpr i64 MAX_SHLVL = 999;
-  if (shell_level > MAX_SHLVL) shell_level = 0;
-  koshka::os::set_environment_variable(
-      "SHLVL", koshka::String::from(shell_level + 1, koshka::heap_allocator()));
   /* The exported set must know SHLVL even on a first shell that did not inherit
      one. */
   context.mark_exported("SHLVL");
@@ -873,6 +916,19 @@ static fn kosh_main(int argc, char **argv) -> int
     context.set_warning_level(
         context.mood() == koshka::mimic_mood::Default ? 0 : 3);
   }
+
+  if (!subshell_bootstrap.is_empty()) {
+    try {
+      context.run_source(subshell_bootstrap.view(), "inherited shell state");
+    } catch (const koshka::Error &error) {
+      koshka::show_message(error.to_string());
+      return 1;
+    }
+  }
+  if (inherited_exit_status.has_value())
+    context.set_last_exit_status(*inherited_exit_status);
+  if (inherited_subshell_depth.has_value())
+    context.set_subshell_depth(*inherited_subshell_depth);
 
   /* The rc files retained a heap copy of their text and tree until the next
      top-level command clears them, dropped now rather than carried through the
@@ -1298,43 +1354,3 @@ static fn kosh_main(int argc, char **argv) -> int
 
   unreachable("the main command loop terminated without exiting");
 }
-
-#if defined _WIN32
-fn wmain(int argc, wchar_t **wide_argv) -> int
-{
-  let narrow_arguments =
-      koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
-  narrow_arguments.reserve(static_cast<usize>(argc));
-  for (int argument_position = 0; argument_position < argc; argument_position++)
-  {
-    usize wide_length = 0;
-    while (wide_argv[argument_position][wide_length] != L'\0')
-      wide_length++;
-    if (wide_length > static_cast<usize>(INT_MAX)) return 1;
-    let const utf8_length = WideCharToMultiByte(
-        CP_UTF8, WC_ERR_INVALID_CHARS, wide_argv[argument_position],
-        static_cast<int>(wide_length), nullptr, 0, nullptr, nullptr);
-    if (wide_length != 0 && utf8_length <= 0) return 1;
-    let utf8 = koshka::ArrayList<char>{koshka::heap_allocator()};
-    utf8.reserve(static_cast<usize>(utf8_length));
-    if (utf8_length != 0 &&
-        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-                            wide_argv[argument_position],
-                            static_cast<int>(wide_length), utf8.begin(),
-                            utf8_length, nullptr, nullptr) != utf8_length)
-      return 1;
-    narrow_arguments.push(koshka::String{
-        koshka::StringView{utf8.begin(), static_cast<usize>(utf8_length)}
-    });
-  }
-
-  let narrow_argv = koshka::ArrayList<char *>{koshka::heap_allocator()};
-  narrow_argv.reserve(static_cast<usize>(argc) + 1);
-  for (koshka::String &argument : narrow_arguments)
-    narrow_argv.push(const_cast<char *>(argument.c_str()));
-  narrow_argv.push(nullptr);
-  return kosh_main(argc, narrow_argv.begin());
-}
-#else
-fn main(int argc, char **argv) -> int { return kosh_main(argc, argv); }
-#endif

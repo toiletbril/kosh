@@ -24,6 +24,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 pure fn find_pipe_overriding_redirection(const SimpleCommand *stage,
                                          bool wants_output) wontthrow
     -> const Redirection *

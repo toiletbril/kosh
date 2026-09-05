@@ -8,7 +8,7 @@
 
 namespace koshka {
 
-namespace expressions {
+namespace expressions::internal {
 
 namespace {
 
@@ -1330,6 +1330,6 @@ fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
     check_call_before_definition(actx, summaries);
 }
 
-} /* namespace expressions */
+} /* namespace expressions::internal */
 
 } /* namespace koshka */

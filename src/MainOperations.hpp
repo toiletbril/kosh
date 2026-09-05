@@ -425,7 +425,8 @@ static fn run_script_contents(
     analysis_diagnostic_totals *diagnostic_totals = nullptr,
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
     bool should_require_shebang = true,
-    bool should_silence_unresolved_commands = false) -> int
+    bool should_silence_unresolved_commands = false,
+    bool should_print_ast = true) -> int
 {
   i32 exit_code = EXIT_SUCCESS;
 
@@ -462,11 +463,11 @@ static fn run_script_contents(
        memory of a large script is the memory of its widest command. */
     let const should_stream_units =
         run_analysis && precompiled_ast == nullptr && context.no_exec() &&
-        out_ast == nullptr && !context.show_ast() &&
+        out_ast == nullptr && !(should_print_ast && context.show_ast()) &&
         !context.show_lexed_words();
     let const should_stream_execution =
         precompiled_ast == nullptr && !context.no_exec() &&
-        out_ast == nullptr && !context.show_ast() &&
+        out_ast == nullptr && !(should_print_ast && context.show_ast()) &&
         !context.show_lexed_words();
 
     /* A function body parsed into the function arena would outlive the unit
@@ -541,7 +542,7 @@ static fn run_script_contents(
 
       if (do_report_parse_errors()) return EXIT_FAILURE;
 
-      if (context.show_ast()) {
+      if (should_print_ast && context.show_ast()) {
         print(ast->to_ast_string());
         print("\n");
       }
@@ -741,7 +742,8 @@ static fn run_lint_document_contents(
     Maybe<StringView> filename,
     analysis_diagnostic_totals *diagnostic_totals = nullptr,
     ArrayList<source_diagnostic> *diagnostic_sink = nullptr,
-    bool *is_format_recognized = nullptr) throws -> int
+    bool *is_format_recognized = nullptr, bool should_print_ast = true) throws
+    -> int
 {
   let const document =
       parse_format_document(parser_format_input{source.view(), filename, None});
@@ -756,7 +758,7 @@ static fn run_lint_document_contents(
   if (!document.is_host_format)
     return run_script_contents(source, context, ast_arena, filename, nullptr,
                                nullptr, None, diagnostic_totals,
-                               diagnostic_sink);
+                               diagnostic_sink, true, false, should_print_ast);
 
   let const saved_mood = context.mood();
   let const saved_warning_level = context.warning_level();
@@ -773,7 +775,7 @@ static fn run_lint_document_contents(
     let const fragment_status = run_script_contents(
         fragment.analysis_source, context, ast_arena, filename, nullptr,
         nullptr, None, diagnostic_totals, diagnostic_sink, false,
-        fragment.should_silence_unresolved_commands);
+        fragment.should_silence_unresolved_commands, should_print_ast);
     if (fragment_status != EXIT_SUCCESS) status = fragment_status;
   }
 
@@ -782,7 +784,8 @@ static fn run_lint_document_contents(
 
 static fn format_document_source(StringView source, Maybe<StringView> filename,
                                  mimic_mood mood, BumpArena &ast_arena,
-                                 ArrayList<String> &errors) throws
+                                 ArrayList<String> &errors,
+                                 String *ast_output = nullptr) throws
     -> Maybe<String>
 {
   let const document =
@@ -793,13 +796,19 @@ static fn format_document_source(StringView source, Maybe<StringView> filename,
     return None;
   }
   if (!document.is_host_format)
-    return format_shell_source(source, mood, ast_arena, errors);
+    return format_shell_source(source, mood, ast_arena, errors, ast_output);
 
   let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
   for (let const &fragment : document.fragments) {
-    let const formatted = format_shell_source(fragment.shell_source.view(),
-                                              fragment.mood, ast_arena, errors);
+    let fragment_ast = String{heap_allocator()};
+    let const formatted = format_shell_source(
+        fragment.shell_source.view(), fragment.mood, ast_arena, errors,
+        ast_output != nullptr ? &fragment_ast : nullptr);
     if (!formatted.has_value()) return None;
+    if (ast_output != nullptr) {
+      if (!ast_output->is_empty()) ast_output->push('\n');
+      ast_output->append(fragment_ast.view());
+    }
     let encoded = parser_format_encode(fragment, formatted->view());
     if (!encoded.has_value()) return None;
     replacements.push(parser_format_replacement{
@@ -1363,7 +1372,7 @@ static fn run_format_operation(const ArrayList<String> &file_names,
       bool is_format_recognized = true;
       unused(run_lint_document_contents(normalized_source, context, ast_arena,
                                         source_name, nullptr, &diagnostics,
-                                        &is_format_recognized));
+                                        &is_format_recognized, false));
       if (!is_format_recognized) {
         did_fail = true;
         continue;
@@ -1401,13 +1410,19 @@ static fn run_format_operation(const ArrayList<String> &file_names,
     let const source_name = is_standard_input
                                 ? Maybe<StringView>{}
                                 : Maybe<StringView>{file_names[input_index]};
-    let formatted = format_document_source(source.view(), source_name, mood,
-                                           ast_arena, errors);
+    let ast_output = String{heap_allocator()};
+    let formatted = format_document_source(
+        source.view(), source_name, mood, ast_arena, errors,
+        context.show_ast() ? &ast_output : nullptr);
     if (!formatted.has_value()) {
       for (let const &error : errors)
         show_message(error.view());
       did_fail = true;
       continue;
+    }
+    if (context.show_ast() && !ast_output.is_empty()) {
+      print(ast_output.view());
+      print("\n");
     }
     if (should_apply) {
       ASSERT(snapshot.has_value());
@@ -1449,7 +1464,7 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     bool is_format_recognized = true;
     unused(run_lint_document_contents(source, context, ast_arena,
                                       file_name.view(), nullptr, &diagnostics,
-                                      &is_format_recognized));
+                                      &is_format_recognized, false));
     if (!is_format_recognized) {
       did_fail = true;
       continue;
@@ -1506,7 +1521,7 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let validation_diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
     unused(run_lint_document_contents(validation_source, context, ast_arena,
                                       file_name.view(), nullptr,
-                                      &validation_diagnostics));
+                                      &validation_diagnostics, nullptr, false));
     bool has_parse_error = false;
     for (let const &diagnostic : validation_diagnostics) {
       if (diagnostic.id.has_value()) continue;

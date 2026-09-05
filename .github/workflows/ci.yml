@@ -197,7 +197,7 @@ jobs:
             throw "Unexpected shell platform: $shellPlatform"
           }
           sh.exe -c `
-            'for tool in diff env git mkfifo mktemp perl rm script sed strings stty tee; do command -v "$tool" || exit 1; done; test -x /bin/stty'
+            'for tool in awk dd diff env git mkfifo mktemp perl printenv rm script sed stat strings stty tee; do command -v "$tool" || exit 1; done; test -x /bin/stty'
           if ($LASTEXITCODE -ne 0) {
             throw "The MSYS2 golden test toolchain is incomplete"
           }

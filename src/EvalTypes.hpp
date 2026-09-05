@@ -232,6 +232,7 @@ struct process_substitution
 {
   os::descriptor shell_fd;
   os::process child;
+  opaque *platform_cleanup;
   SourceLocation location;
   StringView source;
 };
@@ -239,7 +240,6 @@ struct process_substitution
 struct process_substitution_mark
 {
   usize pending{0};
-  usize temp{0};
 };
 
 struct loop_redirect_fd

@@ -19,7 +19,9 @@ namespace koshka {
 
 namespace completion {
 
-BumpArena COMPLETION_ARENA{};
+using namespace internal;
+
+BumpArena internal::COMPLETION_ARENA{};
 
 static fn all_active_glob_mask(usize length) throws -> Bitset
 {

@@ -7,7 +7,7 @@
 
 namespace koshka {
 
-namespace expressions {
+namespace expressions::internal {
 
 /* The direct test operator a leading ! collapses into, for the SC2335 lint.
    None for an operator with no negated shortcut. */
@@ -862,6 +862,6 @@ pure fn arithmetic_assignment_target(StringView expression,
   return expression.substring_of_length(at, end - at);
 }
 
-} /* namespace expressions */
+} /* namespace expressions::internal */
 
 } /* namespace koshka */

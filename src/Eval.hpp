@@ -20,9 +20,40 @@
 
 namespace koshka {
 
+class EvalContext;
+
 namespace completion {
 class shell_highlight_cache;
 } /* namespace completion */
+
+class NameValueArg
+{
+public:
+  static fn from(StringView arg) wontthrow -> NameValueArg
+  {
+    let const equals = arg.find_character('=');
+    if (!equals.has_value()) return NameValueArg{arg, None};
+
+    return NameValueArg{arg.substring_of_length(0, *equals),
+                        arg.substring(*equals + 1)};
+  }
+
+  mustuse pure fn get_name() const wontthrow -> StringView { return m_name; }
+
+  mustuse pure fn get_value() const wontthrow -> const Maybe<StringView> &
+  {
+    return m_value;
+  }
+
+private:
+  NameValueArg(StringView name, Maybe<StringView> value) wontthrow
+      : m_name(name),
+        m_value(steal(value))
+  {}
+
+  StringView m_name;
+  Maybe<StringView> m_value;
+};
 
 enum class substring_subject : u8
 {
@@ -40,6 +71,8 @@ fn compute_substring_bounds(i64 value_count, i64 offset, Maybe<i64> length,
                             substring_subject subject) throws
     -> substring_bounds;
 pure fn shopt_option_index(StringView name) wontthrow -> Maybe<u8>;
+fn shell_option_reusable_lines(const EvalContext &cxt) throws -> String;
+fn shopt_reusable_lines(const EvalContext &cxt) throws -> String;
 
 class EvalContext
 {
@@ -214,8 +247,16 @@ public:
 
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
+  pure fn shell_name() const wontthrow -> StringView
+  {
+    return m_shell_name.view();
+  }
 
   fn directory_stack() wontthrow -> ArrayList<String> &;
+  pure fn directory_stack() const wontthrow -> const ArrayList<String> &
+  {
+    return m_directory_stack;
+  }
 
   /* Move the positional parameters out, so a function call saves the caller's
      without a deep copy and restores them by moving the saved list back. */
@@ -469,9 +510,12 @@ public:
 
   fn snapshot_state() throws -> eval_state_snapshot;
   fn restore_state(eval_state_snapshot snapshot) throws -> void;
+  fn subshell_bootstrap_source() const throws -> String;
 
   fn enter_subshell() wontthrow -> void;
   fn leave_subshell() wontthrow -> void;
+  pure fn get_subshell_depth() const wontthrow -> usize;
+  fn set_subshell_depth(usize depth) wontthrow -> void;
   pure fn in_subshell() const wontthrow -> bool;
   /* Back the descriptor up before a bare exec moves it inside an in-process
      subshell, so leave_subshell restores it. The first backup per subshell
@@ -1356,10 +1400,6 @@ protected:
 #endif
   ArrayList<process_substitution> m_pending_process_substitutions{
       heap_allocator()};
-  /* The temp files a process substitution leaves for the consuming command to
-     read by path, deleted once that command finishes. Empty and free on a
-     platform that reaps a child and a pipe instead, such as POSIX. */
-  os::TempFileSet m_substitution_temp_files{};
   ArrayList<loop_redirect_fd> m_loop_redirect_fds{heap_allocator()};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each

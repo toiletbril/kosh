@@ -649,7 +649,7 @@ public:
   Token &operator=(const Token &) = delete;
   Token &operator=(Token &&) noexcept = delete;
 
-  virtual fn kind() const wontthrow -> Kind = 0;
+  pure alwaysinline fn kind() const wontthrow -> Kind { return m_kind; }
   virtual fn raw_string() const throws -> String = 0;
 
   virtual fn raw_view() const wontthrow -> Maybe<StringView>;
@@ -663,11 +663,14 @@ public:
   static fn operator delete(opaque *pointer) wontthrow->void;
 
 protected:
-  Token(SourceLocation location);
+  Token(SourceLocation location, Kind kind);
 
 private:
   SourceLocation m_location;
+  Kind m_kind;
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(Token) == 24);
 
 inline constexpr static_string_entry<Token::Kind> KEYWORD_ENTRIES[] = {
     {SSK("if"),       Token::Kind::If      },
@@ -729,7 +732,6 @@ namespace tokens {
   public:                                                                      \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind kind() const wontthrow override;                                      \
     String raw_string() const throws override;                                 \
     Maybe<StringView> raw_view() const wontthrow override;                     \
   }
@@ -774,8 +776,6 @@ public:
 
   Assignment(SourceLocation location, String key, Word value, bool is_append);
 
-  fn kind() const wontthrow -> Kind override;
-
   fn raw_string() const throws -> String override;
 
   pure fn key() const wontthrow -> const String &;
@@ -795,8 +795,6 @@ public:
   static constexpr bool is_arena_destructor_noop = true;
 
   WordToken(SourceLocation location, Word word);
-
-  fn kind() const wontthrow -> Kind override;
 
   fn raw_string() const throws -> String override;
   fn raw_view() const wontthrow -> Maybe<StringView> override;

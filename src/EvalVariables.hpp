@@ -27,10 +27,9 @@ constexpr fn operator|(shell_variable_fact left,
 }
 
 constexpr fn has_shell_variable_fact(shell_variable_fact facts,
-                                     shell_variable_fact wanted) wontthrow
-    -> bool
+                                     shell_variable_fact fact) wontthrow -> bool
 {
-  return (static_cast<u8>(facts) & static_cast<u8>(wanted)) != 0;
+  return (static_cast<u8>(facts) & static_cast<u8>(fact)) != 0;
 }
 
 struct shell_variable_description

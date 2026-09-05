@@ -14,9 +14,9 @@ namespace koshka {
 
 using namespace tokens;
 using namespace expressions;
-using parser_internal::is_unquoted_word;
-using parser_internal::throw_unterminated;
-using parser_internal::token_kind_mask;
+using internal::is_unquoted_word;
+using internal::throw_unterminated;
+using internal::token_kind_mask;
 
 hot pure static fn get_sequence_kind(Token::Kind tk) wontthrow
     -> CompoundListCondition::Kind
@@ -122,8 +122,8 @@ hot pure static fn get_unquoted_word_text(const Token *token) wontthrow
   return &word.segments[0].text;
 }
 
-hot pure fn parser_internal::is_unquoted_word(const Token *token,
-                                              StringView text) wontthrow -> bool
+hot pure fn internal::is_unquoted_word(const Token *token,
+                                       StringView text) wontthrow -> bool
 {
   let const *unquoted_text = get_unquoted_word_text(token);
   return unquoted_text != nullptr && *unquoted_text == text;
@@ -170,9 +170,10 @@ cold pure static fn find_standalone_keyword(StringView source,
   return koshka::None;
 }
 
-cold [[noreturn]] fn parser_internal::throw_unterminated(
-    const SourceLocation &opener, StringView what, StringView source,
-    StringView keyword, SourceLocation fallback) throws -> void
+cold [[noreturn]] fn
+internal::throw_unterminated(const SourceLocation &opener, StringView what,
+                             StringView source, StringView keyword,
+                             SourceLocation fallback) throws -> void
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())

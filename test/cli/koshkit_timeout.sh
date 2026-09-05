@@ -98,7 +98,7 @@ preserve_is_alive=no
 if [ -n "$preserve_pid" ] && process_is_alive "$preserve_pid"; then
     preserve_is_alive=yes
 fi
-if { [ "${OS-}" = Windows_NT ] && [ "$preserved_status" -eq 1 ]; } ||
+if { [ "${OS-}" = Windows_NT ] && [ "$preserved_status" -eq 143 ]; } ||
     { [ "${OS-}" != Windows_NT ] && [ "$preserved_status" -eq 23 ] &&
       [ "$preserve_ready" = armed ] && [ "$preserve_is_alive" = no ]; }; then
     echo passed

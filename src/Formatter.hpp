@@ -27,7 +27,8 @@ struct source_fix
 };
 
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
-                       ArrayList<String> &errors) throws -> Maybe<String>;
+                       ArrayList<String> &errors,
+                       String *ast_output = nullptr) throws -> Maybe<String>;
 
 fn apply_source_fixes(StringView source, const ArrayList<source_fix> &fixes,
                       ArrayList<diagnostic_id> *applied_origins =

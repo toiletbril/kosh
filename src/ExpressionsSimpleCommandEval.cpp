@@ -19,6 +19,8 @@ namespace koshka {
 
 namespace expressions {
 
+using namespace internal;
+
 namespace {
 
 /* Replace a command word that names an alias with the alias body. The body is

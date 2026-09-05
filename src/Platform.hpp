@@ -109,6 +109,20 @@ hot alwaysinline fn pack_little_endian_bytes(u64 *words, const char *bytes,
 #endif
 }
 
+hot alwaysinline fn read_native_endian_bytes(const char *bytes,
+                                             usize count) wontthrow -> u64
+{
+  u64 value = 0;
+#if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  __builtin_memcpy(&value, bytes, count);
+#else
+  for (usize index = 0; index < count; index++)
+    value = (value << 8) | static_cast<u8>(bytes[index]);
+#endif
+
+  return value;
+}
+
 } /* namespace koshka::os */
 
 #include "ArrayList.hpp"
@@ -445,14 +459,16 @@ struct process_entry
 {
   i64 pid{0};
   String name{heap_allocator()};
-  u32 owner_id{0};
   String command_line{heap_allocator()};
   /* The BSD aux columns, filled only when resource stats are requested. */
   u64 virtual_kib{0};
   u64 resident_kib{0};
-  char state{'?'};
   u64 cpu_ticks{0};
+  u32 owner_id{0};
+  char state{'?'};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(process_entry) == 152);
 
 /* Every process the current user can see, for the koshkit pkill and killall
    utilities to match a name against. Empty on a platform with no process
@@ -540,23 +556,28 @@ struct file_status
   u64 device_id{0};
   u64 special_device_id{0};
   u64 file_id{0};
-  bool has_file_identity{false};
-  u32 mode{0};
   u64 link_count{0};
-  u32 owner_id{0};
-  u32 group_id{0};
   u64 size{0};
   i64 access_time{0};
-  u32 access_nanoseconds{0};
   i64 modification_time{0};
-  u32 modification_nanoseconds{0};
   i64 change_time{0};
-  u32 change_nanoseconds{0};
   u64 blocks{0};
+  u32 mode{0};
+  u32 owner_id{0};
+  u32 group_id{0};
+  u32 access_nanoseconds{0};
+  u32 modification_nanoseconds{0};
+  u32 change_nanoseconds{0};
+  bool has_file_identity{false};
 };
+
+static_assert(sizeof(usize) != 8 || sizeof(file_status) == 104);
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool;
 fn stat_path_following(StringView path, file_status &status) wontthrow -> bool;
+fn process_file_query_is_supported(const file_status &status,
+                                   bool should_match_filesystem) wontthrow
+    -> bool;
 
 fn format_mode_string(u32 mode) throws -> String;
 
@@ -782,6 +803,8 @@ fn path_is_owned_by_effective_group(StringView path) wontthrow -> bool;
 fn path_file_size(StringView path) wontthrow -> Maybe<u64>;
 fn path_modification_time(StringView path) wontthrow -> Maybe<i64>;
 fn paths_are_same_file(StringView first, StringView second) wontthrow -> bool;
+fn paths_match_for_history(StringView first, StringView second) wontthrow
+    -> bool;
 fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool;
 fn path_is_older_than(StringView first, StringView second) wontthrow -> bool;
 fn path_is_readable(StringView path) wontthrow -> bool;
@@ -863,6 +886,7 @@ fn environment_names() throws -> ArrayList<String>;
 fn is_child_process() wontthrow -> bool;
 
 fn get_shell_process_id() wontthrow -> i64;
+fn set_shell_process_id(i64 pid) wontthrow -> void;
 fn get_current_process_id() wontthrow -> i64;
 
 fn get_parent_process_id() wontthrow -> i64;
@@ -879,17 +903,8 @@ fn executable_system_name() throws -> String;
 fn executable_machine_name() throws -> String;
 fn system_release_name() throws -> String;
 fn system_version_name() throws -> String;
-
-inline fn ostype_name() wontthrow -> StringView
-{
-#if defined(_WIN32)
-  return "msys";
-#elif defined(__APPLE__)
-  return "darwin";
-#else
-  return "linux-gnu";
-#endif
-}
+fn machine_target_name() throws -> String;
+fn ostype_name() wontthrow -> StringView;
 
 /* The shell skips its startup config files in the setuid or setgid case, so a
    file an attacker controls cannot run with the raised privileges. */
@@ -1108,16 +1123,19 @@ struct process_substitution_launch
   Maybe<descriptor> retained_fd{};
   Maybe<descriptor> child_close_fd{};
   process child{KOSH_INVALID_PROCESS};
-  String diagnostic_output{heap_allocator()};
+  opaque *cleanup{nullptr};
   bool should_evaluate_child{false};
-  bool is_temporary_file{false};
-  bool has_shell_diagnostic{false};
 };
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               bool bash_compatible,
-                               bool source_traces_enabled) throws
+                               mimic_mood mood, bool source_traces_enabled,
+                               StringView bootstrap_source = {},
+                               StringView shell_name = {},
+                               i32 previous_exit_status = 0,
+                               i64 shell_process_id = 0,
+                               usize subshell_depth = 0) throws
     -> process_substitution_launch;
+fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void;
 
 fn try_fork_compound_stage(
     Maybe<descriptor> in_fd, Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
@@ -1139,10 +1157,14 @@ fn launch_compound_stage(
     Maybe<descriptor> err_fd, mimic_mood mood, SourceLocation location = {},
     StringView diagnostic_source = {},
     process_group_mode process_group = process_group_mode::Inherit,
-    i64 process_group_id = 0) throws -> compound_stage_launch;
+    i64 process_group_id = 0, StringView bootstrap_source = {},
+    StringView shell_name = {}, i32 previous_exit_status = 0,
+    i64 shell_process_id = 0, usize subshell_depth = 0) throws
+    -> compound_stage_launch;
 
 fn register_platform_flags(FlagList &flags) throws -> void;
 fn initialize_platform_runtime() wontthrow -> void;
+fn take_subshell_bootstrap_source() wontthrow -> String;
 
 /* A forked pipeline-stage child calls this so it never runs the parent's
    cleanup inside the duplicated process. */

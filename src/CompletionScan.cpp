@@ -19,6 +19,8 @@ namespace koshka {
 
 namespace completion {
 
+using namespace internal;
+
 #if !defined NDEBUG
 static usize DEBUG_SHELL_LEXICAL_SCAN_BYTE_COUNT = 0;
 #endif
@@ -305,9 +307,9 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
               ->targets;
 }
 
-fn complete_from_process_arguments(StringView line, StringView token,
-                                   usize token_start,
-                                   completion_mode mode) throws
+fn internal::complete_from_process_arguments(StringView line, StringView token,
+                                             usize token_start,
+                                             completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -353,9 +355,10 @@ fn complete_from_process_arguments(StringView line, StringView token,
   return candidates;
 }
 
-fn complete_from_tools_with_targets(StringView line, StringView token,
-                                    usize token_start, completion_mode mode,
-                                    EvalContext &context) throws
+fn internal::complete_from_tools_with_targets(StringView line, StringView token,
+                                              usize token_start,
+                                              completion_mode mode,
+                                              EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -618,8 +621,9 @@ static fn push_variable_name_candidates(StringView token, EvalContext &context,
     do_add_name(name);
 }
 
-fn complete_from_builtin_flags(StringView line, StringView token,
-                               usize token_start, EvalContext &context) throws
+fn internal::complete_from_builtin_flags(StringView line, StringView token,
+                                         usize token_start,
+                                         EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   let const command = command_word_of(line);
@@ -919,9 +923,9 @@ static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
   candidates.push(String{entry});
 }
 
-fn complete_from_spec(StringView line, StringView token, usize cursor,
-                      completion_mode mode, EvalContext &context,
-                      StringMap<String> &descriptions) throws
+fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
+                                completion_mode mode, EvalContext &context,
+                                StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1103,9 +1107,9 @@ static fn collect_shell_heredoc(StringView source, usize &position, usize end,
         shell_pending_heredoc{steal(delimiter), should_strip_tabs});
 }
 
-fn advance_shell_lexical_state(StringView source, usize end,
-                               shell_lexical_state &state,
-                               shell_lexical_scan_target *target) throws -> void
+fn internal::advance_shell_lexical_state(
+    StringView source, usize end, shell_lexical_state &state,
+    shell_lexical_scan_target *target) throws -> void
 {
   if (end > source.length) end = source.length;
   let i = state.source_position;
@@ -1251,7 +1255,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
         consider_shell_lexical_frame(frame, i, state.frames.count(), target);
       } else {
         state.frames.push(shell_lexical_frame{
-            i + 1, 0, shell_lexical_frame_kind::backtick, state.quote});
+            i + 1, 0, 0, 0, shell_lexical_frame_kind::backtick, state.quote});
         state.quote = 0;
       }
       i++;
@@ -1261,14 +1265,14 @@ fn advance_shell_lexical_state(StringView source, usize end,
     if (c == '$' && i + 1 < end && source[i + 1] == '(') {
       if (i + 2 < end && source[i + 2] == '(') {
         state.frames.push(shell_lexical_frame{
-            i + 3, 0, shell_lexical_frame_kind::arithmetic, state.quote});
+            i + 3, 0, 0, 0, shell_lexical_frame_kind::arithmetic, state.quote});
         state.quote = 0;
         i += 3;
         continue;
       }
 
       state.frames.push(shell_lexical_frame{
-          i + 2, 0, shell_lexical_frame_kind::command, state.quote});
+          i + 2, 0, 0, 0, shell_lexical_frame_kind::command, state.quote});
       state.quote = 0;
       i += 2;
       continue;
@@ -1276,7 +1280,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
 
     if (c == '$' && i + 1 < end && source[i + 1] == '{') {
       state.frames.push(shell_lexical_frame{
-          i + 2, 0, shell_lexical_frame_kind::parameter, state.quote});
+          i + 2, 0, 0, 0, shell_lexical_frame_kind::parameter, state.quote});
       state.quote = 0;
       i += 2;
       continue;
@@ -1453,7 +1457,7 @@ fn advance_shell_lexical_state(StringView source, usize end,
         frame.is_command_position)
     {
       state.frames.push(shell_lexical_frame{
-          i + 2, 0, shell_lexical_frame_kind::arithmetic, state.quote});
+          i + 2, 0, 0, 0, shell_lexical_frame_kind::arithmetic, state.quote});
       state.quote = 0;
       i += 2;
       continue;
@@ -1529,7 +1533,7 @@ pure fn debug_shell_lexical_scan_byte_count() wontthrow -> usize
 }
 #endif
 
-fn command_substitution_range(StringView line, usize cursor) throws
+fn internal::command_substitution_range(StringView line, usize cursor) throws
     -> completion_command_range
 {
   let state = shell_lexical_state{completion_allocator()};

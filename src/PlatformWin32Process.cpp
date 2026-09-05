@@ -3,6 +3,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "EvalVariablesInternal.hpp"
 #include "Platform.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -163,6 +164,51 @@ volatile sig_atomic_t SIGNAL_PENDING = 0;
 
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
 static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
+static volatile LONG64 CHILD_USER_TICKS = 0;
+static volatile LONG64 CHILD_SYSTEM_TICKS = 0;
+static volatile LONG64 CHILD_PEAK_RSS_BYTES = 0;
+static volatile LONG INTERNAL_PIPE_SEQUENCE = 0;
+
+static fn filetime_ticks(FILETIME time) wontthrow -> u64
+{
+  ULARGE_INTEGER ticks{};
+  ticks.LowPart = time.dwLowDateTime;
+  ticks.HighPart = time.dwHighDateTime;
+  return ticks.QuadPart;
+}
+
+static fn record_child_process_usage(process child) wontthrow -> void
+{
+  FILETIME creation_time{};
+  FILETIME exit_time{};
+  FILETIME kernel_time{};
+  FILETIME user_time{};
+  if (GetProcessTimes(child, &creation_time, &exit_time, &kernel_time,
+                      &user_time) != FALSE)
+  {
+    InterlockedAdd64(&CHILD_USER_TICKS,
+                     static_cast<LONG64>(filetime_ticks(user_time)));
+    InterlockedAdd64(&CHILD_SYSTEM_TICKS,
+                     static_cast<LONG64>(filetime_ticks(kernel_time)));
+  }
+
+  PROCESS_MEMORY_COUNTERS memory_counters{};
+  memory_counters.cb = sizeof(memory_counters);
+  if (GetProcessMemoryInfo(child, &memory_counters, sizeof(memory_counters)) ==
+      FALSE)
+    return;
+
+  let const peak_rss_bytes =
+      static_cast<LONG64>(memory_counters.PeakWorkingSetSize);
+  let previous_peak_rss_bytes =
+      InterlockedCompareExchange64(&CHILD_PEAK_RSS_BYTES, 0, 0);
+  while (peak_rss_bytes > previous_peak_rss_bytes) {
+    let const observed_peak_rss_bytes = InterlockedCompareExchange64(
+        &CHILD_PEAK_RSS_BYTES, peak_rss_bytes, previous_peak_rss_bytes);
+    if (observed_peak_rss_bytes == previous_peak_rss_bytes) break;
+    previous_peak_rss_bytes = observed_peak_rss_bytes;
+  }
+}
 
 } /* namespace os */
 } /* namespace koshka */
@@ -306,8 +352,10 @@ fn capture_program_output(const ArrayList<String> &argv,
   if (was_timed_out) {
     TerminateProcess(process_info.hProcess, 1);
     WaitForSingleObject(process_info.hProcess, INFINITE);
+    record_child_process_usage(process_info.hProcess);
     return None;
   }
+  record_child_process_usage(process_info.hProcess);
   captured.normalize_crlf_line_endings();
   return captured;
 }
@@ -477,33 +525,61 @@ static fn create_process_utf8(StringView application_path,
   if (!working_directory.is_empty() && !wide_working_directory.has_value())
     return false;
 
-  HANDLE unique_handles[4]{};
-  usize unique_handle_count = 0;
+  scan_inherited_shell_fds();
+  let unique_handles = ArrayList<HANDLE>{heap_allocator()};
+  unique_handles.reserve(inherited_handle_count +
+                         static_cast<usize>(HIGHEST_OPEN_SHELL_FD + 1));
+  let const do_add_unique_handle = [&](HANDLE handle) throws {
+    if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
+      return;
+    }
+    for (let const existing : unique_handles)
+      if (existing == handle) return;
+    unique_handles.push(handle);
+  };
   for (usize handle_position = 0; handle_position < inherited_handle_count;
        handle_position++)
-  {
-    let const handle = inherited_handles[handle_position];
-    if (handle == nullptr || handle == INVALID_HANDLE_VALUE) continue;
-    bool is_duplicate = false;
-    for (usize unique_position = 0; unique_position < unique_handle_count;
-         unique_position++)
-      if (unique_handles[unique_position] == handle) {
-        is_duplicate = true;
-        break;
-      }
-    if (is_duplicate) continue;
-    if (unique_handle_count == 4) {
+    do_add_unique_handle(inherited_handles[handle_position]);
+
+  let inherited_fd_storage = ArrayList<u8>{heap_allocator()};
+  if (HIGHEST_OPEN_SHELL_FD > 2) {
+    let const inherited_fd_count = HIGHEST_OPEN_SHELL_FD + 1;
+    let const storage_size = sizeof(i32) +
+                             static_cast<usize>(inherited_fd_count) +
+                             sizeof(intptr_t) * inherited_fd_count;
+    if (storage_size > UINT16_MAX) {
       SetLastError(ERROR_TOO_MANY_OPEN_FILES);
       return false;
     }
-    unique_handles[unique_handle_count++] = handle;
+    inherited_fd_storage.reserve(storage_size);
+    for (usize byte_position = 0; byte_position < storage_size; byte_position++)
+      inherited_fd_storage.push(0);
+    __builtin_memcpy(inherited_fd_storage.begin(), &inherited_fd_count,
+                     sizeof(inherited_fd_count));
+    let *flags = inherited_fd_storage.begin() + sizeof(inherited_fd_count);
+    let *handles = flags + inherited_fd_count;
+    for (i32 shell_fd = 0; shell_fd < inherited_fd_count; shell_fd++) {
+      let const handle = descriptor_for_shell_fd(shell_fd);
+      let const handle_value = reinterpret_cast<intptr_t>(handle);
+      __builtin_memcpy(handles + sizeof(handle_value) * shell_fd, &handle_value,
+                       sizeof(handle_value));
+      if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
+        continue;
+      }
+      flags[shell_fd] = 1;
+      do_add_unique_handle(handle);
+    }
   }
 
   static SRWLOCK launch_lock = SRWLOCK_INIT;
   AcquireSRWLockExclusive(&launch_lock);
   defer { ReleaseSRWLockExclusive(&launch_lock); };
 
-  inherited_handle_state inheritance_states[4]{};
+  let inheritance_states = ArrayList<inherited_handle_state>{heap_allocator()};
+  inheritance_states.reserve(unique_handles.count());
+  for (usize handle_position = 0; handle_position < unique_handles.count();
+       handle_position++)
+    inheritance_states.push(inherited_handle_state{});
   usize inheritable_handle_count = 0;
   DWORD preserved_error = ERROR_SUCCESS;
   bool did_restore_inheritance = false;
@@ -517,7 +593,7 @@ static fn create_process_utf8(StringView application_path,
           preserved_error = GetLastError();
     if (preserved_error != ERROR_SUCCESS) SetLastError(preserved_error);
   };
-  for (usize handle_position = 0; handle_position < unique_handle_count;
+  for (usize handle_position = 0; handle_position < unique_handles.count();
        handle_position++)
     if (!make_handle_inheritable(unique_handles[handle_position],
                                  inheritance_states[handle_position]))
@@ -532,7 +608,7 @@ static fn create_process_utf8(StringView application_path,
   LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = nullptr;
   ArrayList<u8> attribute_storage{heap_allocator()};
   STARTUPINFOEXW extended_startup{};
-  extended_startup.StartupInfo.cb = unique_handle_count == 0
+  extended_startup.StartupInfo.cb = unique_handles.is_empty()
                                         ? sizeof(STARTUPINFOW)
                                         : sizeof(extended_startup);
   extended_startup.StartupInfo.dwFlags = startup_info.dwFlags;
@@ -540,13 +616,18 @@ static fn create_process_utf8(StringView application_path,
   extended_startup.StartupInfo.hStdInput = startup_info.hStdInput;
   extended_startup.StartupInfo.hStdOutput = startup_info.hStdOutput;
   extended_startup.StartupInfo.hStdError = startup_info.hStdError;
+  if (!inherited_fd_storage.is_empty()) {
+    extended_startup.StartupInfo.cbReserved2 =
+        static_cast<WORD>(inherited_fd_storage.count());
+    extended_startup.StartupInfo.lpReserved2 = inherited_fd_storage.begin();
+  }
   bool is_attribute_list_initialized = false;
   defer
   {
     if (is_attribute_list_initialized)
       DeleteProcThreadAttributeList(attribute_list);
   };
-  if (unique_handle_count != 0) {
+  if (!unique_handles.is_empty()) {
     InitializeProcThreadAttributeList(nullptr, 1, 0, &attribute_size);
     if (attribute_size == 0) {
       preserved_error = GetLastError();
@@ -564,8 +645,8 @@ static fn create_process_utf8(StringView application_path,
     is_attribute_list_initialized = true;
     if (UpdateProcThreadAttribute(
             attribute_list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-            unique_handles, sizeof(HANDLE) * unique_handle_count, nullptr,
-            nullptr) == FALSE)
+            unique_handles.begin(), sizeof(HANDLE) * unique_handles.count(),
+            nullptr, nullptr) == FALSE)
     {
       preserved_error = GetLastError();
       return false;
@@ -578,7 +659,7 @@ static fn create_process_utf8(StringView application_path,
       CreateProcessW(
           wide_application.has_value() ? wide_application->begin() : nullptr,
           wide_command_line->begin(), nullptr, nullptr,
-          unique_handle_count != 0, creation_flags, environment_block,
+          !unique_handles.is_empty(), creation_flags, environment_block,
           wide_working_directory.has_value() ? wide_working_directory->begin()
                                              : nullptr,
           &extended_startup.StartupInfo, &process_info) != FALSE;
@@ -850,181 +931,148 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
   return process_info.hProcess;
 }
 
-struct process_substitution_temp_result
+static fn spawn_subshell_stage(
+    StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+    Maybe<descriptor> err_fd, mimic_mood mood, process_group_mode process_group,
+    bool source_traces_enabled = true, StringView bootstrap_source = {},
+    StringView shell_name = {}, i32 previous_exit_status = 0,
+    i64 shell_process_id = 0, usize subshell_depth = 0) throws
+    -> Maybe<process>;
+
+static fn make_internal_pipe_path() throws -> String
 {
-  String path{heap_allocator()};
-  String diagnostic_output{heap_allocator()};
-  bool has_shell_diagnostic{false};
-};
+  let path = String{"\\\\.\\pipe\\kosh-"};
+  path += String::from(GetCurrentProcessId(), heap_allocator()) + "-" +
+          String::from(InterlockedIncrement(&INTERNAL_PIPE_SEQUENCE),
+                       heap_allocator());
+  return path;
+}
 
-static fn run_substitution_to_temp(StringView source, bool bash_compatible,
-                                   bool source_traces_enabled) throws
-    -> Maybe<process_substitution_temp_result>
+static fn send_internal_pipe(StringView path, StringView content,
+                             process child) throws -> bool
 {
-  /* Windows has no fork, so <(cmd) spawns a fresh shell that writes its output
-     into a temp file the consumer reads by path. The whole output is written
-     before the path returns. */
-  let const module_path = current_executable_path();
-  if (!module_path.has_value()) return koshka::None;
-
-  wchar_t temp_dir[MAX_PATH];
-  let const temp_directory_length = GetTempPathW(MAX_PATH, temp_dir);
-  if (temp_directory_length == 0 || temp_directory_length >= MAX_PATH) {
-    return koshka::None;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+  let const deadline = GetTickCount64() + 5000;
+  for (;;) {
+    if (WaitNamedPipeW(wide_path->begin(), 50) != FALSE) {
+      let const client = CreateFileW(wide_path->begin(), GENERIC_WRITE, 0,
+                                     nullptr, OPEN_EXISTING, 0, nullptr);
+      if (client == INVALID_HANDLE_VALUE) return false;
+      let const was_written = write_all(client, content.data, content.length);
+      CloseHandle(client);
+      return was_written;
+    }
+    if (WaitForSingleObject(child, 0) == WAIT_OBJECT_0) return false;
+    if (GetTickCount64() >= deadline) return false;
+    Sleep(1);
   }
-  wchar_t temp_path[MAX_PATH];
-  if (GetTempFileNameW(temp_dir, L"kos", 0, temp_path) == 0)
-    return koshka::None;
-  bool should_delete_temp_path = true;
-  defer
-  {
-    if (should_delete_temp_path) DeleteFileW(temp_path);
-  };
-  let temp_path_utf8 = wide_to_utf8(
-      temp_path, static_cast<usize>(lstrlenW(temp_path)), heap_allocator());
-  if (!temp_path_utf8.has_value()) return koshka::None;
-
-  SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
-  const HANDLE temp_file =
-      CreateFileW(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
-                  CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-  if (temp_file == INVALID_HANDLE_VALUE) return koshka::None;
-  defer { CloseHandle(temp_file); };
-
-  wchar_t diagnostic_path[MAX_PATH];
-  if (GetTempFileNameW(temp_dir, L"kos", 0, diagnostic_path) == 0)
-    return koshka::None;
-  defer { DeleteFileW(diagnostic_path); };
-  let diagnostic_path_utf8 = wide_to_utf8(
-      diagnostic_path, static_cast<usize>(lstrlenW(diagnostic_path)),
-      heap_allocator());
-  if (!diagnostic_path_utf8.has_value()) return koshka::None;
-  const HANDLE diagnostic_file =
-      CreateFileW(diagnostic_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
-                  CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-  if (diagnostic_file == INVALID_HANDLE_VALUE) return koshka::None;
-  bool is_diagnostic_file_open = true;
-  defer
-  {
-    if (is_diagnostic_file_open) CloseHandle(diagnostic_file);
-  };
-
-  wchar_t diagnostic_marker_path[MAX_PATH];
-  if (GetTempFileNameW(temp_dir, L"kos", 0, diagnostic_marker_path) == 0)
-    return koshka::None;
-  defer { DeleteFileW(diagnostic_marker_path); };
-  let diagnostic_marker_path_utf8 = wide_to_utf8(
-      diagnostic_marker_path,
-      static_cast<usize>(lstrlenW(diagnostic_marker_path)), heap_allocator());
-  if (!diagnostic_marker_path_utf8.has_value()) return koshka::None;
-
-  let arguments = ArrayList<String>{heap_allocator()};
-  arguments.push(String{heap_allocator(), module_path->view()});
-  if (bash_compatible) {
-    arguments.push(String{heap_allocator(), StringView{"--mood"}});
-    arguments.push(String{heap_allocator(), StringView{"bash"}});
-  }
-  arguments.push(String{heap_allocator(), StringView{"--no-diagnostics"}});
-  if (!source_traces_enabled)
-    arguments.push(String{heap_allocator(), StringView{"--no-traces"}});
-  arguments.push(String{heap_allocator(), StringView{"-c"}});
-  arguments.push(String{heap_allocator(), source});
-  let command_line = make_os_args(arguments);
-
-  STARTUPINFOW startup_info{};
-  startup_info.cb = sizeof(startup_info);
-  startup_info.dwFlags = STARTF_USESTDHANDLES;
-  startup_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-  startup_info.hStdOutput = temp_file;
-  startup_info.hStdError = diagnostic_file;
-  HANDLE null_handle = INVALID_HANDLE_VALUE;
-  defer
-  {
-    if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
-  };
-  if (!ensure_valid_standard_handles(startup_info, null_handle)) return None;
-
-  PROCESS_INFORMATION process_info{};
-  let const previous_root_trace_marker =
-      get_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE");
-  let const previous_diagnostic_marker =
-      get_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER");
-  set_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE", "1");
-  set_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER",
-                           diagnostic_marker_path_utf8->view());
-  defer
-  {
-    if (previous_root_trace_marker.has_value())
-      set_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE",
-                               previous_root_trace_marker->view());
-    else
-      unset_environment_variable("KOSH_INTERNAL_SUPPRESS_ROOT_TRACE");
-    if (previous_diagnostic_marker.has_value())
-      set_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER",
-                               previous_diagnostic_marker->view());
-    else
-      unset_environment_variable("KOSH_INTERNAL_DIAGNOSTIC_MARKER");
-  };
-  HANDLE inherited_handles[] = {startup_info.hStdInput, temp_file,
-                                diagnostic_file};
-  if (!create_process_utf8(module_path->view(), command_line.view(), {}, 0,
-                           nullptr, startup_info, inherited_handles, 3,
-                           process_info))
-    return koshka::None;
-  defer { CloseHandle(process_info.hProcess); };
-  defer { CloseHandle(process_info.hThread); };
-  WaitForSingleObject(process_info.hProcess, INFINITE);
-
-  CloseHandle(diagnostic_file);
-  is_diagnostic_file_open = false;
-  let diagnostic_output = Path{diagnostic_path_utf8->view()}.read_entire_file();
-
-  /* A backslash would read as an escape in the target word, so slashes are
-     returned, which CreateFile accepts the same. */
-  let result = process_substitution_temp_result{};
-  let const temp_path_view = temp_path_utf8->view();
-  for (usize byte_position = 0; byte_position < temp_path_view.length;
-       byte_position++)
-    result.path += temp_path_view[byte_position] == '\\'
-                       ? '/'
-                       : temp_path_view[byte_position];
-  if (diagnostic_output.has_value())
-    result.diagnostic_output = diagnostic_output.take();
-  let const marker_size = Path{diagnostic_marker_path_utf8->view()}.file_size();
-  result.has_shell_diagnostic = marker_size.has_value() && *marker_size != 0;
-  should_delete_temp_path = false;
-  return result;
 }
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               bool bash_compatible,
-                               bool source_traces_enabled) throws
+                               mimic_mood mood, bool source_traces_enabled,
+                               StringView bootstrap_source,
+                               StringView shell_name, i32 previous_exit_status,
+                               i64 shell_process_id,
+                               usize subshell_depth) throws
     -> process_substitution_launch
 {
-  if (!command_writes_pipe)
-    throw Error{"Unable to run a >(cmd) process substitution because it is not "
-                "supported on this platform"};
-
-  let result =
-      run_substitution_to_temp(source, bash_compatible, source_traces_enabled);
-  if (!result.has_value())
+  let path = make_internal_pipe_path();
+  let const wide_path = utf8_to_wide(path.view(), heap_allocator());
+  if (!wide_path.has_value())
+    throw Error{"Unable to name the process substitution pipe"};
+  let cleanup_path = String{heap_allocator(), path.view()};
+  let cleanup = heap_allocator().alloc_array<String>(1);
+  if (cleanup == nullptr) throw std::bad_alloc{};
+  try {
+    new (cleanup) String{steal(cleanup_path)};
+  } catch (...) {
+    heap_allocator().free_array(cleanup, 1);
+    throw;
+  }
+  defer
+  {
+    if (cleanup == nullptr) return;
+    cleanup->~String();
+    heap_allocator().free_array(cleanup, 1);
+  };
+  let const previous_connection =
+      get_environment_variable(internal::CONNECT_NAMED_PIPE);
+  let connection = String{command_writes_pipe ? "stdout:" : "stdin:"};
+  connection += path;
+  set_environment_variable(internal::CONNECT_NAMED_PIPE, connection.view());
+  defer
+  {
+    if (previous_connection.has_value())
+      set_environment_variable(internal::CONNECT_NAMED_PIPE,
+                               previous_connection->view());
+    else
+      unset_environment_variable(internal::CONNECT_NAMED_PIPE);
+  };
+  let const child = spawn_subshell_stage(
+      source, None, None, None, mood, process_group_mode::Inherit,
+      source_traces_enabled, bootstrap_source, shell_name, previous_exit_status,
+      shell_process_id, subshell_depth);
+  if (!child.has_value())
     throw Error{"Unable to run the process substitution because the inner "
                 "shell could not be spawned: " +
                 last_system_error_message()};
-
-  return process_substitution_launch{
-      .path = steal(result->path),
-      .diagnostic_output = steal(result->diagnostic_output),
-      .is_temporary_file = true,
-      .has_shell_diagnostic = result->has_shell_diagnostic,
+  bool is_pipe_ready = false;
+  let const deadline = GetTickCount64() + 5000;
+  for (;;) {
+    if (WaitNamedPipeW(wide_path->begin(), 50) != FALSE) {
+      is_pipe_ready = true;
+      break;
+    }
+    if (WaitForSingleObject(*child, 0) == WAIT_OBJECT_0) break;
+    if (GetTickCount64() >= deadline) break;
+    Sleep(1);
+  }
+  if (!is_pipe_ready) {
+    TerminateProcess(*child, 1);
+    WaitForSingleObject(*child, INFINITE);
+    record_child_process_usage(*child);
+    CloseHandle(*child);
+    throw Error{"Unable to connect the process substitution pipe: " +
+                last_system_error_message()};
+  }
+  let launch = process_substitution_launch{
+      .path = steal(path),
+      .retained_fd = KOSH_INVALID_FD,
+      .child = *child,
+      .cleanup = cleanup,
   };
+  cleanup = nullptr;
+  return launch;
 }
 
-static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
-                               Maybe<descriptor> out_fd,
-                               Maybe<descriptor> err_fd, mimic_mood mood,
-                               process_group_mode process_group) throws
-    -> Maybe<process>
+fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
+{
+  if (cleanup == nullptr) return;
+  let path = static_cast<String *>(cleanup);
+  defer
+  {
+    path->~String();
+    heap_allocator().free_array(path, 1);
+  };
+  let const wide_path = utf8_to_wide(path->view(), heap_allocator());
+  if (!wide_path.has_value()) return;
+  constexpr DWORD ACCESS_MODES[] = {GENERIC_READ, GENERIC_WRITE};
+  for (let const access : ACCESS_MODES) {
+    let const client = CreateFileW(wide_path->begin(), access, 0, nullptr,
+                                   OPEN_EXISTING, 0, nullptr);
+    if (client == INVALID_HANDLE_VALUE) continue;
+    CloseHandle(client);
+    return;
+  }
+}
+
+static fn spawn_subshell_stage(
+    StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+    Maybe<descriptor> err_fd, mimic_mood mood, process_group_mode process_group,
+    bool source_traces_enabled, StringView bootstrap_source,
+    StringView shell_name, i32 previous_exit_status, i64 shell_process_id,
+    usize subshell_depth) throws -> Maybe<process>
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
@@ -1034,14 +1082,75 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), module_path->view()});
   arguments.push(String{heap_allocator(), StringView{"--privileged"}});
+  arguments.push(String{heap_allocator(), StringView{"--no-init-files"}});
   if (mood != mimic_mood::Default) {
     arguments.push(String{heap_allocator(), StringView{"--mood"}});
     arguments.push(String{heap_allocator(), mood_name(mood)});
   }
   arguments.push(String{heap_allocator(), StringView{"--no-diagnostics"}});
+  if (!source_traces_enabled)
+    arguments.push(String{heap_allocator(), StringView{"--no-traces"}});
   arguments.push(String{heap_allocator(), StringView{"-c"}});
   arguments.push(String{heap_allocator(), source});
+  if (!shell_name.is_empty())
+    arguments.push(String{heap_allocator(), shell_name});
   let command_line = make_os_args(arguments);
+
+  let const previous_status_value =
+      get_environment_variable(internal::PREVIOUS_EXIT_STATUS);
+  set_environment_variable(
+      internal::PREVIOUS_EXIT_STATUS,
+      String::from(previous_exit_status, heap_allocator()).view());
+  defer
+  {
+    if (previous_status_value.has_value())
+      set_environment_variable(internal::PREVIOUS_EXIT_STATUS,
+                               previous_status_value->view());
+    else
+      unset_environment_variable(internal::PREVIOUS_EXIT_STATUS);
+  };
+
+  let const previous_parent_process_id =
+      get_environment_variable(internal::PARENT_PROCESS_ID);
+  set_environment_variable(
+      internal::PARENT_PROCESS_ID,
+      String::from(GetCurrentProcessId(), heap_allocator()).view());
+  defer
+  {
+    if (previous_parent_process_id.has_value())
+      set_environment_variable(internal::PARENT_PROCESS_ID,
+                               previous_parent_process_id->view());
+    else
+      unset_environment_variable(internal::PARENT_PROCESS_ID);
+  };
+
+  let const previous_shell_process_id =
+      get_environment_variable(internal::SHELL_PROCESS_ID);
+  set_environment_variable(
+      internal::SHELL_PROCESS_ID,
+      String::from(shell_process_id, heap_allocator()).view());
+  defer
+  {
+    if (previous_shell_process_id.has_value())
+      set_environment_variable(internal::SHELL_PROCESS_ID,
+                               previous_shell_process_id->view());
+    else
+      unset_environment_variable(internal::SHELL_PROCESS_ID);
+  };
+
+  let const previous_subshell_depth =
+      get_environment_variable(internal::SUBSHELL_DEPTH);
+  set_environment_variable(
+      internal::SUBSHELL_DEPTH,
+      String::from(subshell_depth, heap_allocator()).view());
+  defer
+  {
+    if (previous_subshell_depth.has_value())
+      set_environment_variable(internal::SUBSHELL_DEPTH,
+                               previous_subshell_depth->view());
+    else
+      unset_environment_variable(internal::SUBSHELL_DEPTH);
+  };
 
   STARTUPINFOW startup_info{};
   startup_info.cb = sizeof(startup_info);
@@ -1056,6 +1165,26 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
   };
   if (!ensure_valid_standard_handles(startup_info, null_handle)) return None;
 
+  let bootstrap_pipe_path = String{heap_allocator()};
+  let previous_bootstrap_pipe = Maybe<String>{};
+  if (!bootstrap_source.is_empty()) {
+    bootstrap_pipe_path = make_internal_pipe_path();
+    previous_bootstrap_pipe =
+        get_environment_variable(internal::STATE_NAMED_PIPE);
+    set_environment_variable(internal::STATE_NAMED_PIPE,
+                             bootstrap_pipe_path.view());
+  }
+  defer
+  {
+    if (!bootstrap_source.is_empty()) {
+      if (previous_bootstrap_pipe.has_value())
+        set_environment_variable(internal::STATE_NAMED_PIPE,
+                                 previous_bootstrap_pipe->view());
+      else
+        unset_environment_variable(internal::STATE_NAMED_PIPE);
+    }
+  };
+
   PROCESS_INFORMATION process_info{};
   let const creation_flags = process_group == process_group_mode::Inherit
                                  ? static_cast<DWORD>(0)
@@ -1067,6 +1196,16 @@ static fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
                            inherited_handles, 3, process_info))
     return koshka::None;
   CloseHandle(process_info.hThread);
+  if (!bootstrap_source.is_empty() &&
+      !send_internal_pipe(bootstrap_pipe_path.view(), bootstrap_source,
+                          process_info.hProcess))
+  {
+    TerminateProcess(process_info.hProcess, 1);
+    WaitForSingleObject(process_info.hProcess, INFINITE);
+    record_child_process_usage(process_info.hProcess);
+    CloseHandle(process_info.hProcess);
+    return koshka::None;
+  }
   return process_info.hProcess;
 }
 
@@ -1093,8 +1232,10 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
                          mimic_mood mood, SourceLocation location,
                          StringView diagnostic_source,
-                         process_group_mode process_group,
-                         i64 process_group_id) throws -> compound_stage_launch
+                         process_group_mode process_group, i64 process_group_id,
+                         StringView bootstrap_source, StringView shell_name,
+                         i32 previous_exit_status, i64 shell_process_id,
+                         usize subshell_depth) throws -> compound_stage_launch
 {
   unused(diagnostic_source);
   if (source.is_empty())
@@ -1103,8 +1244,10 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
         "A compound command in a pipeline is not supported on this platform"};
 
   unused(process_group_id);
-  let child =
-      spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood, process_group);
+  let child = spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood,
+                                   process_group, true, bootstrap_source,
+                                   shell_name, previous_exit_status,
+                                   shell_process_id, subshell_depth);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
                             "Could not spawn the compound pipeline stage"};
@@ -1217,6 +1360,7 @@ fn wait_and_monitor_process(process p, bool *was_stopped) -> i32
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};
+  record_child_process_usage(p);
 
   DWORD code = -1;
   if (GetExitCodeProcess(p, &code) == 0)
@@ -1234,6 +1378,7 @@ fn reap_process_quietly(process p) -> i32
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"Could not wait for the process to finish: " +
                 last_system_error_message()};
+  record_child_process_usage(p);
   DWORD code = 1;
   GetExitCodeProcess(p, &code);
   return static_cast<i32>(code);
@@ -1248,6 +1393,7 @@ fn poll_process(process p, i32 &status_out) wontthrow -> process_state
     CloseHandle(p);
     return process_state::Exited;
   }
+  record_child_process_usage(p);
 
   DWORD code = 0;
   if (GetExitCodeProcess(p, &code) == 0) {
@@ -1294,6 +1440,7 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool
     SetLastError(ERROR_NOT_SUPPORTED);
     return false;
   }
+  let const exit_status = static_cast<UINT>(128 + signal_number);
 
   if (process_is_group_reference(p)) {
     let const process_handle = process_from_group_reference(p);
@@ -1301,17 +1448,18 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool
     if (!timeout_job_name(process_handle, job_name)) return false;
     let const job = OpenJobObjectA(JOB_OBJECT_TERMINATE, FALSE, job_name);
     if (job == nullptr) return false;
-    let const did_terminate = TerminateJobObject(job, 1) != FALSE;
+    let const did_terminate = TerminateJobObject(job, exit_status) != FALSE;
     CloseHandle(job);
     return did_terminate;
   }
 
-  if (!process_is_pid_reference(p)) return TerminateProcess(p, 1) != 0;
+  if (!process_is_pid_reference(p))
+    return TerminateProcess(p, exit_status) != 0;
 
   let const target =
       OpenProcess(PROCESS_TERMINATE, FALSE, pid_from_reference(p));
   if (target == nullptr) return false;
-  let const did_terminate = TerminateProcess(target, 1) != 0;
+  let const did_terminate = TerminateProcess(target, exit_status) != 0;
   CloseHandle(target);
   return did_terminate;
 }
@@ -1626,13 +1774,62 @@ fn get_supplementary_group_ids(Allocator allocator) throws -> ArrayList<u32>
 
 fn child_max() wontthrow -> i64 { return 0; }
 
-fn machine_type() throws -> String { return String{"x86_64"}; }
+fn machine_type() throws -> String
+{
+  SYSTEM_INFO information{};
+  GetNativeSystemInfo(&information);
+  switch (information.wProcessorArchitecture) {
+  case PROCESSOR_ARCHITECTURE_AMD64: return String{"x86_64"};
+  case PROCESSOR_ARCHITECTURE_ARM64: return String{"arm64"};
+  case PROCESSOR_ARCHITECTURE_INTEL: return String{"i686"};
+  case PROCESSOR_ARCHITECTURE_ARM: return String{"arm"};
+  default: return String{"unknown"};
+  }
+}
 
 fn executable_system_name() throws -> String { return String{"Windows"}; }
 
-fn system_release_name() throws -> String { return String{"unknown"}; }
+static fn windows_version() wontthrow -> OSVERSIONINFOW
+{
+  static const OSVERSIONINFOW version = [] {
+    OSVERSIONINFOW information{};
+    information.dwOSVersionInfoSize = sizeof(information);
+    using rtl_get_version_fn = LONG(WINAPI *)(OSVERSIONINFOW *);
+    let const address =
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion");
+    rtl_get_version_fn get_version = nullptr;
+    static_assert(sizeof(get_version) == sizeof(address));
+    __builtin_memcpy(&get_version, &address, sizeof(get_version));
+    if (get_version != nullptr && get_version(&information) != 0) {
+      information.dwMajorVersion = 0;
+    }
+    return information;
+  }();
+  return version;
+}
 
-fn system_version_name() throws -> String { return String{"unknown"}; }
+fn system_release_name() throws -> String
+{
+  let const version = windows_version();
+  if (version.dwMajorVersion == 0) return String{"unknown"};
+  return String::from(version.dwMajorVersion, heap_allocator()) + "." +
+         String::from(version.dwMinorVersion, heap_allocator()) + "." +
+         String::from(version.dwBuildNumber, heap_allocator());
+}
+
+fn system_version_name() throws -> String
+{
+  let const version = windows_version();
+  if (version.dwMajorVersion == 0) return String{"unknown"};
+  return String::from(version.dwBuildNumber, heap_allocator());
+}
+
+fn machine_target_name() throws -> String
+{
+  return machine_type() + "-pc-msys";
+}
+
+fn ostype_name() wontthrow -> StringView { return "msys"; }
 
 fn executable_machine_name() throws -> String
 {
@@ -1676,12 +1873,39 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
     -> void
 {
-  /* Windows has no RUSAGE_CHILDREN, only the wall time is meaningful. */
-  user_seconds = 0;
-  system_seconds = 0;
+  user_seconds = static_cast<double>(
+                     InterlockedCompareExchange64(&CHILD_USER_TICKS, 0, 0)) /
+                 10000000.0;
+  system_seconds = static_cast<double>(InterlockedCompareExchange64(
+                       &CHILD_SYSTEM_TICKS, 0, 0)) /
+                   10000000.0;
 }
 
-fn children_peak_rss_bytes() wontthrow -> u64 { return 0; }
+fn children_peak_rss_bytes() wontthrow -> u64
+{
+  return static_cast<u64>(
+      InterlockedCompareExchange64(&CHILD_PEAK_RSS_BYTES, 0, 0));
+}
+
+fn read_process_cpu_times() wontthrow -> cpu_times
+{
+  cpu_times result{};
+  FILETIME creation_time{};
+  FILETIME exit_time{};
+  FILETIME kernel_time{};
+  FILETIME user_time{};
+  if (GetProcessTimes(GetCurrentProcess(), &creation_time, &exit_time,
+                      &kernel_time, &user_time) != FALSE)
+  {
+    result.self_user_seconds =
+        static_cast<double>(filetime_ticks(user_time)) / 10000000.0;
+    result.self_system_seconds =
+        static_cast<double>(filetime_ticks(kernel_time)) / 10000000.0;
+  }
+  children_cpu_seconds(result.child_user_seconds, result.child_system_seconds);
+
+  return result;
+}
 
 fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 {
@@ -1761,6 +1985,7 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
 
   if (WaitForSingleObject(process_info.hProcess, INFINITE) != WAIT_OBJECT_0)
     return None;
+  record_child_process_usage(process_info.hProcess);
 
   result.wall_nanos = monotonic_nanos() - start_nanos;
 
@@ -1871,7 +2096,9 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
     DWORD reboot_reasons = 0;
     result = RmGetList(session_handle, &required_count, &process_count, nullptr,
                        &reboot_reasons);
-    if (result == ERROR_SUCCESS && required_count == 0) continue;
+    if (result == ERROR_SUCCESS && required_count == 0) {
+      continue;
+    }
     if (result != ERROR_MORE_DATA) {
       SetLastError(result);
       return query.query_position;
@@ -1938,6 +2165,13 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
   return None;
 }
 
+fn process_file_query_is_supported(const file_status &status,
+                                   bool should_match_filesystem) wontthrow
+    -> bool
+{
+  return !should_match_filesystem && file_type_letter(status.mode) != 'd';
+}
+
 fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws
     -> Maybe<String>
 {
@@ -1976,9 +2210,12 @@ fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws
                         &name_length, domain.begin(), &domain_length,
                         &sid_type) == FALSE)
     return None;
-  if (name_length > 0 && name.begin()[name_length - 1] == L'\0') name_length--;
-  if (domain_length > 0 && domain.begin()[domain_length - 1] == L'\0')
+  if (name_length > 0 && name.begin()[name_length - 1] == L'\0') {
+    name_length--;
+  }
+  if (domain_length > 0 && domain.begin()[domain_length - 1] == L'\0') {
     domain_length--;
+  }
 
   let user_name = wide_to_utf8(name.begin(), name_length, allocator);
   if (!user_name.has_value()) return None;

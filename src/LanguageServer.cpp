@@ -1,8 +1,8 @@
 #include "CompletionInternal.hpp"
+#include "EvalVariables.hpp"
 #include "Formatter.hpp"
 #include "Koshkit.hpp"
 #include "LanguageServerProtocol.hpp"
-#include "ShellVariables.hpp"
 
 namespace koshka::language_server {
 
@@ -1222,7 +1222,8 @@ fn Server::rename_kind_of(const document_symbol &symbol) throws
   }
 
   if (!role_names_command(symbol.role)) return None;
-  if (!completion::word_is_function_name(symbol.text.view())) return None;
+  if (!completion::internal::word_is_function_name(symbol.text.view()))
+    return None;
 
   return rename_kind::command;
 }
@@ -1315,7 +1316,7 @@ fn Server::rename(const JsonValue *id, const JsonValue *params) throws -> bool
   let const is_new_name_valid =
       new_name.has_value() &&
       (is_variable ? lexer::word_is_variable_name(*new_name)
-                   : completion::word_is_function_name(*new_name));
+                   : completion::internal::word_is_function_name(*new_name));
 
   if (!is_new_name_valid) {
     return send_error(id, REQUEST_FAILED_ERROR,
@@ -1527,9 +1528,11 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
     return do_run_shell_help(steal(source));
   }
 
-  let information = String{completion::manpage_text_for(command, m_context)};
+  let information =
+      String{completion::internal::manpage_text_for(command, m_context)};
   if (information.is_empty())
-    information = String{completion::help_text_of(command, m_context)};
+    information =
+        String{completion::internal::help_text_of(command, m_context)};
   if (!information.is_empty()) {
     if (information.view()[information.length() - 1] != '\n')
       information.push('\n');

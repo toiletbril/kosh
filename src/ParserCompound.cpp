@@ -13,9 +13,9 @@ namespace koshka {
 
 using namespace tokens;
 using namespace expressions;
-using parser_internal::is_unquoted_word;
-using parser_internal::throw_unterminated;
-using parser_internal::token_kind_mask;
+using internal::is_unquoted_word;
+using internal::throw_unterminated;
+using internal::token_kind_mask;
 
 hot fn Parser::parse_if() throws -> Command *
 {

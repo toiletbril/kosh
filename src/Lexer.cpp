@@ -208,8 +208,9 @@ fn Lexer::peek_shell_token() throws -> Token *
 
   Token *const token = lex_shell_token();
   m_peek_cache = token;
-  m_peek_cache_position = m_cursor_position;
+#if !defined NDEBUG
   m_peek_cache_generation = m_arena->reset_generation();
+#endif
 
   return token;
 }
@@ -291,12 +292,12 @@ fn Lexer::drop_peek_cache() wontthrow -> void { m_peek_cache = nullptr; }
 
 fn Lexer::peek_cache_is_live() const wontthrow -> bool
 {
-  if (m_peek_cache == nullptr || m_peek_cache_position != m_cursor_position) {
-    return false;
-  }
+  if (m_peek_cache == nullptr) return false;
 
+#if !defined NDEBUG
   ASSERT(m_peek_cache_generation == m_arena->reset_generation(),
          "the arena was rewound without dropping the cached peek");
+#endif
 
   return true;
 }
@@ -307,6 +308,7 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
 
   let const result = advance_forward(m_cached_offset);
   m_cached_offset = 0;
+  m_peek_cache = nullptr;
 
   /* The heredoc body sits on the lines after the newline, so it is collected
      once that newline is consumed. */

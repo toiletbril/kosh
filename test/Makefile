@@ -17,7 +17,6 @@ TARGET ?= $(shell uname -s)
 endif
 
 ifeq ($(TARGET), Windows_NT)
-TEST_JOBS := 1
 export TEST_PATH_SEPARATOR := ;
 export TEST_NULL_DEVICE := NUL
 export TEST_PATH_ENVIRONMENT_NAME := Path
@@ -115,16 +114,8 @@ completion_%: expected/%.out
 
 ifeq ($(TARGET), Windows_NT)
 WINDOWS_SKIPPED_TEST_NAMES := \
-	ast_process_substitution \
-	ast_redirection_varieties \
-	heredoc_fd_three \
 	koshkit_filesystem_posix \
-	lex_process_substitution \
 	mood_conditional \
-	redirect_csh_both_streams \
-	redirect_dynamic_fd \
-	redirect_high_fd \
-	redirections \
 	rerr_redirect_to_directory \
 	umask_modes
 
@@ -133,10 +124,6 @@ $(WINDOWS_SKIPPED_TEST_NAMES):
 
 cli_assimilate:
 	@printf "	%-64s skipped, remote transaction requires POSIX\n" "cli/assimilate.sh"
-
-cli_bash_xtracefd:
-	@printf "	%-64s skipped, numbered descriptors are unsupported on Windows\n" \
-		"cli/bash_xtracefd.sh"
 
 WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_command_substitution_interrupt \
@@ -157,16 +144,11 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_stopped_job_survives_poll \
 	cli_suspend_behavior \
 	cli_time_builtin \
-	cli_ulimit_validation \
 	cli_wait_on_stopped_job
 
 $(WINDOWS_SKIPPED_CLI_NAMES):
 	@printf "	%-64s skipped, unsupported Windows backend feature\n" \
 		"cli/$(patsubst cli_%,%,$@).sh"
-
-build_cpu_count:
-	@printf "	%-64s skipped, unsupported Windows build probe\n" \
-		"build/cpu_count.sh"
 
 WINDOWS_SKIPPED_COMPLETION_NAMES := \
 	completion_complete_git_grouped_subcommands \
@@ -210,13 +192,11 @@ UNREPRESENTABLE_COMPLETION_INPUT := \
 	$(patsubst completion_%,completion/%.sh,$(WINDOWS_UNREPRESENTABLE_COMPLETION_NAMES))
 ifeq ($(TARGET), Windows_NT)
 SKIP_CLI_ASSIMILATE := 1
-SKIP_CLI_BASH_XTRACEFD := 1
-SKIPPED_BUILD_INPUT := build/cpu_count.sh
 endif
 
 export SKIPPED_TEST_NAMES SKIPPED_CLI_INPUT SKIPPED_BUILD_INPUT
 export SKIPPED_COMPLETION_INPUT UNREPRESENTABLE_COMPLETION_INPUT
-export SKIP_CLI_ASSIMILATE SKIP_CLI_BASH_XTRACEFD
+export SKIP_CLI_ASSIMILATE
 
 diagnostic_tty_test: $(BIN)
 	@$(SHELL) run-test-suite.sh interactive

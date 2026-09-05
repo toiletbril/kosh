@@ -18,7 +18,9 @@ namespace koshka {
 
 namespace completion {
 
-pure fn split_path_token(StringView token) wontthrow -> path_token
+using namespace internal;
+
+pure fn internal::split_path_token(StringView token) wontthrow -> path_token
 {
   let last_separator = token.length;
   for (usize i = 0; i < token.length; i++) {
@@ -64,7 +66,8 @@ static pure fn byte_needs_quoting(char byte) wontthrow -> bool
   }
 }
 
-pure fn path_candidate_needs_quoting(StringView candidate) wontthrow -> bool
+pure fn internal::path_candidate_needs_quoting(StringView candidate) wontthrow
+    -> bool
 {
   for (usize i = 0; i < candidate.length; i++)
     if (byte_needs_quoting(candidate[i])) return true;
@@ -77,7 +80,7 @@ static pure fn byte_needs_double_quote_escape(char byte) wontthrow -> bool
   return byte == '"' || byte == '\\' || byte == '$' || byte == '`';
 }
 
-fn quote_path_candidate(StringView candidate) throws -> String
+fn internal::quote_path_candidate(StringView candidate) throws -> String
 {
   let quoted = String{completion_allocator()};
 
@@ -111,7 +114,7 @@ fn quote_path_candidate(StringView candidate) throws -> String
   return quoted;
 }
 
-fn escape_path_candidate(StringView candidate) throws -> String
+fn internal::escape_path_candidate(StringView candidate) throws -> String
 {
   let escaped = String{completion_allocator()};
 
@@ -182,9 +185,9 @@ append_candidate_suffix(String &candidate, StringView suffix,
     candidate += suffix;
 }
 
-fn rebuild_shell_syntax_candidate(StringView raw_token,
-                                  const utils::decoded_shell_word &decoded_word,
-                                  StringView decoded_candidate) throws -> String
+fn internal::rebuild_shell_syntax_candidate(
+    StringView raw_token, const utils::decoded_shell_word &decoded_word,
+    StringView decoded_candidate) throws -> String
 {
   let candidate = String{completion_allocator()};
   if (decoded_candidate.starts_with(decoded_word.text.view())) {
@@ -300,12 +303,10 @@ static fn expand_leading_variable_path(StringView directory_part,
   return expanded;
 }
 
-fn resolve_listing_directory(StringView directory_part,
-                             const Path &base_directory, EvalContext &context,
-                             bool is_leading_tilde_active,
-                             bool is_leading_variable_active,
-                             usize leading_variable_expansion_end) throws
-    -> Path
+fn internal::resolve_listing_directory(
+    StringView directory_part, const Path &base_directory, EvalContext &context,
+    bool is_leading_tilde_active, bool is_leading_variable_active,
+    usize leading_variable_expansion_end) throws -> Path
 {
   if (directory_part.is_empty()) return base_directory;
 

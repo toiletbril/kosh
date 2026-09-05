@@ -17,6 +17,8 @@ namespace koshka {
 
 namespace completion {
 
+using namespace internal;
+
 static fn highlight_line_with_lexical_state(
     StringView line, EvalContext &context,
     const shell_lexical_state *lexical_state) throws
