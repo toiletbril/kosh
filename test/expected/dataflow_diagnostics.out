@@ -124,10 +124,10 @@ Encountered 4 warnings.
        |        ^~~~~~~~~~~~~
 note: Assign 'BASH_VERSOIN' before it is read, or set it in the environment.
 == unavailable catalog names are not suggested:
-1:7: warning: The variable 'BASHOPTZ' is read before any assignment gives it a value. (SC2154)
+1:7: warning: The variable 'BASHOPTZ' is never assigned, and the shell provides 'BASHOPTS'. (SC2153)
      1 |  echo "$BASHOPTZ"
        |        ^~~~~~~~~
-note: Assign 'BASHOPTZ' before it is read, or set it in the environment.
+note: Correct the spelling or assign 'BASHOPTZ'.
 1:7: warning: The variable 'GLOBIGNROE' is read before any assignment gives it a value. (SC2154)
      1 |  echo "$GLOBIGNROE"
        |        ^~~~~~~~~~~

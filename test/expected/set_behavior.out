@@ -17,6 +17,7 @@ hashall        	on
 keyword        	off
 monitor        	off
 noexec         	off
+onecmd         	off
 privileged     	off
 nounset        	on
 verbose        	off
@@ -26,6 +27,7 @@ noclobber      	off
 errtrace       	off
 physical       	off
 functrace      	off
+interactive-comments	on
 pipefail       	on
 failglob       	on
 extended-arithmetic	on
