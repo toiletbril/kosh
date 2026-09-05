@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the unlink utility in koshkit.
- * The unlink utility removes the single named file.
+ * This file implements the unlink utility. It validates one operand, rejects
+ * real directories, and removes the named file or symbolic link without
+ * traversal.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the trap builtin. The trap
- * builtin sets the action to run for each named condition.
+ * This file implements trap installation, removal, reusable listing,
+ * signal-name normalization, and EXIT, DEBUG, ERR, and RETURN condition
+ * handling.
  */
 
 #include "../Builtin.hpp"

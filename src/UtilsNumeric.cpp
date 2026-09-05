@@ -2,10 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements numeric and textual conversion helpers. It parses and
- * formats integers, floating-point values, durations, and time reports,
- * caches source-line positions, expands leading tildes, and handles ANSI C
- * quoting.
+ * This file implements integer, floating-point, duration, and time-report
+ * conversion together with source line indexing, tilde-prefix expansion, and
+ * ANSI C quoting. These allocation-light text transformations remain separate
+ * from process, filesystem-input, glob, and command-resolution helpers.
  */
 
 #include "Builtin.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the grep utility in koshkit.
- * The grep utility prints the lines of each file that match a pattern.
+ * This file implements the grep utility. It compiles the requested regular
+ * expression and streams matching or inverted lines with optional ASCII case
+ * folding.
  */
 
 #include "../Cli.hpp"

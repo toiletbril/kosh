@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for rpm spec documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts POSIX shell bodies from RPM preparation, build,
+ * installation, check, transaction, and trigger sections. Each fragment ends
+ * at the next unescaped section directive.
  */
 
 #include "../ParserFormats.hpp"

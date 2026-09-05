@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the killall utility in
- * koshkit. The killall utility sends a signal to each process by exact name.
+ * This file implements the killall utility. It resolves signal names or
+ * numbers, enumerates processes by exact name, and signals every matching
+ * process.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the cksum utility in koshkit.
- * The cksum utility writes a CRC and byte count.
+ * This file implements the cksum utility. It streams each input through the
+ * POSIX CRC algorithm and reports the complemented checksum and byte count.
  */
 
 #include "../Cli.hpp"

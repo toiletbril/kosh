@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements syntax-tree optimization. It folds constants and
- * removes proven dead work without changing observable shell behavior.
+ * This file declares literal classification, constant arithmetic folding,
+ * propagated values, static command verdicts, and syntax-tree optimization
+ * entry points. Optimizer.cpp owns the rewrite rules and traversal.
  */
 
 #pragma once

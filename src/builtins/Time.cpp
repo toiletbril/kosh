@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the time builtin. The time
- * builtin runs a command and reports how long it took.
+ * This file implements wall-clock, child CPU, and optional peak resident memory
+ * measurement for the time builtin. It renders POSIX or TIMEFORMAT-controlled
+ * reports while preserving the command status.
  */
 
 #include "../Builtin.hpp"

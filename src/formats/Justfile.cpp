@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for justfile documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts indented recipe lines from justfiles and removes recipe
+ * indentation and a leading quiet marker. Recipes default to POSIX parsing,
+ * while a Bash set shell directive changes the mood of following recipes.
  */
 
 #include "../ParserFormats.hpp"

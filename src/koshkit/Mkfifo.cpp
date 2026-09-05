@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the mkfifo utility in koshkit.
- * The mkfifo utility creates FIFO special files.
+ * This file implements the mkfifo utility. It parses the requested creation
+ * mode, applies the file creation mask, and creates each named FIFO through the
+ * platform interface.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the renice utility in koshkit.
- * The renice utility adjusts scheduling priorities of running processes.
+ * This file implements the renice utility. It parses process, process-group, or
+ * user identifiers and adjusts each target by the requested scheduling
+ * increment.
  */
 
 #include "../Cli.hpp"

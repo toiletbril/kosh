@@ -2,10 +2,11 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements conditional commands, arithmetic commands, C-style
- * loops, subshells, function definitions, redirected commands, and arithmetic
- * expression nodes. It provides their rendering, analysis, folding state, and
- * runtime evaluation.
+ * This file implements conditional and arithmetic expression nodes together
+ * with C-style loops, subshells, function definitions, and redirected-command
+ * wrappers. These node families keep their rendering, static analysis, folding,
+ * and evaluation methods together, while list and branch execution lives in
+ * ExpressionsCompound.cpp and ExpressionsControlFlow.cpp.
  */
 
 #include "Arena.hpp"

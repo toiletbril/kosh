@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the declare builtin. The
- * declare builtin declares variables and sets their attributes.
+ * This file implements variable and function declaration, attribute changes,
+ * array creation, reusable declaration output, and function-name queries for
+ * the declare builtin.
  */
 
 #include "../Builtin.hpp"

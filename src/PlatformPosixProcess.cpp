@@ -2,9 +2,11 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements POSIX fork, exec, output capture, pipelines, process
- * groups, terminal handoff, and child accounting. It keeps process lifecycle
- * and job-control code separate from general descriptors and filesystems.
+ * This routed POSIX source fragment implements fork and exec, output capture,
+ * pipelines, process substitution, process groups, terminal handoff, waiting
+ * and signals, child accounting, measured execution, priorities, platform
+ * identity, and the native entry point. The split confines process lifecycle
+ * and job-control dependencies to one backend fragment.
  */
 
 #include "Cli.hpp"

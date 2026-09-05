@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the cmp utility in koshkit.
- * The cmp utility compares two files byte by byte.
+ * This file implements the cmp utility. It compares buffered byte streams and
+ * reports the first mismatch, every mismatch in octal, or only the result
+ * status.
  */
 
 #include "../Cli.hpp"

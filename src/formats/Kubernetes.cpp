@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for kubernetes documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts args values from Kubernetes YAML only when an explicit
+ * Bash, POSIX shell, or Koshka command uses the command-string option. The
+ * detected executable selects the fragment mood.
  */
 
 #include "../ParserFormats.hpp"

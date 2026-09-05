@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the cat utility in koshkit.
- * The cat utility writes each file to standard output.
+ * This file implements the cat utility. It streams files or standard input,
+ * numbers lines, and optionally applies the shared shell syntax highlighter.
  */
 
 #include "../Cli.hpp"

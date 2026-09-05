@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the uname utility in koshkit.
- * The uname utility writes system identification.
+ * This file implements the uname utility. It selects and orders platform
+ * system, node, release, version, and machine identity fields.
  */
 
 #include "../Cli.hpp"

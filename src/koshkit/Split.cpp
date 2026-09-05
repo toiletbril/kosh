@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the split utility in koshkit.
- * The split utility divides input into output files.
+ * This file implements the split utility. It divides input by byte or line
+ * count and generates bounded alphabetic output suffixes of the requested
+ * width.
  */
 
 #include "../Cli.hpp"

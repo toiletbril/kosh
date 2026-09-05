@@ -2,9 +2,13 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements general POSIX descriptors, terminals, signals, user
- * sessions, logging, clocks, and environment operations. Filesystem,
- * process-launch, and optional inspection services stay in separate units.
+ * This routed POSIX source fragment implements descriptor and terminal
+ * operations, signal handling, users and sessions, logging, clocks, resource
+ * limits, system configuration, environment access, program-name
+ * normalization, and platform initialization. Dedicated fragments contain
+ * filesystem operations, process lifecycle code, and optional system
+ * inspection facilities, keeping their specialized headers and conditionals
+ * out of the general backend.
  */
 
 #include "Cli.hpp"

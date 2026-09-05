@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the sed utility in koshkit.
- * The sed utility edits text streams.
+ * This file implements the sed utility. It parses addresses and editing
+ * commands, compiles basic or extended regular expressions, and executes
+ * substitutions and stream control over each input line.
  */
 
 #include "../Cli.hpp"

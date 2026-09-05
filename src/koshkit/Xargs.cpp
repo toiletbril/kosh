@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the xargs utility in koshkit.
- * The xargs utility builds and invokes argument lists from standard input.
+ * This file implements the xargs utility. It parses quoted input items or
+ * logical lines, batches commands by argument and byte limits, performs
+ * replacement, prompts, traces, and propagates execution failures.
  */
 
 #include "../Cli.hpp"

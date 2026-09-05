@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the timeout utility in
- * koshkit. The timeout utility runs a command with a time limit.
+ * This file implements the timeout utility. It resolves and supervises a child
+ * command, tracks deadlines, signals the child or process group, escalates
+ * after a grace period, and maps final statuses.
  */
 
 #include "../Cli.hpp"

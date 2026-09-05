@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the make utility in koshkit.
- * The make utility runs the recipe of each requested target.
+ * This file implements the make utility. It parses makefiles, expands variables
+ * and functions, resolves explicit and inferred rules, tracks prerequisites,
+ * and schedules recipes.
  */
 
 #include "../Cli.hpp"

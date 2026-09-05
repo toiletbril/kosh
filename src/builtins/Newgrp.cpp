@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the newgrp builtin. The newgrp
- * builtin changes the group of the shell.
+ * This file implements the newgrp builtin by resolving the system newgrp
+ * program and replacing the shell process with it. The selected group remains
+ * active for commands run by the replacement process.
  */
 
 #include "../Builtin.hpp"

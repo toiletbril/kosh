@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the readlink utility in
- * koshkit. The readlink utility prints the target of a symbolic link.
+ * This file implements the readlink utility. It reads one symbolic-link target
+ * through the platform interface and controls the trailing newline.
  */
 
 #include "../Cli.hpp"

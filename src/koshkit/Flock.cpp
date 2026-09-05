@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the flock utility in koshkit.
- * The flock utility runs a command while holding a directory lock.
+ * This file implements the flock utility. It acquires a process lock, runs a
+ * command while the lock is held, and can transfer lock ownership to a
+ * transaction keeper.
  */
 
 #include "../Cli.hpp"

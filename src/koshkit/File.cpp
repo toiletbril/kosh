@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the file utility in koshkit.
- * The file utility classifies file operands.
+ * This file implements the file utility. It parses magic databases, inspects
+ * file types and contents, controls symbolic-link traversal, and formats
+ * matching descriptions.
  */
 
 #include "../Cli.hpp"

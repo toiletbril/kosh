@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the nice utility in koshkit.
- * The nice utility invokes a command with an adjusted scheduling priority.
+ * This file implements the nice utility. It parses a priority adjustment,
+ * resolves the requested program, starts it with the adjusted scheduling
+ * priority, and returns its status.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the df utility in koshkit. The
- * df utility reports available filesystem space.
+ * This file implements the df utility. It queries mounted or operand
+ * filesystems and renders capacity, usage, availability, and percentage values
+ * in selected block units.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the chgrp utility in koshkit.
- * The chgrp utility changes file group ownership.
+ * This file implements the chgrp utility. It resolves group identifiers and
+ * applies recursive ownership changes under the selected symbolic-link
+ * traversal policy.
  */
 
 #include "../Cli.hpp"

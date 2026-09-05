@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for dev container documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts lifecycle command strings from Dev Container JSON as POSIX
+ * shell fragments. The adapter covers initialize, creation, content update,
+ * start, and attach commands and preserves JSON escape and host-position
+ * mapping.
  */
 
 #include "../ParserFormats.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the set builtin. The set
- * builtin sets the shell options and the positional parameters.
+ * This file implements shell option and mood changes, option listings,
+ * positional parameter replacement, and variable listings for the set
+ * builtin.
  */
 
 #include "../Builtin.hpp"

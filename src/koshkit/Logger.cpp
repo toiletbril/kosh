@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the logger utility in koshkit.
- * The logger utility writes a message to the system log.
+ * This file implements the logger utility. It validates priorities, reads
+ * messages from operands, files, or standard input, and writes tagged records
+ * through the platform system log.
  */
 
 #include "../Cli.hpp"

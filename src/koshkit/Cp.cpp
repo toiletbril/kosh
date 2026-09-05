@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the cp utility in koshkit. The
- * cp utility copies each source to the destination.
+ * This file implements the cp utility. It copies files and directory trees,
+ * handles overwrite policy, and optionally preserves modes and timestamps.
  */
 
 #include "../Cli.hpp"

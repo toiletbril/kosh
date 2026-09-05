@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the more utility in koshkit.
- * The more utility displays text one screen at a time.
+ * This file implements the more utility. It pages terminal input, handles
+ * search and navigation commands, reads tags, controls screen layout, and
+ * streams directly when paging is unnecessary.
  */
 
 #include "../Cli.hpp"

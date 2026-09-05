@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the tput utility in koshkit.
- * The tput utility writes terminal capability values and control strings.
+ * This file implements the tput utility. It maps supported terminal
+ * capabilities to control strings, reports terminal dimensions and names, and
+ * formats cursor positions.
  */
 
 #include "../Cli.hpp"

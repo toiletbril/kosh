@@ -2,9 +2,11 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file defines the owned evaluator snapshot used to restore shell state
- * after isolated execution. It also defines completion specifications and the
- * move-only regular expression wrapper stored by EvalContext and snapshots.
+ * This file defines the move-only evaluator state captured around isolated
+ * execution, including shell options, directories, completion specifications,
+ * and compiled regular expressions. Completion specifications and compiled
+ * expressions live here because snapshots transfer both with the rest of
+ * mutable evaluator state.
  */
 
 #pragma once

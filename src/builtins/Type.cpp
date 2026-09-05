@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the type builtin. The type
- * builtin reports how each name resolves as a command.
+ * This file implements command classification across keywords, aliases,
+ * functions, builtins, bundled utilities, and PATH entries. Its flags select
+ * type words, executable paths, forced PATH lookup, or every resolution.
  */
 
 #include "../Builtin.hpp"

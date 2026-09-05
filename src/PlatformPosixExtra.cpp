@@ -2,10 +2,12 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements optional POSIX services: performance counters,
+ * This routed POSIX source fragment implements performance counters, heap and
  * resource statistics, CPU affinity, executable lookup, process enumeration,
- * and file-user scans. It isolates large and system-specific interfaces from
- * the core descriptor, filesystem, and process translation units.
+ * ownership lookup, and process file-user scans. These Linux and macOS
+ * facilities share operating-system-specific interfaces and compile-time
+ * fallbacks that do not belong in the core descriptor, filesystem, and process
+ * fragments.
  */
 
 #if defined __APPLE__

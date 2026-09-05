@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the nl utility in koshkit. The
- * nl utility numbers input lines.
+ * This file implements the nl utility. It recognizes logical page sections and
+ * formats selected line numbers with configurable styles, widths, increments,
+ * and separators.
  */
 
 #include "../Cli.hpp"

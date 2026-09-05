@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the sleep utility in koshkit.
- * The sleep utility pauses for the sum of the given durations.
+ * This file implements the sleep utility. It parses and sums suffixed
+ * durations, handles an unbounded duration, waits through the platform clock,
+ * and reports interruption.
  */
 
 #include "../Cli.hpp"

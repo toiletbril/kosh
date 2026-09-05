@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the expr utility in koshkit.
- * The expr utility evaluates an operand expression.
+ * This file implements the expr utility. Its recursive-descent parser evaluates
+ * boolean, comparison, arithmetic, regular-expression, and grouping operators
+ * over command operands.
  */
 
 #include "../Cli.hpp"

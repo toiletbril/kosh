@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the mv utility in koshkit. The
- * mv utility renames each source to the destination.
+ * This file implements the mv utility. It handles multiple sources and
+ * overwrite policy, uses atomic renames, and falls back to copy and removal
+ * across filesystems.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the dirname utility in
- * koshkit. The dirname utility prints the directory part of a path.
+ * This file implements the dirname utility. It recognizes platform directory
+ * separators, removes the final path component, and normalizes root and
+ * separator-only operands.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the who utility in koshkit.
- * The who utility writes logged-in users.
+ * This file implements the who utility. It queries platform login records and
+ * renders selected session, boot, process, run-level, terminal-state, and
+ * idle-time fields.
  */
 
 #include "../Cli.hpp"

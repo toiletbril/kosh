@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the yes utility in koshkit.
- * The yes utility writes the given string on its own line over and over.
+ * This file implements the yes utility. It builds one repeated output record
+ * and writes buffered copies until output closes or interruption is requested.
  */
 
 #include "../Cli.hpp"

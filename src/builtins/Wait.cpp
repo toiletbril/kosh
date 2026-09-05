@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the wait builtin. The wait
- * builtin blocks until the named jobs finish.
+ * This file waits for all tracked jobs or named job and process targets,
+ * propagates the last waited status, reports invalid targets, and removes
+ * completed jobs.
  */
 
 #include "../Builtin.hpp"

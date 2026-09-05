@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell errors and source-aware reporting. It carries
- * messages, locations, notes, severities, and rendering data across parser
- * and evaluator failures.
+ * This file defines source locations and the owned error, warning, note, trace,
+ * and located-diagnostic hierarchy shared by parsing and evaluation. Errors.cpp
+ * owns source interning and source-aware rendering.
  */
 
 #pragma once

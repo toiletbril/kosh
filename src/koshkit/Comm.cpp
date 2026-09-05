@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the comm utility in koshkit.
- * The comm utility compares two sorted files.
+ * This file implements the comm utility. It merges two sorted line streams into
+ * three columns and suppresses the selected columns.
  */
 
 #include "../Cli.hpp"

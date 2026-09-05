@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the realpath utility in
- * koshkit. The realpath utility prints the absolute, normalized form of each
- * path.
+ * This file implements the realpath utility. It canonicalizes each operand
+ * through the platform filesystem interface and reports unresolved paths
+ * independently.
  */
 
 #include "../Cli.hpp"

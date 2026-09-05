@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the link utility in koshkit.
- * The link utility creates a hard link to a file.
+ * This file implements the link utility. It validates two operands and creates
+ * one hard link through the platform filesystem interface.
  */
 
 #include "../Cli.hpp"

@@ -2,10 +2,11 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file manages shell function registration and lookup, function source
- * metadata, traps, and packed variable declaration attributes. It also
- * exposes function and variable inventories to builtins, completion,
- * snapshots, and diagnostics.
+ * This file implements EvalContext storage for shell functions, traps,
+ * readonly and numeric or case-converting variable attributes, and function
+ * and variable inventories. These tables share evaluator scope and snapshot
+ * lifetime, while scalar and array values remain in EvalVariables.cpp and
+ * EvalArrays.cpp.
  */
 
 #include "Common.hpp"

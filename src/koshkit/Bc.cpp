@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the bc utility in koshkit. The
- * bc utility evaluates decimal arithmetic statements.
+ * This file implements the bc utility. It parses statements, variables,
+ * functions, control flow, input and output bases, decimal arithmetic, and the
+ * optional math library.
  */
 
 #include "../Cli.hpp"

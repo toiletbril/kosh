@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the chmod utility in koshkit.
- * The chmod utility changes file permission modes.
+ * This file implements the chmod utility. It applies octal or symbolic modes to
+ * files and recursively traverses directories when requested.
  */
 
 #include "../Cli.hpp"

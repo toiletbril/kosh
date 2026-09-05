@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the env utility in koshkit.
- * The env utility runs a command in a modified environment.
+ * This file implements the env utility. It installs temporary environment
+ * assignments, prints the resulting environment, or resolves and executes a
+ * command before restoring prior values.
  */
 
 #include "../Cli.hpp"

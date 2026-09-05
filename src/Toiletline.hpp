@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements the shell interface to the vendored interactive
- * editor. It owns prompts, history, completion, highlighting, key handling,
- * and terminal-state integration.
+ * This file defines the shell-facing editor interface for input, history,
+ * prompts, completion, highlighting, terminal modes, and display-width
+ * conversion. Toiletline.cpp adapts this interface to the vendored editor,
+ * while ToiletlineStubs.cpp supplies noninteractive builds.
  */
 
 #include "ArrayList.hpp"

@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the pathchk utility in
- * koshkit. The pathchk utility checks pathname portability.
+ * This file implements the pathchk utility. It validates component and pathname
+ * limits, portable filename bytes, and leading-hyphen components.
  */
 
 #include "../Cli.hpp"

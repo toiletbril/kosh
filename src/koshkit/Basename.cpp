@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the basename utility in
- * koshkit. The basename utility prints the final component of a path.
+ * This file implements the basename utility. It removes trailing directory
+ * separators, selects the final path component, and strips an optional suffix.
  */
 
 #include "../Cli.hpp"

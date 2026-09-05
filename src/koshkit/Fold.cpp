@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the fold utility in koshkit.
- * The fold utility wraps input lines.
+ * This file implements the fold utility. It wraps lines by byte or
+ * display-column width and can choose blank boundaries for each break.
  */
 
 #include "../Cli.hpp"

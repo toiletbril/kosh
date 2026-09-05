@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the which utility in koshkit.
- * The which utility prints how each named program resolves.
+ * This file implements the which utility. It resolves builtins, bundled
+ * utilities, and PATH programs in command lookup order and supports all-match
+ * and status-only modes.
  */
 
 #include "../Cli.hpp"

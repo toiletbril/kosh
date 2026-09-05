@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the date utility in koshkit.
- * The date utility writes the date and time.
+ * This file implements the date utility. It reads the platform clock and
+ * formats local or Coordinated Universal Time with strftime directives.
  */
 
 #include "../Cli.hpp"

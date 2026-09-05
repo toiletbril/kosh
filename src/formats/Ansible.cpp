@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for ansible documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file identifies shell, ansible.builtin.shell,
+ * ansible.legacy.shell, and raw values in Ansible YAML as POSIX shell
+ * fragments. The shared YAML extractor preserves their playbook positions for
+ * diagnostics and formatting.
  */
 
 #include "../ParserFormats.hpp"

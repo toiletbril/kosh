@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for markdown documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts fenced Bash, POSIX shell, and Koshka code blocks from
+ * Markdown. It recognizes backtick and tilde fences, preserves indentation,
+ * and maps formatted replacements back inside the original fence.
  */
 
 #include "../ParserFormats.hpp"

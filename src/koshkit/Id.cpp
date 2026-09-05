@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the id utility in koshkit. The
- * id utility writes user and group identities.
+ * This file implements the id utility. It selects real or effective user and
+ * group identifiers, resolves names, and renders primary or supplementary group
+ * results.
  */
 
 #include "../Cli.hpp"

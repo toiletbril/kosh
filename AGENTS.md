@@ -28,8 +28,9 @@ changes update this file.
   containing `&&` or `||`. Separate logical blocks, loops, and returns with blank
   lines.
 - Every project-owned C and C++ file starts with the top-level license
-  notice and a sentence naming that file's responsibility. Do not add it to
-  vendored files.
+  notice and a detailed description of its concrete responsibilities. The
+  description explains why a non-obvious split file exists. Do not add the
+  notice to vendored files.
 - Use a static table for three or more name comparisons and a switch for hot
   leading-byte dispatch. Static name tables use `consteval StaticStringMap` or
   `StaticStringSet` with SSK keys and derived byte and length filters.

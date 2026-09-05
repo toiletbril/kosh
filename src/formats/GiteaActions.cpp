@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for gitea actions documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts run steps from Gitea Actions YAML. Workflow shell
+ * declarations select Bash, POSIX, or Koshka parsing, and unsupported Windows
+ * jobs are excluded when no supported shell applies.
  */
 
 #include "../ParserFormats.hpp"

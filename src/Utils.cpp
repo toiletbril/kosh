@@ -2,10 +2,11 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements general shell helpers without a narrower subsystem
- * owner. It decodes words, maps missing path components to source spans,
- * identifies executables, handles signal names, converts UTF-8 text, splits
- * lines, and formats timestamps.
+ * This file implements shared utility behavior that has no narrower owner,
+ * including word decoding, missing-path source spans, executable and signal
+ * classification, UTF-8 conversion, line splitting, and timestamp formatting.
+ * Process, input, glob, numeric, and resolver helpers live in the other Utils
+ * sources.
  */
 
 #include "Utils.hpp"

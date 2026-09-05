@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the rm utility in koshkit. The
- * rm utility removes each path.
+ * This file implements the rm utility. It applies force and interactive
+ * policies, recursively removes directory trees, rejects protected operands,
+ * and supports dry-run reporting.
  */
 
 #include "../Cli.hpp"

@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements the Path value type and path manipulation helpers. It
- * owns normalization, joining, basename, dirname, extension, and
- * filesystem-facing conversions.
+ * This file defines Path and PathBuilder, component iteration, filesystem
+ * queries, source-type detection, and path construction interfaces. Path.cpp
+ * owns normalization and out-of-line filesystem operations through the
+ * platform boundary.
  */
 
 #pragma once

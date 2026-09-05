@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the unexpand utility in
- * koshkit. The unexpand utility converts spaces to tabs.
+ * This file implements the unexpand utility. It tracks display columns and
+ * replaces eligible blank runs with tabs under default or explicit tab stops.
  */
 
 #include "../Cli.hpp"

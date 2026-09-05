@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the od utility in koshkit. The
- * od utility writes formatted file bytes.
+ * This file implements the od utility. It applies byte ranges and address
+ * bases, renders selected numeric or character formats, and folds repeated
+ * output rows.
  */
 
 #include "../Cli.hpp"

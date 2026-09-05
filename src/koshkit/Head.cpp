@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the head utility in koshkit.
- * The head utility writes the first lines of each file.
+ * This file implements the head utility. It streams leading lines or bytes and
+ * supports negative counts that omit a suffix from seekable or buffered input.
  */
 
 #include "../Cli.hpp"

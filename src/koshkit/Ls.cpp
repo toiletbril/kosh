@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the ls utility in koshkit. The
- * ls utility lists the names in each directory.
+ * This file implements the ls utility. It reads and sorts directory entries,
+ * filters hidden names, resolves owner and group labels, and renders compact or
+ * long listings.
  */
 
 #include "../Cli.hpp"

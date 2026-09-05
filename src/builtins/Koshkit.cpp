@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the koshkit builtin. The
- * koshkit builtin runs a bundled coreutility.
+ * This file implements bundled utility selection, help and sorted listings,
+ * direct bare-name dispatch, and multicall symlink installation for the
+ * koshkit builtin.
  */
 
 #include "../Koshkit.hpp"

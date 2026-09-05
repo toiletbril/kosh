@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for dockerfile documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts shell-form RUN, CMD, ENTRYPOINT, and HEALTHCHECK commands
+ * from Dockerfiles. SHELL instructions select POSIX, Bash, or Koshka parsing
+ * for subsequent commands, while JSON-array forms remain outside shell
+ * analysis.
  */
 
 #include "../ParserFormats.hpp"

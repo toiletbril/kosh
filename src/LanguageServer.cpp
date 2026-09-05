@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements language-server document state and semantic
- * operations. It coordinates analysis, completion, hover, symbols,
- * definitions, renames, formatting, and diagnostics.
+ * This file runs the language server and dispatches lifecycle, document,
+ * completion, hover, symbol, definition, rename, formatting, semantic-token,
+ * and code-action requests. JSON transport and document coordinate mapping
+ * live in LanguageServerProtocol.hpp.
  */
 
 #include "CompletionInternal.hpp"

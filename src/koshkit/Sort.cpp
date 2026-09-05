@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the sort utility in koshkit.
- * The sort utility writes the lines of its input in byte order.
+ * This file implements the sort utility. It collects lines from files or
+ * standard input, orders them by raw byte value, and optionally reverses the
+ * result.
  */
 
 #include "../Cli.hpp"

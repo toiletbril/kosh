@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the getconf utility in
- * koshkit. The getconf utility writes configuration values.
+ * This file implements the getconf utility. It resolves supported system and
+ * pathname configuration names through the platform configuration interfaces.
  */
 
 #include "../Cli.hpp"

@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements startup and top-level execution helpers used by Main.
- * It coordinates input sources, analysis, formatting, script execution, and
- * process lifecycle.
+ * This private implementation header contains startup-file loading, streamed
+ * analysis, formatting and lint application, debug drivers, script execution,
+ * and interactive prompt helpers. Main.cpp includes it after defining
+ * invocation flags so those helpers and flags remain in one translation unit.
  */
 
 #pragma once

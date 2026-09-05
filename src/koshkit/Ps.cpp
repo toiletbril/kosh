@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the ps utility in koshkit. The
- * ps utility lists the running processes.
+ * This file implements the ps utility. It enumerates platform processes,
+ * filters terminal and ownership records, resolves user names, and renders
+ * standard or user-oriented columns.
  */
 
 #include "../Cli.hpp"

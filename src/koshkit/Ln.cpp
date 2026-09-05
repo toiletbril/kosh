@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the ln utility in koshkit. The
- * ln utility creates links to files.
+ * This file implements the ln utility. It creates hard or symbolic links,
+ * handles multiple targets, applies logical or physical source policy, and
+ * replaces destinations when requested.
  */
 
 #include "../Cli.hpp"

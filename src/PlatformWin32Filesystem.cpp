@@ -2,9 +2,12 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements Win32 path roots, canonicalization, metadata,
- * globbing, trust checks, directories, links, permissions, and file operations.
- * It contains Windows pathname semantics outside the shared os interface.
+ * This routed Win32 source fragment implements path roots, canonicalization,
+ * globbing, trust checks, metadata, current-directory references, descriptor
+ * opening, temporary files, locks, directories, links, permissions,
+ * mounted-filesystem queries, executable lookup, and file operations. The
+ * split confines Windows pathname rules and filesystem interfaces to the
+ * filesystem backend.
  */
 
 #include "Cli.hpp"

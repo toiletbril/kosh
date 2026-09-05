@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the nohup utility in koshkit.
- * The nohup utility invokes a command that ignores terminal hangups.
+ * This file implements the nohup utility. It redirects terminal streams when
+ * required, ignores hangup delivery, resolves the command, and returns the
+ * command status.
  */
 
 #include "../Cli.hpp"

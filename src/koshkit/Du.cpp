@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the du utility in koshkit. The
- * du utility prints the total byte size of each path.
+ * This file implements the du utility. It recursively totals file sizes without
+ * following symbolic links and formats either byte counts or human-readable
+ * totals.
  */
 
 #include "../Cli.hpp"

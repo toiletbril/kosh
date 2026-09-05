@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the locale utility in koshkit.
- * The locale utility writes locale information.
+ * This file implements the locale utility. It lists locale and charmap names
+ * and renders supported locale categories and keywords from the active
+ * environment.
  */
 
 #include "../Cli.hpp"

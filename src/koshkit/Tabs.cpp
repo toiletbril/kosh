@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the tabs utility in koshkit.
- * The tabs utility sets terminal tab stops.
+ * This file implements the tabs utility. It parses regular or explicit
+ * increasing tab stops and emits terminal control sequences that clear and
+ * install those stops.
  */
 
 #include "../Cli.hpp"

@@ -2,9 +2,13 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements general Win32 text conversion, descriptors, named
- * pipes, signals, users, clocks, environment access, and regex allocation.
- * Filesystem and process-launch services stay in separate translation units.
+ * This routed Win32 source fragment implements text conversion, descriptor and
+ * shell-fd mapping, named pipes, terminal settings, signals, users, clocks,
+ * resource and configuration queries, environment access, program-name
+ * normalization, regex allocation, evaluator bootstrap reception, platform
+ * initialization, and the native entry point. Dedicated fragments contain
+ * filesystem operations and process creation, leaving this file as the general
+ * Win32 backend.
  */
 
 #include "Cli.hpp"

@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements language-server document state and semantic
- * operations. It coordinates analysis, completion, hover, symbols,
- * definitions, renames, formatting, and diagnostics.
+ * This file exposes the language server entry point used by shell startup.
+ * LanguageServer.cpp owns request dispatch, while LanguageServerProtocol.hpp
+ * owns transport and document coordinate mapping.
  */
 
 #pragma once

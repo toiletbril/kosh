@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the fuser utility in koshkit.
- * The fuser utility lists the process IDs that use each file.
+ * This file implements the fuser utility. It maps files to platform process-use
+ * records and reports process identifiers, access kinds, and optional owner
+ * names.
  */
 
 #include "../Cli.hpp"

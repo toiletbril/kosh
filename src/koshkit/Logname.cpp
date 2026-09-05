@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the logname utility in
- * koshkit. The logname utility writes the login name.
+ * This file implements the logname utility. It queries the platform
+ * login-session identity and reports a failure when no login name is available.
  */
 
 #include "../Cli.hpp"

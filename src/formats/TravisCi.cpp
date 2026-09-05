@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for travis ci documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts Bash fragments from Travis CI installation, script,
+ * success, failure, deployment, and cleanup phase values. The shared YAML
+ * extractor handles inline, block, and sequence values and preserves their
+ * host positions.
  */
 
 #include "../ParserFormats.hpp"

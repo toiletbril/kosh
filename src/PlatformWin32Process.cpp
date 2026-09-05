@@ -2,9 +2,12 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements Win32 process creation, argument quoting, output
- * capture, priorities, job objects, process handles, pipelines, and fresh
- * evaluator bootstrap. It isolates Windows process lifecycle from shared code.
+ * This routed Win32 source fragment implements argument quoting and process
+ * creation, inherited handles, output capture, pipelines, threads, job objects,
+ * process substitution, evaluator bootstrap transport, waiting and signals,
+ * priorities, child accounting, measured execution, platform identity, process
+ * enumeration, and process file-user scans. The split confines Windows process
+ * lifecycle and inspection interfaces to one backend fragment.
  */
 
 #include "Cli.hpp"

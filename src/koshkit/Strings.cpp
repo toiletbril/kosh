@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the strings utility in
- * koshkit. The strings utility writes printable byte sequences.
+ * This file implements the strings utility. It streams file bytes, collects
+ * printable runs, enforces a minimum length, and optionally renders their
+ * offsets in a selected radix.
  */
 
 #include "../Cli.hpp"

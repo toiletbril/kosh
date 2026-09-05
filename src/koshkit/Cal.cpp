@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the cal utility in koshkit.
- * The cal utility writes a Gregorian calendar.
+ * This file implements the cal utility. It computes Gregorian leap years and
+ * weekdays, then renders one month or a complete year.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the man utility in koshkit.
- * The man utility displays manual pages found through MANPATH.
+ * This file implements the man utility. It searches MANPATH section
+ * directories, performs keyword searches, reads manual sources, and sends
+ * selected pages to the pager.
  */
 
 #include "../Cli.hpp"

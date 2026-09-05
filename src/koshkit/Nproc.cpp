@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the nproc utility in koshkit.
- * The nproc utility prints the number of available logical processors.
+ * This file implements the nproc utility. It selects the available or
+ * configured logical processor count and subtracts a bounded ignored count.
  */
 
 #include "../Cli.hpp"

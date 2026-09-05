@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the pkill utility in koshkit.
- * The pkill utility sends a signal to each process whose name matches a
- * pattern.
+ * This file implements the pkill utility. It compiles a process-name pattern,
+ * resolves the requested signal, enumerates matching processes, and signals
+ * each match.
  */
 
 #include "../Cli.hpp"

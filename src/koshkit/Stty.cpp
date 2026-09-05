@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the stty utility in koshkit.
- * The stty utility reports or changes terminal attributes.
+ * This file implements the stty utility. It queries, serializes, and applies
+ * terminal settings through the platform terminal interface and reports invalid
+ * operands separately.
  */
 
 #include "../Cli.hpp"

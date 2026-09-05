@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for vscode tasks documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file extracts command strings from VS Code task JSON as POSIX shell
+ * fragments. JSON decoding and encoding preserve escape sequences and host
+ * positions during analysis and formatting.
  */
 
 #include "../ParserFormats.hpp"

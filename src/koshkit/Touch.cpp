@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the touch utility in koshkit.
- * The touch utility sets the access and the modification times of each named
- * file.
+ * This file implements the touch utility. It parses explicit or reference
+ * timestamps, creates missing files when allowed, and updates selected access
+ * and modification times.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the tail utility in koshkit.
- * The tail utility writes the last lines of each file.
+ * This file implements the tail utility. It selects trailing or offset-based
+ * lines or bytes from each complete input while preserving source order.
  */
 
 #include "../Cli.hpp"

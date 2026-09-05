@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the tr utility in koshkit. The
- * tr utility translates the bytes in set1 to the matching bytes in set2.
+ * This file implements the tr utility. It expands escapes, ranges, repetitions,
+ * and POSIX character classes, then translates or deletes streamed input bytes.
  */
 
 #include "../Cli.hpp"

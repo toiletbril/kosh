@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the csplit utility in koshkit.
- * The csplit utility divides a file at selected lines.
+ * This file implements the csplit utility. It splits input at numeric or
+ * regular-expression boundaries, expands repeated patterns, and manages
+ * numbered output files.
  */
 
 #include "../Cli.hpp"

@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the command builtin builtin.
- * The command builtin runs a command past a same-named function.
+ * This file implements command lookup and execution that bypasses shell
+ * functions. It supports terse and verbose classification, default-PATH
+ * lookup, restricted-shell checks, and direct dispatch of aliases, builtins,
+ * bundled utilities, and programs.
  */
 
 #include "../Builtin.hpp"

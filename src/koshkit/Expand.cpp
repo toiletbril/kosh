@@ -2,8 +2,8 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the expand utility in koshkit.
- * The expand utility converts tabs to spaces.
+ * This file implements the expand utility. It parses explicit tab stops and
+ * replaces input tabs according to the current display column.
  */
 
 #include "../Cli.hpp"

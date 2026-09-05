@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements shell support for makefile documents. It finds
- * embedded shell source, selects its dialect, and maps parsing, formatting,
- * and diagnostics back to the host file.
+ * This file converts make recipe bodies and shell-function arguments into
+ * mapped shell fragments using the bundled make parser. SHELL assignments
+ * select Bash, POSIX, or Koshka parsing, and fragment metadata preserves
+ * make-specific selection boundaries.
  */
 
 #include "../Koshkit.hpp"
