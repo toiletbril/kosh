@@ -74,6 +74,11 @@ echo -e 'oct\101'
 echo -e '\101 \0101'
 echo -e '\0102 end'
 echo -e 'lit\1eral'
+shopt -u xpg_echo
+echo 'xpg-off:\nvalue'
+shopt -s xpg_echo
+echo 'xpg-on:\nvalue'
+echo -E 'xpg-forced-off:\nvalue'
 a=5
 a[2]=99
 echo "${a[0]} ${a[1]} ${a[2]}"
@@ -102,9 +107,7 @@ echo "$padded"
 printf "%s %s\n" direct output
 
 # printf parses the leading numeric prefix of a malformed integer argument the
-# way bash does, checked byte-for-byte on standard output against bash. The
-# diagnostic and the exit status are not compared here since the harness reads
-# standard output alone.
+# way bash does, including the diagnostic stream and final status.
 printf '%d\n' 12abc
 printf '%d\n' 9z
 printf '%d\n' '  42  '

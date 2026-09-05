@@ -52,7 +52,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const is_windows_default =
       cxt.mood() == mimic_mood::Default && os::DIRECTORY_SEPARATOR == '\\';
   let should_interpret_escapes =
-      !cxt.is_bash_compatible() && !is_windows_default;
+      cxt.is_shopt_enabled("xpg_echo") ||
+      (!cxt.is_bash_compatible() && !is_windows_default);
 
   if (!cxt.is_posix_mode()) {
     while (start < args.count()) {
