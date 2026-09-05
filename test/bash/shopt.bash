@@ -31,6 +31,15 @@ shopt -qo nounset; echo "u=$?"
 set -u; shopt -qo nounset; echo "u2=$?"
 shopt -qs progcomp; echo "shopt-still-works=$?"
 
+set +o interactive-comments
+shopt -q interactive_comments; echo "interactive-comments-off=$?"
+set -o interactive-comments
+shopt -q interactive_comments; echo "interactive-comments-on=$?"
+case :$SHELLOPTS: in
+  *:interactive-comments:*) echo interactive-comments-listed ;;
+  *) echo interactive-comments-missing ;;
+esac
+
 alias shopt_alias='echo alias-expanded'
 shopt -u expand_aliases
 shopt_alias 2>/dev/null; echo "alias-off=$?"

@@ -43,6 +43,7 @@ namespace {
 enum class set_option_behavior : u8
 {
   Stored,
+  InteractiveComments,
   Posix,
   Vi,
   Emacs,
@@ -161,6 +162,11 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      set_option_behavior::Stored,
      'T', "functrace",
      "Retain DEBUG and RETURN inheritance mode for compatible option queries.", {},
+     true},
+    {shell_option_id::Count,
+     set_option_behavior::InteractiveComments,
+     '\0', "interactive-comments",
+     "Allow comments in interactive shell input.", {},
      true},
     {shell_option_id::Pipefail,
      set_option_behavior::Stored,
@@ -311,11 +317,9 @@ static_assert(set_option_descriptors_are_valid());
 constexpr auto SET_OPTION_NAMES = make_set_option_name_table();
 constexpr StaticStringMap SET_OPTION_BY_NAME{SET_OPTION_NAMES.entries};
 
-constexpr u8 INTERACTIVE_COMMENTS_POSITION = countof(SET_OPTIONS);
-
 consteval fn shellopts_position_count() wontthrow -> usize
 {
-  usize result = 1;
+  usize result = 0;
   for (let const &option : SET_OPTIONS)
     if (option.is_in_shellopts) result++;
   return result;
@@ -326,13 +330,6 @@ struct shellopts_position_table
 {
   u8 positions[Count]{};
 };
-
-consteval fn shellopts_name(u8 position) wontthrow -> option_text
-{
-  if (position == INTERACTIVE_COMMENTS_POSITION)
-    return option_text{"interactive-comments"};
-  return SET_OPTIONS[position].name;
-}
 
 consteval fn option_text_is_before(option_text left,
                                    option_text right) wontthrow -> bool
@@ -354,14 +351,13 @@ consteval fn make_shellopts_positions() wontthrow
        option_position++)
     if (SET_OPTIONS[option_position].is_in_shellopts)
       result.positions[output_position++] = static_cast<u8>(option_position);
-  result.positions[output_position] = INTERACTIVE_COMMENTS_POSITION;
 
   for (usize position = 1; position < countof(result.positions); position++) {
     let const moved = result.positions[position];
     usize slot = position;
     while (slot > 0 &&
-           option_text_is_before(shellopts_name(moved),
-                                 shellopts_name(result.positions[slot - 1])))
+           option_text_is_before(SET_OPTIONS[moved].name,
+                                 SET_OPTIONS[result.positions[slot - 1]].name))
     {
       result.positions[slot] = result.positions[slot - 1];
       slot--;
@@ -377,15 +373,13 @@ consteval fn shellopts_positions_are_valid() wontthrow -> bool
 {
   for (usize left = 0; left < countof(SHELLOPTS_POSITIONS.positions); left++) {
     let const left_position = SHELLOPTS_POSITIONS.positions[left];
-    if (left_position > INTERACTIVE_COMMENTS_POSITION) return false;
-    if (left_position != INTERACTIVE_COMMENTS_POSITION &&
+    if (left_position >= countof(SET_OPTIONS) ||
         !SET_OPTIONS[left_position].is_in_shellopts)
-    {
       return false;
-    }
-    if (left > 0 && !option_text_is_before(
-                        shellopts_name(SHELLOPTS_POSITIONS.positions[left - 1]),
-                        shellopts_name(left_position)))
+    if (left > 0 &&
+        !option_text_is_before(
+            SET_OPTIONS[SHELLOPTS_POSITIONS.positions[left - 1]].name,
+            SET_OPTIONS[left_position].name))
     {
       return false;
     }
@@ -442,6 +436,8 @@ fn option_is_on(const EvalContext &cxt,
   if (!option_is_available(cxt, option)) return false;
   switch (option.behavior) {
   case set_option_behavior::Stored: return cxt.shell_option_state(option.id);
+  case set_option_behavior::InteractiveComments:
+    return cxt.is_shopt_enabled("interactive_comments");
   case set_option_behavior::Posix: return cxt.is_posix_option_on();
   case set_option_behavior::Vi: return cxt.vi_mode();
   case set_option_behavior::Emacs: return cxt.emacs_mode();
@@ -490,6 +486,9 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
     }
     cxt.note_shell_option_mutation(option.id);
     cxt.set_shell_option_state(option.id, enable);
+    break;
+  case set_option_behavior::InteractiveComments:
+    cxt.set_shopt_option("interactive_comments", enable);
     break;
   case set_option_behavior::Posix: cxt.set_posix_mode_via_option(enable); break;
   case set_option_behavior::Vi: cxt.set_vi_mode(enable); break;
@@ -695,11 +694,6 @@ fn enabled_shell_option_names(const EvalContext &cxt) throws -> String
     joined.append(name);
   };
   for (let const position : SHELLOPTS_POSITIONS.positions) {
-    if (position == INTERACTIVE_COMMENTS_POSITION) {
-      if (cxt.is_shopt_enabled("interactive_comments"))
-        do_append("interactive-comments");
-      continue;
-    }
     let const &option = SET_OPTIONS[position];
     if (option_is_on(cxt, option)) do_append(option.name);
   }
