@@ -8,4 +8,7 @@ restricted-compound=yes
 identity-process=pid:level:depth:bashpid
 identity-compound=pid:level:depth:bashpid
 external-state=pid:status:depth
+pipeline-state=before
+pipeline-output=1
+pipeline-status=0
 internal-startup=skipped

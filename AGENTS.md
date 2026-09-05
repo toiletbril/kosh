@@ -165,6 +165,7 @@ changes update this file.
   [MISTAKES.md](MISTAKES.md) before repeating an action.
 - Resolve the configuration directory before expanding an at-sign guidance
   path. Do not assume that guidance is stored below the repository.
+- Resolve each skill path from its declared root before reading the skill.
 - Use parallel read-only research for broad work. Keep scopes disjoint. Validate
   task names and arguments. Wait at least ten seconds.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
@@ -172,6 +173,8 @@ changes update this file.
   Run independent probes independently.
 - Run compound host probes through an explicitly verified interpreter. Inspect
   an unfamiliar make target recipe before invoking it.
+- Reduce a bounded platform probe to one verified command. Confirm its mood,
+  option defaults, output order, and final status before writing the golden.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
   Use literal ripgrep patterns. Put `--` before dash-leading patterns. Enable
   PCRE2 only when required. Run independent searches independently.
@@ -184,6 +187,8 @@ changes update this file.
 - Edit with apply_patch. Use one file and concern per patch. Copy current anchors
   and preserve escaping. Inspect failed patches. Reread after formatting or
   concurrent work. Apply only nonempty changes.
+- Copy platform argument types, helper namespaces, and ownership transfers from
+  their current declarations before the first compile.
 - Print the required before-and-after table after each edit batch.
 
 ## Implementation

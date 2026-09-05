@@ -97,6 +97,18 @@ startup_file=$TEST_TEMP_DIRECTORY/subshell-startup
 startup_marker=$TEST_TEMP_DIRECTORY/subshell-startup-marker
 test -n "$startup_file" && rm -f "$startup_file"
 test -n "$startup_marker" && rm -f "$startup_marker"
+
+"$BIN" --no-init-files --no-diagnostics -c '
+value=before
+eval "value=after" | koshkit cat
+printf "pipeline-state=%s\n" "$value"
+'
+
+pipeline_output=$("$BIN" --no-init-files --no-diagnostics -c \
+  "set +o pipefail; eval 'koshkit seq 1 100000' | koshkit head -n 1")
+pipeline_status=$?
+printf "pipeline-output=%s\n" "$pipeline_output"
+printf "pipeline-status=%s\n" "$pipeline_status"
 printf 'printf sourced >> "$KOSH_STARTUP_MARKER"\n' > "$startup_file"
 KOSH_STARTUP_MARKER=$startup_marker BASH_ENV=$startup_file \
   "$BIN" --mood bash --no-init-files -c '

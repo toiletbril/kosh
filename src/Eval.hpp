@@ -975,7 +975,7 @@ public:
                           script_isolation isolation) throws -> i32;
   pure fn extglob_enabled() const wontthrow -> bool
   {
-    return m_runtime.mood != mimic_mood::Posix;
+    return m_runtime.mood != mimic_mood::Posix && is_shopt_enabled("extglob");
   }
 
   pure fn bash_dynamic_variables_enabled() const wontthrow -> bool
@@ -1007,6 +1007,9 @@ public:
     let const mask = u64{1} << *index;
     if ((m_shopt_option_overrides & mask) != 0)
       return (m_shopt_option_values & mask) != 0;
+    if (name == "extglob") return m_runtime.mood == mimic_mood::Default;
+    if (name == "expand_aliases")
+      return m_runtime.mood != mimic_mood::Bash || shell_is_interactive();
     return shopt_default_is_on(name);
   }
   /* Whether bash ships the named shopt option enabled, the miss fallback for

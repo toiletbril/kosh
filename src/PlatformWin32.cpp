@@ -566,8 +566,16 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   return result;
 }
 
-/* Windows has no /dev/tty rebind. */
-fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
+fn reopen_terminal_as_stdin() wontthrow -> bool
+{
+  let const terminal = CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE,
+                                   FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                   OPEN_EXISTING, 0, nullptr);
+  if (terminal == INVALID_HANDLE_VALUE) return false;
+  defer { CloseHandle(terminal); };
+
+  return replace_descriptor(0, terminal) && shell_fd_is_a_tty(0);
+}
 
 /* Windows has no POSIX process groups, so the terminal handoff is a no-op. */
 fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
@@ -776,16 +784,27 @@ fn get_home_directory() -> Maybe<Path>
   return koshka::None;
 }
 
-/* Windows has no /etc/passwd, so ~user stays literal. */
 fn get_home_for_user(StringView username) throws -> Maybe<Path>
 {
-  unused(username);
-  return koshka::None;
+  let const current_user = get_current_user();
+  if (!current_user.has_value() || current_user->count() != username.length)
+    return koshka::None;
+
+  for (usize position = 0; position < username.length; position++)
+    if (utils::ascii_to_lower((*current_user)[position]) !=
+        utils::ascii_to_lower(username[position]))
+      return koshka::None;
+
+  return get_home_directory();
 }
 
 fn enumerate_users() throws -> ArrayList<String>
 {
-  return ArrayList<String>{heap_allocator()};
+  let users = ArrayList<String>{heap_allocator()};
+  let current_user = get_current_user();
+  if (current_user.has_value()) users.push(current_user.take());
+
+  return users;
 }
 
 static DWORD PARENT_SHELL_PID = GetCurrentProcessId();

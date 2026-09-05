@@ -31,7 +31,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args,
                           ArrayList<SourceLocation> &arg_locations) throws
     -> void
 {
-  if (!cxt.has_aliases()) return;
+  if (!cxt.has_aliases() || !cxt.is_shopt_enabled("expand_aliases")) return;
 
   HashSet already_expanded{heap_allocator()};
 

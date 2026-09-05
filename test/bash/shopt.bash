@@ -30,3 +30,15 @@ set +e; shopt -qo errexit; echo "e2=$?"
 shopt -qo nounset; echo "u=$?"
 set -u; shopt -qo nounset; echo "u2=$?"
 shopt -qs progcomp; echo "shopt-still-works=$?"
+
+alias shopt_alias='echo alias-expanded'
+shopt -u expand_aliases
+shopt_alias 2>/dev/null; echo "alias-off=$?"
+shopt -s expand_aliases
+shopt_alias
+
+value=aaab
+shopt -s extglob
+echo "extglob-on=${value##+(a)}"
+shopt -u extglob
+echo "extglob-off=${value##+(a)}"

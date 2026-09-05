@@ -230,20 +230,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   return foreground_status;
 }
 
-pure static fn builtin_can_launch_fresh(Builtin::Kind kind) wontthrow -> bool
-{
-  switch (kind) {
-  case Builtin::Kind::Echo:
-  case Builtin::Kind::Pwd:
-  case Builtin::Kind::True:
-  case Builtin::Kind::False:
-  case Builtin::Kind::Test:
-  case Builtin::Kind::Printf:
-  case Builtin::Kind::Koshkit: return true;
-  default: return false;
-  }
-}
-
 fn terminate_and_reap_processes(const ArrayList<os::process> &processes,
                                 usize first_process_position) wontthrow -> void
 {
@@ -379,12 +365,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       let preflight_status = Maybe<i32>{};
       let preflight_location = SourceLocation{};
       let preflight_message = String{cxt.scratch_allocator()};
-      if (!forked_child.has_value() &&
-          builtin_can_launch_fresh(ec.builtin_kind()))
-      {
+      if (!forked_child.has_value()) {
         const usize utility_index = ec.program() == "koshkit" ? 1 : 0;
-        bool should_launch_fresh_stage =
-            ec.builtin_kind() != Builtin::Kind::Koshkit;
+        bool should_launch_fresh_stage = true;
         bool should_restore_environment = false;
         if (ec.builtin_kind() == Builtin::Kind::Koshkit &&
             utility_index < ec.args().count())
