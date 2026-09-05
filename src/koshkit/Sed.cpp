@@ -342,19 +342,28 @@ static fn append_sed_replacement(String &output, StringView replacement,
   }
 }
 
+static fn append_sed_pattern_space(String &output, StringView line,
+                                   bool has_terminating_newline) throws -> void
+{
+  output += line;
+  if (has_terminating_newline) output += '\n';
+}
+
 static fn apply_sed_substitution(sed_command &command, String &line,
                                  Allocator allocator) throws -> bool
 {
   String result{allocator};
   usize consumed = 0;
   bool did_replace = false;
+  bool did_previous_match_consume = false;
 
   while (consumed <= line.length()) {
     let const subject = line.view().substring(consumed);
     let spans = ArrayList<os::regex_span>{allocator};
     String error_message{allocator};
-    let const match_result = os::execute_regex(command.expression, subject,
-                                               spans, error_message, allocator);
+    let const match_result =
+        os::execute_regex(command.expression, subject, spans, error_message,
+                          allocator, consumed != 0);
     if (match_result == os::regex_match_result::Error)
       throw Error{"sed: " + error_message};
     if (match_result == os::regex_match_result::NoMatch) {
@@ -366,6 +375,14 @@ static fn apply_sed_substitution(sed_command &command, String &line,
     let const match_start = static_cast<usize>(spans[0].start);
     let const match_end = static_cast<usize>(spans[0].end);
     result += subject.substring_of_length(0, match_start);
+
+    if (match_start == 0 && match_end == 0 && did_previous_match_consume) {
+      if (consumed == line.length()) break;
+      result += line[consumed++];
+      did_previous_match_consume = false;
+      continue;
+    }
+
     append_sed_replacement(result, command.replacement.view(), subject, spans);
     did_replace = true;
     consumed += match_end;
@@ -377,6 +394,9 @@ static fn apply_sed_substitution(sed_command &command, String &line,
     if (match_end == match_start) {
       if (consumed == line.length()) break;
       result += line[consumed++];
+      did_previous_match_consume = false;
+    } else {
+      did_previous_match_consume = true;
     }
   }
 
@@ -404,7 +424,7 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
     script += FLAG_SED_EXPRESSION.get(index);
   }
   for (usize index = 0; index < FLAG_SED_FILE.count(); index++) {
-    let const file_script = Path{FLAG_SED_FILE.get(index)}.read_entire_file();
+    let const file_script = read_named_or_stdin(ec, FLAG_SED_FILE.get(index));
     if (!file_script.has_value())
       throw Error{"sed: cannot read script file '" +
                   String{FLAG_SED_FILE.get(index)} + "'"};
@@ -452,7 +472,7 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
     contents.push(steal(*content));
     for (let const line : utils::split_lines(contents.back().view(),
                                              cxt.scratch_allocator(), true))
-      lines.push(line.without_trailing_newline());
+      lines.push(line);
   }
 
   let output = String{cxt.scratch_allocator()};
@@ -460,7 +480,11 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize line_index = 0; line_index < lines.count() && !should_quit;
        line_index++)
   {
-    String line{cxt.scratch_allocator(), lines[line_index]};
+    let const source_line = lines[line_index];
+    let const has_terminating_newline =
+        !source_line.is_empty() && source_line[source_line.length - 1] == '\n';
+    String line{cxt.scratch_allocator(),
+                source_line.without_trailing_newline()};
     String appended_text{cxt.scratch_allocator()};
     bool should_delete = false;
     let const line_number = static_cast<u64>(line_index + 1);
@@ -476,14 +500,13 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
         if (apply_sed_substitution(command, line, cxt.scratch_allocator()) &&
             command.should_print)
         {
-          output += line.view();
-          output += '\n';
+          append_sed_pattern_space(output, line.view(),
+                                   has_terminating_newline);
         }
         break;
       case sed_command_kind::Delete: should_delete = true; break;
       case sed_command_kind::Print:
-        output += line.view();
-        output += '\n';
+        append_sed_pattern_space(output, line.view(), has_terminating_newline);
         break;
       case sed_command_kind::Quit: should_quit = true; break;
       case sed_command_kind::LineNumber:
@@ -530,8 +553,7 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (!should_delete && !FLAG_SED_QUIET.is_enabled()) {
-      output += line.view();
-      output += '\n';
+      append_sed_pattern_space(output, line.view(), has_terminating_newline);
     }
     output += appended_text.view();
   }

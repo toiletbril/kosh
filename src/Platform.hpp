@@ -779,7 +779,9 @@ fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
                  ArrayList<regex_span> &spans, String &error_message,
-                 Allocator scratch) throws -> regex_match_result;
+                 Allocator scratch,
+                 bool is_not_beginning_of_line = false) throws
+    -> regex_match_result;
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
 

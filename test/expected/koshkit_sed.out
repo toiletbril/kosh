@@ -1,0 +1,8 @@
+--- anchored global substitution ---
+xab
+--- adjacent empty global match ---
+xbx
+--- unterminated input ---
+b<end>
+--- script from standard input ---
+ALPHA

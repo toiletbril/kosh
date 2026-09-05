@@ -182,7 +182,8 @@ fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
                  ArrayList<regex_span> &spans, String &error_message,
-                 Allocator scratch) throws -> regex_match_result
+                 Allocator scratch, bool is_not_beginning_of_line) throws
+    -> regex_match_result
 {
   let const subject_text = String{scratch, subject};
   let const group_count = compiled.re.re_nsub + 1;
@@ -191,8 +192,9 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
   for (usize i = 0; i < group_count; i++)
     matches.push(regmatch_t{});
 
+  let const execute_flags = is_not_beginning_of_line ? REG_NOTBOL : 0;
   const int match_result = regexec(&compiled.re, subject_text.c_str(),
-                                   group_count, matches.begin(), 0);
+                                   group_count, matches.begin(), execute_flags);
 
   if (match_result == REG_NOMATCH) return regex_match_result::NoMatch;
 
