@@ -1507,6 +1507,125 @@ static fn interactive_history_duplicate_policy(StringView command,
   return toiletline::history_duplicate_policy::Allow;
 }
 
+static pure fn history_newline_needs_semicolon(const Token &previous) wontthrow
+    -> bool
+{
+  switch (previous.kind()) {
+  case Token::Kind::Then:
+  case Token::Kind::Do:
+  case Token::Kind::Else:
+  case Token::Kind::Elif:
+  case Token::Kind::Pipe:
+  case Token::Kind::PipeAmpersand:
+  case Token::Kind::DoublePipe:
+  case Token::Kind::DoubleAmpersand:
+  case Token::Kind::Ampersand:
+  case Token::Kind::Semicolon:
+  case Token::Kind::LeftParen: return false;
+  default:
+    if (let const spelling = previous.raw_view();
+        spelling.has_value() && *spelling == "in")
+    {
+      return false;
+    }
+    return true;
+  }
+}
+
+static fn format_cmdhist_event(StringView command, mimic_mood mood,
+                               BumpArena &arena, Allocator allocator) throws
+    -> String
+{
+  let lexer = Lexer{command, arena, false, None, mood};
+  let formatted = String{allocator};
+  formatted.reserve(command.length);
+  usize copied_position = 0;
+  Token *previous = nullptr;
+
+  loop
+  {
+    let const token = lexer.next_shell_token();
+    if (token->kind() == Token::Kind::EndOfFile) break;
+    if (token->kind() != Token::Kind::Newline) {
+      previous = token;
+      continue;
+    }
+
+    let const newline_position = token->source_location().position;
+    formatted.append(command.substring_of_length(
+        copied_position, newline_position - copied_position));
+    copied_position = newline_position + 1;
+
+    let const next_kind = lexer.peek_shell_token()->kind();
+    if (previous == nullptr || next_kind == Token::Kind::Newline ||
+        next_kind == Token::Kind::EndOfFile)
+    {
+      continue;
+    }
+
+    let const previous_location = previous->source_location();
+    let const previous_end_position =
+        previous_location.position + previous_location.length;
+    let const trailing_source = command.substring_of_length(
+        previous_end_position, newline_position - previous_end_position);
+    if (trailing_source.find_character('#').has_value()) {
+      formatted.push('\n');
+    } else if (history_newline_needs_semicolon(*previous)) {
+      formatted += "; ";
+    } else {
+      formatted.push(' ');
+    }
+  }
+
+  formatted.append(command.substring(copied_position));
+  return formatted;
+}
+
+static fn append_interactive_history(
+    StringView command, toiletline::history_duplicate_policy duplicate_policy,
+    EvalContext &context, BumpArena &ast_arena) throws -> Maybe<usize>
+{
+  let const newline = command.find_character('\n');
+  if (!newline.has_value())
+    return toiletline::history_append_event(command, duplicate_policy);
+
+  if (context.is_shopt_enabled("cmdhist")) {
+    if (context.is_shopt_enabled("lithist"))
+      return toiletline::history_append_event(command, duplicate_policy);
+
+    let const scratch_mark = context.scratch_mark();
+    defer { context.scratch_release(scratch_mark); };
+    let formatted = format_cmdhist_event(command, context.mood(), ast_arena,
+                                         context.scratch_allocator());
+    return toiletline::history_append_event(formatted.view(), duplicate_policy);
+  }
+
+  Maybe<usize> newest_event{None};
+  usize line_position = 0;
+  loop
+  {
+    let const remaining = command.substring(line_position);
+    let const relative_line_end = remaining.find_character('\n');
+    let const line_end = relative_line_end.has_value()
+                             ? line_position + *relative_line_end
+                             : command.length;
+    let const line =
+        command.substring_of_length(line_position, line_end - line_position);
+    if (!line.is_empty()) {
+      if (let const event =
+              toiletline::history_append_event(line, duplicate_policy);
+          event.has_value())
+      {
+        newest_event = *event;
+      }
+    }
+    if (line_end == command.length) break;
+    line_position = line_end + 1;
+  }
+
+  return newest_event;
+}
+
 static fn expand_interactive_history(StringView source,
                                      Maybe<usize> accepted_event_number,
                                      history_expansion_state &state,

@@ -67,6 +67,7 @@ modifier_history_path=$dir/modifiers
 modifier_print_path=$dir/modifier-print
 modifier_stderr_log=$dir/modifier-stderr
 filter_history_path=$dir/filter-history
+multiline_history_path=$dir/multiline-history
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -329,6 +330,8 @@ out=$({
     'echo EXT_ONE\r' \
     'shopt -s extglob\r' \
     'echo EXT_TWO\r' \
+    'HISTIGNORE='\''echo COLON\:MARKER'\''\r' \
+    'echo COLON:MARKER\r' \
     'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
@@ -350,11 +353,61 @@ if [ "$(grep -c '^ echo SPACE_FILTER_MARKER$' "$filter_history_path")" -eq 0 ] &
     "$filter_history_path")" -eq 1 ] &&
   [ "$(grep -c '^echo AMP_FILTER_MARKER$' "$filter_history_path")" -eq 1 ] &&
   [ "$(grep -c '^echo EXT_ONE$' "$filter_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo EXT_TWO$' "$filter_history_path")" -eq 0 ]; then
+  [ "$(grep -c '^echo EXT_TWO$' "$filter_history_path")" -eq 0 ] &&
+  [ "$(grep -c '^echo COLON:MARKER$' "$filter_history_path")" -eq 0 ]; then
   echo "history filtering ok"
 else
   printf 'history filter file:\n%.4096s\n' "$(cat "$filter_history_path")" >&2
   echo "history filtering broken"
+fi
+
+: > "$multiline_history_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready \
+    'shopt -s cmdhist\r' \
+    'shopt -u lithist\r' \
+    'echo CMDHIST_ONE\033\r' \
+    '  echo CMDHIST_TWO\r' \
+    'if true; then\033\r' \
+    '  echo IF_YES\033\r' \
+    'else\033\r' \
+    '  echo IF_NO\033\r' \
+    'fi\r' \
+    'printf p |\033\r' \
+    '  tr p P\r' \
+    'printf "%s\\n" "left\033\r' \
+    'right"\r' \
+    'shopt -s lithist\r' \
+    'echo LITHIST_ONE\033\r' \
+    '  echo LITHIST_TWO\r' \
+    'shopt -u cmdhist\r' \
+    'echo PHYSICAL_ONE\033\r' \
+    '  echo PHYSICAL_TWO\r' \
+    'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$multiline_history_path" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+if [ "$(grep -c '^echo CMDHIST_ONE;   echo CMDHIST_TWO$' \
+    "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^if true; then   echo IF_YES; else   echo IF_NO; fi$' \
+    "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^printf p |   tr p P$' "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -F -c 'printf "%s\\n" "left\nright"' \
+    "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -F -c 'echo LITHIST_ONE\n  echo LITHIST_TWO' \
+    "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^echo PHYSICAL_ONE$' "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -c '^  echo PHYSICAL_TWO$' "$multiline_history_path")" -eq 1 ]; then
+  echo "cmdhist and lithist ok"
+else
+  printf 'multiline history file:\n%.4096s\n' \
+    "$(cat "$multiline_history_path")" >&2
+  echo "cmdhist and lithist broken"
 fi
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"

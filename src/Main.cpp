@@ -1317,11 +1317,11 @@ fn kosh_main(int argc, char **argv) -> int
     {
       let const duplicate_policy = koshka::interactive_history_duplicate_policy(
           script_contents.view(), context);
-      history_event_number =
-          duplicate_policy.has_value()
-              ? toiletline::history_append_event(script_contents.view(),
-                                                 *duplicate_policy)
-              : koshka::Maybe<usize>{koshka::None};
+      history_event_number = duplicate_policy.has_value()
+                                 ? koshka::append_interactive_history(
+                                       script_contents.view(),
+                                       *duplicate_policy, context, ast_arena)
+                                 : koshka::Maybe<usize>{koshka::None};
     }
     if (!should_execute_history_expansion) continue;
 

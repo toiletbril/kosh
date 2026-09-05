@@ -39,5 +39,6 @@ history expansion ok
 history words ok
 history modifiers ok
 history filtering ok
+cmdhist and lithist ok
 history option ok
 ignoreeof ok
