@@ -2,6 +2,7 @@
 MODE ?= dbg
 TARGET ?= # Linux/Windows_NT/Darwin
 ARCH ?= $(shell uname -m)
+NO_TOILETLINE ?= 0
 
 ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp \
 	PlatformPosixFilesystem.cpp PlatformPosixProcess.cpp PlatformWin32.cpp \
@@ -64,10 +65,12 @@ SHOULD_LINK_STATIC_LINUX := 1
 endif
 endif
 
+BUILD_VARIANT_SUFFIX := $(if $(filter 1,$(NO_TOILETLINE)),-no-toiletline,)
+
 ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
-OBJ_DIR ?= o/$(TARGET)/$(LINUX_TARGET_ARCHITECTURE)/$(MODE)
+OBJ_DIR ?= o/$(TARGET)/$(LINUX_TARGET_ARCHITECTURE)/$(MODE)$(BUILD_VARIANT_SUFFIX)
 else
-OBJ_DIR ?= o/$(TARGET)/$(MODE)
+OBJ_DIR ?= o/$(TARGET)/$(MODE)$(BUILD_VARIANT_SUFFIX)
 endif
 OBJECT_DIRECTORY := $(OBJ_DIR)
 
@@ -186,7 +189,8 @@ BUILD_DEFINITIONS := \
 	-DKOSH_OS_INFO="\"$(call encode_build_metadata,$(OPERATING_SYSTEM_INFORMATION))\"" \
 	-DKOSH_COMMIT_HASH="\"$(call encode_build_metadata,$(COMMIT_HASH))\"" \
 	-DKOSH_BUILD_MODE="\"$(call encode_build_metadata,$(MODE))\"" \
-	-DKOSH_ENVCXXFLAGS="\"$(call encode_build_metadata,$(USER_CXXFLAGS))\""
+	-DKOSH_ENVCXXFLAGS="\"$(call encode_build_metadata,$(USER_CXXFLAGS))\"" \
+	$(if $(filter 1,$(NO_TOILETLINE)),-DKOSH_NO_TOILETLINE,)
 
 CXXFLAGS := \
 	-Wall \
@@ -207,7 +211,6 @@ CXXFLAGS := \
 	-fno-strict-aliasing \
 	$(BUILD_DEFINITIONS) \
 	$(USER_CXXFLAGS)
-
 ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
 CXXFLAGS += -Wno-date-time
 endif

@@ -59,16 +59,19 @@ fn Pathchk::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (const String &operand : operands) {
     let const path = operand.view();
-    let const configuration_path =
-        !path.is_empty() && path[0] == '/' ? StringView{"/"} : StringView{"."};
-    let const configured_path_limit = os::path_configuration(
-        configuration_path, os::path_configuration_key::PathMax);
-    let const configured_name_limit = os::path_configuration(
-        configuration_path, os::path_configuration_key::NameMax);
-    let const path_limit =
-        should_check_portable ? i64{256} : configured_path_limit.value_or(4096);
-    let const name_limit =
-        should_check_portable ? i64{14} : configured_name_limit.value_or(255);
+    i64 path_limit = 256;
+    i64 name_limit = 14;
+    if (!should_check_portable) {
+      let const configuration_path = !path.is_empty() && path[0] == '/'
+                                         ? StringView{"/"}
+                                         : StringView{"."};
+      path_limit = os::path_configuration(configuration_path,
+                                          os::path_configuration_key::PathMax)
+                       .value_or(4096);
+      name_limit = os::path_configuration(configuration_path,
+                                          os::path_configuration_key::NameMax)
+                       .value_or(255);
+    }
     String reason{cxt.scratch_allocator()};
     if (path.is_empty() && should_check_hyphen) {
       reason = "empty pathname";

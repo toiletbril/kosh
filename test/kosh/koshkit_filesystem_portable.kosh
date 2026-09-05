@@ -1,0 +1,44 @@
+#!/bin/env kosh
+#
+#    This file is a part of the Koshka shell, (c) toiletbril, 2026
+#    See the top-level LICENSE file for the licensing information.
+#
+# This script verifies portable hard-link creation, filesystem capacity
+# reporting, and pathname portability checks in bundled utilities.
+
+root=$TEST_TEMP_DIRECTORY/koshkit-filesystem-portable
+if [[ -n "$root" ]]; then
+  "$TEST_SYSTEM_RM" -rf -- "$root"
+fi
+koshkit mkdir -p "$root"
+: > "$root/source"
+
+koshkit link "$root/source" "$root/hard-link"
+[[ "$root/source" -ef "$root/hard-link" ]]
+echo "link=$?"
+koshkit link "$root/source" "$root/hard-link" 2> "$TEST_NULL_DEVICE"
+echo "link-existing=$?"
+koshkit ln "$root/source" "$root/ln-hard"
+[[ "$root/source" -ef "$root/ln-hard" ]]
+echo "ln-hard=$?"
+
+echo "df-fields=$(koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w)"
+koshkit df "$root/missing" 2> "$TEST_NULL_DEVICE" > "$TEST_NULL_DEVICE"
+echo "df-missing=$?"
+koshkit df > "$TEST_NULL_DEVICE"
+echo "df-all=$?"
+
+koshkit pathchk -p a_b.c-d
+echo "pathchk-portable=$?"
+koshkit pathchk -p 'a b' 2> "$TEST_NULL_DEVICE"
+echo "pathchk-space=$?"
+koshkit pathchk -P -- dir/-bad 2> "$TEST_NULL_DEVICE"
+echo "pathchk-hyphen=$?"
+koshkit pathchk -p abcdefghijklmno 2> "$TEST_NULL_DEVICE"
+echo "pathchk-name-length=$?"
+koshkit pathchk -P '' 2> "$TEST_NULL_DEVICE"
+echo "pathchk-empty=$?"
+
+if [[ -n "$root" ]]; then
+  "$TEST_SYSTEM_RM" -rf -- "$root"
+fi

@@ -151,6 +151,8 @@ changes update this file.
   `./kosh-dbg` with AddressSanitizer and UndefinedBehaviorSanitizer.
   `make MODE=cov` builds `./kosh-cov`. Debug is the default. `make clean` owns
   removal. Never remove `./kosh` directly.
+- `NO_TOILETLINE=1 make` builds the no editor configuration in a separate
+  object directory. `NO_TOILETLINE=1 make test` runs its portable history test.
 - `make test` runs main and completion suites. `make bench` runs benchmarks.
   Completion tests require debug. Bound interactive and long-running commands.
 - `refill` regenerates goldens. `REFILL` selects source stems. Goldens live
@@ -182,6 +184,8 @@ changes update this file.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
+- Resolve an executable in the environment that launches it. Pass its verified
+  absolute path when a nested shell can use a different command search path.
 - Inspect the reported source line before diagnosing a shell error.
 - Use parallel tool calls for independent reads. Do not join them with shell
   command separators.
@@ -212,6 +216,7 @@ changes update this file.
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
+- Place environment assignments before the command that receives them.
 - Compare a delimiter-sensitive shell pattern with the literal observed value
   before running it.
 - When a host shell invokes a reference shell with `-c`, single-quote the source
@@ -252,6 +257,8 @@ changes update this file.
   resumed session, print any pending table before the first tool call.
 - Inspect the formatter diff before validation. Restore changes to unrelated
   files that were clean before the formatter ran.
+- Name the active case before each assertion in a compound probe that can stop
+  on the first nonzero status.
 
 ## Implementation
 
@@ -282,11 +289,17 @@ changes update this file.
 - Inspect the syntax tree before changing control-flow ownership. Cover every
   evaluator and cache path. Use nonconstant fixtures for uncertain branches.
 - Remove obsolete branches, fields, flags, and writes. Keep valid comments.
+- Use an explicit branch when a Maybe fallback performs work, because value_or
+  evaluates the fallback before the call.
+- Verify that macros and declarations are visible in every active build
+  configuration before using them.
 
 ## Make
 
 - Place conditionals and immediate expansions after their variables. Assign
   deferred tools after parse-time probes.
+- Add variant compiler definitions through `BUILD_DEFINITIONS`. An early
+  override of accumulated compiler flags can suppress later platform flags.
 - Preserve argument zero and input origin when parsing MAKEFLAGS. Exclude parent
   bookkeeping and assignments from operands. Recipe exports use macro
   precedence.
@@ -319,6 +332,10 @@ changes update this file.
   affect container iteration.
 - Remove a focused runner result file before invoking the runner.
 - Disable unrelated analysis when a probe isolates runtime behavior.
+- Assign a runtime shell variable through source when the test depends on its
+  setter. Importing an environment value does not prove that the setter ran.
+- Isolate each operation in a hanging command before identifying the cause.
+  Repeated probes start with a verified unused or clean path.
 - Trace native creation and open requests before changing platform access,
   sharing, or security. Verify both payload and status in every direction.
 - Normalize platform branches to the same output before changing a shared
@@ -355,6 +372,7 @@ changes update this file.
   rule here for each distinct cause.
 - Format changes. Run focused and full bounded tests. Inspect goldens, the full
   diff, untracked files, and `git diff --check`. Confirm README.md is untouched.
+- Check `git ls-files` before staging a path that is absent from status output.
 - Inspect vendored formatting rules before formatting a touched vendor file.
 - Verify git identity. Keep commit subjects within the limit and bodies within
   72 columns. Commit locally. Never push or create external artifacts without

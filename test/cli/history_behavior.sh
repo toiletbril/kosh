@@ -1,39 +1,14 @@
+#!/bin/sh
+#
+#    This file is a part of the Koshka shell, (c) toiletbril, 2026
+#    See the top-level LICENSE file for the licensing information.
+#
+# This script verifies terminal history recall, expansion, rewriting,
+# filtering, persistence, and editor option behavior.
+
 unset KOSH_FLAGS
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
-printf 'echo one\nls\ncd /tmp\ngit status\n' > "$dir/hist"
-export KOSH_HISTORY="$dir/hist"
-echo "== the numbered list prints every entry =="
-"$BIN" -c 'history'
-echo "== a trailing count prints only the most recent entries =="
-"$BIN" -c 'history 2'
-echo "== a non-numeric count is rejected without printing the list =="
-"$BIN" -c 'history foo; echo "rc=$?"'
-echo "== a count past the list size still prints every entry, no overflow =="
-"$BIN" -c 'history 999999999999999999999999'
-echo "== the print flag echoes its operands and stores nothing =="
-"$BIN" -c 'history -p alpha beta'
-echo "== builtin history -a no longer reports an unknown builtin =="
-"$BIN" -c 'builtin history -a; echo continued'
-echo "== type reports the builtin =="
-"$BIN" -c 'type history'
-echo "== clear empties the list =="
-"$BIN" -c 'history -c; history; echo cleared'
-
-unset KOSH_FLAGS
-# history -r <file> reads a named file into the list. The list is backed by its
-# file, so the named file is merged into the backing history and the whole list
-# is listed back.
-d=$(mktemp -d)
-printf 'existing one\nexisting two\n' > "$d/hist"
-printf 'merged alpha\nmerged beta\n' > "$d/extra"
-echo "== history -r <file> merges the named file into the list:"
-KOSH_HISTORY="$d/hist" "$BIN" -c "history -r $d/extra; history"
-echo "== history -r on a missing file errors:"
-KOSH_HISTORY="$d/hist" "$BIN" -c \
-    'history -r "$TEST_TEMP_DIRECTORY/no-such-history"; echo "rc=$?"' \
-    2>/dev/null
-[ -n "$d" ] && rm -rf "$d"
 
 # History recall brings back the newest command even when the history file holds
 # more entries than the in-memory ring. A missing parenthesis in

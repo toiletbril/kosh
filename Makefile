@@ -22,6 +22,7 @@ CALLER_JOBS := $(filter -j% --jobs% --jobserver%,$(MAKEFLAGS)) \
 AUTO_JOBS = $(if $(strip $(CALLER_JOBS)),,-j$(CPU_COUNT))
 
 MODE ?= dbg
+NO_TOILETLINE ?= 0
 
 ifeq ($(OS), Windows_NT)
 TARGET ?= Windows_NT
@@ -30,7 +31,10 @@ TARGET ?= $(shell uname -s)
 endif
 
 export MODE
+export NO_TOILETLINE
 export TARGET
+
+TEST_TARGET := $(if $(filter 1,$(NO_TOILETLINE)),cli_history_noninteractive,test)
 
 all: kosh test
 
@@ -56,7 +60,7 @@ fmt:
 
 test: kosh
 	echo Launching tests...
-	$(MAKE) $(AUTO_JOBS) -C test test
+	$(MAKE) $(AUTO_JOBS) -C test $(TEST_TARGET)
 
 bench: kosh
 	echo Launching benchmarks...

@@ -56,9 +56,9 @@ public:
   mustuse fn parent() const throws -> Path;
   mustuse pure fn filename() const wontthrow -> StringView;
   mustuse pure fn extension() const wontthrow -> StringView;
-  mustuse pure fn next_component(usize &position) const wontthrow -> component;
-  mustuse static pure fn next_component(StringView path,
-                                        usize &position) wontthrow -> component;
+  mustuse fn next_component(usize &position) const wontthrow -> component;
+  mustuse static fn next_component(StringView path, usize &position) wontthrow
+      -> component;
 
   mustuse pure fn is_absolute() const wontthrow -> bool;
   mustuse pure fn is_relative() const wontthrow -> bool;

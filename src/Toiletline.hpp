@@ -13,6 +13,8 @@
 #include "Path.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
+
+#define TL_HISTORY_MAX_SIZE (1024 * 4)
 #include "toiletline/toiletline.h"
 
 namespace koshka {
@@ -43,6 +45,7 @@ void enter_calc_history();
 void leave_calc_history();
 
 koshka::Maybe<koshka::Path> history_path();
+bool is_history_contents_valid(StringView contents);
 bool history_write();
 bool history_read();
 bool history_clear();

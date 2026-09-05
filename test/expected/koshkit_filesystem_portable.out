@@ -1,0 +1,444 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$TEST_TEMP_DIRECTORY/koshkit-filesystem-portable]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "$TEST_SYSTEM_RM" "-rf" "--" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "link" "$root/source" "$root/hard-link"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "link=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "link" "$root/source" "$root/hard-link"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "link-existing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "$root/source" "$root/ln-hard"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ln-hard=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "df-fields=$(koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "df" "$root/missing"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "df-missing=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "df"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "df-all=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-p" "a_b.c-d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-portable=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-p" "a b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-space=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-P" "--" "dir/-bad"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-hyphen=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-p" "abcdefghijklmno"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-name-length=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "pathchk" "-P" ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "pathchk-empty=$?"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "$TEST_SYSTEM_RM" "-rf" "--" "$root"]
+[Word
+  Unquoted "root="
+  Variable "TEST_TEMP_DIRECTORY"
+  Unquoted "/koshkit-filesystem-portable"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Variable "TEST_SYSTEM_RM"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/source"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "link"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/source"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/hard-link"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/source"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/hard-link"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "link="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "link"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/source"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/hard-link"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "link-existing="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/source"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ln-hard"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/source"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ln-hard"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ln-hard="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "df-fields="
+  CommandSubstitution "koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "df"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/missing"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "df-missing="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "df"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "df-all="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "a_b.c-d"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-portable="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Literal "a b"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-space="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "dir/-bad"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-hyphen="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "abcdefghijklmno"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-name-length="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pathchk"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Literal ""
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "pathchk-empty="
+  Variable "?"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Variable "TEST_SYSTEM_RM"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "fi"
+]
+link=0
+link-existing=1
+ln-hard=0
+df-fields=6
+df-missing=1
+df-all=0
+pathchk-portable=0
+pathchk-space=1
+pathchk-hyphen=1
+pathchk-name-length=1
+pathchk-empty=1

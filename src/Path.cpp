@@ -92,13 +92,12 @@ fn Path::push_component(StringView component) throws -> Path &
   return *this;
 }
 
-pure fn Path::next_component(usize &position) const wontthrow -> component
+fn Path::next_component(usize &position) const wontthrow -> component
 {
   return next_component(m_text.view(), position);
 }
 
-pure fn Path::next_component(StringView path, usize &position) wontthrow
-    -> component
+fn Path::next_component(StringView path, usize &position) wontthrow -> component
 {
   while (position < path.length && os::is_directory_separator(path[position]))
     position++;

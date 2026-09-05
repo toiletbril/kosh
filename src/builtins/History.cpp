@@ -56,9 +56,9 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
   let out = String{cxt.scratch_allocator()};
   for (usize i = first_index; i < events.count(); i++) {
     char number_buffer[24];
-    let const number = utils::int_to_text_into(
-        static_cast<i64>(events[i].number), number_buffer,
-        sizeof(number_buffer));
+    let const number =
+        utils::int_to_text_into(static_cast<i64>(events[i].number),
+                                number_buffer, sizeof(number_buffer));
     out.append_repeated(' ', number.length < 5 ? 5 - number.length : 0);
     out.append(number);
     out += "  ";
@@ -68,39 +68,67 @@ static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
   ec.print_to_stdout(out);
 }
 
-static fn append_file_into_history(EvalContext &cxt, const Path &source) throws
-    -> bool
+static fn append_contents_into_history(EvalContext &cxt,
+                                       StringView source_text) throws -> bool
 {
   let const backing = toiletline::history_path();
   if (!backing.has_value()) return false;
 
-  let const source_text = source.read_entire_file();
-  if (!source_text.has_value()) return false;
-  if (source_text->is_empty()) return true;
+  bool needs_separator = false;
+  if (backing->exists()) {
+    let opened = os::open_file_descriptor(backing->text().view(),
+                                          os::file_open_mode::Read);
+    if (!opened.has_value()) return false;
+    let const fd = opened.value();
+    char buffer[2048];
+    bool has_bytes = false;
+    char last_byte = '\0';
+    for (;;) {
+      let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
+      if (!read_count.has_value()) {
+        os::close_fd(fd);
+        return false;
+      }
+      if (*read_count == 0) break;
+      has_bytes = true;
+      last_byte = buffer[*read_count - 1];
+    }
+    os::close_fd(fd);
+    needs_separator = has_bytes && last_byte != '\n';
+  }
+
+  let payload = String{cxt.scratch_allocator()};
+  let contents = source_text;
+  if (needs_separator ||
+      (!source_text.is_empty() && source_text[source_text.length - 1] != '\n'))
+  {
+    payload.reserve(source_text.length + (needs_separator ? 1 : 0) + 1);
+    if (needs_separator) payload.push('\n');
+    payload.append(source_text);
+    if (!source_text.is_empty() && source_text[source_text.length - 1] != '\n')
+      payload.push('\n');
+    contents = payload.view();
+  }
 
   let const opened = os::open_file_descriptor(backing->text().view(),
                                               os::file_open_mode::Append);
   if (!opened.has_value()) return false;
 
   let const fd = opened.value();
-  let payload = String{cxt.scratch_allocator(), source_text->view()};
-  if (payload[payload.count() - 1] != '\n') payload += '\n';
-
-  let const was_written = os::write_all(fd, payload.data(), payload.count());
+  let const was_written =
+      contents.is_empty() || os::write_all(fd, contents.data, contents.length);
   os::close_fd(fd);
   return was_written;
 }
 
-static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
-    -> bool
+static fn write_history_to_file(const Path &target) throws -> bool
 {
-  let contents = String{cxt.scratch_allocator()};
-
+  let contents = Maybe<String>{None};
   if (let const source_path = toiletline::history_path();
-      source_path.has_value())
+      source_path.has_value() && source_path->exists())
   {
-    let const source_text = source_path->read_entire_file();
-    if (source_text.has_value()) contents.append(source_text->view());
+    contents = source_path->read_entire_file();
+    if (!contents.has_value()) return false;
   }
 
   let const opened = os::open_file_descriptor(target.text().view(),
@@ -110,8 +138,8 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
   let const fd = opened.value();
 
   bool was_written = true;
-  if (!contents.is_empty())
-    was_written = os::write_all(fd, contents.data(), contents.count());
+  if (contents.has_value() && !contents->is_empty())
+    was_written = os::write_all(fd, contents->data(), contents->count());
 
   os::close_fd(fd);
   return was_written;
@@ -185,7 +213,12 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HISTORY_CLEAR.is_enabled()) {
     LOG(Debug, "history clearing the list");
-    toiletline::history_clear();
+    if (!toiletline::history_clear()) {
+      report_soft_builtin_error(ec, cxt, ec.source_location(),
+                                "Unable to clear the history list");
+      return 1;
+    }
+
     did_maintain_list = true;
   }
 
@@ -196,18 +229,38 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.guard_restricted_path(args[1].view(), ec.arg_location_at(1),
                                 restricted_path_use::History);
 
-    if (args.count() > 1 &&
-        !append_file_into_history(cxt, Path{args[1].view()}))
-    {
-      report_soft_builtin_error(
-          ec, cxt, ec.arg_location_at(1),
-          StringView{"cannot read history from '"} + args[1].view() +
-              "': " + os::last_system_error_message(),
-          "Pass a readable history file, e.g. `history -r ~/.kosh_history`");
+    if (args.count() > 1) {
+      let const source = Path{args[1].view()};
+      let const source_text = source.read_entire_file();
+      if (!source_text.has_value()) {
+        report_soft_builtin_error(
+            ec, cxt, ec.arg_location_at(1),
+            StringView{"cannot read history from '"} + args[1].view() +
+                "': " + os::last_system_error_message(),
+            "Pass a readable history file, e.g. `history -r ~/.kosh_history`");
+        return 1;
+      }
+      if (!toiletline::is_history_contents_valid(source_text->view())) {
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                                  StringView{"cannot read history from '"} +
+                                      args[1].view() +
+                                      "': the file contains invalid data",
+                                  "Pass a text history file");
+        return 1;
+      }
+      if (!append_contents_into_history(cxt, source_text->view())) {
+        report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                                  "Unable to append the history file");
+        return 1;
+      }
+    }
+
+    if (!toiletline::history_read()) {
+      report_soft_builtin_error(ec, cxt, ec.source_location(),
+                                "Unable to read the history file");
       return 1;
     }
 
-    toiletline::history_read();
     did_maintain_list = true;
   }
 
@@ -218,7 +271,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.guard_restricted_path(args[1].view(), ec.arg_location_at(1),
                                 restricted_path_use::History);
       let const target = Path{args[1].view()};
-      if (!write_history_to_file(cxt, target)) {
+      if (!write_history_to_file(target)) {
         report_soft_builtin_error(
             ec, cxt, ec.arg_location_at(1),
             StringView{"cannot write history to '"} + args[1].view() +
@@ -227,7 +280,11 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         return 1;
       }
     } else {
-      toiletline::history_write();
+      if (!toiletline::history_write()) {
+        report_soft_builtin_error(ec, cxt, ec.source_location(),
+                                  "Unable to write the history file");
+        return 1;
+      }
     }
 
     did_maintain_list = true;

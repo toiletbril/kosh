@@ -688,10 +688,24 @@ fn history_rewrite_event(usize number, StringView expected,
   let const contents = path->read_entire_file();
   if (!contents.has_value()) return false;
   usize end_offset = start_offset;
-  while (end_offset < contents->count() && (*contents)[end_offset] != '\n')
-    end_offset++;
-  if (end_offset >= contents->count()) return false;
-  end_offset++;
+  bool is_escape_pending = false;
+  bool did_find_end = false;
+  while (end_offset < contents->count()) {
+    let const byte = (*contents)[end_offset++];
+    if (is_escape_pending) {
+      is_escape_pending = false;
+      continue;
+    }
+    if (byte == '\\') {
+      is_escape_pending = true;
+      continue;
+    }
+    if (byte == '\n') {
+      did_find_end = true;
+      break;
+    }
+  }
+  if (!did_find_end) return false;
 
   char decoded[ITL_STRING_MAX_LEN + 1];
   usize decoded_size = 0;

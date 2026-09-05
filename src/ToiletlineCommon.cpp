@@ -142,6 +142,24 @@ static fn display_width_walk(StringView text, usize stop_after,
 
 namespace toiletline {
 
+fn is_history_contents_valid(StringView contents) -> bool
+{
+  for (usize byte_offset = 0; byte_offset < contents.length; byte_offset++) {
+    let const byte = static_cast<u8>(contents[byte_offset]);
+    switch (byte) {
+    case '\n':
+    case '\r':
+    case '\t':
+    case '\v':
+    case '\f': continue;
+    default:
+      if (byte < 0x20 || byte == 0x7f) return false;
+    }
+  }
+
+  return true;
+}
+
 fn utf8_strlen(const koshka::String &string, usize byte_count) -> usize
 {
   let const limited_length =

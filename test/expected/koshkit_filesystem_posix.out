@@ -58,22 +58,6 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "chgrp=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "link" "$root/mode" "$root/hard-link"]
-  [CompoundListCondition, None]
-    [ConditionalCommand]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "link=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "link" "$root/mode" "$root/hard-link"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "link-existing=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "ln" "$root/mode" "$root/ln-hard"]
-  [CompoundListCondition, None]
-    [ConditionalCommand]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "ln-hard=$?"]
-  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "ln" "-s" "$root/mode" "$root/ln-symbolic"]
   [CompoundListCondition, None]
     [ConditionalCommand]
@@ -96,35 +80,13 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "mkfifo-symbolic=$fifo_fields%% *"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "df-fields=$(koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w)"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "df" "$root/missing"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "df-missing=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "df"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "df-all=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "pathchk" "-p" "a_b.c-d"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "pathchk-portable=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "pathchk" "-p" "a b"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "pathchk-space=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "pathchk" "-P" "--" "dir/-bad"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "pathchk-hyphen=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "pathchk" "-p" "abcdefghijklmno"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "pathchk-name-length=$?"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "pathchk" "-P" ""]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "pathchk-empty=$?"]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "$TEST_SYSTEM_RM" "-rf" "--" "$root"]
 [Word
   Unquoted "root="
   CommandSubstitution "mktemp -d"
@@ -374,109 +336,6 @@
   Unquoted "koshkit"
 ]
 [Word
-  Unquoted "link"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/mode"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/hard-link"
-]
-[Word
-  Unquoted "[["
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/mode"
-]
-[Word
-  Unquoted "-ef"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/hard-link"
-]
-[Word
-  Unquoted "]]"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "link="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "link"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/mode"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/hard-link"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "link-existing="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "ln"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/mode"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/ln-hard"
-]
-[Word
-  Unquoted "[["
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/mode"
-]
-[Word
-  Unquoted "-ef"
-]
-[Word
-  Variable "root"
-  DoubleQuoted "/ln-hard"
-]
-[Word
-  Unquoted "]]"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "ln-hard="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
   Unquoted "ln"
 ]
 [Word
@@ -588,175 +447,37 @@
   Variable "fifo_fields%% *"
 ]
 [Word
-  Unquoted "echo"
+  Unquoted "if"
 ]
 [Word
-  DoubleQuoted "df-fields="
-  CommandSubstitution "koshkit df -Pk "$root" | koshkit tail -n 1 | koshkit wc -w"
+  Unquoted "[["
 ]
 [Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "df"
+  Unquoted "-n"
 ]
 [Word
   Variable "root"
-  DoubleQuoted "/missing"
 ]
 [Word
-  Unquoted "2"
+  Unquoted "]]"
 ]
 [Word
-  Variable "TEST_NULL_DEVICE"
+  Unquoted "then"
 ]
 [Word
-  Variable "TEST_NULL_DEVICE"
+  Variable "TEST_SYSTEM_RM"
 ]
 [Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "df-missing="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "df"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "df-all="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "pathchk"
-]
-[Word
-  Unquoted "-p"
-]
-[Word
-  Unquoted "a_b.c-d"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "pathchk-portable="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "pathchk"
-]
-[Word
-  Unquoted "-p"
-]
-[Word
-  Literal "a b"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "pathchk-space="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "pathchk"
-]
-[Word
-  Unquoted "-P"
+  Unquoted "-rf"
 ]
 [Word
   Unquoted "--"
 ]
 [Word
-  Unquoted "dir/-bad"
+  Variable "root"
 ]
 [Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "pathchk-hyphen="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "pathchk"
-]
-[Word
-  Unquoted "-p"
-]
-[Word
-  Unquoted "abcdefghijklmno"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "pathchk-name-length="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "pathchk"
-]
-[Word
-  Unquoted "-P"
-]
-[Word
-  Literal ""
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "pathchk-empty="
-  Variable "?"
+  Unquoted "fi"
 ]
 chmod-octal=-rw-r-----
 chmod-symbolic=-rwxrwx---
@@ -765,18 +486,7 @@ chmod-umask=-rw-r--r--
 chown=0
 chown-name=0
 chgrp=0
-link=0
-link-existing=1
-ln-hard=0
 ln-symbolic=0
 mkfifo=prw-------
 mkfifo-existing=1
 mkfifo-symbolic=pr--r--r--
-df-fields=6
-df-missing=1
-df-all=0
-pathchk-portable=0
-pathchk-space=1
-pathchk-hyphen=1
-pathchk-name-length=1
-pathchk-empty=1

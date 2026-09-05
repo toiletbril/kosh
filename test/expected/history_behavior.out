@@ -1,37 +1,3 @@
-== the numbered list prints every entry ==
-    1  echo one
-    2  ls
-    3  cd /tmp
-    4  git status
-== a trailing count prints only the most recent entries ==
-    3  cd /tmp
-    4  git status
-== a non-numeric count is rejected without printing the list ==
-1:9: error: Builtin `history`: 'foo' is not a valid count.
-     1 |  history foo; echo "rc=$?"
-       |          ^~~
-rc=2
-== a count past the list size still prints every entry, no overflow ==
-    1  echo one
-    2  ls
-    3  cd /tmp
-    4  git status
-== the print flag echoes its operands and stores nothing ==
-alpha
-beta
-== builtin history -a no longer reports an unknown builtin ==
-continued
-== type reports the builtin ==
-history is a shell builtin
-== clear empties the list ==
-cleared
-== history -r <file> merges the named file into the list:
-    1  existing one
-    2  existing two
-    3  merged alpha
-    4  merged beta
-== history -r on a missing file errors:
-rc=1
 recall ok
 fc replacement ok
 search casefold ok
