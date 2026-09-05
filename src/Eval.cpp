@@ -232,6 +232,13 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
+  if (name == BASH_ALIASES_VARIABLE &&
+      is_bash_special_array_active(bash_special_array_id::Aliases))
+  {
+    set_alias("0", value);
+    return;
+  }
+
   if (is_integer_variable(name)) [[unlikely]] {
     let const result = value.length == 0 ? String{scratch_allocator(), "0"}
                                          : evaluate_arithmetic_text(value);
@@ -289,9 +296,15 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
 
   if (peel_caller_local_binding(name)) return;
 
+  let const should_disable_bash_aliases =
+      name == BASH_ALIASES_VARIABLE &&
+      is_bash_special_array_active(bash_special_array_id::Aliases);
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
+  clear_associative_array(name);
+  if (should_disable_bash_aliases)
+    disable_bash_special_array(bash_special_array_id::Aliases);
   m_variable_attributes.erase(name);
 }
 

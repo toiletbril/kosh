@@ -664,6 +664,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
                                      m_program_resolver,
                                      m_init_moods_sourcing,
                                      m_initialized_moods,
+                                     m_disabled_bash_special_arrays,
                                      m_was_mood_set_explicitly,
                                      m_mood_mutation_revision,
                                      m_warning_mutation_revision,
@@ -707,6 +708,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_program_resolver = steal(snapshot.program_resolver);
   m_init_moods_sourcing = snapshot.init_moods_sourcing;
   m_initialized_moods = snapshot.initialized_moods;
+  m_disabled_bash_special_arrays = snapshot.disabled_bash_special_arrays;
   m_was_mood_set_explicitly = snapshot.was_mood_set_explicitly;
   m_mood_mutation_revision = snapshot.mood_mutation_revision;
   m_warning_mutation_revision = snapshot.warning_mutation_revision;
@@ -786,7 +788,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 }
 
 static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
-static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 5U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 6U;
 static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
 static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
 
@@ -992,6 +994,11 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
 
   for (let const &stored_name : names) {
     let const name = stored_name.view();
+    if (name == BASH_ALIASES_VARIABLE &&
+        is_bash_special_array_active(bash_special_array_id::Aliases))
+    {
+      continue;
+    }
     let const is_integer = is_integer_variable(name);
     let const is_lowercase = is_lowercase_variable(name);
     let const is_uppercase = is_uppercase_variable(name);
@@ -1114,6 +1121,7 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   append_subshell_bootstrap_runtime(body, RuntimeState::capture(*this));
   append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
   append_subshell_bootstrap_u64(body, m_shopt_option_values);
+  body.push(static_cast<char>(m_disabled_bash_special_arrays));
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_function_call_depth));
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_local_scope_depth));
   append_subshell_bootstrap_u32(
@@ -1221,6 +1229,7 @@ fn EvalContext::apply_subshell_bootstrap(
     invalid_subshell_bootstrap();
   let const shopt_option_overrides = reader.read_u64();
   let const shopt_option_values = reader.read_u64();
+  let const disabled_bash_special_arrays = reader.read_u8();
   let const function_call_depth = reader.read_u64();
   let const local_scope_depth = reader.read_u64();
   let function_call_names = ArrayList<String>{heap_allocator()};
@@ -1233,8 +1242,13 @@ fn EvalContext::apply_subshell_bootstrap(
   function_call_names.reserve(function_call_name_count);
   for (usize index = 0; index < function_call_name_count; index++)
     function_call_names.push(String{heap_allocator(), reader.read_text()});
+  static_assert(static_cast<u8>(bash_special_array_id::Count) <= 8);
+  constexpr u8 VALID_BASH_SPECIAL_ARRAY_MASK =
+      (1U << static_cast<u8>(bash_special_array_id::Count)) - 1U;
   if (getopts_char_index_bits == 0 || getopts_char_index_bits > SIZE_MAX ||
       next_job_id < 1 || (shopt_option_values & ~shopt_option_overrides) != 0 ||
+      (disabled_bash_special_arrays &
+       static_cast<u8>(~VALID_BASH_SPECIAL_ARRAY_MASK)) != 0 ||
       function_call_depth > MAX_FUNCTION_CALL_DEPTH ||
       local_scope_depth > MAX_FUNCTION_CALL_DEPTH)
   {
@@ -1419,6 +1433,7 @@ fn EvalContext::apply_subshell_bootstrap(
   replay_runtime.restore(*this);
   let const is_restricted =
       runtime.option_is_enabled(shell_option_id::Restricted);
+  m_disabled_bash_special_arrays = disabled_bash_special_arrays;
   run_source(bootstrap.payload.view().substring_of_length(
                  0, static_cast<usize>(bootstrap.source_length)),
              "inherited shell state");

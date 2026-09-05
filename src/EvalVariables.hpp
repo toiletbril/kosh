@@ -435,7 +435,8 @@ inline constexpr static_string_entry<shell_variable_description>
               shell_variable_fact::BashOnly}                                  },
         {SSK("BASH_ALIASES"),
          {"The name is an associative array of the defined aliases in bash.",
-          shell_variable_fact::NotPosix | shell_variable_fact::Unmaintained}  },
+          shell_variable_fact::Dynamic | shell_variable_fact::Array |
+              shell_variable_fact::BashOnly}                                  },
         {SSK("BASH_ARGC"),
          {"The elements are the argument count of each active call in bash.",
           shell_variable_fact::Array | shell_variable_fact::NotPosix |

@@ -75,6 +75,7 @@ struct eval_state_snapshot
   ProgramResolver program_resolver;
   u8 init_moods_sourcing;
   u8 initialized_moods;
+  u8 disabled_bash_special_arrays;
   bool was_mood_set_explicitly;
   u64 mood_mutation_revision;
   u64 warning_mutation_revision;

@@ -104,6 +104,21 @@ enum class shell_option_id : u8
   Count,
 };
 
+enum class bash_special_array_id : u8
+{
+  Aliases,
+  DirectoryStack,
+  Count,
+};
+
+inline constexpr StringView BASH_ALIASES_VARIABLE{"BASH_ALIASES"};
+
+constexpr pure fn bash_special_array_mask(bash_special_array_id id) wontthrow
+    -> u8
+{
+  return static_cast<u8>(1U << static_cast<u8>(id));
+}
+
 class RuntimeState
 {
 public:
@@ -425,7 +440,22 @@ public:
   fn declare_associative_array(StringView name) throws -> void;
   pure fn is_associative_array(StringView name) const wontthrow -> bool
   {
-    return m_associative_names.contains(name);
+    return m_associative_names.contains(name) || is_bash_aliases_special(name);
+  }
+  pure fn is_bash_special_array_active(bash_special_array_id id) const wontthrow
+      -> bool
+  {
+    return bash_dynamic_variables_enabled() &&
+           (m_disabled_bash_special_arrays & bash_special_array_mask(id)) == 0;
+  }
+  fn disable_bash_special_array(bash_special_array_id id) wontthrow -> void
+  {
+    m_disabled_bash_special_arrays |= bash_special_array_mask(id);
+  }
+  pure fn is_bash_aliases_special(StringView name) const wontthrow -> bool
+  {
+    return name == BASH_ALIASES_VARIABLE &&
+           is_bash_special_array_active(bash_special_array_id::Aliases);
   }
   fn set_associative_element(StringView name, StringView key,
                              StringView value) throws -> void;
@@ -1739,6 +1769,7 @@ protected:
   ProgramResolver m_program_resolver{};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
+  u8 m_disabled_bash_special_arrays{0};
   bool m_was_mood_set_explicitly{false};
   u64 m_mood_mutation_revision{0};
   u64 m_warning_mutation_revision{0};

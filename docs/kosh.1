@@ -1851,6 +1851,16 @@ lists are read-only. These names are unavailable in the
 .B sh
 mood.
 .TP
+.B BASH_ALIASES
+This associative array contains the current aliases. Assigning an element
+defines or replaces that alias. Unsetting an element has no effect. Unsetting
+the whole variable disconnects the array without deleting the aliases. A later
+.B declare -A BASH_ALIASES
+creates an ordinary array that is not connected to aliases. The name is
+unavailable in the
+.B sh
+mood.
+.TP
 .BR FUNCNAME ", " BASH_SOURCE ", " BASH_LINENO ", " BASH_COMMAND
 These values describe the active call stack and command. Their array forms
 contain the complete stack. They are unavailable in the

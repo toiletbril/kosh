@@ -156,7 +156,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   if (is_associative_array(name)) {
     if (!is_append) {
       clear_associative_array(name);
-      m_associative_names.add(name);
+      declare_associative_array(name);
     }
 
     for (const String &element : elements) {
@@ -372,6 +372,7 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+  if (is_bash_aliases_special(name)) return;
 
   LOG(Debug, "declaring '%.*s' as an associative array",
       static_cast<int>(name.length), name.data);
@@ -388,6 +389,10 @@ fn EvalContext::set_associative_element(StringView name, StringView key,
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+  if (is_bash_aliases_special(name)) {
+    set_alias(key, value);
+    return;
+  }
 
   let adjusted = String{scratch_allocator()};
   if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]] {
@@ -408,6 +413,8 @@ fn EvalContext::lookup_associative_element(StringView name,
                                            StringView key) const throws
     -> Maybe<String>
 {
+  if (is_bash_aliases_special(name)) return get_alias(key);
+
   if (let const *value = m_associative_values.find(
           associative_composite_key(name, key, scratch_allocator()).view());
       value != nullptr)
@@ -419,6 +426,15 @@ fn EvalContext::associative_keys(StringView name) const throws
     -> ArrayList<String>
 {
   let keys = ArrayList<String>{heap_allocator()};
+  if (is_bash_aliases_special(name)) {
+    keys.reserve(m_aliases.count());
+    m_aliases.for_each([&](StringView key, const String &value) {
+      unused(value);
+      keys.push_managed(key);
+    });
+    return keys;
+  }
+
   const String prefix =
       associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
@@ -433,6 +449,15 @@ fn EvalContext::associative_values(StringView name) const throws
     -> ArrayList<String>
 {
   let values = ArrayList<String>{heap_allocator()};
+  if (is_bash_aliases_special(name)) {
+    values.reserve(m_aliases.count());
+    m_aliases.for_each([&](StringView key, const String &value) {
+      unused(key);
+      values.push_managed(value.view());
+    });
+    return values;
+  }
+
   const String prefix =
       associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
@@ -443,6 +468,7 @@ fn EvalContext::associative_values(StringView name) const throws
 
 fn EvalContext::clear_associative_array(StringView name) throws -> void
 {
+  if (is_bash_aliases_special(name)) return;
   if (!is_associative_array(name)) return;
   /* The composite keys are collected before erasing, since removing entries
      while iterating would be unsafe. */
@@ -468,6 +494,7 @@ fn EvalContext::unset_array_element(StringView name,
 
   if (is_associative_array(name)) {
     let const key = expand_modifier_word(subscript);
+    if (is_bash_aliases_special(name)) return;
     m_associative_values.erase(
         associative_composite_key(name, key.view(), scratch_allocator())
             .view());
@@ -622,6 +649,8 @@ fn EvalContext::array_element_count(StringView name) const throws -> usize
     if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value())
       return call_stack_frame_count(*which);
   }
+
+  if (is_bash_aliases_special(name)) return m_aliases.count();
 
   if (is_associative_array(name)) {
     usize element_count = 0;

@@ -169,6 +169,8 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
         names.add(name);
       });
   m_associative_names.for_each([&](StringView name) { names.add(name); });
+  if (is_bash_special_array_active(bash_special_array_id::Aliases))
+    names.add(BASH_ALIASES_VARIABLE);
 #if !defined NDEBUG
   m_debug_variable_name_enumeration_count += names.count();
 #endif

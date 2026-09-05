@@ -175,7 +175,7 @@ constexpr StaticStringMap BASH_DYNAMIC{BASH_DYNAMIC_ENTRIES};
 pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
 {
   if (ALWAYS_DYNAMIC.find(name).has_value() ||
-      BASH_DYNAMIC.find(name).has_value())
+      BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE)
     return true;
 
   for (let const &color : KOSH_ANSI_COLORS)
@@ -186,7 +186,7 @@ pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
 
 pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool
 {
-  return BASH_DYNAMIC.find(name).has_value();
+  return BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE;
 }
 
 pure fn is_process_dynamic_variable_name(StringView name) wontthrow -> bool
@@ -226,6 +226,7 @@ pure fn EvalContext::variable_requires_dynamic_lookup(
   if (name[0] == 'K' && name.starts_with("KOSH_ANSI_")) {
     return true;
   }
+  if (is_bash_aliases_special(name)) return true;
 
   return bash_dynamic_variables_enabled() &&
          BASH_DYNAMIC.find(name).has_value();
@@ -306,6 +307,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       if (array->is_empty()) return koshka::None;
       return array->front();
     }
+  if (is_associative_array(name)) return lookup_associative_element(name, "0");
 
   if (is_local_in_current_scope(name)) return koshka::None;
 
@@ -463,6 +465,8 @@ fn EvalContext::append_dynamic_variable_names(
 
   for (let const &entry : BASH_DYNAMIC.entries)
     out.push(entry.value.name);
+  if (is_bash_special_array_active(bash_special_array_id::Aliases))
+    out.push(BASH_ALIASES_VARIABLE);
 }
 
 } /* namespace koshka */

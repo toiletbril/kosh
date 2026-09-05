@@ -66,6 +66,37 @@ printf "" | {
 }
 '
 
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+alias carried="printf carried"
+BASH_ALIASES[written]="printf written"
+printf "aliases-process="
+koshkit cat < <(
+  printf "%s:%s:" "${BASH_ALIASES[carried]}" "${BASH_ALIASES[written]}"
+  if alias carried >/dev/null; then printf present; fi
+)
+printf "\n"
+printf "" | {
+  printf "aliases-compound=%s:%s:" \
+    "${BASH_ALIASES[carried]}" "${BASH_ALIASES[written]}"
+  if alias written >/dev/null; then printf "present\n"; fi
+}
+
+alias retained="printf retained"
+unset BASH_ALIASES
+declare -A BASH_ALIASES
+BASH_ALIASES[ordinary]=value
+printf "ordinary-aliases-process="
+koshkit cat < <(
+  printf "%s:" "${BASH_ALIASES[ordinary]}"
+  if alias retained >/dev/null; then printf retained; fi
+)
+printf "\n"
+printf "" | {
+  printf "ordinary-aliases-compound=%s:" "${BASH_ALIASES[ordinary]}"
+  if alias retained >/dev/null; then printf "retained\n"; fi
+}
+'
+
 "$BIN" --mood posix --no-init-files -c '
 printf "mood="
 koshkit cat < <(set --mood)

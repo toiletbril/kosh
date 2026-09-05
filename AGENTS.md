@@ -198,6 +198,8 @@ changes update this file.
   contain backticks.
 - Do not use Python, here-documents, sed in-place rewrites, or awk rewrites.
   Shell text tools remain read-only probes.
+- Inspect the complete command string, including nested quoted source, for
+  prohibited forms before execution.
 - Keep Bash's `$(< file)` fast file read as the substitution's only command.
   Append a sentinel before the read when trailing newlines must be preserved.
 - Pass generated text through a literal `printf` format when the text contains
@@ -280,6 +282,8 @@ changes update this file.
   also emit lexer and syntax tree output.
 - Update the matching golden in the same edit when a fixture result label
   changes.
+- Inspect the authoritative formatter order before writing an exact assertion
+  for generated text.
 - Run ordering assertions against clean state before unrelated entries can
   affect container iteration.
 - Disable unrelated analysis when a probe isolates runtime behavior.
