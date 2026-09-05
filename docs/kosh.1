@@ -1094,11 +1094,13 @@ Without a pattern, builtin names are printed one per line. A builtin name
 renders the same help as its
 .B \-\-help
 flag. An unknown name is an error. The
-.BR \-d ,
-.BR \-m ,
-and
+.B \-d
+option prints the name and short description. The
 .B \-s
-flags are accepted without effect.
+option prints only the usage synopsis. The
+.B \-m
+option prints manpage-style name, synopsis, description, and option sections.
+Each mode accepts more than one builtin name.
 .TP
 .B logout
 A login shell runs the EXIT trap and exits. An optional operand supplies the

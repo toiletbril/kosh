@@ -337,14 +337,17 @@ inline constexpr usize BUILTIN_KIND_COUNT =
 /* The FLAG_LIST of a builtin, registered at static-init time by the
    REGISTER_BUILTIN_FLAGS line in its file. A kind with no registration reads
    back null. */
-fn register_builtin_flag_list(Builtin::Kind kind,
-                              const FlagList *flags) wontthrow -> void;
+fn register_builtin_help(Builtin::Kind kind, const FlagList *flags,
+                         const StringView *description,
+                         const SynopsisList *synopsis) wontthrow -> void;
 fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const FlagList *;
+fn builtin_help_description(Builtin::Kind kind) wontthrow -> StringView;
+fn builtin_help_synopsis(Builtin::Kind kind) wontthrow -> const SynopsisList *;
 
 #define REGISTER_BUILTIN_FLAGS(kind)                                           \
   static uchar t__builtin_flag_registrar =                                     \
-      (koshka::register_builtin_flag_list(koshka::Builtin::Kind::kind,         \
-                                          &FLAG_LIST),                         \
+      (koshka::register_builtin_help(koshka::Builtin::Kind::kind, &FLAG_LIST,  \
+                                     &HELP_DESCRIPTION, &HELP_SYNOPSIS),       \
        0)
 
 void show_builtin_help_impl(const ExecContext &ec, StringView description,

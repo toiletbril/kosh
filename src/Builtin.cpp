@@ -69,16 +69,33 @@ flatten fn search_builtin(StringView builtin_name) throws
    order, filled by each builtin file's registrar after its FLAG_LIST is
    built, since both sit in the same translation unit in order. */
 static const FlagList *BUILTIN_FLAG_LISTS[BUILTIN_KIND_COUNT] = {};
+static const StringView *BUILTIN_HELP_DESCRIPTIONS[BUILTIN_KIND_COUNT] = {};
+static const SynopsisList *BUILTIN_HELP_SYNOPSES[BUILTIN_KIND_COUNT] = {};
 
-fn register_builtin_flag_list(Builtin::Kind kind,
-                              const FlagList *flags) wontthrow -> void
+fn register_builtin_help(Builtin::Kind kind, const FlagList *flags,
+                         const StringView *description,
+                         const SynopsisList *synopsis) wontthrow -> void
 {
-  BUILTIN_FLAG_LISTS[static_cast<usize>(kind)] = flags;
+  let const index = static_cast<usize>(kind);
+  BUILTIN_FLAG_LISTS[index] = flags;
+  BUILTIN_HELP_DESCRIPTIONS[index] = description;
+  BUILTIN_HELP_SYNOPSES[index] = synopsis;
 }
 
 fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const FlagList *
 {
   return BUILTIN_FLAG_LISTS[static_cast<usize>(kind)];
+}
+
+fn builtin_help_description(Builtin::Kind kind) wontthrow -> StringView
+{
+  let const description = BUILTIN_HELP_DESCRIPTIONS[static_cast<usize>(kind)];
+  return description != nullptr ? *description : StringView{};
+}
+
+fn builtin_help_synopsis(Builtin::Kind kind) wontthrow -> const SynopsisList *
+{
+  return BUILTIN_HELP_SYNOPSES[static_cast<usize>(kind)];
 }
 
 fn is_special_builtin_name(StringView name) wontthrow -> bool

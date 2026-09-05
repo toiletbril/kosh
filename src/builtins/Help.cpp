@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the help builtin. The help
- * builtin lists the builtins or displays the help for one.
+ * This file lists builtin names and renders full, descriptive, synopsis, or
+ * manpage-style help for the help builtin. It reads immutable help metadata
+ * from the builtin registry and delegates full help to the selected builtin.
  */
 
 #include "../Builtin.hpp"
@@ -19,8 +20,8 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(SHORT, Bool, 'd', "\0",
      "Display a short description instead of the full help.");
-FLAG(MANPAGE, Bool, 'm', "\0", "Accepted without effect.");
-FLAG(SUMMARY, Bool, 's', "\0", "Accepted without effect.");
+FLAG(MANPAGE, Bool, 'm', "\0", "Display help in a manpage-style format.");
+FLAG(SUMMARY, Bool, 's', "\0", "Display only the usage synopsis.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Help);
@@ -30,6 +31,26 @@ namespace koshka {
 Help::Help() = default;
 
 pure fn Help::kind() const wontthrow -> Builtin::Kind { return Kind::Help; }
+
+static fn append_help_synopsis(String &out, StringView name,
+                               const SynopsisList &synopsis,
+                               bool should_prefix_name) throws -> void
+{
+  if (should_prefix_name) {
+    out.append(name);
+    out += ": ";
+  }
+
+  for (usize index = 0; index < synopsis.count(); index++) {
+    if (index > 0) out += should_prefix_name ? " or " : "\n    ";
+    out.append(name);
+    if (!synopsis[index].is_empty()) {
+      out.push(' ');
+      out.append(synopsis[index]);
+    }
+  }
+  out.push('\n');
+}
 
 fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
@@ -60,6 +81,39 @@ fn Help::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           StringView{"'"} + name + "' is not a shell builtin",
           "Run `help` with no operand to list every builtin");
       status = 1;
+      continue;
+    }
+
+    let const description = builtin_help_description(*resolved);
+    let const synopsis = builtin_help_synopsis(*resolved);
+    if (FLAG_SHORT.is_enabled()) {
+      let out = String{cxt.scratch_allocator(), name.view()};
+      out += " - ";
+      out.append(description);
+      out.push('\n');
+      ec.print_to_stdout(out);
+      continue;
+    }
+    if (FLAG_MANPAGE.is_enabled() && synopsis != nullptr) {
+      let out = String{cxt.scratch_allocator()};
+      out += "NAME\n    ";
+      out.append(name.view());
+      out += " - ";
+      out.append(description);
+      out += "\n\nSYNOPSIS\n    ";
+      append_help_synopsis(out, name.view(), *synopsis, false);
+      out += "\nDESCRIPTION\n";
+      out += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
+      out += "\n\n";
+      if (let const flags = builtin_flag_list(*resolved); flags != nullptr)
+        out += make_flag_help(*flags);
+      ec.print_to_stdout(out);
+      continue;
+    }
+    if (FLAG_SUMMARY.is_enabled() && synopsis != nullptr) {
+      let out = String{cxt.scratch_allocator()};
+      append_help_synopsis(out, name.view(), *synopsis, true);
+      ec.print_to_stdout(out);
       continue;
     }
 
