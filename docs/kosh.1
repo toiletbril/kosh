@@ -1868,6 +1868,32 @@ unavailable in the
 .B sh
 mood.
 .TP
+.BR BASH_ARGC ", " BASH_ARGV
+.B BASH_ARGC
+contains the positional parameter count for each recorded call frame.
+.B BASH_ARGV
+contains the recorded arguments in reverse order, with the innermost frame
+first. The root shell is the last frame. Changing positional parameters does
+not change arguments already recorded for a frame.
+.P
+The
+.B extdebug
+shopt option records function calls and sourced-file calls. A source call with
+operands records those operands. A source call without operands records its
+path as one argument. Without
+.BR extdebug ,
+function calls are not recorded. A source call without operands records its
+path while the file runs. The first root source call with operands establishes
+those operands as the base frame. Later source calls with operands are not
+recorded. Enabling
+.B extdebug
+before the arrays have been initialized starts with the current frame.
+.P
+Assignments and declarations with values have no effect. Unset and local
+declarations fail. The names are unavailable in the
+.B sh
+mood.
+.TP
 .B DIRSTACK
 This indexed array contains the current directory at index zero followed by the
 saved directories that

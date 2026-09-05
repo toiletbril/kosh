@@ -4,8 +4,9 @@
  *
  * This file resolves dynamic shell variables and publishes their metadata to
  * completion and hover consumers. It computes process, status, call-stack,
- * random, timing, option, and terminal color values without storing ordinary
- * variables.
+ * call-argument, random, timing, option, and terminal color values without
+ * storing ordinary variables. The split keeps scalar dynamic lookup separate
+ * from aggregate expansion in EvalArrays.cpp.
  */
 
 #include "Arena.hpp"
@@ -98,6 +99,8 @@ enum class dynamic_var : u8
   EUID,
   BASHPID,
   BASH_MONOSECONDS,
+  BASH_ARGC,
+  BASH_ARGV,
   BASH_ARGV0,
   BASH_EXECUTION_STRING,
   BASH_SUBSHELL,
@@ -143,6 +146,8 @@ constexpr StaticStringMap ALWAYS_DYNAMIC{ALWAYS_DYNAMIC_ENTRIES};
 /* Every name here is a bash extension, so membership answers the bash-only
    diagnostic. */
 constexpr static_string_entry<dynamic_variable_info> BASH_DYNAMIC_ENTRIES[] = {
+    DYNAMIC_VARIABLE("BASH_ARGC", BASH_ARGC, false),
+    DYNAMIC_VARIABLE("BASH_ARGV", BASH_ARGV, false),
     DYNAMIC_VARIABLE("BASH_COMMAND", BASH_COMMAND, false),
     DYNAMIC_VARIABLE("BASH_EXECUTION_STRING", BASH_EXECUTION_STRING, false),
     DYNAMIC_VARIABLE("BASH_LINENO", BASH_LINENO, false),
@@ -410,6 +415,16 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(
               static_cast<i64>(os::monotonic_nanos() / 1000000ULL),
               heap_allocator());
+        case dynamic_var::BASH_ARGC:
+          if (dynamic_array_element_count(DynamicArray::ArgumentCount) != 0)
+            return dynamic_array_element_text(DynamicArray::ArgumentCount, 0,
+                                              heap_allocator());
+          break;
+        case dynamic_var::BASH_ARGV:
+          if (dynamic_array_element_count(DynamicArray::ArgumentValue) != 0)
+            return dynamic_array_element_text(DynamicArray::ArgumentValue, 0,
+                                              heap_allocator());
+          break;
         case dynamic_var::BASH_ARGV0:
           return String{heap_allocator(), m_shell_name.view()};
         case dynamic_var::BASH_EXECUTION_STRING:

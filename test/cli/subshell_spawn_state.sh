@@ -191,13 +191,16 @@ f
 '
 
 "$BIN" --mood bash --no-init-files --no-diagnostics -c '
-outer() { inner; }
+shopt -s extdebug
+outer() { inner "inner-one" "inner two"; }
 inner()
 {
   printf "stack-process="
   koshkit cat < <(
     if [ "${FUNCNAME[*]}" = "inner outer" ] &&
-       [ -n "${BASH_LINENO[*]}" ] && [ -n "${BASH_SOURCE[*]}" ]
+       [ -n "${BASH_LINENO[*]}" ] && [ -n "${BASH_SOURCE[*]}" ] &&
+       [ "${BASH_ARGC[*]}" = "2 2 0" ] &&
+       [ "${BASH_ARGV[*]}" = "inner two inner-one outer two outer-one" ]
     then
       printf yes
     else
@@ -207,7 +210,9 @@ inner()
   printf "\n"
   printf x | {
     if [ "${FUNCNAME[*]}" = "inner outer" ] &&
-       [ -n "${BASH_LINENO[*]}" ] && [ -n "${BASH_SOURCE[*]}" ]
+       [ -n "${BASH_LINENO[*]}" ] && [ -n "${BASH_SOURCE[*]}" ] &&
+       [ "${BASH_ARGC[*]}" = "2 2 0" ] &&
+       [ "${BASH_ARGV[*]}" = "inner two inner-one outer two outer-one" ]
     then
       printf "stack-compound=yes\n"
     else
@@ -215,7 +220,7 @@ inner()
     fi
   }
 }
-outer
+outer "outer-one" "outer two"
 '
 
 KOSH_INTERNAL_PREVIOUS_EXIT_STATUS=71 \

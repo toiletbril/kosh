@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the source builtin. The source
- * builtin runs the named file in the current shell.
+ * This file implements the source builtin, source path resolution, temporary
+ * positional parameters, and Bash source argument frames. These operations
+ * stay together because the source invocation owns both the file execution
+ * and the call-entry arguments that must be restored when it returns.
  */
 
 #include "../Builtin.hpp"
@@ -69,18 +71,24 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const has_extra_args =
       !cxt.is_posix_mode() && ec.args().count() > path_index + 1;
   let saved_params = ArrayList<String>{heap_allocator()};
+  let params = ArrayList<String>{heap_allocator()};
   if (has_extra_args) {
-    let params = ArrayList<String>{heap_allocator()};
     for (usize i = path_index + 1; i < ec.args().count(); i++)
       params.push_managed(ec.args()[i]);
-
+  }
+  let bash_argument_frame_context = EvalContext::BashArgumentFrameContext{};
+  cxt.enter_bash_source_argument_frame(bash_argument_frame_context,
+                                       has_extra_args ? &params : nullptr,
+                                       path.view());
+  defer
+  {
+    cxt.leave_bash_argument_frame(bash_argument_frame_context);
+    if (has_extra_args) cxt.set_positional_params(steal(saved_params));
+  };
+  if (has_extra_args) {
     saved_params = cxt.take_positional_params();
     cxt.set_positional_params(steal(params));
   }
-  defer
-  {
-    if (has_extra_args) cxt.set_positional_params(steal(saved_params));
-  };
 
   return cxt.run_source(*contents, "the file '" + path + "'",
                         return_handling::Consume,

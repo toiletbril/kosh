@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the shopt builtin. The shopt
- * builtin sets, unsets, and queries the bash shell options.
+ * This file implements shopt option lookup, compact bit indexes, reusable
+ * status output, and the shopt builtin. The canonical name table remains here
+ * because parsing, BASHOPTS, and runtime option changes must share one order.
  */
 
 #include "../Builtin.hpp"
@@ -203,6 +204,8 @@ pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8
   switch (option) {
   case shopt_option_id::Checkhash:
     return compact_shopt_option_index(SSK("checkhash"));
+  case shopt_option_id::Extdebug:
+    return compact_shopt_option_index(SSK("extdebug"));
   case shopt_option_id::InheritErrexit:
     return compact_shopt_option_index(SSK("inherit_errexit"));
   case shopt_option_id::Lastpipe:

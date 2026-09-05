@@ -14,5 +14,7 @@ echo "== kosh git dynamic variables complete:"
 "$BIN" --debug-complete-at 'echo $KOSH_GIT_' </dev/null
 echo "== bash dynamic variables complete in bash mood:"
 "$BIN" -M bash --debug-complete-at 'echo $BASHPI' </dev/null
+echo "== bash argument arrays complete in bash mood:"
+"$BIN" -M bash --debug-complete-at 'echo $BASH_ARG' </dev/null
 echo "== POSIX mood completes its dynamic variables:"
 "$BIN" -M sh --debug-complete-at 'echo $LINE' </dev/null

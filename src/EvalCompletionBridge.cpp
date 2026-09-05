@@ -3,8 +3,9 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file connects evaluator-owned completion specifications with
- * completion functions and COMPREPLY execution. It isolates completion
- * dependencies from the evaluator core while preserving runtime state.
+ * completion functions, their Bash argument frames, and COMPREPLY execution.
+ * The split exists because completion evaluation needs completion types and
+ * callbacks that the evaluator core does not otherwise include.
  */
 
 #include "Debug.hpp"
@@ -118,6 +119,9 @@ fn EvalContext::run_completion_function(StringView function_name,
                        ? String{heap_allocator(), words[cword - 1].view()}
                        : String{heap_allocator()});
 
+  let bash_argument_frame_context = BashArgumentFrameContext{};
+  enter_bash_function_argument_frame(bash_argument_frame_context, call_params);
+  defer { leave_bash_argument_frame(bash_argument_frame_context); };
   let saved_params = take_positional_params();
   set_positional_params(steal(call_params));
   defer { set_positional_params(steal(saved_params)); };

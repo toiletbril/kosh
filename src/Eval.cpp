@@ -3,9 +3,10 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file implements shared EvalContext and ExecContext operations for
- * assignments, environments, diagnostics, history, scopes, aliases, command
- * resolution, and builtin input and output. Other Eval sources own the
- * specialized evaluation families.
+ * assignments, environments, diagnostics, history, scopes, aliases, Bash
+ * argument-frame capture, command resolution, and builtin input and output.
+ * These operations stay here because they coordinate state shared by several
+ * expression and builtin families.
  */
 
 #include "Eval.hpp"
@@ -53,7 +54,11 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                                 });
 }
 
-EvalContext::~EvalContext() { reset_runtime_diagnostic_highlight_cache(); }
+EvalContext::~EvalContext()
+{
+  reset_bash_argument_arrays();
+  reset_runtime_diagnostic_highlight_cache();
+}
 
 fn EvalContext::get_or_create_diagnostic_highlight_cache() throws
     -> completion::shell_highlight_cache *
@@ -232,6 +237,8 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
+  if (is_bash_argument_array(name)) return;
+
   if (name == BASH_ALIASES_VARIABLE &&
       is_bash_special_array_active(bash_special_array_id::Aliases))
   {
@@ -294,6 +301,9 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
 {
   if (is_readonly(name))
     throw Error{"Unable to unset '" + name + "' because it is read only"};
+
+  if (is_bash_argument_array(name))
+    throw Error{String{name} + ": cannot unset"};
 
   if (peel_caller_local_binding(name)) return;
 
@@ -388,6 +398,7 @@ fn EvalContext::set_indexed_array(StringView name,
       static_cast<int>(name.length), name.data, values.count());
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+  if (is_bash_argument_array(name)) return;
   if (is_bash_directory_stack_special(name)) {
     for (usize index = 0; index < values.count(); index++)
       set_bash_directory_stack_element(index, values[index].view());
@@ -430,6 +441,8 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {
+  if (is_bash_argument_array(name)) return;
+
   if (let *existing = m_indexed_arrays.find(name); existing != nullptr) {
     LOG(All, "appending %zu elements to the existing array '%.*s'",
         values.count(), static_cast<int>(name.length), name.data);
@@ -756,6 +769,183 @@ fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
   return steal(m_positional_params);
 }
 
+pure fn EvalContext::is_bash_argument_array(StringView name) const wontthrow
+    -> bool
+{
+  return bash_dynamic_variables_enabled() &&
+         (name == BASH_ARGUMENT_COUNT_VARIABLE ||
+          name == BASH_ARGUMENT_VALUE_VARIABLE);
+}
+
+fn EvalContext::initialize_bash_argument_arrays(
+    bool should_include_current_frame) const throws -> void
+{
+  if (m_bash_argument_arrays != nullptr) return;
+
+  let values = ArrayList<String>{heap_allocator()};
+  let frame_counts = ArrayList<u32>{heap_allocator()};
+  if (should_include_current_frame) {
+    let const is_source_frame = m_bash_argument_frame_context != nullptr &&
+                                m_bash_argument_frame_context->has_flag(
+                                    BashArgumentFrameFlag::IsSource);
+    let const has_source_arguments =
+        is_source_frame && m_bash_argument_frame_context->has_flag(
+                               BashArgumentFrameFlag::HasSourceArguments);
+    let const uses_source_path = is_source_frame && !has_source_arguments;
+    let const argument_count =
+        uses_source_path ? usize{1} : m_positional_params.count();
+    values.reserve(argument_count);
+    frame_counts.reserve(1);
+    if (uses_source_path) {
+      values.push_managed(m_bash_argument_frame_context->source_path);
+    } else {
+      for (let const &argument : m_positional_params)
+        values.push_managed(argument.view());
+    }
+    frame_counts.push(static_cast<u32>(argument_count));
+  }
+
+  install_bash_argument_arrays(steal(values), steal(frame_counts));
+}
+
+fn EvalContext::install_bash_argument_arrays(
+    ArrayList<String> values, ArrayList<u32> frame_counts) const throws -> void
+{
+  ASSERT(m_bash_argument_arrays == nullptr);
+  let const storage = heap_allocator().alloc_array<BashArgumentArrayStorage>(1);
+  if (storage == nullptr) throw std::bad_alloc{};
+  try {
+    new (storage) BashArgumentArrayStorage{steal(values), steal(frame_counts)};
+  } catch (...) {
+    heap_allocator().free_array(storage, 1);
+    throw;
+  }
+  m_bash_argument_arrays = storage;
+}
+
+fn EvalContext::reset_bash_argument_arrays() const wontthrow -> void
+{
+  if (m_bash_argument_arrays == nullptr) return;
+  m_bash_argument_arrays->~BashArgumentArrayStorage();
+  heap_allocator().free_array(m_bash_argument_arrays, 1);
+  m_bash_argument_arrays = nullptr;
+}
+
+fn EvalContext::append_bash_argument_frame(
+    const ArrayList<String> &arguments) const throws -> void
+{
+  ASSERT(m_bash_argument_arrays != nullptr);
+  let &values = m_bash_argument_arrays->values;
+  let &frame_counts = m_bash_argument_arrays->frame_counts;
+  let const previous_value_count = values.count();
+  values.reserve(previous_value_count + arguments.count());
+  frame_counts.reserve(frame_counts.count() + 1);
+  try {
+    for (let const &argument : arguments)
+      values.push_managed(argument.view());
+  } catch (...) {
+    while (values.count() > previous_value_count)
+      values.pop_back();
+    throw;
+  }
+  frame_counts.push(static_cast<u32>(arguments.count()));
+}
+
+fn EvalContext::append_bash_argument_frame(StringView argument) const throws
+    -> void
+{
+  ASSERT(m_bash_argument_arrays != nullptr);
+  let &values = m_bash_argument_arrays->values;
+  let &frame_counts = m_bash_argument_arrays->frame_counts;
+  values.reserve(values.count() + 1);
+  frame_counts.reserve(frame_counts.count() + 1);
+  values.push_managed(argument);
+  frame_counts.push(1);
+}
+
+fn EvalContext::append_current_bash_argument_frame() const throws -> void
+{
+  ASSERT(m_bash_argument_frame_context != nullptr);
+  let const is_source_frame =
+      m_bash_argument_frame_context->has_flag(BashArgumentFrameFlag::IsSource);
+  let const has_source_arguments = m_bash_argument_frame_context->has_flag(
+      BashArgumentFrameFlag::HasSourceArguments);
+  if (is_source_frame && !has_source_arguments)
+    append_bash_argument_frame(m_bash_argument_frame_context->source_path);
+  else
+    append_bash_argument_frame(m_positional_params);
+}
+
+fn EvalContext::enter_bash_function_argument_frame(
+    BashArgumentFrameContext &frame_context,
+    const ArrayList<String> &arguments) throws -> void
+{
+  frame_context.previous = m_bash_argument_frame_context;
+  frame_context.source_path = {};
+  frame_context.flags = 0;
+
+  if (bash_dynamic_variables_enabled() &&
+      is_shopt_enabled(shopt_option_id::Extdebug))
+  {
+    initialize_bash_argument_arrays(true);
+    append_bash_argument_frame(arguments);
+    frame_context.set_flag(BashArgumentFrameFlag::DidEnter);
+  }
+
+  m_bash_argument_frame_context = &frame_context;
+}
+
+fn EvalContext::enter_bash_source_argument_frame(
+    BashArgumentFrameContext &frame_context, const ArrayList<String> *arguments,
+    StringView source_path) throws -> void
+{
+  frame_context.previous = m_bash_argument_frame_context;
+  frame_context.source_path = source_path;
+  frame_context.flags = 0;
+  frame_context.set_flag(BashArgumentFrameFlag::IsSource);
+  if (arguments != nullptr)
+    frame_context.set_flag(BashArgumentFrameFlag::HasSourceArguments);
+
+  if (bash_dynamic_variables_enabled()) {
+    if (is_shopt_enabled(shopt_option_id::Extdebug)) {
+      initialize_bash_argument_arrays(true);
+      if (arguments != nullptr)
+        append_bash_argument_frame(*arguments);
+      else
+        append_bash_argument_frame(source_path);
+      frame_context.set_flag(BashArgumentFrameFlag::DidEnter);
+    } else if (arguments == nullptr) {
+      initialize_bash_argument_arrays(m_bash_argument_frame_context == nullptr);
+      append_bash_argument_frame(source_path);
+      frame_context.set_flag(BashArgumentFrameFlag::DidEnter);
+    } else if (m_bash_argument_arrays == nullptr) {
+      initialize_bash_argument_arrays(false);
+      if (m_bash_argument_frame_context == nullptr)
+        append_bash_argument_frame(*arguments);
+    }
+  }
+
+  m_bash_argument_frame_context = &frame_context;
+}
+
+fn EvalContext::leave_bash_argument_frame(
+    BashArgumentFrameContext &frame_context) wontthrow -> void
+{
+  ASSERT(m_bash_argument_frame_context == &frame_context);
+  m_bash_argument_frame_context = frame_context.previous;
+  if (!frame_context.has_flag(BashArgumentFrameFlag::DidEnter)) return;
+
+  ASSERT(m_bash_argument_arrays != nullptr);
+  let &values = m_bash_argument_arrays->values;
+  let &frame_counts = m_bash_argument_arrays->frame_counts;
+  ASSERT(!frame_counts.is_empty());
+  let const argument_count = frame_counts.back();
+  frame_counts.pop_back();
+  ASSERT(argument_count <= values.count());
+  for (u32 index = 0; index < argument_count; index++)
+    values.pop_back();
+}
+
 fn EvalContext::enter_function_scope() throws -> void
 {
   if (m_local_scope_depth == m_local_scopes.count())
@@ -936,24 +1126,56 @@ pure fn EvalContext::bash_source_frame_count() const wontthrow -> usize
   return frame_count;
 }
 
-fn EvalContext::call_stack_frame_count(CallStackVariable which) const wontthrow
+fn EvalContext::dynamic_array_element_count(DynamicArray which) const throws
     -> usize
 {
-  if (which == CallStackVariable::SourcePath) return bash_source_frame_count();
+  switch (which) {
+  case DynamicArray::ArgumentCount:
+  case DynamicArray::ArgumentValue: {
+    let const should_include_current_frame =
+        m_bash_argument_frame_context != nullptr
+            ? m_bash_argument_frame_context->has_flag(
+                  BashArgumentFrameFlag::IsSource)
+            : m_function_call_names.is_empty();
+    initialize_bash_argument_arrays(should_include_current_frame);
+    ASSERT(m_bash_argument_arrays != nullptr);
+    return which == DynamicArray::ArgumentCount
+               ? m_bash_argument_arrays->frame_counts.count()
+               : m_bash_argument_arrays->values.count();
+  }
+  case DynamicArray::SourcePath: return bash_source_frame_count();
+  case DynamicArray::FunctionName:
+  case DynamicArray::LineNumber: return funcname_frame_count();
+  }
 
-  return funcname_frame_count();
+  return 0;
 }
 
-fn EvalContext::call_stack_frame_text(CallStackVariable which, usize index,
-                                      Allocator result_allocator) const throws
+fn EvalContext::dynamic_array_element_text(
+    DynamicArray which, usize index, Allocator result_allocator) const throws
     -> String
 {
   switch (which) {
-  case CallStackVariable::FunctionName:
+  case DynamicArray::ArgumentCount: {
+    unused(dynamic_array_element_count(which));
+    ASSERT(m_bash_argument_arrays != nullptr);
+    let const &frame_counts = m_bash_argument_arrays->frame_counts;
+    ASSERT(index < frame_counts.count());
+    let const storage_index = frame_counts.count() - 1 - index;
+    return String::from(frame_counts[storage_index], result_allocator);
+  }
+  case DynamicArray::ArgumentValue: {
+    unused(dynamic_array_element_count(which));
+    ASSERT(m_bash_argument_arrays != nullptr);
+    let const &values = m_bash_argument_arrays->values;
+    ASSERT(index < values.count());
+    return String{result_allocator, values[values.count() - 1 - index].view()};
+  }
+  case DynamicArray::FunctionName:
     return String{result_allocator, funcname_frame_at(index)};
-  case CallStackVariable::LineNumber:
+  case DynamicArray::LineNumber:
     return String::from(funcname_line_at(index), result_allocator);
-  case CallStackVariable::SourcePath:
+  case DynamicArray::SourcePath:
     return String{result_allocator, bash_source_frame_at(index)};
   }
 

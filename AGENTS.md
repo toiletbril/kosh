@@ -182,6 +182,9 @@ changes update this file.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
+- Compatibility fixtures use a stable peer-file operand when that operand is
+  printed. The runner may pass the main input through different path forms to
+  the shell under test and the reference shell.
 - Put the explicitly verified interpreter and `-c` in the command text for a
   compound host probe. Do not rely on command-runner shell metadata. Inspect an
   unfamiliar make target recipe before invoking it.
@@ -196,6 +199,12 @@ changes update this file.
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
+- When a host shell invokes a reference shell with `-c`, single-quote the source
+  at the host boundary so the host cannot expand the reference variables.
+- Keep a shell assignment value on the same logical line as its equals sign.
+  Use an explicit continuation before any physical line break.
+- Resolve every guessed or optional peer path with `fd` before passing it to
+  `rg`. Do not type a path merely because a nearby file suggests its name.
 - Do not use Python, here-documents, sed in-place rewrites, or awk rewrites.
   Shell text tools remain read-only probes.
 - Inspect the complete command string, including nested quoted source, for

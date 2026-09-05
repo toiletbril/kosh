@@ -26,7 +26,6 @@ enum class shell_variable_fact : u8
   Exported = 1 << 3,
   BashOnly = 1 << 4,
   NotPosix = 1 << 5,
-  Unmaintained = 1 << 6,
 };
 
 constexpr fn operator|(shell_variable_fact left,
@@ -439,12 +438,13 @@ inline constexpr static_string_entry<shell_variable_description>
               shell_variable_fact::BashOnly}                                  },
         {SSK("BASH_ARGC"),
          {"The elements are the argument count of each active call in bash.",
-          shell_variable_fact::Array | shell_variable_fact::NotPosix |
-              shell_variable_fact::Unmaintained}                              },
+          shell_variable_fact::Dynamic | shell_variable_fact::Array |
+              shell_variable_fact::BashOnly}                                  },
         {SSK("BASH_ARGV"),
-         {"The elements are the arguments of each active call in bash.",
-          shell_variable_fact::Array | shell_variable_fact::NotPosix |
-              shell_variable_fact::Unmaintained}                              },
+         {"The elements are the arguments of each active call in reverse "
+          "order in bash.",
+          shell_variable_fact::Dynamic | shell_variable_fact::Array |
+              shell_variable_fact::BashOnly}                                  },
         {SSK("DIRSTACK"),
          {"The elements are the directory stack entries in bash. The dirs "
           "builtin reports the stack this shell keeps.",

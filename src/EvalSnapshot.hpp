@@ -3,10 +3,10 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file defines the move-only evaluator state captured around isolated
- * execution, including shell options, directories, completion specifications,
- * and compiled regular expressions. Completion specifications and compiled
- * expressions live here because snapshots transfer both with the rest of
- * mutable evaluator state.
+ * execution, including shell options, directories, Bash argument frames,
+ * completion specifications, and compiled regular expressions. These values
+ * live here because isolated evaluation must restore them as one move-only
+ * unit after the nested evaluator finishes.
  */
 
 #pragma once
@@ -59,6 +59,10 @@ struct eval_state_snapshot
   StringMap<FunctionBodyHandle> functions;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
+  u32 bash_argument_value_count;
+  u32 bash_argument_frame_count;
+  bool had_bash_argument_arrays;
+  u8 bash_argument_frame_context_flags;
   String last_argument;
   ArrayList<String> directory_stack;
   os::DirectoryReference working_directory;

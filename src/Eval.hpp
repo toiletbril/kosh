@@ -4,8 +4,10 @@
  *
  * This file declares the evaluator interface, compact runtime option state,
  * resolved commands, command arguments, execution contexts, and EvalContext
- * storage. Expressions, builtins, startup, completion, and subshell transport
- * share these declarations.
+ * storage. It also declares the compact frame storage projected as Bash call
+ * stack arrays. Expressions, builtins, startup, completion, and subshell
+ * transport share these declarations, so this header is their common runtime
+ * boundary.
  */
 
 #pragma once
@@ -112,6 +114,8 @@ enum class bash_special_array_id : u8
 };
 
 inline constexpr StringView BASH_ALIASES_VARIABLE{"BASH_ALIASES"};
+inline constexpr StringView BASH_ARGUMENT_COUNT_VARIABLE{"BASH_ARGC"};
+inline constexpr StringView BASH_ARGUMENT_VALUE_VARIABLE{"BASH_ARGV"};
 inline constexpr StringView DIRSTACK_VARIABLE{"DIRSTACK"};
 
 constexpr pure fn bash_special_array_mask(bash_special_array_id id) wontthrow
@@ -338,6 +342,7 @@ pure fn shopt_option_index(StringView name) wontthrow -> Maybe<u8>;
 enum class shopt_option_id : u8
 {
   Checkhash,
+  Extdebug,
   InheritErrexit,
   Lastpipe,
   LocalvarInherit,
@@ -345,6 +350,7 @@ enum class shopt_option_id : u8
   ProgcompAlias,
   Sourcepath,
 };
+inline constexpr StringView EXTDEBUG_SHOPT_OPTION{"extdebug"};
 pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8;
 
 class EvalContext
@@ -767,6 +773,35 @@ public:
                              const FunctionBodyHandle &body_storage) throws
       -> void;
   fn pop_function_call_name() wontthrow -> void;
+  enum class BashArgumentFrameFlag : u8
+  {
+    DidEnter = 1 << 0,
+    IsSource = 1 << 1,
+    HasSourceArguments = 1 << 2,
+  };
+  struct BashArgumentFrameContext
+  {
+    BashArgumentFrameContext *previous{nullptr};
+    StringView source_path{};
+    u8 flags{0};
+
+    pure fn has_flag(BashArgumentFrameFlag flag) const wontthrow -> bool
+    {
+      return (flags & static_cast<u8>(flag)) != 0;
+    }
+    fn set_flag(BashArgumentFrameFlag flag) wontthrow -> void
+    {
+      flags |= static_cast<u8>(flag);
+    }
+  };
+  fn enter_bash_function_argument_frame(
+      BashArgumentFrameContext &frame_context,
+      const ArrayList<String> &arguments) throws -> void;
+  fn enter_bash_source_argument_frame(BashArgumentFrameContext &frame_context,
+                                      const ArrayList<String> *arguments,
+                                      StringView source_path) throws -> void;
+  fn leave_bash_argument_frame(
+      BashArgumentFrameContext &frame_context) wontthrow -> void;
   /* The FUNCNAME frame list bash exposes, the function calls innermost first,
      one "source" per sourced file, and "main" at the bottom of a script run. */
   mustuse fn funcname_frame_count() const wontthrow -> usize;
@@ -780,17 +815,20 @@ public:
   mustuse fn bash_source_frame_at(usize index) const wontthrow -> StringView;
   mustuse fn bash_source_frame_count() const wontthrow -> usize;
 
-  enum class CallStackVariable : u8
+  enum class DynamicArray : u8
   {
+    ArgumentCount,
+    ArgumentValue,
     FunctionName,
     LineNumber,
     SourcePath,
   };
-  mustuse fn call_stack_frame_count(CallStackVariable which) const wontthrow
+  mustuse fn dynamic_array_element_count(DynamicArray which) const throws
       -> usize;
-  mustuse fn call_stack_frame_text(CallStackVariable which, usize index,
-                                   Allocator result_allocator) const throws
+  mustuse fn dynamic_array_element_text(DynamicArray which, usize index,
+                                        Allocator result_allocator) const throws
       -> String;
+  pure fn is_bash_argument_array(StringView name) const wontthrow -> bool;
 
   mustuse fn
   line_number_at_location(const SourceLocation &location) const throws -> usize;
@@ -1306,17 +1344,7 @@ public:
     return m_runtime.mood != mimic_mood::Posix;
   }
 
-  fn set_shopt_option(StringView name, bool enabled) throws -> void
-  {
-    let const index = shopt_option_index(name);
-    ASSERT(index.has_value(), "unknown shopt option");
-    let const mask = u64{1} << *index;
-    m_shopt_option_overrides |= mask;
-    if (enabled)
-      m_shopt_option_values |= mask;
-    else
-      m_shopt_option_values &= ~mask;
-  }
+  fn set_shopt_option(StringView name, bool is_enabled) throws -> void;
   pure fn is_shopt_enabled(StringView name) const wontthrow -> bool
   {
     if (name == "restricted_shell") return is_restricted_shell();
@@ -1705,6 +1733,16 @@ protected:
   String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
   ArrayList<String> m_positional_params{heap_allocator()};
+  struct BashArgumentArrayStorage
+  {
+    ArrayList<String> values{heap_allocator()};
+    ArrayList<u32> frame_counts{heap_allocator()};
+  };
+  /* One pointer keeps unused Bash argument arrays out of every EvalContext.
+     The lazily allocated object stores flattened values and one count per
+     frame. */
+  mutable BashArgumentArrayStorage *m_bash_argument_arrays{nullptr};
+  BashArgumentFrameContext *m_bash_argument_frame_context{nullptr};
   /* The saved directories below the current one, back is the top of the stack.
      pushd appends the current directory, popd drops the back and moves to it.
    */
@@ -1844,6 +1882,17 @@ protected:
   bool m_shell_is_interactive;
 
   fn option_flags_string() const throws -> String;
+
+  fn initialize_bash_argument_arrays(
+      bool should_include_current_frame) const throws -> void;
+  fn append_bash_argument_frame(const ArrayList<String> &arguments) const throws
+      -> void;
+  fn append_bash_argument_frame(StringView argument) const throws -> void;
+  fn append_current_bash_argument_frame() const throws -> void;
+  fn install_bash_argument_arrays(ArrayList<String> values,
+                                  ArrayList<u32> frame_counts) const throws
+      -> void;
+  fn reset_bash_argument_arrays() const wontthrow -> void;
 
   fn expand_variable(StringView name) const throws -> String;
 

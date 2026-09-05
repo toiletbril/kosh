@@ -4,10 +4,11 @@
  *
  * This file implements indexed, sparse, and associative shell arrays. It owns
  * assignment, lookup, removal, subscripting, key collection, local bindings,
- * and scalar or array expansion through the common variable interface. It also
- * projects DIRSTACK over the evaluator directory stack. The projection uses
- * the common subscript and expansion paths, and the directory stack remains
- * its sole storage. The split keeps aggregate rules outside scalar lookup.
+ * and scalar or array expansion through the common variable interface. It
+ * projects call-stack variables, flattened Bash call arguments, and DIRSTACK
+ * through the same array paths. EvalContext retains the frame and directory
+ * storage. This split exists because aggregate subscripting and list expansion
+ * are shared even when an array has no ordinary indexed-array allocation.
  */
 
 #include "Arena.hpp"
@@ -23,14 +24,15 @@
 
 namespace koshka {
 
-static constexpr static_string_entry<EvalContext::CallStackVariable>
-    CALL_STACK_VARIABLE_ENTRIES[] = {
-        {SSK("BASH_LINENO"), EvalContext::CallStackVariable::LineNumber  },
-        {SSK("BASH_SOURCE"), EvalContext::CallStackVariable::SourcePath  },
-        {SSK("FUNCNAME"),    EvalContext::CallStackVariable::FunctionName},
+static constexpr static_string_entry<EvalContext::DynamicArray>
+    DYNAMIC_ARRAY_ENTRIES[] = {
+        {SSK("BASH_ARGC"),   EvalContext::DynamicArray::ArgumentCount},
+        {SSK("BASH_ARGV"),   EvalContext::DynamicArray::ArgumentValue},
+        {SSK("BASH_LINENO"), EvalContext::DynamicArray::LineNumber   },
+        {SSK("BASH_SOURCE"), EvalContext::DynamicArray::SourcePath   },
+        {SSK("FUNCNAME"),    EvalContext::DynamicArray::FunctionName },
 };
-static constexpr StaticStringMap CALL_STACK_VARIABLES{
-    CALL_STACK_VARIABLE_ENTRIES};
+static constexpr StaticStringMap DYNAMIC_ARRAYS{DYNAMIC_ARRAY_ENTRIES};
 
 static fn sparse_array_key(StringView name, usize index,
                            Allocator allocator) throws -> String
@@ -145,6 +147,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+  if (is_bash_argument_array(name)) return;
 
   /* POSIX mode has no arrays, so a bash array literal stands in as an empty
      scalar. */
@@ -217,6 +220,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+
+  if (is_bash_argument_array(name)) return;
 
   if (is_bash_directory_stack_special(name)) {
     set_bash_directory_stack_element(index, value);
@@ -529,6 +534,9 @@ fn EvalContext::unset_array_element(StringView name,
   if (is_readonly(name))
     throw Error{"Unable to unset '" + name + "' because it is read only"};
 
+  if (is_bash_argument_array(name))
+    throw Error{String{name} + ": cannot unset"};
+
   if (is_bash_directory_stack_special(name)) {
     unused(evaluate_arithmetic(subscript));
     return;
@@ -676,6 +684,11 @@ hot fn EvalContext::expand_variable(StringView name) const throws -> String
 
 fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
 {
+  if (bash_dynamic_variables_enabled()) [[unlikely]] {
+    if (let const which = DYNAMIC_ARRAYS.find(name); which.has_value())
+      return static_cast<i64>(dynamic_array_element_count(*which));
+  }
+
   if (is_bash_directory_stack_special(name))
     return static_cast<i64>(bash_directory_stack_element_count());
 
@@ -701,8 +714,8 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
 fn EvalContext::array_element_count(StringView name) const throws -> usize
 {
   if (bash_dynamic_variables_enabled()) [[unlikely]] {
-    if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value())
-      return call_stack_frame_count(*which);
+    if (let const which = DYNAMIC_ARRAYS.find(name); which.has_value())
+      return dynamic_array_element_count(*which);
   }
 
   if (is_bash_aliases_special(name)) return m_aliases.count();
@@ -745,8 +758,8 @@ fn EvalContext::apply_array_subscript(
     const SourceLocation *source_location) throws -> String
 {
   if (bash_dynamic_variables_enabled()) [[unlikely]] {
-    if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value()) {
-      let const depth = call_stack_frame_count(*which);
+    if (let const which = DYNAMIC_ARRAYS.find(name); which.has_value()) {
+      let const element_count = dynamic_array_element_count(*which);
 
       if (subscript == "@" || subscript == "*") {
         /* The * form joins with the first IFS byte, the @ form with a space. */
@@ -758,23 +771,30 @@ fn EvalContext::apply_array_subscript(
         }
 
         let out = String{scratch_allocator()};
-        for (usize i = 0; i < depth; i++) {
+        for (usize i = 0; i < element_count; i++) {
           if (i > 0 && has_separator) {
             out.push(separator);
           }
-          out.append(
-              call_stack_frame_text(*which, i, scratch_allocator()).view());
+          if (*which == DynamicArray::ArgumentValue) {
+            ASSERT(m_bash_argument_arrays != nullptr);
+            let const &values = m_bash_argument_arrays->values;
+            out.append(values[values.count() - 1 - i].view());
+          } else {
+            out.append(
+                dynamic_array_element_text(*which, i, scratch_allocator())
+                    .view());
+          }
         }
 
         return out;
       }
 
       let index = evaluate_arithmetic(subscript, source_location);
-      if (index < 0) index += static_cast<i64>(depth);
+      if (index < 0) index += static_cast<i64>(element_count);
 
-      if (index >= 0 && static_cast<usize>(index) < depth) {
-        return call_stack_frame_text(*which, static_cast<usize>(index),
-                                     scratch_allocator());
+      if (index >= 0 && static_cast<usize>(index) < element_count) {
+        return dynamic_array_element_text(*which, static_cast<usize>(index),
+                                          scratch_allocator());
       }
 
       return String{scratch_allocator()};
@@ -893,14 +913,14 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     -> ArrayList<String>
 {
   if (bash_dynamic_variables_enabled()) [[unlikely]] {
-    if (let const which = CALL_STACK_VARIABLES.find(name); which.has_value()) {
-      let const depth = call_stack_frame_count(*which);
+    if (let const which = DYNAMIC_ARRAYS.find(name); which.has_value()) {
+      let const element_count = dynamic_array_element_count(*which);
 
-      if (depth > 0) {
+      if (element_count > 0) {
         let frames = ArrayList<String>{heap_allocator()};
-        frames.reserve(depth);
-        for (usize i = 0; i < depth; i++)
-          frames.push(call_stack_frame_text(*which, i, heap_allocator()));
+        frames.reserve(element_count);
+        for (usize i = 0; i < element_count; i++)
+          frames.push(dynamic_array_element_text(*which, i, heap_allocator()));
 
         return frames;
       }
@@ -944,6 +964,15 @@ fn EvalContext::array_element_is_set(StringView name,
 {
   if (subscript == "@" || subscript == "*") {
     return array_element_count(name) != 0;
+  }
+  if (bash_dynamic_variables_enabled()) [[unlikely]] {
+    if (let const which = DYNAMIC_ARRAYS.find(name); which.has_value()) {
+      let index = evaluate_arithmetic(subscript);
+      let const element_count =
+          static_cast<i64>(dynamic_array_element_count(*which));
+      if (index < 0) index += element_count;
+      return index >= 0 && index < element_count;
+    }
   }
   if (is_bash_directory_stack_special(name)) {
     let index = evaluate_arithmetic(subscript);
@@ -1006,6 +1035,15 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   if (is_associative_array(name)) return associative_keys(name);
 
   let out = ArrayList<String>{heap_allocator()};
+  if (bash_dynamic_variables_enabled()) [[unlikely]] {
+    if (let const which = DYNAMIC_ARRAYS.find(name); which.has_value()) {
+      let const element_count = dynamic_array_element_count(*which);
+      out.reserve(element_count);
+      for (usize index = 0; index < element_count; index++)
+        out.push(String::from(index, heap_allocator()));
+      return out;
+    }
+  }
   if (is_bash_directory_stack_special(name)) {
     let const count = bash_directory_stack_element_count();
     out.reserve(count);

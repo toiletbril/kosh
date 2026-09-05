@@ -1820,10 +1820,6 @@ fn Server::append_shell_variable_facts(
   if (has_shell_variable_fact(description.facts, shell_variable_fact::Exported))
     output.append("\nThe name is exported to a child process.");
 
-  if (has_shell_variable_fact(description.facts,
-                              shell_variable_fact::Unmaintained))
-    output.append("\nThis shell does not maintain the name.");
-
   if (has_shell_variable_fact(description.facts, shell_variable_fact::BashOnly))
   {
     output.append(m_context.mood() == mimic_mood::Posix

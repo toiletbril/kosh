@@ -8,5 +8,9 @@ $KOSH_GIT_BEHIND
 $KOSH_GIT_BRANCH
 == bash dynamic variables complete in bash mood:
 $BASHPID
+== bash argument arrays complete in bash mood:
+$BASH_ARGC
+$BASH_ARGV
+$BASH_ARGV0
 == POSIX mood completes its dynamic variables:
 $LINENO

@@ -4,9 +4,10 @@
  *
  * This file implements mutable evaluator state, including shell options,
  * control flow, source frames, recursion limits, loop resources, status
- * values, snapshots, and restoration. It also owns the framed bootstrap state
- * used by fresh subshell evaluators. The split keeps state transitions and
- * transport serialization separate from expression execution.
+ * values, Bash argument frames, snapshots, and restoration. It also owns the
+ * validated bootstrap format used by fresh subshell evaluators. The split
+ * keeps state transitions and transport serialization separate from
+ * expression execution.
  */
 
 #include "Arena.hpp"
@@ -27,6 +28,36 @@
 #include "Utils.hpp"
 
 namespace koshka {
+
+fn EvalContext::set_shopt_option(StringView name, bool is_enabled) throws
+    -> void
+{
+  let const index = shopt_option_index(name);
+  ASSERT(index.has_value(), "unknown shopt option");
+  let const mask = u64{1} << *index;
+  let const was_enabled = is_shopt_enabled(name);
+  m_shopt_option_overrides |= mask;
+  if (is_enabled)
+    m_shopt_option_values |= mask;
+  else
+    m_shopt_option_values &= ~mask;
+
+  if (name == EXTDEBUG_SHOPT_OPTION && is_enabled && !was_enabled &&
+      bash_dynamic_variables_enabled())
+  {
+    if (m_bash_argument_arrays == nullptr &&
+        m_bash_argument_frame_context != nullptr &&
+        !m_bash_argument_frame_context->has_flag(
+            BashArgumentFrameFlag::DidEnter))
+    {
+      initialize_bash_argument_arrays(false);
+      append_current_bash_argument_frame();
+      m_bash_argument_frame_context->set_flag(BashArgumentFrameFlag::DidEnter);
+    } else {
+      initialize_bash_argument_arrays(true);
+    }
+  }
+}
 
 fn EvalContext::enter_subshell() wontthrow -> void
 {
@@ -639,48 +670,59 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
   if (!working_directory.is_valid())
     throw Error{"Could not preserve the current working directory"};
 
-  let snapshot = eval_state_snapshot{m_shell_variables,
-                                     m_indexed_arrays,
-                                     m_completion_specs,
-                                     m_default_completion_spec,
-                                     m_associative_names,
-                                     m_associative_values,
-                                     m_sparse_array_values,
-                                     m_sparse_array_names,
-                                     m_shopt_option_overrides,
-                                     m_shopt_option_values,
-                                     m_functions,
-                                     m_aliases,
-                                     m_positional_params,
-                                     m_last_argument,
-                                     m_directory_stack,
-                                     steal(working_directory),
-                                     os::get_file_creation_mask(),
-                                     m_traps,
-                                     m_variable_attributes,
-                                     m_exported_names,
-                                     m_environment_undo_log.count(),
-                                     RuntimeState::capture(*this),
-                                     m_program_resolver,
-                                     m_init_moods_sourcing,
-                                     m_initialized_moods,
-                                     m_disabled_bash_special_arrays,
-                                     m_was_mood_set_explicitly,
-                                     m_mood_mutation_revision,
-                                     m_warning_mutation_revision,
-                                     m_diagnostics_mutation_revision,
-                                     m_annoying_diagnostics_mutation_revision,
-                                     m_random_state,
-                                     m_shell_option_mutations,
-                                     m_local_scopes,
-                                     m_local_scope_depth,
-                                     m_last_background_pid,
-                                     m_getopts_char_index,
-                                     m_getopts_last_optind,
-                                     m_terminal_exec_allowed,
-                                     steal(m_jobs),
-                                     steal(m_detached_job_processes),
-                                     m_next_job_id};
+  let snapshot = eval_state_snapshot{
+      m_shell_variables,
+      m_indexed_arrays,
+      m_completion_specs,
+      m_default_completion_spec,
+      m_associative_names,
+      m_associative_values,
+      m_sparse_array_values,
+      m_sparse_array_names,
+      m_shopt_option_overrides,
+      m_shopt_option_values,
+      m_functions,
+      m_aliases,
+      m_positional_params,
+      m_bash_argument_arrays != nullptr
+          ? static_cast<u32>(m_bash_argument_arrays->values.count())
+          : u32{0},
+      m_bash_argument_arrays != nullptr
+          ? static_cast<u32>(m_bash_argument_arrays->frame_counts.count())
+          : u32{0},
+      m_bash_argument_arrays != nullptr,
+      m_bash_argument_frame_context != nullptr
+          ? m_bash_argument_frame_context->flags
+          : u8{0},
+      m_last_argument,
+      m_directory_stack,
+      steal(working_directory),
+      os::get_file_creation_mask(),
+      m_traps,
+      m_variable_attributes,
+      m_exported_names,
+      m_environment_undo_log.count(),
+      RuntimeState::capture(*this),
+      m_program_resolver,
+      m_init_moods_sourcing,
+      m_initialized_moods,
+      m_disabled_bash_special_arrays,
+      m_was_mood_set_explicitly,
+      m_mood_mutation_revision,
+      m_warning_mutation_revision,
+      m_diagnostics_mutation_revision,
+      m_annoying_diagnostics_mutation_revision,
+      m_random_state,
+      m_shell_option_mutations,
+      m_local_scopes,
+      m_local_scope_depth,
+      m_last_background_pid,
+      m_getopts_char_index,
+      m_getopts_last_optind,
+      m_terminal_exec_allowed,
+      steal(m_jobs),
+      steal(m_detached_job_processes),
+      m_next_job_id};
   m_next_job_id = 1;
   return snapshot;
 }
@@ -701,6 +743,24 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_functions = steal(snapshot.functions);
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
+  if (!snapshot.had_bash_argument_arrays) {
+    reset_bash_argument_arrays();
+  } else {
+    ASSERT(m_bash_argument_arrays != nullptr);
+    ASSERT(m_bash_argument_arrays->values.count() >=
+           snapshot.bash_argument_value_count);
+    ASSERT(m_bash_argument_arrays->frame_counts.count() >=
+           snapshot.bash_argument_frame_count);
+    while (m_bash_argument_arrays->values.count() >
+           snapshot.bash_argument_value_count)
+      m_bash_argument_arrays->values.pop_back();
+    while (m_bash_argument_arrays->frame_counts.count() >
+           snapshot.bash_argument_frame_count)
+      m_bash_argument_arrays->frame_counts.pop_back();
+  }
+  if (m_bash_argument_frame_context != nullptr)
+    m_bash_argument_frame_context->flags =
+        snapshot.bash_argument_frame_context_flags;
   m_last_argument = steal(snapshot.last_argument);
   m_directory_stack = steal(snapshot.directory_stack);
 
@@ -788,7 +848,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 }
 
 static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
-static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 6U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 7U;
 static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
 static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
 
@@ -994,7 +1054,8 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
 
   for (let const &stored_name : names) {
     let const name = stored_name.view();
-    if (is_bash_aliases_special(name) || is_bash_directory_stack_special(name))
+    if (is_bash_aliases_special(name) || is_bash_argument_array(name) ||
+        is_bash_directory_stack_special(name))
     {
       continue;
     }
@@ -1121,6 +1182,20 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
   append_subshell_bootstrap_u64(body, m_shopt_option_values);
   body.push(static_cast<char>(m_disabled_bash_special_arrays));
+  body.push(static_cast<char>(m_bash_argument_arrays != nullptr));
+  if (m_bash_argument_arrays != nullptr) {
+    append_subshell_bootstrap_u32(
+        body, static_cast<u32>(m_bash_argument_arrays->frame_counts.count()));
+    for (let const argument_count : m_bash_argument_arrays->frame_counts)
+      append_subshell_bootstrap_u32(body, argument_count);
+    append_subshell_bootstrap_u32(
+        body, static_cast<u32>(m_bash_argument_arrays->values.count()));
+    for (let const &argument : m_bash_argument_arrays->values)
+      append_subshell_bootstrap_text(body, argument.view());
+  } else {
+    append_subshell_bootstrap_u32(body, 0);
+    append_subshell_bootstrap_u32(body, 0);
+  }
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_function_call_depth));
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_local_scope_depth));
   append_subshell_bootstrap_u32(
@@ -1229,6 +1304,43 @@ fn EvalContext::apply_subshell_bootstrap(
   let const shopt_option_overrides = reader.read_u64();
   let const shopt_option_values = reader.read_u64();
   let const disabled_bash_special_arrays = reader.read_u8();
+  bool has_bash_argument_arrays = false;
+  if (!read_subshell_bootstrap_bool(reader, has_bash_argument_arrays))
+    invalid_subshell_bootstrap();
+  let bash_argument_frame_counts = ArrayList<u32>{heap_allocator()};
+  let const bash_argument_frame_count = static_cast<usize>(reader.read_u32());
+  if (!reader.is_valid ||
+      bash_argument_frame_count >
+          MAX_FUNCTION_CALL_DEPTH + MAX_SOURCE_DEPTH + 1 ||
+      bash_argument_frame_count > reader.get_remaining_length() / sizeof(u32))
+  {
+    invalid_subshell_bootstrap();
+  }
+  bash_argument_frame_counts.reserve(bash_argument_frame_count);
+  u64 bash_argument_value_count_from_frames = 0;
+  for (usize index = 0; index < bash_argument_frame_count; index++) {
+    let const argument_count = reader.read_u32();
+    bash_argument_value_count_from_frames += argument_count;
+    if (bash_argument_value_count_from_frames > UINT32_MAX)
+      invalid_subshell_bootstrap();
+    bash_argument_frame_counts.push(argument_count);
+  }
+  let bash_argument_values = ArrayList<String>{heap_allocator()};
+  let const bash_argument_value_count = static_cast<usize>(reader.read_u32());
+  if (!reader.is_valid ||
+      bash_argument_value_count != bash_argument_value_count_from_frames ||
+      bash_argument_value_count > reader.get_remaining_length() / sizeof(u32))
+  {
+    invalid_subshell_bootstrap();
+  }
+  bash_argument_values.reserve(bash_argument_value_count);
+  for (usize index = 0; index < bash_argument_value_count; index++)
+    bash_argument_values.push(String{heap_allocator(), reader.read_text()});
+  if (!has_bash_argument_arrays && (!bash_argument_frame_counts.is_empty() ||
+                                    !bash_argument_values.is_empty()))
+  {
+    invalid_subshell_bootstrap();
+  }
   let const function_call_depth = reader.read_u64();
   let const local_scope_depth = reader.read_u64();
   let function_call_names = ArrayList<String>{heap_allocator()};
@@ -1446,6 +1558,10 @@ fn EvalContext::apply_subshell_bootstrap(
   m_getopts_last_optind = getopts_last_optind;
   m_shopt_option_overrides = shopt_option_overrides;
   m_shopt_option_values = shopt_option_values;
+  reset_bash_argument_arrays();
+  if (has_bash_argument_arrays)
+    install_bash_argument_arrays(steal(bash_argument_values),
+                                 steal(bash_argument_frame_counts));
   m_function_call_depth = static_cast<usize>(function_call_depth);
   for (usize scope = 0; scope < static_cast<usize>(local_scope_depth); scope++)
     enter_function_scope();

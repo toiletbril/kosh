@@ -672,11 +672,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         throw ErrorWithLocation{source_location(), "Bad file descriptor"};
     }
 
-    let saved_params = cxt.take_positional_params();
     let call_params = ArrayList<String>{heap_allocator()};
     call_params.reserve(program_args.count() - 1);
     for (usize i = 1; i < program_args.count(); i++)
       call_params.push_managed(program_args[i]);
+    let bash_argument_frame_context = EvalContext::BashArgumentFrameContext{};
+    cxt.enter_bash_function_argument_frame(bash_argument_frame_context,
+                                           call_params);
+    defer { cxt.leave_bash_argument_frame(bash_argument_frame_context); };
+    let saved_params = cxt.take_positional_params();
     cxt.set_positional_params(steal(call_params));
     defer { cxt.set_positional_params(steal(saved_params)); };
 

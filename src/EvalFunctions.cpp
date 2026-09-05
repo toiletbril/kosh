@@ -169,6 +169,10 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
         names.add(name);
       });
   m_associative_names.for_each([&](StringView name) { names.add(name); });
+  if (bash_dynamic_variables_enabled()) {
+    names.add(BASH_ARGUMENT_COUNT_VARIABLE);
+    names.add(BASH_ARGUMENT_VALUE_VARIABLE);
+  }
   if (is_bash_special_array_active(bash_special_array_id::Aliases))
     names.add(BASH_ALIASES_VARIABLE);
   if (is_bash_directory_stack_special(DIRSTACK_VARIABLE))

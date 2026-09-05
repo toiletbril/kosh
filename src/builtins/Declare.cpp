@@ -3,8 +3,9 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file implements variable and function declaration, attribute changes,
- * array creation, reusable declaration output, and function-name queries for
- * the declare builtin.
+ * array creation, reusable declaration output, virtual-array printing, and
+ * function-name queries. These operations stay together because declare uses
+ * one attribute grammar for mutation, filtering, and reusable output.
  */
 
 #include "../Builtin.hpp"
@@ -209,8 +210,9 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const do_print_declaration = [&](StringView name) throws -> bool {
     let const is_directory_stack = cxt.is_bash_directory_stack_special(name);
+    let const is_argument_array = cxt.is_bash_argument_array(name);
     let const *elements = cxt.lookup_indexed_array(name);
-    if (elements != nullptr || is_directory_stack) {
+    if (elements != nullptr || is_directory_stack || is_argument_array) {
       let line = String{cxt.scratch_allocator(), "declare -a"};
       if (cxt.is_integer_variable(name)) line += 'i';
       if (cxt.is_lowercase_variable(name)) line += 'l';
@@ -219,9 +221,14 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       line += ' ';
       line.append(name);
       line += "=(";
-      let const element_count = is_directory_stack
-                                    ? cxt.bash_directory_stack_element_count()
-                                    : elements->count();
+      let element_count = elements != nullptr ? elements->count() : 0;
+      if (is_directory_stack)
+        element_count = cxt.bash_directory_stack_element_count();
+      else if (is_argument_array)
+        element_count = cxt.dynamic_array_element_count(
+            name == BASH_ARGUMENT_COUNT_VARIABLE
+                ? EvalContext::DynamicArray::ArgumentCount
+                : EvalContext::DynamicArray::ArgumentValue);
       for (usize e = 0; e < element_count; e++) {
         if (e > 0) line += ' ';
         line += '[';
@@ -230,11 +237,19 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                             sizeof(index_text)));
         line += "]=\"";
         let directory_stack_element = Maybe<String>{};
+        let argument_array_element = String{cxt.scratch_allocator()};
         let element = StringView{};
         if (is_directory_stack) {
           directory_stack_element =
               cxt.get_bash_directory_stack_element(e, cxt.scratch_allocator());
           element = directory_stack_element->view();
+        } else if (is_argument_array) {
+          argument_array_element = cxt.dynamic_array_element_text(
+              name == BASH_ARGUMENT_COUNT_VARIABLE
+                  ? EvalContext::DynamicArray::ArgumentCount
+                  : EvalContext::DynamicArray::ArgumentValue,
+              e, cxt.scratch_allocator());
+          element = argument_array_element.view();
         } else {
           element = (*elements)[e].view();
         }
@@ -330,7 +345,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         return false;
       }
       if (should_make_indexed && cxt.lookup_indexed_array(name) == nullptr &&
-          !cxt.is_bash_directory_stack_special(name))
+          !cxt.is_bash_directory_stack_special(name) &&
+          !cxt.is_bash_argument_array(name))
       {
         return false;
       }
@@ -407,6 +423,16 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
+    if (!should_be_global && cxt.in_function_scope() &&
+        cxt.is_bash_argument_array(name))
+    {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                String{name} +
+                                    ": variable may not be assigned value");
+      status = 1;
+      continue;
+    }
+
     if ((should_mark_integer_attribute || should_unmark_integer_attribute ||
          should_mark_lowercase_attribute || should_unmark_lowercase_attribute ||
          should_mark_uppercase_attribute ||
@@ -420,7 +446,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (should_make_associative && (cxt.lookup_indexed_array(name) != nullptr ||
-                                    cxt.is_bash_directory_stack_special(name)))
+                                    cxt.is_bash_directory_stack_special(name) ||
+                                    cxt.is_bash_argument_array(name)))
     {
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                 StringView{"Unable to convert '"} + name +
@@ -464,7 +491,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.declare_associative_array(name);
     } else if (should_make_indexed) {
       if (cxt.lookup_indexed_array(name) == nullptr &&
-          !cxt.is_bash_directory_stack_special(name))
+          !cxt.is_bash_directory_stack_special(name) &&
+          !cxt.is_bash_argument_array(name))
       {
         let values = ArrayList<String>{heap_allocator()};
         if (equals.has_value())

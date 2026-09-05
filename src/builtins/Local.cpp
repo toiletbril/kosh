@@ -2,8 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the local builtin. The local
- * builtin declares each named variable local to the current function.
+ * This file parses local attributes, creates function-scope bindings, applies
+ * initial scalar and array values, and rejects dynamic arrays that Bash does
+ * not permit functions to shadow. These operations stay together because one
+ * local operand controls both scope capture and its initial attributes.
  */
 
 #include "../Builtin.hpp"
@@ -128,6 +130,13 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                 StringView{"'"} + arg +
                                     "' is not a valid identifier");
+      status = 1;
+      continue;
+    }
+    if (cxt.is_bash_argument_array(identifier)) {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
+                                String{identifier} +
+                                    ": variable may not be assigned value");
       status = 1;
       continue;
     }
