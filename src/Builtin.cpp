@@ -379,7 +379,7 @@ static fn abbreviate_home_directory(StringView path, Allocator allocator) throws
 }
 
 fn parse_directory_stack_rotation(StringView arg, usize ring_count,
-                                  const ExecContext &ec,
+                                  SourceLocation location,
                                   usize &index_out) throws -> bool
 {
   if (arg.length < 2 || (arg[0] != '+' && arg[0] != '-')) return false;
@@ -391,7 +391,7 @@ fn parse_directory_stack_rotation(StringView arg, usize ring_count,
   let const number = static_cast<usize>(parsed.value());
   if (number >= ring_count) {
     throw ErrorWithLocationAndDetails{
-        ec.source_location(),
+        location,
         StringView{"the directory stack rotation '"} + arg +
             "' is past the end of the stack",
         "Run `dirs -v` to see the numbered stack"};
@@ -401,7 +401,7 @@ fn parse_directory_stack_rotation(StringView arg, usize ring_count,
   return true;
 }
 
-fn logical_working_directory(EvalContext &cxt) throws -> Path
+fn logical_working_directory(const EvalContext &cxt) throws -> Path
 {
   let physical_directory = Path::current_directory();
   let const logical_pwd = cxt.get_variable_value("PWD");
@@ -417,31 +417,32 @@ fn logical_working_directory(EvalContext &cxt) throws -> Path
 }
 
 fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
-                         bool one_per_line, bool numbered, bool no_tilde) throws
-    -> void
+                         bool should_print_one_per_line,
+                         bool should_print_numbers,
+                         bool should_print_full_paths,
+                         Maybe<usize> selected_index) throws -> void
 {
   let const &stack = cxt.directory_stack();
   let const pwd = logical_working_directory(cxt).text().clone();
-
-  /* The current directory is index zero, then the saved stack from the top,
-     which is its back, down to its front. */
-  ArrayList<StringView> full{cxt.scratch_allocator()};
-  full.push(pwd.view());
-  for (usize i = stack.count(); i > 0; i--)
-    full.push(stack[i - 1].view());
+  let const entry_count = stack.count() + 1;
+  let const first_index = selected_index.value_or(0);
+  let const end_index =
+      selected_index.has_value() ? first_index + 1 : entry_count;
 
   let out = String{cxt.scratch_allocator()};
-  for (usize i = 0; i < full.count(); i++) {
-    if (numbered) {
+  for (usize i = first_index; i < end_index; i++) {
+    let const entry = i == 0 ? pwd.view() : stack[stack.count() - i].view();
+    if (should_print_numbers) {
       out += String::from(i, cxt.scratch_allocator());
       out += "  ";
     }
-    if (no_tilde)
-      out.append(full[i]);
+    if (should_print_full_paths)
+      out.append(entry);
     else
       out.append(
-          abbreviate_home_directory(full[i], cxt.scratch_allocator()).view());
-    if (one_per_line || numbered || i + 1 == full.count())
+          abbreviate_home_directory(entry, cxt.scratch_allocator()).view());
+    if (should_print_one_per_line || should_print_numbers ||
+        selected_index.has_value() || i + 1 == entry_count)
       out += '\n';
     else
       out += ' ';

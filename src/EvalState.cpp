@@ -994,8 +994,7 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
 
   for (let const &stored_name : names) {
     let const name = stored_name.view();
-    if (name == BASH_ALIASES_VARIABLE &&
-        is_bash_special_array_active(bash_special_array_id::Aliases))
+    if (is_bash_aliases_special(name) || is_bash_directory_stack_special(name))
     {
       continue;
     }

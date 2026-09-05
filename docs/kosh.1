@@ -956,6 +956,13 @@ store. Operands form one case-insensitive substring query. Visit count and
 recency determine the ranking. With no operand, z changes to the home directory.
 .SS Compatibility forms
 .TP
+.B dirs
+With no operand, the builtin prints the current directory followed by the saved
+stack. A +N operand prints the Nth entry from the top, and a -N operand prints
+the Nth entry from the bottom. The
+.B -v
+form keeps the selected entry's full-stack index.
+.TP
 .B set
 With no option and no operand, the shell variables are printed as sorted
 assignments. A minus enables an option. A plus disables it. The forms
@@ -1857,6 +1864,22 @@ defines or replaces that alias. Unsetting an element has no effect. Unsetting
 the whole variable disconnects the array without deleting the aliases. A later
 .B declare -A BASH_ALIASES
 creates an ordinary array that is not connected to aliases. The name is
+unavailable in the
+.B sh
+mood.
+.TP
+.B DIRSTACK
+This indexed array contains the current directory at index zero followed by the
+saved directories that
+.B dirs
+prints. Assigning index zero or an index past the end has no effect. Assigning
+another existing index changes that saved stack entry. Whole-array assignment
+changes only the existing indices, and append cannot grow the stack. Unsetting
+an element has no effect. A local declaration shadows the live array until the
+function returns. Unsetting the whole variable disconnects the array without
+clearing the directory stack. A later
+.B declare -a DIRSTACK
+creates an ordinary array that is not connected to the stack. The name is
 unavailable in the
 .B sh
 mood.

@@ -452,20 +452,23 @@ pure fn name_is_valid_identifier(StringView name) wontthrow -> bool;
 /* pushd, popd, and dirs share these. The cd runs through the cd builtin so the
    logical PWD, OLDPWD, and the -L rules stay in one place. The stack print
    shows the current directory first, then the saved stack from the top down,
-   with the home directory abbreviated to ~ unless no_tilde is set. */
+   with the home directory abbreviated to ~ unless should_print_full_paths is
+   set. */
 fn run_cd_to_directory(EvalContext &cxt, const ExecContext &ec,
                        StringView target) throws -> i32;
-fn logical_working_directory(EvalContext &cxt) throws -> Path;
+fn logical_working_directory(const EvalContext &cxt) throws -> Path;
 fn print_directory_stack(EvalContext &cxt, const ExecContext &ec,
-                         bool one_per_line, bool numbered, bool no_tilde) throws
-    -> void;
+                         bool should_print_one_per_line,
+                         bool should_print_numbers,
+                         bool should_print_full_paths,
+                         Maybe<usize> selected_index = None) throws -> void;
 
 /* A +N or -N stack argument names an index into the ring of ring_count entries,
    the current directory at zero then the saved stack from the top. N counts
    from the top for +N and from the bottom for -N. False means the argument is
    not a rotation, and an out-of-range N throws. */
 fn parse_directory_stack_rotation(StringView arg, usize ring_count,
-                                  const ExecContext &ec,
+                                  SourceLocation location,
                                   usize &index_out) throws -> bool;
 
 /* The value a declare -x, declare -r, or declare -p line wraps in double

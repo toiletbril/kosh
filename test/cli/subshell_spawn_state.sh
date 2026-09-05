@@ -97,6 +97,28 @@ printf "" | {
 }
 '
 
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+cd /
+pushd /tmp >/dev/null
+pushd /usr >/dev/null
+DIRSTACK[1]=/bin
+printf "dirstack-process="
+koshkit cat < <(printf "%s:%s\n" "${DIRSTACK[*]}" "$(dirs +1)")
+printf "" | {
+  printf "dirstack-compound=%s:%s\n" "${DIRSTACK[*]}" "$(dirs +1)"
+}
+
+unset DIRSTACK
+declare -a DIRSTACK
+DIRSTACK=(ordinary array)
+printf "ordinary-dirstack-process="
+koshkit cat < <(printf "%s:%s\n" "${DIRSTACK[*]}" "$(dirs +1)")
+printf "" | {
+  printf "ordinary-dirstack-compound=%s:%s\n" \
+    "${DIRSTACK[*]}" "$(dirs +1)"
+}
+'
+
 "$BIN" --mood posix --no-init-files -c '
 printf "mood="
 koshkit cat < <(set --mood)

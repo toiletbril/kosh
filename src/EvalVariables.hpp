@@ -448,8 +448,8 @@ inline constexpr static_string_entry<shell_variable_description>
         {SSK("DIRSTACK"),
          {"The elements are the directory stack entries in bash. The dirs "
           "builtin reports the stack this shell keeps.",
-          shell_variable_fact::Array | shell_variable_fact::NotPosix |
-              shell_variable_fact::Unmaintained}                              },
+          shell_variable_fact::Dynamic | shell_variable_fact::Array |
+              shell_variable_fact::BashOnly}                                  },
 };
 inline constexpr StaticStringMap SHELL_VARIABLES{SHELL_VARIABLE_ENTRIES};
 

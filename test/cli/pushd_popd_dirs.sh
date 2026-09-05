@@ -19,14 +19,20 @@ echo "== pushd builds the stack, current first:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a'; pushd '$dir/b'; dirs" 2>&1 | scrub
 echo "== dirs -v numbers each entry from the top:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; dirs -v" 2>&1 | scrub
+echo "== dirs selects from the top or bottom and preserves full-stack numbering:"
+"$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; dirs +1; dirs -0; dirs -v +1; dirs +1 -v" 2>&1 | scrub
 echo "== popd returns through the stack:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; popd; popd; echo PWD=\$PWD" 2>&1 | scrub
 echo "== pushd with no argument swaps the top two:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd; echo PWD=\$PWD" 2>&1 | scrub
 echo "== pushd +1 rotates the Nth entry to the top:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; pushd +1; echo PWD=\$PWD" 2>&1 | scrub
+echo "== pushd -0 rotates the bottom entry to the top:"
+"$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; pushd -0; echo PWD=\$PWD" 2>&1 | scrub
 echo "== popd +1 drops a saved entry without a chdir:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; popd +1; dirs; echo PWD=\$PWD" 2>&1 | scrub
+echo "== popd -0 drops the bottom entry without a chdir:"
+"$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; pushd '$dir/b' >/dev/null; popd -0; dirs; echo PWD=\$PWD" 2>&1 | scrub
 echo "== dirs -c clears the stack:"
 "$BIN" -c "cd '$dir' || exit; pushd '$dir/a' >/dev/null; dirs -c; dirs" 2>&1 | scrub
 echo "== a forged PWD does not change the saved directory:"

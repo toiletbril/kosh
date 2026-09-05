@@ -238,6 +238,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     set_alias("0", value);
     return;
   }
+  if (is_bash_directory_stack_special(name)) return;
 
   if (is_integer_variable(name)) [[unlikely]] {
     let const result = value.length == 0 ? String{scratch_allocator(), "0"}
@@ -299,12 +300,16 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   let const should_disable_bash_aliases =
       name == BASH_ALIASES_VARIABLE &&
       is_bash_special_array_active(bash_special_array_id::Aliases);
+  let const should_disable_bash_directory_stack =
+      is_bash_directory_stack_special(name);
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
   clear_associative_array(name);
   if (should_disable_bash_aliases)
     disable_bash_special_array(bash_special_array_id::Aliases);
+  if (should_disable_bash_directory_stack)
+    disable_bash_special_array(bash_special_array_id::DirectoryStack);
   m_variable_attributes.erase(name);
 }
 
@@ -383,6 +388,11 @@ fn EvalContext::set_indexed_array(StringView name,
       static_cast<int>(name.length), name.data, values.count());
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+  if (is_bash_directory_stack_special(name)) {
+    for (usize index = 0; index < values.count(); index++)
+      set_bash_directory_stack_element(index, values[index].view());
+    return;
+  }
   if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]]
     for (let &value : values)
       apply_variable_case(name, value);

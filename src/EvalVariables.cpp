@@ -175,7 +175,8 @@ constexpr StaticStringMap BASH_DYNAMIC{BASH_DYNAMIC_ENTRIES};
 pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
 {
   if (ALWAYS_DYNAMIC.find(name).has_value() ||
-      BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE)
+      BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE ||
+      name == DIRSTACK_VARIABLE)
     return true;
 
   for (let const &color : KOSH_ANSI_COLORS)
@@ -186,7 +187,8 @@ pure fn is_runtime_dynamic_variable_name(StringView name) wontthrow -> bool
 
 pure fn is_bash_only_dynamic_variable_name(StringView name) wontthrow -> bool
 {
-  return BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE;
+  return BASH_DYNAMIC.find(name).has_value() || name == BASH_ALIASES_VARIABLE ||
+         name == DIRSTACK_VARIABLE;
 }
 
 pure fn is_process_dynamic_variable_name(StringView name) wontthrow -> bool
@@ -199,6 +201,7 @@ constexpr pure fn is_dynamic_first_byte(char c) wontthrow -> bool
 {
   switch (c) {
   case 'B':
+  case 'D':
   case 'E':
   case 'F':
   case 'G':
@@ -227,6 +230,7 @@ pure fn EvalContext::variable_requires_dynamic_lookup(
     return true;
   }
   if (is_bash_aliases_special(name)) return true;
+  if (is_bash_directory_stack_special(name)) return true;
 
   return bash_dynamic_variables_enabled() &&
          BASH_DYNAMIC.find(name).has_value();
@@ -308,6 +312,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return array->front();
     }
   if (is_associative_array(name)) return lookup_associative_element(name, "0");
+  if (is_bash_directory_stack_special(name))
+    return get_bash_directory_stack_element(0, heap_allocator());
 
   if (is_local_in_current_scope(name)) return koshka::None;
 
@@ -467,6 +473,8 @@ fn EvalContext::append_dynamic_variable_names(
     out.push(entry.value.name);
   if (is_bash_special_array_active(bash_special_array_id::Aliases))
     out.push(BASH_ALIASES_VARIABLE);
+  if (is_bash_directory_stack_special(DIRSTACK_VARIABLE))
+    out.push(DIRSTACK_VARIABLE);
 }
 
 } /* namespace koshka */

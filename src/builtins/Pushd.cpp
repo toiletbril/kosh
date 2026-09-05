@@ -38,7 +38,12 @@ pure fn Pushd::kind() const wontthrow -> Builtin::Kind { return Kind::Pushd; }
 
 fn Pushd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const args = PARSE_BUILTIN_ARGS(ec);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const args =
+      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,
+                      nullptr, &ec.arg_locations(), &operand_locations,
+                      builtin_error_context(ec.program()), true);
+  defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -65,8 +70,8 @@ fn Pushd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* The ring is the current directory at index zero, then the saved stack from
      the top down, which drives a rotation. */
-  if (usize index = 0;
-      parse_directory_stack_rotation(arg, stack.count() + 1, ec, index))
+  if (usize index = 0; parse_directory_stack_rotation(
+          arg, stack.count() + 1, operand_locations[1], index))
   {
     ArrayList<String> ring{cxt.scratch_allocator()};
     ring.push(String{cxt.scratch_allocator(), pwd.view()});

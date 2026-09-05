@@ -112,6 +112,7 @@ enum class bash_special_array_id : u8
 };
 
 inline constexpr StringView BASH_ALIASES_VARIABLE{"BASH_ALIASES"};
+inline constexpr StringView DIRSTACK_VARIABLE{"DIRSTACK"};
 
 constexpr pure fn bash_special_array_mask(bash_special_array_id id) wontthrow
     -> u8
@@ -457,6 +458,23 @@ public:
     return name == BASH_ALIASES_VARIABLE &&
            is_bash_special_array_active(bash_special_array_id::Aliases);
   }
+  pure fn is_bash_directory_stack_special(StringView name) const wontthrow
+      -> bool
+  {
+    return name == DIRSTACK_VARIABLE &&
+           is_bash_special_array_active(
+               bash_special_array_id::DirectoryStack) &&
+           !is_local_in_current_scope(name);
+  }
+  pure fn bash_directory_stack_element_count() const wontthrow -> usize
+  {
+    return m_directory_stack.count() + 1;
+  }
+  fn get_bash_directory_stack_element(usize index,
+                                      Allocator allocator) const throws
+      -> Maybe<String>;
+  fn set_bash_directory_stack_element(usize index, StringView value) throws
+      -> void;
   fn set_associative_element(StringView name, StringView key,
                              StringView value) throws -> void;
   fn lookup_associative_element(StringView name, StringView key) const throws

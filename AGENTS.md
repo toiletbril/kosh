@@ -286,6 +286,7 @@ changes update this file.
   for generated text.
 - Run ordering assertions against clean state before unrelated entries can
   affect container iteration.
+- Remove a focused runner result file before invoking the runner.
 - Disable unrelated analysis when a probe isolates runtime behavior.
 - Trace native creation and open requests before changing platform access,
   sharing, or security. Verify both payload and status in every direction.

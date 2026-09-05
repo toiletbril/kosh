@@ -4,19 +4,23 @@
  *
  * This file implements and is responsible for the dirs builtin. The dirs
  * builtin prints the directory stack, the current directory first, then the
- * saved directories from the top down.
+ * saved directories from the top down. A +N operand selects the Nth entry from
+ * the top, while -N selects from the bottom. The builtin owns selection so it
+ * can share path abbreviation and numbering with pushd and popd output.
  */
 
 #include "../Builtin.hpp"
+#include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-clpv]");
+HELP_SYNOPSIS_DECL("[-clpv] [+N | -N]");
 HELP_DESCRIPTION_DECL(
     "The dirs builtin prints the directory stack, the current directory first, "
-    "then the saved directories from the top down.");
+    "then the saved directories from the top down. A +N operand selects from "
+    "the top, and a -N operand selects from the bottom.");
 
 FLAG(DIRS_CLEAR, Bool, 'c', "", "Clear the directory stack.");
 FLAG(DIRS_LONG, Bool, 'l', "",
@@ -36,8 +40,12 @@ pure fn Dirs::kind() const wontthrow -> Builtin::Kind { return Kind::Dirs; }
 
 fn Dirs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const args = PARSE_BUILTIN_ARGS(ec);
-  unused(args);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const args =
+      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,
+                      nullptr, &ec.arg_locations(), &operand_locations,
+                      builtin_error_context(ec.program()), true, true);
+  defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -47,9 +55,31 @@ fn Dirs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
+  let selected_index = Maybe<usize>{};
+  if (args.count() > 1) {
+    if (args.count() > 2) {
+      throw ErrorWithLocationAndDetails{operand_locations[2],
+                                        "dirs accepts at most one stack index",
+                                        "Pass one +N or -N index"};
+    }
+
+    usize index = 0;
+    if (!parse_directory_stack_rotation(args[1].view(),
+                                        cxt.directory_stack().count() + 1,
+                                        operand_locations[1], index))
+    {
+      throw ErrorWithLocationAndDetails{
+          operand_locations[1],
+          StringView{"dirs does not accept the argument '"} + args[1].view() +
+              "'",
+          "Pass a +N or -N stack index, or no argument to print every entry"};
+    }
+    selected_index = index;
+  }
+
   print_directory_stack(cxt, ec, FLAG_DIRS_PER_LINE.is_enabled(),
                         FLAG_DIRS_NUMBERED.is_enabled(),
-                        FLAG_DIRS_LONG.is_enabled());
+                        FLAG_DIRS_LONG.is_enabled(), selected_index);
   return 0;
 }
 

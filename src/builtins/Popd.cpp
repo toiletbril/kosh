@@ -35,7 +35,12 @@ pure fn Popd::kind() const wontthrow -> Builtin::Kind { return Kind::Popd; }
 
 fn Popd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  let const args = PARSE_BUILTIN_ARGS(ec);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const args =
+      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position,
+                      nullptr, &ec.arg_locations(), &operand_locations,
+                      builtin_error_context(ec.program()), true);
+  defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -63,7 +68,7 @@ fn Popd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (usize index = 0; parse_directory_stack_rotation(
-          args[1].view(), stack.count() + 1, ec, index))
+          args[1].view(), stack.count() + 1, operand_locations[1], index))
   {
     /* Index zero names the current directory, so removing it pops the top and
        moves there. A deeper index drops a saved entry without a chdir. */
@@ -77,7 +82,7 @@ fn Popd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   throw ErrorWithLocationAndDetails{
-      ec.arg_location_at(1),
+      operand_locations[1],
       StringView{"popd does not accept the argument '"} + args[1].view() + "'",
       "Pass a +N or a -N stack index, or no argument to pop the top"};
 }

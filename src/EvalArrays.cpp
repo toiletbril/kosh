@@ -4,11 +4,14 @@
  *
  * This file implements indexed, sparse, and associative shell arrays. It owns
  * assignment, lookup, removal, subscripting, key collection, local bindings,
- * and scalar or array expansion through the common variable interface. The
- * split confines aggregate storage rules outside scalar variable lookup.
+ * and scalar or array expansion through the common variable interface. It also
+ * projects DIRSTACK over the evaluator directory stack. The projection uses
+ * the common subscript and expansion paths, and the directory stack remains
+ * its sole storage. The split keeps aggregate rules outside scalar lookup.
  */
 
 #include "Arena.hpp"
+#include "Builtin.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -171,7 +174,9 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   }
 
   usize running_index = 0;
-  if (is_append) {
+  if (is_bash_directory_stack_special(name)) {
+    if (is_append) running_index = bash_directory_stack_element_count();
+  } else if (is_append) {
     if (let const *array = lookup_indexed_array(name); array != nullptr)
       running_index = array->count();
     if (m_sparse_array_names.contains(name))
@@ -212,6 +217,11 @@ fn EvalContext::set_array_element(StringView name, usize index,
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+
+  if (is_bash_directory_stack_special(name)) {
+    set_bash_directory_stack_element(index, value);
+    return;
+  }
 
   let adjusted = String{scratch_allocator()};
   if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]] {
@@ -263,6 +273,29 @@ fn EvalContext::set_array_element(StringView name, usize index,
   m_sparse_array_names.add(name);
   m_sparse_array_values.set(
       sparse_array_key(name, index, scratch_allocator()).view(), value);
+}
+
+fn EvalContext::get_bash_directory_stack_element(
+    usize index, Allocator allocator) const throws -> Maybe<String>
+{
+  if (index >= bash_directory_stack_element_count()) return None;
+  if (index == 0) {
+    let const current = logical_working_directory(*this);
+    return String{allocator, current.text()};
+  }
+
+  return String{allocator,
+                m_directory_stack[m_directory_stack.count() - index].view()};
+}
+
+fn EvalContext::set_bash_directory_stack_element(usize index,
+                                                 StringView value) throws
+    -> void
+{
+  if (index == 0 || index >= bash_directory_stack_element_count()) return;
+
+  m_directory_stack[m_directory_stack.count() - index] =
+      String{heap_allocator(), value};
 }
 
 /* The name and the key are joined by a byte that does not occur in a name. */
@@ -330,6 +363,10 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
 
   let const resolved_index = static_cast<usize>(index);
   let const do_lookup_existing_element = [&]() throws -> Maybe<String> {
+    if (is_bash_directory_stack_special(name))
+      return get_bash_directory_stack_element(resolved_index,
+                                              scratch_allocator());
+
     if (let const *array = lookup_indexed_array(name);
         array != nullptr && resolved_index < array->count())
       return String{(*array)[resolved_index].view()};
@@ -492,6 +529,11 @@ fn EvalContext::unset_array_element(StringView name,
   if (is_readonly(name))
     throw Error{"Unable to unset '" + name + "' because it is read only"};
 
+  if (is_bash_directory_stack_special(name)) {
+    unused(evaluate_arithmetic(subscript));
+    return;
+  }
+
   if (is_associative_array(name)) {
     let const key = expand_modifier_word(subscript);
     if (is_bash_aliases_special(name)) return;
@@ -548,6 +590,12 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   LOG(All, "declaring '%.*s' local in scope depth %zu",
       static_cast<int>(name.length), name.data, m_local_scope_depth);
 
+  let const was_bash_directory_stack_special =
+      is_bash_directory_stack_special(name);
+  let inherited_directory_stack = ArrayList<String>{heap_allocator()};
+  if (should_inherit_value && was_bash_directory_stack_special)
+    inherited_directory_stack = collect_array_elements(name);
+
   /* Each caller form of the name is saved so the scope pop restores it. A copy
      is taken since the body may overwrite the stored array in place. */
   let previous_array = Maybe<ArrayList<String>>{};
@@ -592,7 +640,8 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
     previous_value = *scalar;
   else if (previous_array.has_value() && !previous_array->is_empty())
     previous_value = previous_array->front();
-  else if (previous_was_exported || variable_requires_dynamic_lookup(name))
+  else if (previous_was_exported || (variable_requires_dynamic_lookup(name) &&
+                                     !was_bash_directory_stack_special))
     previous_value = get_variable_value(name);
 
   m_local_scopes[m_local_scope_depth - 1].push(local_binding{
@@ -600,6 +649,9 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
       steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
       previous_attributes, previous_was_associative, previous_was_exported});
+
+  if (should_inherit_value && was_bash_directory_stack_special)
+    set_indexed_array(name, steal(inherited_directory_stack));
 
   if (!should_inherit_value) {
     force_unset_shell_variable(name);
@@ -624,6 +676,9 @@ hot fn EvalContext::expand_variable(StringView name) const throws -> String
 
 fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
 {
+  if (is_bash_directory_stack_special(name))
+    return static_cast<i64>(bash_directory_stack_element_count());
+
   i64 base = 0;
   if (let const *array = m_indexed_arrays.find(name); array != nullptr)
     base = static_cast<i64>(array->count());
@@ -651,6 +706,8 @@ fn EvalContext::array_element_count(StringView name) const throws -> usize
   }
 
   if (is_bash_aliases_special(name)) return m_aliases.count();
+  if (is_bash_directory_stack_special(name))
+    return bash_directory_stack_element_count();
 
   if (is_associative_array(name)) {
     usize element_count = 0;
@@ -722,6 +779,39 @@ fn EvalContext::apply_array_subscript(
 
       return String{scratch_allocator()};
     }
+  }
+
+  if (is_bash_directory_stack_special(name)) {
+    let const count = bash_directory_stack_element_count();
+    if (subscript == "@" || subscript == "*") {
+      let separator = ' ';
+      let has_separator = true;
+      if (subscript == "*") {
+        has_separator = !m_field_separators.is_empty();
+        if (has_separator) separator = m_field_separators.first_character();
+      }
+
+      let out = String{scratch_allocator()};
+      let const current_directory = logical_working_directory(*this);
+      for (usize index = 0; index < count; index++) {
+        if (index > 0 && has_separator) out.push(separator);
+        if (index == 0)
+          out.append(current_directory.text());
+        else
+          out.append(
+              m_directory_stack[m_directory_stack.count() - index].view());
+      }
+      return out;
+    }
+
+    let index = evaluate_arithmetic(subscript, source_location);
+    if (index < 0) index += static_cast<i64>(count);
+    if (index < 0 || static_cast<usize>(index) >= count)
+      return String{scratch_allocator()};
+
+    return get_bash_directory_stack_element(static_cast<usize>(index),
+                                            scratch_allocator())
+        .take();
   }
 
   /* The associative values come back in the store's order, which need not match
@@ -817,6 +907,16 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     }
   }
 
+  if (is_bash_directory_stack_special(name)) {
+    let elements = ArrayList<String>{heap_allocator()};
+    let const count = bash_directory_stack_element_count();
+    elements.reserve(count);
+    for (usize index = 0; index < count; index++)
+      elements.push(
+          get_bash_directory_stack_element(index, heap_allocator()).take());
+    return elements;
+  }
+
   if (is_associative_array(name)) return associative_values(name);
 
   let out = ArrayList<String>{heap_allocator()};
@@ -844,6 +944,12 @@ fn EvalContext::array_element_is_set(StringView name,
 {
   if (subscript == "@" || subscript == "*") {
     return array_element_count(name) != 0;
+  }
+  if (is_bash_directory_stack_special(name)) {
+    let index = evaluate_arithmetic(subscript);
+    let const count = static_cast<i64>(bash_directory_stack_element_count());
+    if (index < 0) index += count;
+    return index >= 0 && index < count;
   }
   if (is_associative_array(name)) {
     let const key = expand_modifier_word(subscript);
@@ -900,6 +1006,13 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   if (is_associative_array(name)) return associative_keys(name);
 
   let out = ArrayList<String>{heap_allocator()};
+  if (is_bash_directory_stack_special(name)) {
+    let const count = bash_directory_stack_element_count();
+    out.reserve(count);
+    for (usize index = 0; index < count; index++)
+      out.push(String::from(index, heap_allocator()));
+    return out;
+  }
   if (let const *array = lookup_indexed_array(name); array != nullptr) {
     out.reserve(array->count());
     for (usize i = 0; i < array->count(); i++)

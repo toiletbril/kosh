@@ -149,7 +149,8 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (should_make_associative) {
       cxt.declare_associative_array(name);
     } else if (should_make_indexed) {
-      if (cxt.lookup_indexed_array(name) == nullptr)
+      if (cxt.lookup_indexed_array(name) == nullptr &&
+          !cxt.is_bash_directory_stack_special(name))
         cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
     } else if (equals_position.has_value()) {
       let const value = arg.substring(*equals_position + 1);

@@ -8,6 +8,11 @@ D/b D/a D
 0  D/b
 1  D/a
 2  D
+== dirs selects from the top or bottom and preserves full-stack numbering:
+D/a
+D
+1  D/a
+1  D/a
 == popd returns through the stack:
 D/a D
 D
@@ -18,9 +23,16 @@ PWD=D
 == pushd +1 rotates the Nth entry to the top:
 D/a D D/b
 PWD=D/a
+== pushd -0 rotates the bottom entry to the top:
+D D/b D/a
+PWD=D
 == popd +1 drops a saved entry without a chdir:
 D/b D
 D/b D
+PWD=D/b
+== popd -0 drops the bottom entry without a chdir:
+D/b D/a
+D/b D/a
 PWD=D/b
 == dirs -c clears the stack:
 D/a

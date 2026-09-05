@@ -122,6 +122,7 @@ hover-array-variable=ok
 hover-color-variable=ok
 hover-bashopts-variable=ok
 hover-bash-aliases-variable=ok
+hover-dirstack-variable=ok
 hover-special-parameter=ok
 hover-assigned-shell-variable=ok
 hover-posix-mood-variable=ok

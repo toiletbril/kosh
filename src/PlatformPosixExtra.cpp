@@ -2,11 +2,13 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This routed POSIX source fragment owns facilities whose native interfaces
- * differ across Linux, macOS, and other POSIX targets. It implements hardware
- * performance counters, heap and resource statistics, CPU affinity, executable
- * path discovery, process enumeration, ownership lookup, and process file-user
- * scans, including fallbacks for targets that lack a facility.
+ * This routed POSIX source fragment exists because its native interfaces and
+ * required headers differ across Linux, macOS, and other POSIX targets. It
+ * implements hardware performance counters, heap and resource statistics, CPU
+ * affinity, executable path discovery, process enumeration, ownership lookup,
+ * and process file-user scans, including fallbacks for targets that lack a
+ * facility. The separate fragment keeps target-specific conditionals out of
+ * the common POSIX backend.
  */
 
 #if defined __APPLE__
