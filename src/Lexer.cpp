@@ -1458,65 +1458,27 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
     -> Token *
 {
   let const open_position = m_cursor_position;
-  usize byte_count = 2;
-
-  /* The direction byte leads the segment text so the evaluator reads the pipe
-     direction without a second field. */
-  let inner = String{heap_allocator()};
-  inner += direction;
-
-  usize depth = 1;
-  char quote = 0;
-  loop
-  {
-    let const c = chop_character(byte_count);
-    if (c == lexer::CEOF) [[unlikely]] {
-      throw ErrorWithLocationAndDetails{
-          here(open_position, byte_count), "Unterminated process substitution",
-          here(open_position + byte_count, 1), "expected ) here"};
-    }
-    byte_count++;
-
-    if (quote != 0) {
-      if (c == quote) quote = 0;
-      inner += c;
-      continue;
-    }
-    switch (c) {
-    case '\\': {
-      inner += c;
-      let const escaped = chop_character(byte_count);
-      if (escaped != lexer::CEOF) {
-        byte_count++;
-        inner += escaped;
-      }
-      continue;
-    }
-    case '\'':
-    case '"':
-      quote = c;
-      inner += c;
-      continue;
-    case '(':
-      depth++;
-      inner += c;
-      continue;
-    case ')':
-      depth--;
-      if (depth == 0) break;
-      inner += c;
-      continue;
-    default: inner += c; continue;
-    }
-    break;
+  let const inner_start = open_position + 2;
+  let const substitution_end =
+      lexer::scan_balanced_shell_region(m_source, inner_start, ')');
+  if (!substitution_end.has_value()) [[unlikely]] {
+    throw ErrorWithLocationAndDetails{
+        here(open_position, m_source.count() - open_position),
+        "Unterminated process substitution", here(m_source.count(), 1),
+        "expected ) here"};
   }
+  let const byte_count = *substitution_end - open_position;
+  let const body = m_source.substring_of_length(
+      inner_start, *substitution_end - inner_start - 1);
 
   LOG(Debug, "capturing a process substitution of %zu bytes", byte_count);
 
+  /* The direction byte leads the segment text so the evaluator reads the pipe
+     direction without a second field. */
   let word = Word{};
   word.segments.push(WordSegment{
       WordSegment::Kind::ProcessSubstitution,
-      SegmentText{bump_allocator(*m_arena), inner.view()},
+      SegmentText{bump_allocator(*m_arena), direction, body},
       false
   });
   word.segments.back().set_source_span(open_position, byte_count);

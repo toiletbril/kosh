@@ -282,8 +282,7 @@ hot fn Parser::parse_for() throws -> Command *
                                       "Drop the '$' and any quotes"};
   }
 
-  let const variable_name =
-      name_token->raw_string().view().copy_to(bump_allocator(m_lexer.arena()));
+  let const variable_name = name_word.segments[0].text.view();
 
   ArrayList<const Token *> words{heap_allocator()};
   let const has_in_clause = parse_optional_in_clause_words(words);

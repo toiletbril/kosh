@@ -79,6 +79,23 @@ public:
     assign_copy(allocator, initial);
   }
 
+  SegmentText(Allocator allocator, char prefix, StringView suffix) throws
+  {
+    if (suffix.length >= MAXIMUM_TEXT_LENGTH) [[unlikely]]
+      throw std::bad_alloc{};
+
+    let const length = suffix.length + 1;
+    let const bytes = allocator.alloc_array<char>(length);
+    bytes[0] = prefix;
+    if (suffix.length > 0)
+      std::memcpy(bytes + 1, suffix.data, suffix.length);
+    m_data = bytes;
+    m_length = static_cast<u32>(length);
+    m_capacity = allocator.get_kind() == Allocator::Kind::Heap
+                     ? static_cast<u32>(length)
+                     : 0;
+  }
+
   cold SegmentText(const SegmentText &other) throws
   {
     assign_copy(heap_allocator(), other.view());
