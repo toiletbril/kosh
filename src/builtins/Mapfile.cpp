@@ -2,8 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements and is responsible for the mapfile builtin. The
- * mapfile builtin reads standard input lines into an indexed array.
+ * This file reads delimited records from a selected descriptor into an indexed
+ * array for the mapfile builtin. It owns record limits, skipped records,
+ * starting indexes, delimiter trimming, and callbacks before assignment.
  */
 
 #include "../Builtin.hpp"
@@ -15,7 +16,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-t] [-n count] [array]");
+HELP_SYNOPSIS_DECL(
+    "[-t] [-n count] [-s count] [-O origin] [-d delimiter] [-u fd]",
+    "[-C callback] [-c quantum] [array]");
 
 HELP_DESCRIPTION_DECL(
     "The mapfile builtin reads standard input lines into an indexed array.");
@@ -28,8 +31,8 @@ FLAG(MAPFILE_SKIP, String, 's', "", "Discard count lines before reading.");
 FLAG(MAPFILE_ORIGIN, String, 'O', "", "Begin storing at the array index.");
 FLAG(MAPFILE_DELIMITER, String, 'd', "", "Use the first byte as delimiter.");
 FLAG(MAPFILE_FD, String, 'u', "", "Read from the file descriptor.");
-FLAG(MAPFILE_CALLBACK, String, 'C', "", "Accept the callback name.");
-FLAG(MAPFILE_QUANTUM, String, 'c', "", "Accept the callback interval.");
+FLAG(MAPFILE_CALLBACK, String, 'C', "", "Run the callback while reading.");
+FLAG(MAPFILE_QUANTUM, String, 'c', "", "Run the callback every quantum lines.");
 
 REGISTER_BUILTIN_FLAGS(Mapfile);
 
@@ -67,13 +70,21 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i64 max_lines = 0;
   i64 skip_count = 0;
   i64 origin = 0;
+  i64 callback_quantum = 5000;
   if (!do_parse_count(FLAG_MAPFILE_COUNT, ": invalid line count",
                       "The -n count must be a whole number", max_lines) ||
       !do_parse_count(FLAG_MAPFILE_SKIP, ": invalid line count",
                       "The -s count must be a whole number", skip_count) ||
       !do_parse_count(FLAG_MAPFILE_ORIGIN, ": invalid array origin",
-                      "The -O origin must be a whole number", origin))
+                      "The -O origin must be a whole number", origin) ||
+      !do_parse_count(FLAG_MAPFILE_QUANTUM, ": invalid callback quantum",
+                      "The -c quantum must be a positive number",
+                      callback_quantum) ||
+      callback_quantum == 0)
   {
+    if (callback_quantum == 0)
+      report_soft_builtin_error(ec, cxt, FLAG_MAPFILE_QUANTUM.value_location(),
+                                "0: invalid callback quantum");
     return 1;
   }
 
@@ -93,6 +104,7 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       args.count() > 1 ? args[1].view() : StringView{"MAPFILE"};
   let const should_strip_newline = FLAG_MAPFILE_TRIM.is_enabled();
   let const has_origin = FLAG_MAPFILE_ORIGIN.is_set();
+  let const has_callback = FLAG_MAPFILE_CALLBACK.is_set();
   let const delimiter = FLAG_MAPFILE_DELIMITER.is_set()
                             ? (FLAG_MAPFILE_DELIMITER.value().is_empty()
                                    ? '\0'
@@ -110,9 +122,13 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let lines = ArrayList<String>{heap_allocator()};
+  if (has_callback && !has_origin)
+    cxt.set_indexed_array(array_name, ArrayList<String>{heap_allocator()});
+
+  usize read_count = 0;
   loop
   {
-    if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) {
+    if (max_lines > 0 && static_cast<i64>(read_count) >= max_lines) {
       break;
     }
 
@@ -125,10 +141,35 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!should_strip_newline && was_newline_terminated) {
       element.push(delimiter);
     }
-    lines.push(steal(element));
+
+    let const array_index = origin + static_cast<i64>(read_count);
+    char index_text[24];
+    let const subscript =
+        utils::int_to_text_into(array_index, index_text, sizeof(index_text));
+    if (has_callback &&
+        (read_count + 1) % static_cast<usize>(callback_quantum) == 0)
+    {
+      let callback = String{heap_allocator(), FLAG_MAPFILE_CALLBACK.value()};
+      callback.push(' ');
+      append_shell_quoted_arg(callback, subscript, true);
+      callback.push(' ');
+      append_shell_quoted_arg(callback, element.view(), true);
+      unused(cxt.run_source(callback.view(), "mapfile callback",
+                            return_handling::Propagate,
+                            FLAG_MAPFILE_CALLBACK.value_location()));
+    }
+
+    if (has_callback) {
+      cxt.assign_array_element(array_name, subscript, element.view(), false);
+    } else {
+      lines.push(steal(element));
+    }
+    read_count++;
   }
 
-  LOG(Debug, "mapfile stored %zu lines", lines.count());
+  LOG(Debug, "mapfile stored %zu lines", read_count);
+
+  if (has_callback) return 0;
 
   if (has_origin) {
     for (usize element_index = 0; element_index < lines.count();

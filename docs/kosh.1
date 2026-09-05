@@ -1175,9 +1175,11 @@ option replaces the newline delimiter with the first byte of its value. The
 .B \-u
 option reads from a file descriptor. The
 .B \-C
-and
+option evaluates its callback with the destination index and current record as
+arguments. The callback runs after each quantum of records and before the
+current record is assigned. The
 .B \-c
-callback options are accepted without effect.
+option sets that quantum, which defaults to 5000.
 .TP
 .B printf
 The

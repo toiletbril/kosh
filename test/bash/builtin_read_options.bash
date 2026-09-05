@@ -39,6 +39,26 @@ printf 'w\nx\ny\nz\n' | { mapfile -t -n 2 v; echo "n=${#v[@]} first=${v[0]} last
 printf 'a\nb\nc\n' | { mapfile -t -n 0 all; echo "all=${#all[@]}"; }
 printf '1\n2\n3\n4\n5\n' | { mapfile -t -n3 three; echo "three=${#three[@]} ${three[2]}"; }
 printf 'p\nq\n' | { mapfile -t both; echo "both=${#both[@]}"; }
+mapfile_callback()
+{
+  previous_index=$(($1 - 1))
+  echo "callback=$1,$2,previous=${callback_rows[$previous_index]-unset}"
+  return 7
+}
+printf 'a\nb\nc\n' | {
+  mapfile -t -C mapfile_callback -c 2 callback_rows
+  echo "callback-status=$? count=${#callback_rows[@]}"
+}
+mapfile_origin_callback()
+{
+  echo "origin=$1,$2,first=${origin_rows[4]-unset}"
+}
+printf 'x\ny\n' | {
+  mapfile -t -O 4 -C mapfile_origin_callback -c 1 origin_rows
+  echo "origin-count=${#origin_rows[@]}"
+}
+printf 'z\n' | mapfile -t -c 0 invalid_quantum 2>/dev/null
+echo "callback-zero=$?"
 
 # Bash read -d delimiter, checked byte-for-byte against bash. An empty delimiter
 # reads until a NUL byte, so the whole input is slurped and split on IFS, the
