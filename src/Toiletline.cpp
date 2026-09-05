@@ -4,7 +4,9 @@
  *
  * This file implements the shell interface to the vendored interactive
  * editor. It owns prompts, history, completion, highlighting, key handling,
- * and terminal-state integration.
+ * and terminal-state integration. This implementation is compiled when the
+ * editor is enabled, and ToiletlineStubs provides the same interface for
+ * KOSH_NO_TOILETLINE builds.
  */
 
 /* The toiletline configuration macros are defined here, so Toiletline.hpp is

@@ -5,7 +5,8 @@
  * This file implements shared command execution and process lifecycle
  * helpers. It dispatches builtins and programs, constructs pipelines and
  * jobs, records PIPESTATUS, updates foreground titles, and handles shutdown
- * and memory reports.
+ * and memory reports. This unit coordinates evaluator, builtin, and koshkit
+ * state. Native process operations remain behind the platform interface.
  */
 
 #include "Builtin.hpp"

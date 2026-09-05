@@ -5,7 +5,9 @@
  * This file discovers command options and subcommands from trusted help
  * output and section one manpages. It owns bounded execution, manpath lookup,
  * documentation parsing, descriptions, and lazy caches used by this optional
- * completion path.
+ * completion path. External processes, filesystem searches, and document
+ * parsing are isolated here from the in-memory completion scan and ranking
+ * path.
  */
 
 #include "Arena.hpp"

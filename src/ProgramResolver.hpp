@@ -4,7 +4,8 @@
  *
  * This file defines command resolution and PATH caches. It tracks executable
  * directory indexes, remembered commands, invalidation, and forced cache
- * rebuilding.
+ * rebuilding. EvalContext and ExecContext store this type directly. The
+ * standalone header gives them the complete type through a narrow dependency.
  */
 
 #pragma once

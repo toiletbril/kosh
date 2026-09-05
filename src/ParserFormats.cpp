@@ -5,7 +5,9 @@
  * This file detects host document formats and extracts embedded shell
  * fragments for analysis and formatting. It maps positions between host and
  * shell source, handles indentation and JSON string codecs, and applies
- * formatted replacements to the host document.
+ * formatted replacements to the host document. Format-neutral detection,
+ * mapping, codecs, and dispatch stay here. Each source under formats
+ * implements one host format.
  */
 
 #include "ParserFormats.hpp"

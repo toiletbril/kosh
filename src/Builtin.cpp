@@ -4,7 +4,9 @@
  *
  * This file implements the builtin registry and dispatch interface. It
  * defines builtin identities, metadata, construction, lookup, and evaluator
- * execution contracts.
+ * execution contracts. The central registry keeps the packed name table,
+ * metadata arrays, factory switch, and common dispatch consistent. Each source
+ * under builtins implements one command.
  */
 
 #include "Builtin.hpp"

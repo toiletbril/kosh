@@ -5,7 +5,9 @@
  * This file declares the bundled koshkit utility catalog and common execution
  * contract. It contains utility identities, compile-time lookup, flag
  * registration, dispatch helpers, input helpers, and makefile shell-source
- * interfaces.
+ * interfaces. These shared declarations keep the packed utility catalog and
+ * common execution contract available to the one-command implementations
+ * under koshkit.
  */
 
 #pragma once

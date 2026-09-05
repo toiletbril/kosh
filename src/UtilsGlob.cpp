@@ -4,7 +4,9 @@
  *
  * This file implements shell glob matching and completion prefix matching. It
  * handles extended glob groups, repetition, bracket expressions, POSIX
- * character classes, active-character masks, and smart-case prefixes.
+ * character classes, active-character masks, and smart-case prefixes. The
+ * shared pattern engine serves expansion, conditionals, completion, compgen,
+ * and find from one source unit.
  */
 
 #include "Builtin.hpp"

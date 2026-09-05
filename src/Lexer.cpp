@@ -5,7 +5,8 @@
  * This file tokenizes shell source, including quotes, expansions,
  * assignments, redirections, process substitutions, and heredocs. It owns
  * the lexer cursor, token lookahead, source locations, and analysis metadata
- * collection.
+ * collection. LexerScan provides the allocation-light balanced scanner shared
+ * by tokenization, formatting, and highlighting.
  */
 
 #include "Lexer.hpp"

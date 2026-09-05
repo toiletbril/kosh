@@ -2,9 +2,9 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements noninteractive Toiletline stubs. It satisfies editor
- * interfaces without initializing terminal or interactive state on
- * noninteractive paths.
+ * This file implements the Toiletline interface for KOSH_NO_TOILETLINE builds.
+ * The alternate implementation keeps those builds linked without compiling
+ * the vendored editor or initializing terminal state.
  */
 
 #include "CliColors.hpp"

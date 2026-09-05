@@ -4,7 +4,9 @@
  *
  * This file implements the shared PATH resolver and directory indexes. It
  * owns cached listings, directory identity aliases, remembered command paths,
- * completion indexes, PATH invalidation, and executable search.
+ * completion indexes, PATH invalidation, and executable search. Command lookup
+ * and completion share this unit because both consume the same directory
+ * cache and ProgramResolver state.
  */
 
 #include "Builtin.hpp"
