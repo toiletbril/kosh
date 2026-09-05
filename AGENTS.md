@@ -302,6 +302,8 @@ changes update this file.
   before REFILL.
 - Verify that a capability-gated test ran its active branch. A skip summary is
   not coverage.
+- Inspect fixture instrumentation before direct invocation. Match the binary
+  mode to every counter or diagnostic hook the fixture requires.
 - Rebuild the required mode. Verify platform, mode, and revision when relevant.
   Compile release after changing assertion-only locals.
 - Run owners sharing result paths sequentially. Use finite workloads,

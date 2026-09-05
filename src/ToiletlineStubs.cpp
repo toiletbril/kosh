@@ -126,28 +126,6 @@ fn set_highlight_enabled(bool enabled) -> void { unused(enabled); }
 
 fn set_edit_mode(edit_mode mode) -> void { unused(mode); }
 
-fn utf8_strlen(const String &s, usize count) -> usize
-{
-  return (count != static_cast<usize>(-1) && count < s.length()) ? count
-                                                                 : s.length();
-}
-
-fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
-{
-  unused(bytes);
-  return byte_count;
-}
-
-fn display_width(StringView text) -> usize { return text.length; }
-
-fn byte_offset_at_or_before_display_cell(StringView text, usize cell_position,
-                                         usize &actual_cell_position) -> usize
-{
-  actual_cell_position =
-      cell_position < text.length ? cell_position : text.length;
-  return actual_cell_position;
-}
-
 fn is_active() -> bool { return false; }
 
 fn initialize() -> void

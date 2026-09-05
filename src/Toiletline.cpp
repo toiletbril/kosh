@@ -907,41 +907,6 @@ fn set_edit_mode(edit_mode mode) -> void
                                            : TL_EDIT_MODE_EMACS);
 }
 
-fn utf8_strlen(const String &s, usize count) -> usize
-{
-  return (count != static_cast<usize>(-1)) ? ::tl_utf8_strnlen(s.c_str(), count)
-                                           : ::tl_utf8_strlen(s.c_str());
-}
-
-fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
-{
-  return ::tl_utf8_strnlen(bytes, byte_count);
-}
-
-fn display_width(StringView text) -> usize
-{
-  return ::itl_strn_display_width(text.data, text.length);
-}
-
-fn byte_offset_at_or_before_display_cell(StringView text, usize cell_position,
-                                         usize &actual_cell_position) -> usize
-{
-  usize byte_offset = 0;
-  actual_cell_position = ::itl_strn_width_walk(text.data, text.length,
-                                               cell_position, &byte_offset);
-  if (actual_cell_position <= cell_position) return byte_offset;
-
-  usize previous_byte_offset = byte_offset - 1;
-  while (previous_byte_offset > 0 &&
-         (static_cast<unsigned char>(text[previous_byte_offset]) & 0xC0) ==
-             0x80)
-    previous_byte_offset--;
-
-  actual_cell_position =
-      ::itl_strn_display_width(text.data, previous_byte_offset);
-  return previous_byte_offset;
-}
-
 fn is_active() -> bool { return ::itl_g_is_active; }
 
 fn initialize() -> void
