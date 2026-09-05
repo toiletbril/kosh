@@ -68,6 +68,9 @@ modifier_print_path=$dir/modifier-print
 modifier_stderr_log=$dir/modifier-stderr
 filter_history_path=$dir/filter-history
 multiline_history_path=$dir/multiline-history
+histappend_off_path=$dir/histappend-off
+histappend_on_path=$dir/histappend-on
+histfilesize_path=$dir/histfilesize
 disabled_hist=$dir/disabled
 ignoreeof_hist=$dir/ignoreeof
 ignoreeof_rc=$dir/ignoreeof-rc
@@ -408,6 +411,69 @@ else
   printf 'multiline history file:\n%.4096s\n' \
     "$(cat "$multiline_history_path")" >&2
   echo "cmdhist and lithist broken"
+fi
+
+printf 'APPEND_OFF_BASE\n' > "$histappend_off_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'HISTSIZE=2\r' 'HISTFILESIZE=500\r' \
+    'shopt -u histappend\r' 'echo APPEND_OFF_ONE\r' \
+    'echo APPEND_OFF_TWO\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$histappend_off_path" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+
+printf 'APPEND_ON_BASE\n' > "$histappend_on_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'HISTSIZE=2\r' 'HISTFILESIZE=500\r' \
+    'shopt -s histappend\r' 'echo APPEND_ON_ONE\r' \
+    'echo APPEND_ON_TWO\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$histappend_on_path" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+
+printf 'HISTFILESIZE_BASE\n' > "$histfilesize_path"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'HISTSIZE=500\r' 'HISTFILESIZE=2\r' \
+    'shopt -s histappend\r' 'echo HISTFILESIZE_ONE\r' \
+    'echo HISTFILESIZE_TWO\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$histfilesize_path" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+
+if [ "$(wc -l < "$histappend_off_path")" -eq 2 ] &&
+  ! grep -q APPEND_OFF_BASE "$histappend_off_path" &&
+  grep -q '^echo APPEND_OFF_TWO$' "$histappend_off_path" &&
+  grep -q '^exit$' "$histappend_off_path" &&
+  grep -q '^APPEND_ON_BASE$' "$histappend_on_path" &&
+  grep -q '^echo APPEND_ON_ONE$' "$histappend_on_path" &&
+  grep -q '^echo APPEND_ON_TWO$' "$histappend_on_path" &&
+  [ "$(wc -l < "$histfilesize_path")" -eq 2 ] &&
+  grep -q '^echo HISTFILESIZE_TWO$' "$histfilesize_path" &&
+  grep -q '^exit$' "$histfilesize_path"; then
+  echo "histappend ok"
+else
+  printf 'histappend off file:\n%.2048s\n' \
+    "$(cat "$histappend_off_path")" >&2
+  printf 'histappend on file:\n%.2048s\n' \
+    "$(cat "$histappend_on_path")" >&2
+  printf 'HISTFILESIZE file:\n%.2048s\n' \
+    "$(cat "$histfilesize_path")" >&2
+  echo "histappend broken"
 fi
 
 printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"

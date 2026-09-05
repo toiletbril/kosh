@@ -553,6 +553,15 @@ public:
   {
     return m_shell_variables.find(name);
   }
+  pure fn get_history_limit(StringView name, usize fallback) const wontthrow
+      -> usize
+  {
+    let const *value = lookup_shell_variable(name);
+    if (value == nullptr) return fallback;
+    let const parsed = value->view().to<i64>();
+    if (parsed.is_error() || parsed.value() < 0) return 0;
+    return static_cast<usize>(parsed.value());
+  }
 
   hot pure fn has_variable_name(StringView name) const wontthrow -> bool
   {

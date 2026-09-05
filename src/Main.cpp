@@ -836,6 +836,13 @@ fn kosh_main(int argc, char **argv) -> int
   if (should_be_interactive) {
     if (!koshka::os::get_environment_variable("PS1").has_value())
       context.set_shell_variable("PS1", toiletline::default_prompt_template());
+
+    if (should_seed_bash_identity) {
+      if (context.lookup_shell_variable("HISTSIZE") == nullptr)
+        context.set_shell_variable("HISTSIZE", "500");
+      if (context.lookup_shell_variable("HISTFILESIZE") == nullptr)
+        context.set_shell_variable("HISTFILESIZE", "500");
+    }
   }
 
   if (!koshka::os::get_environment_variable("PS2").has_value())
@@ -1194,6 +1201,8 @@ fn kosh_main(int argc, char **argv) -> int
         toiletline::set_edit_mode(context.vi_mode()
                                       ? toiletline::edit_mode::Vi
                                       : toiletline::edit_mode::Emacs);
+        toiletline::set_history_limit(
+            context.get_history_limit("HISTSIZE", static_cast<usize>(-1)));
 
         loop
         {

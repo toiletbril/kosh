@@ -40,5 +40,6 @@ history words ok
 history modifiers ok
 history filtering ok
 cmdhist and lithist ok
+histappend ok
 history option ok
 ignoreeof ok

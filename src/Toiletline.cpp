@@ -433,6 +433,11 @@ fn set_history_enabled(bool is_enabled) -> void
   ::tl_set_history_enabled(is_enabled);
 }
 
+fn set_history_limit(usize entry_count) -> void
+{
+  ::tl_set_history_limit(entry_count);
+}
+
 struct history_event
 {
   usize number;
@@ -954,18 +959,68 @@ fn initialize() -> void
   }
 }
 
-fn exit() -> void
+static fn compact_history_file(usize entry_limit,
+                               bool should_skip_if_within_limit) -> bool
 {
-  if (koshka::Maybe<koshka::Path> kosh_history = history_file_path();
-      kosh_history.has_value())
+  let const path = history_file_path();
+  if (!path.has_value()) return true;
+  let parent = path->parent();
+  if (parent.text().is_empty()) parent = Path{"."};
+  let lock = os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value()) return false;
+  defer { os::release_process_lock(lock.take()); };
+
+  ::tl_set_history_limit(entry_limit);
+  if (!history_read()) return false;
+  if (should_skip_if_within_limit && ::itl_g_history_total_count <= entry_limit)
   {
-    if (int dump_status = ::tl_history_dump(kosh_history->c_str());
-        dump_status != TL_SUCCESS && dump_status != -EINVAL)
+    return true;
+  }
+
+  let contents = String{koshka::heap_allocator()};
+  if (!::itl_history_ensure_read_buffer() && ::itl_g_history_count != 0)
+    return false;
+  char decoded[ITL_STRING_MAX_LEN + 1];
+  for (usize index = 0; index < ::itl_g_history_count; index++) {
+    usize decoded_size = 0;
+    if (!::itl_history_decode_entry_buffered(
+            ::itl_history_index_to_offset(index), decoded, sizeof(decoded),
+            &decoded_size))
     {
-      koshka::Error error{"Toiletline: Could not dump history: " +
-                          koshka::os::last_system_error_message()};
-      koshka::show_message(error.to_string());
+      return false;
     }
+    for (usize position = 0; position < decoded_size; position++) {
+      if (decoded[position] == '\\')
+        contents += "\\\\";
+      else if (decoded[position] == '\n')
+        contents += "\\n";
+      else
+        contents.push(decoded[position]);
+    }
+    contents.push('\n');
+  }
+
+  let replacement = os::write_to_named_temp_file(
+      parent, ".kosh_history_compact", contents.view());
+  if (!replacement.has_value()) return false;
+  defer { unused(os::remove_file(replacement->text().view())); };
+  if (!os::rename_path(replacement->text().view(), path->text().view()))
+    return false;
+  return ::tl_history_load(path->c_str()) == TL_SUCCESS;
+}
+
+fn exit(bool should_append_history, usize history_size_limit,
+        usize history_file_size_limit) -> void
+{
+  let const retained_limit = should_append_history
+                                 ? history_file_size_limit
+                                 : (history_size_limit < history_file_size_limit
+                                        ? history_size_limit
+                                        : history_file_size_limit);
+  if (!compact_history_file(retained_limit, should_append_history)) {
+    koshka::Error error{"Toiletline: Could not save history: " +
+                        koshka::os::last_system_error_message()};
+    koshka::show_message(error.to_string());
   }
 
   if (::tl_exit() != TL_SUCCESS) {

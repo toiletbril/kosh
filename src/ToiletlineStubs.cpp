@@ -39,6 +39,8 @@ fn history_clear() -> bool { return true; }
 
 fn set_history_enabled(bool is_enabled) -> void { unused(is_enabled); }
 
+fn set_history_limit(usize entry_count) -> void { unused(entry_count); }
+
 fn history_events(koshka::Allocator allocator)
     -> koshka::ArrayList<history_event>
 {
@@ -154,7 +156,13 @@ fn initialize() -> void
       "This build has no line editor, use '-c', '-s', or a file argument"};
 }
 
-fn exit() -> void {}
+fn exit(bool should_append_history, usize history_size_limit,
+        usize history_file_size_limit) -> void
+{
+  unused(should_append_history);
+  unused(history_size_limit);
+  unused(history_file_size_limit);
+}
 
 fn set_title(StringView title) -> void { unused(title); }
 

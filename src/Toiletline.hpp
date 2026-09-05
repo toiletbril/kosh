@@ -47,6 +47,7 @@ bool history_write();
 bool history_read();
 bool history_clear();
 void set_history_enabled(bool is_enabled);
+void set_history_limit(usize entry_count);
 
 struct history_event
 {
@@ -114,7 +115,9 @@ bool is_active();
 
 void initialize();
 
-void exit();
+void exit(bool should_append_history = true,
+          usize history_size_limit = static_cast<usize>(-1),
+          usize history_file_size_limit = static_cast<usize>(-1));
 
 void set_title(StringView title);
 void set_idle_title();

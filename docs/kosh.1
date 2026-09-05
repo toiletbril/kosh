@@ -1112,6 +1112,12 @@ option preserves embedded newlines while cmdhist is enabled. Disabling cmdhist
 stores each nonempty physical line as a separate event.
 .PP
 The
+.B histappend
+option keeps appended session entries when the interactive shell exits. When it
+is disabled, the retained list replaces the history file. HISTSIZE bounds the
+retained list, and HISTFILESIZE bounds the file after either exit mode.
+.PP
+The
 .B ignoreeof
 option requires consecutive end-of-file input before an interactive shell
 exits. Its threshold is read from
@@ -1824,6 +1830,11 @@ The value supplies default command-line options.
 .TP
 .B KOSH_HISTORY
 The value names the command history file. The default is ~/.kosh_history.
+.TP
+.BR HISTSIZE ", " HISTFILESIZE
+HISTSIZE bounds the number of events retained for recall and listing.
+HISTFILESIZE bounds the number saved when an interactive shell exits. Both
+values default to 500 in an interactive Bash mood.
 .TP
 .B HISTCONTROL
 The value is a colon-separated list of filters for commands added to history.

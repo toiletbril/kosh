@@ -667,7 +667,20 @@ cold fn print_memory_report() wontthrow -> void
   if (!os::is_child_process()) {
     if (toiletline::is_active()) {
       try {
-        toiletline::exit();
+        let const should_append_history =
+            QUIT_CONTEXT == nullptr ||
+            QUIT_CONTEXT->is_shopt_enabled("histappend");
+        let const history_size_limit =
+            QUIT_CONTEXT != nullptr ? QUIT_CONTEXT->get_history_limit(
+                                          "HISTSIZE", static_cast<usize>(-1))
+                                    : static_cast<usize>(-1);
+        let const history_file_size_limit =
+            QUIT_CONTEXT != nullptr
+                ? QUIT_CONTEXT->get_history_limit("HISTFILESIZE",
+                                                  static_cast<usize>(-1))
+                : static_cast<usize>(-1);
+        toiletline::exit(should_append_history, history_size_limit,
+                         history_file_size_limit);
       } catch (const Error &e) {
         show_message(e.to_string());
       }
