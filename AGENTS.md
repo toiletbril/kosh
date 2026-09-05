@@ -182,8 +182,9 @@ changes update this file.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
-- Run compound host probes through an explicitly verified interpreter. Inspect
-  an unfamiliar make target recipe before invoking it.
+- Put the explicitly verified interpreter and `-c` in the command text for a
+  compound host probe. Do not rely on command-runner shell metadata. Inspect an
+  unfamiliar make target recipe before invoking it.
 - Reduce a bounded platform probe to one verified command. Confirm its mood,
   option defaults, output order, and final status before writing the golden.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
@@ -209,6 +210,8 @@ changes update this file.
   diff. Check every multi-file patch boundary before applying it. Inspect failed
   patches, reread after formatting or concurrent work, and apply only nonempty
   changes.
+- Anchor patches on unchanged lines without escapes when the tool input adds an
+  escaping layer and the escaped text is not being changed.
 - Before a bulk mechanical rewrite, count every known input form and make the
   transformation idempotent when files may already contain the target form.
 - Copy platform argument types, helper namespaces, and ownership transfers from
