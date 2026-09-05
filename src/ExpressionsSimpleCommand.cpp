@@ -480,6 +480,14 @@ static fn redirection_open_mode(Redirection::Kind kind,
   }
 }
 
+static fn redirection_open_error(StringView path) throws -> String
+{
+  let const system_error = os::last_system_error_message();
+  if (os::path_is_directory(path)) return String{"Is a directory"};
+
+  return system_error;
+}
+
 /* Resolve one redirection to an unplaced outcome, the shared open-and-stage
    work the three redirection sites repeat. The returned descriptor is the
    caller's to place and to close. A failure throws a located error, and
@@ -570,10 +578,10 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
                                 cxt.no_clobber()));
       if (!opened) {
         if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
-        throw ErrorWithLocation{redir.target->source_location(),
-                                "Could not open '" +
-                                    *resolved_dup.both_streams_file +
-                                    "': " + os::last_system_error_message()};
+        throw ErrorWithLocation{
+            redir.target->source_location(),
+            "Could not open '" + *resolved_dup.both_streams_file + "': " +
+                redirection_open_error(*resolved_dup.both_streams_file)};
       }
       return resolved_redirection{redirection_outcome::BothStreams, 1,
                                   opened.take(), -1};
@@ -613,7 +621,7 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
     throw ErrorWithLocation{redir.target->source_location(),
                             "Could not open '" + target_path +
-                                "': " + os::last_system_error_message()};
+                                "': " + redirection_open_error(target_path)};
   }
 
   let const file_fd = opened.take();

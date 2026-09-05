@@ -124,10 +124,7 @@ completion_%: expected/%.out $(WINDOWS_DIFF_BOOTSTRAP)
 
 ifeq ($(TARGET), Windows_NT)
 WINDOWS_SKIPPED_TEST_NAMES := \
-	koshkit_filesystem_posix \
-	mood_conditional \
-	rerr_redirect_to_directory \
-	umask_modes
+	koshkit_filesystem_posix
 
 $(WINDOWS_SKIPPED_TEST_NAMES):
 	@printf "	%-64s skipped, unsupported Windows backend feature\n" "$@.kosh"
