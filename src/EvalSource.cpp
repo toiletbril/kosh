@@ -435,7 +435,6 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
       SSK("extquote"),
       SSK("complete_fullquote"),
       SSK("hostcomplete"),
-      SSK("cmdhist"),
       SSK("checkwinsize"),
       SSK("force_fignore"),
       SSK("globasciiranges"),

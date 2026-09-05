@@ -195,6 +195,8 @@ changes update this file.
   unfamiliar make target recipe before invoking it.
 - Reduce a bounded platform probe to one verified command. Confirm its mood,
   option defaults, output order, and final status before writing the golden.
+- Do not embed direct recursive removal in a probe. Use an accepted cleanup
+  owner, or leave a bounded temporary directory for system cleanup.
 - Reduce a high-volume fixture to its failing section before enabling shell
   xtrace.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
@@ -202,6 +204,7 @@ changes update this file.
   separator, and paths. Put `--` before dash-leading patterns. Enable PCRE2
   only when required. Resolve wildcard paths before searching, and pass only
   existing matches. Run independent searches independently.
+- Put `--glob` before the pattern and every path.
 - A command that runs ripgrep must not contain `&&` or `||`.
 - Run an expected no-match search as its own command, since its status must not
   stop later checks.
@@ -235,6 +238,8 @@ changes update this file.
   diff. Check every multi-file patch boundary before applying it. Inspect failed
   patches, reread after formatting or concurrent work, and apply only nonempty
   changes.
+- Do not run a whole-file formatter on a vendored file. Apply narrow formatting
+  patches that preserve the surrounding style.
 - Anchor patches on unchanged lines without escapes when the tool input adds an
   escaping layer and the escaped text is not being changed.
 - Before a bulk mechanical rewrite, count every known input form and make the
@@ -338,6 +343,8 @@ changes update this file.
   temporary worktree submodules before removal.
 - Use `MODE=rel` for every performance make command. Clear inherited jobserver
   flags before serial submakes. Resolve benchmark inputs, options, and statuses.
+  Pass additional compiler flags through `USER_CXXFLAGS`. Command-line
+  `CXXFLAGS` replaces the project compiler flags.
   Enable nonzero handling for expected failures. Run bench through `-c`.
   Benchmark timeouts wrap the measured process directly.
 - Validate profilers on a small payload and bound full workloads. Let the

@@ -1103,13 +1103,8 @@ recording and preserves the previous exit status. Both history options are
 enabled by default in an interactive shell and disabled in a noninteractive
 shell.
 .PP
-The
-.B cmdhist
-option stores a multiline command as one history event. Command-separating
-newlines become semicolons or spaces as required by the shell grammar. The
-.B lithist
-option preserves embedded newlines while cmdhist is enabled. Disabling cmdhist
-stores each nonempty physical line as a separate event.
+Each submitted multiline command is stored as one history event. Embedded
+newlines are preserved when the event is recalled.
 .PP
 The
 .B histappend

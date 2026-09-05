@@ -186,7 +186,7 @@ fn debug_allocation_failure() -> bool { return true; }
 
 fn default_prompt_template() -> String
 {
-  let template_string = String{};
+  let template_string = String{koshka::heap_allocator()};
   let const should_use_color = koshka::colors::stdout_wants_color();
 
   if (should_use_color) {
@@ -221,7 +221,7 @@ fn expand_prompt_template(StringView prompt, koshka::EvalContext &context)
 fn render_ps0(koshka::EvalContext &context) -> String
 {
   unused(context);
-  return String{};
+  return String{koshka::heap_allocator()};
 }
 
 } /* namespace toiletline */

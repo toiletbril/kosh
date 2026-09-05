@@ -369,10 +369,8 @@ rm -f "$ready"
 rm -f "$input_status"
 out=$({
   send_input_when_ready \
-    'shopt -s cmdhist\r' \
-    'shopt -u lithist\r' \
-    'echo CMDHIST_ONE\033\r' \
-    '  echo CMDHIST_TWO\r' \
+    'echo MULTILINE_ONE\033\r' \
+    '  echo MULTILINE_TWO\r' \
     'if true; then\033\r' \
     '  echo IF_YES\033\r' \
     'else\033\r' \
@@ -382,12 +380,6 @@ out=$({
     '  tr p P\r' \
     'printf "%s\\n" "left\033\r' \
     'right"\r' \
-    'shopt -s lithist\r' \
-    'echo LITHIST_ONE\033\r' \
-    '  echo LITHIST_TWO\r' \
-    'shopt -u cmdhist\r' \
-    'echo PHYSICAL_ONE\033\r' \
-    '  echo PHYSICAL_TWO\r' \
     'exit\r'
   printf '%s\n' "$?" > "$input_status"
 } |
@@ -395,22 +387,19 @@ out=$({
     PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
     run_interactive 'exec "$BIN" -i -M bash --rcfile /dev/null') || exit 1
 [ "$(cat "$input_status")" = 0 ] || exit 1
-if [ "$(grep -c '^echo CMDHIST_ONE;   echo CMDHIST_TWO$' \
+if [ "$(grep -F -c 'echo MULTILINE_ONE\n  echo MULTILINE_TWO' \
     "$multiline_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^if true; then   echo IF_YES; else   echo IF_NO; fi$' \
+  [ "$(grep -F -c 'if true; then\n  echo IF_YES\nelse\n  echo IF_NO\nfi' \
     "$multiline_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^printf p |   tr p P$' "$multiline_history_path")" -eq 1 ] &&
+  [ "$(grep -F -c 'printf p |\n  tr p P' \
+    "$multiline_history_path")" -eq 1 ] &&
   [ "$(grep -F -c 'printf "%s\\n" "left\nright"' \
-    "$multiline_history_path")" -eq 1 ] &&
-  [ "$(grep -F -c 'echo LITHIST_ONE\n  echo LITHIST_TWO' \
-    "$multiline_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^echo PHYSICAL_ONE$' "$multiline_history_path")" -eq 1 ] &&
-  [ "$(grep -c '^  echo PHYSICAL_TWO$' "$multiline_history_path")" -eq 1 ]; then
-  echo "cmdhist and lithist ok"
+    "$multiline_history_path")" -eq 1 ]; then
+  echo "multiline history ok"
 else
   printf 'multiline history file:\n%.4096s\n' \
     "$(cat "$multiline_history_path")" >&2
-  echo "cmdhist and lithist broken"
+  echo "multiline history broken"
 fi
 
 printf 'APPEND_OFF_BASE\n' > "$histappend_off_path"
