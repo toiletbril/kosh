@@ -166,7 +166,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* An empty CDPATH entry, including one a leading, trailing, or doubled colon
      makes, names the current directory. */
-  let was_reached_through_cdpath = false;
+  let should_print_target = is_to_previous;
   if (!is_to_previous && operand_count > 0 && cdpath_search_applies(arg_path)) {
     if (let const cdpath = cxt.get_variable_value("CDPATH")) {
       let const entries = cdpath->view();
@@ -203,12 +203,23 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           LOG(Info, "cd resolved '%s' through CDPATH entry '%.*s'",
               arg_path.c_str(), static_cast<int>(entry.length), entry.data);
           target = steal(resolved);
-          was_reached_through_cdpath = !entry.is_empty();
+          should_print_target = !entry.is_empty();
           break;
         }
         if (end >= entries.length) break;
         start = end + 1;
       }
+    }
+  }
+
+  if (!is_to_previous && operand_count > 0 && !target.is_directory() &&
+      cxt.is_shopt_enabled("cdable_vars"))
+  {
+    if (let const directory_variable = cxt.get_variable_value(arg_path)) {
+      arg_path.clear();
+      arg_path.append(directory_variable->view());
+      target = Path{arg_path};
+      should_print_target = true;
     }
   }
 
@@ -287,7 +298,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
     record_directory_access(target.text().view(), cxt.scratch_allocator());
-    if (is_to_previous || was_reached_through_cdpath) {
+    if (should_print_target) {
       ec.print_to_stdout(target.text() + "\n");
     }
     return 0;

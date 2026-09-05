@@ -7,6 +7,23 @@ ln -sfn "$d/real" "$d/link"
 echo "physical=$(cd -P "$d/link" && pwd | grep -o '/real$')"
 echo "logical=$(cd -L "$d/link" && pwd | grep -o '/link$')"
 echo "default=$(cd "$d/link" && pwd | grep -o '/link$')"
+start=$PWD
+mkdir -p "$d/cdable" "$d/cdpath/literalname"
+cdable_target="$d/cdable"
+literalname="$d/cdable"
+shopt -s cdable_vars
+cd cdable_target >/dev/null
+[ "$PWD" = "$d/cdable" ] && echo cdable-variable=yes
+cd "$d"
+empty_target=
+cd empty_target >/dev/null
+[ "$PWD" = "$d" ] && echo cdable-empty=yes
+CDPATH="$d/cdpath"
+cd literalname >/dev/null
+[ "$PWD" = "$d/cdpath/literalname" ] && echo cdable-cdpath-first=yes
+unset CDPATH
+shopt -u cdable_vars
+cd "$start"
 rm -rf "$d"
 
 
