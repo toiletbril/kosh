@@ -1046,9 +1046,10 @@ option clears the stored history, and
 .B \-p
 prints its operands without storing them. The
 .B \-d
-and
+option deletes an event number, a negative offset from the newest event, or an
+inclusive event range. The
 .B \-s
-options accept their operands and leave the list unchanged.
+option joins its operands with spaces and stores the result as a history event.
 .TP
 .B "fc [\-e editor] [\-lnr] [first [last]]"
 The selected history events are edited and executed in the current shell. A

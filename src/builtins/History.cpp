@@ -17,20 +17,19 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-c] [-r|-n|-a|-w] [-p arg ...] [count]");
+HELP_SYNOPSIS_DECL("[-c] [-d offset] [-r|-n|-a|-w] [-p arg ...] [count]",
+                   "-s [arg ...]");
 HELP_DESCRIPTION_DECL(
     "The history builtin lists and maintains the interactive command history.");
 
 FLAG(HISTORY_CLEAR, Bool, 'c', "", "Clear the history list.");
-FLAG(HISTORY_DELETE, Bool, 'd', "",
-     "Accept a delete offset operand, leaving the list unchanged.");
+FLAG(HISTORY_DELETE, String, 'd', "", "Delete an event or event range.");
 FLAG(HISTORY_APPEND, Bool, 'a', "", "Write the history list to the file.");
 FLAG(HISTORY_READ_NEW, Bool, 'n', "", "Read the history file into the list.");
 FLAG(HISTORY_READ, Bool, 'r', "", "Read the history file into the list.");
 FLAG(HISTORY_WRITE, Bool, 'w', "", "Write the history list to the file.");
 FLAG(HISTORY_PRINT, Bool, 'p', "", "Print the operands, storing nothing.");
-FLAG(HISTORY_STORE, Bool, 's', "",
-     "Accept operands to store, leaving the list unchanged.");
+FLAG(HISTORY_STORE, Bool, 's', "", "Store the operands as a history event.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(History);
@@ -132,6 +131,61 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target) throws
   return was_written;
 }
 
+struct history_selection
+{
+  usize first_index;
+  usize last_index;
+};
+
+static fn parse_history_selection(
+    StringView specification,
+    const ArrayList<toiletline::history_event> &events) throws
+    -> Maybe<history_selection>
+{
+  if (events.is_empty()) return None;
+
+  Maybe<usize> separator{None};
+  for (usize position = 1; position < specification.length; position++) {
+    if (specification[position] != '-') continue;
+    separator = position;
+    break;
+  }
+
+  let const do_resolve = [&](StringView text) throws -> Maybe<usize> {
+    let const parsed = utils::parse_decimal_i64(text);
+    if (parsed.is_error() || parsed.value() == 0) return None;
+
+    if (parsed.value() < 0) {
+      let const index = static_cast<i64>(events.count()) + parsed.value();
+      if (index < 0) return None;
+      return static_cast<usize>(index);
+    }
+
+    let const number = static_cast<usize>(parsed.value());
+    for (usize index = 0; index < events.count(); index++)
+      if (events[index].number == number) return index;
+
+    return None;
+  };
+
+  if (!separator.has_value()) {
+    let const index = do_resolve(specification);
+    if (!index.has_value()) return None;
+    return history_selection{*index, *index};
+  }
+
+  let const first_index =
+      do_resolve(specification.substring_of_length(0, *separator));
+  let const last_index = do_resolve(specification.substring(*separator + 1));
+  if (!first_index.has_value() || !last_index.has_value() ||
+      *first_index > *last_index)
+  {
+    return None;
+  }
+
+  return history_selection{*first_index, *last_index};
+}
+
 fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = PARSE_BUILTIN_ARGS(ec);
@@ -200,7 +254,48 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     did_maintain_list = true;
   }
 
-  if (FLAG_HISTORY_DELETE.is_enabled() || FLAG_HISTORY_STORE.is_enabled()) {
+  if (FLAG_HISTORY_DELETE.is_set()) {
+    let events = toiletline::history_events(cxt.scratch_allocator());
+    let const selection =
+        parse_history_selection(FLAG_HISTORY_DELETE.value(), events);
+    if (!selection.has_value()) {
+      report_soft_builtin_error(ec, cxt, FLAG_HISTORY_DELETE.value_location(),
+                                FLAG_HISTORY_DELETE.value() +
+                                    ": history position out of range");
+      return 1;
+    }
+
+    for (usize index = selection->last_index + 1;
+         index-- > selection->first_index;)
+    {
+      let const &event = events[index];
+      if (!toiletline::history_rewrite_event(event.number, event.command.view(),
+                                             ""))
+      {
+        report_soft_builtin_error(ec, cxt, FLAG_HISTORY_DELETE.value_location(),
+                                  "Unable to delete the history event");
+        return 1;
+      }
+    }
+
+    did_maintain_list = true;
+  }
+
+  if (FLAG_HISTORY_STORE.is_enabled()) {
+    if (args.count() > 1) {
+      let event = String{cxt.scratch_allocator()};
+      for (usize index = 1; index < args.count(); index++) {
+        if (index > 1) event.push(' ');
+        event.append(args[index].view());
+      }
+
+      if (!toiletline::history_append_event(event.view()).has_value()) {
+        report_soft_builtin_error(ec, cxt, ec.source_location(),
+                                  "Unable to store the history event");
+        return 1;
+      }
+    }
+
     did_maintain_list = true;
   }
 
