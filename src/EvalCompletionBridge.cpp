@@ -148,8 +148,18 @@ fn EvalContext::run_completion_function(StringView function_name,
 
   /* A completion function that errors must not abort the prompt, so any error
      is swallowed and a stray break or return is consumed. */
+  let was_interrupted = false;
   try {
     body->evaluate(*this);
+  } catch (const InterruptErrorWithLocation &) {
+    /* The throw already consumed the interrupt request on its way out, so it is
+       raised again for the caller. Without it the editor would see a settled
+       flag and offer whatever the function had filled in before the user asked
+       it to stop. */
+    was_interrupted = true;
+    os::INTERRUPT_REQUESTED = 1;
+    LOG(Debug, "completion function '%.*s' was interrupted",
+        static_cast<int>(function_name.length), function_name.data);
   } catch (const ErrorBase &error) {
     LOG(Debug, "completion function '%.*s' threw: %s",
         static_cast<int>(function_name.length), function_name.data,
@@ -162,7 +172,7 @@ fn EvalContext::run_completion_function(StringView function_name,
 
   let result = ArrayList<String>{heap_allocator()};
   if (const ArrayList<String> *reply = lookup_indexed_array("COMPREPLY");
-      reply != nullptr)
+      !was_interrupted && reply != nullptr)
   {
     result.reserve(reply->count());
     for (let const &entry : *reply)

@@ -19,6 +19,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "ExecContext.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Trace.hpp"
@@ -132,6 +133,228 @@ koshka::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{
     koshka::heap_allocator()};
 koshka::completion::completion_result *COMPLETION_RESULT = nullptr;
 
+/* An explicit tab normally prints the candidates as a static list. When
+   KOSH_FZF_COMPLETION holds anything other than an empty value or 0, the same
+   candidates are handed to a filtering program instead, and what it prints
+   replaces them. The engine, the replaced token span, and the quoting are
+   untouched, so only the presentation moves. Every failure below leaves the
+   result alone, so the static list still appears. */
+constexpr koshka::StringView SELECTOR_ENABLE_VARIABLE{"KOSH_FZF_COMPLETION"};
+constexpr koshka::StringView SELECTOR_COMMAND_VARIABLE{
+    "KOSH_FZF_COMPLETION_COMMAND"};
+constexpr koshka::StringView SELECTOR_OPTIONS_VARIABLE{
+    "KOSH_FZF_COMPLETION_OPTS"};
+
+fn selector_command_name(koshka::EvalContext &context) throws
+    -> koshka::Maybe<koshka::String>
+{
+  let const enabled = context.get_variable_value(SELECTOR_ENABLE_VARIABLE);
+  if (!enabled.has_value() || enabled->is_empty() ||
+      enabled->view() == koshka::StringView{"0"})
+  {
+    return koshka::None;
+  }
+
+  if (let const configured =
+          context.get_variable_value(SELECTOR_COMMAND_VARIABLE);
+      configured.has_value() && !configured->is_empty())
+  {
+    return koshka::String{configured->view()};
+  }
+  return koshka::String{"fzf"};
+}
+
+/* Records are NUL separated in both directions, so a candidate carrying a
+   newline still travels as one field. A description rides after a tab, which
+   makes it searchable while never reaching the line. */
+fn build_selector_input(const koshka::completion::completion_result &result)
+    throws -> koshka::String
+{
+  let input = koshka::String{koshka::heap_allocator()};
+  let const has_descriptions = result.descriptions.count() > 0;
+  for (let const &candidate : result.candidates) {
+    input.append(candidate.view());
+    if (has_descriptions) {
+      if (const koshka::String *description =
+              result.descriptions.find(candidate.view());
+          description != nullptr && !description->is_empty())
+      {
+        input.push('\t');
+        input.append(description->view());
+      }
+    }
+    input.push('\0');
+  }
+  return input;
+}
+
+fn build_selector_args(koshka::EvalContext &context,
+                       const koshka::Path &program) throws
+    -> koshka::ArrayList<koshka::String>
+{
+  let args = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+  args.push(koshka::String{program.text().view()});
+  args.push(koshka::String{"--read0"});
+  args.push(koshka::String{"--print0"});
+  args.push(koshka::String{"--multi"});
+  args.push(koshka::String{"--layout=reverse"});
+  args.push(koshka::String{"--height=~40%"});
+  args.push(koshka::String{"--min-height=3"});
+
+  /* The user's own options come last so they win over the defaults above. The
+     value is split on blanks with no expansion, since a completion keystroke
+     must never run a substitution. */
+  if (let const options = context.get_variable_value(SELECTOR_OPTIONS_VARIABLE);
+      options.has_value() && !options->is_empty())
+  {
+    for (let const &option :
+         context.expand_wordlist_to_fields(options->view(), false))
+      args.push(koshka::String{option.view()});
+  }
+  return args;
+}
+
+/* The selected records, with each description stripped back off. */
+fn parse_selector_reply(koshka::StringView reply) throws
+    -> koshka::ArrayList<koshka::String>
+{
+  let selected = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
+  usize start = 0;
+  for (usize i = 0; i <= reply.length; i++) {
+    if (i != reply.length && reply[i] != '\0') continue;
+    if (i > start) {
+      let record = reply.substring_of_length(start, i - start);
+      if (let const tab = record.find_character('\t'); tab.has_value())
+        record = record.substring_of_length(0, *tab);
+      /* fzf writes a trailing newline of its own under some option sets. */
+      while (!record.is_empty() && record[record.length - 1] == '\n')
+        record = record.substring_of_length(0, record.length - 1);
+      if (!record.is_empty()) selected.push(koshka::String{record});
+    }
+    start = i + 1;
+  }
+  return selected;
+}
+
+enum class selector_outcome : u8
+{
+  /* The selector did not run, so the printed list still answers the key. */
+  NotRun,
+  /* The result now holds the replacement the user chose. */
+  Selected,
+  /* The user dismissed the selector, so the key does nothing at all. Printing
+     the list here would dump every candidate over the screen the user just
+     chose to keep. */
+  Dismissed,
+};
+
+fn run_completion_selector(koshka::EvalContext &context,
+                           koshka::completion::completion_result &result) throws
+    -> selector_outcome
+{
+  if (result.candidates.count() < 2) return selector_outcome::NotRun;
+  if (!::itl_g_is_active) return selector_outcome::NotRun;
+  if (!koshka::os::shell_has_controlling_terminal())
+    return selector_outcome::NotRun;
+
+  let const command_name = selector_command_name(context);
+  if (!command_name.has_value()) return selector_outcome::NotRun;
+
+  let const resolved = context.get_program_resolver().search(
+      command_name->view(), koshka::ProgramResolver::SearchMode::First,
+      koshka::ProgramResolver::Requirement::Execution,
+      koshka::ProgramResolver::CachePolicy::ReadOnly);
+  if (resolved.is_empty()) return selector_outcome::NotRun;
+
+  let const input = build_selector_input(result);
+  let const input_fd = koshka::os::write_to_temp_file(input.view());
+  if (!input_fd.has_value()) return selector_outcome::NotRun;
+
+  let const output_pipe = koshka::os::make_pipe();
+  if (!output_pipe.has_value()) {
+    koshka::os::close_fd(*input_fd);
+    return selector_outcome::NotRun;
+  }
+
+  /* execute_program owns both descriptors it is handed and closes them on every
+     path, so only the read end is released here. */
+  bool are_child_descriptors_owned = true;
+  bool is_read_end_open = true;
+  defer
+  {
+    if (are_child_descriptors_owned) {
+      koshka::os::close_fd(*input_fd);
+      koshka::os::close_fd(output_pipe->out);
+    }
+    if (is_read_end_open) koshka::os::close_fd(output_pipe->in);
+  };
+
+  let arg_locations =
+      koshka::ArrayList<koshka::SourceLocation>{koshka::heap_allocator()};
+  let selector = koshka::ExecContext::from_resolved(
+      koshka::SourceLocation{},
+      koshka::ResolvedCommand::from_program(koshka::Path{resolved[0].text()}),
+      build_selector_args(context, resolved[0]), steal(arg_locations));
+  selector.in_fd = *input_fd;
+  selector.out_fd = output_pipe->out;
+
+  koshka::flush();
+  if (::tl_begin_external_screen() != TL_SUCCESS)
+    return selector_outcome::NotRun;
+  bool is_editor_suspended = true;
+  defer
+  {
+    if (is_editor_suspended) unused(::tl_end_external_screen());
+  };
+
+  are_child_descriptors_owned = false;
+  let const child = koshka::os::execute_program(
+      selector, koshka::os::script_fallback_policy::Reject,
+      koshka::os::process_group_mode::Inherit, koshka::StringView{},
+      koshka::os::terminal_handoff::BeforeStart);
+
+  let const captured =
+      koshka::os::read_fd_to_string(output_pipe->in, koshka::heap_allocator());
+  koshka::os::close_fd(output_pipe->in);
+  is_read_end_open = false;
+
+  let const status = koshka::os::wait_and_monitor_process(child);
+  koshka::os::reclaim_controlling_terminal();
+  /* A cancelled picker exits nonzero, and its own SIGINT must not abort the
+     next command the way an interrupted prompt would. */
+  koshka::os::INTERRUPT_REQUESTED = 0;
+
+  is_editor_suspended = false;
+  if (::tl_end_external_screen() != TL_SUCCESS) return selector_outcome::NotRun;
+
+  /* A picker reports 0 for a selection, 1 when nothing matched, and 130 when it
+     was dismissed. Only a status it never uses for either, such as a failure to
+     start, falls back to the printed list. */
+  if (status != 0)
+    return status == 1 || status == 130 ? selector_outcome::Dismissed
+                                        : selector_outcome::NotRun;
+  if (!captured.has_value()) return selector_outcome::NotRun;
+
+  let selected = parse_selector_reply(captured->view());
+  if (selected.is_empty()) return selector_outcome::Dismissed;
+
+  /* Several picks join into one replacement, the same shape the inline glob
+     expansion produces, so the token is rewritten once. */
+  let replacement = koshka::String{koshka::heap_allocator()};
+  for (usize i = 0; i < selected.count(); i++) {
+    if (i > 0) replacement.push(' ');
+    replacement.append(selected[i].view());
+  }
+
+  result.candidates.clear();
+  result.descriptions.clear();
+  result.longest_common_prefix =
+      koshka::String{koshka::heap_allocator(), replacement.view()};
+  result.candidates.push(steal(replacement));
+  result.candidate_count = 1;
+  return selector_outcome::Selected;
+}
+
 /* Toiletline edits in codepoints while the completion engine works in bytes. */
 fn kosh_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out, int for_listing) -> int
@@ -156,6 +379,21 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
         COMPLETION_CONTEXT->get_program_resolver().end_explicit_completion();
     };
 
+    /* A completion spec can shell out, and a command talking to an unreachable
+       host blocks until its own timeout. Raw mode swallows the interrupt key as
+       an ordinary byte, so it is handed back to the terminal for the length of
+       the completion and reaches that command as SIGINT the way it would at a
+       prompt. The ghost path runs no spec, so it is left alone. */
+    let const are_signal_keys_enabled =
+        is_explicit_completion && ::tl_set_signal_keys(1) == TL_SUCCESS;
+    defer
+    {
+      if (are_signal_keys_enabled) unused(::tl_set_signal_keys(0));
+      /* An interrupt belongs to the abandoned completion, not to whatever the
+         user types next. */
+      koshka::os::INTERRUPT_REQUESTED = 0;
+    };
+
     const usize byte_length = std::strlen(buffer);
     let line = koshka::StringView{buffer, byte_length};
 
@@ -178,6 +416,19 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
     DEBUG_COMPLETION_MATERIALIZED_COUNT += result.materialized_candidate_count;
 #endif
     koshka::arm_message_leading_newline(false);
+
+    /* An abandoned completion offers nothing, so the key leaves the line as it
+       was rather than acting on whatever the interrupted spec had produced. */
+    if (koshka::os::INTERRUPT_REQUESTED) return 0;
+
+    /* An explicit tab may route the candidates through a filtering picker
+       first. The ghost never does, since it draws no list and must not fork. */
+    if (is_explicit_completion &&
+        run_completion_selector(*COMPLETION_CONTEXT, *COMPLETION_RESULT) ==
+            selector_outcome::Dismissed)
+    {
+      return 0;
+    }
 
     if (result.candidate_count == 0) return 0;
 

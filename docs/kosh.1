@@ -1712,6 +1712,16 @@ smart-case and subsequence matches. An empty command position includes
 keywords, builtins, functions, aliases, koshkit utilities, and programs from
 PATH. An exact prefix ranks before a subsequence match.
 .PP
+An explicit Tab prints the candidates below the prompt. When
+.B KOSH_FZF_COMPLETION
+is enabled and more than one candidate remains, the candidates are handed to
+the selector named by
+.B KOSH_FZF_COMPLETION_COMMAND
+and what it prints replaces the token. The editor leaves raw mode while the
+selector owns the terminal, then repaints the prompt. The printed list is kept
+when the selector is cancelled or missing, when one candidate remains, and when
+the session has no controlling terminal.
+.PP
 Completion identifies the command segment at the cursor across quoted
 separators, command substitutions, and here-document bodies. Directory prefixes
 that use quotes, escapes, variables, or tildes retain their typed form. An
@@ -1837,6 +1847,14 @@ The value names the z frecency store. The default is
 .TP
 .B KOSH_CALC_HISTORY
 The value names interactive calc history. The default is ~/.kosh_calc_history.
+.TP
+.BR KOSH_FZF_COMPLETION ", " KOSH_FZF_COMPLETION_COMMAND ", " KOSH_FZF_COMPLETION_OPTS
+A value other than empty or 0 in KOSH_FZF_COMPLETION routes the candidates of an
+explicit Tab through an interactive selector. KOSH_FZF_COMPLETION_COMMAND names
+that program and defaults to
+.BR fzf .
+KOSH_FZF_COMPLETION_OPTS supplies further options, split on blanks with no
+expansion, and they follow the built-in ones so they win.
 .TP
 .BR ENV ", " BASH_ENV
 These variables select startup files under the conditions in

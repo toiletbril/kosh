@@ -244,6 +244,15 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
                                             os::process_id_of(p));
     cxt.notify_stopped_job(id, command.view());
   }
+  /* A foreground child owns the terminal, so an interrupt reaches it alone and
+     the shell reads only its status. That is right at a prompt, where the next
+     command is the user's own, but a completion spec has no prompt behind it,
+     so its remaining commands would run against a half-finished answer and
+     offer it as if nothing had happened. The interrupt is therefore raised
+     here, which unwinds the spec and turns the key into a cancelled
+     completion. */
+  if (foreground_status == 130 && cxt.is_completion_function_running())
+    os::INTERRUPT_REQUESTED = 1;
   return foreground_status;
 }
 
