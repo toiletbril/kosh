@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the command builtin builtin.
+ * The command builtin runs a command past a same-named function.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -157,7 +165,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const *source = cxt.current_source();
     sub = ExecContext::make_from(
         ec.source_location(), source != nullptr ? source->view() : StringView{},
-        steal(operand_args), cxt.mood(), cxt.koshkit(), resolver,
+        steal(operand_args), cxt.mood(), cxt.koshkit(),
+        cxt.is_shopt_enabled("checkhash"), resolver,
         steal(operand_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     LOG(Debug, "command handled a resolution error: %s",

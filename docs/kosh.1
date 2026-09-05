@@ -819,6 +819,10 @@ command or using the
 .B hash
 builtin caches its resolved program path. A change to the contents of any PATH
 directory clears every cached path.
+.B hash -r
+forgets cached command locations.
+.B hash -R
+forgets them and immediately rebuilds the PATH command index.
 .PP
 A command path ending in a directory separator fails with status 126 when the
 typed target is not a directory. Components are resolved in order. An

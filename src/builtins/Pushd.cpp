@@ -1,3 +1,14 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the pushd builtin. The pushd
+ * builtin saves the current directory on the stack and changes to dir. With
+ * no argument it swaps the top two directories. With +N it rotates the stack
+ * so the Nth entry from the top becomes the current directory, and with -N
+ * it counts from the bottom.
+ */
+
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

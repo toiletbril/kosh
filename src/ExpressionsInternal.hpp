@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file declares private command-analysis, source-following, resolution,
+ * glob, and location helpers shared by expression source files. It keeps
+ * cross-file implementation details out of the public syntax-tree interface.
+ */
+
 #pragma once
 
 #include "Common.hpp"

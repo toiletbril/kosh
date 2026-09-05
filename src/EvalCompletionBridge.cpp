@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file connects evaluator-owned completion specifications with
+ * completion functions and COMPREPLY execution. It isolates completion
+ * dependencies from the evaluator core while preserving runtime state.
+ */
+
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"

@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the kill builtin. The kill
+ * builtin sends a signal to a job or process.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"

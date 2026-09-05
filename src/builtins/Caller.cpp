@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the caller builtin. The caller
+ * builtin prints the calling context of a function or a sourced file, and
+ * returns zero in a call and one at the top level.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"

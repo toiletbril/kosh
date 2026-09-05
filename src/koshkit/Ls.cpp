@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the ls utility in koshkit. The
+ * ls utility lists the names in each directory.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

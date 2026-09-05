@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements platform-independent os wrappers, shared process
+ * ownership, signal state, regular expressions, numeric helpers, and file
+ * creation masks. It selects the POSIX or Win32 implementation at compile time.
+ */
+
 #include "Platform.hpp"
 
 namespace koshka {
@@ -34,6 +43,45 @@ static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
 
 namespace koshka {
 namespace os {
+
+subshell_bootstrap::subshell_bootstrap(subshell_bootstrap &&other) noexcept
+    : payload(steal(other.payload)), processes(steal(other.processes)),
+      source_length(other.source_length), owns_processes(other.owns_processes)
+{
+  other.source_length = 0;
+  other.owns_processes = false;
+}
+
+subshell_bootstrap::~subshell_bootstrap() { close_owned_processes(); }
+
+fn subshell_bootstrap::operator=(subshell_bootstrap &&other) noexcept
+    -> subshell_bootstrap &
+{
+  if (this == &other) return *this;
+
+  close_owned_processes();
+  payload = steal(other.payload);
+  processes = steal(other.processes);
+  source_length = other.source_length;
+  owns_processes = other.owns_processes;
+  other.source_length = 0;
+  other.owns_processes = false;
+  return *this;
+}
+
+fn subshell_bootstrap::release_process_ownership() wontthrow -> void
+{
+  owns_processes = false;
+}
+
+fn subshell_bootstrap::close_owned_processes() wontthrow -> void
+{
+  if (!owns_processes) return;
+
+  for (let const process : processes)
+    close_process_reference(process);
+  owns_processes = false;
+}
 
 fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
     -> u64

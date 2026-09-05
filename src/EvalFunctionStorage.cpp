@@ -1,6 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements function storage evaluation. It applies the
+ * corresponding shell semantics through EvalContext while preserving state,
+ * source locations, and allocation ownership.
+ */
+
 #include "Allocator.hpp"
 #include "Debug.hpp"
-#include "EvalTypes.hpp"
+#include "Eval.hpp"
 
 namespace koshka {
 

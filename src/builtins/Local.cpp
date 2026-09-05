@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the local builtin. The local
+ * builtin declares each named variable local to the current function.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -120,7 +128,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         is_append && cxt.is_local_in_current_scope(name);
     LOG(All, "local declaring '%.*s' in the function scope",
         static_cast<int>(name.length), name.data);
-    cxt.declare_local(name);
+    cxt.declare_local(
+        name, !cxt.is_bash_compatible() ||
+                  cxt.is_shopt_enabled(shopt_option_id::LocalvarInherit));
     if (should_mark_integer) cxt.mark_integer(name);
 
     if (should_make_associative) {

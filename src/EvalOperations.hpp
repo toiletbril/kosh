@@ -1,21 +1,19 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file declares evaluator operations shared with parser, optimizer, and
+ * startup code, including constant arithmetic, source moods, glob checks, and
+ * assignment helpers. It avoids pulling the full evaluator into those owners.
+ */
+
 #pragma once
 
 #include "Arena.hpp"
-#include "Bitset.hpp"
-#include "Builtin.hpp"
 #include "Common.hpp"
 #include "Containers.hpp"
-#include "Errors.hpp"
-#include "EvalSnapshot.hpp"
-#include "EvalTypes.hpp"
-#include "ExecContext.hpp"
 #include "Maybe.hpp"
 #include "MimicMood.hpp"
-#include "Path.hpp"
-#include "Platform.hpp"
-#include "ProgramResolver.hpp"
-#include "ResolvedCommand.hpp"
-#include "RuntimeState.hpp"
 
 namespace koshka {
 

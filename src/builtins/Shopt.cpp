@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the shopt builtin. The shopt
+ * builtin sets, unsets, and queries the bash shell options.
+ */
+
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
@@ -133,6 +141,13 @@ constexpr PackedStringKey SHOPT_OPTION_KEYS[] = {
 constexpr StaticStringSet SHOPT_OPTIONS{SHOPT_OPTION_KEYS};
 static_assert(countof(SHOPT_OPTION_KEYS) <= 64);
 
+consteval fn compact_shopt_option_index(PackedStringKey key) wontthrow -> u8
+{
+  for (usize index = 0; index < countof(SHOPT_OPTION_KEYS); index++)
+    if (SHOPT_OPTIONS.keys[index] == key) return static_cast<u8>(index);
+  return 0;
+}
+
 pure fn is_known_shopt_option(StringView name) wontthrow -> bool
 {
   return SHOPT_OPTIONS.contains(name);
@@ -183,6 +198,27 @@ pure fn shopt_option_index(StringView name) wontthrow -> Maybe<u8>
   return Maybe<u8>{static_cast<u8>(*index)};
 }
 
+pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8
+{
+  switch (option) {
+  case shopt_option_id::Checkhash:
+    return compact_shopt_option_index(SSK("checkhash"));
+  case shopt_option_id::InheritErrexit:
+    return compact_shopt_option_index(SSK("inherit_errexit"));
+  case shopt_option_id::Lastpipe:
+    return compact_shopt_option_index(SSK("lastpipe"));
+  case shopt_option_id::LocalvarInherit:
+    return compact_shopt_option_index(SSK("localvar_inherit"));
+  case shopt_option_id::Progcomp:
+    return compact_shopt_option_index(SSK("progcomp"));
+  case shopt_option_id::ProgcompAlias:
+    return compact_shopt_option_index(SSK("progcomp_alias"));
+  case shopt_option_id::Sourcepath:
+    return compact_shopt_option_index(SSK("sourcepath"));
+  }
+  return 0;
+}
+
 fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {
   static ArrayList<StringView> names = [] throws {
@@ -193,15 +229,6 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
     return collected;
   }();
   return names;
-}
-
-fn shopt_reusable_lines(const EvalContext &cxt) throws -> String
-{
-  let lines = String{heap_allocator()};
-  for (let const name : shopt_option_name_list())
-    lines += shopt_reusable_line(name, cxt.is_shopt_enabled(name), false,
-                                 heap_allocator());
-  return lines;
 }
 
 Shopt::Shopt() = default;

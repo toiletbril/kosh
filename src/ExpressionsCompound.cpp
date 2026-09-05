@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements compound expression behavior. It connects syntax-tree
+ * analysis and optimization with runtime evaluation and precise source
+ * locations.
+ */
+
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
@@ -429,9 +438,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   os::descriptor last_stdin = KOSH_INVALID_FD;
   i64 process_group_id = 0;
   let pending_pipe = Maybe<os::Pipe>{};
-  let bootstrap_source = String{heap_allocator()};
-  if (!os::can_fork_evaluator())
-    bootstrap_source = cxt.subshell_bootstrap_source();
+  let parent_stage_status = Maybe<i32>{};
+  let bootstrap = os::subshell_bootstrap{};
+  let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
+  if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
 
   /* On a make_pipe or fork failure mid-loop the previous read end and the
      current pipe are closed and every spawned child is waited, then the error
@@ -446,6 +456,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
 
       let const is_first = (stage_index == 0);
       let const is_last = (stage_index + 1 == m_commands.count());
+      let const should_run_in_parent =
+          is_last && !is_async() && cxt.is_bash_compatible() &&
+          cxt.is_shopt_enabled(shopt_option_id::Lastpipe) &&
+          !cxt.shell_option_state(shell_option_id::Monitor);
 
       let stage_in = Maybe<os::descriptor>{};
       let stage_out = Maybe<os::descriptor>{};
@@ -461,6 +475,27 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         pending_pipe = pipe;
       }
       if (!is_first) stage_in = last_stdin;
+
+      if (should_run_in_parent) {
+        let saved_stdin = os::saved_descriptor{};
+        if (stage_in.has_value()) {
+          saved_stdin = os::save_and_replace_descriptor(0, *stage_in);
+          os::close_fd(*stage_in);
+          last_stdin = KOSH_INVALID_FD;
+          if (!saved_stdin.is_dup2_ok) {
+            throw ErrorWithLocation{stage->source_location(),
+                                    "Could not connect the pipeline input"};
+          }
+        }
+        defer
+        {
+          if (stage_in.has_value()) os::restore_descriptor(saved_stdin);
+        };
+        cxt.set_in_pipeline_stage(true);
+        defer { cxt.set_in_pipeline_stage(false); };
+        parent_stage_status = static_cast<i32>(stage->evaluate(cxt));
+        continue;
+      }
 
       let const stage_location = stage->source_location();
       let const stage_source = cxt.current_source();
@@ -481,7 +516,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const launch = os::launch_compound_stage(
           stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{},
-          process_group, process_group_id, bootstrap_source.view(),
+          process_group, process_group_id,
+          should_launch_fresh_evaluator ? &bootstrap : nullptr,
           cxt.shell_name(), cxt.last_exit_status(), os::get_shell_process_id(),
           cxt.get_subshell_depth() + 1);
       let const child = launch.child;
@@ -577,6 +613,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           os::wait_and_monitor_process(children[waited_child_count]);
       stage_status.push(status);
       pipe_status.push(String::from(status, heap_allocator()));
+    }
+    if (parent_stage_status.has_value()) {
+      stage_status.push(*parent_stage_status);
+      pipe_status.push(String::from(*parent_stage_status, heap_allocator()));
     }
   } catch (...) {
     utils::terminate_and_reap_processes(children, waited_child_count);
@@ -697,6 +737,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
           e->source_location(),
           source != nullptr ? source->view() : StringView{}, steal(stage_args),
           cxt.mood(), cxt.koshkit_utilities_are_reachable(),
+          cxt.is_shopt_enabled(shopt_option_id::Checkhash),
           cxt.get_program_resolver(), steal(stage_arg_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       report_command_resolution_error(cxt, resolution_error);

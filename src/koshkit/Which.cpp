@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the which utility in koshkit.
+ * The which utility prints how each named program resolves.
+ */
+
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

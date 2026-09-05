@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the tee utility in koshkit.
+ * The tee utility copies standard input to standard output and to each named
+ * file. With -a it appends to the files. The default truncates them.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

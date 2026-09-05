@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements bump arenas and arena destructor tracking. It
+ * allocates short-lived object graphs quickly and destroys nontrivial
+ * objects when their arena is released.
+ */
+
 #pragma once
 
 #include "ArrayList.hpp"

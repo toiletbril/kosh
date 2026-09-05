@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements compact fixed-size bitsets. It stores boolean state
+ * in integer words and provides indexed tests, updates, and set operations.
+ */
+
 #pragma once
 
 #include "Allocator.hpp"

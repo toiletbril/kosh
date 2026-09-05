@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the source builtin. The source
+ * builtin runs the named file in the current shell.
+ */
+
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements shell source formatting and syntax-tree output. It
+ * walks parsed expressions, preserves source meaning, and produces
+ * normalized text or tree representations.
+ */
+
 #pragma once
 
 #include "Arena.hpp"

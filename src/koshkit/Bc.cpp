@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the bc utility in koshkit. The
+ * bc utility evaluates decimal arithmetic statements.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
@@ -674,7 +682,7 @@ static fn bc_declare_auto(StringView statement, EvalContext &cxt,
     }
     let translated = String{allocator, "__bc_"};
     translated += name;
-    cxt.declare_local(translated.view());
+    cxt.declare_local(translated.view(), true);
     if (is_array)
       cxt.set_indexed_array(translated.view(),
                             ArrayList<String>{heap_allocator()});
@@ -778,7 +786,7 @@ static fn bc_evaluate_function_call(StringView statement, const ExecContext &ec,
   for (usize index = 0; index < function->parameters.count(); index++) {
     let translated = String{cxt.scratch_allocator(), "__bc_"};
     translated += function->parameters[index].name.view();
-    cxt.declare_local(translated.view());
+    cxt.declare_local(translated.view(), true);
     if (function->parameters[index].is_array)
       cxt.set_indexed_array(translated.view(), steal(prepared[index].array));
     else

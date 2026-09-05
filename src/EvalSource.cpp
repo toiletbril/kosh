@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements source evaluation. It applies the corresponding shell
+ * semantics through EvalContext while preserving state, source locations,
+ * and allocation ownership.
+ */
+
 #include "Arena.hpp"
 #include "Cli.hpp"
 #include "Common.hpp"
@@ -9,7 +18,6 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -566,6 +574,7 @@ fn EvalContext::resolve_source_path(StringView path,
   }
   let source_path = Path{path};
   if (os::has_directory_separator(path)) return source_path;
+  if (!is_shopt_enabled("sourcepath")) return source_path;
 
   let const path_matches =
       get_program_resolver().search(path, ProgramResolver::SearchMode::First,

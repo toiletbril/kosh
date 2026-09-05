@@ -1,3 +1,14 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the calc utility in koshkit.
+ * The calc utility joins its command-line operands into one arithmetic
+ * expression and prints the result. With no expression on a terminal it
+ * reads and evaluates expressions interactively, and a name = value line
+ * binds a variable for a later expression to read.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

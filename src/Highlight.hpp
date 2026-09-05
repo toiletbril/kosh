@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file defines semantic highlight roles, spans, and output records
+ * shared by completion, diagnostics, and interactive syntax coloring.
+ */
+
 #pragma once
 
 #include "Common.hpp"

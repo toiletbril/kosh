@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file declares small token predicates and masks shared by parser source
+ * files. It keeps hot parser helpers inline without adding them to the public
+ * Parser interface.
+ */
+
 #pragma once
 
 #include "Common.hpp"

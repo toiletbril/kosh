@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the compopt builtin. The
+ * compopt builtin accepts completion option changes with no effect.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"

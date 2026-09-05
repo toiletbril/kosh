@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements non-owning string views and byte-oriented search,
+ * slicing, comparison, parsing, and conversion helpers.
+ */
+
 #pragma once
 
 #include "Allocator.hpp"

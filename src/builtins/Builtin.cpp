@@ -1,9 +1,16 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the builtin builtin. The
+ * builtin builtin runs a shell builtin past a same-named function.
+ */
+
 #include "../Builtin.hpp"
 
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
-#include "../ResolvedCommand.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 

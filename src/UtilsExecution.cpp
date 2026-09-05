@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements execution execution helpers. It provides shared
+ * low-level operations for commands, streams, numbers, globbing, and
+ * resolution without duplicating policy owners.
+ */
+
 #include "Builtin.hpp"
 #include "Cli.hpp"
 #include "Containers.hpp"
@@ -41,6 +50,12 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
 {
   let const is_async = mode == execution_mode::Background;
   if (ec.is_builtin()) {
+    if (is_async) {
+      let contexts = ArrayList<ExecContext>{cxt.scratch_allocator()};
+      contexts.push(steal(ec));
+      return execute_contexts_with_pipes(steal(contexts), cxt, mode);
+    }
+
     LOG(Debug, "dispatching the builtin '%s'", ec.program().c_str());
     return execute_builtin(steal(ec), cxt);
   }
@@ -250,7 +265,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                execution_mode mode) throws -> i32
 {
   let const is_async = mode == execution_mode::Background;
-  ASSERT(ecs.count() > 1);
+  ASSERT(!ecs.is_empty());
 
   if (!is_async && cxt.shell_is_interactive() && cxt.startup_finished() &&
       !cxt.is_completion_function_running() && !cxt.is_prompt_command_running())
@@ -269,6 +284,18 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
   LOG(Debug, "running a pipeline of %zu stages%s", ecs.count(),
       is_async ? " in the background" : "");
+
+  let job_command = String{heap_allocator()};
+  if (is_async) {
+    for (usize stage = 0; stage < ecs.count(); stage++) {
+      if (stage > 0) job_command += " | ";
+      for (usize argument = 0; argument < ecs[stage].args().count(); argument++)
+      {
+        if (argument > 0) job_command += ' ';
+        append_shell_quoted_arg(job_command, ecs[stage].args()[argument]);
+      }
+    }
+  }
 
   i32 ret = 0;
 
@@ -304,12 +331,17 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
   bool is_first = true;
   usize stage_index = 0;
-  let bootstrap_source = String{heap_allocator()};
+  let bootstrap = os::subshell_bootstrap{};
+  bool has_bootstrap = false;
 
   for (ExecContext &ec : ecs) {
     Maybe<os::Pipe> pipe;
 
     let const is_last = (&ec == &ecs.back());
+    let const should_fork_last_builtin =
+        is_last && !is_async && cxt.is_bash_compatible() &&
+        (!cxt.is_shopt_enabled("lastpipe") ||
+         cxt.shell_option_state(shell_option_id::Monitor));
 
     if (!is_last) {
       pipe = os::make_pipe();
@@ -353,7 +385,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
-    } else if (!is_last || is_async) {
+    } else if (!is_last || is_async || should_fork_last_builtin) {
       let const source = cxt.current_source();
       let const process_group =
           !is_async ? os::process_group_mode::Inherit
@@ -367,7 +399,6 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       let preflight_message = String{cxt.scratch_allocator()};
       if (!forked_child.has_value()) {
         const usize utility_index = ec.program() == "koshkit" ? 1 : 0;
-        bool should_launch_fresh_stage = true;
         bool should_restore_environment = false;
         if (ec.builtin_kind() == Builtin::Kind::Koshkit &&
             utility_index < ec.args().count())
@@ -375,7 +406,6 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           let const utility_kind =
               koshkit::find_util(ec.args()[utility_index].view());
           if (utility_kind.has_value()) {
-            should_launch_fresh_stage = true;
             if (!is_async && *utility_kind == koshkit::Utility::Kind::Timeout) {
               preflight_status = koshkit::preflight_timeout_stage(
                   ec, cxt, utility_index, preflight_location,
@@ -386,7 +416,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           }
         }
 
-        if (should_launch_fresh_stage && !preflight_status.has_value()) {
+        if (!preflight_status.has_value()) {
           let stage_source = String{cxt.scratch_allocator()};
           if (should_restore_environment) {
             static const StringView RESTORED_ENVIRONMENT_NAMES[] = {
@@ -435,16 +465,18 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               [&]() { stage_err = stage_out.value_or(KOSH_STDOUT); },
               [&]() { stage_out = stage_err.value_or(KOSH_STDERR); });
           try {
-            if (!os::can_fork_evaluator() && bootstrap_source.is_empty()) {
-              bootstrap_source = cxt.subshell_bootstrap_source();
+            if (!os::can_fork_evaluator() && !has_bootstrap) {
+              bootstrap = cxt.make_subshell_bootstrap();
+              has_bootstrap = true;
             }
             let const launch = os::launch_compound_stage(
                 stage_source.view(), ec.in_fd, stage_out, stage_err, cxt.mood(),
                 ec.source_location(),
                 source != nullptr ? source->view() : StringView{},
-                process_group, process_group_id, bootstrap_source.view(),
-                cxt.shell_name(), cxt.last_exit_status(),
-                os::get_shell_process_id(), cxt.get_subshell_depth() + 1);
+                process_group, process_group_id,
+                has_bootstrap ? &bootstrap : nullptr, cxt.shell_name(),
+                cxt.last_exit_status(), os::get_shell_process_id(),
+                cxt.get_subshell_depth() + 1);
             forked_child = launch.child;
           } catch (...) {
             ec.close_fds();
@@ -537,8 +569,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   if (is_async) {
     if (last_child != KOSH_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
-      const i32 id = cxt.register_pipeline_job(children, last_child, "pipeline",
-                                               process_group_id);
+      const i32 id = cxt.register_pipeline_job(
+          children, last_child, job_command.view(), process_group_id);
       should_reap_children_on_unwind = false;
       if (cxt.shell_is_interactive())
         koshka::print_error(

@@ -1,6 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements shell process startup. It parses invocation options,
+ * selects startup files and scripts, and owns noninteractive execution and
+ * the interactive loop.
+ */
+
 #include "Arena.hpp"
 #include "Cli.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Common.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
@@ -658,10 +667,12 @@ fn kosh_main(int argc, char **argv) -> int
     });
 
   koshka::os::unset_environment_variable("KOSH_IDENTITY");
-  let subshell_bootstrap = koshka::os::take_subshell_bootstrap_source();
+  let inherited_bootstrap = koshka::os::take_subshell_bootstrap();
   koshka::Maybe<i32> inherited_exit_status = koshka::None;
   koshka::Maybe<usize> inherited_subshell_depth = koshka::None;
-  if (!koshka::os::can_fork_evaluator() && !subshell_bootstrap.is_empty()) {
+  if (!koshka::os::can_fork_evaluator() &&
+      !inherited_bootstrap.payload.is_empty())
+  {
     if (let const status_text = koshka::os::get_environment_variable(
             koshka::internal::PREVIOUS_EXIT_STATUS);
         status_text.has_value())
@@ -917,11 +928,14 @@ fn kosh_main(int argc, char **argv) -> int
         context.mood() == koshka::mimic_mood::Default ? 0 : 3);
   }
 
-  if (!subshell_bootstrap.is_empty()) {
+  if (!inherited_bootstrap.payload.is_empty()) {
     try {
-      context.run_source(subshell_bootstrap.view(), "inherited shell state");
+      context.apply_subshell_bootstrap(steal(inherited_bootstrap));
     } catch (const koshka::Error &error) {
       koshka::show_message(error.to_string());
+      return 1;
+    } catch (const std::bad_alloc &) {
+      koshka::show_message("Could not allocate inherited shell state");
       return 1;
     }
   }

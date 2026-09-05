@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements Win32 process creation, argument quoting, output
+ * capture, priorities, job objects, process handles, pipelines, and fresh
+ * evaluator bootstrap. It isolates Windows process lifecycle from shared code.
+ */
+
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
@@ -367,8 +376,9 @@ static pure fn process_is_pid_reference(process p) wontthrow -> bool
 
 static pure fn process_is_group_reference(process p) wontthrow -> bool
 {
-  return (reinterpret_cast<uintptr_t>(p) & PROCESS_REFERENCE_MASK) ==
-         PROCESS_GROUP_REFERENCE_TAG;
+  return p != INVALID_HANDLE_VALUE &&
+         (reinterpret_cast<uintptr_t>(p) & PROCESS_REFERENCE_MASK) ==
+             PROCESS_GROUP_REFERENCE_TAG;
 }
 
 static pure fn pid_from_reference(process p) wontthrow -> DWORD
@@ -415,11 +425,15 @@ fn process_group_of(process p) throws -> process
                                    PROCESS_GROUP_REFERENCE_TAG);
 }
 
-fn close_process_group(process group) wontthrow -> void
+fn close_process_reference(process p) wontthrow -> void
 {
-  if (group == nullptr || !process_is_group_reference(group)) return;
-  CloseHandle(process_from_group_reference(group));
+  if (p == nullptr || p == INVALID_HANDLE_VALUE || process_is_pid_reference(p))
+    return;
+
+  if (process_is_group_reference(p)) p = process_from_group_reference(p);
+  CloseHandle(p);
 }
+
 fn process_has_id(process p, i64 id) wontthrow -> bool
 {
   return process_id_of(p) == id;
@@ -934,10 +948,10 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
 static fn spawn_subshell_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
     Maybe<descriptor> err_fd, mimic_mood mood, process_group_mode process_group,
-    bool source_traces_enabled = true, StringView bootstrap_source = {},
-    StringView shell_name = {}, i32 previous_exit_status = 0,
-    i64 shell_process_id = 0, usize subshell_depth = 0) throws
-    -> Maybe<process>;
+    bool source_traces_enabled = true,
+    const subshell_bootstrap *bootstrap = nullptr, StringView shell_name = {},
+    i32 previous_exit_status = 0, i64 shell_process_id = 0,
+    usize subshell_depth = 0) throws -> Maybe<process>;
 
 static fn make_internal_pipe_path() throws -> String
 {
@@ -946,6 +960,76 @@ static fn make_internal_pipe_path() throws -> String
           String::from(InterlockedIncrement(&INTERNAL_PIPE_SEQUENCE),
                        heap_allocator());
   return path;
+}
+
+static fn append_subshell_transport_u32(String &output, u32 value) throws
+    -> void
+{
+  for (usize byte_position = 0; byte_position < sizeof(value); byte_position++)
+    output.push(static_cast<char>((value >> (byte_position * 8U)) & 0xffU));
+}
+
+static fn append_subshell_transport_u64(String &output, u64 value) throws
+    -> void
+{
+  for (usize byte_position = 0; byte_position < sizeof(value); byte_position++)
+    output.push(static_cast<char>((value >> (byte_position * 8U)) & 0xffU));
+}
+
+static fn make_subshell_transport(const subshell_bootstrap &bootstrap,
+                                  process child) throws -> Maybe<String>
+{
+  if (bootstrap.payload.count() > MAXIMUM_SUBSHELL_TRANSPORT_LENGTH ||
+      bootstrap.processes.count() >
+          (MAXIMUM_SUBSHELL_TRANSPORT_LENGTH - bootstrap.payload.count()) /
+              sizeof(u64))
+  {
+    return koshka::None;
+  }
+
+  let transport = String{heap_allocator()};
+  append_subshell_transport_u32(transport, SUBSHELL_TRANSPORT_MAGIC);
+  append_subshell_transport_u32(transport, SUBSHELL_TRANSPORT_VERSION);
+  append_subshell_transport_u32(transport,
+                                static_cast<u32>(bootstrap.payload.count()));
+  append_subshell_transport_u32(transport, bootstrap.source_length);
+  append_subshell_transport_u32(transport,
+                                static_cast<u32>(bootstrap.processes.count()));
+  transport.append(bootstrap.payload.view());
+
+  for (let const inherited_process : bootstrap.processes) {
+    if (inherited_process == nullptr ||
+        inherited_process == INVALID_HANDLE_VALUE)
+    {
+      return koshka::None;
+    }
+
+    HANDLE source_process = inherited_process;
+    uintptr process_tag = 0;
+    if (process_is_pid_reference(inherited_process)) {
+      append_subshell_transport_u64(
+          transport,
+          static_cast<u64>(reinterpret_cast<uintptr>(inherited_process)));
+      continue;
+    }
+    if (process_is_group_reference(inherited_process)) {
+      source_process = process_from_group_reference(inherited_process);
+      process_tag = PROCESS_GROUP_REFERENCE_TAG;
+    }
+    HANDLE duplicated_process = INVALID_HANDLE_VALUE;
+    if (DuplicateHandle(GetCurrentProcess(), source_process, child,
+                        &duplicated_process, 0, FALSE,
+                        DUPLICATE_SAME_ACCESS) == FALSE)
+    {
+      return koshka::None;
+    }
+    let const child_process_value =
+        reinterpret_cast<uintptr>(duplicated_process) | process_tag;
+    append_subshell_transport_u64(transport,
+                                  static_cast<u64>(child_process_value));
+  }
+
+  return transport;
 }
 
 static fn send_internal_pipe(StringView path, StringView content,
@@ -971,7 +1055,7 @@ static fn send_internal_pipe(StringView path, StringView content,
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
                                mimic_mood mood, bool source_traces_enabled,
-                               StringView bootstrap_source,
+                               const subshell_bootstrap *bootstrap,
                                StringView shell_name, i32 previous_exit_status,
                                i64 shell_process_id,
                                usize subshell_depth) throws
@@ -1011,7 +1095,7 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
   };
   let const child = spawn_subshell_stage(
       source, None, None, None, mood, process_group_mode::Inherit,
-      source_traces_enabled, bootstrap_source, shell_name, previous_exit_status,
+      source_traces_enabled, bootstrap, shell_name, previous_exit_status,
       shell_process_id, subshell_depth);
   if (!child.has_value())
     throw Error{"Unable to run the process substitution because the inner "
@@ -1070,7 +1154,7 @@ fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
 static fn spawn_subshell_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
     Maybe<descriptor> err_fd, mimic_mood mood, process_group_mode process_group,
-    bool source_traces_enabled, StringView bootstrap_source,
+    bool source_traces_enabled, const subshell_bootstrap *bootstrap,
     StringView shell_name, i32 previous_exit_status, i64 shell_process_id,
     usize subshell_depth) throws -> Maybe<process>
 {
@@ -1167,7 +1251,8 @@ static fn spawn_subshell_stage(
 
   let bootstrap_pipe_path = String{heap_allocator()};
   let previous_bootstrap_pipe = Maybe<String>{};
-  if (!bootstrap_source.is_empty()) {
+  let const has_bootstrap = bootstrap != nullptr;
+  if (has_bootstrap) {
     bootstrap_pipe_path = make_internal_pipe_path();
     previous_bootstrap_pipe =
         get_environment_variable(internal::STATE_NAMED_PIPE);
@@ -1176,7 +1261,7 @@ static fn spawn_subshell_stage(
   }
   defer
   {
-    if (!bootstrap_source.is_empty()) {
+    if (has_bootstrap) {
       if (previous_bootstrap_pipe.has_value())
         set_environment_variable(internal::STATE_NAMED_PIPE,
                                  previous_bootstrap_pipe->view());
@@ -1196,16 +1281,25 @@ static fn spawn_subshell_stage(
                            inherited_handles, 3, process_info))
     return koshka::None;
   CloseHandle(process_info.hThread);
-  if (!bootstrap_source.is_empty() &&
-      !send_internal_pipe(bootstrap_pipe_path.view(), bootstrap_source,
-                          process_info.hProcess))
+  bool should_terminate_child = has_bootstrap;
+  defer
   {
+    if (!should_terminate_child) return;
     TerminateProcess(process_info.hProcess, 1);
     WaitForSingleObject(process_info.hProcess, INFINITE);
     record_child_process_usage(process_info.hProcess);
     CloseHandle(process_info.hProcess);
-    return koshka::None;
+  };
+  if (has_bootstrap) {
+    let transport = make_subshell_transport(*bootstrap, process_info.hProcess);
+    if (!transport.has_value() ||
+        !send_internal_pipe(bootstrap_pipe_path.view(), transport->view(),
+                            process_info.hProcess))
+    {
+      return koshka::None;
+    }
   }
+  should_terminate_child = false;
   return process_info.hProcess;
 }
 
@@ -1233,9 +1327,10 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          mimic_mood mood, SourceLocation location,
                          StringView diagnostic_source,
                          process_group_mode process_group, i64 process_group_id,
-                         StringView bootstrap_source, StringView shell_name,
-                         i32 previous_exit_status, i64 shell_process_id,
-                         usize subshell_depth) throws -> compound_stage_launch
+                         const subshell_bootstrap *bootstrap,
+                         StringView shell_name, i32 previous_exit_status,
+                         i64 shell_process_id, usize subshell_depth) throws
+    -> compound_stage_launch
 {
   unused(diagnostic_source);
   if (source.is_empty())
@@ -1244,10 +1339,9 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
         "A compound command in a pipeline is not supported on this platform"};
 
   unused(process_group_id);
-  let child = spawn_subshell_stage(source, in_fd, out_fd, err_fd, mood,
-                                   process_group, true, bootstrap_source,
-                                   shell_name, previous_exit_status,
-                                   shell_process_id, subshell_depth);
+  let child = spawn_subshell_stage(
+      source, in_fd, out_fd, err_fd, mood, process_group, true, bootstrap,
+      shell_name, previous_exit_status, shell_process_id, subshell_depth);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
                             "Could not spawn the compound pipeline stage"};
@@ -1499,9 +1593,6 @@ fn process_from_pid(i64 pid) wontthrow -> process
    runtime raises none of them, so the table is the whole of what this platform
    answers. */
 static const utils::signal_pair SIGNAL_PAIRS[] = {
-    {1,  "HUP" },
-    {2,  "INT" },
-    {3,  "QUIT"},
     {9,  "KILL"},
     {15, "TERM"},
 };

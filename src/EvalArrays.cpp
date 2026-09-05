@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements arrays evaluation. It applies the corresponding shell
+ * semantics through EvalContext while preserving state, source locations,
+ * and allocation ownership.
+ */
+
 #include "Arena.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
@@ -483,7 +492,8 @@ fn EvalContext::unset_array_element(StringView name,
   }
 }
 
-fn EvalContext::declare_local(StringView name) throws -> void
+fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
+    -> void
 {
   if (m_local_scope_depth == 0) return;
   if (is_readonly(name))
@@ -527,10 +537,10 @@ fn EvalContext::declare_local(StringView name) throws -> void
     }
   }
 
-  /* A local starts with no attributes, so the integer and read-only marks are
-     dropped here and the saved flags put them back when the scope ends. */
+  /* A fresh local drops the integer attribute. An inherited local keeps it.
+     The saved flag restores the caller's state when the scope ends. */
   let const previous_was_integer = is_integer_variable(name);
-  if (previous_was_integer) unmark_integer(name);
+  if (previous_was_integer && !should_inherit_value) unmark_integer(name);
 
   let const previous_was_readonly = is_readonly(name);
   if (previous_was_readonly) unmark_readonly(name);
@@ -554,11 +564,17 @@ fn EvalContext::declare_local(StringView name) throws -> void
       previous_was_associative, previous_was_integer, previous_was_readonly,
       previous_was_exported});
 
-  /* The live array forms are cleared so a local array starts empty. The scalar
-     value is left in place, so a value-less local keeps the caller's value. */
-  m_indexed_arrays.erase(name);
-  clear_sparse_array(name);
-  clear_associative_array(name);
+  if (!should_inherit_value) {
+    force_unset_shell_variable(name);
+    if (previous_was_exported) mark_exported(name);
+  }
+
+  /* The live array forms are cleared so a local array starts empty. */
+  if (!should_inherit_value) {
+    m_indexed_arrays.erase(name);
+    clear_sparse_array(name);
+    clear_associative_array(name);
+  }
 }
 
 hot fn EvalContext::expand_variable(StringView name) const throws -> String

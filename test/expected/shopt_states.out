@@ -25,3 +25,33 @@ rc=1
 == -o queries a set option name:
 noexec              	off
 rc=1
+== sourcepath controls PATH lookup:
+path
+on=0
+local
+off=0
+== inherit_errexit controls command substitutions:
+off=0:kept
+off-rc=0
+on-rc=1
+== lastpipe controls the final builtin:
+default=<>
+lastpipe=<y>
+monitor=<y>
+group=<group>
+function=<function>
+== localvar_inherit controls bare locals:
+value=<> set=
+value=<outer> set=x
+integer=5
+declare -x exported
+array=one two
+== checkhash controls cached command validation:
+first
+4:1: error: Unable to execute `.test-work/checkhash-first/checkhash-probe`: No such file or directory.
+     4 |  checkhash-probe
+       |  ^~~~~~~~~~~~~~~
+off=127
+second
+on=0
+rehash=0

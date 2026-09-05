@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the assimilate builtin. The
+ * assimilate builtin installs this shell on a remote SSH target.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"

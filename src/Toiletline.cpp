@@ -1,9 +1,18 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the shell interface to the vendored interactive
+ * editor. It owns prompts, history, completion, highlighting, key handling,
+ * and terminal-state integration.
+ */
+
 /* The toiletline configuration macros are defined here, so Toiletline.hpp is
    not included. */
 
 #include "Allocator.hpp"
 #include "Cli.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"

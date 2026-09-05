@@ -1,5 +1,13 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the cat utility in koshkit.
+ * The cat utility writes each file to standard output.
+ */
+
 #include "../Cli.hpp"
-#include "../Colors.hpp"
+#include "../CliColors.hpp"
 #include "../Completion.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"

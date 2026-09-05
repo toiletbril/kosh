@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements simple command eval expression behavior. It connects
+ * syntax-tree analysis and optimization with runtime evaluation and precise
+ * source locations.
+ */
+
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
@@ -787,6 +796,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     resolved_ec = ExecContext::make_from(
         source_location(), source != nullptr ? source->view() : StringView{},
         steal(program_args), cxt.mood(), cxt.koshkit_utilities_are_reachable(),
+        cxt.is_shopt_enabled(shopt_option_id::Checkhash),
         cxt.get_program_resolver(), steal(program_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);
@@ -846,7 +856,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     for (let const &assignment : m_array_args) {
       if (is_local || is_function_local) {
-        cxt.declare_local(assignment.name);
+        cxt.declare_local(assignment.name, true);
       }
       if (should_mark_integer) cxt.mark_integer(assignment.name);
       if (should_unmark_integer) cxt.unmark_integer(assignment.name);

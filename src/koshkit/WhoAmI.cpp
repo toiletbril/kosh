@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the who am i utility in
+ * koshkit. The whoami utility prints the name of the effective user.
+ */
+
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

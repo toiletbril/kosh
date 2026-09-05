@@ -27,6 +27,9 @@ changes update this file.
 - Prefer names to comments. C and C++ comments use `/* ... */`. Brace conditions
   containing `&&` or `||`. Separate logical blocks, loops, and returns with blank
   lines.
+- Every project-owned C and C++ file starts with the boxed top-level license
+  notice and a sentence naming that file's responsibility. Do not add it to
+  vendored files.
 - Use a static table for three or more name comparisons and a switch for hot
   leading-byte dispatch. Static name tables use `consteval StaticStringMap` or
   `StaticStringSet` with SSK keys and derived byte and length filters.
@@ -55,8 +58,11 @@ changes update this file.
   mood changes. Explicit `set --mood` clears the level from `-W`, `-WW`, or
   `-WWW`.
 - Eval snapshots keep shell and shopt state, directories, the working directory,
-  and the file creation mask. Restricted behavior uses one context state.
-  BASHPID identifies forked evaluators. `$$` identifies the original shell.
+  and the file creation mask. A fresh evaluator receives replayable shell source
+  and framed structured state. Windows duplicates live process handles into the
+  authenticated child. The bootstrap owns received handles until evaluator state
+  adopts them. Restricted behavior uses one context state. BASHPID identifies
+  forked evaluators. `$$` identifies the original shell.
 - An asynchronous pipeline job owns and reaps every stage. POSIX stages share a
   process group. The last stage owns status and job output. Stream writes retry
   partial writes and reject zero-length writes while bytes remain.
@@ -161,13 +167,14 @@ changes update this file.
 ## Workflow
 
 - Read and state the matching guidance before planning, editing, review, prose,
-  and commits. Resolve guides separately. Review matching entries in
-  [MISTAKES.md](MISTAKES.md) before repeating an action.
-- Resolve the configuration directory before expanding an at-sign guidance
-  path. Do not assume that guidance is stored below the repository.
+  and commits. Resolve the configuration directory before expanding an at-sign
+  path. Reuse a current read until an edit or external change can make it stale.
+  Review matching entries in [MISTAKES.md](MISTAKES.md) before repeating an
+  action.
 - Resolve each skill path from its declared root before reading the skill.
-- Use parallel read-only research for broad work. Keep scopes disjoint. Validate
-  task names and arguments. Wait at least ten seconds.
+- Use parallel read-only research for broad work. Keep scopes disjoint between
+  agents and the main process until each agent reports. Validate task names and
+  arguments. Wait at least ten seconds.
 - Resolve files, tools, services, interpreters, options, streams, test targets,
   cleanup, and expected statuses before use. Recheck CLI options after checkout.
   Run independent probes independently.
@@ -177,31 +184,43 @@ changes update this file.
   option defaults, output order, and final status before writing the golden.
 - Bound searches by matches and bytes. Use current nonoverlapping excerpts.
   Use literal ripgrep patterns. Put `--` before dash-leading patterns. Enable
-  PCRE2 only when required. Run independent searches independently.
+  PCRE2 only when required. Resolve wildcard paths before searching, and pass
+  only existing matches. Run independent searches independently.
 - Quote shell source, use `-c` for source, put `--` before dash-leading operands,
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
 - Pass generated text through a literal `printf` format when the text contains
   percent conversions.
-- Edit with apply_patch. Use one file and concern per patch. Copy current anchors
-  and preserve escaping. Inspect failed patches. Reread after formatting or
-  concurrent work. Apply only nonempty changes.
+- Edit with apply_patch when available. Otherwise, use the exact-edit tool after
+  reading the target. Use one file, concern, and operation per path in each
+  patch. Copy current anchors and escaping. Restore deleted code from the exact
+  diff. Inspect failed patches, reread after formatting or concurrent work, and
+  apply only nonempty changes.
+- Before a bulk mechanical rewrite, count every known input form and make the
+  transformation idempotent when files may already contain the target form.
 - Copy platform argument types, helper namespaces, and ownership transfers from
   their current declarations before the first compile.
-- Print the required before-and-after table after each edit batch.
+- Print the required before-and-after table immediately after each edit batch.
+  Do not run another tool before the table is printed. After a resumed session,
+  print any pending table before the first tool call.
 
 ## Implementation
 
 - Search the owner and all callers. Inspect declarations, linkage, enums,
-  helpers, containers, packed keys, and formatters. Copy iteration syntax from
-  the same type.
+  helpers, containers, packed keys, formatters, and iteration syntax. Use an
+  unrestricted literal source search before deleting a shared symbol.
 - Complete interface, type, field, and container migrations across all uses and
   aggregate initializers before compiling. Check overloads, result types,
   explicit template instantiations, parameter use, widths, local scope, switch
-  case scopes, and standard helper declarations.
+  case scopes, and standard helper declarations. Repeat the unrestricted
+  literal symbol search after the edit.
+- Write and read framed fields in identical order. Review both sides together
+  whenever a framed format changes.
 - Parse internal control markers by their complete validated value. Do not infer
   different values from a shared prefix.
+- Verify option defaults against the reference shell. Resolve compact option
+  identifiers through the canonical packed table instead of declaration order.
 - Keep borrowed views within owner lifetimes. Prove bounds, spans, offsets,
   lengths, optionals, and static evidence. Install restoration guards before
   mutation.
@@ -237,6 +256,8 @@ changes update this file.
 - Assert exact streams, statuses, punctuation, source, carets, and log arguments.
   Use distinct fixture names. CLI fixtures cover runtime output. Native fixtures
   also emit lexer and syntax tree output.
+- Run ordering assertions against clean state before unrelated entries can
+  affect container iteration.
 - Disable unrelated analysis when a probe isolates runtime behavior.
 - Trace native creation and open requests before changing platform access,
   sharing, or security. Verify both payload and status in every direction.
@@ -245,6 +266,9 @@ changes update this file.
 - Trace each platform child transition before asserting shared subshell state.
 - Use explicit koshkit dispatch unless bare lookup is under test. Koshkit rm
   uses `--dry-run`.
+- Verify bundled utility options before using them in fixtures. Prefer shell
+  syntax for simple assertions. Keep fixture control flow exhaustive and free
+  of unrelated diagnostics.
 - Language server probes initialize first, redirect the emitter, drain output,
   and keep final status. Debug completion and highlighting receive source through
   their debug option without `-c`.

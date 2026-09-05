@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the suspend builtin. The
+ * suspend builtin stops the shell until a SIGCONT is received.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -52,7 +60,12 @@ fn Suspend::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let const signal_number = os::signal_number_from_name(StringView{"STOP"});
-  ASSERT(signal_number.has_value());
+  if (!signal_number.has_value()) {
+    report_soft_builtin_error(ec, cxt, ec.source_location(),
+                              "Unable to suspend the shell",
+                              "This platform does not support SIGSTOP");
+    return 1;
+  }
 
   let const self_pid = os::get_shell_process_id();
   let const self_process = os::process_from_pid(self_pid);

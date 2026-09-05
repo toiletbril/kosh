@@ -1,6 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements variables evaluation. It applies the corresponding
+ * shell semantics through EvalContext while preserving state, source
+ * locations, and allocation ownership.
+ */
+
 #include "Arena.hpp"
 #include "Cli.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Common.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
@@ -12,7 +21,6 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"

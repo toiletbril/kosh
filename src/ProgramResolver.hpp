@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file defines command resolution and PATH caches. It tracks executable
+ * directory indexes, remembered commands, invalidation, and forced cache
+ * rebuilding.
+ */
+
 #pragma once
 
 #include "Arena.hpp"
@@ -10,8 +19,6 @@
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
-#include "RuntimeState.hpp"
 
 namespace koshka {
 
@@ -32,6 +39,7 @@ public:
     Bypass,
     ReadOnly,
     Remember,
+    RememberUnchecked,
   };
 
   enum class Status : u8

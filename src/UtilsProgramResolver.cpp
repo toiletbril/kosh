@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements program resolver execution helpers. It provides
+ * shared low-level operations for commands, streams, numbers, globbing, and
+ * resolution without duplicating policy owners.
+ */
+
 #include "Builtin.hpp"
 #include "Cli.hpp"
 #include "Containers.hpp"
@@ -904,7 +913,10 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
         }
         if (is_match) {
           result.push(try_path);
-          if (cache_policy == CachePolicy::Remember && is_runnable) {
+          if ((cache_policy == CachePolicy::Remember ||
+               cache_policy == CachePolicy::RememberUnchecked) &&
+              is_runnable)
+          {
             cache_resolved_path(key, try_path, suffix.extension, true);
           }
           return result;
@@ -924,7 +936,10 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
         if (is_match) result.push(full_path);
       } else if (is_match) {
         result.push(full_path);
-        if (cache_policy == CachePolicy::Remember && is_runnable) {
+        if ((cache_policy == CachePolicy::Remember ||
+             cache_policy == CachePolicy::RememberUnchecked) &&
+            is_runnable)
+        {
           cache_resolved_path(key, full_path, name_info.extension, false);
         }
         return result;
@@ -973,7 +988,9 @@ hot fn ProgramResolver::search(StringView program_name, SearchMode search_mode,
     let result = ArrayList<Path>{heap_allocator()};
     let const path = find_cached_program_path(*cached, name_info.extension);
     if (path != nullptr) {
-      if (!path->is_regular_file() || !path->is_executable()) {
+      if (cache_policy != CachePolicy::RememberUnchecked &&
+          (!path->is_regular_file() || !path->is_executable()))
+      {
         m_execution_cache.erase(stem);
         return resolve_along_path(program_name, SearchMode::First, requirement,
                                   cache_policy, path_override);

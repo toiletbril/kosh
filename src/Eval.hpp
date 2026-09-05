@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements core evaluation. It applies the corresponding shell
+ * semantics through EvalContext while preserving state, source locations,
+ * and allocation ownership.
+ */
+
 #pragma once
 
 #include "Arena.hpp"
@@ -6,17 +15,253 @@
 #include "Common.hpp"
 #include "Containers.hpp"
 #include "Errors.hpp"
-#include "EvalOperations.hpp"
-#include "EvalSnapshot.hpp"
-#include "EvalTypes.hpp"
-#include "ExecContext.hpp"
 #include "Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+
+namespace koshka {
+
+class EvalContext;
+
+class ResolvedCommand
+{
+public:
+  enum class Kind : u8
+  {
+    Builtin,
+    Program,
+    Unresolved,
+  };
+
+  Kind kind{Kind::Program};
+  Builtin::Kind builtin_kind{};
+  Path program_path{};
+  i32 unresolved_status{127};
+
+  mustuse static ResolvedCommand from_builtin(Builtin::Kind chosen_builtin)
+  {
+    ResolvedCommand resolved{};
+    resolved.kind = Kind::Builtin;
+    resolved.builtin_kind = chosen_builtin;
+    return resolved;
+  }
+
+  mustuse static ResolvedCommand from_program(Path path)
+  {
+    ResolvedCommand resolved{};
+    resolved.kind = Kind::Program;
+    resolved.program_path = steal(path);
+    return resolved;
+  }
+
+  mustuse static ResolvedCommand from_unresolved(i32 resolution_status)
+  {
+    ResolvedCommand resolved{};
+    resolved.kind = Kind::Unresolved;
+    resolved.unresolved_status = resolution_status;
+    return resolved;
+  }
+
+  mustuse bool is_builtin() const { return kind == Kind::Builtin; }
+  mustuse bool is_unresolved() const { return kind == Kind::Unresolved; }
+};
+
+enum class shell_option_id : u8
+{
+  Errexit,
+  Xtrace,
+  Nounset,
+  Pipefail,
+  Allexport,
+  Noclobber,
+  Noglob,
+  Noexec,
+  ExtendedArithmetic,
+  Koshkit,
+  Monitor,
+  Failglob,
+  Notify,
+  Vi,
+  Emacs,
+  Hashall,
+  Verbose,
+  Keyword,
+  Errtrace,
+  Functrace,
+  Braceexpand,
+  Physical,
+  Mimicry,
+  Privileged,
+  Restricted,
+  ShowAst,
+  ShowLexedWords,
+  ShowExitCode,
+  ShowStats,
+  ShowMemory,
+  Count,
+};
+
+class RuntimeState
+{
+public:
+  mimic_mood mood{mimic_mood::Default};
+  u8 warning_level{0};
+
+private:
+  enum class Flag : u8
+  {
+    DiagnosticsDisabled = 1U << 0,
+    AnnoyingDiagnosticsEnabled = 1U << 1,
+    ErrorUnsetExplicit = 1U << 2,
+    PipefailExplicit = 1U << 3,
+    FailglobExplicit = 1U << 4,
+    ExtendedArithmeticExplicit = 1U << 5,
+  };
+
+  u8 m_flags{static_cast<u8>(Flag::AnnoyingDiagnosticsEnabled)};
+
+public:
+  u64 shell_options{option_mask(shell_option_id::ExtendedArithmetic) |
+                    option_mask(shell_option_id::Failglob) |
+                    option_mask(shell_option_id::Hashall) |
+                    option_mask(shell_option_id::Braceexpand)};
+
+  pure fn is_diagnostics_disabled() const wontthrow -> bool;
+  fn set_diagnostics_disabled(bool enabled) wontthrow -> void;
+  pure fn is_annoying_diagnostics_enabled() const wontthrow -> bool;
+  fn set_annoying_diagnostics_enabled(bool enabled) wontthrow -> void;
+  pure fn was_error_unset_set_explicitly() const wontthrow -> bool;
+  fn set_error_unset_set_explicitly(bool enabled) wontthrow -> void;
+  pure fn was_pipefail_set_explicitly() const wontthrow -> bool;
+  fn set_pipefail_set_explicitly(bool enabled) wontthrow -> void;
+  pure fn was_failglob_set_explicitly() const wontthrow -> bool;
+  fn set_failglob_set_explicitly(bool enabled) wontthrow -> void;
+  pure fn was_extended_arithmetic_set_explicitly() const wontthrow -> bool;
+  fn set_extended_arithmetic_set_explicitly(bool enabled) wontthrow -> void;
+
+  pure static constexpr fn option_mask(shell_option_id option) wontthrow -> u64
+  {
+    return u64{1} << static_cast<u8>(option);
+  }
+
+  pure fn option_is_enabled(shell_option_id option) const wontthrow -> bool
+  {
+    return (shell_options & option_mask(option)) != 0;
+  }
+
+  pure fn koshkit_utilities_are_reachable() const wontthrow -> bool
+  {
+    return option_is_enabled(shell_option_id::Koshkit) ||
+           mood == mimic_mood::Default;
+  }
+
+  fn set_option(shell_option_id option, bool enabled) wontthrow -> void
+  {
+    if (enabled)
+      shell_options |= option_mask(option);
+    else
+      shell_options &= ~option_mask(option);
+  }
+
+  mustuse static fn capture(const EvalContext &context) wontthrow
+      -> RuntimeState;
+  fn restore(EvalContext &context) const wontthrow -> void;
+
+private:
+  pure fn has_flag(Flag flag) const wontthrow -> bool
+  {
+    return (m_flags & static_cast<u8>(flag)) != 0;
+  }
+  fn set_flag(Flag flag, bool enabled) wontthrow -> void
+  {
+    if (enabled)
+      m_flags |= static_cast<u8>(flag);
+    else
+      m_flags &= static_cast<u8>(~static_cast<u8>(flag));
+  }
+};
+
+static_assert(sizeof(RuntimeState) == 16);
+
+inline pure fn RuntimeState::is_diagnostics_disabled() const wontthrow -> bool
+{
+  return has_flag(Flag::DiagnosticsDisabled);
+}
+
+inline fn RuntimeState::set_diagnostics_disabled(bool enabled) wontthrow -> void
+{
+  set_flag(Flag::DiagnosticsDisabled, enabled);
+}
+
+inline pure fn RuntimeState::is_annoying_diagnostics_enabled() const wontthrow
+    -> bool
+{
+  return has_flag(Flag::AnnoyingDiagnosticsEnabled);
+}
+
+inline fn RuntimeState::set_annoying_diagnostics_enabled(bool enabled) wontthrow
+    -> void
+{
+  set_flag(Flag::AnnoyingDiagnosticsEnabled, enabled);
+}
+
+inline pure fn RuntimeState::was_error_unset_set_explicitly() const wontthrow
+    -> bool
+{
+  return has_flag(Flag::ErrorUnsetExplicit);
+}
+
+inline fn RuntimeState::set_error_unset_set_explicitly(bool enabled) wontthrow
+    -> void
+{
+  set_flag(Flag::ErrorUnsetExplicit, enabled);
+}
+
+inline pure fn RuntimeState::was_pipefail_set_explicitly() const wontthrow
+    -> bool
+{
+  return has_flag(Flag::PipefailExplicit);
+}
+
+inline fn RuntimeState::set_pipefail_set_explicitly(bool enabled) wontthrow
+    -> void
+{
+  set_flag(Flag::PipefailExplicit, enabled);
+}
+
+inline pure fn RuntimeState::was_failglob_set_explicitly() const wontthrow
+    -> bool
+{
+  return has_flag(Flag::FailglobExplicit);
+}
+
+inline fn RuntimeState::set_failglob_set_explicitly(bool enabled) wontthrow
+    -> void
+{
+  set_flag(Flag::FailglobExplicit, enabled);
+}
+
+inline pure fn
+RuntimeState::was_extended_arithmetic_set_explicitly() const wontthrow -> bool
+{
+  return has_flag(Flag::ExtendedArithmeticExplicit);
+}
+
+inline fn
+RuntimeState::set_extended_arithmetic_set_explicitly(bool enabled) wontthrow
+    -> void
+{
+  set_flag(Flag::ExtendedArithmeticExplicit, enabled);
+}
+
+} /* namespace koshka */
+
+#include "EvalOperations.hpp"
+#include "EvalSnapshot.hpp"
+#include "EvalTypes.hpp"
+#include "ExecContext.hpp"
 #include "ProgramResolver.hpp"
-#include "ResolvedCommand.hpp"
-#include "RuntimeState.hpp"
 
 namespace koshka {
 
@@ -71,8 +316,18 @@ fn compute_substring_bounds(i64 value_count, i64 offset, Maybe<i64> length,
                             substring_subject subject) throws
     -> substring_bounds;
 pure fn shopt_option_index(StringView name) wontthrow -> Maybe<u8>;
-fn shell_option_reusable_lines(const EvalContext &cxt) throws -> String;
-fn shopt_reusable_lines(const EvalContext &cxt) throws -> String;
+
+enum class shopt_option_id : u8
+{
+  Checkhash,
+  InheritErrexit,
+  Lastpipe,
+  LocalvarInherit,
+  Progcomp,
+  ProgcompAlias,
+  Sourcepath,
+};
+pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8;
 
 class EvalContext
 {
@@ -491,7 +746,7 @@ public:
                             SourceLocation call_site,
                             bool is_only_root_source) throws -> void;
   fn pop_root_source_frame() wontthrow -> void;
-  fn declare_local(StringView name) throws -> void;
+  fn declare_local(StringView name, bool should_inherit_value) throws -> void;
   mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
 
   fn set_alias(StringView name, StringView value) throws -> void;
@@ -510,7 +765,8 @@ public:
 
   fn snapshot_state() throws -> eval_state_snapshot;
   fn restore_state(eval_state_snapshot snapshot) throws -> void;
-  fn subshell_bootstrap_source() const throws -> String;
+  fn make_subshell_bootstrap() const throws -> os::subshell_bootstrap;
+  fn apply_subshell_bootstrap(os::subshell_bootstrap bootstrap) throws -> void;
 
   fn enter_subshell() wontthrow -> void;
   fn leave_subshell() wontthrow -> void;
@@ -1011,6 +1267,17 @@ public:
     if (name == "expand_aliases")
       return m_runtime.mood != mimic_mood::Bash || shell_is_interactive();
     return shopt_default_is_on(name);
+  }
+  pure fn is_shopt_enabled(shopt_option_id option) const wontthrow -> bool
+  {
+    let const mask = u64{1} << shopt_option_index(option);
+    if ((m_shopt_option_overrides & mask) != 0)
+      return (m_shopt_option_values & mask) != 0;
+    switch (option) {
+    case shopt_option_id::Progcomp:
+    case shopt_option_id::Sourcepath: return true;
+    default: return false;
+    }
   }
   /* Whether bash ships the named shopt option enabled, the miss fallback for
      is_shopt_enabled. */

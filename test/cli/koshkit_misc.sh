@@ -8,6 +8,10 @@ echo "--- sleep zero ---"
 "$BIN" -c 'koshkit sleep 0'
 echo "rc=$?"
 
+echo "--- asynchronous builtin ---"
+"$BIN" -c 'koshkit sleep 0.2 & child=$!; if [ -n "$child" ]; then echo background=set; job_output=$(jobs); case $job_output in *"koshkit sleep 0.2"*) echo job-command=set;; *) echo job-command=empty;; esac; wait "$child"; else echo background=empty; fi'
+echo "rc=$?"
+
 echo "--- sleep accepts representable subnormal values ---"
 "$BIN" -c 'koshkit sleep 4.9406564584124654e-324'
 echo "minimum=$?"

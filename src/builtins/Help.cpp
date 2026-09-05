@@ -1,7 +1,14 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the help builtin. The help
+ * builtin lists the builtins or displays the help for one.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
-#include "../ResolvedCommand.hpp"
 
 FLAG_LIST_DECL();
 

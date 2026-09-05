@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the env utility in koshkit.
+ * The env utility runs a command in a modified environment.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
@@ -124,7 +132,8 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     let const *source = cxt.current_source();
     sub = ExecContext::make_from(
         ec.source_location(), source != nullptr ? source->view() : StringView{},
-        steal(env_args), cxt.mood(), cxt.koshkit(), environment_resolver,
+        steal(env_args), cxt.mood(), cxt.koshkit(),
+        cxt.is_shopt_enabled("checkhash"), environment_resolver,
         steal(env_arg_locations));
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     const String *source = cxt.current_source();

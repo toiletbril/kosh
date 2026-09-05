@@ -1,9 +1,17 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the owning project string. It provides inline
+ * storage, exact first heap growth, allocator-aware mutation, formatting,
+ * and ownership transfer.
+ */
+
 #pragma once
 
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
-#include "IntBase.hpp"
 #include "Maybe.hpp"
 #include "StringView.hpp"
 

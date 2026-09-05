@@ -1,8 +1,17 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements core evaluation. It applies the corresponding shell
+ * semantics through EvalContext while preserving state, source locations,
+ * and allocation ownership.
+ */
+
 #include "Eval.hpp"
 
 #include "Arena.hpp"
 #include "Cli.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Common.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
@@ -13,7 +22,6 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
@@ -1092,6 +1100,7 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 fn ExecContext::make_from(const SourceLocation &location, StringView source,
                           ArrayList<String> &&args, mimic_mood mood,
                           bool are_koshkit_utilities_reachable,
+                          bool should_check_hash,
                           ProgramResolver &program_resolver,
                           ArrayList<SourceLocation> &&arg_locations) throws
     -> ExecContext
@@ -1121,7 +1130,8 @@ fn ExecContext::make_from(const SourceLocation &location, StringView source,
       let program_search_paths = program_resolver.search(
           program.view(), ProgramResolver::SearchMode::First,
           ProgramResolver::Requirement::Execution,
-          ProgramResolver::CachePolicy::Remember);
+          should_check_hash ? ProgramResolver::CachePolicy::Remember
+                            : ProgramResolver::CachePolicy::RememberUnchecked);
       if (program_search_paths.count() > 0)
         resolved_program_path = steal(program_search_paths[0]);
     }

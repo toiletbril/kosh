@@ -1,7 +1,16 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements analysis compound expression behavior. It connects
+ * syntax-tree analysis and optimization with runtime evaluation and precise
+ * source locations.
+ */
+
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Common.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"

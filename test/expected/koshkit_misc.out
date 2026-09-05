@@ -1,5 +1,9 @@
 --- sleep zero ---
 rc=0
+--- asynchronous builtin ---
+background=set
+job-command=set
+rc=0
 --- sleep accepts representable subnormal values ---
 minimum=0
 subnormal=0

@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements lexer token, word, segment, span, and cache storage.
+ * It owns parsed text transfer, lifetime identities, and runtime copying
+ * rules.
+ */
+
 #include "Tokens.hpp"
 
 #include "Arena.hpp"

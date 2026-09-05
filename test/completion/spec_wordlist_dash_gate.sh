@@ -11,3 +11,9 @@ echo "== dash token, mixed list:"
 "$BIN" -c 'complete -W "alpha beta -x --why" mycmd' --debug-complete-at 'mycmd -' </dev/null
 echo "== empty token, flags-only list falls to files:"
 "$BIN" -c 'complete -W "-x --why" flagcmd' --debug-complete-at 'flagcmd ' </dev/null
+echo "== progcomp off ignores the registered specification:"
+"$BIN" -c 'complete -W alpha mycmd; shopt -u progcomp' --debug-complete-at 'mycmd a' </dev/null
+echo "== progcomp_alias off ignores the aliased specification:"
+"$BIN" -c 'alias surface=target; complete -W alpha target' --debug-complete-at 'surface a' </dev/null
+echo "== progcomp_alias on follows the aliased specification:"
+"$BIN" -c 'alias surface=target; complete -W alpha target; shopt -s progcomp_alias' --debug-complete-at 'surface a' </dev/null

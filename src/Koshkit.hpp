@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the koshkit utility registry and dispatcher. It maps
+ * utility names to in-process implementations and exposes their metadata and
+ * help.
+ */
+
 #pragma once
 
 #include "Builtin.hpp"

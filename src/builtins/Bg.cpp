@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the bg builtin. The bg builtin
+ * resumes a stopped job in the background.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -28,11 +36,15 @@ static fn resume_job_in_background(ExecContext &ec, EvalContext &cxt,
 {
   LOG(Info, "bg resuming job %d in the background", job->id);
 
-  if (const Maybe<i32> cont = os::signal_number_from_name("CONT")) {
-    if (job->is_primary_process_active) os::signal_process(job->pid, *cont);
-    for (let const process : job->earlier_pipeline_processes)
-      os::signal_process(process, *cont);
-  }
+  let const cont = os::signal_number_from_name("CONT");
+  if (!cont.has_value())
+    throw Error{"This platform does not support continuing stopped jobs"};
+  bool did_resume = true;
+  if (job->is_primary_process_active)
+    did_resume = os::signal_process(job->pid, *cont);
+  for (let const process : job->earlier_pipeline_processes)
+    if (!os::signal_process(process, *cont)) did_resume = false;
+  if (!did_resume) throw Error{"Unable to continue the stopped job"};
   job->state = job::State::Running;
 
   ec.print_to_stdout("[" + String::from(job->id, cxt.scratch_allocator()) +

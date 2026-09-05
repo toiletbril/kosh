@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements general Win32 text conversion, descriptors, named
+ * pipes, signals, users, clocks, environment access, and regex allocation.
+ * Filesystem and process-launch services stay in separate translation units.
+ */
+
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
@@ -1168,16 +1177,49 @@ fn get_current_process_id() wontthrow -> i64
 
 fn register_platform_flags(FlagList &flags) throws -> void { unused(flags); }
 
-static String SUBSHELL_BOOTSTRAP_SOURCE{heap_allocator()};
+static constexpr u32 SUBSHELL_TRANSPORT_MAGIC = 0x4b535442U;
+static constexpr u32 SUBSHELL_TRANSPORT_VERSION = 1U;
+static constexpr usize SUBSHELL_TRANSPORT_HEADER_LENGTH = 20;
+static constexpr usize MAXIMUM_SUBSHELL_TRANSPORT_LENGTH = 16 * 1024 * 1024;
+static subshell_bootstrap SUBSHELL_BOOTSTRAP{};
+
+static fn read_subshell_transport_exact(descriptor pipe, opaque *output,
+                                        usize length) wontthrow -> bool
+{
+  let bytes = static_cast<char *>(output);
+  usize position = 0;
+  while (position < length) {
+    let const read_count = read_fd(pipe, bytes + position, length - position);
+    if (!read_count.has_value() || *read_count == 0) return false;
+    position += *read_count;
+  }
+  return true;
+}
+
+static fn decode_subshell_transport_u32(const char *bytes) wontthrow -> u32
+{
+  u32 value = 0;
+  for (usize byte_position = 0; byte_position < sizeof(value); byte_position++)
+    value |= static_cast<u32>(static_cast<u8>(bytes[byte_position]))
+             << (byte_position * 8U);
+  return value;
+}
+
+static fn decode_subshell_transport_u64(const char *bytes) wontthrow -> u64
+{
+  u64 value = 0;
+  for (usize byte_position = 0; byte_position < sizeof(value); byte_position++)
+    value |= static_cast<u64>(static_cast<u8>(bytes[byte_position]))
+             << (byte_position * 8U);
+  return value;
+}
 
 static fn receive_subshell_bootstrap() wontthrow -> void
 {
   wchar_t path[256]{};
   let const path_length = GetEnvironmentVariableW(
       internal::STATE_NAMED_PIPE_WIDE, path, countof(path));
-  if (path_length == 0 || path_length >= countof(path)) {
-    return;
-  }
+  if (path_length == 0 || path_length >= countof(path)) return;
   SetEnvironmentVariableW(internal::STATE_NAMED_PIPE_WIDE, nullptr);
   let const pipe =
       CreateNamedPipeW(path, PIPE_ACCESS_INBOUND,
@@ -1187,26 +1229,81 @@ static fn receive_subshell_bootstrap() wontthrow -> void
   if (ConnectNamedPipe(pipe, nullptr) == FALSE &&
       GetLastError() != ERROR_PIPE_CONNECTED)
   {
+    CloseHandle(pipe);
     ExitProcess(1);
   }
+  ULONG client_process_id = 0;
+  if (GetNamedPipeClientProcessId(pipe, &client_process_id) == FALSE ||
+      static_cast<i64>(client_process_id) != get_parent_process_id())
+  {
+    CloseHandle(pipe);
+    ExitProcess(1);
+  }
+
+  char header[SUBSHELL_TRANSPORT_HEADER_LENGTH];
+  if (!read_subshell_transport_exact(pipe, header, sizeof(header))) {
+    CloseHandle(pipe);
+    ExitProcess(1);
+  }
+  let const magic = decode_subshell_transport_u32(header);
+  let const version = decode_subshell_transport_u32(header + 4);
+  let const payload_length =
+      static_cast<usize>(decode_subshell_transport_u32(header + 8));
+  let const source_length = decode_subshell_transport_u32(header + 12);
+  let const process_count =
+      static_cast<usize>(decode_subshell_transport_u32(header + 16));
+  if (magic != SUBSHELL_TRANSPORT_MAGIC ||
+      version != SUBSHELL_TRANSPORT_VERSION || source_length > payload_length ||
+      payload_length > MAXIMUM_SUBSHELL_TRANSPORT_LENGTH ||
+      process_count >
+          (MAXIMUM_SUBSHELL_TRANSPORT_LENGTH - payload_length) / sizeof(u64))
+  {
+    CloseHandle(pipe);
+    ExitProcess(1);
+  }
+
   try {
+    SUBSHELL_BOOTSTRAP.payload.reserve(payload_length);
     char buffer[4096];
-    loop
-    {
-      DWORD read_count = 0;
-      if (ReadFile(pipe, buffer, sizeof(buffer), &read_count, nullptr) == FALSE)
-      {
-        if (GetLastError() == ERROR_BROKEN_PIPE) break;
+    usize remaining_payload_length = payload_length;
+    while (remaining_payload_length > 0) {
+      let const requested_length = remaining_payload_length < sizeof(buffer)
+                                       ? remaining_payload_length
+                                       : sizeof(buffer);
+      if (!read_subshell_transport_exact(pipe, buffer, requested_length)) {
+        CloseHandle(pipe);
         ExitProcess(1);
       }
-      if (read_count == 0) break;
-      SUBSHELL_BOOTSTRAP_SOURCE.append(
-          StringView{buffer, static_cast<usize>(read_count)});
+      SUBSHELL_BOOTSTRAP.payload.append(StringView{buffer, requested_length});
+      remaining_payload_length -= requested_length;
     }
+
+    SUBSHELL_BOOTSTRAP.processes.reserve(process_count);
+    for (usize process_index = 0; process_index < process_count;
+         process_index++)
+    {
+      char encoded_process[sizeof(u64)];
+      if (!read_subshell_transport_exact(pipe, encoded_process,
+                                         sizeof(encoded_process)))
+      {
+        CloseHandle(pipe);
+        ExitProcess(1);
+      }
+      let const process_value = decode_subshell_transport_u64(encoded_process);
+      SUBSHELL_BOOTSTRAP.processes.push(
+          reinterpret_cast<process>(static_cast<uintptr>(process_value)));
+    }
+    SUBSHELL_BOOTSTRAP.source_length = source_length;
+    SUBSHELL_BOOTSTRAP.owns_processes = true;
   } catch (...) {
+    CloseHandle(pipe);
     ExitProcess(1);
   }
+
+  char trailing_byte = 0;
+  let const trailing_length = read_fd(pipe, &trailing_byte, 1);
   CloseHandle(pipe);
+  if (!trailing_length.has_value() || *trailing_length != 0) ExitProcess(1);
 }
 
 fn initialize_platform_runtime() wontthrow -> void
@@ -1263,9 +1360,9 @@ fn initialize_platform_runtime() wontthrow -> void
   }
 }
 
-fn take_subshell_bootstrap_source() wontthrow -> String
+fn take_subshell_bootstrap() wontthrow -> subshell_bootstrap
 {
-  return steal(SUBSHELL_BOOTSTRAP_SOURCE);
+  return steal(SUBSHELL_BOOTSTRAP);
 }
 
 } /* namespace os */

@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the history builtin. The
+ * history builtin lists and maintains the interactive command history.
+ */
+
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"

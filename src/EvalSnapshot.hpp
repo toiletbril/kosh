@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements snapshot evaluation. It applies the corresponding
+ * shell semantics through EvalContext while preserving state, source
+ * locations, and allocation ownership.
+ */
+
 #pragma once
 
 #include "Arena.hpp"
@@ -12,8 +21,6 @@
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ProgramResolver.hpp"
-#include "ResolvedCommand.hpp"
-#include "RuntimeState.hpp"
 
 namespace koshka {
 

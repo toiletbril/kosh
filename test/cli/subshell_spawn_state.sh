@@ -25,6 +25,47 @@ false
 printf "" | { printf "status-compound=%s\n" "$?"; }
 '
 
+"$BIN" --no-init-files --no-diagnostics -c '
+set --mood bash
+set +u
+set +o pipefail
+set +o failglob
+set +o extended-arithmetic
+printf "runtime-marks-process="
+koshkit cat < <(
+  set --mood default
+  [[ -o nounset ]] && printf u
+  [[ -o pipefail ]] && printf p
+  [[ -o failglob ]] && printf f
+  [[ -o extended-arithmetic ]] && printf a
+)
+printf "\n"
+printf "" | {
+  set --mood default
+  printf "runtime-marks-compound="
+  [[ -o nounset ]] && printf u
+  [[ -o pipefail ]] && printf p
+  [[ -o failglob ]] && printf f
+  [[ -o extended-arithmetic ]] && printf a
+  printf "\n"
+}
+'
+
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+printf "implicit-shopt-process="
+koshkit cat < <(
+  set --mood default
+  if shopt -q expand_aliases; then printf on; else printf off; fi
+)
+printf "\n"
+printf "" | {
+  set --mood default
+  printf "implicit-shopt-compound="
+  if shopt -q expand_aliases; then printf on; else printf off; fi
+  printf "\n"
+}
+'
+
 "$BIN" --mood posix --no-init-files -c '
 printf "mood="
 koshkit cat < <(set --mood)
@@ -77,6 +118,51 @@ printf "" | {
   if [ "$BASHPID" != "$parent_pid" ]; then printf bashpid; fi
   printf "\n"
 }
+'
+
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+f()
+{
+  local outer=parent
+  printf "local-process="
+  koshkit cat < <(
+    local inner=child
+    printf "%s:%s\n" "$outer" "$inner"
+  )
+  printf x | {
+    local inner=child
+    printf "local-compound=%s:%s\n" "$outer" "$inner"
+  }
+}
+f
+'
+
+"$BIN" --mood bash --no-init-files --no-diagnostics -c '
+outer() { inner; }
+inner()
+{
+  printf "stack-process="
+  koshkit cat < <(
+    if [ "${FUNCNAME[*]}" = "inner outer" ] &&
+       [ -n "${BASH_LINENO[*]}" ] && [ -n "${BASH_SOURCE[*]}" ]
+    then
+      printf yes
+    else
+      printf no
+    fi
+  )
+  printf "\n"
+  printf x | {
+    if [ "${FUNCNAME[*]}" = "inner outer" ] &&
+       [ -n "${BASH_LINENO[*]}" ] && [ -n "${BASH_SOURCE[*]}" ]
+    then
+      printf "stack-compound=yes\n"
+    else
+      printf "stack-compound=no\n"
+    fi
+  }
+}
+outer
 '
 
 KOSH_INTERNAL_PREVIOUS_EXIT_STATUS=71 \

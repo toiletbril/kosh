@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements POSIX path, metadata, directory, glob, link,
+ * permission, and file-operation wrappers. It isolates filesystem headers and
+ * pathname semantics from descriptor and process-launch code.
+ */
+
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"

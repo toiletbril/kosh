@@ -1,6 +1,14 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the jobs builtin. The jobs
+ * builtin lists the background jobs and their state.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
-#include "../Colors.hpp"
+#include "../CliColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"

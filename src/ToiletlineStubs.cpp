@@ -1,4 +1,13 @@
-#include "Colors.hpp"
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements noninteractive Toiletline stubs. It satisfies editor
+ * interfaces without initializing terminal or interactive state on
+ * noninteractive paths.
+ */
+
+#include "CliColors.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Toiletline.hpp"

@@ -1,3 +1,13 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements optional POSIX services: performance counters,
+ * resource statistics, CPU affinity, executable lookup, process enumeration,
+ * and file-user scans. It isolates large and system-specific interfaces from
+ * the core descriptor, filesystem, and process translation units.
+ */
+
 #if defined __APPLE__
 #define st_mtim st_mtimespec
 #define st_atim st_atimespec

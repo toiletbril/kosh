@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements control flow expression behavior. It connects
+ * syntax-tree analysis and optimization with runtime evaluation and precise
+ * source locations.
+ */
+
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
@@ -40,14 +49,15 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
         command_end_position - source_location().position);
   }
 
-  let bootstrap_source = String{heap_allocator()};
-  if (!os::can_fork_evaluator())
-    bootstrap_source = cxt.subshell_bootstrap_source();
+  let bootstrap = os::subshell_bootstrap{};
+  let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
+  if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
   let const launch = os::launch_compound_stage(
       command_text, None, None, None, cxt.mood(), source_location(),
       source != nullptr ? source->view() : StringView{},
-      os::process_group_mode::NewBackground, 0, bootstrap_source.view(),
-      cxt.shell_name(), cxt.last_exit_status(), os::get_shell_process_id(),
+      os::process_group_mode::NewBackground, 0,
+      should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
+      cxt.last_exit_status(), os::get_shell_process_id(),
       cxt.get_subshell_depth() + 1);
   let const child = launch.child;
 

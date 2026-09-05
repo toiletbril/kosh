@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the complete builtin. The
+ * complete builtin registers a completion spec for a command.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -52,6 +60,49 @@ namespace koshka {
 
 Complete::Complete() = default;
 
+static fn
+append_completion_specification_line(String &output, StringView command,
+                                     const completion_spec &spec) throws -> void
+{
+  output += "complete ";
+  if (spec.should_use_default) output += "-o default ";
+  if (!spec.word_list.is_empty()) {
+    output += "-W ";
+    append_shell_quoted_arg(output, spec.word_list.view(), true);
+    output += ' ';
+  }
+  if (!spec.function_name.is_empty()) {
+    output += "-F ";
+    output += spec.function_name.view();
+    output += ' ';
+  }
+  append_shell_quoted_arg(output, command);
+  output += '\n';
+}
+
+static fn completion_specification_reusable_lines(const EvalContext &cxt) throws
+    -> String
+{
+  let lines = String{heap_allocator()};
+  let names = ArrayList<String>{heap_allocator()};
+  cxt.completion_specs().for_each(
+      [&](StringView command, const completion_spec &) -> void {
+        names.push_managed(command);
+      });
+  names.sort();
+
+  for (let const &name : names) {
+    let const *spec = cxt.lookup_completion_spec(name.view());
+    ASSERT(spec != nullptr);
+    append_completion_specification_line(lines, name.view(), *spec);
+  }
+
+  if (let const *spec = cxt.default_completion_spec(); spec != nullptr)
+    append_completion_specification_line(lines, "-D", *spec);
+
+  return lines;
+}
+
 pure fn Complete::kind() const wontthrow -> Builtin::Kind
 {
   return Kind::Complete;
@@ -88,52 +139,39 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   for (usize i = 1; i < args.count(); i++)
     commands.push_managed(args[i].view());
 
-  /* -p reports failure when a named command has no spec, since the
-     bash-completion loader reads a successful print as a registered spec. */
   if (should_print_specs) {
-    let const do_print_one_spec = [&](StringView command,
-                                      const completion_spec &spec) throws {
-      let line = String{cxt.scratch_allocator(), "complete "};
-      if (spec.should_use_default) line += "-o default ";
-      if (!spec.function_name.is_empty()) {
-        line += "-F ";
-        line += spec.function_name.view();
-        line += ' ';
+    if (is_default_completion) {
+      let output = String{cxt.scratch_allocator()};
+      let const *spec = cxt.default_completion_spec();
+      if (spec == nullptr) {
+        report_soft_builtin_error(
+            ec, cxt, "The default completion specification was not found");
+        return 1;
       }
-      if (!spec.word_list.is_empty()) {
-        /* Each embedded quote is written as the '\'' escape so a list carrying
-           an apostrophe replays as valid shell. */
-        line += "-W '";
-        let const list = spec.word_list.view();
-        for (usize i = 0; i < list.length; i++) {
-          if (list[i] == '\'')
-            line += "'\\''";
-          else
-            line.push(list[i]);
-        }
-        line += "' ";
-      }
-      line += command;
-      line += '\n';
-      ec.print_to_stdout(line.view());
-    };
-    if (commands.is_empty()) {
-      cxt.completion_specs().for_each(
-          [&](StringView command, const completion_spec &spec) {
-            do_print_one_spec(command, spec);
-          });
+      append_completion_specification_line(output, "-D", *spec);
+      ec.print_to_stdout(output.view());
       return 0;
     }
 
+    if (commands.is_empty()) {
+      ec.print_to_stdout(completion_specification_reusable_lines(cxt).view());
+      return 0;
+    }
+
+    let output = String{cxt.scratch_allocator()};
     i32 print_status = 0;
     for (let const &command : commands) {
-      const completion_spec *spec = cxt.lookup_completion_spec(command.view());
+      let const *spec = cxt.lookup_completion_spec(command.view());
       if (spec == nullptr) {
+        report_soft_builtin_error(ec, cxt,
+                                  "The command '" + command +
+                                      "' has no completion specification");
         print_status = 1;
         continue;
       }
-      do_print_one_spec(command.view(), *spec);
+      append_completion_specification_line(output, command.view(), *spec);
     }
+    ec.print_to_stdout(output.view());
     return print_status;
   }
 

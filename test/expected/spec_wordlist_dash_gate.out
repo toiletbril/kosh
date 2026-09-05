@@ -6,3 +6,7 @@ beta
 -x
 == empty token, flags-only list falls to files:
 datafile
+== progcomp off ignores the registered specification:
+== progcomp_alias off ignores the aliased specification:
+== progcomp_alias on follows the aliased specification:
+alpha

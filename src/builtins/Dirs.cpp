@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the dirs builtin. The dirs
+ * builtin prints the directory stack, the current directory first, then the
+ * saved directories from the top down.
+ */
+
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"

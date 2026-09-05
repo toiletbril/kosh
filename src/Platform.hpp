@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements selection platform behavior. It keeps
+ * operating-system types, calls, and value differences behind the shared os
+ * interface.
+ */
+
 #pragma once
 
 #include "Common.hpp"
@@ -915,7 +924,7 @@ fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 fn process_id_of(process p) wontthrow -> i64;
 fn process_group_of(process p) throws -> process;
-fn close_process_group(process group) wontthrow -> void;
+fn close_process_reference(process p) wontthrow -> void;
 fn process_has_id(process p, i64 id) wontthrow -> bool;
 
 fn is_stdin_a_tty() wontthrow -> bool;
@@ -1127,9 +1136,30 @@ struct process_substitution_launch
   bool should_evaluate_child{false};
 };
 
+struct subshell_bootstrap
+{
+  subshell_bootstrap() = default;
+  subshell_bootstrap(subshell_bootstrap &&other) noexcept;
+  ~subshell_bootstrap();
+
+  fn operator=(subshell_bootstrap &&other) noexcept -> subshell_bootstrap &;
+  subshell_bootstrap(const subshell_bootstrap &) = delete;
+  fn operator=(const subshell_bootstrap &)->subshell_bootstrap & = delete;
+
+  fn release_process_ownership() wontthrow -> void;
+
+  String payload{heap_allocator()};
+  ArrayList<process> processes{heap_allocator()};
+  u32 source_length{0};
+  bool owns_processes{false};
+
+private:
+  fn close_owned_processes() wontthrow -> void;
+};
+
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
                                mimic_mood mood, bool source_traces_enabled,
-                               StringView bootstrap_source = {},
+                               const subshell_bootstrap *bootstrap = nullptr,
                                StringView shell_name = {},
                                i32 previous_exit_status = 0,
                                i64 shell_process_id = 0,
@@ -1157,14 +1187,14 @@ fn launch_compound_stage(
     Maybe<descriptor> err_fd, mimic_mood mood, SourceLocation location = {},
     StringView diagnostic_source = {},
     process_group_mode process_group = process_group_mode::Inherit,
-    i64 process_group_id = 0, StringView bootstrap_source = {},
+    i64 process_group_id = 0, const subshell_bootstrap *bootstrap = nullptr,
     StringView shell_name = {}, i32 previous_exit_status = 0,
     i64 shell_process_id = 0, usize subshell_depth = 0) throws
     -> compound_stage_launch;
 
 fn register_platform_flags(FlagList &flags) throws -> void;
 fn initialize_platform_runtime() wontthrow -> void;
-fn take_subshell_bootstrap_source() wontthrow -> String;
+fn take_subshell_bootstrap() wontthrow -> subshell_bootstrap;
 
 /* A forked pipeline-stage child calls this so it never runs the parent's
    cleanup inside the duplicated process. */

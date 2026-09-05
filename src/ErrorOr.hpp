@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements a value-or-error result type. It stores successful
+ * values or owned errors and enforces checked propagation without exceptions
+ * at API boundaries.
+ */
+
 #pragma once
 
 #include "Allocator.hpp"

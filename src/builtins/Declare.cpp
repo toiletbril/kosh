@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the declare builtin. The
+ * declare builtin declares variables and sets their attributes.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -239,8 +247,16 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (cxt.is_integer_variable(name)) {
       let line = String{cxt.scratch_allocator(), "declare -i"};
       if (cxt.is_readonly(name)) line += 'r';
-      if (os::get_environment_variable(name).has_value()) line += 'x';
+      if (cxt.is_exported(name)) line += 'x';
       line += ' ';
+      line.append(name);
+      line += '\n';
+      ec.print_to_stdout(line.view());
+      return true;
+    }
+
+    if (cxt.is_exported(name)) {
+      let line = String{cxt.scratch_allocator(), "declare -x "};
       line.append(name);
       line += '\n';
       ec.print_to_stdout(line.view());
@@ -360,7 +376,10 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    if (!should_be_global) cxt.declare_local(name);
+    if (!should_be_global)
+      cxt.declare_local(
+          name, !cxt.is_bash_compatible() ||
+                    cxt.is_shopt_enabled(shopt_option_id::LocalvarInherit));
 
     /* The attribute applies before the assignment, so declare -i x+=3 already
        adds on this command the way bash applies the integer mark first. */

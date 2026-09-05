@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements syntax-tree optimization. It folds constants and
+ * removes proven dead work without changing observable shell behavior.
+ */
+
 #pragma once
 
 /* The analyze-time optimizer. The prepass calls into this unit to prove a fact

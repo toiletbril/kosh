@@ -1,8 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements state evaluation. It applies the corresponding shell
+ * semantics through EvalContext while preserving state, source locations,
+ * and allocation ownership.
+ */
+
 #include "Arena.hpp"
 #include "Cli.hpp"
-#include "Colors.hpp"
 #include "Common.hpp"
-#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -12,7 +19,6 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
@@ -85,36 +91,34 @@ fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
     level = static_cast<i64>(m_loop_depth);
   LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
       m_loop_depth);
-  m_control_flow = control_flow{kind, level, steal(location), m_current_source,
+  m_control_flow = control_flow{kind, level, location, m_current_source,
                                 String{m_current_origin}};
 }
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
-  request_loop_control(control_flow::Kind::Break, level, steal(location));
+  request_loop_control(control_flow::Kind::Break, level, location);
 }
 
 fn EvalContext::request_continue(i64 level, SourceLocation location) throws
     -> void
 {
-  request_loop_control(control_flow::Kind::Continue, level, steal(location));
+  request_loop_control(control_flow::Kind::Continue, level, location);
 }
 
 fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
   LOG(Debug, "return requested, status %lld", (long long) status);
-  m_control_flow =
-      control_flow{control_flow::Kind::Return, status, steal(location),
-                   m_current_source, String{m_current_origin}};
+  m_control_flow = control_flow{control_flow::Kind::Return, status, location,
+                                m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Debug, "exit requested, status %lld", (long long) status);
-  m_control_flow =
-      control_flow{control_flow::Kind::Exit, status, steal(location),
-                   m_current_source, String{m_current_origin}};
+  m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
+                                m_current_source, String{m_current_origin}};
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
@@ -174,9 +178,9 @@ fn EvalContext::push_root_source_frame(const String *parent_source,
 {
   m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
-      steal(call_site), parent_source, String{heap_allocator()},
-      true,
-      is_only_root_source
+      call_site,
+      parent_source, String{heap_allocator()},
+      true, is_only_root_source
   });
 }
 
@@ -272,7 +276,7 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
 
 fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
 {
-  m_current_location = steal(location);
+  m_current_location = location;
 }
 
 /* TODO: these caps are hand-tuned below the observed native overflow point.
@@ -781,9 +785,197 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      last command's status to the parent. */
 }
 
-fn EvalContext::subshell_bootstrap_source() const throws -> String
+static constexpr u32 SUBSHELL_BOOTSTRAP_MAGIC = 0x4b534842U;
+static constexpr u32 SUBSHELL_BOOTSTRAP_VERSION = 5U;
+static constexpr u32 NO_BOOTSTRAP_PROCESS = UINT32_MAX;
+static constexpr u8 SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS = 0x3fU;
+
+static fn append_subshell_bootstrap_u32(String &output, u32 value) throws
+    -> void
 {
-  let source = String{heap_allocator()};
+  for (usize byte_position = 0; byte_position < sizeof(value); byte_position++)
+    output.push(static_cast<char>((value >> (byte_position * 8U)) & 0xffU));
+}
+
+static fn append_subshell_bootstrap_u64(String &output, u64 value) throws
+    -> void
+{
+  for (usize byte_position = 0; byte_position < sizeof(value); byte_position++)
+    output.push(static_cast<char>((value >> (byte_position * 8U)) & 0xffU));
+}
+
+static fn append_subshell_bootstrap_i32(String &output, i32 value) throws
+    -> void
+{
+  u32 bits = 0;
+  __builtin_memcpy(&bits, &value, sizeof(bits));
+  append_subshell_bootstrap_u32(output, bits);
+}
+
+static fn append_subshell_bootstrap_i64(String &output, i64 value) throws
+    -> void
+{
+  u64 bits = 0;
+  __builtin_memcpy(&bits, &value, sizeof(bits));
+  append_subshell_bootstrap_u64(output, bits);
+}
+
+static fn append_subshell_bootstrap_text(String &output, StringView text) throws
+    -> void
+{
+  if (text.length > UINT32_MAX) throw std::bad_alloc{};
+  append_subshell_bootstrap_u32(output, static_cast<u32>(text.length));
+  output.append(text);
+}
+
+static fn append_subshell_bootstrap_runtime(String &output,
+                                            const RuntimeState &runtime) throws
+    -> void
+{
+  output.push(static_cast<char>(runtime.mood));
+  output.push(static_cast<char>(runtime.warning_level));
+  u8 flags = 0;
+  if (runtime.is_diagnostics_disabled()) flags |= 1U << 0;
+  if (runtime.is_annoying_diagnostics_enabled()) flags |= 1U << 1;
+  if (runtime.was_error_unset_set_explicitly()) flags |= 1U << 2;
+  if (runtime.was_pipefail_set_explicitly()) flags |= 1U << 3;
+  if (runtime.was_failglob_set_explicitly()) flags |= 1U << 4;
+  if (runtime.was_extended_arithmetic_set_explicitly()) flags |= 1U << 5;
+  output.push(static_cast<char>(flags));
+  append_subshell_bootstrap_u64(output, runtime.shell_options);
+}
+
+struct subshell_bootstrap_reader
+{
+  StringView bytes;
+  usize position{0};
+  bool is_valid{true};
+
+  pure fn get_remaining_length() const wontthrow -> usize
+  {
+    return position <= bytes.length ? bytes.length - position : 0;
+  }
+
+  fn read_u8() wontthrow -> u8
+  {
+    if (!is_valid || get_remaining_length() < 1) {
+      is_valid = false;
+      return 0;
+    }
+
+    return static_cast<u8>(bytes[position++]);
+  }
+
+  fn read_u32() wontthrow -> u32
+  {
+    if (!is_valid || get_remaining_length() < sizeof(u32)) {
+      is_valid = false;
+      return 0;
+    }
+
+    u32 value = 0;
+    for (usize byte_position = 0; byte_position < sizeof(value);
+         byte_position++)
+      value |= static_cast<u32>(static_cast<u8>(bytes[position++]))
+               << (byte_position * 8U);
+
+    return value;
+  }
+
+  fn read_u64() wontthrow -> u64
+  {
+    if (!is_valid || get_remaining_length() < sizeof(u64)) {
+      is_valid = false;
+      return 0;
+    }
+
+    u64 value = 0;
+    for (usize byte_position = 0; byte_position < sizeof(value);
+         byte_position++)
+      value |= static_cast<u64>(static_cast<u8>(bytes[position++]))
+               << (byte_position * 8U);
+
+    return value;
+  }
+
+  fn read_i32() wontthrow -> i32
+  {
+    let const bits = read_u32();
+    i32 value = 0;
+    __builtin_memcpy(&value, &bits, sizeof(value));
+    return value;
+  }
+
+  fn read_i64() wontthrow -> i64
+  {
+    let const bits = read_u64();
+    i64 value = 0;
+    __builtin_memcpy(&value, &bits, sizeof(value));
+    return value;
+  }
+
+  fn read_text() wontthrow -> StringView
+  {
+    let const text_length = static_cast<usize>(read_u32());
+    if (!is_valid || text_length > get_remaining_length()) {
+      is_valid = false;
+      return {};
+    }
+
+    let const text = bytes.substring_of_length(position, text_length);
+    position += text_length;
+    return text;
+  }
+};
+
+static fn read_subshell_bootstrap_bool(subshell_bootstrap_reader &reader,
+                                       bool &value) wontthrow -> bool
+{
+  let const encoded = reader.read_u8();
+  if (!reader.is_valid || encoded > 1) return false;
+  value = encoded != 0;
+  return true;
+}
+
+static fn read_subshell_bootstrap_runtime(subshell_bootstrap_reader &reader,
+                                          RuntimeState &runtime) wontthrow
+    -> bool
+{
+  let const mood = reader.read_u8();
+  let const warning_level = reader.read_u8();
+  let const flags = reader.read_u8();
+  let const shell_options = reader.read_u64();
+  static_assert(static_cast<u8>(shell_option_id::Count) < 64);
+  let const valid_shell_options =
+      (u64{1} << static_cast<u8>(shell_option_id::Count)) - 1U;
+  if (!reader.is_valid || mood > static_cast<u8>(mimic_mood::BashPosix) ||
+      warning_level > 3 || (flags & ~SUBSHELL_BOOTSTRAP_RUNTIME_FLAGS) != 0 ||
+      (shell_options & ~valid_shell_options) != 0)
+  {
+    return false;
+  }
+
+  runtime.mood = static_cast<mimic_mood>(mood);
+  runtime.warning_level = warning_level;
+  runtime.shell_options = shell_options;
+  runtime.set_diagnostics_disabled((flags & (1U << 0)) != 0);
+  runtime.set_annoying_diagnostics_enabled((flags & (1U << 1)) != 0);
+  runtime.set_error_unset_set_explicitly((flags & (1U << 2)) != 0);
+  runtime.set_pipefail_set_explicitly((flags & (1U << 3)) != 0);
+  runtime.set_failglob_set_explicitly((flags & (1U << 4)) != 0);
+  runtime.set_extended_arithmetic_set_explicitly((flags & (1U << 5)) != 0);
+  return true;
+}
+
+[[noreturn]] static fn invalid_subshell_bootstrap() throws -> void
+{
+  throw Error{"Invalid inherited shell state"};
+}
+
+fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
+{
+  let bootstrap = os::subshell_bootstrap{};
+  String &source = bootstrap.payload;
   let names = ArrayList<String>{heap_allocator()};
   variable_names().for_each([&](StringView name) { names.push_managed(name); });
   names.sort();
@@ -810,11 +1002,7 @@ fn EvalContext::subshell_bootstrap_source() const throws -> String
         !is_integer && !is_read_only)
     {
       let const environment_value = os::get_environment_variable(name);
-      if (value.has_value() && environment_value.has_value() &&
-          value->view() == environment_value->view())
-      {
-        continue;
-      }
+      if (environment_value.has_value()) continue;
     }
 
     source += is_associative       ? "declare -A"
@@ -842,11 +1030,6 @@ fn EvalContext::subshell_bootstrap_source() const throws -> String
       for (usize index = 0; index < subscripts.count(); index++)
         do_append_assignment(name, subscripts[index].view(),
                              values[index].view());
-    }
-    if (is_read_only) {
-      source += "readonly ";
-      source.append(name);
-      source.push('\n');
     }
   }
 
@@ -904,10 +1087,361 @@ fn EvalContext::subshell_bootstrap_source() const throws -> String
   source += "umask ";
   source += mask_text;
   source.push('\n');
-  source += shopt_reusable_lines(*this);
-  source += shell_option_reusable_lines(*this);
+  for (let const &stored_name : names) {
+    if (!is_readonly(stored_name.view())) continue;
+    source += "readonly ";
+    source.append(stored_name.view());
+    source.push('\n');
+  }
   if (is_restricted_shell()) source += "set -r\n";
-  return source;
+
+  if (source.count() > UINT32_MAX) throw std::bad_alloc{};
+  bootstrap.source_length = static_cast<u32>(source.count());
+
+  let body = String{heap_allocator()};
+  append_subshell_bootstrap_text(body, m_last_argument.view());
+  body.push(static_cast<char>(m_last_background_pid.has_value()));
+  if (m_last_background_pid.has_value())
+    append_subshell_bootstrap_i64(body, *m_last_background_pid);
+  append_subshell_bootstrap_u64(body, m_random_state);
+  append_subshell_bootstrap_u64(body, static_cast<u64>(m_getopts_char_index));
+  append_subshell_bootstrap_i64(body, m_getopts_last_optind);
+  append_subshell_bootstrap_i32(body, m_next_job_id);
+  append_subshell_bootstrap_runtime(body, RuntimeState::capture(*this));
+  append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
+  append_subshell_bootstrap_u64(body, m_shopt_option_values);
+  append_subshell_bootstrap_u64(body, static_cast<u64>(m_function_call_depth));
+  append_subshell_bootstrap_u64(body, static_cast<u64>(m_local_scope_depth));
+  append_subshell_bootstrap_u32(
+      body, static_cast<u32>(m_function_call_names.count()));
+  for (let const &name : m_function_call_names)
+    append_subshell_bootstrap_text(body, name.view());
+
+  let completion_names = ArrayList<String>{heap_allocator()};
+  m_completion_specs.for_each([&](StringView command, const completion_spec &) {
+    completion_names.push_managed(command);
+  });
+  completion_names.sort();
+  append_subshell_bootstrap_u32(body,
+                                static_cast<u32>(completion_names.count()));
+
+  let const do_append_completion_spec = [&](const completion_spec &spec)
+                                            throws -> void {
+    append_subshell_bootstrap_text(body, spec.function_name.view());
+    append_subshell_bootstrap_text(body, spec.word_list.view());
+    body.push(static_cast<char>(spec.should_use_default));
+    append_subshell_bootstrap_runtime(body, spec.defining_runtime);
+  };
+
+  for (let const &command : completion_names) {
+    let const *spec = m_completion_specs.find(command.view());
+    ASSERT(spec != nullptr);
+    append_subshell_bootstrap_text(body, command.view());
+    do_append_completion_spec(*spec);
+  }
+
+  body.push(static_cast<char>(m_default_completion_spec.has_value()));
+  if (m_default_completion_spec.has_value())
+    do_append_completion_spec(*m_default_completion_spec);
+
+  let const do_reference_process = [&](os::process process) throws -> u32 {
+    if (bootstrap.processes.count() >= UINT32_MAX) throw std::bad_alloc{};
+    let const process_index = static_cast<u32>(bootstrap.processes.count());
+    bootstrap.processes.push(process);
+    return process_index;
+  };
+
+  append_subshell_bootstrap_u32(body, static_cast<u32>(m_jobs.count()));
+  for (let const &child_job : m_jobs) {
+    append_subshell_bootstrap_i32(body, child_job.id);
+    append_subshell_bootstrap_text(body, child_job.command.view());
+    append_subshell_bootstrap_i64(body, child_job.process_id);
+    append_subshell_bootstrap_i64(body, child_job.process_group_id);
+    append_subshell_bootstrap_i32(body, child_job.last_status);
+    append_subshell_bootstrap_i32(body, child_job.stopped_status);
+    body.push(static_cast<char>(child_job.state));
+    body.push(static_cast<char>(child_job.is_primary_process_active));
+    body.push(static_cast<char>(child_job.has_unreported_state_change));
+    append_subshell_bootstrap_u32(body,
+                                  child_job.is_primary_process_active
+                                      ? do_reference_process(child_job.pid)
+                                      : NO_BOOTSTRAP_PROCESS);
+    append_subshell_bootstrap_u32(
+        body, static_cast<u32>(child_job.earlier_pipeline_processes.count()));
+    for (let const process : child_job.earlier_pipeline_processes)
+      append_subshell_bootstrap_u32(body, do_reference_process(process));
+  }
+
+  append_subshell_bootstrap_u32(
+      body, static_cast<u32>(m_detached_job_processes.count()));
+  for (let const process : m_detached_job_processes)
+    append_subshell_bootstrap_u32(body, do_reference_process(process));
+
+  if (body.count() > UINT32_MAX) throw std::bad_alloc{};
+  append_subshell_bootstrap_u32(source, SUBSHELL_BOOTSTRAP_MAGIC);
+  append_subshell_bootstrap_u32(source, SUBSHELL_BOOTSTRAP_VERSION);
+  append_subshell_bootstrap_u32(source, static_cast<u32>(body.count()));
+  source.append(body.view());
+  return bootstrap;
+}
+
+fn EvalContext::apply_subshell_bootstrap(
+    os::subshell_bootstrap bootstrap) throws -> void
+{
+  if (bootstrap.source_length > bootstrap.payload.count())
+    invalid_subshell_bootstrap();
+  let const encoded = bootstrap.payload.view().substring(
+      static_cast<usize>(bootstrap.source_length));
+  let reader = subshell_bootstrap_reader{encoded};
+  if (reader.read_u32() != SUBSHELL_BOOTSTRAP_MAGIC ||
+      reader.read_u32() != SUBSHELL_BOOTSTRAP_VERSION)
+  {
+    invalid_subshell_bootstrap();
+  }
+  let const body_length = static_cast<usize>(reader.read_u32());
+  if (!reader.is_valid || body_length != reader.get_remaining_length())
+    invalid_subshell_bootstrap();
+
+  let last_argument = String{heap_allocator(), reader.read_text()};
+  bool has_last_background_pid = false;
+  if (!read_subshell_bootstrap_bool(reader, has_last_background_pid))
+    invalid_subshell_bootstrap();
+  let last_background_pid = Maybe<i64>{None};
+  if (has_last_background_pid) last_background_pid = reader.read_i64();
+  let const random_state = reader.read_u64();
+  let const getopts_char_index_bits = reader.read_u64();
+  let const getopts_last_optind = reader.read_i64();
+  let const next_job_id = reader.read_i32();
+  let runtime = RuntimeState{};
+  if (!read_subshell_bootstrap_runtime(reader, runtime))
+    invalid_subshell_bootstrap();
+  let const shopt_option_overrides = reader.read_u64();
+  let const shopt_option_values = reader.read_u64();
+  let const function_call_depth = reader.read_u64();
+  let const local_scope_depth = reader.read_u64();
+  let function_call_names = ArrayList<String>{heap_allocator()};
+  let const function_call_name_count = static_cast<usize>(reader.read_u32());
+  if (!reader.is_valid || function_call_name_count > function_call_depth ||
+      function_call_name_count > reader.get_remaining_length() / sizeof(u32))
+  {
+    invalid_subshell_bootstrap();
+  }
+  function_call_names.reserve(function_call_name_count);
+  for (usize index = 0; index < function_call_name_count; index++)
+    function_call_names.push(String{heap_allocator(), reader.read_text()});
+  if (getopts_char_index_bits == 0 || getopts_char_index_bits > SIZE_MAX ||
+      next_job_id < 1 || (shopt_option_values & ~shopt_option_overrides) != 0 ||
+      function_call_depth > MAX_FUNCTION_CALL_DEPTH ||
+      local_scope_depth > MAX_FUNCTION_CALL_DEPTH)
+  {
+    invalid_subshell_bootstrap();
+  }
+  let const getopts_char_index = static_cast<usize>(getopts_char_index_bits);
+
+  let completion_specs = StringMap<completion_spec>{heap_allocator()};
+  let const completion_spec_count = static_cast<usize>(reader.read_u32());
+  constexpr usize MINIMUM_COMPLETION_SPEC_BYTES = 24;
+  if (!reader.is_valid ||
+      completion_spec_count >
+          reader.get_remaining_length() / MINIMUM_COMPLETION_SPEC_BYTES)
+  {
+    invalid_subshell_bootstrap();
+  }
+  completion_specs.reserve(completion_spec_count);
+  let const do_read_completion_spec = [&](completion_spec &spec)
+                                          throws -> bool {
+    let const function_name = reader.read_text();
+    let const word_list = reader.read_text();
+    bool should_use_default = false;
+    if (!read_subshell_bootstrap_bool(reader, should_use_default) ||
+        !read_subshell_bootstrap_runtime(reader, spec.defining_runtime))
+    {
+      return false;
+    }
+    spec.function_name = String{heap_allocator(), function_name};
+    spec.word_list = String{heap_allocator(), word_list};
+    spec.should_use_default = should_use_default;
+    return true;
+  };
+
+  for (usize spec_index = 0; spec_index < completion_spec_count; spec_index++) {
+    let const command = reader.read_text();
+    let spec = completion_spec{};
+    if (!reader.is_valid || !do_read_completion_spec(spec) ||
+        completion_specs.find(command) != nullptr)
+    {
+      invalid_subshell_bootstrap();
+    }
+    completion_specs.set(command, steal(spec));
+  }
+
+  bool has_default_completion_spec = false;
+  if (!read_subshell_bootstrap_bool(reader, has_default_completion_spec))
+    invalid_subshell_bootstrap();
+  let default_completion_spec = Maybe<completion_spec>{None};
+  if (has_default_completion_spec) {
+    let spec = completion_spec{};
+    if (!do_read_completion_spec(spec)) invalid_subshell_bootstrap();
+    default_completion_spec = steal(spec);
+  }
+
+  let jobs = ArrayList<job>{heap_allocator()};
+  let const job_count = static_cast<usize>(reader.read_u32());
+  constexpr usize MINIMUM_JOB_BYTES = 43;
+  if (!reader.is_valid ||
+      job_count > reader.get_remaining_length() / MINIMUM_JOB_BYTES)
+  {
+    invalid_subshell_bootstrap();
+  }
+  jobs.reserve(job_count);
+  let process_references = ArrayList<u32>{heap_allocator()};
+  i32 previous_job_id = 0;
+
+  for (usize job_index = 0; job_index < job_count; job_index++) {
+    let child_job = job{};
+    child_job.id = reader.read_i32();
+    let const command = reader.read_text();
+    child_job.command = String{heap_allocator(), command};
+    child_job.process_id = reader.read_i64();
+    child_job.process_group_id = reader.read_i64();
+    child_job.last_status = reader.read_i32();
+    child_job.stopped_status = reader.read_i32();
+    let const state = reader.read_u8();
+    bool is_primary_process_active = false;
+    bool has_unreported_state_change = false;
+    if (!read_subshell_bootstrap_bool(reader, is_primary_process_active) ||
+        !read_subshell_bootstrap_bool(reader, has_unreported_state_change) ||
+        child_job.id <= previous_job_id || child_job.id >= next_job_id ||
+        child_job.process_group_id < 0 ||
+        state > static_cast<u8>(job::State::Done))
+    {
+      invalid_subshell_bootstrap();
+    }
+    previous_job_id = child_job.id;
+    child_job.state = static_cast<job::State>(state);
+    child_job.is_primary_process_active = is_primary_process_active;
+    child_job.has_unreported_state_change = has_unreported_state_change;
+
+    let const primary_process_index = reader.read_u32();
+    if (!reader.is_valid ||
+        (is_primary_process_active &&
+         primary_process_index == NO_BOOTSTRAP_PROCESS) ||
+        (!is_primary_process_active &&
+         primary_process_index != NO_BOOTSTRAP_PROCESS) ||
+        (child_job.state == job::State::Done && is_primary_process_active))
+    {
+      invalid_subshell_bootstrap();
+    }
+    child_job.pid = KOSH_INVALID_PROCESS;
+    if (is_primary_process_active)
+      process_references.push(primary_process_index);
+
+    let const earlier_process_count = static_cast<usize>(reader.read_u32());
+    if (!reader.is_valid ||
+        earlier_process_count > reader.get_remaining_length() / sizeof(u32))
+    {
+      invalid_subshell_bootstrap();
+    }
+    if ((child_job.state == job::State::Done && earlier_process_count != 0) ||
+        (child_job.state != job::State::Done && !is_primary_process_active &&
+         earlier_process_count == 0))
+    {
+      invalid_subshell_bootstrap();
+    }
+
+    child_job.earlier_pipeline_processes.reserve(earlier_process_count);
+    for (usize process_index = 0; process_index < earlier_process_count;
+         process_index++)
+    {
+      process_references.push(reader.read_u32());
+      child_job.earlier_pipeline_processes.push(KOSH_INVALID_PROCESS);
+    }
+    jobs.push(steal(child_job));
+  }
+
+  let detached_processes = ArrayList<os::process>{heap_allocator()};
+  let const detached_process_count = static_cast<usize>(reader.read_u32());
+  if (!reader.is_valid ||
+      detached_process_count > reader.get_remaining_length() / sizeof(u32))
+  {
+    invalid_subshell_bootstrap();
+  }
+  detached_processes.reserve(detached_process_count);
+  for (usize process_index = 0; process_index < detached_process_count;
+       process_index++)
+  {
+    process_references.push(reader.read_u32());
+    detached_processes.push(KOSH_INVALID_PROCESS);
+  }
+
+  if (!reader.is_valid || reader.position != encoded.length ||
+      process_references.count() != bootstrap.processes.count())
+  {
+    invalid_subshell_bootstrap();
+  }
+  let referenced_processes = Bitset{heap_allocator()};
+  referenced_processes.reset(bootstrap.processes.count());
+  for (let const process_index : process_references) {
+    if (process_index >= bootstrap.processes.count() ||
+        referenced_processes[process_index])
+    {
+      invalid_subshell_bootstrap();
+    }
+    referenced_processes.set(process_index);
+  }
+
+  usize process_reference_position = 0;
+  for (let &child_job : jobs) {
+    if (child_job.is_primary_process_active)
+      child_job.pid =
+          bootstrap.processes[process_references[process_reference_position++]];
+    for (let &process : child_job.earlier_pipeline_processes)
+      process =
+          bootstrap.processes[process_references[process_reference_position++]];
+  }
+  for (let &process : detached_processes)
+    process =
+        bootstrap.processes[process_references[process_reference_position++]];
+  ASSERT(process_reference_position == process_references.count());
+
+  let replay_runtime = runtime;
+  replay_runtime.set_option(shell_option_id::Allexport, false);
+  replay_runtime.set_option(shell_option_id::Errexit, false);
+  replay_runtime.set_option(shell_option_id::Noexec, false);
+  replay_runtime.set_option(shell_option_id::Nounset, false);
+  replay_runtime.set_option(shell_option_id::Restricted, false);
+  replay_runtime.set_option(shell_option_id::Verbose, false);
+  replay_runtime.set_option(shell_option_id::Xtrace, false);
+  replay_runtime.restore(*this);
+  let const is_restricted =
+      runtime.option_is_enabled(shell_option_id::Restricted);
+  run_source(bootstrap.payload.view().substring_of_length(
+                 0, static_cast<usize>(bootstrap.source_length)),
+             "inherited shell state");
+  if (is_restricted) request_restricted_shell();
+  runtime.restore(*this);
+
+  m_last_argument = steal(last_argument);
+  m_last_background_pid = last_background_pid;
+  m_random_state = random_state;
+  m_getopts_char_index = getopts_char_index;
+  m_getopts_last_optind = getopts_last_optind;
+  m_shopt_option_overrides = shopt_option_overrides;
+  m_shopt_option_values = shopt_option_values;
+  m_function_call_depth = static_cast<usize>(function_call_depth);
+  for (usize scope = 0; scope < static_cast<usize>(local_scope_depth); scope++)
+    enter_function_scope();
+  for (let const &name : function_call_names) {
+    let const *storage = find_function_storage(name.view());
+    if (storage == nullptr) invalid_subshell_bootstrap();
+    push_function_call_name(name.view(), *storage);
+  }
+  m_completion_specs = steal(completion_specs);
+  m_default_completion_spec = steal(default_completion_spec);
+  m_jobs = steal(jobs);
+  m_detached_job_processes = steal(detached_processes);
+  bootstrap.release_process_ownership();
+  m_next_job_id = next_job_id;
 }
 
 fn EvalContext::option_flags_string() const throws -> String
@@ -999,9 +1533,9 @@ cold fn EvalContext::make_stats_string() const throws -> String
      sampled here. */
   const usize live_ast_arena_bytes =
       AST_ARENA != nullptr ? AST_ARENA->bytes_used() : 0;
-  const usize peak_ast_arena_bytes =
-      live_ast_arena_bytes > m_peak_ast_arena_bytes ? live_ast_arena_bytes
-                                                    : m_peak_ast_arena_bytes;
+  usize peak_ast_arena_bytes = m_peak_ast_arena_bytes;
+  if (live_ast_arena_bytes > peak_ast_arena_bytes)
+    peak_ast_arena_bytes = live_ast_arena_bytes;
 
   stats_text += "[Stats\n";
 

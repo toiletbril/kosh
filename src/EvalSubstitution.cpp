@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements substitution evaluation. It applies the corresponding
+ * shell semantics through EvalContext while preserving state, source
+ * locations, and allocation ownership.
+ */
+
 #include "Arena.hpp"
 #include "Cli.hpp"
 #include "Debug.hpp"
@@ -207,13 +216,15 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   }
   ASSERT(ast != nullptr);
 
-  let bootstrap_source = String{heap_allocator()};
-  if (!os::can_fork_evaluator()) bootstrap_source = subshell_bootstrap_source();
+  let bootstrap = os::subshell_bootstrap{};
+  let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
+  if (should_launch_fresh_evaluator) bootstrap = make_subshell_bootstrap();
   let const do_launch = [&]() throws -> os::process_substitution_launch {
     try {
       return os::launch_process_substitution(
           substitution_source.view(), command_writes_the_pipe, mood(),
-          should_print_source_traces(), bootstrap_source.view(), shell_name(),
+          should_print_source_traces(),
+          should_launch_fresh_evaluator ? &bootstrap : nullptr, shell_name(),
           last_exit_status(), os::get_shell_process_id(),
           get_subshell_depth() + 1);
     } catch (const ErrorBase &error) {
@@ -485,6 +496,10 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
         os::close_fd(pipe->in);
         m_shell_is_interactive = false;
         enter_subshell();
+        if (mood() == mimic_mood::Bash && !is_shopt_enabled("inherit_errexit"))
+        {
+          set_error_exit(false);
+        }
         clear_inherited_exit_trap();
         std::exception_ptr error;
         try {
@@ -634,6 +649,9 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
        it and must not escape into the enclosing loop, function, or shell. */
     enter_subshell();
     did_enter_subshell = true;
+    if (mood() == mimic_mood::Bash && !is_shopt_enabled("inherit_errexit")) {
+      set_error_exit(false);
+    }
     clear_inherited_exit_trap();
     std::exception_ptr error;
     try {

@@ -1,3 +1,13 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the enable builtin. The enable
+ * builtin lists and toggles shell builtins. In Koshka every builtin is
+ * always enabled, so toggling is accepted without effect and the listing is
+ * the only observable output.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"

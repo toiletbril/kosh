@@ -1,6 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements syntax for command completion. It scans tolerant
+ * shell input and produces semantic candidates, highlighting, syntax, paths,
+ * or command metadata.
+ */
+
 #include "Arena.hpp"
 #include "Builtin.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"

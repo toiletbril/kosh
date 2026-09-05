@@ -1,6 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements shell errors and source-aware reporting. It carries
+ * messages, locations, notes, severities, and rendering data across parser
+ * and evaluator failures.
+ */
+
 #include "Errors.hpp"
 
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
 #include "ErrorOr.hpp"

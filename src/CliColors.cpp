@@ -1,4 +1,13 @@
-#include "Colors.hpp"
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements terminal color policy. It caches descriptor-sensitive
+ * color decisions and emits the escape sequences used by diagnostics and
+ * interactive output.
+ */
+
+#include "CliColors.hpp"
 
 #include "Platform.hpp"
 #include "Trace.hpp"

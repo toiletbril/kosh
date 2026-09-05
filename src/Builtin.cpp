@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the builtin registry and dispatch interface. It
+ * defines builtin identities, metadata, construction, lookup, and evaluator
+ * execution contracts.
+ */
+
 #include "Builtin.hpp"
 
 #include "Cli.hpp"
@@ -7,7 +16,6 @@
 #include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"

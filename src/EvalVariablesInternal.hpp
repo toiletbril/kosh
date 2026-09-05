@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file defines private environment keys used to bootstrap evaluator
+ * state and Windows named-pipe transport. It centralizes narrow and wide
+ * spellings so internal protocol names cannot diverge between process paths.
+ */
+
 #pragma once
 
 #include "StringView.hpp"

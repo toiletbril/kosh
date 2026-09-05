@@ -110,7 +110,7 @@ chmod +x "$fake_cxx"
 
 commit_hash_cli_object=$commit_hash_dir/o/Cli.o
 commit_hash_main_object=$commit_hash_dir/o/Main.o
-commit_hash_control_object=$commit_hash_dir/o/Colors.o
+commit_hash_control_object=$commit_hash_dir/o/CliColors.o
 FAKE_CXX_LOG=$commit_hash_log MAKEFLAGS= MFLAGS= MAKELEVEL=0 \
   make -C ../src --no-print-directory \
   -j1 MODE=dbg OBJ_DIR="$commit_hash_dir/o" CXX="$fake_cxx" COMMIT_HASH=first \

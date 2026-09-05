@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the type builtin. The type
+ * builtin reports how each name resolves as a command.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"

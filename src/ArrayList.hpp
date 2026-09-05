@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the allocation-aware dynamic array. It provides
+ * checked growth, managed construction, iteration, search, and
+ * ownership-preserving moves.
+ */
+
 #pragma once
 
 #include "Allocator.hpp"

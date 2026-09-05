@@ -1,6 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements scan for command completion. It scans tolerant shell
+ * input and produces semantic candidates, highlighting, syntax, paths, or
+ * command metadata.
+ */
+
 #include "Arena.hpp"
 #include "Builtin.hpp"
-#include "Colors.hpp"
+#include "CliColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
@@ -928,6 +937,8 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
                                 StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
+  if (!context.is_shopt_enabled(shopt_option_id::Progcomp)) return None;
+
   let const for_listing = mode == completion_mode::Listing;
   let const command = command_word_of(line.substring_of_length(0, cursor));
   if (command.is_empty()) return None;
@@ -953,7 +964,9 @@ fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
      through an alias and a symlink. */
   const completion_spec *spec = context.lookup_completion_spec(command);
   String resolved_command{heap_allocator()};
-  if (spec == nullptr) {
+  if (spec == nullptr &&
+      context.is_shopt_enabled(shopt_option_id::ProgcompAlias))
+  {
     resolved_command = resolve_completion_command(command, context);
     if (resolved_command.view() != command)
       spec = context.lookup_completion_spec(resolved_command.view());

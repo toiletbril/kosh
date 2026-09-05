@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the xargs utility in koshkit.
+ * The xargs utility builds and invokes argument lists from standard input.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
@@ -290,8 +298,8 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
       sub = ExecContext::make_from(
           ec.source_location(),
           source != nullptr ? source->view() : StringView{}, steal(command),
-          cxt.mood(), cxt.koshkit(), cxt.get_program_resolver(),
-          steal(command_locations));
+          cxt.mood(), cxt.koshkit(), cxt.is_shopt_enabled("checkhash"),
+          cxt.get_program_resolver(), steal(command_locations));
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       let const *source = cxt.current_source();
       show_message(resolution_error.to_string(

@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements POSIX fork, exec, output capture, pipelines, process
+ * groups, terminal handoff, and child accounting. It keeps process lifecycle
+ * and job-control code separate from general descriptors and filesystems.
+ */
+
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
@@ -30,7 +39,7 @@ fn drop_elevated_identity() wontthrow -> bool
 
 fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
 fn process_group_of(process p) throws -> process { return -p; }
-fn close_process_group(process group) wontthrow -> void { unused(group); }
+fn close_process_reference(process p) wontthrow -> void { unused(p); }
 fn process_has_id(process p, i64 id) wontthrow -> bool
 {
   return p == static_cast<process>(id);
@@ -489,7 +498,7 @@ fn can_fork_evaluator() wontthrow -> bool { return true; }
 
 fn launch_process_substitution(StringView source, bool command_writes_pipe,
                                mimic_mood mood, bool source_traces_enabled,
-                               StringView bootstrap_source,
+                               const subshell_bootstrap *bootstrap,
                                StringView shell_name, i32 previous_exit_status,
                                i64 shell_process_id,
                                usize subshell_depth) throws
@@ -498,7 +507,7 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
   unused(source);
   unused(mood);
   unused(source_traces_enabled);
-  unused(bootstrap_source);
+  unused(bootstrap);
   unused(shell_name);
   unused(previous_exit_status);
   unused(shell_process_id);
@@ -555,13 +564,14 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          mimic_mood mood, SourceLocation location,
                          StringView diagnostic_source,
                          process_group_mode process_group, i64 process_group_id,
-                         StringView bootstrap_source, StringView shell_name,
-                         i32 previous_exit_status, i64 shell_process_id,
-                         usize subshell_depth) throws -> compound_stage_launch
+                         const subshell_bootstrap *bootstrap,
+                         StringView shell_name, i32 previous_exit_status,
+                         i64 shell_process_id, usize subshell_depth) throws
+    -> compound_stage_launch
 {
   unused(source);
   unused(mood);
-  unused(bootstrap_source);
+  unused(bootstrap);
   unused(shell_name);
   unused(previous_exit_status);
   unused(shell_process_id);
@@ -575,9 +585,9 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
   };
 }
 
-fn take_subshell_bootstrap_source() wontthrow -> String
+fn take_subshell_bootstrap() wontthrow -> subshell_bootstrap
 {
-  return String{heap_allocator()};
+  return subshell_bootstrap{};
 }
 
 [[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
@@ -963,9 +973,11 @@ fn machine_type() throws -> String
   static const String cached = []() -> String {
     struct utsname info{};
     if (uname(&info) != 0) return String{"unknown"};
-    return String{
-        StringView{info.machine, std::strlen(info.machine)}
-    };
+    let const machine = StringView{info.machine, std::strlen(info.machine)};
+#if defined __APPLE__
+    if (machine == "arm64") return String{"aarch64"};
+#endif
+    return String{machine};
   }();
   return cached;
 }
@@ -1004,7 +1016,7 @@ fn system_version_name() throws -> String
 fn machine_target_name() throws -> String
 {
 #if defined __APPLE__
-  return machine_type() + "-apple-darwin";
+  return machine_type() + "-apple-darwin" + system_release_name();
 #else
   return machine_type() + "-unknown-linux-gnu";
 #endif

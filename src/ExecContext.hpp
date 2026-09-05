@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file defines per-command execution context. It carries arguments,
+ * source locations, descriptors, and command metadata into builtins and
+ * koshkit utilities.
+ */
+
 #pragma once
 
 #include "Arena.hpp"
@@ -12,8 +21,6 @@
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ProgramResolver.hpp"
-#include "ResolvedCommand.hpp"
-#include "RuntimeState.hpp"
 
 namespace koshka {
 
@@ -23,7 +30,7 @@ public:
   static fn make_from(const SourceLocation &location, StringView source,
                       ArrayList<String> &&args, mimic_mood mood,
                       bool are_koshkit_utilities_reachable,
-                      ProgramResolver &program_resolver,
+                      bool should_check_hash, ProgramResolver &program_resolver,
                       ArrayList<SourceLocation> &&arg_locations) throws
       -> ExecContext;
 

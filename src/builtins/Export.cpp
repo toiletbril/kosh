@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the export builtin. The export
+ * builtin moves a variable into the environment.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"

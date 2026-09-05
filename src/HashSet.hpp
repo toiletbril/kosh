@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the project hash set on top of StringMap storage. It
+ * provides allocator-aware insertion, lookup, removal, and iteration for
+ * unique keys.
+ */
+
 #pragma once
 
 #include "Maybe.hpp"

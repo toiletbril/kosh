@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file defines lightweight evaluator enums and value records for
+ * argument lifetimes, execution modes, status propagation, restrictions, and
+ * glob fields. It prevents common evaluator types from depending on Eval.hpp.
+ */
+
 #pragma once
 
 #include "Arena.hpp"
@@ -10,8 +19,6 @@
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "ResolvedCommand.hpp"
-#include "RuntimeState.hpp"
 
 namespace koshka {
 
@@ -213,8 +220,8 @@ struct job
   String command{heap_allocator()};
   i64 process_id{0};
   i64 process_group_id{0};
-  i32 id;
-  os::process pid;
+  i32 id{0};
+  os::process pid{KOSH_INVALID_PROCESS};
   i32 last_status{0};
   i32 stopped_status{0};
   State state{State::Running};

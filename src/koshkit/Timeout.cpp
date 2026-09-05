@@ -1,8 +1,15 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the timeout utility in
+ * koshkit. The timeout utility runs a command with a time limit.
+ */
+
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../ResolvedCommand.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -353,7 +360,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     } catch (...) {}
     throw;
   }
-  defer { os::close_process_group(process_group); };
+  defer { os::close_process_reference(process_group); };
 
   i32 status = 0;
   let has_child_exited = false;

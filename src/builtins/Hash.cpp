@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the hash builtin. The hash
+ * builtin manages the cache of resolved command locations.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
@@ -6,11 +14,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-r] [-p pathname] [name ...]");
+HELP_SYNOPSIS_DECL("[-rR] [-p pathname] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The hash builtin manages the cache of resolved command locations.");
 
 FLAG(RESET, Bool, 'r', "", "Forget remembered command locations.");
+FLAG(REHASH, Bool, 'R', "", "Rebuild the PATH command cache.");
 FLAG(PATHNAME, String, 'p', "", "Remember each name at pathname.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -28,7 +37,11 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (FLAG_RESET.is_enabled()) {
+  if (FLAG_REHASH.is_enabled()) {
+    LOG(Info, "hash rebuilding the PATH command cache");
+    cxt.get_program_resolver().invalidate();
+    cxt.get_program_resolver().initialize_path_map();
+  } else if (FLAG_RESET.is_enabled()) {
     LOG(Info, "hash forgetting every remembered command location");
     cxt.get_program_resolver().invalidate();
   }

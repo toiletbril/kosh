@@ -1,3 +1,12 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements language-server protocol transport and requests. It
+ * parses JSON messages and serves diagnostics, completion, hover, symbols,
+ * definitions, renames, formatting, and code actions.
+ */
+
 #pragma once
 
 #include "Builtin.hpp"

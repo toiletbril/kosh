@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the set builtin. The set
+ * builtin sets the shell options and the positional parameters.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -636,11 +644,6 @@ fn format_option_switches_help() throws -> String
 }
 
 } /* namespace */
-
-fn shell_option_reusable_lines(const EvalContext &cxt) throws -> String
-{
-  return list_options(cxt, true);
-}
 
 fn query_shell_option(const EvalContext &cxt, StringView name) throws
     -> Maybe<bool>

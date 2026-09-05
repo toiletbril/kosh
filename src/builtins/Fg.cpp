@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the fg builtin. The fg builtin
+ * brings a job to the foreground and waits for it.
+ */
+
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Errors.hpp"
@@ -70,11 +78,15 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       should_reclaim && job->process_group_id > 0;
   let const do_resume_job = [&]() throws {
     if (job->state == job::State::Stopped) {
-      if (const Maybe<i32> cont = os::signal_number_from_name("CONT")) {
-        if (job->is_primary_process_active) os::signal_process(job->pid, *cont);
-        for (let const process : job->earlier_pipeline_processes)
-          os::signal_process(process, *cont);
-      }
+      let const cont = os::signal_number_from_name("CONT");
+      if (!cont.has_value())
+        throw Error{"This platform does not support continuing stopped jobs"};
+      bool did_resume = true;
+      if (job->is_primary_process_active)
+        did_resume = os::signal_process(job->pid, *cont);
+      for (let const process : job->earlier_pipeline_processes)
+        if (!os::signal_process(process, *cont)) did_resume = false;
+      if (!did_resume) throw Error{"Unable to continue the stopped job"};
       job->state = job::State::Running;
     }
   };

@@ -1,3 +1,11 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements and is responsible for the eval builtin. The eval
+ * builtin runs its arguments as a command in the current shell.
+ */
+
 #include "../Eval.hpp"
 
 #include "../Builtin.hpp"
