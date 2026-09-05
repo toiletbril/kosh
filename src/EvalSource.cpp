@@ -40,6 +40,22 @@ static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
   }
 }
 
+static fn mimicked_error_status(const std::exception_ptr &error,
+                                bool is_posix) throws -> i32
+{
+  ASSERT(error != nullptr);
+
+  try {
+    std::rethrow_exception(error);
+  } catch (const ErrorBase &caught_error) {
+    let const status = caught_error.command_status();
+    return static_cast<i32>(
+        status == 1 && is_posix && caught_error.is_script_fatal() ? 2 : status);
+  } catch (...) {
+    return 1;
+  }
+}
+
 fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
                                      script_isolation isolation) throws -> i32
 {
@@ -292,9 +308,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const do_finish_script = [&](std::exception_ptr &error, bool is_subshell)
                                    throws -> bool {
     let is_interrupt = mimicked_error_is_interrupt(error);
+    i32 final_status = last_exit_status();
     bool was_error_rendered = false;
     if (error && !is_interrupt) {
-      set_last_exit_status(1);
+      final_status = mimicked_error_status(error, is_posix_mode());
+      set_last_exit_status(final_status);
       do_render_error(error);
       was_error_rendered = true;
     }
@@ -308,12 +326,15 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
         if (!error) {
           error = std::current_exception();
           is_interrupt = mimicked_error_is_interrupt(error);
+          if (!is_interrupt)
+            final_status = mimicked_error_status(error, is_posix_mode());
         }
       }
     }
     if (error && !is_interrupt && !was_error_rendered) {
       do_render_error(error);
     }
+    set_last_exit_status(final_status);
     return is_interrupt;
   };
 
@@ -366,7 +387,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     if (error) {
       if (is_interrupt) throw InterruptErrorWithLocation{previous_location};
 
-      return 1;
+      return last_exit_status();
     }
     return last_exit_status();
   }
@@ -399,7 +420,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   if (error) {
     if (is_interrupt) throw InterruptErrorWithLocation{previous_location};
 
-    return 1;
+    return status;
   }
   return status;
 }

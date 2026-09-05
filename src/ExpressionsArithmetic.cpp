@@ -1389,7 +1389,26 @@ fn RedirectedCommand::evaluate_status_impl(EvalContext &cxt) const throws
     }
   }
 
-  return m_child->evaluate_status(cxt);
+  try {
+    return m_child->evaluate_status(cxt);
+  } catch (ErrorWithLocationAndDetails &error) {
+    if (!error.was_rendered()) {
+      let const source = cxt.current_source();
+      let const source_text = source != nullptr ? source->view() : StringView{};
+      show_message(error.to_string(source_text, &cxt));
+      show_message(error.details_to_string(source_text, &cxt));
+      error.set_rendered();
+    }
+    throw;
+  } catch (ErrorWithLocation &error) {
+    if (!error.was_rendered()) {
+      let const source = cxt.current_source();
+      show_message(error.to_string(
+          source != nullptr ? source->view() : StringView{}, &cxt));
+      error.set_rendered();
+    }
+    throw;
+  }
 }
 
 UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
