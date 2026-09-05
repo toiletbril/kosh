@@ -749,7 +749,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     i64 function_ret = 0;
     try {
       function_ret = function_body->evaluate(cxt);
-      if (!cxt.is_posix_mode()) cxt.run_named_trap(StringView{"RETURN", 6});
+      if (cxt.should_run_return_trap())
+        cxt.run_named_trap(StringView{"RETURN", 6});
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
         if (let const windowed = window_function_body_error(cxt, error);

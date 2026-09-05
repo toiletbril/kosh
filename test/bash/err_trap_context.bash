@@ -45,3 +45,15 @@ echo "status=$?"
 echo errtrace-subshell
 (false)
 echo "status=$?"
+
+echo return-plain
+trap 'echo RETURN' RETURN
+return_function() {
+  true
+}
+return_function
+echo return-functrace
+set -T
+return_function
+set +T
+trap - RETURN

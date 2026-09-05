@@ -676,6 +676,12 @@ public:
            (m_function_call_depth == 0 && m_subshell_depth == 0 &&
             m_substitution_depth == 0);
   }
+  pure fn should_run_return_trap() const wontthrow -> bool
+  {
+    return !is_posix_mode() &&
+           (!is_bash_compatible() ||
+            m_runtime.option_is_enabled(shell_option_id::Functrace));
+  }
 
   /* Run the action of every signal whose flag the handler set, at the command
      boundary. A re-entrancy guard keeps a triggered signal from nesting. */
