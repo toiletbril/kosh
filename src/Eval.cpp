@@ -44,6 +44,8 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_echo_expanded(should_echo_expanded);
   set_error_exit(should_error_exit);
   set_emacs_mode(shell_is_interactive);
+  set_shell_option_state(shell_option_id::History, shell_is_interactive);
+  set_shell_option_state(shell_option_id::Histexpand, shell_is_interactive);
   set_field_separators(m_field_separators.view());
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
@@ -166,6 +168,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
       static_cast<int>(name.length), name.data, value.length);
   if (name == "IFS") set_field_separators(value);
   if (name == "PATH") m_program_resolver.assign_path(String{value});
+  if (name == "IGNOREEOF")
+    m_runtime.set_option(shell_option_id::Ignoreeof, true);
   m_shell_variables.set(name, value);
   if (m_exported_names.contains(name)) {
     if (m_subshell_depth > 0)
@@ -173,6 +177,15 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
           String{name}, os::get_environment_variable(name)});
     os::set_environment_variable(name, value);
   }
+}
+
+fn EvalContext::restore_temporary_shell_variable(
+    StringView name, const Maybe<String> &previous_value) throws -> void
+{
+  if (previous_value.has_value())
+    m_shell_variables.set(name, previous_value->view());
+  else
+    m_shell_variables.erase(name);
 }
 
 fn EvalContext::set_field_separators(StringView value) throws -> void
@@ -321,6 +334,12 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   if (should_disable_bash_directory_stack)
     disable_bash_special_array(bash_special_array_id::DirectoryStack);
   m_variable_attributes.erase(name);
+}
+
+fn EvalContext::disable_ignoreeof() throws -> void
+{
+  force_unset_shell_variable("IGNOREEOF");
+  m_variable_attributes.erase("IGNOREEOF");
 }
 
 fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
@@ -696,6 +715,8 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   if (name == "IFS") set_field_separators(" \t\n");
   if (name == "PATH")
     m_program_resolver.assign_path(os::get_environment_variable("PATH"));
+  if (name == "IGNOREEOF")
+    m_runtime.set_option(shell_option_id::Ignoreeof, false);
 }
 
 fn EvalContext::record_environment_change(StringView name) throws -> void

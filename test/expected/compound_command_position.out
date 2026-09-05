@@ -17,6 +17,7 @@ no-unset
 noclobber
 noexec
 noglob
+nolog
 notify
 nounset
 == case arm body:
@@ -32,6 +33,7 @@ no-unset
 noclobber
 noexec
 noglob
+nolog
 notify
 nounset
 == matched paren stays an argument:

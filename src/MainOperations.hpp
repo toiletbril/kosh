@@ -4,8 +4,9 @@
  *
  * This private implementation header contains startup-file loading, streamed
  * analysis, formatting and lint application, debug drivers, script execution,
- * and interactive prompt helpers. Main.cpp includes it after defining
- * invocation flags so those helpers and flags remain in one translation unit.
+ * interactive history expansion, and prompt helpers. Main.cpp includes it
+ * after defining invocation flags so those helpers and flags remain in one
+ * translation unit.
  */
 
 #pragma once
@@ -868,6 +869,124 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 
   context.set_last_exit_status(saved_exit_status);
   context.set_last_command_duration_nanos(saved_command_duration_nanos);
+}
+
+static fn expand_interactive_history(StringView source,
+                                     Maybe<usize> accepted_event_number,
+                                     EvalContext &context) throws
+    -> Maybe<String>
+{
+  bool is_single_quoted = false;
+  bool is_double_quoted = false;
+  bool did_expand = false;
+  usize copied_position = 0;
+  let expanded = String{heap_allocator()};
+
+  let const do_terminate_designator = [](char byte) wontthrow -> bool {
+    return is_ascii_whitespace(byte) || byte == ':' || byte == '"' ||
+           byte == '\'' || byte == '\\' || byte == '=' || byte == ';' ||
+           byte == '&' || byte == '|' || byte == '(' || byte == ')' ||
+           byte == '<' || byte == '>';
+  };
+
+  for (usize position = 0; position < source.length; position++) {
+    let const byte = source[position];
+    if (byte == '\'' && !is_double_quoted) {
+      is_single_quoted = !is_single_quoted;
+      continue;
+    }
+    if (byte == '"' && !is_single_quoted) {
+      is_double_quoted = !is_double_quoted;
+      continue;
+    }
+    if (byte == '\\' && !is_single_quoted && position + 1 < source.length) {
+      position++;
+      continue;
+    }
+    if (byte != '!' || is_single_quoted || position + 1 >= source.length)
+      continue;
+
+    let const next_byte = source[position + 1];
+    if (is_ascii_whitespace(next_byte) || next_byte == '=' ||
+        next_byte == '"' || next_byte == '\'')
+    {
+      continue;
+    }
+
+    usize reference_end_position = position + 2;
+    StringView replacement{};
+    let selected_event = Maybe<toiletline::history_event>{};
+    let current_line = String{context.scratch_allocator()};
+
+    if (next_byte == '#') {
+      current_line.append(expanded.view());
+      current_line.append(source.substring_of_length(
+          copied_position, position - copied_position));
+      replacement = current_line.view();
+    } else {
+      if (next_byte == '!') {
+        selected_event = toiletline::relative_history_event(
+            context.scratch_allocator(), 1, accepted_event_number);
+      } else if (next_byte == '?') {
+        let close_position = source.find_substring("?", reference_end_position);
+        if (!close_position.has_value()) close_position = source.length;
+        let const needle = source.substring_of_length(
+            reference_end_position, *close_position - reference_end_position);
+        reference_end_position = *close_position < source.length
+                                     ? *close_position + 1
+                                     : *close_position;
+        selected_event = toiletline::containing_history_event(
+            context.scratch_allocator(), needle, accepted_event_number);
+      } else {
+        while (reference_end_position < source.length &&
+               !do_terminate_designator(source[reference_end_position]))
+          reference_end_position++;
+        let const designator = source.substring_of_length(
+            position + 1, reference_end_position - position - 1);
+        if (designator.length > 1 && designator[0] == '-' &&
+            designator.substring(1).is_all_decimal_digits())
+        {
+          let const parsed = designator.substring(1).to<u64>();
+          if (!parsed.is_error() && parsed.value() > 0 &&
+              parsed.value() <= static_cast<u64>(static_cast<usize>(-1)))
+            selected_event = toiletline::relative_history_event(
+                context.scratch_allocator(), static_cast<usize>(parsed.value()),
+                accepted_event_number);
+        } else if (designator.is_all_decimal_digits()) {
+          let const parsed = designator.to<u64>();
+          if (!parsed.is_error() &&
+              parsed.value() <= static_cast<u64>(static_cast<usize>(-1)))
+            selected_event = toiletline::numbered_history_event(
+                context.scratch_allocator(), static_cast<usize>(parsed.value()),
+                accepted_event_number);
+        } else {
+          selected_event = toiletline::prefixed_history_event(
+              context.scratch_allocator(), designator, accepted_event_number);
+        }
+      }
+
+      if (selected_event.has_value())
+        replacement = selected_event->command.view();
+      else {
+        let message = String{source.substring_of_length(
+            position, reference_end_position - position)};
+        message += ": event not found";
+        throw Error{steal(message)};
+      }
+    }
+
+    if (!did_expand) expanded.reserve(source.length + replacement.length);
+    expanded.append(source.substring_of_length(copied_position,
+                                               position - copied_position));
+    expanded.append(replacement);
+    copied_position = reference_end_position;
+    position = reference_end_position - 1;
+    did_expand = true;
+  }
+
+  if (!did_expand) return None;
+  expanded.append(source.substring(copied_position));
+  return expanded;
 }
 
 enum class startup_file_requirement : u8

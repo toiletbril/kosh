@@ -420,6 +420,11 @@ fn history_clear() -> bool
   return true;
 }
 
+fn set_history_enabled(bool is_enabled) -> void
+{
+  ::tl_set_history_enabled(is_enabled);
+}
+
 struct history_event
 {
   usize number;
@@ -454,6 +459,78 @@ fn history_events(koshka::Allocator allocator)
   }
 
   return events;
+}
+
+template <class Match>
+static fn find_history_event(koshka::Allocator allocator,
+                             koshka::Maybe<usize> before_event_number,
+                             Match do_match) -> koshka::Maybe<history_event>
+{
+  if (!history_read() || ::itl_g_history_count == 0) return koshka::None;
+  if (!::itl_history_ensure_read_buffer()) return koshka::None;
+
+  let const first_number =
+      ::itl_g_history_total_count - ::itl_g_history_count + 1;
+  char decoded[ITL_STRING_MAX_LEN + 1];
+  for (usize index = ::itl_g_history_count; index > 0; index--) {
+    let const number = first_number + index - 1;
+    if (before_event_number.has_value() && number >= *before_event_number)
+      continue;
+
+    usize decoded_size = 0;
+    if (!::itl_history_decode_entry_buffered(
+            ::itl_history_index_to_offset(index - 1), decoded, sizeof(decoded),
+            &decoded_size))
+    {
+      return koshka::None;
+    }
+    let const command = koshka::StringView{decoded, decoded_size};
+    if (do_match(number, command))
+      return history_event{
+          number, koshka::String{allocator, command}
+      };
+  }
+
+  return koshka::None;
+}
+
+fn relative_history_event(koshka::Allocator allocator, usize distance,
+                          koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  if (distance == 0) return koshka::None;
+  usize remaining_event_count = distance;
+  return find_history_event(
+      allocator, before_event_number,
+      [&](usize, StringView) { return --remaining_event_count == 0; });
+}
+
+fn numbered_history_event(koshka::Allocator allocator, usize wanted_number,
+                          koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  return find_history_event(
+      allocator, before_event_number,
+      [&](usize number, StringView) { return number == wanted_number; });
+}
+
+fn prefixed_history_event(koshka::Allocator allocator, StringView prefix,
+                          koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  return find_history_event(
+      allocator, before_event_number,
+      [&](usize, StringView command) { return command.starts_with(prefix); });
+}
+
+fn containing_history_event(koshka::Allocator allocator, StringView text,
+                            koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  return find_history_event(allocator, before_event_number,
+                            [&](usize, StringView command) {
+                              return command.find_substring(text).has_value();
+                            });
 }
 
 fn history_append_event(StringView command) -> koshka::Maybe<usize>

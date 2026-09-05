@@ -975,12 +975,13 @@ prints reusable commands. The
 .B set \-\-options
 form prints every option with its state and description. The
 .BR \-E ,
+.BR \-H ,
 .BR \-P ,
 .BR \-T ,
 and
 .B \-B
-forms control errtrace, physical directory resolution, functrace, and brace
-expansion. The
+forms control errtrace, history expansion, physical directory resolution,
+functrace, and brace expansion. The
 .B \-t
 form and the
 .B onecmd
@@ -995,10 +996,12 @@ are their short names. Without a value,
 prints the active mood name. The
 .BR \-b ,
 .BR \-h ,
-.BR \-k ,
 and
 .B \-m
 letters are accepted without effect. The
+.B \-k
+form places unquoted assignment arguments in the command environment and
+removes them from the argument list. The
 .BR \-W ,
 .BR \-WW ,
 and
@@ -1012,6 +1015,32 @@ and
 control the annoying tier, the analysis stage, extended arithmetic, and bundled
 command lookup. A command substitution restores every set option when it
 finishes.
+.PP
+The
+.B history
+option records submitted interactive commands. The
+.B histexpand
+option expands interactive history references. The supported references are
+.BR !! ,
+.BR !-N ,
+.BR !N ,
+.BR !prefix ,
+.BR !?text? ,
+and
+.BR !# .
+Single-quoted and backslash-escaped references remain literal. Both options are
+enabled by default in an interactive shell and disabled in a noninteractive
+shell.
+.PP
+The
+.B ignoreeof
+option requires consecutive end-of-file input before an interactive shell
+exits. Its threshold is read from
+.BR IGNOREEOF .
+Enabling the option sets an unset IGNOREEOF to 10. Assigning IGNOREEOF enables
+the option. Disabling the option or unsetting IGNOREEOF disables it. The
+.B nolog
+option is accepted for Bash compatibility and does not change execution.
 .TP
 .B "time [\-p|\-\-posix] [\-R] command [argument ...]"
 The command or pipeline is timed. The

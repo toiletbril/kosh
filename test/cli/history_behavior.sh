@@ -46,13 +46,22 @@ if ! BIN="$BIN" script -qec \
   echo "recall ok"
   echo "fc replacement ok"
   echo "search casefold ok"
+  echo "history expansion ok"
+  echo "history option ok"
+  echo "ignoreeof ok"
   exit 0
 fi
-hist=$(mktemp)
-search_hist=$(mktemp)
-ready=$(mktemp)
-input_status=$(mktemp)
-trap 'rm -f "$hist" "$search_hist" "$ready" "$input_status"' EXIT
+hist=$dir/recall
+search_hist=$dir/search
+expansion_hist=$dir/expansion
+disabled_hist=$dir/disabled
+ignoreeof_hist=$dir/ignoreeof
+ignoreeof_rc=$dir/ignoreeof-rc
+stderr_hist=$dir/stderr-history
+stderr_log=$dir/stderr-log
+stderr_rc=$dir/stderr-rc
+ready=$dir/ready
+input_status=$dir/input-status
 send_input_when_ready()
 {
   wait_count=0
@@ -110,4 +119,88 @@ out=$({
 case "$out" in
 *MiXeD_History_Marker*) echo "search casefold ok" ;;
 *) echo "search casefold broken" ;;
+esac
+
+printf 'echo HISTORY_EXPANSION_MARKER\n' > "$expansion_hist"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'echo !!\r' 'echo one !# !#\r' \
+    '!echo; echo PUNCTUATION_HISTORY_MARKER\r' \
+    'echo !MISSING_HISTORY_EVENT\r' 'set +H\r' \
+    'printf "<%s>\\n" !!\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$expansion_hist" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    script -qec 'exec "$BIN" -i -M bash --rcfile /dev/null' \
+      /dev/null 2>/dev/null) || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+case "$out" in
+*HISTORY_EXPANSION_MARKER*PUNCTUATION_HISTORY_MARKER*'event not found'*'<!!>'*)
+  if grep -q '!#\|^!echo\|MISSING_HISTORY_EVENT' "$expansion_hist"; then
+    echo "history expansion broken"
+  else
+    echo "history expansion ok"
+  fi
+*) echo "history expansion broken" ;;
+esac
+
+printf 'echo STDERR_HISTORY_MARKER\n' > "$stderr_hist"
+printf 'exec 2>"$HISTORY_STDERR_LOG"\n' > "$stderr_rc"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'echo !!\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$stderr_hist" \
+    HISTORY_STDERR_LOG="$stderr_log" HISTORY_STDERR_RC="$stderr_rc" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    script -qec 'exec "$BIN" -i -M bash --rcfile "$HISTORY_STDERR_RC"' \
+      /dev/null 2>/dev/null) || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+if grep -q '^echo echo STDERR_HISTORY_MARKER$' "$stderr_log"; then
+  :
+else
+  echo "history expansion broken"
+fi
+
+printf 'echo HISTORY_BASE\n' > "$disabled_hist"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready 'set +o history\r' \
+    'echo OMITTED_HISTORY_MARKER\r' 'set -o history\r' 'exit\r'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$disabled_hist" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    script -qec 'exec "$BIN" -i -M bash --rcfile /dev/null' \
+      /dev/null 2>/dev/null) || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+if grep -q OMITTED_HISTORY_MARKER "$disabled_hist"; then
+  echo "history option broken"
+else
+  echo "history option ok"
+fi
+
+printf 'IGNOREEOF=1\n' > "$ignoreeof_rc"
+rm -f "$ready"
+rm -f "$input_status"
+out=$({
+  send_input_when_ready '\004' 'echo EOF_RESET_MARKER\r' '\004' '\004'
+  printf '%s\n' "$?" > "$input_status"
+} |
+  BIN="$BIN" READY="$ready" KOSH_HISTORY="$ignoreeof_hist" \
+    IGNOREEOF_RC="$ignoreeof_rc" \
+    PROMPT_COMMAND='printf ready > "$READY"; unset PROMPT_COMMAND' \
+    script -qec 'exec "$BIN" -i -M bash --rcfile "$IGNOREEOF_RC"' \
+      /dev/null 2>/dev/null) || exit 1
+[ "$(cat "$input_status")" = 0 ] || exit 1
+warning_count=$(printf '%s\n' "$out" |
+  grep -c 'Use "exit" to leave the shell.')
+case "$out:$warning_count" in
+*EOF_RESET_MARKER*:2) echo "ignoreeof ok" ;;
+*) echo "ignoreeof broken" ;;
 esac

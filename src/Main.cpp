@@ -956,6 +956,7 @@ fn kosh_main(int argc, char **argv) -> int
   bool did_seed_interactive_path_map = false;
   bool did_lint_input_fail = false;
   usize next_file_index = 0;
+  usize ignored_eof_count = 0;
   koshka::analysis_diagnostic_totals lint_diagnostic_totals{};
 
   loop
@@ -1113,6 +1114,7 @@ fn kosh_main(int argc, char **argv) -> int
         if (!toiletline::is_active()) {
           LOG(Info, "initializing the line editor");
           toiletline::initialize();
+          toiletline::set_history_enabled(false);
           /* The set -b wake hook registers even under -T, since job reporting
              is not completion. */
           toiletline::enable_job_notifications(context);
@@ -1204,9 +1206,31 @@ fn kosh_main(int argc, char **argv) -> int
             toiletline::set_input(input);
             continue;
           case TL_PRESSED_EOF:
-            /* EOF logs out only on an empty line. On a non-empty line it is
-               ignored so the user can finish the command. */
+            /* EOF exits only on an empty line after the configured number of
+               consecutive events. */
             if (input.is_empty()) {
+              i64 ignored_eof_limit_count = 0;
+              if (context.shell_option_state(
+                      koshka::shell_option_id::Ignoreeof))
+              {
+                ignored_eof_limit_count = 10;
+                if (let const value = context.get_variable_value("IGNOREEOF");
+                    value.has_value())
+                {
+                  let const parsed =
+                      koshka::utils::parse_decimal_i64(value->view());
+                  if (!parsed.is_error() && parsed.value() >= 0)
+                    ignored_eof_limit_count = parsed.value();
+                }
+              }
+              if (ignored_eof_count <
+                  static_cast<usize>(ignored_eof_limit_count))
+              {
+                ignored_eof_count++;
+                toiletline::emit_newlines(input);
+                koshka::show_message("Use \"exit\" to leave the shell.");
+                continue;
+              }
               koshka::print("^D");
               koshka::flush();
               toiletline::emit_newlines(input);
@@ -1232,6 +1256,8 @@ fn kosh_main(int argc, char **argv) -> int
             break;
           default:;
           }
+
+          if (code != TL_PRESSED_EOF) ignored_eof_count = 0;
 
           toiletline::emit_newlines(input);
 
@@ -1262,6 +1288,31 @@ fn kosh_main(int argc, char **argv) -> int
       koshka::show_message("Last system message: " +
                            koshka::os::last_system_error_message());
       koshka::utils::quit(EXIT_FAILURE);
+    }
+
+    if (context.shell_is_interactive() &&
+        context.shell_option_state(koshka::shell_option_id::Histexpand) &&
+        !script_contents.is_empty())
+    {
+      try {
+        let expanded = koshka::expand_interactive_history(
+            script_contents.view(), history_event_number, context);
+        if (expanded.has_value()) {
+          koshka::show_message(expanded->view());
+          script_contents = expanded.take();
+        }
+      } catch (const koshka::Error &error) {
+        koshka::show_message(error.to_string());
+        continue;
+      }
+    }
+
+    if (context.shell_is_interactive() &&
+        context.shell_option_state(koshka::shell_option_id::History) &&
+        !script_contents.is_empty())
+    {
+      history_event_number =
+          toiletline::history_append_event(script_contents.view());
     }
 
     /* A Ctrl-C used to clear the input line must not abort the command about to

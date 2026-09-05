@@ -171,8 +171,28 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const substitution_mark = cxt.mark_process_substitutions();
   let program_arg_locations =
       ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let keyword_assignments =
+      ArrayList<const tokens::Assignment *>{cxt.scratch_allocator()};
+  const ArrayList<const Token *> *argument_tokens = &m_args;
+  let filtered_argument_tokens =
+      ArrayList<const Token *>{cxt.scratch_allocator()};
+  if (cxt.shell_option_state(shell_option_id::Keyword)) {
+    for (let const token : m_args)
+      if (token->kind() == Token::Kind::Assignment)
+        keyword_assignments.push(
+            static_cast<const tokens::Assignment *>(token));
+
+    if (!keyword_assignments.is_empty()) {
+      filtered_argument_tokens.reserve(m_args.count() -
+                                       keyword_assignments.count());
+      for (let const token : m_args)
+        if (token->kind() != Token::Kind::Assignment)
+          filtered_argument_tokens.push(token);
+      argument_tokens = &filtered_argument_tokens;
+    }
+  }
   let program_args =
-      cxt.process_args(m_args, argument_lifetime::Transient,
+      cxt.process_args(*argument_tokens, argument_lifetime::Transient,
                        argument_context::Command, &program_arg_locations);
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
@@ -499,21 +519,27 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.write_xtrace(trace.view());
   };
 
+  let const do_apply_persistent_assignment =
+      [&](const tokens::Assignment &assignment) throws {
+        let const name = assignment.key().view();
+        let value = cxt.expand_word_for_assignment(assignment.value_word());
+        do_trace_assignment(name, assignment.is_append(), value.view());
+        if (assignment.is_append()) do_apply_append(name, value);
+        cxt.set_shell_variable(name, value);
+        if (cxt.export_all()) {
+          cxt.record_environment_change(name);
+          os::set_environment_variable(name, value.view());
+          cxt.mark_exported(name);
+        }
+      };
+
   /* An expansion may drop every word. A command-less line still carries its
      assignments, which persist in the current shell. */
   if (program_args.is_empty()) {
-    for (let const &var : m_local_vars) {
-      let const name = var.get_name();
-      let value = cxt.expand_word_for_assignment(var.get_value());
-      do_trace_assignment(name, var.is_append(), value.view());
-      if (var.is_append()) do_apply_append(name, value);
-      cxt.set_shell_variable(name, value);
-      if (cxt.export_all()) {
-        cxt.record_environment_change(name);
-        os::set_environment_variable(name, value.view());
-        cxt.mark_exported(name);
-      }
-    }
+    for (let const &var : m_local_vars)
+      do_apply_persistent_assignment(*var.token);
+    for (let const assignment : keyword_assignments)
+      do_apply_persistent_assignment(*assignment);
     /* Bare array assignments apply after the scalars in source order. */
     for (let const &assignment : m_array_args) {
       if (cxt.is_readonly(assignment.name))
@@ -529,12 +555,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* A value that ran a command substitution leaves the status of the last
        one. A line with no substitution resets to 0. */
     let const do_token_ran_substitution = [&](const Token *token) {
-      if (token == nullptr || token->kind() != Token::Kind::Word) {
-        return false;
-      }
-      return static_cast<const tokens::WordToken *>(token)
-          ->word()
-          .runs_substitution();
+      if (token == nullptr) return false;
+      if (token->kind() == Token::Kind::Word)
+        return static_cast<const tokens::WordToken *>(token)
+            ->word()
+            .runs_substitution();
+      if (token->kind() == Token::Kind::Assignment)
+        return static_cast<const tokens::Assignment *>(token)
+            ->value_word()
+            .runs_substitution();
+      return false;
     };
     let ran_substitution = false;
     for (let const token : m_args)
@@ -557,81 +587,25 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   {
     String name;
     Maybe<String> previous_value;
+    Maybe<String> previous_shell_value;
+    bool did_overlay_shell_value;
   };
   ArrayList<saved_env_var> saved_env{cxt.scratch_allocator()};
-  saved_env.reserve(m_local_vars.count());
+  saved_env.reserve(m_local_vars.count() + keyword_assignments.count());
   /* A prefix IFS=... drives the shell's own word splitting for this command
      through the live separator cache. The effective separators are saved before
      the first such prefix and restored on exit. */
   bool was_ifs_assigned = false;
   String saved_ifs_separators{cxt.scratch_allocator()};
   Maybe<ProgramResolver> saved_program_resolver{};
-  /* The assignments apply left to right, each committed before the next is
-     expanded, so a later value reads an earlier same-line one. */
-  for (let const &var : m_local_vars) {
-    let const name = var.get_name();
-    if (cxt.is_readonly(name))
-      throw Error{"Unable to assign '" + name + "' because it is read only"};
-    const bool is_read_field_separator =
-        name == "IFS" && command_word_function == nullptr &&
-        !program_args.is_empty() && program_args[0] == "read";
-    Maybe<String> previous;
-    if (!is_read_field_separator) previous = os::get_environment_variable(name);
-    let expanded_value = String{cxt.scratch_allocator()};
-    try {
-      expanded_value = cxt.expand_word_for_assignment(var.get_value());
-    } catch (const ErrorWithLocation &) {
-      throw;
-    } catch (const Error &e) {
-      relocate_error(e, source_location());
-    }
-    do_trace_assignment(name, var.is_append(), expanded_value.view());
-    if (var.is_append()) do_apply_append(name, expanded_value);
-
-    /* A special builtin keeps the assignment outside the bash mood, so it
-       commits to the store. The bash mood drops it after the command, so it
-       falls to the temporary path instead. */
-    if (is_command_special_builtin && !cxt.is_bash_compatible()) {
-      cxt.set_shell_variable(name, expanded_value);
-      if (cxt.export_all()) {
-        cxt.record_environment_change(name);
-        os::set_environment_variable(name, expanded_value.view());
-        cxt.mark_exported(name);
-      }
-      continue;
-    }
-
-    if (!is_read_field_separator) {
-      saved_env.push(saved_env_var{String{name}, steal(previous)});
-      os::set_environment_variable(name, expanded_value.view());
-      cxt.mark_exported(name);
-    }
-    /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must update
-       it for the environment write to change the search order. */
-    if (name == "PATH") {
-      if (!saved_program_resolver.has_value())
-        saved_program_resolver =
-            Maybe<ProgramResolver>{cxt.get_program_resolver()};
-      cxt.get_program_resolver().assign_path(String{expanded_value.view()});
-    }
-    /* The value before the first IFS prefix is saved once, so a name repeated
-       on the line still reverts to where it began. */
-    if (name == "IFS") {
-      if (!was_ifs_assigned) {
-        was_ifs_assigned = true;
-        saved_ifs_separators =
-            cxt.get_variable_value("IFS").value_or(String{" \t\n"});
-      }
-      cxt.set_field_separators(expanded_value.view());
-    }
-  }
-  cxt.write_xtrace(program_args);
+  Maybe<bool> previous_ignoreeof_state{};
   defer
   {
-    /* The restore runs newest first, so a name spelled more than once restores
-       to the value it held before the first of its assignments. */
     for (usize i = saved_env.count(); i > 0; i--) {
       const saved_env_var &restore = saved_env[i - 1];
+      if (restore.did_overlay_shell_value)
+        cxt.restore_temporary_shell_variable(restore.name.view(),
+                                             restore.previous_shell_value);
       if (restore.previous_value)
         os::set_environment_variable(restore.name.view(),
                                      restore.previous_value->view());
@@ -643,7 +617,94 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (saved_program_resolver.has_value())
       cxt.get_program_resolver() = steal(*saved_program_resolver);
     if (was_ifs_assigned) cxt.set_field_separators(saved_ifs_separators.view());
+    if (previous_ignoreeof_state.has_value())
+      cxt.set_shell_option_state(shell_option_id::Ignoreeof,
+                                 *previous_ignoreeof_state);
   };
+  /* The assignments apply left to right, each committed before the next is
+     expanded, so a later value reads an earlier same-line one. */
+  let const do_apply_environment_assignment =
+      [&](const tokens::Assignment &assignment) throws {
+        let const name = assignment.key().view();
+        if (cxt.is_readonly(name))
+          throw Error{"Unable to assign '" + name +
+                      "' because it is read only"};
+        const bool is_read_field_separator =
+            name == "IFS" && command_word_function == nullptr &&
+            !program_args.is_empty() && program_args[0] == "read";
+        Maybe<String> previous;
+        if (!is_read_field_separator)
+          previous = os::get_environment_variable(name);
+        let expanded_value = String{cxt.scratch_allocator()};
+        try {
+          expanded_value =
+              cxt.expand_word_for_assignment(assignment.value_word());
+        } catch (const ErrorWithLocation &) {
+          throw;
+        } catch (const Error &e) {
+          relocate_error(e, source_location());
+        }
+        do_trace_assignment(name, assignment.is_append(),
+                            expanded_value.view());
+        if (assignment.is_append()) do_apply_append(name, expanded_value);
+
+        /* A special builtin keeps the assignment outside the bash mood, so it
+           commits to the store. The bash mood drops it after the command, so it
+           falls to the temporary path instead. */
+        if (is_command_special_builtin && !cxt.is_bash_compatible()) {
+          cxt.set_shell_variable(name, expanded_value);
+          if (cxt.export_all()) {
+            cxt.record_environment_change(name);
+            os::set_environment_variable(name, expanded_value.view());
+            cxt.mark_exported(name);
+          }
+          return;
+        }
+
+        if (name == "IFS" && !was_ifs_assigned) {
+          was_ifs_assigned = true;
+          saved_ifs_separators =
+              cxt.get_variable_value("IFS").value_or(String{" \t\n"});
+        }
+
+        if (!is_read_field_separator) {
+          Maybe<String> previous_shell_value;
+          let const did_overlay_shell_value = command_word_function != nullptr;
+          if (did_overlay_shell_value) {
+            if (let const *stored = cxt.lookup_shell_variable(name);
+                stored != nullptr)
+            {
+              previous_shell_value =
+                  String{cxt.scratch_allocator(), stored->view()};
+            }
+            if (name == "IGNOREEOF" && !previous_ignoreeof_state.has_value())
+              previous_ignoreeof_state =
+                  cxt.shell_option_state(shell_option_id::Ignoreeof);
+            cxt.set_shell_variable(name, expanded_value.view());
+          }
+          saved_env.push(saved_env_var{
+              String{cxt.scratch_allocator(), name},
+              steal(previous),
+              steal(previous_shell_value), did_overlay_shell_value
+          });
+          os::set_environment_variable(name, expanded_value.view());
+          cxt.mark_exported(name);
+        }
+        /* The resolver reads its own MAYBE_PATH, so a prefix PATH=... must
+           update it for the environment write to change the search order. */
+        if (name == "PATH") {
+          if (!saved_program_resolver.has_value())
+            saved_program_resolver =
+                Maybe<ProgramResolver>{cxt.get_program_resolver()};
+          cxt.get_program_resolver().assign_path(String{expanded_value.view()});
+        }
+        if (name == "IFS") cxt.set_field_separators(expanded_value.view());
+      };
+  for (let const &var : m_local_vars)
+    do_apply_environment_assignment(*var.token);
+  for (let const assignment : keyword_assignments)
+    do_apply_environment_assignment(*assignment);
+  cxt.write_xtrace(program_args);
 
   ASSERT(!program_args.is_empty());
   let const &program_name = program_args[0];

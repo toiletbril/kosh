@@ -30,6 +30,25 @@ substitution-revisions-isolated
 annoying-substitution-isolated
 == command strings publish c in dollar dash:
 command-string
+== bash history and compatibility options round-trip:
+noninteractive-defaults-off
+histexpand-letter-on
+ignoreeof=10
+shellopts-options-on
+histexpand-letter-off
+ignoreeof=unset
+== keyword assignments enter only the command environment:
+K=value argc=2 args=one,two,unset
+K=base argc=2 args=Q=value,tail,unset
+K=basesuffix argc=1 args=append,unset,unset
+after=base
+K=base argc=3 args=one,K=value,two
+commandless=one
+prefix-ifs=2
+keyword-ifs=2
+== ignoreeof option disable can remove a readonly variable:
+option-status=0 value=unset state=off
+unset-status=1 value=3 state=on
 == interactive state is independent of hashall:
 interactive
 == command substitution isolates startup state:

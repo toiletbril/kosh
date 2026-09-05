@@ -8,6 +8,7 @@
 -C
 -E
 -G
+-H
 -I
 -L
 -M
@@ -40,6 +41,7 @@ no-unset
 noclobber
 noexec
 noglob
+nolog
 notify
 nounset
 == set annoying diagnostics name:

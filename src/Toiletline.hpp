@@ -46,6 +46,7 @@ koshka::Maybe<koshka::Path> history_path();
 bool history_write();
 bool history_read();
 bool history_clear();
+void set_history_enabled(bool is_enabled);
 
 struct history_event
 {
@@ -54,6 +55,18 @@ struct history_event
 };
 
 koshka::ArrayList<history_event> history_events(koshka::Allocator allocator);
+koshka::Maybe<history_event>
+relative_history_event(koshka::Allocator allocator, usize distance,
+                       koshka::Maybe<usize> before_event_number = koshka::None);
+koshka::Maybe<history_event>
+numbered_history_event(koshka::Allocator allocator, usize number,
+                       koshka::Maybe<usize> before_event_number = koshka::None);
+koshka::Maybe<history_event>
+prefixed_history_event(koshka::Allocator allocator, StringView prefix,
+                       koshka::Maybe<usize> before_event_number = koshka::None);
+koshka::Maybe<history_event> containing_history_event(
+    koshka::Allocator allocator, StringView text,
+    koshka::Maybe<usize> before_event_number = koshka::None);
 koshka::Maybe<usize> history_append_event(StringView command);
 bool history_rewrite_event(usize number, StringView expected,
                            StringView replacement);

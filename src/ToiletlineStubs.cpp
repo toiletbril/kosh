@@ -37,10 +37,52 @@ fn history_read() -> bool { return true; }
 
 fn history_clear() -> bool { return true; }
 
+fn set_history_enabled(bool is_enabled) -> void { unused(is_enabled); }
+
 fn history_events(koshka::Allocator allocator)
     -> koshka::ArrayList<history_event>
 {
   return koshka::ArrayList<history_event>{allocator};
+}
+
+fn relative_history_event(koshka::Allocator allocator, usize distance,
+                          koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  unused(allocator);
+  unused(distance);
+  unused(before_event_number);
+  return koshka::None;
+}
+
+fn numbered_history_event(koshka::Allocator allocator, usize number,
+                          koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  unused(allocator);
+  unused(number);
+  unused(before_event_number);
+  return koshka::None;
+}
+
+fn prefixed_history_event(koshka::Allocator allocator, StringView prefix,
+                          koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  unused(allocator);
+  unused(prefix);
+  unused(before_event_number);
+  return koshka::None;
+}
+
+fn containing_history_event(koshka::Allocator allocator, StringView text,
+                            koshka::Maybe<usize> before_event_number)
+    -> koshka::Maybe<history_event>
+{
+  unused(allocator);
+  unused(text);
+  unused(before_event_number);
+  return koshka::None;
 }
 
 fn history_append_event(StringView command) -> koshka::Maybe<usize>

@@ -35,3 +35,6 @@ rc=1
 recall ok
 fc replacement ok
 search casefold ok
+history expansion ok
+history option ok
+ignoreeof ok

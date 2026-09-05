@@ -9,6 +9,7 @@ no-unset
 noclobber
 noexec
 noglob
+nolog
 notify
 nounset
 == command position through time options:

@@ -177,6 +177,83 @@ fi
 echo "== command strings publish c in dollar dash:"
 "$BIN" -M bash -c 'case $- in *c*) echo command-string;; *) echo missing;; esac'
 
+echo "== bash history and compatibility options round-trip:"
+"$BIN" -M bash -c '
+for option in history histexpand ignoreeof nolog; do
+  [[ ! -o "$option" ]] || exit 1
+done
+echo noninteractive-defaults-off
+set -o history
+set -H
+set -o ignoreeof
+set -o nolog
+case $- in *H*) echo histexpand-letter-on;; *) exit 1;; esac
+printf "ignoreeof=%s\n" "$IGNOREEOF"
+case :$SHELLOPTS: in
+*:histexpand:history:ignoreeof:interactive-comments:nolog:*)
+  echo shellopts-options-on;;
+*) exit 1;;
+esac
+set +H
+set +o history
+set +o ignoreeof
+set +o nolog
+case $- in *H*) exit 1;; *) echo histexpand-letter-off;; esac
+printf "ignoreeof=%s\n" "${IGNOREEOF-unset}"
+'
+
+echo "== keyword assignments enter only the command environment:"
+"$BIN" -M bash -c '
+probe()
+{
+  printf "K=%s argc=%s args=%s,%s,%s\n" \
+    "${K-unset}" "$#" "${1-unset}" "${2-unset}" "${3-unset}"
+}
+K=base
+set -k
+probe one K=value two
+probe "Q=value" tail
+probe K+=suffix append
+printf "after=%s\n" "$K"
+set +k
+probe one K=value two
+'
+"$BIN" -M bash -c '
+set -k
+unset command_name A
+$command_name A=one
+printf "commandless=%s\n" "${A-unset}"
+'
+"$BIN" -M bash -c '
+probe() { :; }
+IFS=:
+IFS=, probe
+value=a:b
+set -- $value
+printf "prefix-ifs=%s\n" "$#"
+set -k
+probe IFS=, IFS=";"
+value=a:b
+set -- $value
+printf "keyword-ifs=%s\n" "$#"
+'
+
+echo "== ignoreeof option disable can remove a readonly variable:"
+"$BIN" -M bash -c '
+IGNOREEOF=3
+readonly IGNOREEOF
+set +o ignoreeof
+printf "option-status=%s value=%s state=%s\n" "$?" \
+  "${IGNOREEOF-unset}" "$([[ -o ignoreeof ]] && echo on || echo off)"
+'
+"$BIN" -M bash -c '
+IGNOREEOF=3
+readonly IGNOREEOF
+unset IGNOREEOF
+printf "unset-status=%s value=%s state=%s\n" "$?" \
+  "${IGNOREEOF-unset}" "$([[ -o ignoreeof ]] && echo on || echo off)"
+' 2>/dev/null
+
 echo "== interactive state is independent of hashall:"
 send_interactive_input()
 {

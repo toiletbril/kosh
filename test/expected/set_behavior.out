@@ -25,10 +25,14 @@ xtrace         	off
 braceexpand    	on
 noclobber      	off
 errtrace       	off
+histexpand     	off
 physical       	off
 functrace      	off
 interactive-comments	on
 pipefail       	on
+history        	off
+ignoreeof      	off
+nolog          	off
 failglob       	on
 extended-arithmetic	on
 koshkit        	off

@@ -115,7 +115,7 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
     {shell_option_id::Keyword,
      set_option_behavior::Stored,
      'k', "keyword",
-     "Retain keyword assignment mode for compatible option queries.", {},
+     "Place assignment arguments in the command environment.", {},
      true},
     {shell_option_id::Monitor,
      set_option_behavior::Stored,
@@ -158,6 +158,11 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      'E', "errtrace",
      "Retain ERR trap inheritance mode for compatible option queries.", {},
      true},
+    {shell_option_id::Histexpand,
+     set_option_behavior::Stored,
+     'H', "histexpand",
+     "Expand history references introduced by an exclamation mark.", {},
+     true},
     {shell_option_id::Physical,
      set_option_behavior::Stored,
      'P', "physical",
@@ -177,6 +182,21 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      set_option_behavior::Stored,
      '\0', "pipefail",
      "Report a pipeline's status as the rightmost stage that failed.", {},
+     true},
+    {shell_option_id::History,
+     set_option_behavior::Stored,
+     '\0', "history",
+     "Store commands in the history list.", {},
+     true},
+    {shell_option_id::Ignoreeof,
+     set_option_behavior::Stored,
+     '\0', "ignoreeof",
+     "Require repeated end-of-file input before an interactive shell exits.", {},
+     true},
+    {shell_option_id::Nolog,
+     set_option_behavior::Stored,
+     '\0', "nolog",
+     "Accept the Bash compatibility option without changing execution.", {},
      true},
     {shell_option_id::Failglob,
      set_option_behavior::Stored,
@@ -488,6 +508,13 @@ fn apply_or_reject_option(EvalContext &cxt, const set_option_descriptor &option,
     {
       throw Error{"Unable to drop elevated ids: " +
                   os::last_system_error_message()};
+    }
+    if (option.id == shell_option_id::Ignoreeof) {
+      let const value = cxt.get_variable_value("IGNOREEOF");
+      if (enable && !value.has_value())
+        cxt.set_shell_variable("IGNOREEOF", "10");
+      else if (!enable && value.has_value())
+        cxt.disable_ignoreeof();
     }
     cxt.note_shell_option_mutation(option.id);
     cxt.set_shell_option_state(option.id, enable);

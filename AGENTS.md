@@ -199,6 +199,8 @@ changes update this file.
   order redirections from creation to use, and capture status or PIPESTATUS
   before another command changes it. Single-quote literal shell arguments that
   contain backticks.
+- Compare a delimiter-sensitive shell pattern with the literal observed value
+  before running it.
 - When a host shell invokes a reference shell with `-c`, single-quote the source
   at the host boundary so the host cannot expand the reference variables.
 - Keep a shell assignment value on the same logical line as its equals sign.
@@ -246,6 +248,7 @@ changes update this file.
   explicit template instantiations, parameter use, widths, local scope, switch
   case scopes, and standard helper declarations. Repeat the unrestricted
   literal symbol search after the edit.
+- Recheck every break and continue when moving a loop body into a lambda.
 - Write and read framed fields in identical order. Review both sides together
   whenever a framed format changes.
 - Inspect exact-length stream readers for read-ahead and end-of-file dependence

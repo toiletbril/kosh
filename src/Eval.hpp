@@ -90,6 +90,10 @@ enum class shell_option_id : u8
   Hashall,
   Verbose,
   Keyword,
+  History,
+  Histexpand,
+  Ignoreeof,
+  Nolog,
   Errtrace,
   Functrace,
   Braceexpand,
@@ -395,6 +399,9 @@ public:
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
+  fn disable_ignoreeof() throws -> void;
+  fn restore_temporary_shell_variable(
+      StringView name, const Maybe<String> &previous_value) throws -> void;
   fn get_program_resolver() wontthrow -> ProgramResolver &
   {
     return m_program_resolver;
