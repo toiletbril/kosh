@@ -91,16 +91,11 @@ fn append_network_interface_report(String &output, bool should_color,
   return addresses.count();
 }
 
-fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
-                                 Allocator allocator, bool should_color) throws
-    -> usize
+fn append_network_traffic_statistics_report(
+    String &output, ArrayList<String> &warnings, Allocator allocator,
+    const ArrayList<os::network_interface_statistics_entry> &statistics,
+    bool should_color) throws -> usize
 {
-  let statistics = os::read_network_interface_statistics();
-  statistics.sort([](const os::network_interface_statistics_entry &left,
-                     const os::network_interface_statistics_entry &right) {
-    return left.interface_name < right.interface_name;
-  });
-
   usize name_width = 4;
   for (let const &entry : statistics) {
     if (entry.interface_name.length() > name_width) {
@@ -216,6 +211,19 @@ fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
   }
 
   return statistics.count();
+}
+
+fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
+                                 Allocator allocator, bool should_color) throws
+    -> usize
+{
+  let statistics = os::read_network_interface_statistics();
+  statistics.sort([](const os::network_interface_statistics_entry &left,
+                     const os::network_interface_statistics_entry &right) {
+    return left.interface_name < right.interface_name;
+  });
+  return append_network_traffic_statistics_report(output, warnings, allocator,
+                                                  statistics, should_color);
 }
 
 fn append_tcp_report(String &output, ArrayList<String> &warnings,
@@ -344,10 +352,19 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   return true;
 }
 
+struct live_network_row
+{
+  os::network_interface_statistics_entry statistics;
+  u64 last_seen_nanoseconds{0};
+};
+
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
                             f64 falloff_seconds, bool should_color) throws
     -> i32
 {
+  let retained = ArrayList<live_network_row>{allocator};
+  let const falloff_nanoseconds =
+      static_cast<u64>(falloff_seconds * 1000000000.0);
   let const is_terminal = colors::stdout_is_a_terminal();
   let const is_alternate = is_terminal && enter_alternate_screen(ec);
   defer
@@ -357,9 +374,42 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
 
   loop
   {
+    let current = os::read_network_interface_statistics();
+    let const now = os::monotonic_nanos();
+    for (let const &entry : current) {
+      bool is_known = false;
+      for (usize index = 0; index < retained.count(); index++) {
+        if (retained[index].statistics.interface_name.view() !=
+            entry.interface_name.view())
+          continue;
+        retained[index].statistics = entry;
+        retained[index].last_seen_nanoseconds = now;
+        is_known = true;
+        break;
+      }
+      if (!is_known) {
+        retained.push(live_network_row{entry, now});
+      }
+    }
+    for (usize index = retained.count(); index > 0; index--) {
+      let const position = index - 1;
+      if (now - retained[position].last_seen_nanoseconds >=
+          falloff_nanoseconds) {
+        retained.remove(position);
+      }
+    }
+    retained.sort([](const live_network_row &left,
+                     const live_network_row &right) {
+      return left.statistics.interface_name < right.statistics.interface_name;
+    });
+    let statistics =
+        ArrayList<os::network_interface_statistics_entry>{allocator};
+    statistics.reserve(retained.count());
+    for (let const &row : retained) statistics.push(row.statistics);
     let output = String{allocator};
     let warnings = ArrayList<String>{allocator};
-    append_network_traffic_report(output, warnings, allocator, should_color);
+    append_network_traffic_statistics_report(output, warnings, allocator,
+                                             statistics, should_color);
     if (is_terminal) output = String{allocator, "\x1b[H\x1b[2J"} + output.view();
     ec.print_to_stdout(output);
     for (let const &warning : warnings)
