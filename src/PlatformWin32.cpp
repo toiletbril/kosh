@@ -18,6 +18,7 @@
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
 #include "Platform.hpp"
+#include "StaticStringMap.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -1504,6 +1505,11 @@ fn apply_terminal_settings(descriptor terminal,
                            const ArrayList<String> &settings) wontthrow
     -> terminal_settings_apply_result
 {
+  static constexpr static_string_entry<DWORD> TERMINAL_FLAG_ENTRIES[] = {
+      {SSK("echo"), ENABLE_ECHO_INPUT},
+      {SSK("icanon"), ENABLE_LINE_INPUT},
+      {SSK("isig"), ENABLE_PROCESSED_INPUT}};
+  static constexpr StaticStringMap TERMINAL_FLAGS{TERMINAL_FLAG_ENTRIES};
   DWORD mode = 0;
   if (GetConsoleMode(terminal, &mode) == FALSE)
     return {terminal_settings_apply_kind::SystemError, 0};
@@ -1528,19 +1534,13 @@ fn apply_terminal_settings(descriptor terminal,
       is_disabled = true;
       name = name.substring(1);
     }
-    DWORD flag = 0;
-    if (name == "echo")
-      flag = ENABLE_ECHO_INPUT;
-    else if (name == "icanon")
-      flag = ENABLE_LINE_INPUT;
-    else if (name == "isig")
-      flag = ENABLE_PROCESSED_INPUT;
-    else
+    let const flag = TERMINAL_FLAGS.find(name);
+    if (!flag.has_value())
       return {terminal_settings_apply_kind::InvalidSetting, setting_position};
     if (is_disabled)
-      mode &= ~flag;
+      mode &= ~*flag;
     else
-      mode |= flag;
+      mode |= *flag;
   }
   if (SetConsoleMode(terminal, mode) == FALSE)
     return {terminal_settings_apply_kind::SystemError, 0};
