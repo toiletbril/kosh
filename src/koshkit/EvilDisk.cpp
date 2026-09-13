@@ -16,14 +16,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [--color when] [file ...]");
+HELP_SYNOPSIS_DECL("[-a] [file ...]");
 
 HELP_DESCRIPTION_DECL(
     "The evildisk utility reports filesystem capacity and disk health data.");
 
 FLAG(EVILDISK_ALL, Bool, 'a', "all", "Show available SMART data.");
-FLAG(EVILDISK_COLOR, String, '\0', "color",
-     "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilDisk);
@@ -289,18 +287,7 @@ fn EvilDisk::execute(
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  cli_color_mode color_mode = cli_color_mode::Auto;
-  if (FLAG_EVILDISK_COLOR.is_set()) {
-    let const parsed = parse_cli_color_mode(FLAG_EVILDISK_COLOR.value());
-    if (!parsed.has_value()) {
-      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILDISK_COLOR.value_location(),
-                              "invalid color mode",
-                              "use always, auto, or never");
-      return 1;
-    }
-    color_mode = *parsed;
-  }
-  let const should_color = stdout_wants_color(color_mode);
+  let const should_color = koshkit_should_color();
   let const allocator = cxt.scratch_allocator();
 
   let filesystems = ArrayList<os::mounted_filesystem>{allocator};

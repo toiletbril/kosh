@@ -241,7 +241,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   });
 
   let output = String{allocator};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   for (let const &row : output_rows)
     append_size_line(output, row, size_width, should_color);
 

@@ -7,7 +7,6 @@ more
 mv
 == ls flags through koshkit:
 --classify
---color
 --help
 --level
 --recursive
@@ -41,23 +40,25 @@ mv
 --ignore
 == evil flags through koshkit:
 --all
---color
 --help
 --short
+--users
 -a
 -s
+-u
 == evildisk flags through koshkit:
 --all
---color
 --help
 -a
 == evilfiles flags through koshkit:
 --command
 --help
+--network
 --pid
 --terse
 --user
 -c
+-i
 -p
 -t
 -u
@@ -67,13 +68,14 @@ mv
 -a
 == evilio flags through koshkit:
 --all
---color
 --count
 --cumulative
 --help
+--live
 --pid
 --ps
 -a
+-l
 -n
 -p
 == evillogs flags through koshkit:
@@ -134,25 +136,25 @@ mv
 --event-flags
 --exclude
 --help
+--human-readable
 --latency
 --one-event
 --recursive
 --timestamp
 -1
 -e
+-h
 -l
 -r
 -t
 -x
 == goodnode flags through koshkit:
---color
 --help
 --inode
 --root
 -i
 -r
 == goodstat flags through koshkit:
---color
 --dereference
 --help
 -L
@@ -239,11 +241,11 @@ mv
 +%z
 == koshkit own flags:
 --assimilate
+--color
 --help
 --list
 == bare utility flags under set -o koshkit:
 --classify
---color
 --help
 --level
 --recursive

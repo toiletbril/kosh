@@ -100,11 +100,10 @@ rc=2
 note: the inode must be a non-negative integer.
 rc=1
 --- goodnode locates an invalid color mode ---
-1:26: error: goodnode: invalid color mode.
-     1 |  koshkit goodnode --color rainbow .
-       |                           ^~~~~~~
-note: use always, auto, or never.
-rc=1
+1:17: error: koshkit: invalid color mode 'rainbow'.
+     1 |  koshkit --color rainbow goodnode .
+       |                  ^~~~~~~
+rc=2
 --- koshkit sync data mode with no file ---
 1:1: error: sync: Not enough arguments.
      1 |  koshkit sync -d

@@ -17,7 +17,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-asu] [--color when]");
+HELP_SYNOPSIS_DECL("[-asu]");
 
 HELP_DESCRIPTION_DECL(
     "The evil utility reports what the machine is and how it is running.");
@@ -26,8 +26,6 @@ FLAG(EVIL_ALL, Bool, 'a', "all", "Print additional system details.");
 FLAG(EVIL_SHORT, Bool, 's', "short",
      "Print system identity without resource usage.");
 FLAG(EVIL_USERS, Bool, 'u', "users", "Print every local user account.");
-FLAG(EVIL_COLOR, String, '\0', "color",
-     "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Evil);
@@ -88,22 +86,9 @@ fn format_uptime(u64 seconds, Allocator allocator) throws -> String
 fn resolve_color(const ExecContext &ec, EvalContext &cxt,
                  bool &out_should_color) throws -> bool
 {
-  if (!FLAG_EVIL_COLOR.is_set()) {
-    out_should_color = colors::stdout_wants_color();
-    return true;
-  }
-
-  let const selected = parse_cli_color_mode(FLAG_EVIL_COLOR.value());
-  if (!selected.has_value()) {
-    report_soft_koshkit_util_error(
-        ec, cxt, FLAG_EVIL_COLOR.value_location(), "evil",
-        "invalid color mode '" +
-            String{cxt.scratch_allocator(), FLAG_EVIL_COLOR.value()} + "'",
-        "the value is always, auto, or never");
-    return false;
-  }
-
-  out_should_color = stdout_wants_color(*selected);
+  unused(ec);
+  unused(cxt);
+  out_should_color = koshkit_should_color();
   return true;
 }
 

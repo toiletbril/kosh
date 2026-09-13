@@ -297,6 +297,11 @@ fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
                        bool should_allow_options_after_operands = false,
                        bool should_accept_unknown_flag_operand = false) throws
     -> ArrayList<String>;
+fn parse_until_subcommand(
+    const FlagList &flags, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> *arg_locations = nullptr,
+    ArrayList<SourceLocation> *operand_locations = nullptr,
+    StringView program_name = StringView{}) throws -> usize;
 
 fn join_command_line(int argc, const char *const *argv) throws -> String;
 

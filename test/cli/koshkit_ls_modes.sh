@@ -31,9 +31,9 @@ echo "--- sort by size ---"
 echo "--- sort by size reversed ---"
 "$BIN" -c 'koshkit ls -Sr sized'
 echo "--- color never is bare ---"
-"$BIN" -c 'koshkit ls --color never -F'
+"$BIN" -c 'koshkit --color never ls -F'
 echo "--- color always ---"
-"$BIN" -c 'koshkit ls --color always -F' | cat -v
+"$BIN" -c 'koshkit --color always ls -F' | cat -v
 echo "--- redirected output carries no escape ---"
 "$BIN" -c 'koshkit ls -F' | cat -v
 echo "--- human total ---"
@@ -56,7 +56,7 @@ echo "--- invalid level ---"
 "$BIN" -c 'koshkit ls -L 0 sub' 2>/dev/null
 echo "rc=$?"
 echo "--- invalid color ---"
-"$BIN" -c 'koshkit ls --color pink sub' 2>/dev/null
+"$BIN" -c 'koshkit --color pink ls sub' 2>/dev/null
 echo "rc=$?"
 
 cd / || exit 1

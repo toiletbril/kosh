@@ -369,7 +369,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   let const should_show_sections = FLAG_EVILNET_ALL.is_enabled();
   if (should_show_sections) {
     append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,

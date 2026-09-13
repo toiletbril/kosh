@@ -534,7 +534,7 @@ fn EvilLogs::execute(
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   let const has_filter =
       FLAG_EVILLOGS_CORES.is_enabled() || FLAG_EVILLOGS_LOGS.is_enabled();
   let const should_show_titles =

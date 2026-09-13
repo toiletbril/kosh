@@ -352,7 +352,7 @@ fn EvilFiles::execute(
 
   if (rows.is_empty()) return 1;
 
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   let output = String{allocator};
   append_report_column(output, "COMMAND", widths.command, false,
                        colors::ansi::BOLD_CYAN, should_color);

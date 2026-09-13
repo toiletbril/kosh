@@ -1,17 +1,17 @@
-(koshkit evil --color invalid) 2> "$TEST_NULL_DEVICE"
+(koshkit --color invalid evil) 2> "$TEST_NULL_DEVICE"
 echo "invalid-color=$?"
 
 test_passwd=$TEST_TEMP_DIRECTORY/evil-passwd
 printf 'first:x\nsecond:x\n' > "$test_passwd"
 export KOSH_TEST_PASSWD=$test_passwd
 
-evil_all=$(koshkit evil -as --color never)
+evil_all=$(koshkit --color never evil -as)
 case "$evil_all" in
   *Users:*) echo 'all-users=present' ;;
   *) echo 'all-users=absent' ;;
 esac
 
-evil_users=$(koshkit evil -su --color never)
+evil_users=$(koshkit --color never evil -su)
 case "$evil_users" in
   *'Users: first, second'*) echo 'users=present' ;;
   *) echo 'users=missing' ;;

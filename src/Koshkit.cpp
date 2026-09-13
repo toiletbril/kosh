@@ -31,6 +31,23 @@ flatten fn find_util(StringView name) throws -> Maybe<Utility::Kind>
   return KOSHKIT_UTILS.find(name);
 }
 
+static thread_local cli_color_mode KOSHKIT_COLOR_MODE = cli_color_mode::Auto;
+
+fn set_koshkit_color_mode(cli_color_mode mode) wontthrow -> void
+{
+  KOSHKIT_COLOR_MODE = mode;
+}
+
+fn get_koshkit_color_mode() wontthrow -> cli_color_mode
+{
+  return KOSHKIT_COLOR_MODE;
+}
+
+fn koshkit_should_color() throws -> bool
+{
+  return stdout_wants_color(KOSHKIT_COLOR_MODE);
+}
+
 /* Zero-initialized so it is immune to static-init order, filled by each
    utility's registrar. */
 static const FlagList *KOSHKIT_UTIL_FLAG_LISTS[KOSHKIT_UTIL_COUNT] = {};

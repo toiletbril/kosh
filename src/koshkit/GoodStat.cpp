@@ -16,14 +16,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-L] [--color when] file ...");
+HELP_SYNOPSIS_DECL("[-L] file ...");
 
 HELP_DESCRIPTION_DECL(
     "The goodstat utility presents file metadata as a readable report.");
 
 FLAG(GOODSTAT_DEREFERENCE, Bool, 'L', "dereference", "Follow symbolic links.");
-FLAG(GOODSTAT_COLOR, String, '\0', "color",
-     "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(GoodStat);
@@ -171,21 +169,7 @@ fn GoodStat::execute(
     return report_usage_error(ec, cxt, args[0].view());
   }
 
-  bool should_color = colors::stdout_wants_color();
-  if (FLAG_GOODSTAT_COLOR.is_set()) {
-    let const mode = parse_cli_color_mode(FLAG_GOODSTAT_COLOR.value());
-    if (!mode.has_value()) {
-      KOSHKIT_REPORT_ERROR_AT(
-          FLAG_GOODSTAT_COLOR.value_location(),
-          "invalid color mode '" +
-              String{cxt.scratch_allocator(), FLAG_GOODSTAT_COLOR.value()} +
-              "'",
-          "the value is always, auto, or never");
-      return 1;
-    }
-
-    should_color = stdout_wants_color(*mode);
-  }
+  let const should_color = koshkit_should_color();
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};

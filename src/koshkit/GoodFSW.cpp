@@ -278,7 +278,7 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
               &operand_statuses[index]);
   sort_entries(previous);
 
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
 
   loop
   {

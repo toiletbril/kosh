@@ -281,7 +281,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let output = String{allocator};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   usize rendered_count = 0;
 
   if (root_position < nodes.count()) {

@@ -227,7 +227,7 @@ echo "=== evil operand location ==="
 "$BIN" -c 'koshkit evil extra' 2>&1
 
 echo "=== evil color value location ==="
-"$BIN" -c 'koshkit evil --color invalid' 2>&1
+"$BIN" -c 'koshkit --color invalid evil' 2>&1
 
 echo "=== evilfs operand location ==="
 "$BIN" -c 'koshkit evilfs extra' 2>&1
@@ -281,7 +281,7 @@ echo "=== evilio process value location ==="
 "$BIN" -c 'koshkit evilio --pid 0' 2>&1
 
 echo "=== evilio color value location ==="
-"$BIN" -c 'koshkit evilio --color invalid' 2>&1
+"$BIN" -c 'koshkit --color invalid evilio' 2>&1
 
 echo "=== evilio report mode location ==="
 "$BIN" -c 'koshkit evilio --all --cumulative' 2>&1
@@ -341,7 +341,7 @@ echo "=== nproc operand location ==="
 "$BIN" -c 'koshkit nproc extra' 2>&1
 
 echo "=== evildisk color value location ==="
-"$BIN" -c 'koshkit evildisk --color invalid' 2>&1
+"$BIN" -c 'koshkit --color invalid evildisk' 2>&1
 
 echo "=== evildisk path location ==="
 "$BIN" -c 'koshkit evildisk KOSH_MISSING_FILESYSTEM' 2>&1 >/dev/null
@@ -356,7 +356,7 @@ echo "=== goodfsw path location ==="
 "$BIN" -c 'koshkit goodfsw KOSH_MISSING_PATH' 2>&1
 
 echo "=== goodstat color value location ==="
-"$BIN" -c 'koshkit goodstat --color invalid LICENSE' 2>&1
+"$BIN" -c 'koshkit --color invalid goodstat LICENSE' 2>&1
 
 echo "=== goodstat path location ==="
 "$BIN" -c 'koshkit goodstat KOSH_MISSING_PATH' 2>&1

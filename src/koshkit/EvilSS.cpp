@@ -286,7 +286,7 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
   unused(FLAG_EVILSS_NUMERIC);
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   append_network_socket_report(
       output,
       network_socket_report_options{

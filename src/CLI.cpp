@@ -810,6 +810,38 @@ fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
   return operands;
 }
 
+fn parse_until_subcommand(
+  const FlagList &flags, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> *arg_locations,
+    ArrayList<SourceLocation> *operand_locations, StringView program_name) throws
+    -> usize
+{
+  let local_operand_locations = ArrayList<SourceLocation>{heap_allocator()};
+  let operands = parse_flags_vec(
+      flags, args, 0, nullptr, arg_locations,
+      operand_locations != nullptr ? operand_locations : &local_operand_locations,
+      program_name);
+  if (operands.count() <= 1) return args.count();
+
+  let const &locations = operand_locations != nullptr
+                             ? *operand_locations
+                             : local_operand_locations;
+  let const subcommand_operand = operands[1].view();
+  let const subcommand_location = locations[1];
+  if (arg_locations != nullptr) {
+    for (usize index = 0; index < arg_locations->count(); index++) {
+      if ((*arg_locations)[index].position == subcommand_location.position &&
+          (*arg_locations)[index].length == subcommand_location.length)
+        return index;
+    }
+  }
+
+  for (usize index = 0; index < args.count(); index++)
+    if (args[index].view() == subcommand_operand) return index;
+
+  return args.count();
+}
+
 pure fn arg_needs_shell_quoting(StringView arg) wontthrow -> bool
 {
   if (arg.is_empty()) return true;

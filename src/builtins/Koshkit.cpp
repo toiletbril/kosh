@@ -19,7 +19,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[utility] [arg ...]");
+HELP_SYNOPSIS_DECL("[--color when] [utility] [arg ...]");
 
 HELP_DESCRIPTION_DECL("The koshkit builtin runs a bundled utility.");
 
@@ -28,6 +28,8 @@ FLAG(KOSHKIT_LIST, Bool, '\0', "list", "List the utility names, one per line.");
 FLAG(KOSHKIT_ASSIMILATE, String, '\0', "assimilate",
      "Install a symlink to this binary for each utility into the given "
      "directory.");
+FLAG(KOSHKIT_COLOR, String, '\0', "color",
+     "Set utility color output to always, auto, or never.");
 
 REGISTER_BUILTIN_FLAGS(Koshkit);
 
@@ -71,14 +73,29 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  if (let const chosen = koshkit::find_util(ec.args()[0].view());
-      chosen.has_value())
-    return koshkit::dispatch(ec, cxt, 0, chosen);
+  defer { koshkit::set_koshkit_color_mode(cli_color_mode::Auto); };
 
-  if (ec.args().count() >= 2) {
-    if (let const chosen = koshkit::find_util(ec.args()[1].view());
+  let const utility_index = parse_until_subcommand(
+      FLAG_LIST, ec.args(), &ec.arg_locations(), nullptr, ec.program());
+  defer { reset_flags(FLAG_LIST); };
+
+  if (FLAG_KOSHKIT_COLOR.is_set()) {
+    let const selected = parse_cli_color_mode(FLAG_KOSHKIT_COLOR.value());
+    if (!selected.has_value()) {
+      let error = ErrorWithLocation{
+          FLAG_KOSHKIT_COLOR.value_location(),
+          "koshkit: invalid color mode '" +
+              String{FLAG_KOSHKIT_COLOR.value()} + "'"};
+      error.set_command_status(2);
+      throw error;
+    }
+    koshkit::set_koshkit_color_mode(*selected);
+  }
+
+  if (utility_index < ec.args().count()) {
+    if (let const chosen = koshkit::find_util(ec.args()[utility_index].view());
         chosen.has_value())
-      return koshkit::dispatch(ec, cxt, 1, chosen);
+      return koshkit::dispatch(ec, cxt, utility_index, chosen);
   }
 
   let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
@@ -86,7 +103,7 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     sorted_names.push(name.clone());
   sorted_names.sort();
 
-  if (ec.args().count() >= 2 && ec.args()[1] == "--list") {
+  if (FLAG_KOSHKIT_LIST.is_enabled()) {
     let names_output = String{cxt.scratch_allocator()};
     for (let const &name : sorted_names) {
       names_output += name.view();
@@ -96,8 +113,9 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  if (ec.args().count() >= 2 && ec.args()[1] == "--assimilate") {
-    if (ec.args().count() < 3) return report_usage_error(ec, cxt, ec.program());
+  if (FLAG_KOSHKIT_ASSIMILATE.is_set()) {
+    if (FLAG_KOSHKIT_ASSIMILATE.value().is_empty())
+      return report_usage_error(ec, cxt, ec.program());
 
     let const target = os::current_executable_path();
     if (!target.has_value()) {
@@ -106,18 +124,18 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return 1;
     }
 
-    if (!Path{ec.args()[2].view()}.is_directory()) {
+    if (!Path{FLAG_KOSHKIT_ASSIMILATE.value()}.is_directory()) {
       report_soft_builtin_error(
           ec, cxt,
           "Cannot assimilate into '" +
-              String{cxt.scratch_allocator(), ec.args()[2].view()} +
+              String{cxt.scratch_allocator(), FLAG_KOSHKIT_ASSIMILATE.value()} +
               "': not a directory");
       return 1;
     }
 
     i32 status = 0;
     for (let const &name : sorted_names) {
-      let link = Path{ec.args()[2].view()};
+      let link = Path{FLAG_KOSHKIT_ASSIMILATE.value()};
       link.push_component(name.view());
       if (link.is_symbolic_link()) os::remove_file(link.text().view());
       if (!os::create_symlink(target->view(), link.text().view())) {
@@ -130,12 +148,13 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return status;
   }
 
-  if (ec.args().count() < 2 || ec.args()[1] == "--help") {
+  if (FLAG_HELP.is_enabled() || utility_index == ec.args().count()) {
     let listing = String{cxt.scratch_allocator()};
     listing += "DESCRIPTION\n";
     listing += wrap_text(HELP_DESCRIPTION, HELP_INDENT, HELP_WRAP_WIDTH);
     listing += "\n\nSYNOPSIS\n";
     listing += "  koshkit [utility] [arg ...]\n";
+    listing += "  koshkit --color when [utility] [arg ...]\n";
     listing += "  koshkit --list\n";
     listing += "  koshkit --assimilate DIR\n";
     listing += "\nUTILITIES\n\n";
@@ -151,7 +170,7 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
     }
 
-    let const should_color = colors::stdout_wants_color();
+    let const should_color = koshkit::koshkit_should_color();
     append_report_name_section(listing, "POSIX", posix_names, should_color,
                                "  ");
     append_report_name_section(listing, "Koshka", koshka_names, should_color,

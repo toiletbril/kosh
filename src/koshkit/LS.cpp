@@ -20,7 +20,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aA1lhFRrtS] [-L level] [--tree] [--color when] "
+HELP_SYNOPSIS_DECL("[-aA1lhFRrtS] [-L level] [--tree] "
                    "[path ...]");
 
 HELP_DESCRIPTION_DECL("The ls utility lists the names in each directory.");
@@ -44,9 +44,6 @@ FLAG(LS_TREE, Bool, '\0', "tree",
      "Draw every reached subdirectory as an indented tree.");
 FLAG(LS_LEVEL, String, 'L', "level",
      "Descend at most this many levels with -R and --tree.");
-FLAG(LS_COLOR, String, '\0', "color",
-     "Color names by file type. The value is always, auto, or never, and auto "
-     "colors a terminal alone.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(LS);
@@ -669,22 +666,9 @@ static fn render_directory_block(
 static fn resolve_color_mode(const ExecContext &ec, EvalContext &cxt,
                              bool &out_should_color) throws -> bool
 {
-  if (!FLAG_LS_COLOR.is_set()) {
-    out_should_color = colors::stdout_wants_color();
-    return true;
-  }
-
-  let const selected = parse_cli_color_mode(FLAG_LS_COLOR.value());
-  if (!selected.has_value()) {
-    report_soft_koshkit_error(
-        ec, cxt,
-        "ls: invalid color mode '" +
-            String{cxt.scratch_allocator(), FLAG_LS_COLOR.value()} + "'",
-        "the value is always, auto, or never");
-    return false;
-  }
-
-  out_should_color = stdout_wants_color(*selected);
+  unused(ec);
+  unused(cxt);
+  out_should_color = koshkit_should_color();
   return true;
 }
 

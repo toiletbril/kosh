@@ -522,7 +522,7 @@ fn GoodCore::execute(
 
   if (!FLAG_GOODCORE_QUIET.is_enabled()) {
     let result = String{allocator};
-    let const should_color = colors::stdout_wants_color();
+    let const should_color = koshkit_should_color();
     append_report_text(result, "GOODCORE", colors::ansi::BOLD_BLUE,
                        should_color);
     result += "\n";

@@ -173,7 +173,7 @@ fn Cal::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let output = String{cxt.scratch_allocator()};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   let const is_monday_first = FLAG_CAL_TODAY.is_enabled();
   if (month != 0) {
     append_calendar_month(output, month, year, current_date, is_monday_first,

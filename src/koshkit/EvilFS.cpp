@@ -146,7 +146,7 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let output = String{cxt.scratch_allocator()};
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
   if (FLAG_EVILFS_ALL.is_enabled()) {
     append_report_text(output, "FILESYSTEMS", colors::ansi::BOLD_BLUE,
                        should_color);

@@ -19,15 +19,13 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-i inode] [-r root] [--color when] [path ...]");
+HELP_SYNOPSIS_DECL("[-i inode] [-r root] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The goodnode utility reports inode metadata and a CRC32C checksum.");
 
 FLAG(GOODNODE_INODE, String, 'i', "inode", "Locate this inode.");
 FLAG(GOODNODE_ROOT, String, 'r', "root", "Search beneath this path.");
-FLAG(GOODNODE_COLOR, String, '\0', "color",
-     "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(GoodNode);
@@ -285,18 +283,7 @@ fn GoodNode::execute(
     return report_usage_error(ec, cxt, args[0].view());
   }
 
-  cli_color_mode color_mode = cli_color_mode::Auto;
-  if (FLAG_GOODNODE_COLOR.is_set()) {
-    let const parsed = parse_cli_color_mode(FLAG_GOODNODE_COLOR.value());
-    if (!parsed.has_value()) {
-      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_COLOR.value_location(),
-                              "invalid color mode",
-                              "use always, auto, or never");
-      return 1;
-    }
-    color_mode = *parsed;
-  }
-  let const should_color = stdout_wants_color(color_mode);
+  let const should_color = koshkit_should_color();
 
   let output = String{allocator};
   i32 exit_status = 0;

@@ -35,7 +35,7 @@ node_path=$node_root/a/b/needle
 mkdir -p "$node_root/a/b"
 : > "$node_path"
 inode=$("$BIN" -c 'koshkit stat -c %i "$1"' stat "$node_path")
-node_report=$("$BIN" -c 'koshkit goodnode --color never -r "$1" -i "$2"' \
+node_report=$("$BIN" -c 'koshkit --color never goodnode -r "$1" -i "$2"' \
   goodnode "$node_root" "$inode")
 node_status=$?
 case $node_report in
@@ -45,7 +45,7 @@ esac
 printf 'goodnode-status=%s\n' "$node_status"
 printf 'goodnode-path=%s\n' "$node_path_status"
 
-default_report=$("$BIN" -c 'koshkit evilio --color never')
+default_report=$("$BIN" -c 'koshkit --color never evilio')
 case $default_report in
   MEMORY*DISKS*SWAP*) default_shape=matched ;;
   *) default_shape=wrong ;;
@@ -57,7 +57,7 @@ esac
 printf 'evilio-default-shape=%s\n' "$default_shape"
 printf 'evilio-default-scope=%s\n' "$default_scope"
 
-disk_report=$("$BIN" -c 'koshkit evilio --cumulative 0.05 --color never')
+disk_report=$("$BIN" -c 'koshkit --color never evilio --cumulative 0.05')
 case $disk_report in
   DEVICE*READ/S*WRITE/S*"READ OPS/S"*"WRITE OPS/S"*BUSY*"READ LAT"*"WRITE LAT"*"AVG QUEUE"*QUEUE*ERRORS*RETRIES*)
     disk_shape=matched
@@ -86,7 +86,7 @@ esac
 printf 'evilio-cumulative-help=%s\n' "$cumulative_help"
 
 process_report=$("$BIN" -c \
-  'koshkit evilio --cumulative=0.05 --ps --count 1 --color never')
+  'koshkit --color never evilio --cumulative=0.05 --ps --count 1')
 case $process_report in
   *PID*READ/S*WRITE/S*"READ IOPS"*"WRITE IOPS"*COMMAND*)
     process_shape=matched
@@ -115,15 +115,15 @@ done < "$process_report_path"
 printf 'evilio-process-idle=%s\n' "$process_idle"
 
 "$BIN" -c \
-  'koshkit evilio --cumulative --ps -1 0.05 --color never' \
+  'koshkit --color never evilio --cumulative --ps -1 0.05' \
   > "$TEST_NULL_DEVICE"
 printf 'evilio-process-duration-limit=%s\n' "$?"
 
 all_process_report=$(
-  "$BIN" -c 'koshkit evilio --ps --color never'
+  "$BIN" -c 'koshkit --color never evilio --ps'
 )
 limited_process_report=$(
-  "$BIN" -c 'koshkit evilio --ps -1 --color never'
+  "$BIN" -c 'koshkit --color never evilio --ps -1'
 )
 all_process_line_count=$(printf '%s\n' "$all_process_report" | wc -l)
 limited_process_line_count=$(printf '%s\n' "$limited_process_report" | wc -l)
@@ -195,7 +195,7 @@ if [ "$host_system" = Darwin ]; then
     > "$evildisk_tools/diskutil"
   chmod 755 "$evildisk_tools/smartctl" "$evildisk_tools/diskutil"
   evildisk_report=$(PATH="$evildisk_tools:$PATH" "$BIN" -c \
-    'koshkit evildisk -a --color never /dev/null' 2>&1)
+    'koshkit --color never evildisk -a /dev/null' 2>&1)
   case $evildisk_report in
     *disk-test*Verified*temperature*"42 Celsius"*"used 7%"*"media errors 5,075"*warning:*"nonzero SMART counters"*)
       evildisk_fallback=passed
@@ -210,7 +210,7 @@ printf '%s\n' '#!/bin/sh' \
   > "$evildisk_tools/smartctl"
 chmod 755 "$evildisk_tools/smartctl"
 evildisk_ata_report=$(PATH="$evildisk_tools:$PATH" "$BIN" -c \
-  'koshkit evildisk -a --color never /dev/null' 2>&1)
+  'koshkit --color never evildisk -a /dev/null' 2>&1)
 case $evildisk_ata_report in
   *uncorrectable*) evildisk_ata=failed ;;
   *"Mock ATA"*"reallocated 2"*"timeouts 0"*"pending 3"*"CRC errors 4"*warning:*"nonzero SMART counters reallocated 2, pending 3, CRC errors 4"*)
@@ -221,6 +221,6 @@ esac
 printf 'evildisk-smart-fallback=%s\n' "$evildisk_fallback"
 printf 'evildisk-smart-ata=%s\n' "$evildisk_ata"
 
-"$BIN" -c 'koshkit evilio --all --cumulative --color never' \
+"$BIN" -c 'koshkit --color never evilio --all --cumulative' \
   > "$TEST_NULL_DEVICE" 2>&1
 printf 'evilio-conflict=%s\n' "$?"

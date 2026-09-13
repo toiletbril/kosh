@@ -17,7 +17,7 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-a] [--live] [--cumulative [seconds]] "
-                   "[--ps | -NUMBER | -n count | -p pid] [--color when]");
+                   "[--ps | -NUMBER | -n count | -p pid]");
 
 HELP_DESCRIPTION_DECL(
     "The evilio utility reports system and process I/O activity.");
@@ -43,8 +43,6 @@ FLAG(EVILIO_LIVE, Bool, 'l', "live",
      "Refresh rate and IOPS samples until interrupted.");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
-FLAG(EVILIO_COLOR, String, '\0', "color",
-     "Set color output to always, auto, or never.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilIO);
@@ -852,18 +850,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     selected_pid = parsed.value();
   }
 
-  cli_color_mode color_mode = cli_color_mode::Auto;
-  if (FLAG_EVILIO_COLOR.is_set()) {
-    let const parsed = parse_cli_color_mode(FLAG_EVILIO_COLOR.value());
-    if (!parsed.has_value()) {
-      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_COLOR.value_location(),
-                              "invalid color mode",
-                              "use always, auto, or never");
-      return 1;
-    }
-    color_mode = *parsed;
-  }
-  let const should_color = stdout_wants_color(color_mode);
+  let const should_color = koshkit_should_color();
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();

@@ -65,9 +65,9 @@ note: use a valid local calendar time in [[CC]YY]MMDDhhmm[.SS] format.
        |  ^~~~~~~~~~~~~~
 note: Supply SET1 and SET2, or use `-d` with one set.
 === find bad -type ===
-1:1: error: find: -type expects one of f, d, or l.
+1:22: error: find: -type expects one of f, d, or l.
      1 |  koshkit find . -type x
-       |  ^~~~~~~~~~~~~~~~~~~~~~
+       |                       ^
 note: Pass `f`, `d`, or `l` after `-type`.
 === readlink extra operand location ===
 1:24: error: readlink: extra operand 'second'.
@@ -357,10 +357,9 @@ note: use increasing positive columns separated by commas or blanks.
        |               ^~~~~
 note: this utility reads no operand.
 === evil color value location ===
-1:22: error: evil: invalid color mode 'invalid'.
-     1 |  koshkit evil --color invalid
-       |                       ^~~~~~~
-note: the value is always, auto, or never.
+1:17: error: koshkit: invalid color mode 'invalid'.
+     1 |  koshkit --color invalid evil
+       |                  ^~~~~~~
 === evilfs operand location ===
 1:16: error: evilfs: unexpected operand.
      1 |  koshkit evilfs extra
@@ -447,10 +446,9 @@ note: the count must be from 1 through 100000.
        |                       ^
 note: the process id must be a positive integer.
 === evilio color value location ===
-1:24: error: evilio: invalid color mode.
-     1 |  koshkit evilio --color invalid
-       |                         ^~~~~~~
-note: use always, auto, or never.
+1:17: error: koshkit: invalid color mode 'invalid'.
+     1 |  koshkit --color invalid evilio
+       |                  ^~~~~~~
 === evilio report mode location ===
 1:22: error: evilio: conflicting report modes.
      1 |  koshkit evilio --all --cumulative
@@ -554,10 +552,9 @@ note: use an unsigned decimal count.
        |                ^~~~~
 note: nproc accepts flags without operands.
 === evildisk color value location ===
-1:26: error: evildisk: invalid color mode.
-     1 |  koshkit evildisk --color invalid
-       |                           ^~~~~~~
-note: use always, auto, or never.
+1:17: error: koshkit: invalid color mode 'invalid'.
+     1 |  koshkit --color invalid evildisk
+       |                  ^~~~~~~
 === evildisk path location ===
 1:18: error: evildisk: cannot read 'KOSH_MISSING_FILESYSTEM': No such file or directory.
      1 |  koshkit evildisk KOSH_MISSING_FILESYSTEM
@@ -577,10 +574,9 @@ note: provide a user name or numeric uid.
      1 |  koshkit goodfsw KOSH_MISSING_PATH
        |                  ^~~~~~~~~~~~~~~~~
 === goodstat color value location ===
-1:26: error: goodstat: invalid color mode 'invalid'.
-     1 |  koshkit goodstat --color invalid LICENSE
-       |                           ^~~~~~~
-note: the value is always, auto, or never.
+1:17: error: koshkit: invalid color mode 'invalid'.
+     1 |  koshkit --color invalid goodstat LICENSE
+       |                  ^~~~~~~
 === goodstat path location ===
 1:18: error: goodstat: cannot stat 'KOSH_MISSING_PATH': No such file or directory.
      1 |  koshkit goodstat KOSH_MISSING_PATH

@@ -143,7 +143,7 @@ fn Watch::execute(const ExecContext &ec, EvalContext &cxt,
   bool has_previous_body = false;
   i32 status = 0;
   let const is_terminal = colors::stdout_is_a_terminal();
-  let const should_color = colors::stdout_wants_color();
+  let const should_color = koshkit_should_color();
 
   let const saved_terminal_exec = cxt.terminal_exec_allowed();
   cxt.set_terminal_exec_allowed(false);

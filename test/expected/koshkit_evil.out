@@ -4,7 +4,7 @@
       [Subshell]
         [CompoundList]
           [CompoundListCondition, None]
-            [SimpleCommand "koshkit" "evil" "--color" "invalid"]
+            [SimpleCommand "koshkit" "--color" "invalid" "evil"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "invalid-color=$?"]
   [CompoundListCondition, None]
@@ -14,7 +14,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "export" "KOSH_TEST_PASSWD=$test_passwd"]
   [CompoundListCondition, None]
-    [Assign evil_all=$(koshkit evil -as --color never)]
+    [Assign evil_all=$(koshkit --color never evil -as)]
   [CompoundListCondition, None]
     [CaseClause]
       [CompoundList]
@@ -24,7 +24,7 @@
         [CompoundListCondition, None]
           [SimpleCommand "echo" "all-users=absent"]
   [CompoundListCondition, None]
-    [Assign evil_users=$(koshkit evil -su --color never)]
+    [Assign evil_users=$(koshkit --color never evil -su)]
   [CompoundListCondition, None]
     [CaseClause]
       [CompoundList]
@@ -37,13 +37,13 @@
   Unquoted "koshkit"
 ]
 [Word
-  Unquoted "evil"
-]
-[Word
   Unquoted "--color"
 ]
 [Word
   Unquoted "invalid"
+]
+[Word
+  Unquoted "evil"
 ]
 [Word
   Unquoted "2"
@@ -81,7 +81,7 @@
 ]
 [Word
   Unquoted "evil_all="
-  CommandSubstitution "koshkit evil -as --color never"
+  CommandSubstitution "koshkit --color never evil -as"
 ]
 [Word
   Unquoted "case"
@@ -115,7 +115,7 @@
 ]
 [Word
   Unquoted "evil_users="
-  CommandSubstitution "koshkit evil -su --color never"
+  CommandSubstitution "koshkit --color never evil -su"
 ]
 [Word
   Unquoted "case"
