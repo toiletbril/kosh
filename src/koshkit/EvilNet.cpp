@@ -16,13 +16,16 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-at]");
+HELP_SYNOPSIS_DECL("[-atl] [--falloff seconds]");
 
 HELP_DESCRIPTION_DECL(
     "The evilnet utility reports the addresses assigned to each interface.");
 
 FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
 FLAG(EVILNET_TRAFFIC, Bool, 't', "traffic", "Show interface traffic only.");
+FLAG(EVILNET_LIVE, Bool, 'l', "live", "Refresh traffic until interrupted.");
+FLAG(EVILNET_FALLOFF, String, '\0', "falloff",
+     "Retain inactive interfaces for this many seconds.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilNet);
@@ -341,6 +344,34 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   return true;
 }
 
+fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
+                            f64 falloff_seconds, bool should_color) throws
+    -> i32
+{
+  let const is_terminal = colors::stdout_is_a_terminal();
+  let const is_alternate = is_terminal && enter_alternate_screen(ec);
+  defer
+  {
+    if (is_alternate) leave_alternate_screen(ec);
+  };
+
+  loop
+  {
+    let output = String{allocator};
+    let warnings = ArrayList<String>{allocator};
+    append_network_traffic_report(output, warnings, allocator, should_color);
+    if (is_terminal) output = String{allocator, "\x1b[H\x1b[2J"} + output.view();
+    ec.print_to_stdout(output);
+    for (let const &warning : warnings)
+      show_message(Warning{warning.view()}.to_string());
+    os::sleep_for_seconds(falloff_seconds);
+    if (os::INTERRUPT_REQUESTED != 0) {
+      os::INTERRUPT_REQUESTED = 0;
+      return 130;
+    }
+  }
+}
+
 } /* namespace */
 
 EvilNet::EvilNet() = default;
@@ -371,6 +402,21 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let const should_color = koshkit_should_color();
+  if (FLAG_EVILNET_LIVE.is_enabled()) {
+    f64 falloff_seconds = 5.0;
+    if (FLAG_EVILNET_FALLOFF.is_set()) {
+      let const parsed = utils::parse_decimal_f64(FLAG_EVILNET_FALLOFF.value());
+      if (parsed.is_error() || parsed.value() <= 0) {
+        KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_FALLOFF.value_location(),
+                                "invalid falloff interval",
+                                "use a positive number of seconds");
+        return 1;
+      }
+      falloff_seconds = parsed.value();
+    }
+    return run_live_network_traffic(ec, allocator, falloff_seconds,
+                                    should_color);
+  }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
   let const should_show_traffic =
       should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled();

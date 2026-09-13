@@ -375,6 +375,11 @@ note: this utility reads no operand.
      1 |  koshkit evilnet extra
        |                  ^~~~~
 note: this utility accepts no operands.
+=== evilnet falloff location ===
+1:34: error: evilnet: invalid falloff interval.
+     1 |  koshkit evilnet --live --falloff invalid
+       |                                   ^~~~~~~
+note: use a positive number of seconds.
 === evilss operand location ===
 1:16: error: evilss: unexpected operand.
      1 |  koshkit evilss extra

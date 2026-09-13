@@ -238,6 +238,9 @@ echo "=== evillogs operand location ==="
 echo "=== evilnet operand location ==="
 "$BIN" -c 'koshkit evilnet extra' 2>&1
 
+echo "=== evilnet falloff location ==="
+"$BIN" -c 'koshkit evilnet --live --falloff invalid' 2>&1
+
 echo "=== evilss operand location ==="
 "$BIN" -c 'koshkit evilss extra' 2>&1
 
