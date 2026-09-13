@@ -129,6 +129,6 @@ UTILITIES
     wc        which     who       whoami    xargs     yes
 
   Koshka
-    evil       evildisk   evilfiles  evilfs     evilio     evillogs
-    evilnet    evilps     evilss     goodcore   goodfsw    goodnode
-    goodstat
+    evil       evildisk   evilfiles  evilfs     evilio     eviliso
+    evillogs   evilnet    evilps     evilss     goodcore   goodfsw
+    goodnode   goodstat

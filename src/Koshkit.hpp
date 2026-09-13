@@ -136,6 +136,7 @@ public:
     EvilIO,
     EvilLogs,
     EvilSS,
+    EvilIso,
     GoodCore,
   };
 
@@ -254,6 +255,7 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("evilio"),    Utility::Kind::EvilIO   },
     {SSK("evillogs"),  Utility::Kind::EvilLogs },
     {SSK("evilss"),    Utility::Kind::EvilSS   },
+    {SSK("eviliso"),   Utility::Kind::EvilIso  },
     {SSK("goodcore"),  Utility::Kind::GoodCore },
 };
 
@@ -476,6 +478,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(EvilIO);                                                              \
   U_CASE(EvilLogs);                                                            \
   U_CASE(EvilSS);                                                              \
+  U_CASE(EvilIso);                                                             \
   U_CASE(GoodCore)
 
 #define UTILITY_STRUCT(u)                                                      \
@@ -593,6 +596,7 @@ UTILITY_STRUCT(EvilDisk);
 UTILITY_STRUCT(EvilIO);
 UTILITY_STRUCT(EvilLogs);
 UTILITY_STRUCT(EvilSS);
+UTILITY_STRUCT(EvilIso);
 UTILITY_STRUCT(GoodCore);
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;

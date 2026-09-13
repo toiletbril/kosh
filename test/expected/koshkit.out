@@ -82,6 +82,18 @@ mv
 --cores
 --help
 --logs
+== eviliso flags through koshkit:
+--all
+--cgroups
+--help
+--namespaces
+--remote
+--sessions
+-a
+-c
+-n
+-r
+-s
 == evilnet flags through koshkit:
 --all
 --help

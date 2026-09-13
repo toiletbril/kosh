@@ -62,6 +62,7 @@ static pure fn get_utility_section(koshkit::Utility::Kind kind) wontthrow
   case koshkit::Utility::Kind::EvilDisk:
   case koshkit::Utility::Kind::EvilIO:
   case koshkit::Utility::Kind::EvilLogs:
+  case koshkit::Utility::Kind::EvilIso:
   case koshkit::Utility::Kind::GoodCore:
   case koshkit::Utility::Kind::EvilSS:
   case koshkit::Utility::Kind::GoodFSW: return utility_section::Koshka;

@@ -1,0 +1,7 @@
+default-shape=matched
+all-shape=matched
+namespaces-selector=matched
+cgroups-selector=matched
+sessions-selector=matched
+remote-selector=matched
+help-shape=matched

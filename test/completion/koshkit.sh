@@ -15,7 +15,7 @@ echo "== timeout flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit timeout -' </dev/null
 echo "== nproc flags through koshkit:"
 "$BIN" --debug-complete-at 'koshkit nproc -' </dev/null
-for utility in evil evildisk evilfiles evilfs evilio evillogs evilnet evilps \
+for utility in evil evildisk evilfiles evilfs evilio evillogs eviliso evilnet evilps \
   evilss goodcore goodfsw goodnode goodstat retry stat sync watch; do
   echo "== $utility flags through koshkit:"
   "$BIN" --debug-complete-at "koshkit $utility -" </dev/null
