@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r]");
+HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r] [-k]");
 
 HELP_DESCRIPTION_DECL(
     "The eviliso utility reports namespaces, cgroups, sessions, and remote "
@@ -27,6 +27,8 @@ FLAG(EVILISO_NAMESPACES, Bool, 'n', "namespaces", "Report process namespaces.");
 FLAG(EVILISO_CGROUPS, Bool, 'c', "cgroups", "Report cgroup membership.");
 FLAG(EVILISO_SESSIONS, Bool, 's', "sessions", "Report login sessions.");
 FLAG(EVILISO_REMOTE, Bool, 'r', "remote", "Report remote-capable sockets.");
+FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
+     "Report container and Kubernetes runtime evidence.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilIso);
@@ -43,11 +45,26 @@ fn append_namespace_report(String &output, bool should_color) throws -> void
   let body = String{heap_allocator()};
   constexpr StringView names[] = {"cgroup", "ipc", "mnt", "net", "pid",
                                   "time",    "user", "uts"};
+  let const processes = os::enumerate_processes();
   for (let const name : names) {
-    let const target = os::read_symlink(
-        String{"/proc/self/ns/"} + name, heap_allocator());
+    let const target = os::read_symlink(String{"/proc/self/ns/"} + name,
+                                        heap_allocator());
     append_report_field(body, name,
                         target.has_value() ? target->view() : "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+    if (!target.has_value()) continue;
+
+    usize process_count = 0;
+    for (let const &process : processes) {
+      let const process_namespace = os::read_symlink(
+          String{"/proc/"} + String::from(process.pid, heap_allocator()) +
+              "/ns/" + name,
+          heap_allocator());
+      if (process_namespace.has_value() && process_namespace->view() == target->view())
+        process_count++;
+    }
+    let const process_field = String::from(process_count, heap_allocator());
+    append_report_field(body, String{name} + " processes", process_field.view(),
                         colors::ansi::BOLD_CYAN, should_color);
   }
   output += body.view();
@@ -105,6 +122,40 @@ fn append_remote_report(String &output, bool should_color) throws -> void
                       colors::ansi::BOLD_CYAN, should_color);
 }
 
+fn append_runtime_report(String &output, bool should_color) throws -> void
+{
+  append_report_text(output, "RUNTIME", colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+  let const cgroup = Path{"/proc/1/cgroup"}.read_entire_file();
+  let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
+  let const kubernetes = os::get_environment_variable("KUBERNETES_SERVICE_HOST");
+  let runtime = String{heap_allocator()};
+  if (kubernetes.has_value() || cgroup_text.find_substring("kubepods").has_value())
+    runtime += "kubernetes";
+  if (cgroup_text.find_substring("docker").has_value()) {
+    if (!runtime.is_empty()) runtime += ", ";
+    runtime += "docker";
+  }
+  if (cgroup_text.find_substring("containerd").has_value()) {
+    if (!runtime.is_empty()) runtime += ", ";
+    runtime += "containerd";
+  }
+  if (cgroup_text.find_substring("crio").has_value()) {
+    if (!runtime.is_empty()) runtime += ", ";
+    runtime += "cri-o";
+  }
+  if (runtime.is_empty() && Path{"/.dockerenv"}.is_regular_file()) runtime = "docker";
+  if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file()) runtime = "podman";
+  append_report_field(output, "Runtime", runtime.is_empty() ? "none detected" : runtime.view(),
+                      colors::ansi::BOLD_CYAN, should_color);
+  append_report_field(output, "Kubernetes",
+                      kubernetes.has_value() ||
+                              cgroup_text.find_substring("kubepods").has_value()
+                          ? "present"
+                          : "not detected",
+                      colors::ansi::BOLD_CYAN, should_color);
+}
+
 } // namespace
 
 EvilIso::EvilIso() = default;
@@ -130,7 +181,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
                            FLAG_EVILISO_NAMESPACES.is_enabled() ||
                            FLAG_EVILISO_CGROUPS.is_enabled() ||
                            FLAG_EVILISO_SESSIONS.is_enabled() ||
-                           FLAG_EVILISO_REMOTE.is_enabled();
+                           FLAG_EVILISO_REMOTE.is_enabled() ||
+                           FLAG_EVILISO_RUNTIME.is_enabled();
   let const show_namespaces = FLAG_EVILISO_ALL.is_enabled() ||
                               !any_selector ||
                               FLAG_EVILISO_NAMESPACES.is_enabled();
@@ -140,12 +192,15 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
                             !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
   let const show_remote = FLAG_EVILISO_ALL.is_enabled() ||
                           !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
+  let const show_runtime = FLAG_EVILISO_ALL.is_enabled() ||
+                           !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
   if (show_namespaces) append_namespace_report(output, should_color);
   if (show_cgroups) append_cgroup_report(output, should_color);
   if (show_sessions) append_session_report(output, should_color);
   if (show_remote) append_remote_report(output, should_color);
+  if (show_runtime) append_runtime_report(output, should_color);
   ec.print_to_stdout(output);
   return 0;
 }

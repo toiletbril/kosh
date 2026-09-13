@@ -29,7 +29,8 @@ for selector_section in \
   'namespaces -n NAMESPACES' \
   'cgroups -c CGROUPS' \
   'sessions -s SESSIONS' \
-  'remote -r REMOTE'; do
+  'remote -r REMOTE' \
+  'runtime -k RUNTIME'; do
   set -- $selector_section
   report=$(run_report "$2")
   case $report in

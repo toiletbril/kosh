@@ -1504,7 +1504,8 @@ The bundled set contains basename, bc, cal, calc, cat, chgrp, chmod, chown,
 cksum, cmp, comm, cp, csplit, cut, date, df, diff, dirname, du, env, evil,
 evildisk, evilfiles, evilfs, evilio, eviliso, evillogs, evilnet, evilps, evilss,
 expand, expr, file, find, flock, fold, fuser, getconf, goodcore, goodfsw,
-goodnode, goodstat, grep, head, id, killall, link, ln, locale, logger, logname, ls, make,
+goodnode, goodstat, grep, head, id, killall, link, ln, locale, logger,
+logname, ls, make,
 man, mkdir, mkfifo, more, mv, nice, nl, nohup, nproc, od, paste, pathchk,
 pkill, pr, printenv, ps, readlink, realpath, renice, retry, rm, rmdir, sed, seq,
 sleep, sort, split, stat, strings, stty, sync, tabs, tail, tee, timeout, touch,
@@ -1897,8 +1898,10 @@ option selects all sections; otherwise
 .BR -n , -c , -s ,
 and
 .B -r
-select namespaces, cgroups, sessions, and remote sockets. With no selector,
-all sections are shown.
+select namespaces, cgroups, sessions, and remote sockets; the
+.B \\-k
+option selects container and Kubernetes runtime evidence. With no selector, all
+sections are shown.
 .TP
 .B evildisk
 The utility prints capacity and filesystem identity for each named path or

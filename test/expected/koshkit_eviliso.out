@@ -4,4 +4,5 @@ namespaces-selector=matched
 cgroups-selector=matched
 sessions-selector=matched
 remote-selector=matched
+runtime-selector=matched
 help-shape=matched

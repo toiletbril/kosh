@@ -88,9 +88,11 @@ mv
 --help
 --namespaces
 --remote
+--runtime
 --sessions
 -a
 -c
+-k
 -n
 -r
 -s
