@@ -13,6 +13,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -221,7 +222,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (FLAG_EVILPS_SORT.is_set()) {
     let const key = FLAG_EVILPS_SORT.value();
-    if (key != "name" && key != "pid" && key != "cpu" && key != "memory") {
+    static constexpr PackedStringKey SORT_KEYS[] = {
+        SSK("name"), SSK("pid"), SSK("cpu"), SSK("memory")};
+    static constexpr StaticStringSet VALID_SORT_KEYS{SORT_KEYS};
+    if (!VALID_SORT_KEYS.contains(key)) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_EVILPS_SORT.value_location(),
                               "invalid sort key",
                               "use name, pid, cpu, or memory");
