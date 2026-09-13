@@ -1906,10 +1906,11 @@ sections are shown.
 .B evildisk
 The utility prints capacity and filesystem identity for each named path or
 mounted filesystem. It also prints native disk error and retry totals when the
-operating system provides them. The
+operating system provides them. With
 .B \-a
-option adds SMART status, model, and protocol data when smartctl or macOS
-diskutil is available.
+mount labels and UUIDs plus filesystem error counters are included when the
+platform exposes them. The same option adds SMART status, model, and protocol
+data when smartctl or macOS diskutil is available.
 .TP
 .B evilfiles
 Open files are listed for visible processes. The

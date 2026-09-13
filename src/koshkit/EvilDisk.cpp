@@ -488,6 +488,75 @@ fn EvilDisk::execute(
   }
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
+    output += "\n";
+    append_report_text(output, "IDENTITY", colors::ansi::BOLD_BLUE,
+                       should_color);
+    output += "\n";
+    bool has_identity = false;
+    for (let const &filesystem : filesystems) {
+      if (filesystem.volume_name.is_empty() &&
+          filesystem.volume_uuid.is_empty())
+        continue;
+      has_identity = true;
+      let body = String{allocator};
+      append_report_field(body, "Mount", filesystem.target.view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(body, "Label",
+                          filesystem.volume_name.is_empty()
+                              ? StringView{"-"}
+                              : filesystem.volume_name.view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(body, "UUID",
+                          filesystem.volume_uuid.is_empty()
+                              ? StringView{"-"}
+                              : filesystem.volume_uuid.view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_body(output, body.view());
+    }
+    if (!has_identity) {
+      let body = String{allocator};
+      append_report_field(body, "Status", "unavailable",
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_body(output, body.view());
+    }
+
+    output += "\n";
+    append_report_text(output, "FILESYSTEM FAILURES", colors::ansi::BOLD_BLUE,
+                       should_color);
+    output += "\n";
+    bool has_filesystem_failures = false;
+    for (let const &filesystem : filesystems) {
+      os::filesystem_error_counters counters{};
+      if (!os::read_filesystem_error_counters(filesystem.target.view(),
+                                              counters))
+        continue;
+      has_filesystem_failures = true;
+      let body = String{allocator};
+      append_report_field(body, "Mount", filesystem.target.view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+      let values = String{allocator, "read "};
+      values += String::from(counters.read_count, allocator).view();
+      values += ", write ";
+      values += String::from(counters.write_count, allocator).view();
+      values += ", flush ";
+      values += String::from(counters.flush_count, allocator).view();
+      values += ", corruption ";
+      values += String::from(counters.corruption_count, allocator).view();
+      values += ", generation ";
+      values += String::from(counters.generation_count, allocator).view();
+      append_report_field(body, "Counters", values.view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_body(output, body.view());
+    }
+    if (!has_filesystem_failures) {
+      let body = String{allocator};
+      append_report_field(body, "Status", "unavailable",
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_body(output, body.view());
+    }
+  }
+
+  if (FLAG_EVILDISK_ALL.is_enabled()) {
     let const smart_rows = read_smart_rows(cxt, filesystems, allocator);
     output += "\n";
     append_report_text(output, "SMART", colors::ansi::BOLD_BLUE, should_color);
