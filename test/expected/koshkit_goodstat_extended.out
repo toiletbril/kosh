@@ -1,0 +1,5 @@
+default-scope=portable
+filesystem-shape=matched
+checksum-shape=matched
+combined-status=0
+help-shape=matched

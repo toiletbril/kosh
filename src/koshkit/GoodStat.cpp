@@ -16,12 +16,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-L] file ...");
+HELP_SYNOPSIS_DECL("[-L] [-c] [-f] file ...");
 
 HELP_DESCRIPTION_DECL(
     "The goodstat utility presents file metadata as a readable report.");
 
 FLAG(GOODSTAT_DEREFERENCE, Bool, 'L', "dereference", "Follow symbolic links.");
+FLAG(GOODSTAT_CHECKSUM, Bool, 'c', "checksum", "Calculate a CRC32C checksum.");
+FLAG(GOODSTAT_FILESYSTEM, Bool, 'f', "filesystem",
+     "Report filesystem capacity and identity.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(GoodStat);
@@ -64,9 +67,57 @@ fn size_text(u64 size, Allocator allocator) throws -> String
   return result;
 }
 
+fn file_crc32c(const ExecContext &ec, StringView path,
+               Allocator allocator) throws -> Maybe<String>
+{
+  let const input = open_named_or_stdin(ec, path);
+  if (!input.has_value()) return None;
+  defer
+  {
+    if (input->should_close) unused(os::close_fd(input->descriptor));
+  };
+
+  u32 crc = 0xffffffffu;
+  char buffer[65536];
+  loop
+  {
+    let const read_count = os::read_fd(input->descriptor, buffer, sizeof(buffer));
+    if (!read_count.has_value()) return None;
+    if (*read_count == 0) break;
+    crc = os::crc32c_update(crc, buffer, *read_count);
+    if (os::INTERRUPT_REQUESTED) return None;
+  }
+
+  let digest = String::from_in_base(~crc, false, int_base::hex, allocator);
+  if (digest.length() < 8) {
+    let padded = String{allocator};
+    padded.append_repeated('0', 8 - digest.length());
+    padded += digest.view();
+    return padded;
+  }
+  return digest;
+}
+
+fn percent_used(const os::filesystem_status &filesystem) wontthrow -> u64
+{
+  if (filesystem.total_blocks == 0) return 0;
+  let const used = filesystem.total_blocks -
+                   (filesystem.free_blocks > filesystem.total_blocks
+                        ? filesystem.total_blocks
+                        : filesystem.free_blocks);
+  let const whole_percent = used / filesystem.total_blocks;
+  let const remainder = used % filesystem.total_blocks;
+  return whole_percent * 100 +
+         static_cast<u64>(
+             (static_cast<u128>(remainder) * 100 +
+              filesystem.total_blocks / 2) /
+             filesystem.total_blocks);
+}
+
 fn append_subject(String &output, StringView operand,
                   const os::file_status &status, bool should_color,
-                  Allocator allocator) throws -> void
+                  bool should_report_filesystem, bool should_report_checksum,
+                  const ExecContext &ec, Allocator allocator) throws -> void
 {
   append_report_text(output, operand, colors::ansi::BOLD_BLUE, should_color);
   output += "\n";
@@ -143,6 +194,46 @@ fn append_subject(String &output, StringView operand,
                                             allocator)
                           .view(),
                       colors::ansi::BOLD_CYAN, should_color);
+
+  if (should_report_filesystem) {
+    let filesystem = os::filesystem_status{};
+    if (os::stat_filesystem(operand, filesystem)) {
+      append_report_field(body, "Filesystem",
+                          StringView{filesystem.type_name},
+                          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          body, "Filesystem block size",
+          String::from(filesystem.block_size, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          body, "Filesystem capacity",
+          String::from(percent_used(filesystem), allocator).view() + "%",
+          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          body, "Filesystem blocks",
+          String::from(filesystem.total_blocks, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          body, "Filesystem free blocks",
+          String::from(filesystem.free_blocks, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          body, "Filesystem available blocks",
+          String::from(filesystem.available_blocks, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          body, "Filesystem id",
+          String::from(filesystem.filesystem_id, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+  }
+
+  if (should_report_checksum && os::file_type_letter(status.mode) == '-') {
+    if (let const checksum = file_crc32c(ec, operand, allocator))
+      append_report_field(body, "CRC32C", checksum->view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+  }
+
   append_report_body(output, body.view());
 }
 
@@ -170,6 +261,8 @@ fn GoodStat::execute(
   }
 
   let const should_color = koshkit_should_color();
+  let const should_report_filesystem = FLAG_GOODSTAT_FILESYSTEM.is_enabled();
+  let const should_report_checksum = FLAG_GOODSTAT_CHECKSUM.is_enabled();
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
@@ -208,6 +301,7 @@ fn GoodStat::execute(
 
     if (!output.is_empty()) output += "\n";
     append_subject(output, operand.view(), file_statuses[index], should_color,
+                   should_report_filesystem, should_report_checksum, ec,
                    allocator);
   }
 

@@ -175,7 +175,7 @@ _koshkit_util_flags()
     evilnet)       echo "-a --all" ;;
     goodnode)      echo "-i --inode -r --root" ;;
     evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory --sort" ;;
-    goodstat)      echo "-L --dereference" ;;
+    goodstat)      echo "-L --dereference -c --checksum -f --filesystem" ;;
     goodfsw)       echo "-h --human-readable -r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude" ;;
     ls)            echo "-a -A -1 -l -h -F -t -S -r -R -L --classify --recursive --level --tree" ;;
     nproc)         echo "--all --ignore=" ;;

@@ -155,9 +155,13 @@ mv
 -i
 -r
 == goodstat flags through koshkit:
+--checksum
 --dereference
+--filesystem
 --help
 -L
+-c
+-f
 == retry flags through koshkit:
 --attempts
 --backoff
