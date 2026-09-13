@@ -1926,8 +1926,11 @@ the sample interval in seconds and defaults to one second. With
 .BR \-\-ps ,
 each mode prints per-process data. The
 .BR \-l " and " \-\-live
-options refresh the rate report until interrupted. Terminal output uses the
-alternate screen and restores the previous contents on exit. The optional
+options refresh the rate report until interrupted. An optional value on
+.B \-\-live
+sets the number of seconds inactive process and disk rows remain visible;
+it defaults to five seconds. Terminal output uses the alternate screen and
+restores the previous contents on exit. The optional
 .B \-\-cumulative
 duration also sets the live refresh interval. The
 .BR \-\-ps ,

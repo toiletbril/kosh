@@ -23,7 +23,7 @@ run_live_report() {
 }
 
 run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-process-report" \
-  'koshkit --color never evilio --live --cumulative=0.02 --ps -1'
+  'koshkit --color never evilio --live=0.05 --cumulative=0.02 --ps -1'
 process_live_status=$live_status
 process_live_report=$live_report
 case $process_live_report in
@@ -36,7 +36,7 @@ case $process_live_report in
 esac
 
 run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-disk-report" \
-  'koshkit --color never evilio --live --cumulative=0.02'
+  'koshkit --color never evilio --live=0.05 --cumulative=0.02'
 disk_live_status=$live_status
 disk_live_report=$live_report
 case $disk_live_report in

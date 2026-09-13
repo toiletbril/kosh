@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [--live] [--cumulative [seconds]] "
+HELP_SYNOPSIS_DECL("[-a] [--live [seconds]] [--cumulative [seconds]] "
                    "[--ps | -NUMBER | -n count | -p pid]");
 
 HELP_DESCRIPTION_DECL(
@@ -39,8 +39,14 @@ static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
     is_evilio_sample_duration,
     "seconds"};
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
-FLAG(EVILIO_LIVE, Bool, 'l', "live",
-     "Refresh rate and IOPS samples until interrupted.");
+static koshka::FlagOptionalValue FLAG_EVILIO_LIVE{
+    FLAG_LIST,
+    'l',
+    "live",
+    koshka::flag_section::NoSection,
+    "Refresh rate and IOPS samples until interrupted.",
+    is_evilio_sample_duration,
+    "seconds"};
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -195,6 +201,12 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
 
   return sampled_rows;
 }
+
+struct live_process_row
+{
+  io_row row;
+  u64 last_seen_nanoseconds{0};
+};
 
 fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
@@ -553,9 +565,13 @@ fn append_disk_io_report(String &output,
 
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        usize row_limit, f64 sample_duration_seconds,
-                       bool is_terminal, bool should_color) throws -> i32
+                       f64 falloff_seconds, bool is_terminal,
+                       bool should_color) throws -> i32
 {
   let const allocator = heap_allocator();
+  let retained = ArrayList<live_process_row>{allocator};
+  let const falloff_nanoseconds =
+      static_cast<u64>(falloff_seconds * 1000000000.0);
   let before_rows = read_process_io_rows(allocator, selected_pid, true);
   if (selected_pid.has_value() && before_rows.is_empty()) return 1;
 
@@ -575,20 +591,62 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
         os::monotonic_nanos() - started_at_nanoseconds;
     let const sampled_rows = sample_process_io_rows(
         before_rows, after_rows, elapsed_nanoseconds, allocator);
+    let const now = os::monotonic_nanos();
+    for (let const &row : sampled_rows) {
+      bool is_known = false;
+      for (usize index = 0; index < retained.count(); index++) {
+        if (retained[index].row.pid != row.pid) continue;
+        retained[index].row = row;
+        retained[index].last_seen_nanoseconds = now;
+        is_known = true;
+        break;
+      }
+      if (!is_known) retained.push(live_process_row{row, now});
+    }
+    for (usize index = retained.count(); index > 0; index--) {
+      let const position = index - 1;
+      if (now - retained[position].last_seen_nanoseconds >=
+          falloff_nanoseconds)
+      {
+        retained.remove(position);
+      }
+    }
+    retained.sort([](const live_process_row &left,
+                     const live_process_row &right) {
+      let const left_total = saturated_sum(left.row.status.read_bytes,
+                                           left.row.status.written_bytes);
+      let const right_total = saturated_sum(right.row.status.read_bytes,
+                                            right.row.status.written_bytes);
+      if (left_total != right_total) return left_total > right_total;
+      return left.row.pid < right.row.pid;
+    });
+    let rows = ArrayList<io_row>{allocator};
+    rows.reserve(retained.count());
+    for (let const &row : retained) rows.push(row.row);
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
-    append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
+    append_process_io_rate_report(output, rows, row_limit, allocator,
                                   should_color);
     ec.print_to_stdout(output);
     before_rows = steal(after_rows);
   }
 }
 
+struct live_disk_row
+{
+  os::disk_io_status status;
+  u64 last_seen_nanoseconds{0};
+};
+
 fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
-                    bool is_terminal, bool should_color) throws -> i32
+                    f64 falloff_seconds, bool is_terminal,
+                    bool should_color) throws -> i32
 {
   let const allocator = heap_allocator();
   let before_snapshot = os::read_disk_io_snapshot(allocator);
+  let retained = ArrayList<live_disk_row>{allocator};
+  let const falloff_nanoseconds =
+      static_cast<u64>(falloff_seconds * 1000000000.0);
 
   loop
   {
@@ -599,6 +657,31 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
     }
 
     let after_snapshot = os::read_disk_io_snapshot(allocator);
+    let const now = os::monotonic_nanos();
+    for (let const &disk : after_snapshot.disks) {
+      bool is_known = false;
+      for (usize index = 0; index < retained.count(); index++) {
+        if (retained[index].status.name != disk.name) continue;
+        retained[index].status = disk;
+        retained[index].last_seen_nanoseconds = now;
+        is_known = true;
+        break;
+      }
+      if (!is_known) retained.push(live_disk_row{disk, now});
+    }
+    for (usize index = retained.count(); index > 0; index--) {
+      let const position = index - 1;
+      if (now - retained[position].last_seen_nanoseconds >=
+          falloff_nanoseconds)
+      {
+        retained.remove(position);
+      }
+    }
+    let current_snapshot = os::disk_io_snapshot{};
+    current_snapshot.sampled_at_nanoseconds =
+        after_snapshot.sampled_at_nanoseconds;
+    current_snapshot.disks.reserve(retained.count());
+    for (let const &row : retained) current_snapshot.disks.push(row.status);
     u64 elapsed_nanoseconds = 0;
     if (after_snapshot.sampled_at_nanoseconds >=
         before_snapshot.sampled_at_nanoseconds)
@@ -609,7 +692,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
 
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
-    append_disk_io_report(output, before_snapshot, after_snapshot,
+    append_disk_io_report(output, before_snapshot, current_snapshot,
                           elapsed_nanoseconds, true, false, allocator,
                           should_color);
     ec.print_to_stdout(output);
@@ -851,6 +934,17 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const should_color = koshkit_should_color();
+  f64 falloff_seconds = 5.0;
+  if (FLAG_EVILIO_LIVE.has_value()) {
+    let const parsed = utils::parse_decimal_f64(FLAG_EVILIO_LIVE.value());
+    if (parsed.is_error() || parsed.value() <= 0) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_LIVE.value_location(),
+                              "invalid falloff interval",
+                              "use a positive number of seconds");
+      return 1;
+    }
+    falloff_seconds = parsed.value();
+  }
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();
@@ -882,12 +976,12 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (should_show_processes) {
       return run_live_process_io(ec, selected_pid, row_limit,
-                                 sample_duration_seconds, is_terminal,
-                                 should_color);
+                                 sample_duration_seconds, falloff_seconds,
+                                 is_terminal, should_color);
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds, is_terminal,
-                            should_color);
+    return run_live_disk_io(ec, sample_duration_seconds, falloff_seconds,
+                            is_terminal, should_color);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {

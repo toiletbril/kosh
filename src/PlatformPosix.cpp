@@ -27,6 +27,204 @@
 namespace koshka {
 namespace os {
 
+#if defined __linux__
+
+static pure fn linux_socket_state(u64 value) wontthrow -> network_socket_state
+{
+  switch (value) {
+  case 1: return network_socket_state::Established;
+  case 2: return network_socket_state::SynSent;
+  case 3: return network_socket_state::SynReceived;
+  case 4: return network_socket_state::FinWait1;
+  case 5: return network_socket_state::FinWait2;
+  case 6: return network_socket_state::TimeWait;
+  case 7: return network_socket_state::Closed;
+  case 8: return network_socket_state::CloseWait;
+  case 9: return network_socket_state::LastAck;
+  case 10: return network_socket_state::Listen;
+  case 11: return network_socket_state::Closing;
+  default: return network_socket_state::Unknown;
+  }
+}
+
+static fn linux_socket_address(StringView encoded, bool is_ipv6,
+                               Allocator allocator) throws -> Maybe<String>
+{
+  if (is_ipv6) {
+    if (encoded.length != 32) return None;
+    u8 bytes[16]{};
+    for (usize word_index = 0; word_index < 4; word_index++) {
+      let const word = utils::parse_integer_in_base_u64(
+          encoded.substring_of_length(word_index * 8, 8), int_base::hex);
+      if (word.is_error()) return None;
+      let const value = word.value();
+      for (usize byte_index = 0; byte_index < 4; byte_index++)
+        bytes[word_index * 4 + byte_index] =
+            static_cast<u8>((value >> (byte_index * 8)) & 0xff);
+    }
+    char text[INET6_ADDRSTRLEN]{};
+    if (::inet_ntop(AF_INET6, bytes, text, sizeof(text)) == nullptr) return None;
+    return String{allocator, StringView{text}};
+  }
+
+  if (encoded.length != 8) return None;
+  let const value = utils::parse_integer_in_base_u64(encoded, int_base::hex);
+  if (value.is_error()) return None;
+  u32 address = static_cast<u32>(value.value());
+  char text[INET_ADDRSTRLEN]{};
+  if (::inet_ntop(AF_INET, &address, text, sizeof(text)) == nullptr) return None;
+  return String{allocator, StringView{text}};
+}
+
+struct linux_socket_owner
+{
+  u64 inode{0};
+  u32 pid{0};
+};
+
+static fn linux_socket_owners(Allocator allocator)
+    throws -> ArrayList<linux_socket_owner>
+{
+  let owners = ArrayList<linux_socket_owner>{allocator};
+  DIR *proc_directory = ::opendir("/proc");
+  if (proc_directory == nullptr) return owners;
+  defer { ::closedir(proc_directory); };
+
+  for (struct dirent *entry = ::readdir(proc_directory); entry != nullptr;
+       entry = ::readdir(proc_directory))
+  {
+    let const name = StringView{entry->d_name};
+    let const parsed_pid = name.to<u32>();
+    if (parsed_pid.is_error()) continue;
+
+    char descriptor_path[80];
+    let const path_length = std::snprintf(
+        descriptor_path, sizeof(descriptor_path), "/proc/%s/fd", entry->d_name);
+    if (path_length <= 0 || static_cast<usize>(path_length) >= sizeof(descriptor_path))
+      continue;
+    DIR *descriptor_directory = ::opendir(descriptor_path);
+    if (descriptor_directory == nullptr) continue;
+
+    let const descriptor_directory_fd = ::dirfd(descriptor_directory);
+    for (struct dirent *descriptor = ::readdir(descriptor_directory);
+         descriptor != nullptr; descriptor = ::readdir(descriptor_directory))
+    {
+      if (descriptor->d_name[0] == '.') continue;
+      char target[128];
+      let const target_length =
+          ::readlinkat(descriptor_directory_fd, descriptor->d_name, target,
+                       sizeof(target) - 1);
+      if (target_length <= 9) continue;
+      target[target_length] = '\0';
+      let const target_view = StringView{target, static_cast<usize>(target_length)};
+      if (!target_view.starts_with("socket:[") ||
+          target_view[target_view.length - 1] != ']')
+        continue;
+      let const inode = target_view.substring_of_length(
+                            8, target_view.length - 9).to<u64>();
+      if (inode.is_error()) continue;
+      bool is_known = false;
+      for (let const &owner : owners) {
+        if (owner.inode == inode.value()) {
+          is_known = true;
+          break;
+        }
+      }
+      if (!is_known) owners.push(linux_socket_owner{inode.value(), parsed_pid.value()});
+    }
+    ::closedir(descriptor_directory);
+  }
+
+  return owners;
+}
+
+static fn linux_network_sockets_from_file(
+    StringView path, network_socket_protocol protocol, bool should_include_process_ids,
+    const ArrayList<linux_socket_owner> *owners, Allocator allocator) throws
+    -> ArrayList<network_socket_entry>
+{
+  let result = ArrayList<network_socket_entry>{allocator};
+  unused(should_include_process_ids);
+  const String path_string{path};
+  let const is_ipv6 = path == StringView{"/proc/net/tcp6"} ||
+                      path == StringView{"/proc/net/udp6"};
+  char buffer[1024 * 1024];
+  let const length = read_small_file(path_string.c_str(), buffer, sizeof(buffer));
+  if (length == 0) return result;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  bool is_header = true;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    if (is_header) {
+      is_header = false;
+      continue;
+    }
+
+    let const local = nth_space_field(line, 1);
+    let const peer = nth_space_field(line, 2);
+    let const state = nth_space_field(line, 3);
+    let const queues = nth_space_field(line, 4);
+    let const inode_word = nth_space_field(line, 9);
+    let const local_separator = local.find_character(':');
+    let const peer_separator = peer.find_character(':');
+    let const queue_separator = queues.find_character(':');
+    if (!local_separator.has_value() || !peer_separator.has_value() ||
+        !queue_separator.has_value())
+      continue;
+
+    let const local_address = linux_socket_address(
+        local.substring_of_length(0, *local_separator),
+        is_ipv6, allocator);
+    let const peer_address = linux_socket_address(
+        peer.substring_of_length(0, *peer_separator), is_ipv6, allocator);
+    let const local_port = utils::parse_integer_in_base_u64(
+        local.substring(*local_separator + 1), int_base::hex);
+    let const peer_port = utils::parse_integer_in_base_u64(
+        peer.substring(*peer_separator + 1), int_base::hex);
+    let const state_value =
+        utils::parse_integer_in_base_u64(state, int_base::hex);
+    let const receive_queue = utils::parse_integer_in_base_u64(
+        queues.substring(*queue_separator + 1), int_base::hex);
+    let const send_queue = utils::parse_integer_in_base_u64(
+        queues.substring_of_length(0, *queue_separator), int_base::hex);
+    let const inode = inode_word.to<u64>();
+    if (!local_address.has_value() || !peer_address.has_value() ||
+        local_port.is_error() || peer_port.is_error() || state_value.is_error() ||
+        receive_queue.is_error() || send_queue.is_error() || inode.is_error())
+      continue;
+
+    u32 process_id = 0;
+    if (should_include_process_ids && owners != nullptr) {
+      for (let const &owner : *owners)
+        if (owner.inode == inode.value()) {
+          process_id = owner.pid;
+          break;
+        }
+    }
+    result.push(network_socket_entry{
+        steal(*local_address),
+        steal(*peer_address),
+        inode.value(),
+        receive_queue.value(),
+        send_queue.value(),
+        process_id,
+        static_cast<u16>(local_port.value()),
+        static_cast<u16>(peer_port.value()),
+        protocol,
+        is_ipv6 ? network_address_family::IPv6 : network_address_family::IPv4,
+        protocol == network_socket_protocol::Udp
+            ? network_socket_state::Unconnected
+            : linux_socket_state(state_value.value()),
+    });
+  }
+
+  return result;
+}
+
+#endif
+
 fn logged_in_users() throws -> ArrayList<user_session>
 {
   let result = ArrayList<user_session>{heap_allocator()};
@@ -579,7 +777,7 @@ static fn socket_address(const struct in_sockinfo &info, bool is_local,
 
 fn has_network_socket_listing() wontthrow -> bool
 {
-#if defined __APPLE__
+#if defined __APPLE__ || defined __linux__
   return true;
 #else
   return false;
@@ -651,6 +849,28 @@ fn network_sockets(bool should_include_process_ids) throws
               : network_socket_state::Unconnected,
       });
     }
+  }
+#elif defined __linux__
+  let const allocator = heap_allocator();
+  let owners = ArrayList<linux_socket_owner>{allocator};
+  if (should_include_process_ids) owners = linux_socket_owners(allocator);
+  struct linux_socket_source
+  {
+    StringView path;
+    network_socket_protocol protocol;
+  };
+  constexpr linux_socket_source SOURCES[] = {
+      {"/proc/net/tcp", network_socket_protocol::Tcp},
+      {"/proc/net/tcp6", network_socket_protocol::Tcp},
+      {"/proc/net/udp", network_socket_protocol::Udp},
+      {"/proc/net/udp6", network_socket_protocol::Udp},
+  };
+  for (let const &source : SOURCES)
+  {
+    let entries = linux_network_sockets_from_file(
+        source.path, source.protocol, should_include_process_ids,
+        should_include_process_ids ? &owners : nullptr, allocator);
+    for (let &entry : entries) result.push(steal(entry));
   }
 #else
   unused(should_include_process_ids);
@@ -2087,8 +2307,6 @@ static constexpr int STRING_CONFIGURATION_KEYS[] = {
     _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS,
     _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS,
     _CS_POSIX_V7_LPBIG_OFFBIG_LIBS,
-    _CS_POSIX_V7_THREADS_CFLAGS,
-    _CS_POSIX_V7_THREADS_LDFLAGS,
     _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS,
     _CS_V7_ENV,
 #else
