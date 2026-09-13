@@ -149,6 +149,13 @@ case $network_all_report in
 esac
 printf 'evilnet-multiple-titles=%s\n' "$network_all_title"
 
+network_traffic_report=$("$BIN" -c 'koshkit evilnet --traffic' 2> "$TEST_NULL_DEVICE")
+case $network_traffic_report in
+  TRAFFIC*) network_traffic_only=present ;;
+  *) network_traffic_only=missing ;;
+esac
+printf 'evilnet-traffic-only=%s\n' "$network_traffic_only"
+
 process_tree=$("$BIN" -c 'koshkit evilps -1')
 case $process_tree in
   PROCESSES*) process_title=present ;;

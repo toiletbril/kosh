@@ -16,12 +16,13 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a]");
+HELP_SYNOPSIS_DECL("[-at]");
 
 HELP_DESCRIPTION_DECL(
     "The evilnet utility reports the addresses assigned to each interface.");
 
 FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
+FLAG(EVILNET_TRAFFIC, Bool, 't', "traffic", "Show interface traffic only.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilNet);
@@ -370,20 +371,26 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let const should_color = koshkit_should_color();
-  let const should_show_sections = FLAG_EVILNET_ALL.is_enabled();
-  if (should_show_sections) {
+  let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
+  let const should_show_traffic =
+      should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled();
+  let const should_show_interfaces = !FLAG_EVILNET_TRAFFIC.is_enabled();
+  if (should_show_all) {
     append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,
                        should_color);
     output += "\n";
   }
-  let const address_count = append_network_interface_report(
-      output, should_color, should_show_sections ? "  " : "");
+  let const address_count =
+      should_show_interfaces
+          ? append_network_interface_report(output, should_color,
+                                            should_show_all ? "  " : "")
+          : 0;
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
-  if (FLAG_EVILNET_ALL.is_enabled()) {
+  if (should_show_traffic) {
     traffic_count = append_network_traffic_report(output, warnings, allocator,
                                                   should_color);
-    has_tcp_statistics =
+    has_tcp_statistics = should_show_all &&
         append_tcp_report(output, warnings, allocator, should_color);
   }
 
@@ -392,8 +399,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
     show_message(Warning{warning.view()}.to_string());
   }
 
-  return address_count == 0 && (!FLAG_EVILNET_ALL.is_enabled() ||
-                                (traffic_count == 0 && !has_tcp_statistics))
+  return address_count == 0 && traffic_count == 0 && !has_tcp_statistics
              ? 1
              : 0;
 }

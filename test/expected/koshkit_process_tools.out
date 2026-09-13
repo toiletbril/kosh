@@ -18,6 +18,7 @@ evilio-process-duration-limit=0
 evilio-process-limit=unlimited
 evilnet-single-title=omitted
 evilnet-multiple-titles=present
+evilnet-traffic-only=missing
 evilps-single-title=omitted
 evilfs-single-title=omitted
 evilfs-multiple-titles=present
