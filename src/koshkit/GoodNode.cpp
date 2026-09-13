@@ -156,7 +156,7 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
 }
 
 fn find_inode(const Path &path, const os::file_status &status, u64 inode,
-              String &found_path) throws -> bool
+              String &found_path, Allocator allocator) throws -> bool
 {
   if (status.has_file_identity && status.file_id == inode) {
     found_path = path.text().clone();
@@ -164,13 +164,8 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
   }
   if (os::file_type_letter(status.mode) != 'd') return false;
 
-  let children =
-      os::list_directory_status(path.text().view(), heap_allocator());
+  let children = os::list_directory_status(path.text().view(), allocator);
   if (!children.has_value()) return false;
-  children->sort([](const os::directory_status_entry &left,
-                    const os::directory_status_entry &right) {
-    return left.child.name < right.child.name;
-  });
 
   for (let const &child : *children) {
     if (os::INTERRUPT_REQUESTED) return false;
@@ -179,7 +174,8 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
     let const child_path =
         PathBuilder{path.text().view()}.append(child.child.name.view()).build();
 
-    if (find_inode(child_path, child.status, inode, found_path)) return true;
+    if (find_inode(child_path, child.status, inode, found_path, allocator))
+      return true;
   }
 
   return false;
@@ -265,7 +261,7 @@ fn GoodNode::execute(
     if (found.is_empty()) {
       os::file_status root_status{};
       if (os::stat_path(root_path.text().view(), root_status))
-        unused(find_inode(root_path, root_status, inode, found));
+        unused(find_inode(root_path, root_status, inode, found, allocator));
     }
 
     if (found.is_empty()) {

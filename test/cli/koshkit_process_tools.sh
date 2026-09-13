@@ -31,8 +31,15 @@ printf 'event=%s\n' "$event_name"
 printf 'kind=%s\n' "$event_kind"
 
 node_root=$TEST_TEMP_DIRECTORY/goodnode-batch
-node_path=$node_root/a/b/needle
-mkdir -p "$node_root/a/b"
+node_path=$node_root
+node_depth=24
+node_index=0
+while [ "$node_index" -lt "$node_depth" ]; do
+  node_path=$node_path/node-$node_index
+  mkdir -p "$node_path"
+  node_index=$((node_index + 1))
+done
+node_path=$node_path/needle
 : > "$node_path"
 inode=$("$BIN" -c 'koshkit stat -c %i "$1"' stat "$node_path")
 node_report=$("$BIN" -c 'koshkit --color never goodnode -r "$1" -i "$2"' \
