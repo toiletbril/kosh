@@ -34,16 +34,22 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  if (args.count() > 2) {
-    KOSHKIT_REPORT_ERROR_AT(
-        arg_locations[2], "extra operand '" + args[2] + "'",
-        "pass one tab interval, stop list, or named template");
-    return 1;
-  }
-  if (args.count() == 2 && args[1].view() == "--help") {
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands = parse_util_operands(
+      FLAG_LIST, args, &arg_locations, &operand_locations, false, false, true);
+  defer { reset_flags(FLAG_LIST); };
+
+  if (FLAG_HELP.is_enabled()) {
     print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
                     FLAG_LIST);
     return 0;
+  }
+
+  if (operands.count() > 1) {
+    KOSHKIT_REPORT_ERROR_AT(
+        operand_locations[1], "extra operand '" + operands[1] + "'",
+        "pass one tab interval, stop list, or named template");
+    return 1;
   }
   static constexpr static_string_entry<StringView> TEMPLATE_ENTRIES[] = {
       {SSK("-a"),  "1,10,16,36,72"                                   },
@@ -58,7 +64,8 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
   };
   static constexpr StaticStringMap TEMPLATES{TEMPLATE_ENTRIES};
   let stops = ArrayList<u64>{cxt.scratch_allocator()};
-  let specification = args.count() == 2 ? args[1].view() : StringView{"-8"};
+  let specification = operands.count() == 1 ? operands[0].view()
+                                            : StringView{"-8"};
   if (let const canned = TEMPLATES.find(specification); canned.has_value())
     specification = *canned;
   if (specification.length > 1 && specification[0] == '-' &&
@@ -67,7 +74,7 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed = utils::parse_decimal_u64(specification.substring(1));
     if (parsed.is_error() || parsed.value() == 0 || parsed.value() > 160) {
       KOSHKIT_REPORT_ERROR_AT(
-          arg_locations[1], "invalid tab interval '" + args[1] + "'",
+          operand_locations[0], "invalid tab interval '" + operands[0] + "'",
           "use - followed by a decimal interval from 1 through 160");
       return 1;
     }
@@ -86,7 +93,7 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
       let const parsed = utils::parse_decimal_u64(item);
       if (parsed.is_error() || parsed.value() == 0) {
         KOSHKIT_REPORT_ERROR_AT(
-            arg_locations[1], "invalid tab stop in '" + args[1] + "'",
+            operand_locations[0], "invalid tab stop in '" + operands[0] + "'",
             "use a named template or comma-separated positive decimal columns"
             ", with + for relative stops");
         return 1;
@@ -100,8 +107,8 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
       }
       if (stop <= previous_stop || stop > 160) {
         KOSHKIT_REPORT_ERROR_AT(
-            arg_locations[1],
-            "tab stops do not increase within column 160 in '" + args[1] + "'",
+            operand_locations[0],
+            "tab stops do not increase within column 160 in '" + operands[0] + "'",
             "list each stop after the previous stop and no later than column "
             "160");
         return 1;
