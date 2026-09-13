@@ -792,22 +792,22 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
 }
 
 fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
+                       Allocator allocator,
                        const ArrayList<SourceLocation> *arg_locations,
-                       ArrayList<SourceLocation> *operand_locations,
                        bool should_accept_negative_number_operand,
                        bool should_allow_options_after_operands,
                        bool should_accept_unknown_flag_operand) throws
-    -> ArrayList<String>
+    -> util_operands_result
 {
+  let operand_locations = ArrayList<SourceLocation>{allocator};
   let operands = parse_flags_vec(
-      flags, args, 0, NULL, arg_locations, operand_locations, {},
+      flags, args, 0, NULL, arg_locations, &operand_locations, {},
       should_accept_negative_number_operand,
       should_allow_options_after_operands, should_accept_unknown_flag_operand);
   if (!operands.is_empty()) operands.remove(0);
-  if (operand_locations != nullptr && !operand_locations->is_empty())
-    operand_locations->remove(0);
+  if (!operand_locations.is_empty()) operand_locations.remove(0);
 
-  return operands;
+  return util_operands_result{steal(operands), steal(operand_locations)};
 }
 
 fn parse_until_subcommand(

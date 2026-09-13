@@ -290,13 +290,19 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                bool should_allow_options_after_operands = false,
                bool should_accept_unknown_flag_operand = false) throws
     -> ArrayList<String>;
+struct util_operands_result
+{
+  ArrayList<String> operands;
+  ArrayList<SourceLocation> operand_locations;
+};
+
 fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
+                       Allocator allocator,
                        const ArrayList<SourceLocation> *arg_locations = nullptr,
-                       ArrayList<SourceLocation> *operand_locations = nullptr,
                        bool should_accept_negative_number_operand = false,
                        bool should_allow_options_after_operands = false,
                        bool should_accept_unknown_flag_operand = false) throws
-    -> ArrayList<String>;
+    -> util_operands_result;
 fn parse_until_subcommand(
     const FlagList &flags, const ArrayList<String> &args,
     const ArrayList<SourceLocation> *arg_locations = nullptr,

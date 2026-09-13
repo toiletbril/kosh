@@ -344,14 +344,23 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   } while (false)
 
 #define PARSE_KOSHKIT_ARGS(args, arg_locations, ...)                           \
-  parse_util_operands(FLAG_LIST, (args), &(arg_locations),                     \
-                      nullptr __VA_OPT__(, ) __VA_ARGS__);                     \
+  ([&]() {                                                                     \
+    let [operands, operand_locations] = parse_util_operands(                   \
+        FLAG_LIST, (args), cxt.scratch_allocator(), &(arg_locations)           \
+            __VA_OPT__(, ) __VA_ARGS__);                                       \
+    return steal(operands);                                                     \
+  }());                                                                         \
   defer { reset_flags(FLAG_LIST); }
 
 #define PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations,                 \
                                           operand_locations, ...)              \
-  parse_util_operands(FLAG_LIST, (args), &(arg_locations),                     \
-                      &(operand_locations) __VA_OPT__(, ) __VA_ARGS__);        \
+  ([&]() {                                                                     \
+    let [operands, parsed_operand_locations] = parse_util_operands(             \
+        FLAG_LIST, (args), cxt.scratch_allocator(), &(arg_locations)           \
+            __VA_OPT__(, ) __VA_ARGS__);                                       \
+    (operand_locations) = steal(parsed_operand_locations);                     \
+    return steal(operands);                                                     \
+  }());                                                                         \
   defer { reset_flags(FLAG_LIST); }
 
 #define KOSHKIT_REPORT_ERROR_AT(location, ...)                                 \

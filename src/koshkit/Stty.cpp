@@ -37,9 +37,9 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let setting_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const settings = parse_util_operands(
-      FLAG_LIST, args, &arg_locations, &setting_locations, false, false, true);
+  let const [settings, setting_locations] = parse_util_operands(
+      FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, false, false,
+      true);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);

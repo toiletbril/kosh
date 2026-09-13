@@ -42,9 +42,8 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
 {
   defer { reset_flags(FLAG_LIST); };
 
-  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
+  let const [operands, operand_locations] = parse_util_operands(
+      FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());

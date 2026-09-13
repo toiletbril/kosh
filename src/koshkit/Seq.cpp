@@ -83,9 +83,9 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
       negative_position.has_value() ? patched_args : args;
   let const &effective_arg_locations =
       negative_position.has_value() ? patched_arg_locations : arg_locations;
-  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
-  let const operands = parse_util_operands(
-      FLAG_LIST, effective_args, &effective_arg_locations, &operand_locations);
+  let const [operands, operand_locations] = parse_util_operands(
+      FLAG_LIST, effective_args, cxt.scratch_allocator(),
+      &effective_arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);

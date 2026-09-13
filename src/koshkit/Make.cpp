@@ -3439,10 +3439,9 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   reset_flags(FLAG_LIST);
-  ArrayList<SourceLocation> operand_locations{cxt.scratch_allocator()};
-  let const operands =
-      parse_util_operands(FLAG_LIST, parse_arguments, &parse_locations,
-                          &operand_locations, false, true);
+  let const [operands, operand_locations] = parse_util_operands(
+      FLAG_LIST, parse_arguments, cxt.scratch_allocator(), &parse_locations,
+      false, true);
   defer { reset_flags(FLAG_LIST); };
 
   for (usize makefile_position = 0; makefile_position < FLAG_MAKE_FILE.count();

@@ -204,12 +204,14 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
     arg_locations.push(ec.arg_location_at(argument_index));
   }
 
-  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   defer { reset_flags(FLAG_LIST); };
   let operands = ArrayList<String>{cxt.scratch_allocator()};
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   try {
-    operands = parse_util_operands(FLAG_LIST, args, &arg_locations,
-                                   &operand_locations, true);
+    let const parsed = parse_util_operands(
+        FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, true);
+    operands = steal(parsed.operands);
+    operand_locations = steal(parsed.operand_locations);
   } catch (const ErrorBase &) {
     return None;
   }
@@ -251,10 +253,9 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   defer { reset_flags(FLAG_LIST); };
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations,
-                                           &operand_locations, true);
+  let const [operands, operand_locations] = parse_util_operands(
+      FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, true);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 

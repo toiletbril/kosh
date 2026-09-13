@@ -113,8 +113,8 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
     filtered_args.push(args[index].clone());
     filtered_locations.push(arg_locations[index]);
   }
-  let const operands =
-      parse_util_operands(FLAG_LIST, filtered_args, &filtered_locations);
+  let const [operands, operand_locations] = parse_util_operands(
+      FLAG_LIST, filtered_args, cxt.scratch_allocator(), &filtered_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
