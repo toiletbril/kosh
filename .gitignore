@@ -29,10 +29,13 @@ src/o
 /coverage
 zig-out/
 .zig-cache/
+
 test/failed.diff
-test/.test_history
-test/.test_directory_history
-test/.test-work/
+.test_history
+.test_directory_history
+.test-work
+.env*
+.handoff*
 
 __pycache__/
 
@@ -68,4 +71,3 @@ deploy/alpine/*
 !deploy/alpine/kosh.post-install
 !deploy/alpine/kosh.post-upgrade
 !deploy/alpine/kosh.pre-deinstall
-/.test-work
