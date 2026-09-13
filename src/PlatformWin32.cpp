@@ -244,16 +244,23 @@ fn write_system_log(StringView tag, StringView priority, StringView message,
   let const dot = priority.find_character('.');
   let const severity =
       dot.has_value() ? priority.substring(*dot + 1) : priority;
-  if (severity == "emerg" || severity == "alert" || severity == "crit" ||
-      severity == "err")
-  {
-    event_type = EVENTLOG_ERROR_TYPE;
-  } else if (severity == "warning" || severity == "notice") {
-    event_type = EVENTLOG_WARNING_TYPE;
-  } else if (severity != "info" && severity != "debug") {
+  static constexpr static_string_entry<WORD> EVENT_TYPES[] = {
+      {SSK("alert"),   EVENTLOG_ERROR_TYPE},
+      {SSK("crit"),    EVENTLOG_ERROR_TYPE},
+      {SSK("debug"),   EVENTLOG_INFORMATION_TYPE},
+      {SSK("emerg"),   EVENTLOG_ERROR_TYPE},
+      {SSK("err"),     EVENTLOG_ERROR_TYPE},
+      {SSK("info"),    EVENTLOG_INFORMATION_TYPE},
+      {SSK("notice"),  EVENTLOG_WARNING_TYPE},
+      {SSK("warning"), EVENTLOG_WARNING_TYPE},
+  };
+  static constexpr StaticStringMap EVENT_TYPE_MAP{EVENT_TYPES};
+  let const event_type_value = EVENT_TYPE_MAP.find(severity);
+  if (!event_type_value.has_value()) {
     SetLastError(ERROR_INVALID_PARAMETER);
     return false;
   }
+  event_type = *event_type_value;
 
   let const source_name =
       String{heap_allocator(), tag.is_empty() ? "kosh" : tag};
