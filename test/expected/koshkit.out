@@ -98,8 +98,15 @@ mv
 -s
 == evilnet flags through koshkit:
 --all
+--failures
+--falloff
 --help
+--live
+--traffic
 -a
+-f
+-l
+-t
 == evilps flags through koshkit:
 --arguments
 --cpu

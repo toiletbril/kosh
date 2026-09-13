@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-atl] [--falloff seconds]");
+HELP_SYNOPSIS_DECL("[-atlf] [--falloff seconds]");
 
 HELP_DESCRIPTION_DECL(
     "The evilnet utility reports the addresses assigned to each interface.");
@@ -24,6 +24,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
 FLAG(EVILNET_TRAFFIC, Bool, 't', "traffic", "Show interface traffic only.");
 FLAG(EVILNET_LIVE, Bool, 'l', "live", "Refresh traffic until interrupted.");
+FLAG(EVILNET_FAILURES, Bool, 'f', "failures",
+     "Show TCP failure and packet-loss telemetry only.");
 FLAG(EVILNET_FALLOFF, String, '\0', "falloff",
      "Retain inactive interfaces for this many seconds.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -452,6 +454,13 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let const should_color = koshkit_should_color();
+  if (FLAG_EVILNET_FAILURES.is_enabled() &&
+      FLAG_EVILNET_LIVE.is_enabled()) {
+    KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_FAILURES.value_location(),
+                            "conflicting flags",
+                            "--failures cannot be combined with --live");
+    return 2;
+  }
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     f64 falloff_seconds = 5.0;
     if (FLAG_EVILNET_FALLOFF.is_set()) {
@@ -470,7 +479,9 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
   let const should_show_traffic =
       should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled();
-  let const should_show_interfaces = !FLAG_EVILNET_TRAFFIC.is_enabled();
+  let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
+  let const should_show_interfaces = !FLAG_EVILNET_TRAFFIC.is_enabled() &&
+                                     !should_show_failures;
   if (should_show_all) {
     append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,
                        should_color);
@@ -483,12 +494,13 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
           : 0;
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
-  if (should_show_traffic) {
+  if (should_show_traffic && !should_show_failures) {
     traffic_count = append_network_traffic_report(output, warnings, allocator,
                                                   should_color);
-    has_tcp_statistics = should_show_all &&
-        append_tcp_report(output, warnings, allocator, should_color);
   }
+  if (should_show_all || should_show_failures)
+    has_tcp_statistics = append_tcp_report(output, warnings, allocator,
+                                           should_color);
 
   ec.print_to_stdout(output);
   for (let const &warning : warnings) {
