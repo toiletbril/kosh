@@ -176,6 +176,68 @@ fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
                       colors::ansi::BOLD_CYAN, should_color);
 }
 
+fn append_procfs_report(String &output, bool should_color, Allocator allocator)
+    throws -> void
+{
+  append_report_text(output, "PROCFS", colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+  os::system_activity_status activity{};
+  if (os::read_system_activity_status(activity)) {
+    append_report_field(output, "CPU user units",
+                        String::from(activity.cpu_user_units, allocator).view(),
+                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "CPU system units",
+        String::from(activity.cpu_system_units, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "Page faults",
+                        String::from(activity.page_fault_count, allocator).view(),
+                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "Major page faults",
+        String::from(activity.major_page_fault_count, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "Runnable processes",
+        String::from(activity.runnable_process_count, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "Blocked processes",
+        String::from(activity.blocked_process_count, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "CPU stall microseconds",
+        String::from(activity.cpu_some_stall_microseconds, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "Memory stall microseconds",
+        String::from(activity.memory_some_stall_microseconds, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "IO stall microseconds",
+        String::from(activity.io_some_stall_microseconds, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "OOM kills",
+                        String::from(activity.oom_kill_count, allocator).view(),
+                        colors::ansi::BOLD_CYAN, should_color);
+  } else {
+    append_report_field(output, "Activity", "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+  }
+
+  os::memory_status memory{};
+  if (os::read_memory_status(memory)) {
+    let memory_line = String::from(memory.available_kib, allocator) + " KiB available of " +
+                      String::from(memory.total_kib, allocator).view() + " KiB";
+    append_report_field(output, "Memory", memory_line.view(),
+                        colors::ansi::BOLD_CYAN, should_color);
+  }
+  let const processors = os::get_processor_counts();
+  append_report_field(output, "Processors",
+                      String::from(processors.online_count, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
+}
+
 fn names_text(const ArrayList<String> &names, Allocator allocator) throws
     -> Maybe<String>
 {
@@ -518,6 +580,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     append_resource_limit(output, "Core size limit",
                           os::resource_kind::CoreBlocks, allocator,
                           should_color);
+    append_procfs_report(output, should_color, allocator);
     append_anomaly_report(output, cxt, should_color);
   }
 
