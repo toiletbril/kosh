@@ -126,6 +126,56 @@ fn append_system_configuration(String &output, StringView name,
                       colors::ansi::BOLD_CYAN, should_color);
 }
 
+struct mapped_library_family
+{
+  String family;
+  String path;
+};
+
+fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
+    throws -> void
+{
+  append_report_text(output, "ANOMALIES", colors::ansi::BOLD_BLUE,
+                     should_color);
+  output += '\n';
+  let const allocator = cxt.scratch_allocator();
+  if (!os::has_process_open_file_listing()) {
+    append_report_field(output, "Mixed libraries", "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+    return;
+  }
+
+  let const files = os::list_process_open_files(os::get_current_process_id(),
+                                                allocator);
+  let families = ArrayList<mapped_library_family>{allocator};
+  usize findings = 0;
+  for (let const &file : files) {
+    if (file.use != os::process_file_use::Mapped) continue;
+    let const filename = Path{file.path.view()}.filename();
+    let const marker = filename.find_substring(".so");
+    if (!marker.has_value()) continue;
+    let const family = filename.substring_of_length(0, *marker);
+    usize family_index = 0;
+    while (family_index < families.count() &&
+           families[family_index].family.view() != family)
+      family_index++;
+    if (family_index == families.count()) {
+      families.push(mapped_library_family{String{allocator, family},
+                                          String{allocator, file.path.view()}});
+    } else if (families[family_index].path.view() != file.path.view()) {
+      findings++;
+    }
+  }
+
+  append_report_field(output, "Mixed libraries",
+                      String::from(findings, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
+  append_report_field(output, "Confidence", "high",
+                      colors::ansi::BOLD_CYAN, should_color);
+  append_report_field(output, "Cost", "process mappings",
+                      colors::ansi::BOLD_CYAN, should_color);
+}
+
 fn names_text(const ArrayList<String> &names, Allocator allocator) throws
     -> Maybe<String>
 {
@@ -468,6 +518,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     append_resource_limit(output, "Core size limit",
                           os::resource_kind::CoreBlocks, allocator,
                           should_color);
+    append_anomaly_report(output, cxt, should_color);
   }
 
   let report = String{allocator};
