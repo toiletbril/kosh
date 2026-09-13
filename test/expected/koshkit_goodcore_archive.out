@@ -1,0 +1,7 @@
+uncompressed-status=0
+report-shape=matched
+uncompressed-contents=matched
+quiet-status=0
+compressed-status=0
+compressed-suffix=.tar.zst
+compressed-shape=matched
