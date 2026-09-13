@@ -54,6 +54,8 @@ plain.txt
 run.sh*
 sized/
 sub/
+--- human total ---
+human-total=matched
 --- tree ---
 sub
 ├── deep

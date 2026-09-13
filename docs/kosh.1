@@ -1990,7 +1990,10 @@ The
 option follows symbolic links.
 .TP
 .B goodfsw
-Path changes are reported by polling filesystem metadata. The
+Path changes are reported by polling filesystem metadata. Each default record
+contains the Unix scan time, a numeric event mask, and the path. The
+.BR \-h " and " \-\-human-readable
+options use normal timestamps and descriptive event names. The
 .BR \-r ,
 .BR \-t ,
 .BR \-x ,

@@ -176,7 +176,7 @@ _koshkit_util_flags()
     goodnode)      echo "-i --inode -r --root --color" ;;
     evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory --sort" ;;
     goodstat)      echo "-L --dereference --color" ;;
-    goodfsw)       echo "-r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude" ;;
+    goodfsw)       echo "-h --human-readable -r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude" ;;
     ls)            echo "-a -A -1 -l -h -F -t -S -r -R -L --classify --recursive --level --tree --color" ;;
     nproc)         echo "--all --ignore=" ;;
     ln)            echo "-s -f -L -P" ;;

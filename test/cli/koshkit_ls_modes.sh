@@ -36,6 +36,12 @@ echo "--- color always ---"
 "$BIN" -c 'koshkit ls --color always -F' | cat -v
 echo "--- redirected output carries no escape ---"
 "$BIN" -c 'koshkit ls -F' | cat -v
+echo "--- human total ---"
+human_total=$("$BIN" -c 'koshkit ls -lah sized' | head -n 1)
+case $human_total in
+  total\ *[KMGTP]) echo "human-total=matched" ;;
+  *) echo "human-total=wrong" ;;
+esac
 echo "--- tree ---"
 "$BIN" -c 'koshkit ls --tree sub'
 echo "--- tree bounded to one level ---"

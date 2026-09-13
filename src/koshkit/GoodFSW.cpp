@@ -16,12 +16,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-rtx1] [-l latency] [-e substring] path ...");
+HELP_SYNOPSIS_DECL("[-hrtx1] [-l latency] [-e substring] path ...");
 
 HELP_DESCRIPTION_DECL(
     "The goodfsw utility reports changes under the paths it watches.");
 
 FLAG(GOODFSW_RECURSIVE, Bool, 'r', "recursive", "Watch every subdirectory.");
+FLAG(GOODFSW_HUMAN, Bool, 'h', "human-readable",
+     "Use normal timestamps and descriptive event names.");
 FLAG(GOODFSW_TIMESTAMP, Bool, 't', "timestamp",
      "Prefix every record with the epoch second of the scan.");
 FLAG(GOODFSW_EVENT_FLAGS, Bool, 'x', "event-flags",
@@ -45,10 +47,10 @@ constexpr usize MAXIMUM_SCAN_DEPTH = 64;
 
 enum class watch_event : u8
 {
-  Created,
-  Removed,
-  Updated,
-  AttributeModified,
+  Created = 1,
+  Removed = 2,
+  Updated = 4,
+  AttributeModified = 8,
 };
 
 struct watched_entry
@@ -112,21 +114,40 @@ fn append_event_names(String &output, const os::file_status &status,
   }
 }
 
+pure fn event_mask(watch_event event) wontthrow -> u8
+{
+  return static_cast<u8>(event);
+}
+
 fn report_event(String &output, StringView path, const os::file_status &status,
                 watch_event event, i64 scan_time, bool should_color) throws
     -> void
 {
-  if (FLAG_GOODFSW_TIMESTAMP.is_enabled()) {
+  let const is_human = FLAG_GOODFSW_HUMAN.is_enabled();
+  if (is_human) {
+    output += format_file_timestamp(scan_time, 0, output.allocator());
+    output += " ";
+  } else {
     output +=
         String::from(static_cast<u64>(scan_time), output.allocator()).view();
     output += " ";
   }
 
-  append_report_text(output, path, colors::ansi::BOLD, should_color);
-
-  if (FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
+  if (is_human) {
+    append_report_text(output, path, colors::ansi::BOLD, should_color);
     output += " ";
     append_event_names(output, status, event, should_color);
+  } else if (FLAG_GOODFSW_TIMESTAMP.is_enabled() ||
+             FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
+    append_report_text(output, path, colors::ansi::BOLD, should_color);
+    if (FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
+      output += " ";
+      append_event_names(output, status, event, should_color);
+    }
+  } else {
+    output += String::from(event_mask(event), output.allocator()).view();
+    output += " ";
+    append_report_text(output, path, colors::ansi::BOLD, should_color);
   }
 
   output += "\n";

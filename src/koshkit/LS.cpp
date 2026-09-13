@@ -557,6 +557,8 @@ static fn long_total_blocks(const ArrayList<long_entry> &entries,
   u64 total_512_blocks = 0;
   for (const long_entry &entry : entries)
     total_512_blocks += entry.blocks;
+  if (FLAG_LS_HUMAN.is_enabled())
+    return "total " + format_human_size(total_512_blocks * 512, allocator);
   return "total " + String::from(total_512_blocks / 2, allocator);
 }
 
