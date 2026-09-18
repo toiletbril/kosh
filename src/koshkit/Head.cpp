@@ -125,7 +125,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -147,8 +147,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     if (parsed_value.is_error()) {
       throw ErrorWithDetails{
           "invalid byte count '" + String{cxt.scratch_allocator(), raw}
-            +
-              "'",
+            + "'",
           "The count must be an integer"
       };
     }
@@ -161,8 +160,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     if (parsed_value.is_error()) {
       throw ErrorWithDetails{
           "invalid line count '" + String{cxt.scratch_allocator(), raw}
-            +
-              "'",
+            + "'",
           "The count must be an integer"
       };
     }

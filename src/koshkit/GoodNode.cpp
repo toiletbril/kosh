@@ -203,7 +203,7 @@ fn GoodNode::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -216,7 +216,8 @@ fn GoodNode::execute(
 
   if (FLAG_GOODNODE_ROOT.is_set() && !FLAG_GOODNODE_INODE.is_set()) {
     KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_ROOT.value_location(),
-                            "root requires an inode", "pass --inode with --root");
+                            "root requires an inode",
+                            "pass --inode with --root");
     return 1;
   }
 

@@ -363,16 +363,15 @@ public:
 
   fn add(StringView name, StringView value, StringView style = {}) throws
       -> void;
-  fn to_string(bool should_color, StringView indentation = "  ") const
-      throws -> String;
+  fn to_string(bool should_color, StringView indentation = "  ") const throws
+      -> String;
 
 private:
   ArrayList<report_table_row> m_rows;
 };
-fn append_report_table(String &output,
-                       const ArrayList<report_table_row> &rows,
-                       bool should_color, StringView indentation = "  ")
-    throws -> void;
+fn append_report_table(String &output, const ArrayList<report_table_row> &rows,
+                       bool should_color, StringView indentation = "  ") throws
+    -> void;
 fn append_report_name_section(String &output, StringView title,
                               const ArrayList<StringView> &names,
                               bool should_color,

@@ -316,8 +316,7 @@ fn EvilDisk::execute(
     let const &mounted = filesystems[filesystem_index];
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
-      if (operands.is_empty() &&
-          os::last_system_error_is_permission_denied())
+      if (operands.is_empty() && os::last_system_error_is_permission_denied())
         continue;
       let const location = operands.is_empty()
                                ? ec.source_location()

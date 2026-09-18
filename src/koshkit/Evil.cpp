@@ -132,8 +132,8 @@ struct mapped_library_family
   String path;
 };
 
-fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
-    throws -> void
+fn append_anomaly_report(String &output, EvalContext &cxt,
+                         bool should_color) throws -> void
 {
   let const allocator = cxt.scratch_allocator();
   if (!os::has_process_open_file_listing()) {
@@ -142,8 +142,8 @@ fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
     return;
   }
 
-  let const files = os::list_process_open_files(os::get_current_process_id(),
-                                                allocator);
+  let const files =
+      os::list_process_open_files(os::get_current_process_id(), allocator);
   let families = ArrayList<mapped_library_family>{allocator};
   usize findings = 0;
   for (let const &file : files) {
@@ -157,8 +157,10 @@ fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
            families[family_index].family.view() != family)
       family_index++;
     if (family_index == families.count()) {
-      families.push(mapped_library_family{String{allocator, family},
-                                          String{allocator, file.path.view()}});
+      families.push(mapped_library_family{
+          String{allocator, family          },
+          String{allocator, file.path.view()}
+      });
     } else if (families[family_index].path.view() != file.path.view()) {
       findings++;
     }
@@ -167,14 +169,14 @@ fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
   append_report_field(output, "Mixed libraries",
                       String::from(findings, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(output, "Confidence", "high",
-                      colors::ansi::BOLD_CYAN, should_color);
+  append_report_field(output, "Confidence", "high", colors::ansi::BOLD_CYAN,
+                      should_color);
   append_report_field(output, "Cost", "process mappings",
                       colors::ansi::BOLD_CYAN, should_color);
 }
 
-fn append_procfs_report(String &output, bool should_color, Allocator allocator)
-    throws -> void
+fn append_procfs_report(String &output, bool should_color,
+                        Allocator allocator) throws -> void
 {
   os::system_activity_status activity{};
   if (os::read_system_activity_status(activity)) {
@@ -185,9 +187,10 @@ fn append_procfs_report(String &output, bool should_color, Allocator allocator)
         output, "CPU system units",
         String::from(activity.cpu_system_units, allocator).view(),
         colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(output, "Page faults",
-                        String::from(activity.page_fault_count, allocator).view(),
-                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(
+        output, "Page faults",
+        String::from(activity.page_fault_count, allocator).view(),
+        colors::ansi::BOLD_CYAN, should_color);
     append_report_field(
         output, "Major page faults",
         String::from(activity.major_page_fault_count, allocator).view(),
@@ -222,7 +225,8 @@ fn append_procfs_report(String &output, bool should_color, Allocator allocator)
 
   os::memory_status memory{};
   if (os::read_memory_status(memory)) {
-    let memory_line = String::from(memory.available_kib, allocator) + " KiB available of " +
+    let memory_line = String::from(memory.available_kib, allocator) +
+                      " KiB available of " +
                       String::from(memory.total_kib, allocator).view() + " KiB";
     append_report_field(output, "Memory", memory_line.view(),
                         colors::ansi::BOLD_CYAN, should_color);

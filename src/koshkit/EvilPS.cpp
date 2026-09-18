@@ -222,8 +222,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (FLAG_EVILPS_SORT.is_set()) {
     let const key = FLAG_EVILPS_SORT.value();
-    static constexpr PackedStringKey SORT_KEYS[] = {
-        SSK("name"), SSK("pid"), SSK("cpu"), SSK("memory")};
+    static constexpr PackedStringKey SORT_KEYS[] = {SSK("name"), SSK("pid"),
+                                                    SSK("cpu"), SSK("memory")};
     static constexpr StaticStringSet VALID_SORT_KEYS{SORT_KEYS};
     if (!VALID_SORT_KEYS.contains(key)) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_EVILPS_SORT.value_location(),

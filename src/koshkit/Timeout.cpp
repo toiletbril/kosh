@@ -206,7 +206,7 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
 
   defer { reset_flags(FLAG_LIST); };
   try {
-    let [operands, operand_locations] = parse_util_operands(
+    let[operands, operand_locations] = parse_util_operands(
         FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, true);
     if (FLAG_HELP.is_enabled() || operands.count() < 2) return None;
     if (!Path{operands[1].view()}.has_trailing_separator()) return None;
@@ -217,8 +217,7 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
       if (FLAG_TIMEOUT_KILL_AFTER.is_set())
         unused(parse_koshkit_duration_seconds(
             FLAG_TIMEOUT_KILL_AFTER.value(),
-            FLAG_TIMEOUT_KILL_AFTER.value_location(),
-            cxt.scratch_allocator()));
+            FLAG_TIMEOUT_KILL_AFTER.value_location(), cxt.scratch_allocator()));
       let const timeout_signal = resolve_koshkit_signal(
           FLAG_TIMEOUT_SIGNAL.is_set() ? FLAG_TIMEOUT_SIGNAL.value()
                                        : StringView{"TERM"},
@@ -230,7 +229,7 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
 
     try {
       unused(checked_timeout_program(operands[1].view(), operand_locations[1],
-                                    cxt));
+                                     cxt));
     } catch (const ErrorWithLocation &error) {
       error_location = error.location();
       error_message = "koshkit timeout: " + error.message();
@@ -249,7 +248,7 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
     -> i32
 {
   defer { reset_flags(FLAG_LIST); };
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, true);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);

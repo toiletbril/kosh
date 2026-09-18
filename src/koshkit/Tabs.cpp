@@ -34,9 +34,9 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
-      FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, false, false,
-      true);
+  let const[operands, operand_locations] =
+      parse_util_operands(FLAG_LIST, args, cxt.scratch_allocator(),
+                          &arg_locations, false, false, true);
   defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) {
@@ -64,8 +64,8 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
   };
   static constexpr StaticStringMap TEMPLATES{TEMPLATE_ENTRIES};
   let stops = ArrayList<u64>{cxt.scratch_allocator()};
-  let specification = operands.count() == 1 ? operands[0].view()
-                                            : StringView{"-8"};
+  let specification =
+      operands.count() == 1 ? operands[0].view() : StringView{"-8"};
   if (let const canned = TEMPLATES.find(specification); canned.has_value())
     specification = *canned;
   if (specification.length > 1 && specification[0] == '-' &&
@@ -108,7 +108,8 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
       if (stop <= previous_stop || stop > 160) {
         KOSHKIT_REPORT_ERROR_AT(
             operand_locations[0],
-            "tab stops do not increase within column 160 in '" + operands[0] + "'",
+            "tab stops do not increase within column 160 in '" + operands[0] +
+                "'",
             "list each stop after the previous stop and no later than column "
             "160");
         return 1;

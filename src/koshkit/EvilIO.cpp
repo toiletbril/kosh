@@ -300,7 +300,8 @@ fn append_disk_io_report(String &output,
   }
   append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                        should_color);
-  let const do_append_header = [&](StringView text, usize width) throws -> void {
+  let const do_append_header = [&](StringView text, usize width)
+                                   throws -> void {
     output += "  ";
     append_report_column(output, text, width, true, colors::ansi::BOLD_CYAN,
                          should_color);
@@ -340,8 +341,8 @@ fn append_disk_io_report(String &output,
         if (before->has_field(os::disk_io_field::WrittenBytes) &&
             after.has_field(os::disk_io_field::WrittenBytes))
         {
-          write_value = counter_rate(before->written_bytes,
-                                     after.written_bytes, elapsed_nanoseconds);
+          write_value = counter_rate(before->written_bytes, after.written_bytes,
+                                     elapsed_nanoseconds);
         }
         if (before->has_field(os::disk_io_field::ReadOperations) &&
             after.has_field(os::disk_io_field::ReadOperations))
@@ -369,19 +370,17 @@ fn append_disk_io_report(String &output,
         write_operation_value = after.write_operation_count;
     }
     output += "  ";
-    append_report_column(
-        output,
-        read_value.has_value()
-            ? format_human_size(*read_value, allocator).view()
-            : StringView{"-"},
-        10, true, colors::ansi::GREEN, should_color);
+    append_report_column(output,
+                         read_value.has_value()
+                             ? format_human_size(*read_value, allocator).view()
+                             : StringView{"-"},
+                         10, true, colors::ansi::GREEN, should_color);
     output += "  ";
-    append_report_column(
-        output,
-        write_value.has_value()
-            ? format_human_size(*write_value, allocator).view()
-            : StringView{"-"},
-        10, true, colors::ansi::GREEN, should_color);
+    append_report_column(output,
+                         write_value.has_value()
+                             ? format_human_size(*write_value, allocator).view()
+                             : StringView{"-"},
+                         10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
         output,
@@ -427,8 +426,7 @@ fn append_disk_io_report(String &output,
                            true, {}, should_color);
 
       let read_latency = String{allocator};
-      if (before != nullptr &&
-          before->has_field(os::disk_io_field::ReadTime) &&
+      if (before != nullptr && before->has_field(os::disk_io_field::ReadTime) &&
           after.has_field(os::disk_io_field::ReadTime) &&
           before->has_field(os::disk_io_field::ReadOperations) &&
           after.has_field(os::disk_io_field::ReadOperations))
@@ -438,8 +436,8 @@ fn append_disk_io_report(String &output,
         let const operations = counter_delta(before->read_operation_count,
                                              after.read_operation_count);
         if (time.has_value() && operations.has_value() && *operations != 0) {
-          read_latency = utils::format_duration_nanoseconds(
-              *time / *operations, allocator);
+          read_latency = utils::format_duration_nanoseconds(*time / *operations,
+                                                            allocator);
         }
       }
       output += "  ";
@@ -479,8 +477,8 @@ fn append_disk_io_report(String &output,
             counter_delta(before->weighted_busy_time_nanoseconds,
                           after.weighted_busy_time_nanoseconds);
         if (weighted.has_value()) {
-          let const tenths = static_cast<u64>(static_cast<u128>(*weighted) * 10 /
-                                              elapsed_nanoseconds);
+          let const tenths = static_cast<u64>(static_cast<u128>(*weighted) *
+                                              10 / elapsed_nanoseconds);
           average_queue = String::from(tenths / 10, allocator);
           average_queue += ".";
           average_queue += String::from(tenths % 10, allocator).view();
@@ -493,12 +491,11 @@ fn append_disk_io_report(String &output,
                            9, true, {}, should_color);
     }
     output += "  ";
-    append_report_column(
-        output,
-        after.has_field(os::disk_io_field::QueueDepth)
-            ? String::from(after.queue_depth, allocator).view()
-            : StringView{"-"},
-        7, true, {}, should_color);
+    append_report_column(output,
+                         after.has_field(os::disk_io_field::QueueDepth)
+                             ? String::from(after.queue_depth, allocator).view()
+                             : StringView{"-"},
+                         7, true, {}, should_color);
     let const do_failure_total =
         [&](os::disk_io_field read_field, os::disk_io_field write_field,
             u64 os::disk_io_status::*read_member,
@@ -520,9 +517,10 @@ fn append_disk_io_report(String &output,
       if (after.has_field(write_field)) {
         let value = Maybe<u64>{after.*write_member};
         if (is_sampled) {
-          value = before != nullptr && before->has_field(write_field)
-                      ? counter_delta(before->*write_member, after.*write_member)
-                      : Maybe<u64>{};
+          value =
+              before != nullptr && before->has_field(write_field)
+                  ? counter_delta(before->*write_member, after.*write_member)
+                  : Maybe<u64>{};
         }
         if (value.has_value()) {
           total = saturated_sum(total, *value);
@@ -565,15 +563,14 @@ fn append_disk_io_report(String &output,
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        usize row_limit, f64 sample_duration_seconds,
                        f64 refresh_interval_seconds, f64 falloff_seconds,
-                       bool is_terminal,
-                       bool should_color) throws -> i32
+                       bool is_terminal, bool should_color) throws -> i32
 {
   let const allocator = heap_allocator();
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
-  let const refresh_interval_nanoseconds = static_cast<u64>(
-      refresh_interval_seconds * 1000000000.0);
+  let const refresh_interval_nanoseconds =
+      static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   let before_rows = read_process_io_rows(allocator, selected_pid, true);
   if (selected_pid.has_value() && before_rows.is_empty()) return 1;
@@ -608,29 +605,28 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     }
     for (usize index = retained.count(); index > 0; index--) {
       let const position = index - 1;
-      if (now - retained[position].last_seen_nanoseconds >=
-          falloff_nanoseconds)
+      if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
       {
         retained.remove(position);
       }
     }
     before_rows = steal(after_rows);
-    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds)
-      continue;
+    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
 
     last_refresh_nanoseconds = now;
-    retained.sort([](const live_process_row &left,
-                     const live_process_row &right) {
-      let const left_total = saturated_sum(left.row.status.read_bytes,
-                                           left.row.status.written_bytes);
-      let const right_total = saturated_sum(right.row.status.read_bytes,
-                                            right.row.status.written_bytes);
-      if (left_total != right_total) return left_total > right_total;
-      return left.row.pid < right.row.pid;
-    });
+    retained.sort(
+        [](const live_process_row &left, const live_process_row &right) {
+          let const left_total = saturated_sum(left.row.status.read_bytes,
+                                               left.row.status.written_bytes);
+          let const right_total = saturated_sum(right.row.status.read_bytes,
+                                                right.row.status.written_bytes);
+          if (left_total != right_total) return left_total > right_total;
+          return left.row.pid < right.row.pid;
+        });
     let rows = ArrayList<io_row>{allocator};
     rows.reserve(retained.count());
-    for (let const &row : retained) rows.push(row.row);
+    for (let const &row : retained)
+      rows.push(row.row);
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_process_io_rate_report(output, rows, row_limit, allocator,
@@ -654,8 +650,8 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
   let retained = ArrayList<live_disk_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
-  let const refresh_interval_nanoseconds = static_cast<u64>(
-      refresh_interval_seconds * 1000000000.0);
+  let const refresh_interval_nanoseconds =
+      static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
 
   loop
@@ -681,22 +677,21 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
     }
     for (usize index = retained.count(); index > 0; index--) {
       let const position = index - 1;
-      if (now - retained[position].last_seen_nanoseconds >=
-          falloff_nanoseconds)
+      if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
       {
         retained.remove(position);
       }
     }
     before_snapshot = steal(after_snapshot);
-    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds)
-      continue;
+    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
 
     last_refresh_nanoseconds = now;
     let current_snapshot = os::disk_io_snapshot{};
     current_snapshot.sampled_at_nanoseconds =
         after_snapshot.sampled_at_nanoseconds;
     current_snapshot.disks.reserve(retained.count());
-    for (let const &row : retained) current_snapshot.disks.push(row.status);
+    for (let const &row : retained)
+      current_snapshot.disks.push(row.status);
     u64 elapsed_nanoseconds = 0;
     if (after_snapshot.sampled_at_nanoseconds >=
         before_snapshot.sampled_at_nanoseconds)
@@ -993,15 +988,13 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     };
 
     if (should_show_processes) {
-      return run_live_process_io(ec, selected_pid, row_limit,
-                                 live_interval_seconds,
-                                 refresh_interval_seconds, falloff_seconds,
-                                 is_terminal, should_color);
+      return run_live_process_io(
+          ec, selected_pid, row_limit, live_interval_seconds,
+          refresh_interval_seconds, falloff_seconds, is_terminal, should_color);
     }
 
-    return run_live_disk_io(ec, live_interval_seconds,
-                            refresh_interval_seconds, falloff_seconds,
-                            is_terminal, should_color);
+    return run_live_disk_io(ec, live_interval_seconds, refresh_interval_seconds,
+                            falloff_seconds, is_terminal, should_color);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {

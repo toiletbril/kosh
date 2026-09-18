@@ -47,7 +47,7 @@ fn Pathchk::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -111,8 +111,7 @@ fn Pathchk::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (!reason.is_empty()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "pathchk: " + operand + ": " + reason);
+      report_soft_koshkit_error(ec, cxt, "pathchk: " + operand + ": " + reason);
       status = 1;
     }
   }

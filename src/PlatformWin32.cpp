@@ -245,14 +245,14 @@ fn write_system_log(StringView tag, StringView priority, StringView message,
   let const severity =
       dot.has_value() ? priority.substring(*dot + 1) : priority;
   static constexpr static_string_entry<WORD> EVENT_TYPES[] = {
-      {SSK("alert"),   EVENTLOG_ERROR_TYPE},
-      {SSK("crit"),    EVENTLOG_ERROR_TYPE},
+      {SSK("alert"),   EVENTLOG_ERROR_TYPE      },
+      {SSK("crit"),    EVENTLOG_ERROR_TYPE      },
       {SSK("debug"),   EVENTLOG_INFORMATION_TYPE},
-      {SSK("emerg"),   EVENTLOG_ERROR_TYPE},
-      {SSK("err"),     EVENTLOG_ERROR_TYPE},
+      {SSK("emerg"),   EVENTLOG_ERROR_TYPE      },
+      {SSK("err"),     EVENTLOG_ERROR_TYPE      },
       {SSK("info"),    EVENTLOG_INFORMATION_TYPE},
-      {SSK("notice"),  EVENTLOG_WARNING_TYPE},
-      {SSK("warning"), EVENTLOG_WARNING_TYPE},
+      {SSK("notice"),  EVENTLOG_WARNING_TYPE    },
+      {SSK("warning"), EVENTLOG_WARNING_TYPE    },
   };
   static constexpr StaticStringMap EVENT_TYPE_MAP{EVENT_TYPES};
   let const event_type_value = EVENT_TYPE_MAP.find(severity);
@@ -1513,9 +1513,10 @@ fn apply_terminal_settings(descriptor terminal,
     -> terminal_settings_apply_result
 {
   static constexpr static_string_entry<DWORD> TERMINAL_FLAG_ENTRIES[] = {
-      {SSK("echo"), ENABLE_ECHO_INPUT},
-      {SSK("icanon"), ENABLE_LINE_INPUT},
-      {SSK("isig"), ENABLE_PROCESSED_INPUT}};
+      {SSK("echo"),   ENABLE_ECHO_INPUT     },
+      {SSK("icanon"), ENABLE_LINE_INPUT     },
+      {SSK("isig"),   ENABLE_PROCESSED_INPUT}
+  };
   static constexpr StaticStringMap TERMINAL_FLAGS{TERMINAL_FLAG_ENTRIES};
   DWORD mode = 0;
   if (GetConsoleMode(terminal, &mode) == FALSE)

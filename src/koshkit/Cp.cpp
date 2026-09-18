@@ -111,9 +111,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
       }
       if (!os::create_symlink(target->view(), destination)) {
         throw Error{
-            "unable to create the symlink '" +
-            String{allocator, destination}
-            +
+            "unable to create the symlink '" + String{allocator, destination}
+              +
             "': " + os::last_system_error_message()
         };
       }
@@ -222,9 +221,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
                           source_status->modification_nanoseconds))
   {
     throw Error{
-        "unable to preserve timestamps for '" +
-        String{allocator, destination}
-        +
+        "unable to preserve timestamps for '" + String{allocator, destination}
+          +
         "': " + os::last_system_error_message()
     };
   }
@@ -239,7 +237,7 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 

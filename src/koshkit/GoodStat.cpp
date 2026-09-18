@@ -81,7 +81,8 @@ fn file_crc32c(const ExecContext &ec, StringView path,
   char buffer[65536];
   loop
   {
-    let const read_count = os::read_fd(input->descriptor, buffer, sizeof(buffer));
+    let const read_count =
+        os::read_fd(input->descriptor, buffer, sizeof(buffer));
     if (!read_count.has_value()) return None;
     if (*read_count == 0) break;
     crc = os::crc32c_update(crc, buffer, *read_count);
@@ -108,10 +109,9 @@ fn percent_used(const os::filesystem_status &filesystem) wontthrow -> u64
   let const whole_percent = used / filesystem.total_blocks;
   let const remainder = used % filesystem.total_blocks;
   return whole_percent * 100 +
-         static_cast<u64>(
-             (static_cast<u128>(remainder) * 100 +
-              filesystem.total_blocks / 2) /
-             filesystem.total_blocks);
+         static_cast<u64>((static_cast<u128>(remainder) * 100 +
+                           filesystem.total_blocks / 2) /
+                          filesystem.total_blocks);
 }
 
 fn append_subject(String &output, StringView operand,
@@ -129,41 +129,36 @@ fn append_subject(String &output, StringView operand,
   };
   let const described_type = describe_file_type(operand, status, allocator);
   do_append_field("Type",
-                      described_type.has_value() ? described_type->view()
-                                                 : file_type_name(status),
-                      colors::ansi::BOLD_CYAN, should_color);
+                  described_type.has_value() ? described_type->view()
+                                             : file_type_name(status),
+                  colors::ansi::BOLD_CYAN, should_color);
 
   if (os::file_type_letter(status.mode) == 'l') {
     let const target = os::read_symlink(operand, allocator);
     if (target.has_value()) {
-      do_append_field("Target", target->view(),
-                          colors::ansi::BOLD_CYAN, should_color);
+      do_append_field("Target", target->view(), colors::ansi::BOLD_CYAN,
+                      should_color);
     }
   }
 
   do_append_field("Size", size_text(status.size, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Permissions",
-                      permission_text(status.mode, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Owner",
-                      id_name(status.owner_id, true, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Group",
-                      id_name(status.group_id, false, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Inode",
-                      String::from(status.file_id, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Links",
-                      String::from(status.link_count, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN, should_color);
+  do_append_field("Permissions", permission_text(status.mode, allocator).view(),
+                  colors::ansi::BOLD_CYAN, should_color);
+  do_append_field("Owner", id_name(status.owner_id, true, allocator).view(),
+                  colors::ansi::BOLD_CYAN, should_color);
+  do_append_field("Group", id_name(status.group_id, false, allocator).view(),
+                  colors::ansi::BOLD_CYAN, should_color);
+  do_append_field("Inode", String::from(status.file_id, allocator).view(),
+                  colors::ansi::BOLD_CYAN, should_color);
+  do_append_field("Links", String::from(status.link_count, allocator).view(),
+                  colors::ansi::BOLD_CYAN, should_color);
 
   let device = String::from(os::device_major(status.device_id), allocator);
   device += ",";
   device += String::from(os::device_minor(status.device_id), allocator).view();
   do_append_field("Device", device.view(), colors::ansi::BOLD_CYAN,
-                      should_color);
+                  should_color);
 
   let const type_letter = os::file_type_letter(status.mode);
   if (type_letter == 'b' || type_letter == 'c') {
@@ -173,64 +168,63 @@ fn append_subject(String &output, StringView operand,
     special +=
         String::from(os::device_minor(status.special_device_id), allocator)
             .view();
-    do_append_field("Device type", special.view(),
-                        colors::ansi::BOLD_CYAN, should_color);
+    do_append_field("Device type", special.view(), colors::ansi::BOLD_CYAN,
+                    should_color);
   }
 
   let blocks = String::from(status.blocks, allocator);
   blocks += " of 512 bytes";
   do_append_field("Blocks", blocks.view(), colors::ansi::BOLD_CYAN,
-                      should_color);
+                  should_color);
   do_append_field("Accessed",
-                      format_file_timestamp(status.access_time,
-                                            status.access_nanoseconds,
-                                            allocator)
-                          .view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                  format_file_timestamp(status.access_time,
+                                        status.access_nanoseconds, allocator)
+                      .view(),
+                  colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Modified",
-                      format_file_timestamp(status.modification_time,
-                                            status.modification_nanoseconds,
-                                            allocator)
-                          .view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                  format_file_timestamp(status.modification_time,
+                                        status.modification_nanoseconds,
+                                        allocator)
+                      .view(),
+                  colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Changed",
-                      format_file_timestamp(status.change_time,
-                                            status.change_nanoseconds,
-                                            allocator)
-                          .view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                  format_file_timestamp(status.change_time,
+                                        status.change_nanoseconds, allocator)
+                      .view(),
+                  colors::ansi::BOLD_CYAN, should_color);
 
   if (should_report_filesystem) {
     let filesystem = os::filesystem_status{};
     if (os::stat_filesystem(operand, filesystem)) {
-      do_append_field("Filesystem",
-                          StringView{filesystem.type_name},
-                          colors::ansi::BOLD_CYAN, should_color);
+      do_append_field("Filesystem", StringView{filesystem.type_name},
+                      colors::ansi::BOLD_CYAN, should_color);
       do_append_field("Filesystem block size",
-          String::from(filesystem.block_size, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
+                      String::from(filesystem.block_size, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
       do_append_field("Filesystem capacity",
-          String::from(percent_used(filesystem), allocator).view() + "%",
-          colors::ansi::BOLD_CYAN, should_color);
+                      String::from(percent_used(filesystem), allocator).view() +
+                          "%",
+                      colors::ansi::BOLD_CYAN, should_color);
       do_append_field("Filesystem blocks",
-          String::from(filesystem.total_blocks, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
+                      String::from(filesystem.total_blocks, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
       do_append_field("Filesystem free blocks",
-          String::from(filesystem.free_blocks, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-      do_append_field("Filesystem available blocks",
+                      String::from(filesystem.free_blocks, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
+      do_append_field(
+          "Filesystem available blocks",
           String::from(filesystem.available_blocks, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
       do_append_field("Filesystem id",
-          String::from(filesystem.filesystem_id, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
+                      String::from(filesystem.filesystem_id, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
     }
   }
 
   if (should_report_checksum && os::file_type_letter(status.mode) == '-') {
     if (let const checksum = file_crc32c(ec, operand, allocator))
-      do_append_field("CRC32C", checksum->view(),
-                          colors::ansi::BOLD_CYAN, should_color);
+      do_append_field("CRC32C", checksum->view(), colors::ansi::BOLD_CYAN,
+                      should_color);
   }
 
   output += table.to_string(should_color).view();
@@ -249,7 +243,7 @@ fn GoodStat::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 

@@ -87,8 +87,7 @@ static fn parse_xargs_items(StringView input, Allocator allocator) throws
         if (byte == quote) {
           quote = '\0';
         } else {
-          if (byte == '\n')
-            throw Error{"unmatched quote before newline"};
+          if (byte == '\n') throw Error{"unmatched quote before newline"};
           value += byte;
         }
         continue;
@@ -194,7 +193,7 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -314,8 +313,7 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
     if (FLAG_XARGS_TRACE.is_enabled())
       trace_xargs_command(ec, command, cxt.scratch_allocator());
     if (FLAG_XARGS_PROMPT.is_enabled())
-      throw Error{
-          "interactive prompting requires a controlling terminal"};
+      throw Error{"interactive prompting requires a controlling terminal"};
     Maybe<ExecContext> sub;
     try {
       let const *source = cxt.current_source();

@@ -42,7 +42,7 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
 {
   defer { reset_flags(FLAG_LIST); };
 
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 

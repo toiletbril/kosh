@@ -45,8 +45,9 @@ static fn change_path_ownership_recursive(
   os::file_status path_status{};
   if (!os::stat_path(path.text().view(), path_status)) {
     koshkit::report_soft_koshkit_error(
-        ec, cxt, utility_name + ": cannot access '" + path.text() +
-                  "': " + os::last_system_error_message());
+        ec, cxt,
+        utility_name + ": cannot access '" + path.text() +
+            "': " + os::last_system_error_message());
     return false;
   }
 
@@ -55,8 +56,9 @@ static fn change_path_ownership_recursive(
   if (!os::set_file_owner(path.text().view(), owner_id, group_id, does_follow))
   {
     koshkit::report_soft_koshkit_error(
-        ec, cxt, utility_name + ": cannot change ownership of '" +
-                  path.text() + "': " + os::last_system_error_message());
+        ec, cxt,
+        utility_name + ": cannot change ownership of '" + path.text() +
+            "': " + os::last_system_error_message());
     return false;
   }
 
@@ -73,8 +75,9 @@ static fn change_path_ownership_recursive(
           identity.file_id == followed_status.file_id)
       {
         koshkit::report_soft_koshkit_error(
-            ec, cxt, utility_name + ": recursive directory loop at '" +
-                      path.text() + "'");
+            ec, cxt,
+            utility_name + ": recursive directory loop at '" + path.text() +
+                "'");
         return false;
       }
     }
@@ -90,8 +93,9 @@ static fn change_path_ownership_recursive(
   let children = Path::read_directory(path);
   if (!children.has_value()) {
     koshkit::report_soft_koshkit_error(
-        ec, cxt, utility_name + ": cannot read directory '" + path.text() +
-                  "': " + os::last_system_error_message());
+        ec, cxt,
+        utility_name + ": cannot read directory '" + path.text() +
+            "': " + os::last_system_error_message());
     return false;
   }
 

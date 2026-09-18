@@ -86,10 +86,10 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_KOSHKIT_COLOR.is_set()) {
     let const selected = parse_cli_color_mode(FLAG_KOSHKIT_COLOR.value());
     if (!selected.has_value()) {
-      let error = ErrorWithLocation{
-          FLAG_KOSHKIT_COLOR.value_location(),
-          "koshkit: invalid color mode '" +
-              String{FLAG_KOSHKIT_COLOR.value()} + "'"};
+      let error =
+          ErrorWithLocation{FLAG_KOSHKIT_COLOR.value_location(),
+                            "koshkit: invalid color mode '" +
+                                String{FLAG_KOSHKIT_COLOR.value()} + "'"};
       error.set_command_status(2);
       throw error;
     }

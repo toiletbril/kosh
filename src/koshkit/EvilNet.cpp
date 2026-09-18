@@ -380,14 +380,13 @@ struct live_network_row
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
                             f64 sample_interval_seconds,
                             f64 refresh_interval_seconds, f64 falloff_seconds,
-                            bool should_color) throws
-    -> i32
+                            bool should_color) throws -> i32
 {
   let retained = ArrayList<live_network_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
-  let const refresh_interval_nanoseconds = static_cast<u64>(
-      refresh_interval_seconds * 1000000000.0);
+  let const refresh_interval_nanoseconds =
+      static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   let const is_terminal = colors::stdout_is_a_terminal();
   let const is_alternate = is_terminal && enter_alternate_screen(ec);
@@ -417,8 +416,8 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     }
     for (usize index = retained.count(); index > 0; index--) {
       let const position = index - 1;
-      if (now - retained[position].last_seen_nanoseconds >=
-          falloff_nanoseconds) {
+      if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
+      {
         retained.remove(position);
       }
     }
@@ -438,12 +437,14 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let statistics =
         ArrayList<os::network_interface_statistics_entry>{allocator};
     statistics.reserve(retained.count());
-    for (let const &row : retained) statistics.push(row.statistics);
+    for (let const &row : retained)
+      statistics.push(row.statistics);
     let output = String{allocator};
     let warnings = ArrayList<String>{allocator};
     append_network_traffic_statistics_report(output, warnings, allocator,
                                              statistics, should_color);
-    if (is_terminal) output = String{allocator, "\x1b[H\x1b[2J"} + output.view();
+    if (is_terminal)
+      output = String{allocator, "\x1b[H\x1b[2J"} + output.view();
     ec.print_to_stdout(output);
     for (let const &warning : warnings)
       show_message(Warning{warning.view()}.to_string());
@@ -485,8 +486,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let const should_color = koshkit_should_color();
-  if (FLAG_EVILNET_FAILURES.is_enabled() &&
-      FLAG_EVILNET_LIVE.is_enabled()) {
+  if (FLAG_EVILNET_FAILURES.is_enabled() && FLAG_EVILNET_LIVE.is_enabled()) {
     KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_FAILURES.value_location(),
                             "conflicting flags",
                             "--failures cannot be combined with --live");
@@ -537,8 +537,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_show_traffic =
       should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled();
   let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
-  let const should_show_interfaces = !FLAG_EVILNET_TRAFFIC.is_enabled() &&
-                                     !should_show_failures;
+  let const should_show_interfaces =
+      !FLAG_EVILNET_TRAFFIC.is_enabled() && !should_show_failures;
   let const address_count =
       should_show_interfaces
           ? append_network_interface_report(output, should_color,
@@ -551,17 +551,16 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
                                                   should_color);
   }
   if (should_show_all || should_show_failures)
-    has_tcp_statistics = append_tcp_report(output, warnings, allocator,
-                                           should_color);
+    has_tcp_statistics =
+        append_tcp_report(output, warnings, allocator, should_color);
 
   ec.print_to_stdout(output);
   for (let const &warning : warnings) {
     show_message(Warning{warning.view()}.to_string());
   }
 
-  return address_count == 0 && traffic_count == 0 && !has_tcp_statistics
-             ? 1
-             : 0;
+  return address_count == 0 && traffic_count == 0 && !has_tcp_statistics ? 1
+                                                                         : 0;
 }
 
 } /* namespace koshka::koshkit */

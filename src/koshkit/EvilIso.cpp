@@ -40,12 +40,12 @@ namespace {
 fn append_namespace_report(String &output, bool should_color) throws -> void
 {
   let body = String{heap_allocator()};
-  constexpr StringView names[] = {"cgroup", "ipc", "mnt", "net", "pid",
-                                  "time",    "user", "uts"};
+  constexpr StringView names[] = {"cgroup", "ipc",  "mnt",  "net",
+                                  "pid",    "time", "user", "uts"};
   let const processes = os::enumerate_processes();
   for (let const name : names) {
-    let const target = os::read_symlink(String{"/proc/self/ns/"} + name,
-                                        heap_allocator());
+    let const target =
+        os::read_symlink(String{"/proc/self/ns/"} + name, heap_allocator());
     append_report_field(body, name,
                         target.has_value() ? target->view() : "unavailable",
                         colors::ansi::BOLD_CYAN, should_color);
@@ -57,7 +57,8 @@ fn append_namespace_report(String &output, bool should_color) throws -> void
           String{"/proc/"} + String::from(process.pid, heap_allocator()) +
               "/ns/" + name,
           heap_allocator());
-      if (process_namespace.has_value() && process_namespace->view() == target->view())
+      if (process_namespace.has_value() &&
+          process_namespace->view() == target->view())
         process_count++;
     }
     let const process_field = String::from(process_count, heap_allocator());
@@ -117,9 +118,11 @@ fn append_runtime_report(String &output, bool should_color) throws -> void
 {
   let const cgroup = Path{"/proc/1/cgroup"}.read_entire_file();
   let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
-  let const kubernetes = os::get_environment_variable("KUBERNETES_SERVICE_HOST");
+  let const kubernetes =
+      os::get_environment_variable("KUBERNETES_SERVICE_HOST");
   let runtime = String{heap_allocator()};
-  if (kubernetes.has_value() || cgroup_text.find_substring("kubepods").has_value())
+  if (kubernetes.has_value() ||
+      cgroup_text.find_substring("kubepods").has_value())
     runtime += "kubernetes";
   if (cgroup_text.find_substring("docker").has_value()) {
     if (!runtime.is_empty()) runtime += ", ";
@@ -133,9 +136,12 @@ fn append_runtime_report(String &output, bool should_color) throws -> void
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "cri-o";
   }
-  if (runtime.is_empty() && Path{"/.dockerenv"}.is_regular_file()) runtime = "docker";
-  if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file()) runtime = "podman";
-  append_report_field(output, "Runtime", runtime.is_empty() ? "none detected" : runtime.view(),
+  if (runtime.is_empty() && Path{"/.dockerenv"}.is_regular_file())
+    runtime = "docker";
+  if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file())
+    runtime = "podman";
+  append_report_field(output, "Runtime",
+                      runtime.is_empty() ? "none detected" : runtime.view(),
                       colors::ansi::BOLD_CYAN, should_color);
   append_report_field(output, "Kubernetes",
                       kubernetes.has_value() ||
@@ -149,14 +155,17 @@ fn append_runtime_report(String &output, bool should_color) throws -> void
 
 EvilIso::EvilIso() = default;
 
-pure fn EvilIso::kind() const wontthrow -> Utility::Kind { return Kind::EvilIso; }
+pure fn EvilIso::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::EvilIso;
+}
 
 fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<String> &args,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -166,23 +175,20 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  let const any_selector = FLAG_EVILISO_ALL.is_enabled() ||
-                           FLAG_EVILISO_NAMESPACES.is_enabled() ||
-                           FLAG_EVILISO_CGROUPS.is_enabled() ||
-                           FLAG_EVILISO_SESSIONS.is_enabled() ||
-                           FLAG_EVILISO_REMOTE.is_enabled() ||
-                           FLAG_EVILISO_RUNTIME.is_enabled();
-  let const show_namespaces = FLAG_EVILISO_ALL.is_enabled() ||
-                              !any_selector ||
+  let const any_selector =
+      FLAG_EVILISO_ALL.is_enabled() || FLAG_EVILISO_NAMESPACES.is_enabled() ||
+      FLAG_EVILISO_CGROUPS.is_enabled() || FLAG_EVILISO_SESSIONS.is_enabled() ||
+      FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled();
+  let const show_namespaces = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
                               FLAG_EVILISO_NAMESPACES.is_enabled();
-  let const show_cgroups = FLAG_EVILISO_ALL.is_enabled() ||
-                           !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
-  let const show_sessions = FLAG_EVILISO_ALL.is_enabled() ||
-                            !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
-  let const show_remote = FLAG_EVILISO_ALL.is_enabled() ||
-                          !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
-  let const show_runtime = FLAG_EVILISO_ALL.is_enabled() ||
-                           !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
+  let const show_cgroups = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
+                           FLAG_EVILISO_CGROUPS.is_enabled();
+  let const show_sessions = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
+                            FLAG_EVILISO_SESSIONS.is_enabled();
+  let const show_remote = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
+                          FLAG_EVILISO_REMOTE.is_enabled();
+  let const show_runtime = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
+                           FLAG_EVILISO_RUNTIME.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
   if (show_namespaces) append_namespace_report(output, should_color);

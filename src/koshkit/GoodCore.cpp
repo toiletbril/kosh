@@ -41,8 +41,8 @@ namespace koshka::koshkit {
 
 namespace {
 
-fn print_progress(const ExecContext &ec, bool should_show, StringView message)
-    throws -> void
+fn print_progress(const ExecContext &ec, bool should_show,
+                  StringView message) throws -> void
 {
   if (!should_show) return;
   let const is_terminal = colors::stderr_is_a_terminal();
@@ -237,7 +237,7 @@ fn GoodCore::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -318,11 +318,11 @@ fn GoodCore::execute(
   if (!binary.has_value() || !Path{binary->view()}.is_regular_file()) {
     let const error_location = FLAG_GOODCORE_BINARY.is_set()
                                    ? FLAG_GOODCORE_BINARY.value_location()
-                                   : has_pid ? FLAG_GOODCORE_PID.value_location()
-                                             : operand_locations[0];
-    report_soft_koshkit_util_error(
-        ec, cxt, error_location, args[0].view(),
-        "executable not found", "pass its path with --binary");
+                               : has_pid ? FLAG_GOODCORE_PID.value_location()
+                                         : operand_locations[0];
+    report_soft_koshkit_util_error(ec, cxt, error_location, args[0].view(),
+                                   "executable not found",
+                                   "pass its path with --binary");
     return 1;
   }
 
@@ -339,8 +339,7 @@ fn GoodCore::execute(
 
   let const dump_directory = PathBuilder{stage.text()}.append("dump").build();
   if (!os::make_directory(dump_directory.text().view(), 0700)) {
-    report_soft_koshkit_error(ec, cxt,
-                              "goodcore: cannot create dump directory",
+    report_soft_koshkit_error(ec, cxt, "goodcore: cannot create dump directory",
                               os::last_system_error_message());
     return 1;
   }
@@ -412,7 +411,8 @@ fn GoodCore::execute(
     return 1;
   }
 
-  print_progress(ec, should_show_progress, "collecting executable and libraries");
+  print_progress(ec, should_show_progress,
+                 "collecting executable and libraries");
   collect_core_libraries(cxt, core.text().view(), binary->view(), paths,
                          allocator);
   print_progress(ec, should_show_progress,
@@ -422,8 +422,7 @@ fn GoodCore::execute(
   append_unique_path(paths, binary->view(), allocator);
   usize copied_path_count = 0;
   for (let const &path : paths) {
-    print_progress(ec, should_show_progress,
-                   String{"copying "} + path.view());
+    print_progress(ec, should_show_progress, String{"copying "} + path.view());
     if (!copy_into_root(stage, path.view())) {
       report_soft_koshkit_error(ec, cxt, "goodcore: cannot copy required file",
                                 path.view());
@@ -559,8 +558,8 @@ fn GoodCore::execute(
     let const should_color = koshkit_should_color();
     append_report_field(body, "Archive", output.text().view(),
                         colors::ansi::GREEN, should_color);
-    append_report_field(body, "Executable", binary->view(),
-                        colors::ansi::GREEN, should_color);
+    append_report_field(body, "Executable", binary->view(), colors::ansi::GREEN,
+                        should_color);
     append_report_field(body, "Files",
                         String::from(copied_path_count, allocator).view(),
                         colors::ansi::GREEN, should_color);

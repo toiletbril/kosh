@@ -176,18 +176,17 @@ fn append_network_socket_report(String &output,
     previous_process_id = socket.process_id;
 
     let row = socket_row{};
-    row.protocol = String{allocator, is_unix ? "u_str" : (is_tcp ? "tcp" : "udp")};
+    row.protocol =
+        String{allocator, is_unix ? "u_str" : (is_tcp ? "tcp" : "udp")};
     row.state = String{allocator, state_name(socket.state)};
     row.receive_queue = String::from(socket.receive_queue_bytes, allocator);
     row.send_queue = String::from(socket.send_queue_bytes, allocator);
-    row.local = is_unix
-                    ? String{allocator, socket.local_address.view()}
-                    : endpoint(socket.local_address.view(), socket.local_port,
-                               socket.family, allocator);
-    row.peer = is_unix
-                   ? String{allocator, socket.peer_address.view()}
-                   : endpoint(socket.peer_address.view(), socket.peer_port,
-                              socket.family, allocator);
+    row.local = is_unix ? String{allocator, socket.local_address.view()}
+                        : endpoint(socket.local_address.view(),
+                                   socket.local_port, socket.family, allocator);
+    row.peer = is_unix ? String{allocator, socket.peer_address.view()}
+                       : endpoint(socket.peer_address.view(), socket.peer_port,
+                                  socket.family, allocator);
     row.process = socket.process_id == 0
                       ? String{allocator, "-"}
                       : String::from(socket.process_id, allocator);
@@ -288,8 +287,7 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (!os::has_network_socket_listing()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "evilss: socket listing is unavailable",
+    report_soft_koshkit_error(ec, cxt, "evilss: socket listing is unavailable",
                               "this platform does not expose socket records");
     return 1;
   }

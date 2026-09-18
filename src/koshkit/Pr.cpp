@@ -113,7 +113,7 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
     filtered_args.push(args[index].clone());
     filtered_locations.push(arg_locations[index]);
   }
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, filtered_args, cxt.scratch_allocator(), &filtered_locations);
   defer { reset_flags(FLAG_LIST); };
 

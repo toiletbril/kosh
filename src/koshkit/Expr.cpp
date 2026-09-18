@@ -260,8 +260,7 @@ private:
 
   fn number_string(i128 value) const throws -> String
   {
-    if (value < INT64_MIN || value > INT64_MAX)
-      throw Error{"integer overflow"};
+    if (value < INT64_MIN || value > INT64_MAX) throw Error{"integer overflow"};
     return String::from(static_cast<i64>(value), m_allocator);
   }
 
@@ -280,7 +279,7 @@ fn Expr::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, true);
   defer { reset_flags(FLAG_LIST); };
 

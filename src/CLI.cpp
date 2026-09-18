@@ -810,22 +810,21 @@ fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
   return util_operands_result{steal(operands), steal(operand_locations)};
 }
 
-fn parse_until_subcommand(
-  const FlagList &flags, const ArrayList<String> &args,
-    const ArrayList<SourceLocation> *arg_locations,
-    ArrayList<SourceLocation> *operand_locations, StringView program_name) throws
-    -> usize
+fn parse_until_subcommand(const FlagList &flags, const ArrayList<String> &args,
+                          const ArrayList<SourceLocation> *arg_locations,
+                          ArrayList<SourceLocation> *operand_locations,
+                          StringView program_name) throws -> usize
 {
   let local_operand_locations = ArrayList<SourceLocation>{heap_allocator()};
-  let operands = parse_flags_vec(
-      flags, args, 0, nullptr, arg_locations,
-      operand_locations != nullptr ? operand_locations : &local_operand_locations,
-      program_name);
+  let operands =
+      parse_flags_vec(flags, args, 0, nullptr, arg_locations,
+                      operand_locations != nullptr ? operand_locations
+                                                   : &local_operand_locations,
+                      program_name);
   if (operands.count() <= 1) return args.count();
 
-  let const &locations = operand_locations != nullptr
-                             ? *operand_locations
-                             : local_operand_locations;
+  let const &locations = operand_locations != nullptr ? *operand_locations
+                                                      : local_operand_locations;
   let const subcommand_operand = operands[1].view();
   let const subcommand_location = locations[1];
   if (arg_locations != nullptr) {
@@ -1130,8 +1129,7 @@ fn append_report_inline_field(String &output, StringView name, StringView value,
   output += value;
 }
 
-fn append_report_table(String &output,
-                       const ArrayList<report_table_row> &rows,
+fn append_report_table(String &output, const ArrayList<report_table_row> &rows,
                        bool should_color, StringView indentation) throws -> void
 {
   for (let const &row : rows) {
@@ -1147,12 +1145,15 @@ fn append_report_table(String &output,
 fn ReportTable::add(StringView name, StringView value, StringView style) throws
     -> void
 {
-  m_rows.push({String{m_rows.allocator(), name},
-               String{m_rows.allocator(), value}, style});
+  m_rows.push({
+      String{m_rows.allocator(), name },
+      String{m_rows.allocator(), value},
+      style
+  });
 }
 
-fn ReportTable::to_string(bool should_color, StringView indentation) const
-    throws -> String
+fn ReportTable::to_string(bool should_color,
+                          StringView indentation) const throws -> String
 {
   let output = String{m_rows.allocator()};
   append_report_table(output, m_rows, should_color, indentation);

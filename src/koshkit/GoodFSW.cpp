@@ -138,7 +138,8 @@ fn report_event(String &output, StringView path, const os::file_status &status,
     output += " ";
     append_event_names(output, status, event, should_color);
   } else if (FLAG_GOODFSW_TIMESTAMP.is_enabled() ||
-             FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
+             FLAG_GOODFSW_EVENT_FLAGS.is_enabled())
+  {
     append_report_text(output, path, colors::ansi::BOLD, should_color);
     if (FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
       output += " ";
