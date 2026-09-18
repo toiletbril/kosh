@@ -310,14 +310,17 @@ fn EvilDisk::execute(
   let rows = ArrayList<disk_row>{allocator};
   rows.reserve(filesystems.count());
   i32 status = 0;
+  usize skipped_permission_count = 0;
   for (usize filesystem_index = 0; filesystem_index < filesystems.count();
        filesystem_index++)
   {
     let const &mounted = filesystems[filesystem_index];
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
-      if (operands.is_empty() && os::last_system_error_is_permission_denied())
+      if (operands.is_empty() && os::last_system_error_is_permission_denied()) {
+        skipped_permission_count++;
         continue;
+      }
       let const location = operands.is_empty()
                                ? ec.source_location()
                                : operand_locations[filesystem_index];
@@ -618,6 +621,14 @@ fn EvilDisk::execute(
   }
 
   ec.print_to_stdout(output);
+  if (skipped_permission_count != 0) {
+    let warning = String{allocator, "skipped "};
+    warning += String::from(skipped_permission_count, allocator).view();
+    warning += " filesystem";
+    if (skipped_permission_count != 1) warning += "s";
+    warning += " due to permission denied";
+    show_message(Warning{warning.view()}.to_string());
+  }
   for (let const &warning : warnings)
     show_message(Warning{warning.view()}.to_string());
 
