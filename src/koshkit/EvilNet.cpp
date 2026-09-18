@@ -30,10 +30,12 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
 FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
-              "Refresh traffic at an optional interval until interrupted.",
+              "Refresh live traffic at an optional interval; the default is "
+              "0.5 seconds.",
               is_evilnet_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILNET_CUMULATIVE, '\0', "cumulative",
-              "Use an optional interval for sampled traffic.",
+              "Measure traffic over an optional sampling window; the default "
+              "is one second.",
               is_evilnet_sample_duration, "seconds");
 FLAG(EVILNET_FAILURES, Bool, 'f', "failures",
      "Show TCP failure and packet-loss telemetry only.");
@@ -107,7 +109,7 @@ fn append_network_interface_report(String &output, bool should_color,
 fn append_network_traffic_statistics_report(
     String &output, ArrayList<String> &warnings, Allocator allocator,
     const ArrayList<os::network_interface_statistics_entry> &statistics,
-    bool should_color) throws -> usize
+    bool should_color, bool is_sampled = false) throws -> usize
 {
   usize name_width = 4;
   for (let const &entry : statistics) {
@@ -119,9 +121,15 @@ fn append_network_traffic_statistics_report(
   output += "\n\n";
   append_report_column(output, "NAME", name_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
-  constexpr StringView HEADERS[] = {
-      "RX",        "TX",        "RX PACKETS", "TX PACKETS",
-      "RX ERRORS", "TX ERRORS", "RX DROPS",   "TX DROPS",
+  const StringView HEADERS[] = {
+      is_sampled ? StringView{"RX/S"} : StringView{"RX"},
+      is_sampled ? StringView{"TX/S"} : StringView{"TX"},
+      is_sampled ? StringView{"RX PACKETS/S"} : StringView{"RX PACKETS"},
+      is_sampled ? StringView{"TX PACKETS/S"} : StringView{"TX PACKETS"},
+      is_sampled ? StringView{"RX ERRORS/S"} : StringView{"RX ERRORS"},
+      is_sampled ? StringView{"TX ERRORS/S"} : StringView{"TX ERRORS"},
+      is_sampled ? StringView{"RX DROPS/S"} : StringView{"RX DROPS"},
+      is_sampled ? StringView{"TX DROPS/S"} : StringView{"TX DROPS"},
       "RX CAP",    "TX CAP",    "TX QUEUE",   "TX LIMIT",
   };
   constexpr usize WIDTHS[] = {9, 9, 12, 12, 10, 10, 9, 9, 9, 9, 10, 10};
@@ -360,6 +368,79 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   return true;
 }
 
+pure fn network_counter_rate(u64 before, u64 after,
+                             u64 elapsed_nanoseconds) wontthrow -> u64
+{
+  if (after < before || elapsed_nanoseconds == 0) return 0;
+
+  return static_cast<u64>(static_cast<u128>(after - before) * 1000000000ULL /
+                          elapsed_nanoseconds);
+}
+
+fn sample_network_statistics(
+    const ArrayList<os::network_interface_statistics_entry> &before,
+    const ArrayList<os::network_interface_statistics_entry> &after,
+    u64 elapsed_nanoseconds, Allocator allocator)
+    throws -> ArrayList<os::network_interface_statistics_entry>
+{
+  let sampled = ArrayList<os::network_interface_statistics_entry>{allocator};
+  sampled.reserve(after.count());
+  for (let const &entry : after) {
+    const os::network_interface_statistics_entry *previous = nullptr;
+    for (let const &candidate : before) {
+      if (candidate.interface_name.view() == entry.interface_name.view()) {
+        previous = &candidate;
+        break;
+      }
+    }
+
+    let result = entry;
+    result.interface_name = String{allocator, entry.interface_name.view()};
+    if (previous != nullptr) {
+      if (entry.has_field(os::network_statistics_field::ReceiveBytes) &&
+          previous->has_field(os::network_statistics_field::ReceiveBytes))
+        result.receive_bytes = network_counter_rate(
+            previous->receive_bytes, entry.receive_bytes, elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::TransmitBytes) &&
+          previous->has_field(os::network_statistics_field::TransmitBytes))
+        result.transmit_bytes = network_counter_rate(
+            previous->transmit_bytes, entry.transmit_bytes, elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::ReceivePackets) &&
+          previous->has_field(os::network_statistics_field::ReceivePackets))
+        result.receive_packet_count = network_counter_rate(
+            previous->receive_packet_count, entry.receive_packet_count,
+            elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::TransmitPackets) &&
+          previous->has_field(os::network_statistics_field::TransmitPackets))
+        result.transmit_packet_count = network_counter_rate(
+            previous->transmit_packet_count, entry.transmit_packet_count,
+            elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::ReceiveErrors) &&
+          previous->has_field(os::network_statistics_field::ReceiveErrors))
+        result.receive_error_count = network_counter_rate(
+            previous->receive_error_count, entry.receive_error_count,
+            elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::TransmitErrors) &&
+          previous->has_field(os::network_statistics_field::TransmitErrors))
+        result.transmit_error_count = network_counter_rate(
+            previous->transmit_error_count, entry.transmit_error_count,
+            elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::ReceiveDrops) &&
+          previous->has_field(os::network_statistics_field::ReceiveDrops))
+        result.receive_drop_count = network_counter_rate(
+            previous->receive_drop_count, entry.receive_drop_count,
+            elapsed_nanoseconds);
+      if (entry.has_field(os::network_statistics_field::TransmitDrops) &&
+          previous->has_field(os::network_statistics_field::TransmitDrops))
+        result.transmit_drop_count = network_counter_rate(
+            previous->transmit_drop_count, entry.transmit_drop_count,
+            elapsed_nanoseconds);
+    }
+    sampled.push(steal(result));
+  }
+  return sampled;
+}
+
 struct live_network_row
 {
   os::network_interface_statistics_entry statistics;
@@ -376,7 +457,11 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
       static_cast<u64>(falloff_seconds * 1000000000.0);
   let const refresh_interval_nanoseconds =
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
+  let const sample_interval_nanoseconds =
+      static_cast<u64>(sample_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
+  u64 last_sample_nanoseconds = last_refresh_nanoseconds;
+  let before = os::read_network_interface_statistics();
   let const is_terminal = colors::stdout_is_a_terminal();
   let const is_alternate = is_terminal && enter_alternate_screen(ec);
   defer
@@ -386,36 +471,50 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
 
   loop
   {
-    let current = os::read_network_interface_statistics();
-    let const now = os::monotonic_nanos();
-    for (let const &entry : current) {
-      bool is_known = false;
-      for (usize index = 0; index < retained.count(); index++) {
-        if (retained[index].statistics.interface_name.view() !=
-            entry.interface_name.view())
-          continue;
-        retained[index].statistics = entry;
-        retained[index].last_seen_nanoseconds = now;
-        is_known = true;
-        break;
-      }
-      if (!is_known) {
-        retained.push(live_network_row{entry, now});
-      }
+    let const before_wait_nanoseconds = os::monotonic_nanos();
+    let const sample_elapsed = before_wait_nanoseconds - last_sample_nanoseconds;
+    let const refresh_elapsed = before_wait_nanoseconds - last_refresh_nanoseconds;
+    let const until_sample = sample_interval_nanoseconds > sample_elapsed
+                                 ? sample_interval_nanoseconds - sample_elapsed
+                                 : 0;
+    let const until_refresh = refresh_interval_nanoseconds > refresh_elapsed
+                                  ? refresh_interval_nanoseconds - refresh_elapsed
+                                  : 0;
+    let const wait_nanoseconds = until_sample < until_refresh ? until_sample
+                                                               : until_refresh;
+    os::sleep_for_seconds(static_cast<f64>(wait_nanoseconds) / 1000000000.0);
+    if (os::INTERRUPT_REQUESTED != 0) {
+      os::INTERRUPT_REQUESTED = 0;
+      return 130;
     }
-    for (usize index = retained.count(); index > 0; index--) {
-      let const position = index - 1;
-      if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
-      {
-        retained.remove(position);
+
+    let const now = os::monotonic_nanos();
+    if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
+      let const current = os::read_network_interface_statistics();
+      let const sampled = sample_network_statistics(
+          before, current, now - last_sample_nanoseconds, allocator);
+      for (let const &entry : sampled) {
+        bool is_known = false;
+        for (usize index = 0; index < retained.count(); index++) {
+          if (retained[index].statistics.interface_name.view() !=
+              entry.interface_name.view())
+            continue;
+          retained[index].statistics = entry;
+          retained[index].last_seen_nanoseconds = now;
+          is_known = true;
+          break;
+        }
+        if (!is_known) retained.push(live_network_row{entry, now});
       }
+      for (usize index = retained.count(); index > 0; index--) {
+        let const position = index - 1;
+        if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
+          retained.remove(position);
+      }
+      before = steal(current);
+      last_sample_nanoseconds = now;
     }
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) {
-      os::sleep_for_seconds(sample_interval_seconds);
-      if (os::INTERRUPT_REQUESTED != 0) {
-        os::INTERRUPT_REQUESTED = 0;
-        return 130;
-      }
       continue;
     }
     last_refresh_nanoseconds = now;
@@ -431,17 +530,12 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let output = String{allocator};
     let warnings = ArrayList<String>{allocator};
     append_network_traffic_statistics_report(output, warnings, allocator,
-                                             statistics, should_color);
+                                             statistics, should_color, true);
     if (is_terminal)
       output = String{allocator, "\x1b[H\x1b[2J"} + output.view();
     ec.print_to_stdout(output);
     for (let const &warning : warnings)
       show_message(Warning{warning.view()}.to_string());
-    os::sleep_for_seconds(sample_interval_seconds);
-    if (os::INTERRUPT_REQUESTED != 0) {
-      os::INTERRUPT_REQUESTED = 0;
-      return 130;
-    }
   }
 }
 
@@ -481,7 +575,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
                             "--failures cannot be combined with --live");
     return 2;
   }
-  f64 live_interval_seconds = 1.0;
+  f64 live_interval_seconds = 0.5;
   if (FLAG_EVILNET_LIVE.has_value()) {
     let const parsed = parse_koshkit_duration_seconds(
         FLAG_EVILNET_LIVE.value(), FLAG_EVILNET_LIVE.value_location(),
@@ -494,12 +588,12 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
     }
     live_interval_seconds = parsed;
   }
-  f64 refresh_interval_seconds = live_interval_seconds;
+  f64 sample_interval_seconds = live_interval_seconds;
   if (FLAG_EVILNET_CUMULATIVE.has_value()) {
-    refresh_interval_seconds = parse_koshkit_duration_seconds(
+    sample_interval_seconds = parse_koshkit_duration_seconds(
         FLAG_EVILNET_CUMULATIVE.value(),
         FLAG_EVILNET_CUMULATIVE.value_location(), allocator);
-    if (refresh_interval_seconds <= 0.0) {
+    if (sample_interval_seconds <= 0.0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_CUMULATIVE.value_location(),
                               "invalid cumulative interval",
                               "use a positive number of seconds");
@@ -518,8 +612,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       }
       falloff_seconds = parsed.value();
     }
-    return run_live_network_traffic(ec, allocator, live_interval_seconds,
-                                    refresh_interval_seconds, falloff_seconds,
+    return run_live_network_traffic(ec, allocator, sample_interval_seconds,
+                                    live_interval_seconds, falloff_seconds,
                                     should_color);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
