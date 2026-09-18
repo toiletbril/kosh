@@ -566,7 +566,8 @@ fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
                   bool should_follow_symlink) wontthrow -> bool;
 fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool;
 fn make_fifo(StringView path, u32 mode) wontthrow -> bool;
-fn make_device_node(StringView path, u32 mode, u64 device_id) wontthrow -> bool;
+fn make_device_node(StringView path, u32 mode, u32 major_number,
+                    u32 minor_number) wontthrow -> bool;
 fn touch_file_times(StringView path) wontthrow -> bool;
 fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
                   i64 modification_time, u32 modification_nanoseconds) wontthrow

@@ -658,7 +658,8 @@ fn make_fifo(StringView path, u32 mode) wontthrow -> bool
   return did_succeed;
 }
 
-fn make_device_node(StringView path, u32 mode, u64 device_id) wontthrow -> bool
+fn make_device_node(StringView path, u32 mode, u32 major_number,
+                    u32 minor_number) wontthrow -> bool
 {
   bool did_succeed;
   int saved_errno;
@@ -666,10 +667,11 @@ fn make_device_node(StringView path, u32 mode, u64 device_id) wontthrow -> bool
     const String path_string{path};
 #if defined __linux__
     did_succeed = ::mknod(path_string.c_str(), static_cast<mode_t>(mode),
-                          static_cast<dev_t>(device_id)) == 0;
+                          ::makedev(major_number, minor_number)) == 0;
 #else
     unused(mode);
-    unused(device_id);
+    unused(major_number);
+    unused(minor_number);
     did_succeed = false;
     errno = ENOTSUP;
 #endif

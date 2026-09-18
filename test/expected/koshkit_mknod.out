@@ -1,0 +1,4 @@
+posix-status=0 type=fifo
+modern-status=0 type=fifo
+invalid-mode-status=1
+cleanup=ok

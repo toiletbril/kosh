@@ -934,11 +934,13 @@ fn make_fifo(StringView path, u32 mode) wontthrow -> bool
   return false;
 }
 
-fn make_device_node(StringView path, u32 mode, u64 device_id) wontthrow -> bool
+fn make_device_node(StringView path, u32 mode, u32 major_number,
+                    u32 minor_number) wontthrow -> bool
 {
   unused(path);
   unused(mode);
-  unused(device_id);
+  unused(major_number);
+  unused(minor_number);
   SetLastError(ERROR_NOT_SUPPORTED);
   return false;
 }

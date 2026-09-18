@@ -80,6 +80,7 @@ public:
     Df,
     Link,
     Mkfifo,
+    Mknod,
     Pathchk,
     Cksum,
     Cmp,
@@ -199,6 +200,7 @@ inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
     {SSK("df"),        Utility::Kind::Df       },
     {SSK("link"),      Utility::Kind::Link     },
     {SSK("mkfifo"),    Utility::Kind::Mkfifo   },
+    {SSK("mknod"),     Utility::Kind::Mknod    },
     {SSK("pathchk"),   Utility::Kind::Pathchk  },
     {SSK("cksum"),     Utility::Kind::Cksum    },
     {SSK("cmp"),       Utility::Kind::Cmp      },
@@ -422,6 +424,7 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(Df);                                                                  \
   U_CASE(Link);                                                                \
   U_CASE(Mkfifo);                                                              \
+  U_CASE(Mknod);                                                               \
   U_CASE(Pathchk);                                                             \
   U_CASE(Cksum);                                                               \
   U_CASE(Cmp);                                                                 \
@@ -540,6 +543,7 @@ UTILITY_STRUCT(Chown);
 UTILITY_STRUCT(Df);
 UTILITY_STRUCT(Link);
 UTILITY_STRUCT(Mkfifo);
+UTILITY_STRUCT(Mknod);
 UTILITY_STRUCT(Pathchk);
 UTILITY_STRUCT(Cksum);
 UTILITY_STRUCT(Cmp);
