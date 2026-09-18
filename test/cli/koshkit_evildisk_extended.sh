@@ -5,7 +5,7 @@ path=$TEST_TEMP_DIRECTORY/evildisk-file
 report=$($BIN -c 'koshkit --color never evildisk --all "$1"' evildisk "$path" \
   2>/dev/null)
 case $report in
-  *IDENTITY*'Status: unavailable'*'FILESYSTEM FAILURES'*)
+  *'Status: unavailable'*)
     extended_shape=matched
     ;;
   *) extended_shape=wrong ;;

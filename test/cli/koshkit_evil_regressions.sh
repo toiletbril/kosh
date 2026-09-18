@@ -20,7 +20,7 @@ printf 'evilps-pid-labels=%s\n' "$ps_pid_labels"
 
 fs_report=$($BIN -c 'koshkit --color never evilfs --all')
 case $fs_report in
-  *FILESYSTEMS*'Source:'*'Volume:'*'UUID:'*'OS METADATA'*) fs_detail=matched ;;
+  *'Source:'*'Volume:'*'UUID:'*'Filesystem ID:'*) fs_detail=matched ;;
   *) fs_detail=wrong ;;
 esac
 printf 'evilfs-detail=%s\n' "$fs_detail"
@@ -34,14 +34,14 @@ printf 'evilnet-addresses=%s\n' "$net_addresses"
 
 net_all=$($BIN -c 'koshkit --color never evilnet --all' 2>/dev/null)
 case $net_all in
-  *TRAFFIC*TCP*) net_all_sections=matched ;;
+  *'NAME'*'RX'*'TX'*'Opens:'*'Failures:'*) net_all_sections=matched ;;
   *) net_all_sections=wrong ;;
 esac
 printf 'evilnet-all-sections=%s\n' "$net_all_sections"
 
 net_failures=$($BIN -c 'koshkit --color never evilnet --failures' 2>/dev/null)
 case $net_failures in
-  *TCP*Failures:*) net_failure_section=matched ;;
+  *'Opens:'*'Connections:'*'Failures:'*) net_failure_section=matched ;;
   *) net_failure_section=wrong ;;
 esac
 printf 'evilnet-failures=%s\n' "$net_failure_section"

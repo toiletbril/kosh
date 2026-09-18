@@ -7,7 +7,7 @@ run_report()
 
 default_report=$(run_report "")
 default_shape=matched
-for section in NAMESPACES CGROUPS SESSIONS REMOTE; do
+for section in 'cgroup:' 'Membership:' 'Session:' 'Remote sockets:'; do
   case $default_report in
     *"$section"*) ;;
     *) default_shape=missing ;;
@@ -17,7 +17,7 @@ printf 'default-shape=%s\n' "$default_shape"
 
 all_report=$(run_report --all)
 all_shape=matched
-for section in NAMESPACES CGROUPS SESSIONS REMOTE; do
+for section in 'cgroup:' 'Membership:' 'Session:' 'Remote sockets:'; do
   case $all_report in
     *"$section"*) ;;
     *) all_shape=missing ;;
@@ -26,12 +26,15 @@ done
 printf 'all-shape=%s\n' "$all_shape"
 
 for selector_section in \
-  'namespaces -n NAMESPACES' \
-  'cgroups -c CGROUPS' \
-  'sessions -s SESSIONS' \
-  'remote -r REMOTE' \
-  'runtime -k RUNTIME'; do
+  'namespaces|-n|cgroup:' \
+  'cgroups|-c|Membership:' \
+  'sessions|-s|Session:' \
+  'remote|-r|Remote sockets:' \
+  'runtime|-k|Runtime:'; do
+  old_ifs=$IFS
+  IFS='|'
   set -- $selector_section
+  IFS=$old_ifs
   report=$(run_report "$2")
   case $report in
     *"$3"*) selector_status=matched ;;
