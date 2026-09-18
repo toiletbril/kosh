@@ -371,7 +371,7 @@ fn EvilDisk::execute(
 
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
-  output += "\n  ";
+  output += "\n";
   append_report_column(output, "FILESYSTEM", source_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";

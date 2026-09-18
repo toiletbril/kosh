@@ -290,7 +290,7 @@ fn append_disk_io_report(String &output,
   if (after_snapshot.disks.is_empty() && !is_sampled) return;
 
   if (should_include_heading) {
-    output += "\n  ";
+    output += "\n";
   }
   append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                        should_color);
@@ -322,7 +322,6 @@ fn append_disk_io_report(String &output,
 
   for (let const &after : after_snapshot.disks) {
     let const before = find_disk_io_status(before_snapshot, after.name.view());
-    if (should_include_heading) output += "  ";
     append_report_column(output, after.name.view(), 16, false,
                          colors::ansi::BOLD_GREEN, should_color);
     let read_value = Maybe<u64>{};

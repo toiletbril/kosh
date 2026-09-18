@@ -145,20 +145,41 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_color = koshkit_should_color();
   if (FLAG_EVILFS_ALL.is_enabled()) {
     usize skipped_permission_count = 0;
+    let failed_targets = ArrayList<StringView>{cxt.scratch_allocator()};
     for (let const &mount : mounts) {
       if (!output.is_empty()) output += "\n";
       let const metadata_available = append_detailed_filesystem(
           output, mount, cxt.scratch_allocator(), should_color);
-      if (!metadata_available && os::last_system_error_is_permission_denied())
+      if (!metadata_available) {
+        if (os::last_system_error_is_permission_denied())
         skipped_permission_count++;
+        else
+          failed_targets.push(mount.target.view());
+      }
     }
     if (skipped_permission_count != 0) {
       output += "\n";
-      output += "Warning: skipped ";
+      output += "Warning: Skipped ";
       output += String::from(skipped_permission_count,
                              cxt.scratch_allocator()).view();
       output += skipped_permission_count == 1 ? " filesystem" : " filesystems";
       output += " due to permission denied.\n";
+    }
+    if (!failed_targets.is_empty()) {
+      output += "\n";
+      append_report_column(output, "TARGET", 24, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+      output += "  ";
+      append_report_text(output, "ERROR", colors::ansi::BOLD_RED, should_color);
+      output += "\n";
+      for (let const &target : failed_targets) {
+        append_report_column(output, target, 24, false,
+                             colors::ansi::BOLD_GREEN, should_color);
+        output += "  ";
+        append_report_text(output, os::last_system_error_message(),
+                           colors::ansi::BOLD_RED, should_color);
+        output += "\n";
+      }
     }
     ec.print_to_stdout(output);
     return mounts.is_empty() ? 1 : 0;
