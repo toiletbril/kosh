@@ -87,7 +87,7 @@ For more details, see the [manual page](docs/kosh.1).
 $ man docs/kosh.1
 ```
 
-**Koshka** runs win four moods across three shell identities. Zsh provides a
+**Koshka** runs with four moods across three shell identities. Zsh provides a
 similar feature through its `emulate` builtin.
 
 The default `kosh` mood is a strict superset of Bash with analysis and
