@@ -441,7 +441,7 @@ fn EvilDisk::execute(
     table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
     output += table.to_string(should_color, "");
   } else {
-    output += "  ";
+    output += "";
     append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                          should_color);
     constexpr StringView HEADERS[] = {
@@ -470,7 +470,6 @@ fn EvilDisk::execute(
           os::disk_io_field::ReadRetries,
           os::disk_io_field::WriteRetries,
       };
-      output += "  ";
       append_report_column(output, disk.name.view(), 16, false,
                            colors::ansi::BOLD_GREEN, should_color);
       for (usize index = 0; index < countof(counters); index++) {
