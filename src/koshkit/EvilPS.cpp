@@ -42,11 +42,12 @@ static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
 FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
-              "Refresh the process tree at an optional interval until "
-              "interrupted.",
+              "Refresh the process tree until interrupted; the optional "
+              "interval defaults to 0.5 seconds.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, '\0', "cumulative",
-              "Wait an optional interval before collecting the process tree.",
+              "Collect the process tree over an optional window; without "
+              "--live, wait before collecting.",
               is_evilps_sample_duration, "seconds");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
