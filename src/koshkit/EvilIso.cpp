@@ -165,20 +165,86 @@ fn append_remote_report(String &output, bool should_color,
   table.add("Total sockets",
             String::from(sockets.count(), heap_allocator()).view(),
             colors::ansi::BOLD_CYAN);
+  output += table.to_string(should_color, "");
   if (should_show_detail) {
-    usize remote_index = 0;
+    struct remote_peer_row
+    {
+      String peer{heap_allocator()};
+      StringView state;
+      StringView protocol;
+      String process{heap_allocator()};
+    };
+    let remote_rows = ArrayList<remote_peer_row>{heap_allocator()};
     for (let const &socket : sockets) {
       if (socket.peer_address.is_empty() || socket.peer_port == 0) continue;
       let text = String{heap_allocator()};
       text += socket.peer_address.view();
       text += ":";
       text += String::from(socket.peer_port, heap_allocator()).view();
-      table.add(String{"Remote peer "} +
-                    String::from(remote_index++, heap_allocator()),
-                text.view(), colors::ansi::BOLD_CYAN);
+      StringView state = "-";
+      switch (socket.state) {
+      case os::network_socket_state::Established: state = "ESTABLISHED"; break;
+      case os::network_socket_state::Listen: state = "LISTEN"; break;
+      case os::network_socket_state::SynSent: state = "SYN-SENT"; break;
+      case os::network_socket_state::SynReceived: state = "SYN-RECV"; break;
+      case os::network_socket_state::CloseWait: state = "CLOSE-WAIT"; break;
+      case os::network_socket_state::FinWait1: state = "FIN-WAIT-1"; break;
+      case os::network_socket_state::FinWait2: state = "FIN-WAIT-2"; break;
+      case os::network_socket_state::Closing: state = "CLOSING"; break;
+      case os::network_socket_state::LastAck: state = "LAST-ACK"; break;
+      case os::network_socket_state::TimeWait: state = "TIME-WAIT"; break;
+      case os::network_socket_state::Closed: state = "CLOSED"; break;
+      default: break;
+      }
+      remote_rows.push(remote_peer_row{
+          steal(text),
+          state,
+          socket.protocol == os::network_socket_protocol::Udp
+              ? StringView{"UDP"}
+              : StringView{"TCP"},
+          socket.process_id == 0
+              ? String{heap_allocator(), "-"}
+              : String::from(socket.process_id, heap_allocator())});
+    }
+    if (remote_rows.is_empty()) return;
+
+    usize peer_width = 4;
+    usize process_width = 7;
+    for (let const &row : remote_rows) {
+      if (row.peer.length() > peer_width) peer_width = row.peer.length();
+      if (row.process.length() > process_width) {
+        process_width = row.process.length();
+      }
+    }
+
+    output += "\n";
+    append_report_column(output, "PEER", peer_width, false,
+                         colors::ansi::BOLD_CYAN, should_color);
+    output += "  ";
+    append_report_column(output, "STATE", 11, false, colors::ansi::BOLD_CYAN,
+                         should_color);
+    output += "  ";
+    append_report_column(output, "PROTO", 5, false, colors::ansi::BOLD_CYAN,
+                         should_color);
+    output += "  ";
+    append_report_column(output, "PROCESS", process_width, false,
+                         colors::ansi::BOLD_CYAN, should_color);
+    output += "\n";
+    for (let const &row : remote_rows) {
+      append_report_column(output, row.peer.view(), peer_width, false,
+                           colors::ansi::BOLD_GREEN, should_color);
+      output += "  ";
+      append_report_column(output, row.state, 11, false,
+                           colors::ansi::BOLD_MAGENTA, should_color);
+      output += "  ";
+      append_report_column(output, row.protocol, 5, false,
+                           colors::ansi::BOLD_MAGENTA, should_color);
+      output += "  ";
+      append_report_column(output, row.process.view(), process_width, false, {},
+                           should_color);
+      output += "\n";
     }
   }
-  output += table.to_string(should_color, "");
 }
 
 fn append_runtime_report(String &output, bool should_color) throws -> void

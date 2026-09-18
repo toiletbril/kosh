@@ -33,7 +33,7 @@ case $all_report in
   *) detail_shape=missing ;;
 esac
 case $all_report in
-  *"Controller 0:"*"Login time:"*"Remote peer 0:"*) ;;
+  *"Controller 0:"*"Login time:"*"PEER"*"STATE"*"PROTO"*"PROCESS"*) ;;
   *) detail_shape=missing ;;
 esac
 printf 'detail-shape=%s\n' "$detail_shape"
