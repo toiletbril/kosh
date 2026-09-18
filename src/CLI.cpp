@@ -1326,6 +1326,16 @@ fn leave_alternate_screen(const ExecContext &ec) wontthrow -> void
   unused(write_alternate_screen_sequence(ec, "\x1b[?1049l"));
 }
 
+fn hide_cursor(const ExecContext &ec) wontthrow -> bool
+{
+  return write_alternate_screen_sequence(ec, "\x1b[?25l");
+}
+
+fn show_cursor(const ExecContext &ec) wontthrow -> void
+{
+  unused(write_alternate_screen_sequence(ec, "\x1b[?25h"));
+}
+
 cold fn make_flag_help(const FlagList &flags, bool should_color) throws
     -> String
 {

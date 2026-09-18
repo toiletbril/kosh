@@ -407,6 +407,8 @@ fn format_cli_help(StringView text, bool should_color) throws -> String;
 fn format_cli_help(StringView text) throws -> String;
 fn enter_alternate_screen(const ExecContext &ec) wontthrow -> bool;
 fn leave_alternate_screen(const ExecContext &ec) wontthrow -> void;
+fn hide_cursor(const ExecContext &ec) wontthrow -> bool;
+fn show_cursor(const ExecContext &ec) wontthrow -> void;
 
 fn show_message(StringView err) throws -> void;
 

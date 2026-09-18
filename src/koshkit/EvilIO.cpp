@@ -202,22 +202,23 @@ struct live_process_row
 
 fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
-                                 bool should_color) throws -> void
+                                 bool should_color,
+                                 StringView duration_suffix) throws -> void
 {
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
   output += "  ";
-  append_report_column(output, "READ/S", 10, true, colors::ansi::BOLD_CYAN,
-                       should_color);
+  append_report_column(output, String{"READ"} + duration_suffix, 10, true,
+                       colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
-  append_report_column(output, "WRITE/S", 10, true, colors::ansi::BOLD_CYAN,
-                       should_color);
+  append_report_column(output, String{"WRITE"} + duration_suffix, 10, true,
+                       colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
-  append_report_column(output, "READ IOPS", 10, true, colors::ansi::BOLD_CYAN,
-                       should_color);
+  append_report_column(output, String{"READ OPS"} + duration_suffix, 10, true,
+                       colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
-  append_report_column(output, "WRITE IOPS", 11, true, colors::ansi::BOLD_CYAN,
-                       should_color);
+  append_report_column(output, String{"WRITE OPS"} + duration_suffix, 11, true,
+                       colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
   append_report_text(output, "COMMAND", colors::ansi::BOLD_CYAN, should_color);
   output += "\n";
@@ -283,7 +284,8 @@ fn append_disk_io_report(String &output,
                          const os::disk_io_snapshot &after_snapshot,
                          u64 elapsed_nanoseconds, bool is_sampled,
                          bool should_include_heading, Allocator allocator,
-                         bool should_color) throws -> void
+                         bool should_color,
+                         StringView duration_suffix = "/S") throws -> void
 {
   if (after_snapshot.disks.is_empty() && !is_sampled) return;
 
@@ -298,10 +300,15 @@ fn append_disk_io_report(String &output,
     append_report_column(output, text, width, true, colors::ansi::BOLD_CYAN,
                          should_color);
   };
-  do_append_header(is_sampled ? "READ/S" : "READ", 10);
-  do_append_header(is_sampled ? "WRITE/S" : "WRITTEN", 10);
-  do_append_header(is_sampled ? "READ OPS/S" : "READ OPS", 11);
-  do_append_header(is_sampled ? "WRITE OPS/S" : "WRITE OPS", 12);
+  do_append_header(is_sampled ? String{"READ"} + duration_suffix : "READ", 10);
+  do_append_header(is_sampled ? String{"WRITE"} + duration_suffix : "WRITTEN",
+                   10);
+  do_append_header(is_sampled ? String{"READ OPS"} + duration_suffix
+                              : "READ OPS",
+                   11);
+  do_append_header(is_sampled ? String{"WRITE OPS"} + duration_suffix
+                              : "WRITE OPS",
+                   12);
   if (is_sampled) {
     do_append_header("BUSY", 7);
     do_append_header("READ LAT", 9);
@@ -641,7 +648,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_process_io_rate_report(output, rows, row_limit, allocator,
-                                  should_color);
+                                  should_color, "/S");
     ec.print_to_stdout(output);
   }
 }
@@ -739,7 +746,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_disk_io_report(output, before_snapshot, current_snapshot,
                           elapsed_nanoseconds, true, false, allocator,
-                          should_color);
+                          should_color, "/S");
     ec.print_to_stdout(output);
     if (did_sample) before_snapshot = steal(after_snapshot);
   }
@@ -989,8 +996,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                                           ? cumulative_duration_seconds
                                           : live_interval_seconds;
   let const refresh_interval_seconds = live_interval_seconds;
-  let const falloff_seconds =
-      live_interval_seconds > 5.0 ? live_interval_seconds * 3.0 : 5.0;
+  let const falloff_seconds = sample_duration_seconds;
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();
@@ -1015,8 +1021,10 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let const is_terminal = colors::stdout_is_a_terminal();
     bool is_alternate_screen_active = false;
     if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
+    let const is_cursor_hidden = is_terminal && hide_cursor(ec);
     defer
     {
+      if (is_cursor_hidden) show_cursor(ec);
       if (is_alternate_screen_active) leave_alternate_screen(ec);
     };
 
@@ -1046,7 +1054,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
         before_rows, after_rows, elapsed_nanoseconds, allocator);
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
-                                  should_color);
+                                  should_color, "/S");
     ec.print_to_stdout(output);
     return selected_pid.has_value() && after_rows.is_empty() ? 1 : 0;
   }
