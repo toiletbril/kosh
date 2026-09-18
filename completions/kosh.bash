@@ -150,7 +150,7 @@ complete -c -W '--help --posix -p -R' time
 
 _koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date df diff \
 dirname du env evil evildisk evilfiles evilfs evilio evillogs evilnet evilps evilss expand expr file find flock \
-fold fuser getconf goodcore goodfsw goodnode goodstat eviliso grep head id killall link ln locale logger logname ls make man mkdir mkfifo more \
+fold fuser getconf goodcore goodfsw goodnode goodstat eviliso grep head id killall link ln locale logger logname ls make man mkdir mkfifo mknod more \
 mv nice nl nohup nproc od paste pathchk pkill pr printenv ps readlink realpath renice retry rm rmdir sed seq \
 sleep sort split stat strings stty sync tabs tail tee timeout touch tput tr tsort tty uname unexpand uniq \
 unlink watch wc which who whoami xargs yes"
@@ -175,7 +175,7 @@ _koshkit_util_flags()
     evillogs)      echo "--cores --logs" ;;
     evilnet)       echo "-a --all -t --traffic -l --live -f --failures --falloff" ;;
     goodnode)      echo "-i --inode -r --root" ;;
-    evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory --sort --live --cumulative" ;;
+    evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory -h --human-readable --sort -l --live --cumulative" ;;
     goodstat)      echo "-L --dereference -c --checksum -f --filesystem" ;;
     goodfsw)       echo "-h --human-readable -m --machine-readable -r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude --timezone --precision" ;;
     ls)            echo "-a -A -1 -l -h -F -t -S -r -R -L --classify --recursive --level --tree" ;;
@@ -187,6 +187,7 @@ _koshkit_util_flags()
     rm)            echo "-r -R -f -i --dry-run" ;;
     rmdir)         echo "-p" ;;
     mkdir)         echo "-p -m" ;;
+    mknod)         echo "-m --mode --type --fifo --character --block --major --minor" ;;
     mv)            echo "-f -i -v" ;;
     od)            echo "-A --address-radix -j --skip-bytes -N --read-bytes -t --format -v --output-duplicates" ;;
     pr)            echo "-a --across -d --double-space -F -f -h --header -l --length -m --merge -n --number-lines -o --indent -r --no-file-warnings -t --omit-header -s --separator -w --width" ;;

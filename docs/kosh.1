@@ -1763,6 +1763,23 @@ and an octal
 .B \-m
 mode.
 .TP
+.B mknod
+FIFO, character, and block special files are created with POSIX type operands
+or the modern
+.B \-\-fifo
+,
+.B \-\-character
+,
+and
+.B \-\-block
+options. Device nodes accept
+.B \-\-major
+and
+.B \-\-minor
+numbers; the
+.B \-m
+option sets the permission mode.
+.TP
 .B mv
 Sources are renamed with
 .BR \-f ,
@@ -1936,22 +1953,25 @@ option adds processor usage, paging, scheduler state, pressure stalls, disk
 activity, and swap rates from a one second sample.
 Nonzero stall rates and disk failures are highlighted. The
 .B \-\-cumulative
-option prints disk throughput, operation rates, busy time, latency, average
-queue depth, current queue depth, errors, and retries. Its optional value sets
-the sample interval in seconds and defaults to one second. With
+option collects counters for the specified number of seconds before printing;
+its default collection window is one second. With
 .BR \-\-ps ,
 each mode prints per-process data. The
 .BR \-l " and " \-\-live
-options refresh the rate report until interrupted. An optional value on
-.B \-\-live
-sets the refresh interval in seconds and defaults to 0.5 seconds. Terminal
-output uses the alternate screen and restores the previous contents on exit.
-The optional
+options refresh the rate report until interrupted. They only control the
+refresh interval: an optional value sets it in seconds and defaults to 0.5
+seconds. Output uses the alternate screen and restores the previous contents
+on exit.
+When both options are present,
 .B \-\-cumulative
-duration sets the sampling window and defaults to one second. In live mode, it
-controls how long each rate sample covers; it does not change the refresh
-interval. Inactive process and disk rows remain visible for at least five
-seconds or three refresh intervals. The
+sets the collection window and
+.B \-\-live
+sets the refresh interval. The
+.B \-\-cumulative
+option does not change the refresh interval. An optional value on
+.B \-\-live
+sets the refresh interval in seconds. Inactive process and disk rows remain
+visible for at least five seconds or three refresh intervals. The
 .BR \-\-ps ,
 .BR \-n ,
 .BR \-p ,
@@ -1975,6 +1995,15 @@ option adds interface traffic, packet errors, packet drops, and TCP totals.
 .B \-f
 prints TCP failure and packet-loss telemetry without interface or socket rows.
 Nonzero error, drop, and failure counters are also reported as warnings.
+The
+.B \-\-live
+option refreshes traffic at an optional interval, defaulting to 0.5 seconds.
+The
+.B \-\-cumulative
+option collects traffic for an optional window, defaulting to one second;
+with
+.B \-\-live
+it controls the collection window without changing the refresh interval.
 .TP
 .B goodnode
 Inode identity, allocation, known filesystem capabilities, verification state,
@@ -2004,20 +2033,20 @@ The
 and
 .B \-\-live
 options refresh the process tree until interrupted. An optional duration sets
-the sampling interval, which defaults to one second. The
+the refresh interval, which defaults to 0.5 seconds. The
 .B \-\-cumulative
-option accepts an optional duration. Without
+option accepts an optional collection window. Without
 .B \-\-live,
 it waits for that duration before collecting the process tree; with
 .B \-\-live,
-it sets the refresh interval while
+it controls how long each process sample covers while
 .B \-\-live
-continues to set the sampling interval.
+continues to control refresh frequency.
 .TP
 .B evilss
-Visible TCP and UDP sockets are printed in a table. Address family, protocol,
-listening state, process identifiers, and the header can be selected with
-ss-compatible options.
+Visible TCP, UDP, and Unix-domain sockets are printed in a table. Address
+family, protocol, listening state, process identifiers, and the header can be
+selected with ss-compatible options.
 .TP
 .B goodstat
 File metadata is printed as a labeled report. Its type uses the same classifier
