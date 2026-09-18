@@ -24,6 +24,9 @@ HELP_DESCRIPTION_DECL(
 FLAG(MKNOD_MODE, String, 'm', "mode", "Set the node permission mode.");
 FLAG(MKNOD_TYPE, String, '\0', "type",
      "Choose fifo, character, or block node type.");
+FLAG(MKNOD_FIFO, Bool, '\0', "fifo", "Create a FIFO node.");
+FLAG(MKNOD_CHARACTER, Bool, '\0', "character", "Create a character node.");
+FLAG(MKNOD_BLOCK, Bool, '\0', "block", "Create a block node.");
 FLAG(MKNOD_MAJOR, String, '\0', "major", "Set the device major number.");
 FLAG(MKNOD_MINOR, String, '\0', "minor", "Set the device minor number.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -75,9 +78,35 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   let const allocator = cxt.scratch_allocator();
   let type_text = StringView{};
   let type_location = operand_locations[0];
+  let const named_type_count =
+      static_cast<usize>(FLAG_MKNOD_TYPE.is_set()) +
+      static_cast<usize>(FLAG_MKNOD_FIFO.is_enabled()) +
+      static_cast<usize>(FLAG_MKNOD_CHARACTER.is_enabled()) +
+      static_cast<usize>(FLAG_MKNOD_BLOCK.is_enabled());
+  if (named_type_count > 1) {
+    KOSHKIT_REPORT_ERROR_AT(FLAG_MKNOD_TYPE.is_set()
+                                ? FLAG_MKNOD_TYPE.value_location()
+                                : FLAG_MKNOD_FIFO.is_enabled()
+                                      ? FLAG_MKNOD_FIFO.value_location()
+                                      : FLAG_MKNOD_CHARACTER.is_enabled()
+                                            ? FLAG_MKNOD_CHARACTER.value_location()
+                                            : FLAG_MKNOD_BLOCK.value_location(),
+                            "conflicting node types",
+                            "choose one of --type, --fifo, --character, or --block");
+    return 1;
+  }
   if (FLAG_MKNOD_TYPE.is_set()) {
     type_text = FLAG_MKNOD_TYPE.value();
     type_location = FLAG_MKNOD_TYPE.value_location();
+  } else if (FLAG_MKNOD_FIFO.is_enabled()) {
+    type_text = "fifo";
+    type_location = FLAG_MKNOD_FIFO.value_location();
+  } else if (FLAG_MKNOD_CHARACTER.is_enabled()) {
+    type_text = "character";
+    type_location = FLAG_MKNOD_CHARACTER.value_location();
+  } else if (FLAG_MKNOD_BLOCK.is_enabled()) {
+    type_text = "block";
+    type_location = FLAG_MKNOD_BLOCK.value_location();
   } else if (operands.count() >= 2) {
     type_text = operands[1].view();
     type_location = operand_locations[1];

@@ -8,7 +8,7 @@ posix_status=$?
 if test -p "$root/fifo-posix"; then posix_type=fifo; else posix_type=missing; fi
 printf 'posix-status=%s type=%s\n' "$posix_status" "$posix_type"
 
-"$BIN" -c 'koshkit mknod --type fifo --mode 600 "$1/fifo-modern"' \
+"$BIN" -c 'koshkit mknod --fifo --mode 600 "$1/fifo-modern"' \
   mknod "$root"
 modern_status=$?
 if test -p "$root/fifo-modern"; then modern_type=fifo; else modern_type=missing; fi
