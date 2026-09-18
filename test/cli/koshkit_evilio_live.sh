@@ -32,7 +32,8 @@ case $process_live_report in
 esac
 run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-process-window-report" \
   'koshkit --color never evilio --live=0.05 --cumulative=1.2 --ps -1'
-case $process_live_report in
+process_window_report=$live_report
+case $process_window_report in
   *"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
     process_window_shape=matched
     ;;
@@ -63,7 +64,8 @@ case $disk_live_report in
 esac
 run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-disk-window-report" \
   'koshkit --color never evilio --live=0.05 --cumulative=1.2'
-case $disk_live_report in
+disk_window_report=$live_report
+case $disk_window_report in
   *"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
     disk_window_shape=matched
     ;;
