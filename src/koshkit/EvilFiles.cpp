@@ -253,7 +253,7 @@ fn EvilFiles::execute(
   column_widths widths{};
   let terse_output = String{allocator};
   bool did_match = false;
-  let warnings = String{allocator};
+  usize inaccessible_process_count = 0;
 
   for (let const &process : processes) {
     if (!matches_filters(process, wanted_pid, has_wanted_pid, wanted_owner)) {
@@ -264,11 +264,7 @@ fn EvilFiles::execute(
     if (files.is_empty()) continue;
 
     if (files.count() == 1 && files[0].is_inaccessible) {
-      warnings += "Warning: Process ";
-      warnings += String::from(static_cast<u64>(process.pid), allocator).view();
-      warnings += " (";
-      warnings += process.name.view();
-      warnings += ") is inaccessible; skipping its descriptors.\n";
+      inaccessible_process_count++;
       continue;
     }
 
@@ -366,6 +362,14 @@ fn EvilFiles::execute(
       widen(widths.endpoint, row.endpoint);
       rows.push(steal(row));
     }
+  }
+
+  let warnings = String{allocator};
+  if (inaccessible_process_count != 0) {
+    warnings += "Warning: Skipped ";
+    warnings += String::from(inaccessible_process_count, allocator).view();
+    warnings += inaccessible_process_count == 1 ? " inaccessible process.\n"
+                                                 : " inaccessible processes.\n";
   }
 
   if (FLAG_EVILFILES_TERSE.is_enabled()) {
