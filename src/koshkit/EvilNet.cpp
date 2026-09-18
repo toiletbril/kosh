@@ -29,22 +29,12 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
   return !value.is_empty() &&
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
-static koshka::FlagOptionalValue FLAG_EVILNET_LIVE{
-    FLAG_LIST,
-    'l',
-    "live",
-    koshka::flag_section::NoSection,
-    "Refresh traffic at an optional interval until interrupted.",
-    is_evilnet_sample_duration,
-    "seconds"};
-static koshka::FlagOptionalValue FLAG_EVILNET_CUMULATIVE{
-    FLAG_LIST,
-    '\0',
-    "cumulative",
-    koshka::flag_section::NoSection,
-    "Use an optional interval for sampled traffic.",
-    is_evilnet_sample_duration,
-    "seconds"};
+FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
+              "Refresh traffic at an optional interval until interrupted.",
+              is_evilnet_sample_duration, "seconds");
+FLAG_OPTIONAL(EVILNET_CUMULATIVE, '\0', "cumulative",
+              "Use an optional interval for sampled traffic.",
+              is_evilnet_sample_duration, "seconds");
 FLAG(EVILNET_FAILURES, Bool, 'f', "failures",
      "Show TCP failure and packet-loss telemetry only.");
 FLAG(EVILNET_FALLOFF, String, '\0', "falloff",

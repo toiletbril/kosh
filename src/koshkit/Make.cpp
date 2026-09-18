@@ -57,13 +57,9 @@ static pure fn is_make_job_count(koshka::StringView value) wontthrow -> bool
 {
   return !value.is_empty() && value.is_all_decimal_digits();
 }
-static koshka::FlagOptionalValue FLAG_MAKE_JOBS{
-    FLAG_LIST,
-    'j',
-    "jobs",
-    koshka::flag_section::NoSection,
-    "Accept an optional job count and propagate it through MAKEFLAGS.",
-    is_make_job_count};
+FLAG_OPTIONAL(MAKE_JOBS, 'j', "jobs",
+              "Accept an optional job count and propagate it through MAKEFLAGS.",
+              is_make_job_count);
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Make);

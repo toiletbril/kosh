@@ -43,6 +43,29 @@
         description                                                            \
   }
 
+/* FLAG_OPTIONAL takes an optional flag_section argument before the
+   description, followed by the value validator and displayed value name. */
+#define T__FLAG_OPTIONAL_SELECT(_1, _2, _3, _4, _5, _6, _7, name, ...) name
+#define FLAG_OPTIONAL(...)                                                     \
+  T__FLAG_OPTIONAL_SELECT(__VA_ARGS__, T__FLAG_OPTIONAL7, T__FLAG_OPTIONAL6, \
+                          T__FLAG_OPTIONAL5)                                  \
+  (__VA_ARGS__)
+#define T__FLAG_OPTIONAL5(var_name, short_name, long_name, description,        \
+                          acceptor)                                           \
+  T__FLAG_OPTIONAL6(var_name, short_name, long_name, description, acceptor,    \
+                    "...")
+#define T__FLAG_OPTIONAL6(var_name, short_name, long_name, description,        \
+                          acceptor, value_name)                               \
+  T__FLAG_OPTIONAL7(var_name, short_name, long_name, NoSection, description,   \
+                    acceptor, value_name)
+#define T__FLAG_OPTIONAL7(var_name, short_name, long_name, section,            \
+                          description, acceptor, value_name)                  \
+  static koshka::FlagOptionalValue concat_literal(FLAG_, var_name)            \
+  {                                                                            \
+    FLAG_LIST, short_name, long_name, koshka::flag_section::section,           \
+        description, acceptor, value_name                                      \
+  }
+
 namespace koshka {
 
 class ExecContext;

@@ -30,23 +30,15 @@ static pure fn is_evilio_sample_duration(koshka::StringView value) wontthrow
 }
 
 FLAG(EVILIO_ALL, Bool, 'a', "all", "Include sampled system activity.");
-static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
-    FLAG_LIST,
-    '\0',
-    "cumulative",
-    koshka::flag_section::NoSection,
-    "Collect activity over an optional window; the default is one second.",
-    is_evilio_sample_duration,
-    "seconds"};
+FLAG_OPTIONAL(EVILIO_CUMULATIVE, '\0', "cumulative",
+              "Collect activity over an optional window; the default is one "
+              "second.",
+              is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
-static koshka::FlagOptionalValue FLAG_EVILIO_LIVE{
-    FLAG_LIST,
-    'l',
-    "live",
-    koshka::flag_section::NoSection,
-    "Refresh live output at an optional interval; the default is 0.5 seconds.",
-    is_evilio_sample_duration,
-    "seconds"};
+FLAG_OPTIONAL(EVILIO_LIVE, 'l', "live",
+              "Refresh live output at an optional interval; the default is 0.5 "
+              "seconds.",
+              is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
