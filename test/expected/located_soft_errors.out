@@ -19,7 +19,7 @@ rc=1
        |  ^~~~~~~~~
 rc=1
 == timeout command:
-1:1: error: timeout: command 'missing_name' was not found.
+1:19: error: timeout: command 'missing_name' was not found.
      1 |  koshkit timeout 1 missing_name
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       |                    ^~~~~~~~~~~~
 rc=127

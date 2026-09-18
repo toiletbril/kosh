@@ -30,7 +30,7 @@ main_help=$(NO_COLOR= capture_terminal_command "exec \"$BIN\" --help") || exit 1
 builtin_help=$(NO_COLOR= capture_terminal_command \
   "exec \"$BIN\" -c 'help set'") || exit 1
 koshkit_help=$(NO_COLOR= capture_terminal_command \
-  "exec \"$BIN\" -c 'koshkit goodnode --help'") || exit 1
+  "exec \"$BIN\" -c 'koshkit --help'") || exit 1
 
 check_contains "$main_help" \
   "${escape}[1;34mSYNOPSIS${escape}[0m" main-heading
@@ -40,6 +40,6 @@ check_contains "$main_help" \
 check_contains "$builtin_help" \
   "  -M, --mood${escape}[2m=<...>${escape}[0m" builtin-flag
 check_contains "$koshkit_help" \
-  "      --color${escape}[2m=<...>${escape}[0m" koshkit-flag
+  "${escape}[32m  koshkit --color" koshkit-flag
 check_excludes "$main_help$builtin_help$koshkit_help" \
   "${escape}[1;37m" bold-white
