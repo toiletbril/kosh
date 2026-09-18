@@ -34,6 +34,8 @@ usize observed_operation_count = 0;
 usize failure_count = 0;
 bool should_fail_metadata = false;
 bool should_report_existing = true;
+bool should_validate_operations = false;
+bool should_interrupt = false;
 
 fn expect(bool is_true, const char *message) wontthrow -> void
 {
@@ -251,6 +253,77 @@ fn test_exists_results_and_deduplication() throws -> void
          "a missing path is not a batch error");
 }
 
+fn test_zero_partial_and_aliased_operations() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  let path = Path{};
+  file_status status{};
+  char buffer[1]{};
+
+  batch.add(batch_operation::read(KOSH_STDIN, buffer, 0));
+  batch.add(batch_operation::lstat(path, status));
+  batch.add(batch_operation::lstat(path, status));
+  reset_observations();
+  let const results = batch.execute();
+
+  expect(observed_operation_count == 2,
+         "zero-length and aliased metadata requests keep valid ordering");
+  expect(results.count() == 3 && results[0].transferred_byte_count == 0,
+         "zero-length transfers report no bytes");
+  expect(status.size == 1001,
+         "aliased metadata destinations receive the canonical result");
+}
+
+fn test_invalid_operation_result() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  char buffer[1]{};
+  batch.add(batch_operation::read(KOSH_INVALID_FD, buffer, sizeof(buffer)));
+
+  should_validate_operations = true;
+  let const results = batch.execute();
+  should_validate_operations = false;
+  expect(results.count() == 1 && results[0].error_number == 22,
+         "invalid operations return their validation error");
+}
+
+fn test_interrupted_batch() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  let path = Path{};
+  file_status first_status{};
+  file_status second_status{};
+  batch.add(batch_operation::lstat(path, first_status));
+  batch.add(batch_operation::lstat(path, second_status));
+
+  should_interrupt = true;
+  let const results = batch.execute();
+  should_interrupt = false;
+  expect(results.count() == 2 && results[0].error_number == 4 &&
+             results[1].error_number == 4,
+         "interrupted batches propagate cancellation to every request");
+  expect(first_status.size == 0 && second_status.size == 0,
+         "interrupted metadata requests do not publish status data");
+}
+
+fn test_oversized_mixed_batch() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  char buffer[1]{};
+  constexpr usize OPERATION_COUNT = 300;
+  batch.reserve(OPERATION_COUNT);
+  for (usize index = 0; index < OPERATION_COUNT; index++)
+    batch.add(batch_operation::read(KOSH_STDIN, buffer, index % 2, index));
+
+  reset_observations();
+  let const results = batch.execute();
+  expect(observed_operation_count == OPERATION_COUNT,
+         "oversized batches reach the backend without truncation");
+  expect(results.count() == OPERATION_COUNT &&
+             results[OPERATION_COUNT - 1].request_id == OPERATION_COUNT - 1,
+         "oversized results preserve request order");
+}
+
 fn run_batch_contract() -> int
 {
   try {
@@ -258,6 +331,10 @@ fn run_batch_contract() -> int
     test_metadata_deduplication();
     test_failed_metadata_deduplication();
     test_exists_results_and_deduplication();
+    test_zero_partial_and_aliased_operations();
+    test_invalid_operation_result();
+    test_interrupted_batch();
+    test_oversized_mixed_batch();
   } catch (...) {
     std::fprintf(stderr, "Batch contract failed with an exception.\n");
     return 1;
@@ -321,16 +398,24 @@ fn execute_batch_operations(const batched_syscall *operations,
   observed_operation_count = operation_count;
   for (usize index = 0; index < operation_count; index++) {
     let const &operation = operations[index];
-    observed_operations[index] = {
-        operation.syscall_id,   operation.fd,        operation.output_buffer,
-        operation.input_buffer, operation.path,      operation.request_id,
-        operation.byte_offset,  operation.byte_count};
+    if (index < sizeof(observed_operations) / sizeof(observed_operations[0]))
+      observed_operations[index] = {
+          operation.syscall_id,   operation.fd,        operation.output_buffer,
+          operation.input_buffer, operation.path,      operation.request_id,
+          operation.byte_offset,  operation.byte_count};
 
     let &result = results[index];
     result.request_id = operation.request_id;
+    if (should_interrupt) {
+      result.error_number = 4;
+      continue;
+    }
     result.transferred_byte_count =
         operation.byte_count + operation.byte_offset;
-    result.error_number = 30 + static_cast<i32>(operation.request_id);
+    result.error_number = should_validate_operations &&
+                                  operation.fd == KOSH_INVALID_FD
+                              ? 22
+                              : 30 + static_cast<i32>(operation.request_id);
 
     if (operation.output_buffer != nullptr && operation.byte_count != 0) {
       operation.output_buffer[0] = static_cast<char>('A' + index);

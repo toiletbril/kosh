@@ -130,6 +130,7 @@ static fn find_canonical_operation_positions(
     const ArrayList<batch_internal::batched_syscall> &operations,
     ArrayList<usize> &canonical_positions) throws -> bool
 {
+  constexpr usize LINEAR_METADATA_LIMIT = 8;
   usize metadata_count = 0;
   for (let const &operation : operations)
     if (is_metadata_request(operation)) metadata_count++;
@@ -139,6 +140,23 @@ static fn find_canonical_operation_positions(
   {
     return false;
   }
+
+  if (metadata_count <= LINEAR_METADATA_LIMIT) {
+    for (usize left_index = 0; left_index < operations.count(); left_index++) {
+      if (!is_metadata_request(operations[left_index])) continue;
+
+      for (usize right_index = left_index + 1;
+           right_index < operations.count(); right_index++) {
+        if (is_same_metadata_request(operations[left_index],
+                                     operations[right_index]))
+          goto has_duplicate_metadata;
+      }
+    }
+
+    return false;
+  }
+
+has_duplicate_metadata:
 
   canonical_positions.clear();
   canonical_positions.reserve(operations.count());
