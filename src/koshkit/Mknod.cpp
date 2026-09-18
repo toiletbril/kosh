@@ -19,7 +19,9 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-m mode] [--type type --major N --minor N] name [type [major minor]]");
 HELP_DESCRIPTION_DECL(
-    "The mknod utility creates FIFO, character, and block special files.");
+    "The mknod utility creates FIFO, character, and block special files.\n"
+    "Examples: mknod pipe p; mknod --fifo pipe; "
+    "mknod --character --major 1 --minor 3 device.");
 
 FLAG(MKNOD_MODE, String, 'm', "mode", "Set the node permission mode.");
 FLAG(MKNOD_TYPE, String, '\0', "type",

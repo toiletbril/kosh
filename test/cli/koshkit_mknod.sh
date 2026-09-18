@@ -23,6 +23,21 @@ printf 'invalid-mode-status=%s\n' "$?"
   mknod "$root" >/dev/null 2>&1
 printf 'invalid-device-status=%s\n' "$?"
 
+help=$($BIN -c 'koshkit mknod --help')
+case "$help" in
+  *"mknod --fifo pipe"*"mknod --character --major 1 --minor 3 device"*)
+    help_examples=present ;;
+  *) help_examples=missing ;;
+esac
+printf 'help-examples=%s\n' "$help_examples"
+
+error=$($BIN -c 'koshkit mknod --fifo --mode invalid "$1/bad"' mknod "$root" 2>&1 >/dev/null)
+case "$error" in
+  *"error:"*"invalid mode"*) redirected_error=plain ;;
+  *) redirected_error=missing ;;
+esac
+printf 'redirected-error=%s\n' "$redirected_error"
+
 "$BIN" -c 'koshkit mknod --fifo "$1/fifo-extra" p' mknod "$root" \
   >/dev/null 2>&1
 printf 'named-extra-status=%s\n' "$?"
