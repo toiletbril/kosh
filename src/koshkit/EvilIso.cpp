@@ -41,16 +41,15 @@ namespace {
 fn append_namespace_report(String &output, bool should_color,
                            bool should_show_detail) throws -> void
 {
-  let body = String{heap_allocator()};
+  let table = ReportTable{heap_allocator()};
   constexpr StringView names[] = {"cgroup", "ipc",  "mnt",  "net",
                                   "pid",    "time", "user", "uts"};
   let const processes = os::enumerate_processes();
   for (let const name : names) {
     let const target =
         os::read_symlink(String{"/proc/self/ns/"} + name, heap_allocator());
-    append_report_field(body, name,
-                        target.has_value() ? target->view() : "unavailable",
-                        colors::ansi::BOLD_CYAN, should_color);
+    table.add(name, target.has_value() ? target->view() : "unavailable",
+              colors::ansi::BOLD_CYAN);
     if (!target.has_value()) continue;
 
     usize process_count = 0;
@@ -64,8 +63,8 @@ fn append_namespace_report(String &output, bool should_color,
         process_count++;
     }
     let const process_field = String::from(process_count, heap_allocator());
-    append_report_field(body, String{name} + " processes", process_field.view(),
-                        colors::ansi::BOLD_CYAN, should_color);
+    table.add(String{name} + " processes", process_field.view(),
+              colors::ansi::BOLD_CYAN);
     if (!should_show_detail) continue;
 
     for (let const &process : processes) {
@@ -86,42 +85,45 @@ fn append_namespace_report(String &output, bool should_color,
       identity += " namespace ";
       identity += target->view();
       identity += ")";
-      append_report_field(body, String{name} + " process", identity.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
+      table.add(String{name} + " process", identity.view(),
+                colors::ansi::BOLD_CYAN);
     }
   }
-  output += body.view();
+  output += table.to_string(should_color, "");
   output += '\n';
 }
 
 fn append_cgroup_report(String &output, bool should_color) throws -> void
 {
+  let table = ReportTable{heap_allocator()};
   let const contents = Path{"/proc/self/cgroup"}.read_entire_file();
-  append_report_field(output, "Membership",
-                      contents.has_value() ? contents->view() : "unavailable",
-                      colors::ansi::BOLD_CYAN, should_color);
+  table.add("Membership",
+            contents.has_value() ? contents->view() : "unavailable",
+            colors::ansi::BOLD_CYAN);
+  output += table.to_string(should_color, "");
 }
 
 fn append_session_report(String &output, bool should_color) throws -> void
 {
+  let table = ReportTable{heap_allocator()};
   let const sessions = os::logged_in_users();
-  append_report_field(output, "Count",
-                      String::from(sessions.count(), heap_allocator()).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+  table.add("Count", String::from(sessions.count(), heap_allocator()).view(),
+            colors::ansi::BOLD_CYAN);
   for (let const &session : sessions) {
     let text = String{heap_allocator(), session.user.view()};
     text += '@';
     text += session.terminal.view();
-    append_report_field(output, "Session", text.view(), colors::ansi::BOLD_CYAN,
-                        should_color);
+    table.add("Session", text.view(), colors::ansi::BOLD_CYAN);
   }
+  output += table.to_string(should_color, "");
 }
 
 fn append_remote_report(String &output, bool should_color) throws -> void
 {
+  let table = ReportTable{heap_allocator()};
   if (!os::has_network_socket_listing()) {
-    append_report_field(output, "Sockets", "unavailable",
-                        colors::ansi::BOLD_CYAN, should_color);
+    table.add("Sockets", "unavailable", colors::ansi::BOLD_CYAN);
+    output += table.to_string(should_color, "");
     return;
   }
 
@@ -131,16 +133,18 @@ fn append_remote_report(String &output, bool should_color) throws -> void
     if (!socket.peer_address.is_empty() && socket.peer_port != 0)
       remote_count++;
   }
-  append_report_field(output, "Remote sockets",
-                      String::from(remote_count, heap_allocator()).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(output, "Total sockets",
-                      String::from(sockets.count(), heap_allocator()).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+  table.add("Remote sockets",
+            String::from(remote_count, heap_allocator()).view(),
+            colors::ansi::BOLD_CYAN);
+  table.add("Total sockets",
+            String::from(sockets.count(), heap_allocator()).view(),
+            colors::ansi::BOLD_CYAN);
+  output += table.to_string(should_color, "");
 }
 
 fn append_runtime_report(String &output, bool should_color) throws -> void
 {
+  let table = ReportTable{heap_allocator()};
   let const cgroup = Path{"/proc/1/cgroup"}.read_entire_file();
   let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
   let const kubernetes =
@@ -165,15 +169,15 @@ fn append_runtime_report(String &output, bool should_color) throws -> void
     runtime = "docker";
   if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file())
     runtime = "podman";
-  append_report_field(output, "Runtime",
-                      runtime.is_empty() ? "none detected" : runtime.view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(output, "Kubernetes",
-                      kubernetes.has_value() ||
-                              cgroup_text.find_substring("kubepods").has_value()
-                          ? "present"
-                          : "not detected",
-                      colors::ansi::BOLD_CYAN, should_color);
+  table.add("Runtime", runtime.is_empty() ? "none detected" : runtime.view(),
+            colors::ansi::BOLD_CYAN);
+  table.add("Kubernetes",
+            kubernetes.has_value() ||
+                    cgroup_text.find_substring("kubepods").has_value()
+                ? "present"
+                : "not detected",
+            colors::ansi::BOLD_CYAN);
+  output += table.to_string(should_color, "");
 }
 
 } // namespace
