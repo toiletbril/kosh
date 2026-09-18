@@ -437,11 +437,8 @@ fn EvilDisk::execute(
 
   output += "\n";
   if (!has_failure_counters) {
-    let table = ReportTable{allocator};
-    table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
-    output += table.to_string(should_color, "");
+    output += "Disk failure counters are unavailable on this platform.\n";
   } else {
-    output += "";
     append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                          should_color);
     constexpr StringView HEADERS[] = {
@@ -489,57 +486,101 @@ fn EvilDisk::execute(
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
     output += "\n";
-    bool has_identity = false;
+    struct identity_row
+    {
+      StringView mount;
+      StringView label;
+      StringView uuid;
+    };
+    let identity_rows = ArrayList<identity_row>{allocator};
     for (let const &filesystem : filesystems) {
       if (filesystem.volume_name.is_empty() &&
           filesystem.volume_uuid.is_empty())
         continue;
-      has_identity = true;
-      let table = ReportTable{allocator};
-      table.add("Mount", filesystem.target.view(), colors::ansi::BOLD_CYAN);
-      table.add("Label", filesystem.volume_name.is_empty()
-                             ? StringView{"-"}
-                             : filesystem.volume_name.view(),
-                colors::ansi::BOLD_CYAN);
-      table.add("UUID", filesystem.volume_uuid.is_empty()
-                            ? StringView{"-"}
-                            : filesystem.volume_uuid.view(),
-                colors::ansi::BOLD_CYAN);
-      output += table.to_string(should_color, "");
+      identity_rows.push(identity_row{
+          filesystem.target.view(),
+          filesystem.volume_name.is_empty() ? StringView{"-"}
+                                            : filesystem.volume_name.view(),
+          filesystem.volume_uuid.is_empty() ? StringView{"-"}
+                                            : filesystem.volume_uuid.view()});
     }
-    if (!has_identity) {
-      let table = ReportTable{allocator};
-      table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
-      output += table.to_string(should_color, "");
+    if (identity_rows.is_empty()) {
+      output += "Identity data is unavailable on this platform.\n";
+    } else {
+      usize mount_width = 5;
+      usize label_width = 5;
+      for (let const &row : identity_rows) {
+        if (row.mount.length > mount_width) mount_width = row.mount.length;
+        if (row.label.length > label_width) label_width = row.label.length;
+      }
+      append_report_column(output, "MOUNT", mount_width, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+      output += "  ";
+      append_report_column(output, "LABEL", label_width, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+      output += "  ";
+      append_report_text(output, "UUID", colors::ansi::BOLD_CYAN,
+                         should_color);
+      output += "\n";
+      for (let const &row : identity_rows) {
+        append_report_column(output, row.mount, mount_width, false,
+                             colors::ansi::BOLD_GREEN, should_color);
+        output += "  ";
+        append_report_column(output, row.label, label_width, false, {},
+                             should_color);
+        output += "  ";
+        append_report_text(output, row.uuid, colors::ansi::DIM, should_color);
+        output += "\n";
+      }
     }
 
     output += "\n";
-    bool has_filesystem_failures = false;
+    struct failure_row
+    {
+      StringView mount;
+      os::filesystem_error_counters counters{};
+    };
+    let failure_rows = ArrayList<failure_row>{allocator};
     for (let const &filesystem : filesystems) {
       os::filesystem_error_counters counters{};
       if (!os::read_filesystem_error_counters(filesystem.target.view(),
                                               counters))
         continue;
-      has_filesystem_failures = true;
-      let values = String{allocator, "read "};
-      values += String::from(counters.read_count, allocator).view();
-      values += ", write ";
-      values += String::from(counters.write_count, allocator).view();
-      values += ", flush ";
-      values += String::from(counters.flush_count, allocator).view();
-      values += ", corruption ";
-      values += String::from(counters.corruption_count, allocator).view();
-      values += ", generation ";
-      values += String::from(counters.generation_count, allocator).view();
-      let table = ReportTable{allocator};
-      table.add("Mount", filesystem.target.view(), colors::ansi::BOLD_CYAN);
-      table.add("Counters", values.view(), colors::ansi::BOLD_CYAN);
-      output += table.to_string(should_color, "");
+      failure_rows.push(failure_row{filesystem.target.view(), counters});
     }
-    if (!has_filesystem_failures) {
-      let table = ReportTable{allocator};
-      table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
-      output += table.to_string(should_color, "");
+    if (failure_rows.is_empty()) {
+      output += "Filesystem failure counters are unavailable.\n";
+    } else {
+      constexpr StringView HEADERS[] = {"READ", "WRITE", "FLUSH", "CORRUPTION",
+                                        "GENERATION"};
+      constexpr usize WIDTHS[] = {6, 6, 6, 10, 10};
+      usize mount_width = 5;
+      for (let const &row : failure_rows) {
+        if (row.mount.length > mount_width) mount_width = row.mount.length;
+      }
+      append_report_column(output, "MOUNT", mount_width, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+      for (usize index = 0; index < countof(HEADERS); index++) {
+        output += "  ";
+        append_report_column(output, HEADERS[index], WIDTHS[index], true,
+                             colors::ansi::BOLD_CYAN, should_color);
+      }
+      output += "\n";
+      for (let const &row : failure_rows) {
+        const u64 values[] = {row.counters.read_count,
+                              row.counters.write_count,
+                              row.counters.flush_count,
+                              row.counters.corruption_count,
+                              row.counters.generation_count};
+        append_report_column(output, row.mount, mount_width, false,
+                             colors::ansi::BOLD_GREEN, should_color);
+        for (usize index = 0; index < countof(values); index++) {
+          output += "  ";
+          append_report_column(output, String::from(values[index], allocator),
+                               WIDTHS[index], true, {}, should_color);
+        }
+        output += "\n";
+      }
     }
   }
 
@@ -547,9 +588,7 @@ fn EvilDisk::execute(
     let const smart_rows = read_smart_rows(cxt, filesystems, allocator);
     output += "\n";
     if (smart_rows.is_empty()) {
-      let table = ReportTable{allocator};
-      table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
-      output += table.to_string(should_color, "");
+      output += "SMART data is unavailable on this platform.\n";
     } else {
       usize device_width = 6;
       usize status_width = 6;
