@@ -22,6 +22,10 @@ printf 'invalid-mode-status=%s\n' "$?"
   mknod "$root" >/dev/null 2>&1
 printf 'invalid-device-status=%s\n' "$?"
 
+"$BIN" -c 'koshkit mknod --fifo "$1/fifo-extra" p' mknod "$root" \
+  >/dev/null 2>&1
+printf 'named-extra-status=%s\n' "$?"
+
 rm -f "$root/fifo-posix" "$root/fifo-modern"
 if test ! -e "$root/fifo-posix" && test ! -e "$root/fifo-modern"; then
   cleanup=ok

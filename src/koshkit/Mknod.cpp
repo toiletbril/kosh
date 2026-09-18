@@ -126,7 +126,8 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const is_fifo = *type == FIFO_TYPE;
-  usize number_index = FLAG_MKNOD_TYPE.is_set() ? 1 : 2;
+  let const has_named_type = named_type_count != 0;
+  usize number_index = has_named_type ? 1 : 2;
   Maybe<u32> major_number;
   Maybe<u32> minor_number;
   if (FLAG_MKNOD_MAJOR.is_set())
@@ -150,9 +151,11 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  usize name_end = FLAG_MKNOD_TYPE.is_set() ? 1 : 1;
-  if (operands.count() > name_end + (is_fifo ? 1 : 3)) {
-    KOSHKIT_REPORT_ERROR_AT(operand_locations[name_end + (is_fifo ? 1 : 3)],
+  let const maximum_operand_count = has_named_type
+                                        ? (is_fifo ? usize{1} : usize{3})
+                                        : (is_fifo ? usize{2} : usize{4});
+  if (operands.count() > maximum_operand_count) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[maximum_operand_count],
                             "too many operands",
                             "provide one name and one node specification");
     return 1;
