@@ -445,6 +445,7 @@ struct live_network_row
 {
   os::network_interface_statistics_entry statistics;
   u64 last_seen_nanoseconds{0};
+  u64 idle_nanoseconds{0};
 };
 
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
@@ -505,7 +506,10 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
           if (retained[index].statistics.interface_name.view() !=
               entry.interface_name.view())
             continue;
+          let const idle_nanoseconds =
+              now - retained[index].last_seen_nanoseconds;
           retained[index].statistics = entry;
+          retained[index].idle_nanoseconds = idle_nanoseconds;
           retained[index].last_seen_nanoseconds = now;
           is_known = true;
           break;
@@ -531,8 +535,27 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let statistics =
         ArrayList<os::network_interface_statistics_entry>{allocator};
     statistics.reserve(retained.count());
-    for (let const &row : retained)
-      statistics.push(row.statistics);
+    for (let const &row : retained) {
+      let entry = row.statistics;
+      if (row.idle_nanoseconds != 0) {
+        let const decayed_factor =
+            row.idle_nanoseconds >= falloff_nanoseconds
+                ? u64{0}
+                : 1000 - row.idle_nanoseconds * 1000 / falloff_nanoseconds;
+        if (entry.has_field(os::network_statistics_field::ReceiveBytes))
+          entry.receive_bytes = entry.receive_bytes * decayed_factor / 1000;
+        if (entry.has_field(os::network_statistics_field::TransmitBytes))
+          entry.transmit_bytes =
+              entry.transmit_bytes * decayed_factor / 1000;
+        if (entry.has_field(os::network_statistics_field::ReceivePackets))
+          entry.receive_packet_count =
+              entry.receive_packet_count * decayed_factor / 1000;
+        if (entry.has_field(os::network_statistics_field::TransmitPackets))
+          entry.transmit_packet_count =
+              entry.transmit_packet_count * decayed_factor / 1000;
+      }
+      statistics.push(entry);
+    }
     let output = String{allocator};
     let warnings = ArrayList<String>{allocator};
     if (is_terminal) {
