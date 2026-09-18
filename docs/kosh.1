@@ -2033,10 +2033,17 @@ and
 options add a CRC32C checksum and filesystem capacity report, respectively.
 .TP
 .B goodfsw
-Path changes are reported by polling filesystem metadata. Each default record
-contains the Unix scan time, a numeric event mask, and the path. The
+Path changes are reported by polling filesystem metadata. Machine-readable
+output is the default: each record contains the Unix scan time, a numeric event
+mask, and the path. The
 .BR \-h " and " \-\-human-readable
-options use normal timestamps and descriptive event names. The
+options use formatted timestamps and descriptive event names. The
+.BR \-m " and " \-\-machine-readable
+options select the numeric format explicitly. The
+.B \-\-timezone
+option selects local or UTC time for human output, and
+.B \-\-precision
+selects zero through nine fractional timestamp digits. The
 .BR \-r ,
 .BR \-t ,
 .BR \-x ,

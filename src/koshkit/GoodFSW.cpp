@@ -13,10 +13,13 @@
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Utils.hpp"
+
+#include <ctime>
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-hrtx1] [-l latency] [-e substring] path ...");
+HELP_SYNOPSIS_DECL("[-hmrtx1] [-l latency] [-e substring] path ...");
 
 HELP_DESCRIPTION_DECL(
     "The goodfsw utility reports changes under the paths it watches.");
@@ -24,8 +27,10 @@ HELP_DESCRIPTION_DECL(
 FLAG(GOODFSW_RECURSIVE, Bool, 'r', "recursive", "Watch every subdirectory.");
 FLAG(GOODFSW_HUMAN, Bool, 'h', "human-readable",
      "Use normal timestamps and descriptive event names.");
+FLAG(GOODFSW_MACHINE, Bool, 'm', "machine-readable",
+     "Use Unix timestamps and numeric event masks.");
 FLAG(GOODFSW_TIMESTAMP, Bool, 't', "timestamp",
-     "Prefix every record with the epoch second of the scan.");
+     "Prefix every record with the Unix scan timestamp.");
 FLAG(GOODFSW_EVENT_FLAGS, Bool, 'x', "event-flags",
      "Append the event names to every record.");
 FLAG(GOODFSW_ONE_EVENT, Bool, '1', "one-event",
@@ -34,6 +39,10 @@ FLAG(GOODFSW_LATENCY, String, 'l', "latency",
      "Wait this many seconds between scans. The default is one.");
 FLAG(GOODFSW_EXCLUDE, String, 'e', "exclude",
      "Skip every path that contains this text.");
+FLAG(GOODFSW_TIMEZONE, String, '\0', "timezone",
+     "Use local or UTC time for human timestamps.");
+FLAG(GOODFSW_PRECISION, String, '\0', "precision",
+     "Use zero to nine fractional timestamp digits.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(GoodFSW);
@@ -44,6 +53,12 @@ namespace {
 
 constexpr f64 DEFAULT_LATENCY_SECONDS = 1.0;
 constexpr usize MAXIMUM_SCAN_DEPTH = 64;
+
+enum class timestamp_timezone : u8
+{
+  Local,
+  UTC,
+};
 
 enum class watch_event : u8
 {
@@ -119,13 +134,49 @@ pure fn event_mask(watch_event event) wontthrow -> u8
   return static_cast<u8>(event);
 }
 
-fn report_event(String &output, StringView path, const os::file_status &status,
-                watch_event event, i64 scan_time, bool should_color) throws
-    -> void
+fn format_watch_timestamp(i64 seconds, u32 nanoseconds, usize precision,
+                          timestamp_timezone timezone, Allocator allocator)
+    throws -> String
 {
-  let const is_human = FLAG_GOODFSW_HUMAN.is_enabled();
+  let const when = static_cast<time_t>(seconds);
+  let const *broken_down = timezone == timestamp_timezone::UTC
+                               ? std::gmtime(&when)
+                               : std::localtime(&when);
+  if (broken_down == nullptr) return String{allocator};
+
+  char date_buffer[32];
+  let const date_length =
+      std::strftime(date_buffer, sizeof(date_buffer), "%Y-%m-%d %H:%M:%S",
+                    broken_down);
+  let text = String{allocator, StringView{date_buffer, date_length}};
+  if (precision != 0) {
+    text += ".";
+    let const digits = String::from(nanoseconds, allocator);
+    let fraction = String{allocator};
+    for (usize index = digits.length(); index < 9; index++) fraction += "0";
+    fraction += digits.view();
+    text += fraction.substring_of_length(0, precision);
+  }
+
+  char zone_buffer[16];
+  let const zone_length =
+      std::strftime(zone_buffer, sizeof(zone_buffer), "%z", broken_down);
+  text += " ";
+  text += StringView{zone_buffer, zone_length};
+  return text;
+}
+
+fn report_event(String &output, StringView path, const os::file_status &status,
+                watch_event event, i64 scan_time, u32 scan_nanoseconds,
+                usize timestamp_precision, timestamp_timezone timezone,
+                bool should_color) throws -> void
+{
+  let const is_human = FLAG_GOODFSW_HUMAN.is_enabled() &&
+                       !FLAG_GOODFSW_MACHINE.is_enabled();
   if (is_human) {
-    output += format_file_timestamp(scan_time, 0, output.allocator());
+    output += format_watch_timestamp(scan_time, scan_nanoseconds,
+                                     timestamp_precision, timezone,
+                                     output.allocator());
     output += " ";
   } else {
     output +=
@@ -247,6 +298,33 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
     if (latency_seconds < 0.05) latency_seconds = 0.05;
   }
 
+  usize timestamp_precision = 9;
+  if (FLAG_GOODFSW_PRECISION.is_set()) {
+    let const parsed = utils::parse_decimal_u64(FLAG_GOODFSW_PRECISION.value());
+    if (parsed.is_error() || parsed.value() > 9) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_GOODFSW_PRECISION.value_location(),
+          "Invalid timestamp precision '" + FLAG_GOODFSW_PRECISION.value() +
+              "'",
+          "use a number from 0 through 9");
+      return 1;
+    }
+    timestamp_precision = static_cast<usize>(parsed.value());
+  }
+
+  timestamp_timezone timezone = timestamp_timezone::Local;
+  if (FLAG_GOODFSW_TIMEZONE.is_set()) {
+    let const value = FLAG_GOODFSW_TIMEZONE.value();
+    if (value == "utc") {
+      timezone = timestamp_timezone::UTC;
+    } else if (value != "local") {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODFSW_TIMEZONE.value_location(),
+                              "Invalid timestamp timezone '" + value + "'",
+                              "use local or utc");
+      return 1;
+    }
+  }
+
   let const is_recursive = FLAG_GOODFSW_RECURSIVE.is_enabled();
 
   let operand_paths = ArrayList<Path>{allocator};
@@ -294,8 +372,10 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
       scan_path(operand.view(), current, is_recursive, 0, allocator);
     sort_entries(current);
 
-    let const scan_time =
-        static_cast<i64>(os::realtime_microseconds() / 1000000u);
+    let const scan_microseconds = os::realtime_microseconds();
+    let const scan_time = static_cast<i64>(scan_microseconds / 1000000u);
+    let const scan_nanoseconds =
+        static_cast<u32>((scan_microseconds % 1000000u) * 1000u);
     let output = String{allocator};
 
     usize previous_position = 0;
@@ -312,7 +392,8 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
         os::file_status rendered{};
         rendered.mode = entry.mode;
         report_event(output, entry.path.view(), rendered, watch_event::Removed,
-                     scan_time, should_color);
+                     scan_time, scan_nanoseconds, timestamp_precision, timezone,
+                     should_color);
         previous_position++;
         continue;
       }
@@ -325,7 +406,8 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
         os::file_status rendered{};
         rendered.mode = entry.mode;
         report_event(output, entry.path.view(), rendered, watch_event::Created,
-                     scan_time, should_color);
+                     scan_time, scan_nanoseconds, timestamp_precision, timezone,
+                     should_color);
         current_position++;
         continue;
       }
@@ -336,10 +418,12 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
       rendered.mode = current_entry.mode;
       if (!is_same_content(previous_entry, current_entry)) {
         report_event(output, current_entry.path.view(), rendered,
-                     watch_event::Updated, scan_time, should_color);
+                     watch_event::Updated, scan_time, scan_nanoseconds,
+                     timestamp_precision, timezone, should_color);
       } else if (!is_same_attributes(previous_entry, current_entry)) {
         report_event(output, current_entry.path.view(), rendered,
-                     watch_event::AttributeModified, scan_time, should_color);
+                     watch_event::AttributeModified, scan_time, scan_nanoseconds,
+                     timestamp_precision, timezone, should_color);
       }
 
       previous_position++;
