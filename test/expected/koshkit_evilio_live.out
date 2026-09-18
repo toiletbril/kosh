@@ -5,3 +5,5 @@ disk-status=130
 disk-shape=matched
 disk-scope=only-disk-io
 disk-margin=unindented
+live-help=described
+cumulative-help=described

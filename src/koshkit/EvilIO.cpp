@@ -35,7 +35,7 @@ static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
     '\0',
     "cumulative",
     koshka::flag_section::NoSection,
-    "Show sampled activity over an optional number of seconds.",
+    "Collect activity over an optional window; the default is one second.",
     is_evilio_sample_duration,
     "seconds"};
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
@@ -44,7 +44,7 @@ static koshka::FlagOptionalValue FLAG_EVILIO_LIVE{
     'l',
     "live",
     koshka::flag_section::NoSection,
-    "Refresh rate and IOPS samples until interrupted.",
+    "Refresh live output at an optional interval; the default is 0.5 seconds.",
     is_evilio_sample_duration,
     "seconds"};
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
@@ -569,48 +569,67 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
+  let const sample_interval_nanoseconds =
+      static_cast<u64>(sample_duration_seconds * 1000000000.0);
   let const refresh_interval_nanoseconds =
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
+  u64 last_sample_nanoseconds = last_refresh_nanoseconds;
   let before_rows = read_process_io_rows(allocator, selected_pid, true);
   if (selected_pid.has_value() && before_rows.is_empty()) return 1;
 
   loop
   {
-    let const started_at_nanoseconds = os::monotonic_nanos();
-    os::sleep_for_seconds(sample_duration_seconds);
+    let const before_wait_nanoseconds = os::monotonic_nanos();
+    let const until_sample =
+        sample_interval_nanoseconds -
+        (before_wait_nanoseconds - last_sample_nanoseconds <
+                 sample_interval_nanoseconds
+             ? before_wait_nanoseconds - last_sample_nanoseconds
+             : sample_interval_nanoseconds);
+    let const until_refresh =
+        refresh_interval_nanoseconds -
+        (before_wait_nanoseconds - last_refresh_nanoseconds <
+                 refresh_interval_nanoseconds
+             ? before_wait_nanoseconds - last_refresh_nanoseconds
+             : refresh_interval_nanoseconds);
+    let const wait_nanoseconds =
+        until_sample < until_refresh ? until_sample : until_refresh;
+    os::sleep_for_seconds(static_cast<f64>(wait_nanoseconds) / 1000000000.0);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
     }
 
-    let after_rows = read_process_io_rows(allocator, selected_pid, true);
-    if (selected_pid.has_value() && after_rows.is_empty()) return 1;
-
-    let const elapsed_nanoseconds =
-        os::monotonic_nanos() - started_at_nanoseconds;
-    let const sampled_rows = sample_process_io_rows(
-        before_rows, after_rows, elapsed_nanoseconds, allocator);
     let const now = os::monotonic_nanos();
-    for (let const &row : sampled_rows) {
-      bool is_known = false;
-      for (usize index = 0; index < retained.count(); index++) {
-        if (retained[index].row.pid != row.pid) continue;
-        retained[index].row = row;
-        retained[index].last_seen_nanoseconds = now;
-        is_known = true;
-        break;
+    if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
+      let after_rows = read_process_io_rows(allocator, selected_pid, true);
+      if (selected_pid.has_value() && after_rows.is_empty()) return 1;
+
+      let const sampled_rows = sample_process_io_rows(
+          before_rows, after_rows, now - last_sample_nanoseconds, allocator);
+      for (let const &row : sampled_rows) {
+        bool is_known = false;
+        for (usize index = 0; index < retained.count(); index++) {
+          if (retained[index].row.pid != row.pid) continue;
+          retained[index].row = row;
+          retained[index].last_seen_nanoseconds = now;
+          is_known = true;
+          break;
+        }
+        if (!is_known) retained.push(live_process_row{row, now});
       }
-      if (!is_known) retained.push(live_process_row{row, now});
-    }
-    for (usize index = retained.count(); index > 0; index--) {
-      let const position = index - 1;
-      if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
-      {
-        retained.remove(position);
+      for (usize index = retained.count(); index > 0; index--) {
+        let const position = index - 1;
+        if (now - retained[position].last_seen_nanoseconds >=
+            falloff_nanoseconds)
+        {
+          retained.remove(position);
+        }
       }
+      before_rows = steal(after_rows);
+      last_sample_nanoseconds = now;
     }
-    before_rows = steal(after_rows);
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
 
     last_refresh_nanoseconds = now;
@@ -648,15 +667,31 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
   let const allocator = heap_allocator();
   let before_snapshot = os::read_disk_io_snapshot(allocator);
   let retained = ArrayList<live_disk_row>{allocator};
+  let const sample_interval_nanoseconds =
+      static_cast<u64>(sample_duration_seconds * 1000000000.0);
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
   let const refresh_interval_nanoseconds =
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
+  u64 last_sample_nanoseconds = last_refresh_nanoseconds;
 
   loop
   {
-    os::sleep_for_seconds(sample_duration_seconds);
+    let const now_before_wait = os::monotonic_nanos();
+    let const sample_elapsed = now_before_wait - last_sample_nanoseconds;
+    let const refresh_elapsed = now_before_wait - last_refresh_nanoseconds;
+    let const until_sample =
+        sample_interval_nanoseconds > sample_elapsed
+            ? sample_interval_nanoseconds - sample_elapsed
+            : 0;
+    let const until_refresh =
+        refresh_interval_nanoseconds > refresh_elapsed
+            ? refresh_interval_nanoseconds - refresh_elapsed
+            : 0;
+    let const wait_nanoseconds =
+        until_sample < until_refresh ? until_sample : until_refresh;
+    os::sleep_for_seconds(static_cast<f64>(wait_nanoseconds) / 1000000000.0);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -664,26 +699,34 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
 
     let after_snapshot = os::read_disk_io_snapshot(allocator);
     let const now = os::monotonic_nanos();
-    for (let const &disk : after_snapshot.disks) {
-      bool is_known = false;
-      for (usize index = 0; index < retained.count(); index++) {
-        if (retained[index].status.name != disk.name) continue;
-        retained[index].status = disk;
-        retained[index].last_seen_nanoseconds = now;
-        is_known = true;
-        break;
+    let const did_sample =
+        now - last_sample_nanoseconds >= sample_interval_nanoseconds;
+    if (did_sample) {
+      for (let const &disk : after_snapshot.disks) {
+        bool is_known = false;
+        for (usize index = 0; index < retained.count(); index++) {
+          if (retained[index].status.name != disk.name) continue;
+          retained[index].status = disk;
+          retained[index].last_seen_nanoseconds = now;
+          is_known = true;
+          break;
+        }
+        if (!is_known) retained.push(live_disk_row{disk, now});
       }
-      if (!is_known) retained.push(live_disk_row{disk, now});
-    }
-    for (usize index = retained.count(); index > 0; index--) {
-      let const position = index - 1;
-      if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
-      {
-        retained.remove(position);
+      for (usize index = retained.count(); index > 0; index--) {
+        let const position = index - 1;
+        if (now - retained[position].last_seen_nanoseconds >=
+            falloff_nanoseconds)
+        {
+          retained.remove(position);
+        }
       }
+      last_sample_nanoseconds = now;
     }
-    before_snapshot = steal(after_snapshot);
-    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
+    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) {
+      if (did_sample) before_snapshot = steal(after_snapshot);
+      continue;
+    }
 
     last_refresh_nanoseconds = now;
     let current_snapshot = os::disk_io_snapshot{};
@@ -706,6 +749,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
                           elapsed_nanoseconds, true, false, allocator,
                           should_color);
     ec.print_to_stdout(output);
+    if (did_sample) before_snapshot = steal(after_snapshot);
   }
 }
 
@@ -939,7 +983,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const should_color = koshkit_should_color();
-  f64 live_interval_seconds = 1.0;
+  f64 live_interval_seconds = 0.5;
   if (FLAG_EVILIO_LIVE.has_value()) {
     let const parsed = utils::parse_decimal_f64(FLAG_EVILIO_LIVE.value());
     if (parsed.is_error() || parsed.value() <= 0) {
@@ -950,12 +994,10 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
     live_interval_seconds = parsed.value();
   }
-  let const refresh_interval_seconds =
-      FLAG_EVILIO_LIVE.is_enabled() && FLAG_EVILIO_CUMULATIVE.has_value()
-          ? parse_koshkit_duration_seconds(
-                FLAG_EVILIO_CUMULATIVE.value(),
-                FLAG_EVILIO_CUMULATIVE.value_location(), allocator)
-          : live_interval_seconds;
+  let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
+                                          ? cumulative_duration_seconds
+                                          : live_interval_seconds;
+  let const refresh_interval_seconds = live_interval_seconds;
   let const falloff_seconds =
       live_interval_seconds > 5.0 ? live_interval_seconds * 3.0 : 5.0;
   let const should_show_processes =
@@ -989,12 +1031,13 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (should_show_processes) {
       return run_live_process_io(
-          ec, selected_pid, row_limit, live_interval_seconds,
+          ec, selected_pid, row_limit, sample_duration_seconds,
           refresh_interval_seconds, falloff_seconds, is_terminal, should_color);
     }
 
-    return run_live_disk_io(ec, live_interval_seconds, refresh_interval_seconds,
-                            falloff_seconds, is_terminal, should_color);
+    return run_live_disk_io(ec, sample_duration_seconds,
+                            refresh_interval_seconds, falloff_seconds,
+                            is_terminal, should_color);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {

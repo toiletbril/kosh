@@ -61,3 +61,17 @@ printf 'disk-status=%s\n' "$disk_live_status"
 printf 'disk-shape=%s\n' "$disk_live_shape"
 printf 'disk-scope=%s\n' "$disk_live_scope"
 printf 'disk-margin=%s\n' "$disk_live_margin"
+
+help=$($BIN -c 'koshkit evilio --help')
+case $help in
+  *"Refresh live output"*"0.5 seconds"*) live_help=described ;;
+  *) live_help=missing ;;
+esac
+case $help in
+  *"Collect activity over an optional"*"window; the default is one second."*)
+    cumulative_help=described
+    ;;
+  *) cumulative_help=missing ;;
+esac
+printf 'live-help=%s\n' "$live_help"
+printf 'cumulative-help=%s\n' "$cumulative_help"
