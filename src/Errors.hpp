@@ -103,8 +103,11 @@ struct SourceLocation
     let const part_offset = static_cast<usize>(part.data - source.data);
     if (part_offset < source_offset) return nullptr;
     let const mapped_offset = part_offset - source_offset;
-    ASSERT(mapped_offset <= length);
-    ASSERT(part.length <= length - mapped_offset);
+    if (part.length == 0) return nullptr;
+    /* Expanded words can be empty or extend beyond a shortened source span;
+       leave the diagnostic unmapped rather than trapping the shell. */
+    if (mapped_offset > length || part.length > length - mapped_offset)
+      return nullptr;
     storage = subspan(mapped_offset, part.length);
     return &storage;
   }

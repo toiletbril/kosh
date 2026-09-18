@@ -239,8 +239,10 @@ fn EvalContext::expand_modifier_word_worker(
       }
       let call_site = SourceLocation{};
       const SourceLocation *call_site_pointer = nullptr;
-      if (source_location != nullptr) {
-        call_site = source_location->subspan(i, j - i + (j < word.length));
+      let const call_site_length = j - i + (j < word.length);
+      if (source_location != nullptr && i <= source_location->length &&
+          call_site_length <= source_location->length - i) {
+        call_site = source_location->subspan(i, call_site_length);
         call_site_pointer = &call_site;
       }
       do_emit_run(capture_command_substitution(inner, None, call_site_pointer),
@@ -381,7 +383,8 @@ fn EvalContext::expand_modifier_word_worker(
       }
       let inner_location = SourceLocation{};
       const SourceLocation *inner_location_pointer = nullptr;
-      if (source_location != nullptr) {
+      if (source_location != nullptr && i + 2 <= source_location->length &&
+          inner.count() <= source_location->length - (i + 2)) {
         inner_location = source_location->subspan(i + 2, inner.count());
         inner_location_pointer = &inner_location;
       }
@@ -484,8 +487,10 @@ fn EvalContext::expand_modifier_word_worker(
       }
       let call_site = SourceLocation{};
       const SourceLocation *call_site_pointer = nullptr;
-      if (source_location != nullptr) {
-        call_site = source_location->subspan(i, j - i + (j < word.length));
+      let const call_site_length = j - i + (j < word.length);
+      if (source_location != nullptr && i <= source_location->length &&
+          call_site_length <= source_location->length - i) {
+        call_site = source_location->subspan(i, call_site_length);
         call_site_pointer = &call_site;
       }
       do_emit_run(capture_command_substitution(inner, None, call_site_pointer),
