@@ -13,11 +13,12 @@
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
+#include "../Toiletline.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-it] [-p pid] [-u user] [-c command] [path ...]");
+HELP_SYNOPSIS_DECL("[-itw] [-p pid] [-u user] [-c command] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The evilfiles utility lists the files that running processes hold open.");
@@ -30,6 +31,8 @@ FLAG(EVILFILES_USER, String, 'u', "user",
 FLAG(EVILFILES_COMMAND, String, 'c', "command",
      "List only the processes whose name starts with this text.");
 FLAG(EVILFILES_NETWORK, Bool, 'i', "network", "List only socket descriptors.");
+FLAG(EVILFILES_WIDE, Bool, 'w', "wide",
+     "Do not truncate names to the terminal width.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilFiles);
@@ -385,6 +388,15 @@ fn EvilFiles::execute(
 
   let const should_color = koshkit_should_color();
   let output = String{allocator};
+  usize line_width_limit = SIZE_MAX;
+  if (!FLAG_EVILFILES_WIDE.is_enabled()) {
+    u32 terminal_columns = 0;
+    u32 terminal_rows = 0;
+    if (os::terminal_size(terminal_columns, terminal_rows,
+                          ec.out_fd.value_or(KOSH_STDOUT)) &&
+        terminal_columns > 8)
+      line_width_limit = terminal_columns;
+  }
   append_report_column(output, "COMMAND", widths.command, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
@@ -455,6 +467,32 @@ fn EvilFiles::execute(
     append_report_column(output, row.endpoint.view(), widths.endpoint, false,
                          colors::ansi::CYAN, should_color);
     output += "  ";
+    if (line_width_limit != SIZE_MAX) {
+      usize const used_width =
+          widths.command + 2 + widths.pid + 2 + widths.user + 2 +
+          widths.descriptor + 2 + widths.type + 2 + widths.mode + 2 +
+          widths.device + 2 + widths.size + 2 + widths.offset + 2 +
+          widths.node + 2 + widths.endpoint + 2;
+      if (used_width + toiletline::display_width(row.name.view()) >
+          line_width_limit)
+      {
+        if (line_width_limit > used_width + 4) {
+          String name = String{allocator, row.name.view()};
+          usize actual_cells = 0;
+          let const kept_bytes =
+              toiletline::byte_offset_at_or_before_display_cell(
+                  name.view(), line_width_limit - used_width - 3,
+                  actual_cells);
+          name.truncate(kept_bytes);
+          name += "...";
+          output += name.view();
+        } else {
+          output += "...";
+        }
+        output += "\n";
+        continue;
+      }
+    }
     output += row.name.view();
     output += "\n";
   }

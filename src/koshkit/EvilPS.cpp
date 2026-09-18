@@ -14,11 +14,12 @@
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
+#include "../Toiletline.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-NUMBER] [-pAnUChM] [--sort key] [--live [seconds]] "
+HELP_SYNOPSIS_DECL("[-NUMBER] [-pAnUChMw] [--sort key] [--live [seconds]] "
                    "[--cumulative [seconds]] [pid]");
 
 HELP_DESCRIPTION_DECL("The evilps utility shows running processes as a tree.");
@@ -34,6 +35,8 @@ FLAG(EVILPS_ARGUMENTS, Bool, 'A', "arguments", "Show the command line.");
 FLAG(EVILPS_OWNER, Bool, 'U', "show-owner", "Show the owner of each process.");
 FLAG(EVILPS_CPU, Bool, 'C', "cpu", "Show accumulated processor time.");
 FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
+FLAG(EVILPS_WIDE, Bool, 'w', "wide",
+     "Do not truncate command lines to the terminal width.");
 FLAG(EVILPS_SORT, String, '\0', "sort",
      "Sort children by name, pid, cpu, or memory.");
 static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
@@ -238,6 +241,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            const ArrayList<SourceLocation> &operand_locations,
                            usize output_limit, bool should_read_resources,
                            bool should_color, u32 viewport_rows,
+                           usize line_width_limit,
                            usize scroll_offset, StringView search,
                            bool should_human,
                            usize &visible_line_count) throws -> i32
@@ -262,6 +266,17 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     node.owner_id = process.owner_id;
     node.name = String{allocator, process.name.view()};
     node.command_line = String{allocator, process.command_line.view()};
+    if (line_width_limit != 0 && line_width_limit != SIZE_MAX &&
+        toiletline::display_width(node.command_line.view()) >
+            line_width_limit)
+    {
+      const StringView text = node.command_line.view();
+      usize actual_cells = 0;
+      let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+          text, line_width_limit - 3, actual_cells);
+      node.command_line.truncate(kept_bytes);
+      node.command_line += "...";
+    }
     nodes.push(steal(node));
   }
 
@@ -545,6 +560,16 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
+  let line_width_limit = SIZE_MAX;
+  if (!FLAG_EVILPS_WIDE.is_enabled()) {
+    u32 terminal_columns = 0;
+    u32 terminal_rows = 0;
+    if (os::terminal_size(terminal_columns, terminal_rows,
+                          ec.out_fd.value_or(KOSH_STDOUT)) &&
+        terminal_columns > 8)
+      line_width_limit = terminal_columns;
+  }
+
   if (FLAG_EVILPS_LIVE.is_enabled()) {
     let const is_terminal = colors::stdout_is_a_terminal();
     let const refresh_interval_seconds =
@@ -581,7 +606,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
             ec, cxt, allocator, operands, operand_locations, output_limit,
             should_read_resources, should_color,
             is_terminal && terminal_rows > 1 ? terminal_rows : 0,
-            scroll_offset, live_search.view(), false, visible_line_count);
+            line_width_limit, scroll_offset, live_search.view(), false,
+            visible_line_count);
         if (status != 0) return status;
         if (visible_line_count > terminal_rows && terminal_rows > 1) {
           let const maximum_offset = visible_line_count - (terminal_rows - 1);
@@ -614,8 +640,9 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   return render_process_snapshot(ec, cxt, allocator, operands,
                                  operand_locations, output_limit,
-                                 should_read_resources, should_color, 0, 0,
-                                 StringView{}, false, output_limit);
+                                 should_read_resources, should_color, 0,
+                                 line_width_limit, 0, StringView{}, false,
+                                 output_limit);
 }
 
 } // namespace koshka::koshkit
