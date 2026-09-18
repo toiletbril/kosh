@@ -934,6 +934,15 @@ fn make_fifo(StringView path, u32 mode) wontthrow -> bool
   return false;
 }
 
+fn make_device_node(StringView path, u32 mode, u64 device_id) wontthrow -> bool
+{
+  unused(path);
+  unused(mode);
+  unused(device_id);
+  SetLastError(ERROR_NOT_SUPPORTED);
+  return false;
+}
+
 fn touch_file_times(StringView path) wontthrow -> bool
 {
   let const wide_path = utf8_to_wide(path, heap_allocator());

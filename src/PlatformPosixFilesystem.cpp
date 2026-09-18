@@ -16,6 +16,10 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
+#if defined __linux__
+#include <sys/sysmacros.h>
+#endif
+
 namespace koshka {
 
 namespace os {
@@ -648,6 +652,27 @@ fn make_fifo(StringView path, u32 mode) wontthrow -> bool
   {
     const String path_string{path};
     did_succeed = ::mkfifo(path_string.c_str(), static_cast<mode_t>(mode)) == 0;
+    saved_errno = errno;
+  }
+  errno = saved_errno;
+  return did_succeed;
+}
+
+fn make_device_node(StringView path, u32 mode, u64 device_id) wontthrow -> bool
+{
+  bool did_succeed;
+  int saved_errno;
+  {
+    const String path_string{path};
+#if defined __linux__
+    did_succeed = ::mknod(path_string.c_str(), static_cast<mode_t>(mode),
+                          static_cast<dev_t>(device_id)) == 0;
+#else
+    unused(mode);
+    unused(device_id);
+    did_succeed = false;
+    errno = ENOTSUP;
+#endif
     saved_errno = errno;
   }
   errno = saved_errno;
