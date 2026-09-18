@@ -94,7 +94,8 @@ fn append_namespace_report(String &output, bool should_color,
   output += '\n';
 }
 
-fn append_cgroup_report(String &output, bool should_color) throws -> void
+fn append_cgroup_report(String &output, bool should_color,
+                        bool should_show_detail) throws -> void
 {
   let const contents = Path{"/proc/self/cgroup"}.read_entire_file();
   let table = ReportTable{heap_allocator()};
@@ -119,6 +120,58 @@ fn append_cgroup_report(String &output, bool should_color) throws -> void
               line, colors::ansi::BOLD_CYAN);
   }
   output += table.to_string(should_color, "");
+
+  if (!should_show_detail) return;
+
+  let member_rows = ArrayList<const os::process_entry *>{heap_allocator()};
+  let const processes = os::enumerate_processes();
+  for (let const &process : processes) {
+    let const member = Path{String{"/proc/"} +
+                            String::from(process.pid, heap_allocator()) +
+                            "/cgroup"}.read_entire_file();
+    if (!member.has_value()) continue;
+    if (member->view().find_substring("name=systemd:/").has_value() ||
+        member->view().find_substring("name=elogind:/").has_value())
+      member_rows.push(&process);
+  }
+  if (member_rows.is_empty()) return;
+
+  usize pid_width = 3;
+  usize name_width = 4;
+  for (let const *process : member_rows) {
+    let pid = String::from(process->pid, heap_allocator());
+    if (pid.length() > pid_width) pid_width = pid.length();
+    if (process->name.length() > name_width) {
+      name_width = process->name.length();
+    }
+  }
+
+  output += "\n";
+  append_report_column(output, "PID", pid_width, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "NAME", name_width, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "ROLE", 5, false, colors::ansi::BOLD_CYAN,
+                       should_color);
+  output += "\n";
+  for (let const *process : member_rows) {
+    append_report_column(output,
+                         String::from(process->pid, heap_allocator()).view(),
+                         pid_width, false, colors::ansi::BOLD_GREEN,
+                         should_color);
+    output += "  ";
+    append_report_column(output, process->name.view(), name_width, false, {},
+                         should_color);
+    output += "  ";
+    append_report_text(output,
+                       process->pid == os::get_current_process_id()
+                           ? StringView{"self"}
+                           : StringView{"other"},
+                       colors::ansi::BOLD_MAGENTA, should_color);
+    output += "\n";
+  }
 }
 
 fn append_session_report(String &output, bool should_color,
@@ -323,7 +376,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   if (show_namespaces)
     append_namespace_report(output, should_color,
                             FLAG_EVILISO_ALL.is_enabled());
-  if (show_cgroups) append_cgroup_report(output, should_color);
+  if (show_cgroups)
+    append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_sessions)
     append_session_report(output, should_color,
                           FLAG_EVILISO_ALL.is_enabled());

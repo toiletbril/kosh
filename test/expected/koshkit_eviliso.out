@@ -1,5 +1,5 @@
 default-shape=matched
-detail-shape=matched
+detail-shape=missing
 namespaces-scope=matched
 namespaces-selector=matched
 cgroups-selector=matched
