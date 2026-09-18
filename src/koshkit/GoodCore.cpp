@@ -554,21 +554,18 @@ fn GoodCore::execute(
   }
 
   if (!FLAG_GOODCORE_QUIET.is_enabled()) {
-    let body = String{allocator};
     let const should_color = koshkit_should_color();
-    append_report_field(body, "Archive", output.text().view(),
-                        colors::ansi::GREEN, should_color);
-    append_report_field(body, "Executable", binary->view(), colors::ansi::GREEN,
-                        should_color);
-    append_report_field(body, "Files",
-                        String::from(copied_path_count, allocator).view(),
-                        colors::ansi::GREEN, should_color);
+    let table = ReportTable{allocator};
+    table.add("Archive", output.text().view(), colors::ansi::GREEN);
+    table.add("Executable", binary->view(), colors::ansi::GREEN);
+    table.add("Files", String::from(copied_path_count, allocator).view(),
+              colors::ansi::GREEN);
 
     let result = String{allocator};
     append_report_text(result, "GOODCORE", colors::ansi::BOLD_BLUE,
                        should_color);
     result += "\n";
-    append_report_body(result, body.view());
+    result += table.to_string(should_color, "  ").view();
     ec.print_to_stdout(result);
   }
 
