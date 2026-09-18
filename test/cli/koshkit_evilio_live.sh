@@ -27,14 +27,14 @@ run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-process-report" \
 process_live_status=$live_status
 process_live_report=$live_report
 case $process_live_report in
-  *PID*READ/0.02s*WRITE/0.02s*COMMAND*) live_shape=matched ;;
+  *ctrl*c*exit*PID*READ/0.02s*WRITE/0.02s*COMMAND*) live_shape=matched ;;
   *) live_shape=wrong ;;
 esac
 run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-process-window-report" \
   'koshkit --color never evilio --live=0.05 --cumulative=1.2 --ps -1'
 process_window_report=$live_report
 case $process_window_report in
-  *"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
+  *ctrl*c*exit*"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
     process_window_shape=matched
     ;;
   *) process_window_shape=wrong ;;

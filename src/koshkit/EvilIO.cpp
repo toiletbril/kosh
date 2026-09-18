@@ -206,8 +206,8 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
                                  bool should_color,
                                  StringView duration_suffix,
-                                 const ArrayList<u64> *idle_nanoseconds_list)
-    throws -> void
+                                 const ArrayList<u64> *idle_nanoseconds_list,
+                                 u64 falloff_nanoseconds) throws -> void
 {
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
@@ -237,7 +237,11 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
       let const idle = (*idle_nanoseconds_list)[index];
       /* A row fades linearly to zero across the collection window after its
          last activity, then reads as zero until it is dropped. */
-      decayed_factor = idle == 0 ? 1000 : 0;
+      decayed_factor = idle == 0
+                           ? 1000
+                           : idle >= falloff_nanoseconds
+                                 ? 0
+                                 : 1000 - idle * 1000 / falloff_nanoseconds;
     }
     append_report_column(output, String::from(row.pid, allocator).view(), 8,
                          true, colors::ansi::BOLD_MAGENTA, should_color);
@@ -687,7 +691,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                              should_color);
     append_process_io_rate_report(
         output, rows, row_limit, allocator, should_color,
-        sample_duration_label, &idle_nanoseconds_list);
+        sample_duration_label, &idle_nanoseconds_list, falloff_nanoseconds);
     ec.print_to_stdout(output);
   }
 }
@@ -781,7 +785,26 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
         after_snapshot.sampled_at_nanoseconds;
     current_snapshot.disks.reserve(retained.count());
     for (let const &row : retained)
-      current_snapshot.disks.push(row.status);
+    {
+      let status = row.status;
+      if (row.idle_nanoseconds != 0) {
+        let const decayed_factor =
+            row.idle_nanoseconds >= falloff_nanoseconds
+                ? u64{0}
+                : 1000 - row.idle_nanoseconds * 1000 / falloff_nanoseconds;
+        if (status.has_field(os::disk_io_field::ReadBytes))
+          status.read_bytes = status.read_bytes * decayed_factor / 1000;
+        if (status.has_field(os::disk_io_field::WrittenBytes))
+          status.written_bytes = status.written_bytes * decayed_factor / 1000;
+        if (status.has_field(os::disk_io_field::ReadOperations))
+          status.read_operation_count =
+              status.read_operation_count * decayed_factor / 1000;
+        if (status.has_field(os::disk_io_field::WriteOperations))
+          status.write_operation_count =
+              status.write_operation_count * decayed_factor / 1000;
+      }
+      current_snapshot.disks.push(status);
+    }
     u64 elapsed_nanoseconds = 0;
     if (after_snapshot.sampled_at_nanoseconds >=
         before_snapshot.sampled_at_nanoseconds)
@@ -1112,7 +1135,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
                                   should_color, sample_duration_label.view(),
-                                  nullptr);
+                                  nullptr, 0);
     ec.print_to_stdout(output);
     return selected_pid.has_value() && after_rows.is_empty() ? 1 : 0;
   }
