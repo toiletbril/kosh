@@ -23,6 +23,23 @@ printf 'invalid-mode-status=%s\n' "$?"
   mknod "$root" >/dev/null 2>&1
 printf 'invalid-device-status=%s\n' "$?"
 
+device_path=$root/device
+device_error=$($BIN -c 'koshkit mknod --character --major 1 --minor 3 "$1"' \
+  mknod "$device_path" 2>&1)
+device_status=$?
+if test -c "$device_path"; then
+  device_check=ok
+  rm -f "$device_path"
+elif test "$device_status" -ne 0; then
+  case "$device_error" in
+    *"permission denied"*|*"Operation not permitted"*) device_check=ok ;;
+    *) device_check=failed ;;
+  esac
+else
+  device_check=failed
+fi
+printf 'device-check=%s\n' "$device_check"
+
 help=$($BIN -c 'koshkit mknod --help')
 case "$help" in
   *"mknod --fifo pipe"*"mknod --character --major 1 --minor 3 device"*)
