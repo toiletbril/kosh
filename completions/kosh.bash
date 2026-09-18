@@ -175,7 +175,7 @@ _koshkit_util_flags()
     evillogs)      echo "--cores --logs" ;;
     evilnet)       echo "-a --all -t --traffic -l --live -f --failures --falloff" ;;
     goodnode)      echo "-i --inode -r --root" ;;
-    evilps)        echo "-p --show-pids -n --numeric-sort -a --all -A --arguments -U --show-owner -C --cpu -M --memory --sort -l --live --cumulative" ;;
+    evilps)        echo "-p --show-pids -n --numeric-sort -a --all -A --arguments -c --cpu -U --show-owner -M --memory -w --wide --sort -l --live -C --cumulative" ;;
     goodstat)      echo "-L --dereference -c --checksum -f --filesystem" ;;
     goodfsw)       echo "-h --human-readable -m --machine-readable -r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude --timezone --precision" ;;
     ls)            echo "-a -A -1 -l -h -F -t -S -r -R -L --classify --recursive --level --tree" ;;

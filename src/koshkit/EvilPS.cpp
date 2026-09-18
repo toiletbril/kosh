@@ -19,7 +19,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-NUMBER] [-pAnUChMw] [--sort key] [--live [seconds]] "
+HELP_SYNOPSIS_DECL("[-NUMBER] [-pAncUhMw] [--sort key] [--live [seconds]] "
                    "[--cumulative [seconds]] [pid]");
 
 HELP_DESCRIPTION_DECL("The evilps utility shows running processes as a tree.");
@@ -33,7 +33,7 @@ FLAG(EVILPS_ALL, Bool, 'a', "all",
      "lines.");
 FLAG(EVILPS_ARGUMENTS, Bool, 'A', "arguments", "Show the command line.");
 FLAG(EVILPS_OWNER, Bool, 'U', "show-owner", "Show the owner of each process.");
-FLAG(EVILPS_CPU, Bool, 'C', "cpu", "Show accumulated processor time.");
+FLAG(EVILPS_CPU, Bool, 'c', "cpu", "Show accumulated processor time.");
 FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
 FLAG(EVILPS_WIDE, Bool, 'w', "wide",
      "Do not truncate command lines to the terminal width.");
@@ -49,7 +49,7 @@ FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
               "Refresh the process tree until interrupted; the optional "
               "interval defaults to 0.5 seconds.",
               is_evilps_sample_duration, "seconds");
-FLAG_OPTIONAL(EVILPS_CUMULATIVE, '\0', "cumulative",
+FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative",
               "Collect the process tree over an optional window; without "
               "--live, wait before collecting.",
               is_evilps_sample_duration, "seconds");

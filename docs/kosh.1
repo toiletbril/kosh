@@ -2022,15 +2022,20 @@ Visible processes are printed as a parent and child tree. The
 .BR \-U ,
 .BR \-C ,
 and
-.B \-M
+.BR \-M
 options show process identifiers, sort numerically, enable every field, show
-command lines, show owners, show processor time, and show resident memory. The
+command lines, show owners, and show resident memory. The
+.B \-c
+option shows processor time. The
 .B \-\-sort
 option accepts name, pid, cpu, and memory.
 The
 .B \-NUMBER
 operand limits the output to NUMBER processes.
 The
+.B \-C
+option is shorthand for
+.BR \-\-cumulative .
 .B \-l
 and
 .B \-\-live

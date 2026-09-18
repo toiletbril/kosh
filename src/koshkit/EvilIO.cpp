@@ -16,7 +16,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [--live [seconds]] [--cumulative [seconds]] "
+HELP_SYNOPSIS_DECL("[-a] [-C [seconds]] [--live [seconds]] [--cumulative "
+                   "[seconds]] "
                    "[--ps | -NUMBER | -n count | -p pid]");
 
 HELP_DESCRIPTION_DECL(
@@ -30,7 +31,7 @@ static pure fn is_evilio_sample_duration(koshka::StringView value) wontthrow
 }
 
 FLAG(EVILIO_ALL, Bool, 'a', "all", "Include sampled system activity.");
-FLAG_OPTIONAL(EVILIO_CUMULATIVE, '\0', "cumulative",
+FLAG_OPTIONAL(EVILIO_CUMULATIVE, 'C', "cumulative",
               "Collect activity over an optional window; the default is one "
               "second.",
               is_evilio_sample_duration, "seconds");

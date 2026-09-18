@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-atlf] [--falloff seconds]");
+HELP_SYNOPSIS_DECL("[-aCtlf] [--falloff seconds]");
 
 HELP_DESCRIPTION_DECL(
     "The evilnet utility reports the addresses assigned to each interface.");
@@ -33,7 +33,7 @@ FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
               "Refresh live traffic at an optional interval; the default is "
               "0.5 seconds.",
               is_evilnet_sample_duration, "seconds");
-FLAG_OPTIONAL(EVILNET_CUMULATIVE, '\0', "cumulative",
+FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative",
               "Measure traffic over an optional sampling window; the default "
               "is one second.",
               is_evilnet_sample_duration, "seconds");

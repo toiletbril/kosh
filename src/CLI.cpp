@@ -626,7 +626,7 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                                     is_long, base_position, arg_locations));
 
           let value = StringView{value_offset};
-          if (is_long && !value.is_empty() && value[0] == '=')
+          if (!value.is_empty() && value[0] == '=')
             value = value.substring(1);
           if (!value.is_empty() && optional_flag->should_accept_value(value)) {
             optional_flag->set(value);
