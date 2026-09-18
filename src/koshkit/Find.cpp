@@ -92,8 +92,8 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
   return true;
 }
 
-static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
-                    StringView display, usize depth,
+static fn find_walk(const ExecContext &ec, EvalContext &cxt,
+                    StringView path_text, StringView display, usize depth,
                     const find_options &options, String &output,
                     i32 &exit_status, Allocator allocator,
                     const os::file_status *known_status = nullptr) throws
@@ -102,15 +102,23 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
   /* The stat reads the symlink, not its target, and a failed stat yields the
      marker '\0' that matches no -type filter and is not descended. */
   os::file_status queried_status{};
-  if (known_status == nullptr &&
-      os::stat_path(path.text().view(), queried_status))
+  if (known_status == nullptr && os::stat_path(path_text, queried_status))
   {
     known_status = &queried_status;
   }
   let const type_letter =
       known_status != nullptr ? os::file_type_letter(known_status->mode) : '\0';
 
-  if (find_entry_matches(type_letter, path.filename(), depth, options)) {
+  usize filename_start = 0;
+  for (usize index = path_text.length; index > 0; index--) {
+    if (path_text[index - 1] == '/') {
+      filename_start = index;
+      break;
+    }
+  }
+  let const filename = path_text.substring(filename_start);
+
+  if (find_entry_matches(type_letter, filename, depth, options)) {
     output += display;
     output += '\n';
   }
@@ -121,9 +129,9 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
     return;
   }
 
-  let children = os::list_directory_status(path.text().view(), allocator);
+  let children = os::list_directory_status(path_text, allocator);
   if (!children.has_value()) {
-    if (!path.is_readable()) {
+    if (!os::path_is_readable(path_text)) {
       report_soft_koshkit_error(ec, cxt,
                                 "find: '" + String{allocator, display} +
                                     "': Permission denied");
@@ -145,11 +153,10 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
       child_display += '/';
     }
     child_display += child_entry.child.name.view();
-    let const child_path = Path{child_display.view()};
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
-    find_walk(ec, cxt, child_path, child_display.view(), depth + 1, options,
-              output, exit_status, allocator, child_status);
+    find_walk(ec, cxt, child_display.view(), child_display.view(), depth + 1,
+              options, output, exit_status, allocator, child_status);
   }
 }
 
@@ -306,8 +313,8 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    find_walk(ec, cxt, root_paths[root_index], root, 0, options, output, status,
-              allocator, &root_statuses[root_index]);
+    find_walk(ec, cxt, root, root, 0, options, output, status, allocator,
+              &root_statuses[root_index]);
   }
 
   ec.print_to_stdout(output);

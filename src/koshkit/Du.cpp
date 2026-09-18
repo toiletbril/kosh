@@ -99,8 +99,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   let const allocated_size_bytes = known_status->blocks * 512;
   if (type_letter == 'd') {
     u64 total_bytes = allocated_size_bytes;
-    let children =
-        os::list_directory_status(path.text().view(), heap_allocator());
+    let children = os::list_directory_status(path.text().view(), allocator);
     if (!children.has_value()) {
       report_soft_koshkit_error(ec, cxt,
                                 "du: cannot read '" + path.text() +
