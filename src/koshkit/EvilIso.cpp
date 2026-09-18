@@ -80,8 +80,12 @@ fn append_namespace_report(String &output, bool should_color,
       let identity = String::from(process.pid, heap_allocator());
       identity += " (";
       identity += process.name.view();
-      identity += process.pid == os::get_current_process_id() ? ", self)"
-                                                               : ", other)";
+      identity += process.pid == os::get_current_process_id() ? ", self; "
+                                                               : ", other; ";
+      identity += name;
+      identity += " namespace ";
+      identity += target->view();
+      identity += ")";
       append_report_field(body, String{name} + " process", identity.view(),
                           colors::ansi::BOLD_CYAN, should_color);
     }

@@ -25,6 +25,10 @@ case $detail_report in
   *" ("*", "*")"*) ;;
   *) detail_shape=missing ;;
 esac
+case $detail_report in
+  *" ("*", self; "*" namespace "*")"*) ;;
+  *) detail_shape=missing ;;
+esac
 printf 'detail-shape=%s\n' "$detail_shape"
 
 namespaces_only=$(run_report --namespaces)
