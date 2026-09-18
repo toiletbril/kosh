@@ -167,7 +167,7 @@ _koshkit_util_flags()
     file)          echo "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only" ;;
     evil)          echo "-a --all -s --short -u --users" ;;
     goodcore)      echo "-p --pid -b --binary -o --output -q --quiet --no-compress" ;;
-    eviliso)       echo "-a --detail -n --namespaces -c --cgroups -s --sessions -r --remote -k --runtime" ;;
+    eviliso)       echo "-a --all -n --namespaces -c --cgroups -s --sessions -r --remote -k --runtime" ;;
     evildisk)      echo "-a --all" ;;
     evilfiles)     echo "-t --terse -p --pid -u --user -c --command -i --network" ;;
     evilfs)        echo "-a --all" ;;

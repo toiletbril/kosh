@@ -84,8 +84,8 @@ mv
 --help
 --logs
 == eviliso flags through koshkit:
+--all
 --cgroups
---detail
 --help
 --namespaces
 --remote

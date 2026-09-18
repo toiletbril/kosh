@@ -1912,8 +1912,9 @@ Isolation evidence is grouped into namespace, cgroup, login-session, remote
 socket, and runtime sections. With no selector, all sections are shown. The
 .B -a
 or
-.B --detail
-option includes additional detail. Otherwise
+.B --all
+option includes detailed rows, including per-process namespace attribution,
+controller membership, login times, and remote peers. Otherwise
 .BR -n , -c , -s ,
 and
 .B -r

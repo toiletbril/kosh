@@ -8,25 +8,32 @@ run_report()
 default_report=$(run_report "")
 default_shape=matched
 for section in 'cgroup:' 'Membership:' 'Session:' 'Remote sockets:'; do
-  case $default_report in
-    *"$section"*) ;;
-    *) default_shape=missing ;;
-  esac
+  :
 done
+case $default_report in
+  *"cgroup:"*"Controller 0:"*"Session:"*"Remote sockets:"*)
+    default_shape=matched
+    ;;
+  *) default_shape=missing ;;
+esac
 printf 'default-shape=%s\n' "$default_shape"
 
-detail_report=$(run_report --detail)
+all_report=$(run_report -a)
 detail_shape=matched
-case $detail_report in
+case $all_report in
   *"cgroup:"*"cgroup processes:"*"cgroup process:"*) ;;
   *) detail_shape=missing ;;
 esac
-case $detail_report in
+case $all_report in
   *" ("*", "*")"*) ;;
   *) detail_shape=missing ;;
 esac
-case $detail_report in
+case $all_report in
   *" ("*", self; "*" namespace "*")"*) ;;
+  *) detail_shape=missing ;;
+esac
+case $all_report in
+  *"Controller 0:"*"Login time:"*"Remote peer 0:"*) ;;
   *) detail_shape=missing ;;
 esac
 printf 'detail-shape=%s\n' "$detail_shape"
@@ -40,7 +47,7 @@ printf 'namespaces-scope=%s\n' "$namespaces_scope"
 
 for selector_section in \
   'namespaces|-n|cgroup:' \
-  'cgroups|-c|Membership:' \
+  'cgroups|-c|Controller 0:' \
   'sessions|-s|Session:' \
   'remote|-r|Remote sockets:' \
   'runtime|-k|Runtime:'; do

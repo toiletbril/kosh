@@ -13,6 +13,7 @@
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -22,8 +23,8 @@ HELP_DESCRIPTION_DECL(
     "The eviliso utility reports namespaces, cgroups, sessions, and remote "
     "connections.");
 
-FLAG(EVILISO_DETAIL, Bool, 'a', "detail",
-     "Include additional isolation details.");
+FLAG(EVILISO_ALL, Bool, 'a', "all",
+     "Include detailed rows for every selected section.");
 FLAG(EVILISO_NAMESPACES, Bool, 'n', "namespaces", "Report process namespaces.");
 FLAG(EVILISO_CGROUPS, Bool, 'c', "cgroups", "Report cgroup membership.");
 FLAG(EVILISO_SESSIONS, Bool, 's', "sessions", "Report login sessions.");
@@ -95,15 +96,33 @@ fn append_namespace_report(String &output, bool should_color,
 
 fn append_cgroup_report(String &output, bool should_color) throws -> void
 {
-  let table = ReportTable{heap_allocator()};
   let const contents = Path{"/proc/self/cgroup"}.read_entire_file();
-  table.add("Membership",
-            contents.has_value() ? contents->view() : "unavailable",
-            colors::ansi::BOLD_CYAN);
+  let table = ReportTable{heap_allocator()};
+  if (!contents.has_value()) {
+    table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
+    output += table.to_string(should_color, "");
+    return;
+  }
+
+  StringView text = contents->view();
+  usize index = 0;
+  while (!text.is_empty()) {
+    usize line_end = 0;
+    while (line_end < text.length && text[line_end] != '\n') line_end++;
+    let const line = text.substring_of_length(0, line_end);
+    if (line_end < text.length)
+      text = text.substring(line_end + 1);
+    else
+      text = StringView{};
+    if (line.is_empty()) continue;
+    table.add(String{"Controller "} + String::from(index++, heap_allocator()),
+              line, colors::ansi::BOLD_CYAN);
+  }
   output += table.to_string(should_color, "");
 }
 
-fn append_session_report(String &output, bool should_color) throws -> void
+fn append_session_report(String &output, bool should_color,
+                         bool should_show_detail) throws -> void
 {
   let table = ReportTable{heap_allocator()};
   let const sessions = os::logged_in_users();
@@ -114,11 +133,18 @@ fn append_session_report(String &output, bool should_color) throws -> void
     text += '@';
     text += session.terminal.view();
     table.add("Session", text.view(), colors::ansi::BOLD_CYAN);
+    if (!should_show_detail) continue;
+    table.add("Login time",
+              utils::format_unix_timestamp(session.login_time,
+                                           "%Y-%m-%d %H:%M:%S")
+                  .view(),
+              colors::ansi::BOLD_CYAN);
   }
   output += table.to_string(should_color, "");
 }
 
-fn append_remote_report(String &output, bool should_color) throws -> void
+fn append_remote_report(String &output, bool should_color,
+                        bool should_show_detail) throws -> void
 {
   let table = ReportTable{heap_allocator()};
   if (!os::has_network_socket_listing()) {
@@ -139,6 +165,19 @@ fn append_remote_report(String &output, bool should_color) throws -> void
   table.add("Total sockets",
             String::from(sockets.count(), heap_allocator()).view(),
             colors::ansi::BOLD_CYAN);
+  if (should_show_detail) {
+    usize remote_index = 0;
+    for (let const &socket : sockets) {
+      if (socket.peer_address.is_empty() || socket.peer_port == 0) continue;
+      let text = String{heap_allocator()};
+      text += socket.peer_address.view();
+      text += ":";
+      text += String::from(socket.peer_port, heap_allocator()).view();
+      table.add(String{"Remote peer "} +
+                    String::from(remote_index++, heap_allocator()),
+                text.view(), colors::ansi::BOLD_CYAN);
+    }
+  }
   output += table.to_string(should_color, "");
 }
 
@@ -217,10 +256,14 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   if (show_namespaces)
     append_namespace_report(output, should_color,
-                            FLAG_EVILISO_DETAIL.is_enabled());
+                            FLAG_EVILISO_ALL.is_enabled());
   if (show_cgroups) append_cgroup_report(output, should_color);
-  if (show_sessions) append_session_report(output, should_color);
-  if (show_remote) append_remote_report(output, should_color);
+  if (show_sessions)
+    append_session_report(output, should_color,
+                          FLAG_EVILISO_ALL.is_enabled());
+  if (show_remote)
+    append_remote_report(output, should_color,
+                         FLAG_EVILISO_ALL.is_enabled());
   if (show_runtime) append_runtime_report(output, should_color);
   ec.print_to_stdout(output);
   return 0;
