@@ -629,8 +629,24 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
   if (should_show_traffic && !should_show_failures) {
-    traffic_count = append_network_traffic_report(output, warnings, allocator,
-                                                  should_color);
+    if (FLAG_EVILNET_CUMULATIVE.is_enabled()) {
+      let const before = os::read_network_interface_statistics();
+      let const started_at_nanoseconds = os::monotonic_nanos();
+      os::sleep_for_seconds(sample_interval_seconds);
+      if (os::INTERRUPT_REQUESTED != 0) {
+        os::INTERRUPT_REQUESTED = 0;
+        return 130;
+      }
+      let const after = os::read_network_interface_statistics();
+      let const sampled = sample_network_statistics(
+          before, after, os::monotonic_nanos() - started_at_nanoseconds,
+          allocator);
+      traffic_count = append_network_traffic_statistics_report(
+          output, warnings, allocator, sampled, should_color, true);
+    } else {
+      traffic_count = append_network_traffic_report(output, warnings, allocator,
+                                                    should_color);
+    }
   }
   if (should_show_all || should_show_failures)
     has_tcp_statistics =
