@@ -39,22 +39,13 @@ static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
   return !value.is_empty() &&
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
-static koshka::FlagOptionalValue FLAG_EVILPS_LIVE{
-    FLAG_LIST,
-    'l',
-    "live",
-    koshka::flag_section::NoSection,
-    "Refresh the process tree at an optional interval until interrupted.",
-    is_evilps_sample_duration,
-    "seconds"};
-static koshka::FlagOptionalValue FLAG_EVILPS_CUMULATIVE{
-    FLAG_LIST,
-    '\0',
-    "cumulative",
-    koshka::flag_section::NoSection,
-    "Wait an optional interval before collecting the process tree.",
-    is_evilps_sample_duration,
-    "seconds"};
+FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
+              "Refresh the process tree at an optional interval until "
+              "interrupted.",
+              is_evilps_sample_duration, "seconds");
+FLAG_OPTIONAL(EVILPS_CUMULATIVE, '\0', "cumulative",
+              "Wait an optional interval before collecting the process tree.",
+              is_evilps_sample_duration, "seconds");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilPS);
@@ -207,7 +198,9 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            const ArrayList<String> &operands,
                            const ArrayList<SourceLocation> &operand_locations,
                            usize output_limit, bool should_read_resources,
-                           bool should_color) throws -> i32
+                           bool should_color, u32 viewport_rows,
+                           usize scroll_offset, StringView search,
+                           usize &visible_line_count) throws -> i32
 {
   let const processes = os::enumerate_processes(
       should_read_resources ? os::process_detail::ResourceStats
@@ -266,6 +259,32 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     rendered_count++;
     render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
                     should_color, output_limit, rendered_count);
+    visible_line_count = 1;
+    if (viewport_rows != 0) {
+      let const full_output = String{allocator, output.view()};
+      output.clear();
+      usize line_number = 0;
+      usize position = 0;
+      while (position < full_output.length()) {
+        let const relative_end =
+            full_output.view().substring(position).find_character('\n');
+        let const line_end = relative_end.has_value()
+                                 ? position + *relative_end
+                                 : full_output.length();
+        let const line = full_output.view().substring_of_length(
+            position, line_end - position);
+        if (search.is_empty() || line.find_substring(search).has_value()) {
+          if (line_number >= scroll_offset &&
+              line_number - scroll_offset < viewport_rows - 1) {
+            output += line;
+            output += "\n";
+          }
+          line_number++;
+        }
+        position = relative_end.has_value() ? line_end + 1 : full_output.length();
+      }
+      visible_line_count = line_number;
+    }
     ec.print_to_stdout(output);
     return 0;
   }
@@ -302,8 +321,85 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                     allocator, should_color, output_limit, rendered_count);
   }
 
+  visible_line_count = rendered_count;
+  if (viewport_rows != 0) {
+    let const full_output = String{allocator, output.view()};
+    output.clear();
+    usize line_number = 0;
+    usize position = 0;
+    while (position < full_output.length()) {
+      let const relative_end =
+          full_output.view().substring(position).find_character('\n');
+      let const line_end = relative_end.has_value()
+                               ? position + *relative_end
+                               : full_output.length();
+      let const line = full_output.view().substring_of_length(
+          position, line_end - position);
+      if (search.is_empty() || line.find_substring(search).has_value()) {
+        if (line_number >= scroll_offset &&
+            line_number - scroll_offset < viewport_rows - 1) {
+          output += line;
+          output += "\n";
+        }
+        line_number++;
+      }
+      position = relative_end.has_value() ? line_end + 1 : full_output.length();
+    }
+    visible_line_count = line_number;
+  }
   ec.print_to_stdout(output);
   return 0;
+}
+
+fn poll_live_input(os::descriptor input_fd, String &input, String &search,
+                   usize &scroll_offset) wontthrow -> bool
+{
+  if (os::wait_for_fd_readable(input_fd, 0) <= 0) return true;
+
+  char buffer[64];
+  let const read_count = os::read_fd(input_fd, buffer, sizeof(buffer));
+  if (!read_count.has_value()) return true;
+
+  for (usize index = 0; index < *read_count; index++) {
+    let const byte = buffer[index];
+    if (byte == 'q' || byte == 'Q' || byte == 3 || byte == 27) return false;
+    if (byte == 'j' || byte == 'J' || byte == ' ') {
+      scroll_offset++;
+      continue;
+    }
+    if (byte == 'k' || byte == 'K') {
+      if (scroll_offset > 0) scroll_offset--;
+      continue;
+    }
+    if (byte == 'g') {
+      scroll_offset = 0;
+      continue;
+    }
+    if (byte == 'G') {
+      scroll_offset = SIZE_MAX;
+      continue;
+    }
+    if (byte == '/') {
+      input.clear();
+      input += '/';
+      continue;
+    }
+    if (byte == 127 || byte == 8) {
+      if (!input.is_empty()) input.truncate(input.length() - 1);
+      continue;
+    }
+    if (byte == '\n' || byte == '\r') {
+      if (!input.is_empty() && input[0] == '/') {
+        search = String{search.allocator(), input.view().substring(1)};
+        scroll_offset = 0;
+        input.clear();
+      }
+      continue;
+    }
+    if (!input.is_empty() && input[0] == '/') input += byte;
+  }
+
+  return true;
 }
 
 } // namespace
@@ -401,6 +497,9 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
         refresh_interval_seconds * 1000000000.0);
     u64 last_refresh_nanoseconds = 0;
     bool is_alternate_screen_active = false;
+    let live_input = String{allocator};
+    let live_search = String{allocator};
+    usize scroll_offset = 0;
     if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
     defer
     {
@@ -410,16 +509,36 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     loop
     {
       let const now = os::monotonic_nanos();
+      u32 terminal_rows = 0;
+      if (is_terminal) {
+        u32 terminal_columns = 0;
+        if (!os::terminal_size(terminal_columns, terminal_rows))
+          terminal_rows = 24;
+      }
       if (last_refresh_nanoseconds == 0 ||
           now - last_refresh_nanoseconds >= refresh_interval_nanoseconds) {
         last_refresh_nanoseconds = now;
         if (is_terminal) ec.print_to_stdout("\x1b[H\x1b[2J");
+        usize visible_line_count = 0;
         let const status = render_process_snapshot(
             ec, cxt, allocator, operands, operand_locations, output_limit,
-            should_read_resources, should_color);
+            should_read_resources, should_color,
+            is_terminal && terminal_rows > 1 ? terminal_rows : 0,
+            scroll_offset, live_search.view(), visible_line_count);
         if (status != 0) return status;
+        if (visible_line_count > terminal_rows && terminal_rows > 1) {
+          let const maximum_offset = visible_line_count - (terminal_rows - 1);
+          if (scroll_offset == SIZE_MAX || scroll_offset > maximum_offset)
+            scroll_offset = maximum_offset;
+        } else {
+          scroll_offset = 0;
+        }
       }
 
+      if (is_terminal && !poll_live_input(
+                              ec.in_fd.value_or(KOSH_STDIN), live_input,
+                              live_search, scroll_offset))
+        return 0;
       os::sleep_for_seconds(live_interval_seconds);
       if (os::INTERRUPT_REQUESTED != 0) {
         os::INTERRUPT_REQUESTED = 0;
@@ -438,7 +557,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   return render_process_snapshot(ec, cxt, allocator, operands,
                                  operand_locations, output_limit,
-                                 should_read_resources, should_color);
+                                 should_read_resources, should_color, 0, 0,
+                                 StringView{}, output_limit);
 }
 
 } // namespace koshka::koshkit
