@@ -47,7 +47,6 @@ static fn append_detailed_filesystem(String &output,
                                      Allocator allocator,
                                      bool should_color) throws -> bool
 {
-  output += "  ";
   append_report_text(output, mount.target.view(), colors::ansi::BOLD_BLUE,
                      should_color);
   output += "\n";
@@ -66,7 +65,7 @@ static fn append_detailed_filesystem(String &output,
                       colors::ansi::BOLD_CYAN, should_color);
   append_report_field(identity, "Options", mount.options.view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_body(output, identity.view(), "    ");
+  append_report_body(output, identity.view(), "");
 
   os::filesystem_status status{};
   if (!os::stat_filesystem(mount.target.view(), status)) return false;
@@ -100,7 +99,7 @@ static fn append_detailed_filesystem(String &output,
   append_report_field(metadata, "Name limit",
                       String::from(status.name_max, allocator),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_body(output, metadata.view(), "      ");
+  append_report_body(output, metadata.view(), "");
   return true;
 }
 

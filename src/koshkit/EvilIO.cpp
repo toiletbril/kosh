@@ -798,10 +798,10 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
         String::from(total_write_operation_count, allocator).view(),
         colors::ansi::BOLD_CYAN, should_color);
   }
-  append_report_body(output, summary.view());
+  append_report_body(output, summary.view(), "");
 
   output += "\n";
-  output += "\n  ";
+  output += "\n";
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
   output += "  ";
@@ -825,7 +825,6 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
   let const shown_count = rows.count() < row_limit ? rows.count() : row_limit;
   for (usize index = 0; index < shown_count; index++) {
     let const &row = rows[index];
-    output += "  ";
     append_report_column(output, String::from(row.pid, allocator).view(), 8,
                          true, colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
@@ -1181,7 +1180,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                             percent_text(*stolen, total, allocator),
                             colors::ansi::BOLD_CYAN, should_color);
       }
-      append_report_body(output, body.view());
+      append_report_body(output, body.view(), "");
       output += "\n";
     }
   }
@@ -1274,7 +1273,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!memory_body.is_empty()) {
-    append_report_body(output, memory_body.view());
+    append_report_body(output, memory_body.view(), "");
     output += "\n";
   }
 
@@ -1324,7 +1323,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!paging_body.is_empty()) {
-    append_report_body(output, paging_body.view());
+    append_report_body(output, paging_body.view(), "");
     output += "\n";
   }
 
@@ -1349,7 +1348,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!scheduler_body.is_empty()) {
-    append_report_body(output, scheduler_body.view());
+    append_report_body(output, scheduler_body.view(), "");
     output += "\n";
   }
 
@@ -1417,7 +1416,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!stalls.is_empty()) {
-    append_report_body(output, stalls.view());
+    append_report_body(output, stalls.view(), "");
     output += "\n";
   }
 
@@ -1491,7 +1490,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                           colors::ansi::BOLD_CYAN, should_color);
     }
   }
-  append_report_body(output, swap_body.view());
+  append_report_body(output, swap_body.view(), "");
 
   ec.print_to_stdout(output);
   return 0;
