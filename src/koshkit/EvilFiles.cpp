@@ -264,7 +264,7 @@ fn EvilFiles::execute(
     if (files.is_empty()) continue;
 
     if (files.count() == 1 && files[0].is_inaccessible) {
-      warnings += "warning: Process ";
+      warnings += "Warning: Process ";
       warnings += String::from(static_cast<u64>(process.pid), allocator).view();
       warnings += " (";
       warnings += process.name.view();
