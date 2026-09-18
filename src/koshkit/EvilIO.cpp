@@ -562,7 +562,8 @@ fn append_disk_io_report(String &output,
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        usize row_limit, f64 sample_duration_seconds,
                        f64 refresh_interval_seconds, f64 falloff_seconds,
-                       bool is_terminal, bool should_color) throws -> i32
+                       bool is_terminal, bool should_color,
+                       StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
   let retained = ArrayList<live_process_row>{allocator};
@@ -648,7 +649,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_process_io_rate_report(output, rows, row_limit, allocator,
-                                  should_color, "/S");
+                                  should_color, sample_duration_label);
     ec.print_to_stdout(output);
   }
 }
@@ -661,7 +662,8 @@ struct live_disk_row
 
 fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
                     f64 refresh_interval_seconds, f64 falloff_seconds,
-                    bool is_terminal, bool should_color) throws -> i32
+                    bool is_terminal, bool should_color,
+                    StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
   let before_snapshot = os::read_disk_io_snapshot(allocator);
@@ -746,7 +748,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_disk_io_report(output, before_snapshot, current_snapshot,
                           elapsed_nanoseconds, true, false, allocator,
-                          should_color, "/S");
+                          should_color, sample_duration_label);
     ec.print_to_stdout(output);
     if (did_sample) before_snapshot = steal(after_snapshot);
   }
@@ -923,6 +925,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   f64 cumulative_duration_seconds = 1.0;
+  String cumulative_duration_label{allocator, "1"};
   if (sample_duration_operand.has_value()) {
     cumulative_duration_seconds = parse_koshkit_duration_seconds(
         *sample_duration_operand, *sample_duration_location, allocator);
@@ -931,6 +934,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                               "the duration must be greater than zero");
       return 1;
     }
+    cumulative_duration_label = String{allocator, *sample_duration_operand};
   }
 
   usize row_limit = FLAG_EVILIO_PS.is_enabled() ? SIZE_MAX : 10;
@@ -992,6 +996,10 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
     live_interval_seconds = parsed.value();
   }
+  String sample_duration_label{allocator, "/S"};
+  if (FLAG_EVILIO_CUMULATIVE.is_enabled())
+    sample_duration_label =
+        String{allocator, "/"} + cumulative_duration_label.view() + "s";
   let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
                                           ? cumulative_duration_seconds
                                           : live_interval_seconds;
@@ -1031,12 +1039,13 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     if (should_show_processes) {
       return run_live_process_io(
           ec, selected_pid, row_limit, sample_duration_seconds,
-          refresh_interval_seconds, falloff_seconds, is_terminal, should_color);
+          refresh_interval_seconds, falloff_seconds, is_terminal, should_color,
+          sample_duration_label.view());
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds,
-                            refresh_interval_seconds, falloff_seconds,
-                            is_terminal, should_color);
+    return run_live_disk_io(ec, sample_duration_seconds, refresh_interval_seconds,
+                            falloff_seconds, is_terminal, should_color,
+                            sample_duration_label.view());
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {
@@ -1054,7 +1063,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
         before_rows, after_rows, elapsed_nanoseconds, allocator);
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
-                                  should_color, "/S");
+                                  should_color, sample_duration_label.view());
     ec.print_to_stdout(output);
     return selected_pid.has_value() && after_rows.is_empty() ? 1 : 0;
   }
@@ -1432,7 +1441,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     append_disk_io_report(
         output, disk_before, disk_after, elapsed_nanoseconds,
         FLAG_EVILIO_ALL.is_enabled() || FLAG_EVILIO_CUMULATIVE.is_enabled(),
-        !FLAG_EVILIO_CUMULATIVE.is_enabled(), allocator, should_color);
+        !FLAG_EVILIO_CUMULATIVE.is_enabled(), allocator, should_color,
+        sample_duration_label.view());
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {

@@ -1,9 +1,11 @@
 status=130
 shape=matched
+process-window-shape=wrong
 scope=only-process-io
 disk-status=130
 disk-shape=matched
 disk-scope=only-disk-io
 disk-margin=unindented
+disk-window-shape=wrong
 live-help=described
 cumulative-help=described

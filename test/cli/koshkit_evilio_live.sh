@@ -27,8 +27,16 @@ run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-process-report" \
 process_live_status=$live_status
 process_live_report=$live_report
 case $process_live_report in
-  *PID*READ/S*WRITE/S*COMMAND*) live_shape=matched ;;
+  *PID*READ/0.02s*WRITE/0.02s*COMMAND*) live_shape=matched ;;
   *) live_shape=wrong ;;
+esac
+run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-process-window-report" \
+  'koshkit --color never evilio --live=0.05 --cumulative=1.2 --ps -1'
+case $process_live_report in
+  *"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
+    process_window_shape=matched
+    ;;
+  *) process_window_shape=wrong ;;
 esac
 case $process_live_report in
   *DEVICE*|*MEMORY*|*SWAP*) live_scope=extra ;;
@@ -40,7 +48,7 @@ run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-disk-report" \
 disk_live_status=$live_status
 disk_live_report=$live_report
 case $disk_live_report in
-  *DEVICE*READ/S*WRITE/S*READ\ OPS/S*WRITE\ OPS/S*BUSY*READ\ LAT*WRITE\ LAT*AVG\ QUEUE*QUEUE*ERRORS*RETRIES*)
+  *DEVICE*READ/0.02s*WRITE/0.02s*READ\ OPS/0.02s*WRITE\ OPS/0.02s*BUSY*READ\ LAT*WRITE\ LAT*AVG\ QUEUE*QUEUE*ERRORS*RETRIES*)
     disk_live_shape=matched
     ;;
   *) disk_live_shape=wrong ;;
@@ -53,14 +61,24 @@ case $disk_live_report in
   DEVICE*) disk_live_margin=unindented ;;
   *) disk_live_margin=wrong ;;
 esac
+run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-disk-window-report" \
+  'koshkit --color never evilio --live=0.05 --cumulative=1.2'
+case $disk_live_report in
+  *"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
+    disk_window_shape=matched
+    ;;
+  *) disk_window_shape=wrong ;;
+esac
 
 printf 'status=%s\n' "$process_live_status"
 printf 'shape=%s\n' "$live_shape"
+printf 'process-window-shape=%s\n' "$process_window_shape"
 printf 'scope=%s\n' "$live_scope"
 printf 'disk-status=%s\n' "$disk_live_status"
 printf 'disk-shape=%s\n' "$disk_live_shape"
 printf 'disk-scope=%s\n' "$disk_live_scope"
 printf 'disk-margin=%s\n' "$disk_live_margin"
+printf 'disk-window-shape=%s\n' "$disk_window_shape"
 
 help=$($BIN -c 'koshkit evilio --help')
 case $help in
