@@ -552,8 +552,13 @@ struct process_open_file
   i64 descriptor_number{-1};
   u64 size{0};
   u64 file_id{0};
+  u64 offset{0};
+  u32 mode{0};
   process_file_use use{process_file_use::File};
   char access{'u'};
+  bool is_deleted{false};
+  bool is_inaccessible{false};
+  String socket_endpoint{heap_allocator()};
 };
 
 fn has_process_open_file_listing() wontthrow -> bool;
@@ -1512,6 +1517,13 @@ enum class network_socket_protocol : u8
   Unix,
 };
 
+enum class network_unix_socket_type : u8
+{
+  Stream,
+  Datagram,
+  SequentialPacket,
+};
+
 enum class network_socket_state : u8
 {
   Unconnected,
@@ -1542,6 +1554,7 @@ struct network_socket_entry
   network_socket_protocol protocol{network_socket_protocol::Tcp};
   network_address_family family{network_address_family::IPv4};
   network_socket_state state{network_socket_state::Unknown};
+  network_unix_socket_type unix_type{network_unix_socket_type::Stream};
 };
 
 fn has_network_socket_listing() wontthrow -> bool;

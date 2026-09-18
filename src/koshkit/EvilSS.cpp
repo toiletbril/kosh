@@ -62,6 +62,18 @@ struct socket_row
   String process{heap_allocator()};
 };
 
+pure fn unix_protocol_name(os::network_unix_socket_type type) wontthrow
+    -> StringView
+{
+  switch (type) {
+  case os::network_unix_socket_type::Stream: return "u_str";
+  case os::network_unix_socket_type::Datagram: return "u_dgr";
+  case os::network_unix_socket_type::SequentialPacket: return "u_seq";
+  }
+
+  unreachable("unknown Unix socket type");
+}
+
 pure fn state_name(os::network_socket_state state) wontthrow -> StringView
 {
   switch (state) {
@@ -176,8 +188,9 @@ fn append_network_socket_report(String &output,
     previous_process_id = socket.process_id;
 
     let row = socket_row{};
-    row.protocol =
-        String{allocator, is_unix ? "u_str" : (is_tcp ? "tcp" : "udp")};
+    row.protocol = String{allocator, is_unix
+                                       ? unix_protocol_name(socket.unix_type)
+                                       : (is_tcp ? "tcp" : "udp")};
     row.state = String{allocator, state_name(socket.state)};
     row.receive_queue = String::from(socket.receive_queue_bytes, allocator);
     row.send_queue = String::from(socket.send_queue_bytes, allocator);

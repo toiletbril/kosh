@@ -124,6 +124,7 @@ static fn linux_unix_sockets(bool should_include_process_ids,
     }
     let const inode = linux_unix_socket_field(line, 6).to<u64>();
     if (inode.is_error()) continue;
+    let const type = linux_unix_socket_field(line, 4);
     let const state = linux_unix_socket_field(line, 5);
     let process_id = u32{0};
     if (should_include_process_ids && owners != nullptr) {
@@ -134,14 +135,22 @@ static fn linux_unix_sockets(bool should_include_process_ids,
         }
     }
     let path = linux_unix_socket_field(line, 7);
-    let row_state = state == "01" ? network_socket_state::Listen
-                                  : network_socket_state::Unconnected;
+    let const unix_type = type == "0002"
+                              ? network_unix_socket_type::Datagram
+                              : (type == "0005"
+                                     ? network_unix_socket_type::SequentialPacket
+                                     : network_unix_socket_type::Stream);
+    let const row_state = state == "01"
+                              ? network_socket_state::Listen
+                              : (state == "03"
+                                     ? network_socket_state::Established
+                                     : network_socket_state::Unconnected);
     result.push(network_socket_entry{
         String{allocator, path},
         String{allocator},
         inode.value(), 0, 0,
         process_id, 0, 0, network_socket_protocol::Unix,
-        network_address_family::IPv4, row_state
+        network_address_family::IPv4, row_state, unix_type
     });
   }
   return result;
