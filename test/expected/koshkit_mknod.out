@@ -2,6 +2,8 @@ posix-status=0 type=fifo
 modern-status=0 type=fifo mode=600
 invalid-mode-status=1
 invalid-device-status=1
+missing-major-status=1 check=ok
+missing-minor-status=1 check=ok
 device-check=ok
 help-examples=present
 redirected-error=plain

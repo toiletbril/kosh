@@ -126,8 +126,7 @@ fn append_network_traffic_statistics_report(
     }
   }
 
-  output += "\n";
-  output += "\n  ";
+  output += "\n\n";
   append_report_column(output, "NAME", name_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
   constexpr StringView HEADERS[] = {
@@ -137,14 +136,13 @@ fn append_network_traffic_statistics_report(
   };
   constexpr usize WIDTHS[] = {9, 9, 12, 12, 10, 10, 9, 9, 9, 9, 10, 10};
   for (usize index = 0; index < countof(HEADERS); index++) {
-    output += "  ";
+    if (index != 0) output += "  ";
     append_report_column(output, HEADERS[index], WIDTHS[index], true,
                          colors::ansi::BOLD_CYAN, should_color);
   }
   output += "\n";
 
   for (let const &entry : statistics) {
-    output += "  ";
     append_report_column(output, entry.interface_name.view(), name_width, false,
                          colors::ansi::BOLD_GREEN, should_color);
     output += "  ";
@@ -225,7 +223,8 @@ fn append_network_traffic_statistics_report(
                       os::network_statistics_field::TransmitDrops,
                       entry.transmit_drop_count);
     if (!warning.is_empty()) {
-      let message = String{allocator, entry.interface_name.view()};
+      let message = String{allocator, "Interface "};
+      message += entry.interface_name.view();
       message += " reports ";
       message += warning.view();
       warnings.push(steal(message));
@@ -320,7 +319,7 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   };
   do_append_group("Failures", FAILURE_NAMES, failure_values, FAILURE_FIELDS,
                   countof(FAILURE_NAMES));
-  append_report_body(output, body.view());
+  append_report_body(output, body.view(), "");
 
   constexpr StringView WARNING_NAMES[] = {
       "failed connections",   "established resets", "retransmitted segments",
@@ -539,11 +538,10 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
   let const should_show_interfaces =
       !FLAG_EVILNET_TRAFFIC.is_enabled() && !should_show_failures;
-  let const address_count =
-      should_show_interfaces
-          ? append_network_interface_report(output, should_color,
-                                            should_show_all ? "  " : "")
-          : 0;
+  let const address_count = should_show_interfaces
+                                ? append_network_interface_report(
+                                      output, should_color, "")
+                                : 0;
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
   if (should_show_traffic && !should_show_failures) {
@@ -554,6 +552,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
     has_tcp_statistics =
         append_tcp_report(output, warnings, allocator, should_color);
 
+  if (!warnings.is_empty()) output += "\n";
   ec.print_to_stdout(output);
   for (let const &warning : warnings) {
     show_message(Warning{warning.view()}.to_string());

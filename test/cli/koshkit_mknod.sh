@@ -23,6 +23,27 @@ printf 'invalid-mode-status=%s\n' "$?"
   mknod "$root" >/dev/null 2>&1
 printf 'invalid-device-status=%s\n' "$?"
 
+missing_major_error=$($BIN -c 'koshkit mknod --block "$1/missing-major"' \
+  mknod "$root" 2>&1 >/dev/null)
+missing_major_status=$?
+case "$missing_major_error" in
+  *"Missing major device number"*) missing_major_check=ok ;;
+  *) missing_major_check=missing ;;
+esac
+printf 'missing-major-status=%s check=%s\n' "$missing_major_status" \
+  "$missing_major_check"
+
+missing_minor_error=$($BIN -c \
+  'koshkit mknod --block --major 1 "$1/missing-minor"' \
+  mknod "$root" 2>&1 >/dev/null)
+missing_minor_status=$?
+case "$missing_minor_error" in
+  *"Missing minor device number"*) missing_minor_check=ok ;;
+  *) missing_minor_check=missing ;;
+esac
+printf 'missing-minor-status=%s check=%s\n' "$missing_minor_status" \
+  "$missing_minor_check"
+
 device_path=$root/device
 device_error=$($BIN -c 'koshkit mknod --character --major 1 --minor 3 "$1"' \
   mknod "$device_path" 2>&1)
@@ -50,7 +71,7 @@ printf 'help-examples=%s\n' "$help_examples"
 
 error=$($BIN -c 'koshkit mknod --fifo --mode invalid "$1/bad"' mknod "$root" 2>&1 >/dev/null)
 case "$error" in
-  *"error:"*"invalid mode"*) redirected_error=plain ;;
+  *"error:"*"Invalid mode"*) redirected_error=plain ;;
   *) redirected_error=missing ;;
 esac
 printf 'redirected-error=%s\n' "$redirected_error"
