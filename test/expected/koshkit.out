@@ -3,6 +3,7 @@ make
 man
 mkdir
 mkfifo
+mknod
 more
 mv
 == ls flags through koshkit:
@@ -98,6 +99,7 @@ mv
 -s
 == evilnet flags through koshkit:
 --all
+--cumulative
 --failures
 --falloff
 --help
@@ -133,6 +135,7 @@ mv
 --processes
 --tcp
 --udp
+--unix
 -4
 -6
 -H
@@ -142,6 +145,7 @@ mv
 -p
 -t
 -u
+-x
 == goodcore flags through koshkit:
 --binary
 --help
