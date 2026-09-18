@@ -146,7 +146,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed_value = utils::parse_decimal_u64(magnitude);
     if (parsed_value.is_error()) {
       throw ErrorWithDetails{
-          "head: invalid byte count '" + String{cxt.scratch_allocator(), raw}
+          "invalid byte count '" + String{cxt.scratch_allocator(), raw}
             +
               "'",
           "The count must be an integer"
@@ -160,7 +160,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed_value = utils::parse_decimal_u64(magnitude);
     if (parsed_value.is_error()) {
       throw ErrorWithDetails{
-          "head: invalid line count '" + String{cxt.scratch_allocator(), raw}
+          "invalid line count '" + String{cxt.scratch_allocator(), raw}
             +
               "'",
           "The count must be an integer"

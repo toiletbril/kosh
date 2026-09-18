@@ -41,6 +41,21 @@ namespace koshka::koshkit {
 
 namespace {
 
+fn print_progress(const ExecContext &ec, bool should_show, StringView message)
+    throws -> void
+{
+  if (!should_show) return;
+  let const is_terminal = colors::stderr_is_a_terminal();
+  let const should_color = colors::stderr_wants_color();
+  let output = String{heap_allocator()};
+  if (is_terminal) output += "\r\x1b[2K";
+  append_report_text(output, "goodcore: ", colors::ansi::BOLD_CYAN,
+                     should_color);
+  append_report_text(output, message, colors::ansi::BOLD_WHITE, should_color);
+  if (!is_terminal) output += "\n";
+  ec.print_to_stderr(output);
+}
+
 fn run_tool(const Path &tool, ArrayList<String> arguments,
             os::measured_output output) throws -> bool
 {
@@ -230,6 +245,12 @@ fn GoodCore::execute(
 
   let const allocator = cxt.scratch_allocator();
   let const has_pid = FLAG_GOODCORE_PID.is_set();
+  let const should_show_progress = !FLAG_GOODCORE_QUIET.is_enabled();
+  defer
+  {
+    if (should_show_progress && colors::stderr_is_a_terminal())
+      ec.print_to_stderr("\r\x1b[2K\n");
+  };
   if (!has_pid && operands.is_empty()) {
     return report_usage_error(ec, cxt, args[0].view());
   }
@@ -318,13 +339,15 @@ fn GoodCore::execute(
 
   let const dump_directory = PathBuilder{stage.text()}.append("dump").build();
   if (!os::make_directory(dump_directory.text().view(), 0700)) {
-    report_soft_koshkit_error(ec, cxt, "goodcore: cannot create dump directory",
+    report_soft_koshkit_error(ec, cxt,
+                              "goodcore: cannot create dump directory",
                               os::last_system_error_message());
     return 1;
   }
 
   let core = PathBuilder{dump_directory.text()}.append("core").build();
   if (has_pid) {
+    print_progress(ec, should_show_progress, "capturing process core");
 #if defined __APPLE__
     let const debugger = resolve_util_program(cxt, "lldb");
     let capture_arguments = ArrayList<String>{heap_allocator()};
@@ -363,6 +386,7 @@ fn GoodCore::execute(
     }
 #endif
   } else {
+    print_progress(ec, should_show_progress, "copying existing core");
     let const source = Path{operands[0].view()}.to_absolute();
     if (!source.is_regular_file()) {
       report_soft_koshkit_error(ec, cxt, "goodcore: core file not found",
@@ -388,12 +412,18 @@ fn GoodCore::execute(
     return 1;
   }
 
+  print_progress(ec, should_show_progress, "collecting executable and libraries");
   collect_core_libraries(cxt, core.text().view(), binary->view(), paths,
                          allocator);
+  print_progress(ec, should_show_progress,
+                 String{"collected "} + String::from(paths.count(), allocator) +
+                     " candidate files");
 
   append_unique_path(paths, binary->view(), allocator);
   usize copied_path_count = 0;
   for (let const &path : paths) {
+    print_progress(ec, should_show_progress,
+                   String{"copying "} + path.view());
     if (!copy_into_root(stage, path.view())) {
       report_soft_koshkit_error(ec, cxt, "goodcore: cannot copy required file",
                                 path.view());
@@ -475,9 +505,12 @@ fn GoodCore::execute(
   archive_arguments.push(String{"."});
   bool did_archive = false;
   if (FLAG_GOODCORE_NO_COMPRESS.is_enabled()) {
+    print_progress(ec, should_show_progress, "creating tar archive");
     did_archive =
         run_tool(*tar, steal(archive_arguments), os::measured_output::Suppress);
   } else if (zstd.has_value()) {
+    print_progress(ec, should_show_progress,
+                   "creating tar archive and compressing with zstd");
     let const temporary_tar = os::write_to_named_temp_file(
         output.parent(), ".goodcore-tar", StringView{});
     if (!temporary_tar.has_value()) {
@@ -502,6 +535,8 @@ fn GoodCore::execute(
                              os::measured_output::Suppress);
     }
   } else {
+    print_progress(ec, should_show_progress,
+                   "creating tar archive and compressing with gzip");
     archive_arguments[0] = String{"-czf"};
     did_archive =
         run_tool(*tar, steal(archive_arguments), os::measured_output::Suppress);
@@ -520,18 +555,21 @@ fn GoodCore::execute(
   }
 
   if (!FLAG_GOODCORE_QUIET.is_enabled()) {
-    let result = String{allocator};
+    let body = String{allocator};
     let const should_color = koshkit_should_color();
+    append_report_field(body, "Archive", output.text().view(),
+                        colors::ansi::GREEN, should_color);
+    append_report_field(body, "Executable", binary->view(),
+                        colors::ansi::GREEN, should_color);
+    append_report_field(body, "Files",
+                        String::from(copied_path_count, allocator).view(),
+                        colors::ansi::GREEN, should_color);
+
+    let result = String{allocator};
     append_report_text(result, "GOODCORE", colors::ansi::BOLD_BLUE,
                        should_color);
     result += "\n";
-    append_report_field(result, "Archive", output.text().view(),
-                        colors::ansi::GREEN, should_color);
-    append_report_field(result, "Executable", binary->view(),
-                        colors::ansi::GREEN, should_color);
-    append_report_field(result, "Files",
-                        String::from(copied_path_count, allocator).view(),
-                        colors::ansi::GREEN, should_color);
+    append_report_body(result, body.view());
     ec.print_to_stdout(result);
   }
 

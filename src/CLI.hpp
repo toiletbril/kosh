@@ -350,6 +350,29 @@ fn append_report_field(String &output, StringView name, StringView value,
 fn append_report_inline_field(String &output, StringView name, StringView value,
                               StringView style, bool should_color) throws
     -> void;
+struct report_table_row
+{
+  String name;
+  String value;
+  StringView style;
+};
+class ReportTable
+{
+public:
+  explicit ReportTable(Allocator allocator) : m_rows(allocator) {}
+
+  fn add(StringView name, StringView value, StringView style = {}) throws
+      -> void;
+  fn to_string(bool should_color, StringView indentation = "  ") const
+      throws -> String;
+
+private:
+  ArrayList<report_table_row> m_rows;
+};
+fn append_report_table(String &output,
+                       const ArrayList<report_table_row> &rows,
+                       bool should_color, StringView indentation = "  ")
+    throws -> void;
 fn append_report_name_section(String &output, StringView title,
                               const ArrayList<StringView> &names,
                               bool should_color,

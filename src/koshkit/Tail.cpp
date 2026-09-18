@@ -77,7 +77,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   if (is_byte_mode) {
     if (!parse_tail_count(FLAG_TAIL_BYTES.value(), origin, count)) {
       throw ErrorWithDetails{
-          "tail: invalid byte count '" +
+          "invalid byte count '" +
               String{cxt.scratch_allocator(), FLAG_TAIL_BYTES.value()}
               + "'",
           "The count must be a non-negative integer"
@@ -86,7 +86,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   } else if (FLAG_TAIL_LINES.is_set()) {
     if (!parse_tail_count(FLAG_TAIL_LINES.value(), origin, count)) {
       throw ErrorWithDetails{
-          "tail: invalid line count '" +
+          "invalid line count '" +
               String{cxt.scratch_allocator(), FLAG_TAIL_LINES.value()}
               + "'",
           "The count must be a non-negative integer"

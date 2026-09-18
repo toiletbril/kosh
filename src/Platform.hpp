@@ -453,6 +453,7 @@ fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 fn last_system_error_message() throws -> String;
 fn get_last_system_error_number() wontthrow -> i32;
 fn last_system_error_is_missing_file() wontthrow -> bool;
+fn last_system_error_is_permission_denied() wontthrow -> bool;
 fn last_system_error_is_descriptor_quota() wontthrow -> bool;
 fn set_last_system_error(i32 error_number) wontthrow -> void;
 
@@ -1018,8 +1019,6 @@ enum class string_configuration_key : u8
   V7LpBigOffBigCFlags,
   V7LpBigOffBigLdFlags,
   V7LpBigOffBigLibs,
-  V7ThreadsCFlags,
-  V7ThreadsLdFlags,
   V7WidthRestrictedEnvironments,
   V7Environment,
   V8Ilp32Off32CFlags,
@@ -1508,6 +1507,7 @@ enum class network_socket_protocol : u8
 {
   Tcp,
   Udp,
+  Unix,
 };
 
 enum class network_socket_state : u8

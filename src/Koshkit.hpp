@@ -487,11 +487,11 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   public:                                                                      \
     u();                                                                       \
                                                                                \
-    pure Kind kind() const wontthrow override;                                 \
-    i32 execute(                                                               \
-        const ExecContext &ec, EvalContext &cxt,                               \
-        const ArrayList<String> &args,                                         \
-        const ArrayList<SourceLocation> &arg_locations) const throws override; \
+    pure fn kind() const wontthrow -> Kind override;                           \
+    fn execute(const ExecContext &ec, EvalContext &cxt,                        \
+               const ArrayList<String> &args,                                  \
+               const ArrayList<SourceLocation> &arg_locations) const throws    \
+        -> i32 override;                                                       \
   };
 
 UTILITY_STRUCT(LS);

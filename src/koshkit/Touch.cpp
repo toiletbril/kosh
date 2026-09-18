@@ -61,7 +61,7 @@ static fn parse_touch_time(StringView text, i64 &parsed_time) throws -> bool
 
   let const now = std::time(NULL);
   let const *current = std::localtime(&now);
-  if (current == NULL) throw Error{"touch: cannot read the current time"};
+  if (current == NULL) throw Error{"cannot read the current time"};
 
   struct tm value = *current;
   usize position = 0;

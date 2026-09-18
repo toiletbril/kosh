@@ -1833,6 +1833,11 @@ fn last_system_error_is_missing_file() wontthrow -> bool
   return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
 }
 
+fn last_system_error_is_permission_denied() wontthrow -> bool
+{
+  return GetLastError() == ERROR_ACCESS_DENIED;
+}
+
 fn last_system_error_is_descriptor_quota() wontthrow -> bool
 {
   return GetLastError() == ERROR_TOO_MANY_OPEN_FILES;

@@ -121,9 +121,14 @@ fn append_subject(String &output, StringView operand,
 {
   append_report_text(output, operand, colors::ansi::BOLD_BLUE, should_color);
   output += "\n";
-  let body = String{allocator};
+  let table = ReportTable{allocator};
+  let const do_append_field = [&](StringView name, StringView value,
+                                  StringView style, bool unused_color) throws {
+    unused(unused_color);
+    table.add(name, value, style);
+  };
   let const described_type = describe_file_type(operand, status, allocator);
-  append_report_field(body, "Type",
+  do_append_field("Type",
                       described_type.has_value() ? described_type->view()
                                                  : file_type_name(status),
                       colors::ansi::BOLD_CYAN, should_color);
@@ -131,33 +136,33 @@ fn append_subject(String &output, StringView operand,
   if (os::file_type_letter(status.mode) == 'l') {
     let const target = os::read_symlink(operand, allocator);
     if (target.has_value()) {
-      append_report_field(body, "Target", target->view(),
+      do_append_field("Target", target->view(),
                           colors::ansi::BOLD_CYAN, should_color);
     }
   }
 
-  append_report_field(body, "Size", size_text(status.size, allocator).view(),
+  do_append_field("Size", size_text(status.size, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Permissions",
+  do_append_field("Permissions",
                       permission_text(status.mode, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Owner",
+  do_append_field("Owner",
                       id_name(status.owner_id, true, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Group",
+  do_append_field("Group",
                       id_name(status.group_id, false, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Inode",
+  do_append_field("Inode",
                       String::from(status.file_id, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Links",
+  do_append_field("Links",
                       String::from(status.link_count, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
 
   let device = String::from(os::device_major(status.device_id), allocator);
   device += ",";
   device += String::from(os::device_minor(status.device_id), allocator).view();
-  append_report_field(body, "Device", device.view(), colors::ansi::BOLD_CYAN,
+  do_append_field("Device", device.view(), colors::ansi::BOLD_CYAN,
                       should_color);
 
   let const type_letter = os::file_type_letter(status.mode);
@@ -168,27 +173,27 @@ fn append_subject(String &output, StringView operand,
     special +=
         String::from(os::device_minor(status.special_device_id), allocator)
             .view();
-    append_report_field(body, "Device type", special.view(),
+    do_append_field("Device type", special.view(),
                         colors::ansi::BOLD_CYAN, should_color);
   }
 
   let blocks = String::from(status.blocks, allocator);
   blocks += " of 512 bytes";
-  append_report_field(body, "Blocks", blocks.view(), colors::ansi::BOLD_CYAN,
+  do_append_field("Blocks", blocks.view(), colors::ansi::BOLD_CYAN,
                       should_color);
-  append_report_field(body, "Accessed",
+  do_append_field("Accessed",
                       format_file_timestamp(status.access_time,
                                             status.access_nanoseconds,
                                             allocator)
                           .view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Modified",
+  do_append_field("Modified",
                       format_file_timestamp(status.modification_time,
                                             status.modification_nanoseconds,
                                             allocator)
                           .view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(body, "Changed",
+  do_append_field("Changed",
                       format_file_timestamp(status.change_time,
                                             status.change_nanoseconds,
                                             allocator)
@@ -198,31 +203,25 @@ fn append_subject(String &output, StringView operand,
   if (should_report_filesystem) {
     let filesystem = os::filesystem_status{};
     if (os::stat_filesystem(operand, filesystem)) {
-      append_report_field(body, "Filesystem",
+      do_append_field("Filesystem",
                           StringView{filesystem.type_name},
                           colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          body, "Filesystem block size",
+      do_append_field("Filesystem block size",
           String::from(filesystem.block_size, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          body, "Filesystem capacity",
+      do_append_field("Filesystem capacity",
           String::from(percent_used(filesystem), allocator).view() + "%",
           colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          body, "Filesystem blocks",
+      do_append_field("Filesystem blocks",
           String::from(filesystem.total_blocks, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          body, "Filesystem free blocks",
+      do_append_field("Filesystem free blocks",
           String::from(filesystem.free_blocks, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          body, "Filesystem available blocks",
+      do_append_field("Filesystem available blocks",
           String::from(filesystem.available_blocks, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          body, "Filesystem id",
+      do_append_field("Filesystem id",
           String::from(filesystem.filesystem_id, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
     }
@@ -230,11 +229,11 @@ fn append_subject(String &output, StringView operand,
 
   if (should_report_checksum && os::file_type_letter(status.mode) == '-') {
     if (let const checksum = file_crc32c(ec, operand, allocator))
-      append_report_field(body, "CRC32C", checksum->view(),
+      do_append_field("CRC32C", checksum->view(),
                           colors::ansi::BOLD_CYAN, should_color);
   }
 
-  append_report_body(output, body.view());
+  output += table.to_string(should_color).view();
 }
 
 } // namespace

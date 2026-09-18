@@ -23,7 +23,28 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
 FLAG(EVILNET_TRAFFIC, Bool, 't', "traffic", "Show interface traffic only.");
-FLAG(EVILNET_LIVE, Bool, 'l', "live", "Refresh traffic until interrupted.");
+static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
+    -> bool
+{
+  return !value.is_empty() &&
+         ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
+}
+static koshka::FlagOptionalValue FLAG_EVILNET_LIVE{
+    FLAG_LIST,
+    'l',
+    "live",
+    koshka::flag_section::NoSection,
+    "Refresh traffic at an optional interval until interrupted.",
+    is_evilnet_sample_duration,
+    "seconds"};
+static koshka::FlagOptionalValue FLAG_EVILNET_CUMULATIVE{
+    FLAG_LIST,
+    '\0',
+    "cumulative",
+    koshka::flag_section::NoSection,
+    "Use an optional interval for sampled traffic.",
+    is_evilnet_sample_duration,
+    "seconds"};
 FLAG(EVILNET_FAILURES, Bool, 'f', "failures",
      "Show TCP failure and packet-loss telemetry only.");
 FLAG(EVILNET_FALLOFF, String, '\0', "falloff",
@@ -106,7 +127,6 @@ fn append_network_traffic_statistics_report(
   }
 
   output += "\n";
-  append_report_text(output, "TRAFFIC", colors::ansi::BOLD_BLUE, should_color);
   output += "\n  ";
   append_report_column(output, "NAME", name_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
@@ -234,9 +254,6 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   os::tcp_statistics statistics{};
   if (!os::read_tcp_statistics(statistics)) return false;
 
-  output += "\n";
-  append_report_text(output, "TCP", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   let body = String{allocator};
   let const do_append_group =
       [&](StringView title, const StringView *names, const u64 *values,
@@ -361,12 +378,17 @@ struct live_network_row
 };
 
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
-                            f64 falloff_seconds, bool should_color) throws
+                            f64 sample_interval_seconds,
+                            f64 refresh_interval_seconds, f64 falloff_seconds,
+                            bool should_color) throws
     -> i32
 {
   let retained = ArrayList<live_network_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
+  let const refresh_interval_nanoseconds = static_cast<u64>(
+      refresh_interval_seconds * 1000000000.0);
+  u64 last_refresh_nanoseconds = os::monotonic_nanos();
   let const is_terminal = colors::stdout_is_a_terminal();
   let const is_alternate = is_terminal && enter_alternate_screen(ec);
   defer
@@ -400,6 +422,15 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
         retained.remove(position);
       }
     }
+    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) {
+      os::sleep_for_seconds(sample_interval_seconds);
+      if (os::INTERRUPT_REQUESTED != 0) {
+        os::INTERRUPT_REQUESTED = 0;
+        return 130;
+      }
+      continue;
+    }
+    last_refresh_nanoseconds = now;
     retained.sort([](const live_network_row &left,
                      const live_network_row &right) {
       return left.statistics.interface_name < right.statistics.interface_name;
@@ -416,7 +447,7 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     ec.print_to_stdout(output);
     for (let const &warning : warnings)
       show_message(Warning{warning.view()}.to_string());
-    os::sleep_for_seconds(falloff_seconds);
+    os::sleep_for_seconds(sample_interval_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -461,6 +492,31 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
                             "--failures cannot be combined with --live");
     return 2;
   }
+  f64 live_interval_seconds = 1.0;
+  if (FLAG_EVILNET_LIVE.has_value()) {
+    let const parsed = parse_koshkit_duration_seconds(
+        FLAG_EVILNET_LIVE.value(), FLAG_EVILNET_LIVE.value_location(),
+        allocator);
+    if (parsed <= 0.0) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_LIVE.value_location(),
+                              "invalid live interval",
+                              "use a positive number of seconds");
+      return 1;
+    }
+    live_interval_seconds = parsed;
+  }
+  f64 refresh_interval_seconds = live_interval_seconds;
+  if (FLAG_EVILNET_CUMULATIVE.has_value()) {
+    refresh_interval_seconds = parse_koshkit_duration_seconds(
+        FLAG_EVILNET_CUMULATIVE.value(),
+        FLAG_EVILNET_CUMULATIVE.value_location(), allocator);
+    if (refresh_interval_seconds <= 0.0) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_CUMULATIVE.value_location(),
+                              "invalid cumulative interval",
+                              "use a positive number of seconds");
+      return 1;
+    }
+  }
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     f64 falloff_seconds = 5.0;
     if (FLAG_EVILNET_FALLOFF.is_set()) {
@@ -473,7 +529,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       }
       falloff_seconds = parsed.value();
     }
-    return run_live_network_traffic(ec, allocator, falloff_seconds,
+    return run_live_network_traffic(ec, allocator, live_interval_seconds,
+                                    refresh_interval_seconds, falloff_seconds,
                                     should_color);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
@@ -482,11 +539,6 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
   let const should_show_interfaces = !FLAG_EVILNET_TRAFFIC.is_enabled() &&
                                      !should_show_failures;
-  if (should_show_all) {
-    append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,
-                       should_color);
-    output += "\n";
-  }
   let const address_count =
       should_show_interfaces
           ? append_network_interface_report(output, should_color,

@@ -71,10 +71,6 @@ static fn append_detailed_filesystem(String &output,
   os::filesystem_status status{};
   if (!os::stat_filesystem(mount.target.view(), status)) return;
 
-  output += "    ";
-  append_report_text(output, "OS METADATA", colors::ansi::BOLD_MAGENTA,
-                     should_color);
-  output += "\n";
   let metadata = String{allocator};
   append_filesystem_id(metadata, "Filesystem ID", status.filesystem_id,
                        allocator, should_color);
@@ -148,9 +144,6 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   let const should_color = koshkit_should_color();
   if (FLAG_EVILFS_ALL.is_enabled()) {
-    append_report_text(output, "FILESYSTEMS", colors::ansi::BOLD_BLUE,
-                       should_color);
-    output += "\n";
     for (let const &mount : mounts) {
       if (!output.is_empty()) output += "\n";
       append_detailed_filesystem(output, mount, cxt.scratch_allocator(),

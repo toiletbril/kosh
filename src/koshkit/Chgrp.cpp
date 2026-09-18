@@ -11,7 +11,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "Ownership.hpp"
+#include "../UtilsOwnership.hpp"
 
 FLAG_LIST_DECL();
 
@@ -51,7 +51,7 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
-  let const group_id = resolve_group_id(operands[0].view());
+  let const group_id = utils::resolve_group_id(operands[0].view());
   if (!group_id.has_value()) {
     KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
                             "invalid group '" + operands[0] + "'",
@@ -78,9 +78,9 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
 
   for (usize index = 1; index < operands.count(); index++)
-    if (!change_path_ownership(ec, cxt, "chgrp", Path{operands[index].view()},
-                               -1, *group_id, should_recurse,
-                               should_follow_argument, should_follow_nested))
+    if (!utils::change_path_ownership(
+            ec, cxt, "chgrp", Path{operands[index].view()}, -1, *group_id,
+            should_recurse, should_follow_argument, should_follow_nested))
       status = 1;
 
   return status;

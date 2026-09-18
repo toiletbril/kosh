@@ -205,44 +205,39 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
   }
 
   defer { reset_flags(FLAG_LIST); };
-  let operands = ArrayList<String>{cxt.scratch_allocator()};
-  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   try {
-    let const parsed = parse_util_operands(
+    let [operands, operand_locations] = parse_util_operands(
         FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations, true);
-    operands = steal(parsed.operands);
-    operand_locations = steal(parsed.operand_locations);
-  } catch (const ErrorBase &) {
-    return None;
-  }
-  if (FLAG_HELP.is_enabled() || operands.count() < 2) {
-    return None;
-  }
-  if (!Path{operands[1].view()}.has_trailing_separator()) return None;
+    if (FLAG_HELP.is_enabled() || operands.count() < 2) return None;
+    if (!Path{operands[1].view()}.has_trailing_separator()) return None;
 
-  try {
-    unused(parse_koshkit_duration_seconds(
-        operands[0].view(), operand_locations[0], cxt.scratch_allocator()));
-    if (FLAG_TIMEOUT_KILL_AFTER.is_set())
+    try {
       unused(parse_koshkit_duration_seconds(
-          FLAG_TIMEOUT_KILL_AFTER.value(),
-          FLAG_TIMEOUT_KILL_AFTER.value_location(), cxt.scratch_allocator()));
-    let const timeout_signal = resolve_koshkit_signal(
-        FLAG_TIMEOUT_SIGNAL.is_set() ? FLAG_TIMEOUT_SIGNAL.value()
-                                     : StringView{"TERM"},
-        FLAG_TIMEOUT_SIGNAL.value_location(), cxt.scratch_allocator());
-    if (!os::is_process_signal_supported(timeout_signal)) return None;
+          operands[0].view(), operand_locations[0], cxt.scratch_allocator()));
+      if (FLAG_TIMEOUT_KILL_AFTER.is_set())
+        unused(parse_koshkit_duration_seconds(
+            FLAG_TIMEOUT_KILL_AFTER.value(),
+            FLAG_TIMEOUT_KILL_AFTER.value_location(),
+            cxt.scratch_allocator()));
+      let const timeout_signal = resolve_koshkit_signal(
+          FLAG_TIMEOUT_SIGNAL.is_set() ? FLAG_TIMEOUT_SIGNAL.value()
+                                       : StringView{"TERM"},
+          FLAG_TIMEOUT_SIGNAL.value_location(), cxt.scratch_allocator());
+      if (!os::is_process_signal_supported(timeout_signal)) return None;
+    } catch (const ErrorBase &) {
+      return None;
+    }
+
+    try {
+      unused(checked_timeout_program(operands[1].view(), operand_locations[1],
+                                    cxt));
+    } catch (const ErrorWithLocation &error) {
+      error_location = error.location();
+      error_message = "koshkit timeout: " + error.message();
+      return static_cast<i32>(error.command_status());
+    }
   } catch (const ErrorBase &) {
     return None;
-  }
-
-  try {
-    unused(
-        checked_timeout_program(operands[1].view(), operand_locations[1], cxt));
-  } catch (const ErrorWithLocation &error) {
-    error_location = error.location();
-    error_message = "koshkit timeout: " + error.message();
-    return static_cast<i32>(error.command_status());
   }
 
   return None;

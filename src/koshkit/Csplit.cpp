@@ -321,7 +321,7 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
               ec, cxt, prefix, digit_count, output_index++, lines, current_line,
               target_line, FLAG_CSPLIT_SILENT.is_enabled(),
               FLAG_CSPLIT_KEEP.is_enabled(), width_location, output_paths))
-        throw Error{"csplit: cannot write output"};
+        throw Error{"cannot write output"};
     }
     current_line = target_line;
     has_applied_pattern = true;

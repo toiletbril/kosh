@@ -88,7 +88,7 @@ static fn parse_xargs_items(StringView input, Allocator allocator) throws
           quote = '\0';
         } else {
           if (byte == '\n')
-            throw Error{"xargs: unmatched quote before newline"};
+            throw Error{"unmatched quote before newline"};
           value += byte;
         }
         continue;
@@ -98,7 +98,7 @@ static fn parse_xargs_items(StringView input, Allocator allocator) throws
         continue;
       }
       if (byte == '\\') {
-        if (position == input.length) throw Error{"xargs: trailing backslash"};
+        if (position == input.length) throw Error{"trailing backslash"};
         let const escaped = input[position++];
         if (escaped == '\n') {
           line_number++;
@@ -113,7 +113,7 @@ static fn parse_xargs_items(StringView input, Allocator allocator) throws
       }
       value += byte;
     }
-    if (quote != '\0') throw Error{"xargs: unmatched quote"};
+    if (quote != '\0') throw Error{"unmatched quote"};
     items.push(xargs_item{steal(value), item_line});
   }
   return items;
@@ -296,7 +296,7 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
         if (candidate_size > maximum_size) {
           if (added_count == 0) {
             if (FLAG_XARGS_EXIT.is_enabled())
-              throw Error{"xargs: one argument exceeds the size limit"};
+              throw Error{"one argument exceeds the size limit"};
             command.push(items[item_position].value.clone());
             command_locations.push(ec.source_location());
             item_position++;
@@ -315,7 +315,7 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
       trace_xargs_command(ec, command, cxt.scratch_allocator());
     if (FLAG_XARGS_PROMPT.is_enabled())
       throw Error{
-          "xargs: interactive prompting requires a controlling terminal"};
+          "interactive prompting requires a controlling terminal"};
     Maybe<ExecContext> sub;
     try {
       let const *source = cxt.current_source();

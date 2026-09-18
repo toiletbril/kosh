@@ -463,7 +463,7 @@ static fn apply_sed_substitution(sed_command &command, String &line,
         os::execute_regex(command.expression, subject, spans, error_message,
                           allocator, consumed != 0);
     if (match_result == os::regex_match_result::Error)
-      throw Error{"sed: " + error_message};
+      throw Error{"" + error_message};
     if (match_result == os::regex_match_result::NoMatch) {
       result += subject;
       break;

@@ -111,7 +111,8 @@ fn Pathchk::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (!reason.is_empty()) {
-      report_soft_koshkit_error(ec, cxt, "pathchk: " + operand + ": " + reason);
+      report_soft_koshkit_error(ec, cxt,
+                                "pathchk: " + operand + ": " + reason);
       status = 1;
     }
   }

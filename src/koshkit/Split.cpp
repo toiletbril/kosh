@@ -33,7 +33,7 @@ namespace koshka::koshkit {
 static fn split_output_name(StringView prefix, usize suffix_length, u64 index,
                             Allocator allocator) throws -> String
 {
-  if (suffix_length > 64) throw Error{"split: suffix length is too large"};
+  if (suffix_length > 64) throw Error{"suffix length is too large"};
 
   char suffix[64];
   for (usize position = 0; position < suffix_length; position++)
@@ -42,7 +42,7 @@ static fn split_output_name(StringView prefix, usize suffix_length, u64 index,
     suffix[position - 1] = static_cast<char>('a' + index % 26);
     index /= 26;
   }
-  if (index != 0) throw Error{"split: output file suffixes are exhausted"};
+  if (index != 0) throw Error{"output file suffixes are exhausted"};
 
   String name{allocator, prefix};
   name += StringView{suffix, suffix_length};

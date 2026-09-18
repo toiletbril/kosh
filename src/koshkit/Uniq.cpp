@@ -58,7 +58,7 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
   let const input = open_named_or_stdin(ec, source);
   if (!input.has_value())
     throw Error{
-        "uniq: cannot read '" + String{cxt.scratch_allocator(), source}
+        "cannot read '" + String{cxt.scratch_allocator(), source}
           +
         "': " + os::last_system_error_message()
     };

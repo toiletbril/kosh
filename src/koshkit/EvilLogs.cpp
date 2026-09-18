@@ -537,32 +537,16 @@ fn EvilLogs::execute(
   let const should_color = koshkit_should_color();
   let const has_filter =
       FLAG_EVILLOGS_CORES.is_enabled() || FLAG_EVILLOGS_LOGS.is_enabled();
-  let const should_show_titles =
-      !has_filter ||
-      (FLAG_EVILLOGS_CORES.is_enabled() && FLAG_EVILLOGS_LOGS.is_enabled());
   if (!has_filter || FLAG_EVILLOGS_CORES.is_enabled()) {
     let section = String{allocator};
     append_core_dump_report(section, allocator, should_color);
-    if (should_show_titles) {
-      append_report_text(output, "CORES", colors::ansi::BOLD_BLUE,
-                         should_color);
-      output += "\n";
-      append_report_body(output, section.view());
-    } else {
-      output += section.view();
-    }
+    output += section.view();
   }
   if (!has_filter || FLAG_EVILLOGS_LOGS.is_enabled()) {
     if (!output.is_empty()) output += "\n";
     let section = String{allocator};
     append_log_report(section, allocator, should_color);
-    if (should_show_titles) {
-      append_report_text(output, "LOGS", colors::ansi::BOLD_BLUE, should_color);
-      output += "\n";
-      append_report_body(output, section.view());
-    } else {
-      output += section.view();
-    }
+    output += section.view();
   }
 
   ec.print_to_stdout(output);

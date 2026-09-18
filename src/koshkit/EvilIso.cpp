@@ -39,9 +39,6 @@ namespace {
 
 fn append_namespace_report(String &output, bool should_color) throws -> void
 {
-  append_report_text(output, "NAMESPACES", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += '\n';
   let body = String{heap_allocator()};
   constexpr StringView names[] = {"cgroup", "ipc", "mnt", "net", "pid",
                                   "time",    "user", "uts"};
@@ -73,8 +70,6 @@ fn append_namespace_report(String &output, bool should_color) throws -> void
 
 fn append_cgroup_report(String &output, bool should_color) throws -> void
 {
-  append_report_text(output, "CGROUPS", colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
   let const contents = Path{"/proc/self/cgroup"}.read_entire_file();
   append_report_field(output, "Membership",
                       contents.has_value() ? contents->view() : "unavailable",
@@ -83,8 +78,6 @@ fn append_cgroup_report(String &output, bool should_color) throws -> void
 
 fn append_session_report(String &output, bool should_color) throws -> void
 {
-  append_report_text(output, "SESSIONS", colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
   let const sessions = os::logged_in_users();
   append_report_field(output, "Count",
                       String::from(sessions.count(), heap_allocator()).view(),
@@ -100,8 +93,6 @@ fn append_session_report(String &output, bool should_color) throws -> void
 
 fn append_remote_report(String &output, bool should_color) throws -> void
 {
-  append_report_text(output, "REMOTE", colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
   if (!os::has_network_socket_listing()) {
     append_report_field(output, "Sockets", "unavailable",
                         colors::ansi::BOLD_CYAN, should_color);
@@ -124,8 +115,6 @@ fn append_remote_report(String &output, bool should_color) throws -> void
 
 fn append_runtime_report(String &output, bool should_color) throws -> void
 {
-  append_report_text(output, "RUNTIME", colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
   let const cgroup = Path{"/proc/1/cgroup"}.read_entire_file();
   let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
   let const kubernetes = os::get_environment_variable("KUBERNETES_SERVICE_HOST");

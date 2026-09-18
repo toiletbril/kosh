@@ -135,9 +135,6 @@ struct mapped_library_family
 fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
     throws -> void
 {
-  append_report_text(output, "ANOMALIES", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += '\n';
   let const allocator = cxt.scratch_allocator();
   if (!os::has_process_open_file_listing()) {
     append_report_field(output, "Mixed libraries", "unavailable",
@@ -179,8 +176,6 @@ fn append_anomaly_report(String &output, EvalContext &cxt, bool should_color)
 fn append_procfs_report(String &output, bool should_color, Allocator allocator)
     throws -> void
 {
-  append_report_text(output, "PROCFS", colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
   os::system_activity_status activity{};
   if (os::read_system_activity_status(activity)) {
     append_report_field(output, "CPU user units",
@@ -280,9 +275,6 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
-
-  append_report_text(output, "SYSTEM", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
 
   let const host = os::get_hostname();
   append_report_field(output, "Host",

@@ -27,6 +27,12 @@ echo "=== sh mood, empty PATH, not found ==="
 echo "=== set -o koshkit turns bare names on ==="
 "$BIN" -c 'PATH=; set -o koshkit; seq 3'
 
+echo "=== set -o koshkit passes bare Koshka utility flags ==="
+"$BIN" -c 'PATH=; set -o koshkit; evil --short' | head -1
+
+echo "=== set -o koshkit passes bare POSIX utility flags ==="
+"$BIN" -c 'PATH=; set -o koshkit; ls --help' >/dev/null
+
 echo "=== --enable-koshkit turns bare names on ==="
 "$BIN" --enable-koshkit -c 'PATH=; seq 3'
 

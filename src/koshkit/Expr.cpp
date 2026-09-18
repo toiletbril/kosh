@@ -42,7 +42,7 @@ public:
   fn parse() throws -> String
   {
     let result = parse_or();
-    if (m_position != m_tokens.count()) throw Error{"expr: syntax error"};
+    if (m_position != m_tokens.count()) throw Error{"syntax error"};
     return result;
   }
 
@@ -87,7 +87,7 @@ private:
 
   fn take() throws -> String
   {
-    if (m_position == m_tokens.count()) throw Error{"expr: missing operand"};
+    if (m_position == m_tokens.count()) throw Error{"missing operand"};
     return String{m_allocator, m_tokens[m_position++].view()};
   }
 
@@ -174,14 +174,14 @@ private:
       let const right_number = require_number(right.view());
       if ((operation.view() == "/" || operation.view() == "%") &&
           right_number == 0)
-        throw Error{"expr: division by zero"};
+        throw Error{"division by zero"};
 
       i128 result = 0;
       if (operation.view() == "*")
         result = static_cast<i128>(left_number) * right_number;
       else if (operation.view() == "/") {
         if (left_number == INT64_MIN && right_number == -1)
-          throw Error{"expr: integer overflow"};
+          throw Error{"integer overflow"};
         result = left_number / right_number;
       } else {
         result = left_number % right_number;
@@ -216,7 +216,7 @@ private:
       let const result = os::execute_regex(compiled, left.view(), spans,
                                            error_message, m_allocator);
       if (result == os::regex_match_result::Error)
-        throw Error{"expr: " + error_message};
+        throw Error{"" + error_message};
       if (result == os::regex_match_result::NoMatch) {
         left = String{m_allocator, "0"};
       } else if (spans.count() > 1) {
@@ -239,7 +239,7 @@ private:
     if (peek("(")) {
       m_position++;
       let result = parse_or();
-      if (!peek(")")) throw Error{"expr: missing closing parenthesis"};
+      if (!peek(")")) throw Error{"missing closing parenthesis"};
       m_position++;
       return result;
     }
@@ -254,14 +254,14 @@ private:
   {
     let const parsed = value.to<i64>();
     if (parsed.is_error())
-      throw Error{"expr: expected integer, got '" + String{value} + "'"};
+      throw Error{"expected integer, got '" + String{value} + "'"};
     return parsed.value();
   }
 
   fn number_string(i128 value) const throws -> String
   {
     if (value < INT64_MIN || value > INT64_MAX)
-      throw Error{"expr: integer overflow"};
+      throw Error{"integer overflow"};
     return String::from(static_cast<i64>(value), m_allocator);
   }
 

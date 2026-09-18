@@ -82,6 +82,64 @@ struct linux_socket_owner
   u32 pid{0};
 };
 
+static pure fn linux_unix_socket_field(StringView text, usize index) wontthrow
+    -> StringView
+{
+  usize field = 0;
+  usize position = 0;
+  while (position < text.length) {
+    while (position < text.length && text[position] == ' ') position++;
+    if (position >= text.length) break;
+    let const start = position;
+    while (position < text.length && text[position] != ' ') position++;
+    if (field == index)
+      return text.substring_of_length(start, position - start);
+    field++;
+  }
+  return StringView{};
+}
+
+static fn linux_unix_sockets(bool should_include_process_ids,
+                             const ArrayList<linux_socket_owner> *owners,
+                             Allocator allocator) throws
+    -> ArrayList<network_socket_entry>
+{
+  let result = ArrayList<network_socket_entry>{allocator};
+  char buffer[1024 * 1024];
+  let const length = read_small_file("/proc/net/unix", buffer, sizeof(buffer));
+  if (length == 0) return result;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  bool is_header = true;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    if (is_header) {
+      is_header = false;
+      continue;
+    }
+    let const inode = linux_unix_socket_field(line, 6).to<u64>();
+    if (inode.is_error()) continue;
+    let const state = linux_unix_socket_field(line, 5);
+    let process_id = u32{0};
+    if (should_include_process_ids && owners != nullptr) {
+      for (let const &owner : *owners)
+        if (owner.inode == inode.value()) {
+          process_id = owner.pid;
+          break;
+        }
+    }
+    let path = linux_unix_socket_field(line, 7);
+    let row_state = state == "01" ? network_socket_state::Listen
+                                  : network_socket_state::Unconnected;
+    result.push(network_socket_entry{
+        String{allocator, path}, String{allocator}, inode.value(), 0, 0,
+        process_id, 0, 0, network_socket_protocol::Unix,
+        network_address_family::IPv4, row_state});
+  }
+  return result;
+}
+
 static fn linux_socket_owners(Allocator allocator)
     throws -> ArrayList<linux_socket_owner>
 {
@@ -872,6 +930,10 @@ fn network_sockets(bool should_include_process_ids) throws
         should_include_process_ids ? &owners : nullptr, allocator);
     for (let &entry : entries) result.push(steal(entry));
   }
+  let unix_entries = linux_unix_sockets(
+      should_include_process_ids,
+      should_include_process_ids ? &owners : nullptr, allocator);
+  for (let &entry : unix_entries) result.push(steal(entry));
 #else
   unused(should_include_process_ids);
 #endif
@@ -1815,6 +1877,11 @@ fn get_last_system_error_number() wontthrow -> i32 { return errno; }
 fn last_system_error_is_missing_file() wontthrow -> bool
 {
   return errno == ENOENT;
+}
+
+fn last_system_error_is_permission_denied() wontthrow -> bool
+{
+  return errno == EACCES || errno == EPERM;
 }
 
 fn last_system_error_is_descriptor_quota() wontthrow -> bool

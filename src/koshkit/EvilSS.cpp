@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-4aHlnptu6]");
+HELP_SYNOPSIS_DECL("[-46aHlnptux]");
 
 HELP_DESCRIPTION_DECL("The evilss utility reports visible network sockets.");
 
@@ -24,6 +24,7 @@ FLAG(EVILSS_LISTENING, Bool, 'l', "listening", "Show only listening sockets.");
 FLAG(EVILSS_ALL, Bool, 'a', "all", "Show listening and connected sockets.");
 FLAG(EVILSS_TCP, Bool, 't', "tcp", "Show TCP sockets.");
 FLAG(EVILSS_UDP, Bool, 'u', "udp", "Show UDP sockets.");
+FLAG(EVILSS_UNIX, Bool, 'x', "unix", "Show Unix-domain sockets.");
 FLAG(EVILSS_PROCESSES, Bool, 'p', "processes", "Show the owning process id.");
 FLAG(EVILSS_NUMERIC, Bool, 'n', "numeric", "Keep addresses and ports numeric.");
 FLAG(EVILSS_IPV4, Bool, '4', "ipv4", "Show IPv4 sockets.");
@@ -43,6 +44,7 @@ struct network_socket_report_options
   bool should_include_listening{false};
   bool should_show_tcp{false};
   bool should_show_udp{false};
+  bool should_show_unix{false};
   bool should_show_ipv4{false};
   bool should_show_ipv6{false};
   bool should_show_processes{false};
@@ -135,12 +137,16 @@ fn append_network_socket_report(String &output,
   bool has_previous = false;
   for (let const &socket : sockets) {
     let const is_tcp = socket.protocol == os::network_socket_protocol::Tcp;
+    let const is_udp = socket.protocol == os::network_socket_protocol::Udp;
+    let const is_unix = socket.protocol == os::network_socket_protocol::Unix;
     if (options.should_show_tcp && !options.should_show_udp && !is_tcp) {
       continue;
     }
-    if (options.should_show_udp && !options.should_show_tcp && is_tcp) {
+    if (options.should_show_udp && !options.should_show_tcp && !is_udp) {
       continue;
     }
+    if (options.should_show_unix && !is_unix) continue;
+    if (!options.should_show_unix && is_unix) continue;
     if (options.should_show_ipv4 && !options.should_show_ipv6 &&
         socket.family != os::network_address_family::IPv4)
     {
@@ -170,14 +176,18 @@ fn append_network_socket_report(String &output,
     previous_process_id = socket.process_id;
 
     let row = socket_row{};
-    row.protocol = String{allocator, is_tcp ? "tcp" : "udp"};
+    row.protocol = String{allocator, is_unix ? "u_str" : (is_tcp ? "tcp" : "udp")};
     row.state = String{allocator, state_name(socket.state)};
     row.receive_queue = String::from(socket.receive_queue_bytes, allocator);
     row.send_queue = String::from(socket.send_queue_bytes, allocator);
-    row.local = endpoint(socket.local_address.view(), socket.local_port,
-                         socket.family, allocator);
-    row.peer = endpoint(socket.peer_address.view(), socket.peer_port,
-                        socket.family, allocator);
+    row.local = is_unix
+                    ? String{allocator, socket.local_address.view()}
+                    : endpoint(socket.local_address.view(), socket.local_port,
+                               socket.family, allocator);
+    row.peer = is_unix
+                   ? String{allocator, socket.peer_address.view()}
+                   : endpoint(socket.peer_address.view(), socket.peer_port,
+                              socket.family, allocator);
     row.process = socket.process_id == 0
                       ? String{allocator, "-"}
                       : String::from(socket.process_id, allocator);
@@ -278,7 +288,8 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (!os::has_network_socket_listing()) {
-    report_soft_koshkit_error(ec, cxt, "evilss: socket listing is unavailable",
+    report_soft_koshkit_error(ec, cxt,
+                              "evilss: socket listing is unavailable",
                               "this platform does not expose socket records");
     return 1;
   }
@@ -294,6 +305,7 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
           .should_include_listening = FLAG_EVILSS_ALL.is_enabled(),
           .should_show_tcp = FLAG_EVILSS_TCP.is_enabled(),
           .should_show_udp = FLAG_EVILSS_UDP.is_enabled(),
+          .should_show_unix = FLAG_EVILSS_UNIX.is_enabled(),
           .should_show_ipv4 = FLAG_EVILSS_IPV4.is_enabled(),
           .should_show_ipv6 = FLAG_EVILSS_IPV6.is_enabled(),
           .should_show_processes = FLAG_EVILSS_PROCESSES.is_enabled(),

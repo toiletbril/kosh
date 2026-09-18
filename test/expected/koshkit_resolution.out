@@ -17,6 +17,9 @@ rc=127
 1
 2
 3
+=== set -o koshkit passes bare Koshka utility flags ===
+Host: void
+=== set -o koshkit passes bare POSIX utility flags ===
 === --enable-koshkit turns bare names on ===
 1
 2

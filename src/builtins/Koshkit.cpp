@@ -76,8 +76,11 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   defer { koshkit::set_koshkit_color_mode(cli_color_mode::Auto); };
 
-  let const utility_index = parse_until_subcommand(
-      FLAG_LIST, ec.args(), &ec.arg_locations(), nullptr, ec.program());
+  let const utility_index =
+      ec.program() == "koshkit"
+          ? parse_until_subcommand(FLAG_LIST, ec.args(), &ec.arg_locations(),
+                                   nullptr, ec.program())
+          : usize{0};
   defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_KOSHKIT_COLOR.is_set()) {

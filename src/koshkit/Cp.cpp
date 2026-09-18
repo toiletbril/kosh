@@ -39,25 +39,25 @@ static fn copy_file(const ExecContext &ec, StringView source,
   switch (copy_file_contents(source, destination, should_force)) {
   case copy_file_result::SourceOpenFailed:
     throw Error{
-        "cp: unable to open '" + String{allocator, source}
+        "unable to open '" + String{allocator, source}
           +
         "': " + os::last_system_error_message()
     };
   case copy_file_result::DestinationOpenFailed:
     throw Error{
-        "cp: unable to create '" + String{allocator, destination}
+        "unable to create '" + String{allocator, destination}
           +
         "': " + os::last_system_error_message()
     };
   case copy_file_result::ReadFailed:
     throw Error{
-        "cp: a read of '" + String{allocator, source}
+        "a read of '" + String{allocator, source}
           +
         "' failed: " + os::last_system_error_message()
     };
   case copy_file_result::WriteFailed:
     throw Error{
-        "cp: a write to '" + String{allocator, destination}
+        "a write to '" + String{allocator, destination}
           +
         "' failed: " + os::last_system_error_message()
     };
@@ -88,7 +88,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       source_path.is_same_file_as(destination_path))
   {
     throw Error{
-        "cp: '" + String{allocator, source     }
+        "'" + String{allocator, source     }
           + "' and '" +
         String{allocator, destination}
           + "' are the same file"
@@ -104,14 +104,14 @@ static fn copy_path(const ExecContext &ec, StringView source,
           !os::remove_file(destination))
       {
         throw Error{
-            "cp: unable to remove '" + String{allocator, destination}
+            "unable to remove '" + String{allocator, destination}
               +
             "': " + os::last_system_error_message()
         };
       }
       if (!os::create_symlink(target->view(), destination)) {
         throw Error{
-            "cp: unable to create the symlink '" +
+            "unable to create the symlink '" +
             String{allocator, destination}
             +
             "': " + os::last_system_error_message()
@@ -131,7 +131,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
   if (source_path.is_directory() && !source_path.is_symbolic_link()) {
     if (!is_recursive)
       throw Error{
-          "cp: '" + String{allocator, source}
+          "'" + String{allocator, source}
             +
           "' is a directory, pass -r to copy it"
       };
@@ -145,7 +145,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
         destination_absolute.text().view().starts_with(source_prefix.view()))
     {
       throw ErrorWithDetails{
-          "cp: cannot copy '" + String{allocator, source}
+          "cannot copy '" + String{allocator, source}
             + "' into itself",
           "The destination is inside the source directory"
       };
@@ -156,7 +156,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
     Maybe<ArrayList<String>> names = Path::read_directory(source_path);
     if (!names.has_value())
       throw Error{
-          "cp: unable to read the directory '" + String{allocator, source}
+          "unable to read the directory '" + String{allocator, source}
             +
           "': " + os::last_system_error_message()
       };
@@ -185,7 +185,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
                             source_status->modification_nanoseconds))
     {
       throw Error{
-          "cp: unable to preserve timestamps for '" +
+          "unable to preserve timestamps for '" +
           String{allocator, destination}
           +
           "': " + os::last_system_error_message()
@@ -199,7 +199,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
      truncate its target. */
   if (destination_path.is_symbolic_link() && !os::remove_file(destination)) {
     throw Error{
-        "cp: unable to remove '" + String{allocator, destination}
+        "unable to remove '" + String{allocator, destination}
           +
         "': " + os::last_system_error_message()
     };
@@ -222,7 +222,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
                           source_status->modification_nanoseconds))
   {
     throw Error{
-        "cp: unable to preserve timestamps for '" +
+        "unable to preserve timestamps for '" +
         String{allocator, destination}
         +
         "': " + os::last_system_error_message()
@@ -260,7 +260,7 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() > 2 && !is_destination_directory) {
     throw Error{
-        "cp: the destination '" + String{cxt.scratch_allocator(), destination}
+        "the destination '" + String{cxt.scratch_allocator(), destination}
           +
         "' is not a directory, so it cannot hold several sources"
     };
@@ -278,7 +278,7 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (should_prompt && Path{target.view()}.exists() &&
-        !confirm_koshkit_action(ec, "cp: overwrite '" + target + "'? "))
+        !confirm_koshkit_action(ec, "overwrite '" + target + "'? "))
       continue;
 
     copy_path(ec, source, target.view(), is_recursive, should_force,

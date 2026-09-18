@@ -202,7 +202,7 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (should_prompt && Path{target.view()}.exists() &&
-        !confirm_koshkit_action(ec, "mv: overwrite '" + target + "'? "))
+        !confirm_koshkit_action(ec, "overwrite '" + target + "'? "))
       continue;
 
     try {

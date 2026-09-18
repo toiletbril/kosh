@@ -49,7 +49,7 @@ fn Mkfifo::execute(const ExecContext &ec, EvalContext &cxt,
         parse_file_mode(FLAG_MKFIFO_MODE.value(), mode, 0, false);
     if (!parsed.has_value())
       throw Error{
-          "mkfifo: invalid mode '" +
+          "invalid mode '" +
           String{cxt.scratch_allocator(), FLAG_MKFIFO_MODE.value()}
           + "'"
       };

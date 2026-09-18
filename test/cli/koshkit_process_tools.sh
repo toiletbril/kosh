@@ -151,17 +151,24 @@ printf 'evilnet-single-title=%s\n' "$network_title"
 network_all_report=$("$BIN" -c 'koshkit evilnet --all' \
   2> "$TEST_NULL_DEVICE")
 case $network_all_report in
-  INTERFACES*) network_all_title=present ;;
-  *) network_all_title=missing ;;
+  *NAME*FAMILY*ADDRESS*) network_all_title=omitted ;;
+  *) network_all_title=present ;;
 esac
 printf 'evilnet-multiple-titles=%s\n' "$network_all_title"
 
 network_traffic_report=$("$BIN" -c 'koshkit evilnet --traffic' 2> "$TEST_NULL_DEVICE")
 case $network_traffic_report in
-  TRAFFIC*) network_traffic_only=present ;;
+  *RX*TX*"RX PACKETS"*) network_traffic_only=present ;;
   *) network_traffic_only=missing ;;
 esac
 printf 'evilnet-traffic-only=%s\n' "$network_traffic_only"
+
+unix_socket_report=$("$BIN" -c 'koshkit --color never evilss -x')
+case $unix_socket_report in
+  *u_str*/*|*u_str*'@/'*) unix_socket_shape=present ;;
+  *) unix_socket_shape=missing ;;
+esac
+printf 'evilss-unix=%s\n' "$unix_socket_shape"
 
 process_tree=$("$BIN" -c 'koshkit evilps -1')
 case $process_tree in
@@ -179,8 +186,8 @@ printf 'evilfs-single-title=%s\n' "$filesystem_title"
 
 filesystem_all_report=$("$BIN" -c 'koshkit evilfs --all')
 case $filesystem_all_report in
-  FILESYSTEMS*) filesystem_all_title=present ;;
-  *) filesystem_all_title=missing ;;
+  *Source:*Type:*Options:*) filesystem_all_title=omitted ;;
+  *) filesystem_all_title=present ;;
 esac
 printf 'evilfs-multiple-titles=%s\n' "$filesystem_all_title"
 
@@ -194,7 +201,7 @@ printf 'evillogs-single-title=%s\n' "$cores_title"
 logs_report=$("$BIN" -c 'koshkit evillogs --cores --logs')
 case $logs_report in
   CORES*LOGS*) logs_titles=present ;;
-  *) logs_titles=missing ;;
+  *) logs_titles=omitted ;;
 esac
 printf 'evillogs-multiple-titles=%s\n' "$logs_titles"
 

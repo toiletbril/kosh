@@ -11,7 +11,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "Ownership.hpp"
+#include "../UtilsOwnership.hpp"
 
 FLAG_LIST_DECL();
 
@@ -74,7 +74,7 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
   i64 owner_id = -1;
   i64 group_id = -1;
   if (!owner_text.is_empty()) {
-    let const resolved = resolve_user_id(owner_text);
+    let const resolved = utils::resolve_user_id(owner_text);
     if (!resolved.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           operand_locations[0],
@@ -85,7 +85,7 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
     owner_id = *resolved;
   }
   if (!group_text.is_empty()) {
-    let const resolved = resolve_group_id(group_text);
+    let const resolved = utils::resolve_group_id(group_text);
     if (!resolved.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           operand_locations[0],
@@ -115,9 +115,9 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
 
   for (usize index = 1; index < operands.count(); index++)
-    if (!change_path_ownership(ec, cxt, "chown", Path{operands[index].view()},
-                               owner_id, group_id, should_recurse,
-                               should_follow_argument, should_follow_nested))
+    if (!utils::change_path_ownership(
+            ec, cxt, "chown", Path{operands[index].view()}, owner_id, group_id,
+            should_recurse, should_follow_argument, should_follow_nested))
       status = 1;
 
   return status;

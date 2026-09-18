@@ -92,7 +92,7 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
        check rejects it rather than truncating to an over-permissive mode. */
     if (parsed.is_error() || parsed.value() < 0 || parsed.value() > 07777) {
       throw ErrorWithDetails{
-          "mkdir: invalid mode '" +
+          "invalid mode '" +
               String{cxt.scratch_allocator(), FLAG_MKDIR_MODE.value()}
               + "'",
           "A mode is an octal number such as 0755"

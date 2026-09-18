@@ -1130,6 +1130,35 @@ fn append_report_inline_field(String &output, StringView name, StringView value,
   output += value;
 }
 
+fn append_report_table(String &output,
+                       const ArrayList<report_table_row> &rows,
+                       bool should_color, StringView indentation) throws -> void
+{
+  for (let const &row : rows) {
+    if (row.value.is_empty()) continue;
+    output += indentation;
+    append_report_text(output, row.name.view(), row.style, should_color);
+    output += ": ";
+    append_report_text(output, row.value.view(), {}, should_color);
+    output += '\n';
+  }
+}
+
+fn ReportTable::add(StringView name, StringView value, StringView style) throws
+    -> void
+{
+  m_rows.push({String{m_rows.allocator(), name},
+               String{m_rows.allocator(), value}, style});
+}
+
+fn ReportTable::to_string(bool should_color, StringView indentation) const
+    throws -> String
+{
+  let output = String{m_rows.allocator()};
+  append_report_table(output, m_rows, should_color, indentation);
+  return output;
+}
+
 static pure fn report_indentation_width(StringView indentation) wontthrow
     -> usize
 {

@@ -296,7 +296,6 @@ fn append_disk_io_report(String &output,
   if (after_snapshot.disks.is_empty() && !is_sampled) return;
 
   if (should_include_heading) {
-    append_report_text(output, "DISKS", colors::ansi::BOLD_BLUE, should_color);
     output += "\n  ";
   }
   append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
@@ -565,13 +564,17 @@ fn append_disk_io_report(String &output,
 
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        usize row_limit, f64 sample_duration_seconds,
-                       f64 falloff_seconds, bool is_terminal,
+                       f64 refresh_interval_seconds, f64 falloff_seconds,
+                       bool is_terminal,
                        bool should_color) throws -> i32
 {
   let const allocator = heap_allocator();
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
+  let const refresh_interval_nanoseconds = static_cast<u64>(
+      refresh_interval_seconds * 1000000000.0);
+  u64 last_refresh_nanoseconds = os::monotonic_nanos();
   let before_rows = read_process_io_rows(allocator, selected_pid, true);
   if (selected_pid.has_value() && before_rows.is_empty()) return 1;
 
@@ -611,6 +614,11 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
         retained.remove(position);
       }
     }
+    before_rows = steal(after_rows);
+    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds)
+      continue;
+
+    last_refresh_nanoseconds = now;
     retained.sort([](const live_process_row &left,
                      const live_process_row &right) {
       let const left_total = saturated_sum(left.row.status.read_bytes,
@@ -628,7 +636,6 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     append_process_io_rate_report(output, rows, row_limit, allocator,
                                   should_color);
     ec.print_to_stdout(output);
-    before_rows = steal(after_rows);
   }
 }
 
@@ -639,14 +646,17 @@ struct live_disk_row
 };
 
 fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
-                    f64 falloff_seconds, bool is_terminal,
-                    bool should_color) throws -> i32
+                    f64 refresh_interval_seconds, f64 falloff_seconds,
+                    bool is_terminal, bool should_color) throws -> i32
 {
   let const allocator = heap_allocator();
   let before_snapshot = os::read_disk_io_snapshot(allocator);
   let retained = ArrayList<live_disk_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(falloff_seconds * 1000000000.0);
+  let const refresh_interval_nanoseconds = static_cast<u64>(
+      refresh_interval_seconds * 1000000000.0);
+  u64 last_refresh_nanoseconds = os::monotonic_nanos();
 
   loop
   {
@@ -677,6 +687,11 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
         retained.remove(position);
       }
     }
+    before_snapshot = steal(after_snapshot);
+    if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds)
+      continue;
+
+    last_refresh_nanoseconds = now;
     let current_snapshot = os::disk_io_snapshot{};
     current_snapshot.sampled_at_nanoseconds =
         after_snapshot.sampled_at_nanoseconds;
@@ -696,7 +711,6 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
                           elapsed_nanoseconds, true, false, allocator,
                           should_color);
     ec.print_to_stdout(output);
-    before_snapshot = steal(after_snapshot);
   }
 }
 
@@ -733,8 +747,6 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
                             bool has_operation_counts, Allocator allocator,
                             bool should_color) throws -> void
 {
-  append_report_text(output, "IO", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   let summary = String{allocator};
   append_report_field(summary, "Visible processes",
                       String::from(rows.count(), allocator).view(),
@@ -758,8 +770,6 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
   append_report_body(output, summary.view());
 
   output += "\n";
-  append_report_text(output, "PROCESSES", colors::ansi::BOLD_BLUE,
-                     should_color);
   output += "\n  ";
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
@@ -875,11 +885,11 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  f64 sample_duration_seconds = 1.0;
+  f64 cumulative_duration_seconds = 1.0;
   if (sample_duration_operand.has_value()) {
-    sample_duration_seconds = parse_koshkit_duration_seconds(
+    cumulative_duration_seconds = parse_koshkit_duration_seconds(
         *sample_duration_operand, *sample_duration_location, allocator);
-    if (sample_duration_seconds <= 0.0) {
+    if (cumulative_duration_seconds <= 0.0) {
       KOSHKIT_REPORT_ERROR_AT(*sample_duration_location, "invalid duration",
                               "the duration must be greater than zero");
       return 1;
@@ -934,17 +944,25 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const should_color = koshkit_should_color();
-  f64 falloff_seconds = 5.0;
+  f64 live_interval_seconds = 1.0;
   if (FLAG_EVILIO_LIVE.has_value()) {
     let const parsed = utils::parse_decimal_f64(FLAG_EVILIO_LIVE.value());
     if (parsed.is_error() || parsed.value() <= 0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_LIVE.value_location(),
-                              "invalid falloff interval",
+                              "invalid live interval",
                               "use a positive number of seconds");
       return 1;
     }
-    falloff_seconds = parsed.value();
+    live_interval_seconds = parsed.value();
   }
+  let const refresh_interval_seconds =
+      FLAG_EVILIO_LIVE.is_enabled() && FLAG_EVILIO_CUMULATIVE.has_value()
+          ? parse_koshkit_duration_seconds(
+                FLAG_EVILIO_CUMULATIVE.value(),
+                FLAG_EVILIO_CUMULATIVE.value_location(), allocator)
+          : live_interval_seconds;
+  let const falloff_seconds =
+      live_interval_seconds > 5.0 ? live_interval_seconds * 3.0 : 5.0;
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();
@@ -976,18 +994,20 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (should_show_processes) {
       return run_live_process_io(ec, selected_pid, row_limit,
-                                 sample_duration_seconds, falloff_seconds,
+                                 live_interval_seconds,
+                                 refresh_interval_seconds, falloff_seconds,
                                  is_terminal, should_color);
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds, falloff_seconds,
+    return run_live_disk_io(ec, live_interval_seconds,
+                            refresh_interval_seconds, falloff_seconds,
                             is_terminal, should_color);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {
     let const before_rows = read_process_io_rows(allocator, selected_pid, true);
     let const started_at_nanoseconds = os::monotonic_nanos();
-    os::sleep_for_seconds(sample_duration_seconds);
+    os::sleep_for_seconds(cumulative_duration_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -1057,7 +1077,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     has_activity_before = os::read_system_activity_status(activity_before);
     has_swap_before = os::read_swap_status(swap_before);
     disk_before = steal(disk_after);
-    os::sleep_for_seconds(1.0);
+    os::sleep_for_seconds(cumulative_duration_seconds);
     has_activity_after = os::read_system_activity_status(activity_after);
     disk_after = os::read_disk_io_snapshot(allocator);
     has_swap_after = os::read_swap_status(swap_after);
@@ -1068,7 +1088,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   } else if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {
     disk_before = steal(disk_after);
-    os::sleep_for_seconds(sample_duration_seconds);
+    os::sleep_for_seconds(cumulative_duration_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
@@ -1116,8 +1136,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
       u64 total = saturated_sum(saturated_sum(*user, *system), *idle);
       if (wait.has_value()) total = saturated_sum(total, *wait);
       if (stolen.has_value()) total = saturated_sum(total, *stolen);
-      append_report_text(output, "CPU", colors::ansi::BOLD_BLUE, should_color);
-      output += "\n";
       let body = String{allocator};
       append_report_field(body, "User", percent_text(*user, total, allocator),
                           colors::ansi::BOLD_CYAN, should_color);
@@ -1228,8 +1246,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!memory_body.is_empty()) {
-    append_report_text(output, "MEMORY", colors::ansi::BOLD_BLUE, should_color);
-    output += "\n";
     append_report_body(output, memory_body.view());
     output += "\n";
   }
@@ -1280,8 +1296,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!paging_body.is_empty()) {
-    append_report_text(output, "PAGING", colors::ansi::BOLD_BLUE, should_color);
-    output += "\n";
     append_report_body(output, paging_body.view());
     output += "\n";
   }
@@ -1307,9 +1321,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!scheduler_body.is_empty()) {
-    append_report_text(output, "SCHEDULER", colors::ansi::BOLD_BLUE,
-                       should_color);
-    output += "\n";
     append_report_body(output, scheduler_body.view());
     output += "\n";
   }
@@ -1378,8 +1389,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (!stalls.is_empty()) {
-    append_report_text(output, "STALLS", colors::ansi::BOLD_BLUE, should_color);
-    output += "\n";
     append_report_body(output, stalls.view());
     output += "\n";
   }
@@ -1396,8 +1405,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  append_report_text(output, "SWAP", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   let swap_body = String{allocator};
   if (!has_swap_after) {
     append_report_field(swap_body, "Status", "unavailable",

@@ -54,7 +54,7 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() > 2 && !is_destination_directory) {
     throw Error{
-        "ln: the destination '" + String{cxt.scratch_allocator(), destination}
+        "the destination '" + String{cxt.scratch_allocator(), destination}
           +
         "' is not a directory, so it cannot hold several links"
     };

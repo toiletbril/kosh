@@ -316,6 +316,9 @@ fn EvilDisk::execute(
     let const &mounted = filesystems[filesystem_index];
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
+      if (operands.is_empty() &&
+          os::last_system_error_is_permission_denied())
+        continue;
       let const location = operands.is_empty()
                                ? ec.source_location()
                                : operand_locations[filesystem_index];
@@ -366,7 +369,6 @@ fn EvilDisk::execute(
 
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
-  append_report_text(output, "DISKS", colors::ansi::BOLD_BLUE, should_color);
   output += "\n  ";
   append_report_column(output, "FILESYSTEM", source_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
@@ -432,8 +434,6 @@ fn EvilDisk::execute(
   }
 
   output += "\n";
-  append_report_text(output, "FAILURES", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   if (!has_failure_counters) {
     let body = String{allocator};
     append_report_field(body, "Status", "unavailable", colors::ansi::BOLD_CYAN,
@@ -489,9 +489,6 @@ fn EvilDisk::execute(
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
     output += "\n";
-    append_report_text(output, "IDENTITY", colors::ansi::BOLD_BLUE,
-                       should_color);
-    output += "\n";
     bool has_identity = false;
     for (let const &filesystem : filesystems) {
       if (filesystem.volume_name.is_empty() &&
@@ -520,9 +517,6 @@ fn EvilDisk::execute(
       append_report_body(output, body.view());
     }
 
-    output += "\n";
-    append_report_text(output, "FILESYSTEM FAILURES", colors::ansi::BOLD_BLUE,
-                       should_color);
     output += "\n";
     bool has_filesystem_failures = false;
     for (let const &filesystem : filesystems) {
@@ -559,8 +553,6 @@ fn EvilDisk::execute(
   if (FLAG_EVILDISK_ALL.is_enabled()) {
     let const smart_rows = read_smart_rows(cxt, filesystems, allocator);
     output += "\n";
-    append_report_text(output, "SMART", colors::ansi::BOLD_BLUE, should_color);
-    output += "\n";
     if (smart_rows.is_empty()) {
       let body = String{allocator};
       append_report_field(body, "Status", "unavailable",
@@ -594,9 +586,6 @@ fn EvilDisk::execute(
       append_report_column(output, "PROTOCOL", protocol_width, false,
                            colors::ansi::BOLD_CYAN, should_color);
       output += "  ";
-      append_report_text(output, "STATS", colors::ansi::BOLD_CYAN,
-                         should_color);
-      output += "\n";
       for (let const &row : smart_rows) {
         output += "  ";
         append_report_column(output, row.device.view(), device_width, false,

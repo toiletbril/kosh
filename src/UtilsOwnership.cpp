@@ -2,19 +2,20 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file implements ownership helpers shared by chown, chgrp, and id. It
- * resolves numeric and named user and group identifiers, changes ownership
- * recursively, follows requested symbolic links, and detects directory
- * cycles.
+ * This file implements shared user, group, and recursive ownership helpers.
+ * Keeping traversal and identifier resolution here prevents chown, chgrp,
+ * and id from growing subtly different ownership behavior.
  */
 
-#include "Ownership.hpp"
+#include "UtilsOwnership.hpp"
 
-#include "../Eval.hpp"
-#include "../Koshkit.hpp"
-#include "../Platform.hpp"
+#include "Eval.hpp"
+#include "Koshkit.hpp"
+#include "Platform.hpp"
 
-namespace koshka::koshkit {
+namespace koshka::utils {
+
+namespace {
 
 struct ownership_directory_identity
 {
@@ -35,20 +36,6 @@ static fn parse_numeric_id(StringView text) wontthrow -> Maybe<u32>
   return static_cast<u32>(value);
 }
 
-fn resolve_user_id(StringView text) throws -> Maybe<u32>
-{
-  if (let const numeric = parse_numeric_id(text); numeric.has_value())
-    return numeric;
-  return os::username_to_uid(text);
-}
-
-fn resolve_group_id(StringView text) throws -> Maybe<u32>
-{
-  if (let const numeric = parse_numeric_id(text); numeric.has_value())
-    return numeric;
-  return os::groupname_to_gid(text);
-}
-
 static fn change_path_ownership_recursive(
     const ExecContext &ec, EvalContext &cxt, StringView utility_name,
     const Path &path, i64 owner_id, i64 group_id, bool should_recurse,
@@ -57,9 +44,9 @@ static fn change_path_ownership_recursive(
 {
   os::file_status path_status{};
   if (!os::stat_path(path.text().view(), path_status)) {
-    report_soft_koshkit_error(ec, cxt,
-                              utility_name + ": cannot access '" + path.text() +
-                                  "': " + os::last_system_error_message());
+    koshkit::report_soft_koshkit_error(
+        ec, cxt, utility_name + ": cannot access '" + path.text() +
+                  "': " + os::last_system_error_message());
     return false;
   }
 
@@ -67,10 +54,9 @@ static fn change_path_ownership_recursive(
   let const does_follow = !is_symlink || should_follow_symlink;
   if (!os::set_file_owner(path.text().view(), owner_id, group_id, does_follow))
   {
-    report_soft_koshkit_error(ec, cxt,
-                              utility_name + ": cannot change ownership of '" +
-                                  path.text() +
-                                  "': " + os::last_system_error_message());
+    koshkit::report_soft_koshkit_error(
+        ec, cxt, utility_name + ": cannot change ownership of '" +
+                  path.text() + "': " + os::last_system_error_message());
     return false;
   }
 
@@ -86,10 +72,9 @@ static fn change_path_ownership_recursive(
       if (identity.device_id == followed_status.device_id &&
           identity.file_id == followed_status.file_id)
       {
-        report_soft_koshkit_error(ec, cxt,
-                                  utility_name +
-                                      ": recursive directory loop at '" +
-                                      path.text() + "'");
+        koshkit::report_soft_koshkit_error(
+            ec, cxt, utility_name + ": recursive directory loop at '" +
+                      path.text() + "'");
         return false;
       }
     }
@@ -104,10 +89,9 @@ static fn change_path_ownership_recursive(
 
   let children = Path::read_directory(path);
   if (!children.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              utility_name + ": cannot read directory '" +
-                                  path.text() +
-                                  "': " + os::last_system_error_message());
+    koshkit::report_soft_koshkit_error(
+        ec, cxt, utility_name + ": cannot read directory '" + path.text() +
+                  "': " + os::last_system_error_message());
     return false;
   }
 
@@ -125,6 +109,22 @@ static fn change_path_ownership_recursive(
   return did_succeed;
 }
 
+} /* namespace */
+
+fn resolve_user_id(StringView text) throws -> Maybe<u32>
+{
+  if (let const numeric = parse_numeric_id(text); numeric.has_value())
+    return numeric;
+  return os::username_to_uid(text);
+}
+
+fn resolve_group_id(StringView text) throws -> Maybe<u32>
+{
+  if (let const numeric = parse_numeric_id(text); numeric.has_value())
+    return numeric;
+  return os::groupname_to_gid(text);
+}
+
 fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
                          StringView utility_name, const Path &path,
                          i64 owner_id, i64 group_id, bool should_recurse,
@@ -139,4 +139,4 @@ fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
       should_follow_symlink, should_follow_nested_symlinks, active_directories);
 }
 
-} // namespace koshka::koshkit
+} /* namespace koshka::utils */

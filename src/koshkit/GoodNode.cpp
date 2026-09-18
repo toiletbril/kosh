@@ -90,13 +90,9 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
 {
   append_report_text(output, path, colors::ansi::BOLD_BLUE, should_color);
   output += '\n';
-  let body = String{allocator, "  "};
-  bool has_field = false;
+  let table = ReportTable{allocator};
   let const do_append_field = [&](StringView name, StringView value) throws {
-    if (has_field) body += ", ";
-    append_report_inline_field(body, name, value, colors::ansi::BOLD_CYAN,
-                               should_color);
-    has_field = true;
+    table.add(name, value, colors::ansi::BOLD_CYAN);
   };
   do_append_field("Type", file_type_name(status));
   do_append_field("Inode", String::from(status.file_id, allocator));
@@ -151,8 +147,7 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     if (digest.has_value()) do_append_field("CRC32C", digest->view());
   }
 
-  output += body.view();
-  output += '\n';
+  output += table.to_string(should_color).view();
 }
 
 fn find_inode(const Path &path, const os::file_status &status, u64 inode,
