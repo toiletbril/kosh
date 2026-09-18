@@ -1026,6 +1026,8 @@ enum class string_configuration_key : u8
   V7LpBigOffBigCFlags,
   V7LpBigOffBigLdFlags,
   V7LpBigOffBigLibs,
+  V7ThreadsCFlags,
+  V7ThreadsLdFlags,
   V7WidthRestrictedEnvironments,
   V7Environment,
   V8Ilp32Off32CFlags,
