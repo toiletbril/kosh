@@ -437,10 +437,9 @@ fn EvilDisk::execute(
 
   output += "\n";
   if (!has_failure_counters) {
-    let body = String{allocator};
-    append_report_field(body, "Status", "unavailable", colors::ansi::BOLD_CYAN,
-                        should_color);
-    append_report_body(output, body.view());
+    let table = ReportTable{allocator};
+    table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
+    output += table.to_string(should_color);
   } else {
     output += "  ";
     append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
@@ -497,26 +496,22 @@ fn EvilDisk::execute(
           filesystem.volume_uuid.is_empty())
         continue;
       has_identity = true;
-      let body = String{allocator};
-      append_report_field(body, "Mount", filesystem.target.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(body, "Label",
-                          filesystem.volume_name.is_empty()
-                              ? StringView{"-"}
-                              : filesystem.volume_name.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(body, "UUID",
-                          filesystem.volume_uuid.is_empty()
-                              ? StringView{"-"}
-                              : filesystem.volume_uuid.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_body(output, body.view());
+      let table = ReportTable{allocator};
+      table.add("Mount", filesystem.target.view(), colors::ansi::BOLD_CYAN);
+      table.add("Label", filesystem.volume_name.is_empty()
+                             ? StringView{"-"}
+                             : filesystem.volume_name.view(),
+                colors::ansi::BOLD_CYAN);
+      table.add("UUID", filesystem.volume_uuid.is_empty()
+                            ? StringView{"-"}
+                            : filesystem.volume_uuid.view(),
+                colors::ansi::BOLD_CYAN);
+      output += table.to_string(should_color);
     }
     if (!has_identity) {
-      let body = String{allocator};
-      append_report_field(body, "Status", "unavailable",
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_body(output, body.view());
+      let table = ReportTable{allocator};
+      table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
+      output += table.to_string(should_color);
     }
 
     output += "\n";
@@ -527,9 +522,6 @@ fn EvilDisk::execute(
                                               counters))
         continue;
       has_filesystem_failures = true;
-      let body = String{allocator};
-      append_report_field(body, "Mount", filesystem.target.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
       let values = String{allocator, "read "};
       values += String::from(counters.read_count, allocator).view();
       values += ", write ";
@@ -540,15 +532,15 @@ fn EvilDisk::execute(
       values += String::from(counters.corruption_count, allocator).view();
       values += ", generation ";
       values += String::from(counters.generation_count, allocator).view();
-      append_report_field(body, "Counters", values.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_body(output, body.view());
+      let table = ReportTable{allocator};
+      table.add("Mount", filesystem.target.view(), colors::ansi::BOLD_CYAN);
+      table.add("Counters", values.view(), colors::ansi::BOLD_CYAN);
+      output += table.to_string(should_color);
     }
     if (!has_filesystem_failures) {
-      let body = String{allocator};
-      append_report_field(body, "Status", "unavailable",
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_body(output, body.view());
+      let table = ReportTable{allocator};
+      table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
+      output += table.to_string(should_color);
     }
   }
 
@@ -556,10 +548,9 @@ fn EvilDisk::execute(
     let const smart_rows = read_smart_rows(cxt, filesystems, allocator);
     output += "\n";
     if (smart_rows.is_empty()) {
-      let body = String{allocator};
-      append_report_field(body, "Status", "unavailable",
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_body(output, body.view());
+      let table = ReportTable{allocator};
+      table.add("Status", "unavailable", colors::ansi::BOLD_CYAN);
+      output += table.to_string(should_color);
     } else {
       usize device_width = 6;
       usize status_width = 6;
