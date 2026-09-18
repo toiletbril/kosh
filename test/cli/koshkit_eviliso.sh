@@ -64,3 +64,6 @@ case $help in
   *) help_shape=wrong ;;
 esac
 printf 'help-shape=%s\n' "$help_shape"
+
+"$BIN" -c 'koshkit evilps >/dev/null; koshkit evilss -x >/dev/null; koshkit eviliso -n >/dev/null'
+echo "unprivileged-status=$?"

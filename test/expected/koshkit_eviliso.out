@@ -7,3 +7,4 @@ sessions-selector=matched
 remote-selector=matched
 runtime-selector=matched
 help-shape=matched
+unprivileged-status=0
