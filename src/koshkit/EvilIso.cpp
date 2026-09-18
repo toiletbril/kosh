@@ -22,7 +22,8 @@ HELP_DESCRIPTION_DECL(
     "The eviliso utility reports namespaces, cgroups, sessions, and remote "
     "connections.");
 
-FLAG(EVILISO_ALL, Bool, 'a', "all", "Report every isolation section.");
+FLAG(EVILISO_DETAIL, Bool, 'a', "detail",
+     "Include additional isolation details.");
 FLAG(EVILISO_NAMESPACES, Bool, 'n', "namespaces", "Report process namespaces.");
 FLAG(EVILISO_CGROUPS, Bool, 'c', "cgroups", "Report cgroup membership.");
 FLAG(EVILISO_SESSIONS, Bool, 's', "sessions", "Report login sessions.");
@@ -176,19 +177,14 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const any_selector =
-      FLAG_EVILISO_ALL.is_enabled() || FLAG_EVILISO_NAMESPACES.is_enabled() ||
+      FLAG_EVILISO_NAMESPACES.is_enabled() ||
       FLAG_EVILISO_CGROUPS.is_enabled() || FLAG_EVILISO_SESSIONS.is_enabled() ||
       FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled();
-  let const show_namespaces = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
-                              FLAG_EVILISO_NAMESPACES.is_enabled();
-  let const show_cgroups = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
-                           FLAG_EVILISO_CGROUPS.is_enabled();
-  let const show_sessions = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
-                            FLAG_EVILISO_SESSIONS.is_enabled();
-  let const show_remote = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
-                          FLAG_EVILISO_REMOTE.is_enabled();
-  let const show_runtime = FLAG_EVILISO_ALL.is_enabled() || !any_selector ||
-                           FLAG_EVILISO_RUNTIME.is_enabled();
+  let const show_namespaces = !any_selector || FLAG_EVILISO_NAMESPACES.is_enabled();
+  let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
+  let const show_sessions = !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
+  let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
+  let const show_runtime = !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
   if (show_namespaces) append_namespace_report(output, should_color);

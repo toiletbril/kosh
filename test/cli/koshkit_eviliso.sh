@@ -15,15 +15,20 @@ for section in 'cgroup:' 'Membership:' 'Session:' 'Remote sockets:'; do
 done
 printf 'default-shape=%s\n' "$default_shape"
 
-all_report=$(run_report --all)
-all_shape=matched
-for section in 'cgroup:' 'Membership:' 'Session:' 'Remote sockets:'; do
-  case $all_report in
-    *"$section"*) ;;
-    *) all_shape=missing ;;
-  esac
-done
-printf 'all-shape=%s\n' "$all_shape"
+detail_report=$(run_report --detail)
+detail_shape=matched
+case $detail_report in
+  *"cgroup:"*) ;;
+  *) detail_shape=missing ;;
+esac
+printf 'detail-shape=%s\n' "$detail_shape"
+
+namespaces_only=$(run_report --namespaces)
+case $namespaces_only in
+  *"Membership:"*) namespaces_scope=wrong ;;
+  *) namespaces_scope=matched ;;
+esac
+printf 'namespaces-scope=%s\n' "$namespaces_scope"
 
 for selector_section in \
   'namespaces|-n|cgroup:' \

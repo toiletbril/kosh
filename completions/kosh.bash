@@ -167,7 +167,7 @@ _koshkit_util_flags()
     file)          echo "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only" ;;
     evil)          echo "-a --all -s --short -u --users" ;;
     goodcore)      echo "-p --pid -b --binary -o --output -q --quiet --no-compress" ;;
-    eviliso)       echo "-a --all -n --namespaces -c --cgroups -s --sessions -r --remote -k --runtime" ;;
+    eviliso)       echo "-a --detail -n --namespaces -c --cgroups -s --sessions -r --remote -k --runtime" ;;
     evildisk)      echo "-a --all" ;;
     evilfiles)     echo "-t --terse -p --pid -u --user -c --command -i --network" ;;
     evilfs)        echo "-a --all" ;;
@@ -175,7 +175,7 @@ _koshkit_util_flags()
     evillogs)      echo "--cores --logs" ;;
     evilnet)       echo "-a --all -t --traffic -l --live -f --failures --falloff" ;;
     goodnode)      echo "-i --inode -r --root" ;;
-    evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory --sort" ;;
+    evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory --sort --live --cumulative" ;;
     goodstat)      echo "-L --dereference -c --checksum -f --filesystem" ;;
     goodfsw)       echo "-h --human-readable -r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude" ;;
     ls)            echo "-a -A -1 -l -h -F -t -S -r -R -L --classify --recursive --level --tree" ;;

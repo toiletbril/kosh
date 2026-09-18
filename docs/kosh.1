@@ -1891,17 +1891,18 @@ Mapped libraries and host metadata are included. Zstandard compression is used
 when available, with gzip as the fallback.
 .TP
 .B eviliso
-Isolation evidence is grouped into namespace, cgroup, login-session, and remote
-socket sections. The
+Isolation evidence is grouped into namespace, cgroup, login-session, remote
+socket, and runtime sections. With no selector, all sections are shown. The
 .B -a
-option selects all sections; otherwise
+or
+.B --detail
+option includes additional detail. Otherwise
 .BR -n , -c , -s ,
 and
 .B -r
 select namespaces, cgroups, sessions, and remote sockets; the
 .B \\-k
-option selects container and Kubernetes runtime evidence. With no selector, all
-sections are shown.
+option selects container and Kubernetes runtime evidence.
 .TP
 .B evildisk
 The utility prints capacity and filesystem identity for each named path or
@@ -1995,6 +1996,20 @@ option accepts name, pid, cpu, and memory.
 The
 .B \-NUMBER
 operand limits the output to NUMBER processes.
+The
+.B \-l
+and
+.B \-\-live
+options refresh the process tree until interrupted. An optional duration sets
+the sampling interval, which defaults to one second. The
+.B \-\-cumulative
+option accepts an optional duration. Without
+.B \-\-live,
+it waits for that duration before collecting the process tree; with
+.B \-\-live,
+it sets the refresh interval while
+.B \-\-live
+continues to set the sampling interval.
 .TP
 .B evilss
 Visible TCP and UDP sockets are printed in a table. Address family, protocol,

@@ -1,5 +1,6 @@
 default-shape=matched
-all-shape=matched
+detail-shape=matched
+namespaces-scope=matched
 namespaces-selector=matched
 cgroups-selector=matched
 sessions-selector=matched
