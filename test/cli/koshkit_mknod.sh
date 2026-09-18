@@ -12,7 +12,8 @@ printf 'posix-status=%s type=%s\n' "$posix_status" "$posix_type"
   mknod "$root"
 modern_status=$?
 if test -p "$root/fifo-modern"; then modern_type=fifo; else modern_type=missing; fi
-printf 'modern-status=%s type=%s\n' "$modern_status" "$modern_type"
+modern_mode=$(stat -c '%a' "$root/fifo-modern" 2>/dev/null || printf missing)
+printf 'modern-status=%s type=%s mode=%s\n' "$modern_status" "$modern_type" "$modern_mode"
 
 "$BIN" -c 'koshkit mknod --mode definitely-not-a-mode "$1/bad"' \
   mknod "$root" >/dev/null 2>&1

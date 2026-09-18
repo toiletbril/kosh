@@ -1,5 +1,5 @@
 posix-status=0 type=fifo
-modern-status=0 type=fifo
+modern-status=0 type=fifo mode=600
 invalid-mode-status=1
 invalid-device-status=1
 named-extra-status=1
