@@ -199,12 +199,15 @@ struct live_process_row
 {
   io_row row;
   u64 last_seen_nanoseconds{0};
+  u64 idle_nanoseconds{0};
 };
 
 fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
                                  bool should_color,
-                                 StringView duration_suffix) throws -> void
+                                 StringView duration_suffix,
+                                 const ArrayList<u64> *idle_nanoseconds_list)
+    throws -> void
 {
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
@@ -227,28 +230,49 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
   let const shown_count = rows.count() < row_limit ? rows.count() : row_limit;
   for (usize index = 0; index < shown_count; index++) {
     let const &row = rows[index];
+    u64 decayed_factor = 1000;
+    if (idle_nanoseconds_list != nullptr &&
+        index < idle_nanoseconds_list->count())
+    {
+      let const idle = (*idle_nanoseconds_list)[index];
+      /* A row fades linearly to zero across the collection window after its
+         last activity, then reads as zero until it is dropped. */
+      decayed_factor = idle == 0 ? 1000 : 0;
+    }
     append_report_column(output, String::from(row.pid, allocator).view(), 8,
                          true, colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
     append_report_column(
-        output, format_human_size(row.status.read_bytes, allocator).view(), 10,
-        true, colors::ansi::GREEN, should_color);
+        output,
+        format_human_size(
+            row.status.read_bytes * decayed_factor / 1000, allocator)
+            .view(),
+        10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
-        output, format_human_size(row.status.written_bytes, allocator).view(),
+        output,
+        format_human_size(
+            row.status.written_bytes * decayed_factor / 1000, allocator)
+            .view(),
         10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
         output,
         row.status.has_operation_counts
-            ? String::from(row.status.read_operation_count, allocator).view()
+            ? String::from(row.status.read_operation_count * decayed_factor /
+                               1000,
+                           allocator)
+                  .view()
             : StringView{"-"},
         10, true, {}, should_color);
     output += "  ";
     append_report_column(
         output,
         row.status.has_operation_counts
-            ? String::from(row.status.write_operation_count, allocator).view()
+            ? String::from(row.status.write_operation_count * decayed_factor /
+                               1000,
+                           allocator)
+                  .view()
             : StringView{"-"},
         11, true, {}, should_color);
     output += "  ";
@@ -616,7 +640,10 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
           if (retained[index].row.pid != row.pid) continue;
+          let const idle_nanoseconds =
+              now - retained[index].last_seen_nanoseconds;
           retained[index].row = row;
+          retained[index].idle_nanoseconds = idle_nanoseconds;
           retained[index].last_seen_nanoseconds = now;
           is_known = true;
           break;
@@ -648,14 +675,19 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
         });
     let rows = ArrayList<io_row>{allocator};
     rows.reserve(retained.count());
+    let idle_nanoseconds_list = ArrayList<u64>{allocator};
     for (let const &row : retained)
+    {
       rows.push(row.row);
+      idle_nanoseconds_list.push(row.idle_nanoseconds);
+    }
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_process_io_rate_report(output, rows, row_limit, allocator,
-                                  should_color, sample_duration_label);
+    append_process_io_rate_report(
+        output, rows, row_limit, allocator, should_color,
+        sample_duration_label, &idle_nanoseconds_list);
     ec.print_to_stdout(output);
   }
 }
@@ -664,6 +696,7 @@ struct live_disk_row
 {
   os::disk_io_status status;
   u64 last_seen_nanoseconds{0};
+  u64 idle_nanoseconds{0};
 };
 
 fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
@@ -717,7 +750,10 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
           if (retained[index].status.name != disk.name) continue;
+          let const idle_nanoseconds =
+              now - retained[index].last_seen_nanoseconds;
           retained[index].status = disk;
+          retained[index].idle_nanoseconds = idle_nanoseconds;
           retained[index].last_seen_nanoseconds = now;
           is_known = true;
           break;
@@ -1075,7 +1111,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
         before_rows, after_rows, elapsed_nanoseconds, allocator);
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
-                                  should_color, sample_duration_label.view());
+                                  should_color, sample_duration_label.view(),
+                                  nullptr);
     ec.print_to_stdout(output);
     return selected_pid.has_value() && after_rows.is_empty() ? 1 : 0;
   }
