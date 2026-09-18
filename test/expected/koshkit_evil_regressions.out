@@ -1,6 +1,8 @@
 evilps-tree=matched
 evilps-limit=matched
 evilps-pid-labels=matched
+evilps-human-format=matched
+evilps-sorted-roots=matched
 evilps-sampling-help=matched
 evilps-invalid-live=1
 evilps-invalid-cumulative=1

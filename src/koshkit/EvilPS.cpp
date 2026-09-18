@@ -31,6 +31,8 @@ FLAG(EVILPS_ARGUMENTS, Bool, 'a', "arguments", "Show the command line.");
 FLAG(EVILPS_OWNER, Bool, 'U', "show-owner", "Show the owner of each process.");
 FLAG(EVILPS_CPU, Bool, 'C', "cpu", "Show accumulated processor time.");
 FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
+FLAG(EVILPS_HUMAN, Bool, 'h', "human-readable",
+     "Show a compact process graph with readable resource columns.");
 FLAG(EVILPS_SORT, String, '\0', "sort",
      "Sort children by name, pid, cpu, or memory.");
 static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
@@ -94,8 +96,39 @@ fn sort_nodes(ArrayList<tree_node> &nodes) throws -> void
 }
 
 fn append_label(String &output, const tree_node &node, Allocator allocator,
-                bool should_color) throws -> void
+                bool should_color, bool should_human) throws -> void
 {
+  if (should_human) {
+    append_report_text(output,
+                       String::from(static_cast<u64>(node.pid), allocator).view(),
+                       colors::ansi::CYAN, should_color);
+    output += "  ";
+    append_report_text(
+        output, String::from(static_cast<u64>(node.parent_pid), allocator).view(),
+        colors::ansi::CYAN, should_color);
+    output += "  ";
+    let cpu_time = String::from(node.cpu_milliseconds / 1000, allocator);
+    cpu_time += ".";
+    let const milliseconds =
+        String::from(node.cpu_milliseconds % 1000, allocator);
+    cpu_time.append_repeated('0', 3 - milliseconds.length());
+    cpu_time += milliseconds.view();
+    cpu_time += "s";
+    output += cpu_time.view();
+    output += "  ";
+    output += format_human_size(node.resident_kib * 1024, allocator).view();
+    output += "  ";
+    append_report_text(output, node.name.view(), colors::ansi::BOLD_GREEN,
+                       should_color);
+    if (FLAG_EVILPS_ARGUMENTS.is_enabled() && !node.command_line.is_empty()) {
+      output += " ";
+      append_report_text(output, node.command_line.view(), colors::ansi::DIM,
+                         should_color);
+    }
+    output += "\n";
+    return;
+  }
+
   append_report_text(output, node.name.view(), colors::ansi::BOLD_GREEN,
                      should_color);
 
@@ -158,7 +191,7 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
 fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
                    const String &prefix, usize depth, Allocator allocator,
                    bool should_color, usize output_limit,
-                   usize &rendered_count) throws -> void
+                   usize &rendered_count, bool should_human) throws -> void
 {
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
 
@@ -183,13 +216,14 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
     append_report_text(output, prefix.view(), colors::ansi::CYAN, should_color);
     append_report_text(output, is_last ? "└── " : "├── ", colors::ansi::CYAN,
                        should_color);
-    append_label(output, nodes[position], allocator, should_color);
+    append_label(output, nodes[position], allocator, should_color, should_human);
     rendered_count++;
 
     let child_prefix = String{allocator, prefix.view()};
     child_prefix += is_last ? "    " : "│   ";
     render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
-                    allocator, should_color, output_limit, rendered_count);
+                    allocator, should_color, output_limit, rendered_count,
+                    should_human);
   }
 }
 
@@ -200,6 +234,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            usize output_limit, bool should_read_resources,
                            bool should_color, u32 viewport_rows,
                            usize scroll_offset, StringView search,
+                           bool should_human,
                            usize &visible_line_count) throws -> i32
 {
   let const processes = os::enumerate_processes(
@@ -253,12 +288,15 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   usize rendered_count = 0;
 
-  if (root_position < nodes.count()) {
+  if (should_human) output += "PID  PPID  CPU  MEM  COMMAND\n";
+
+  if (root_position < nodes.count() && !FLAG_EVILPS_SORT.is_set()) {
     nodes[root_position].was_rendered = true;
-    append_label(output, nodes[root_position], allocator, should_color);
+    append_label(output, nodes[root_position], allocator, should_color,
+                 should_human);
     rendered_count++;
     render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
-                    should_color, output_limit, rendered_count);
+                    should_color, output_limit, rendered_count, should_human);
     visible_line_count = 1;
     if (viewport_rows != 0) {
       let const full_output = String{allocator, output.view()};
@@ -302,6 +340,17 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     if (nodes[position].was_rendered) continue;
 
+    if (FLAG_EVILPS_SORT.is_set()) {
+      nodes[position].was_rendered = true;
+      append_label(output, nodes[position], allocator, should_color,
+                   should_human);
+      rendered_count++;
+      render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
+                      allocator, should_color, output_limit, rendered_count,
+                      should_human);
+      continue;
+    }
+
     bool has_visible_parent = false;
     for (let const &candidate : nodes) {
       if (candidate.pid != nodes[position].parent_pid) continue;
@@ -315,10 +364,12 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (has_visible_parent) continue;
 
     nodes[position].was_rendered = true;
-    append_label(output, nodes[position], allocator, should_color);
+    append_label(output, nodes[position], allocator, should_color,
+                 should_human);
     rendered_count++;
     render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
-                    allocator, should_color, output_limit, rendered_count);
+                    allocator, should_color, output_limit, rendered_count,
+                    should_human);
   }
 
   visible_line_count = rendered_count;
@@ -524,7 +575,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
             ec, cxt, allocator, operands, operand_locations, output_limit,
             should_read_resources, should_color,
             is_terminal && terminal_rows > 1 ? terminal_rows : 0,
-            scroll_offset, live_search.view(), visible_line_count);
+            scroll_offset, live_search.view(), FLAG_EVILPS_HUMAN.is_enabled(),
+            visible_line_count);
         if (status != 0) return status;
         if (visible_line_count > terminal_rows && terminal_rows > 1) {
           let const maximum_offset = visible_line_count - (terminal_rows - 1);
@@ -558,7 +610,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   return render_process_snapshot(ec, cxt, allocator, operands,
                                  operand_locations, output_limit,
                                  should_read_resources, should_color, 0, 0,
-                                 StringView{}, output_limit);
+                                 StringView{}, FLAG_EVILPS_HUMAN.is_enabled(),
+                                 output_limit);
 }
 
 } // namespace koshka::koshkit
