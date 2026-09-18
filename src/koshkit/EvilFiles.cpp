@@ -45,9 +45,12 @@ struct open_file_row
   String user;
   String descriptor;
   String type;
+  String mode;
   String device;
   String size;
+  String offset;
   String node;
+  String endpoint;
   String name;
 };
 
@@ -58,9 +61,12 @@ struct column_widths
   usize user{4};
   usize descriptor{2};
   usize type{4};
+  usize mode{4};
   usize device{6};
   usize size{8};
+  usize offset{6};
   usize node{4};
+  usize endpoint{8};
 };
 
 pure fn file_type_label(u32 mode) wontthrow -> StringView
@@ -247,6 +253,7 @@ fn EvilFiles::execute(
   column_widths widths{};
   let terse_output = String{allocator};
   bool did_match = false;
+  let warnings = String{allocator};
 
   for (let const &process : processes) {
     if (!matches_filters(process, wanted_pid, has_wanted_pid, wanted_owner)) {
@@ -255,6 +262,15 @@ fn EvilFiles::execute(
 
     let const files = os::list_process_open_files(process.pid, allocator);
     if (files.is_empty()) continue;
+
+    if (files.count() == 1 && files[0].is_inaccessible) {
+      warnings += "warning: Process ";
+      warnings += String::from(static_cast<u64>(process.pid), allocator).view();
+      warnings += " (";
+      warnings += process.name.view();
+      warnings += ") is inaccessible; skipping its descriptors.\n";
+      continue;
+    }
 
     if (FLAG_EVILFILES_TERSE.is_enabled()) {
       bool did_match_this_process = false;
@@ -324,12 +340,16 @@ fn EvilFiles::execute(
           descriptor_label(file, allocator),
           String{allocator, did_stat ? file_type_label(status.mode)
                                      : bracketed_type_label(file.path.view())},
+          did_stat ? os::format_mode_string(status.mode)
+                   : String{allocator, "-"},
           did_stat ? device_label(status, allocator) : String{allocator, "-"                                                                         },
           String::from(file.size != 0 || !did_stat ? file.size : status.size,
                        allocator),
+          String::from(file.offset, allocator),
           String::from(file.file_id != 0 || !did_stat ? file.file_id
                                                       : status.file_id,
                        allocator),
+          file.socket_endpoint,
           String{allocator, file.path.view()                                                            },
       };
 
@@ -338,9 +358,12 @@ fn EvilFiles::execute(
       widen(widths.user, row.user);
       widen(widths.descriptor, row.descriptor);
       widen(widths.type, row.type);
+      widen(widths.mode, row.mode);
       widen(widths.device, row.device);
       widen(widths.size, row.size);
+      widen(widths.offset, row.offset);
       widen(widths.node, row.node);
+      widen(widths.endpoint, row.endpoint);
       rows.push(steal(row));
     }
   }
@@ -350,7 +373,10 @@ fn EvilFiles::execute(
     return did_match ? 0 : 1;
   }
 
-  if (rows.is_empty()) return 1;
+  if (rows.is_empty()) {
+    if (!warnings.is_empty()) ec.print_to_stderr(warnings.view());
+    return 1;
+  }
 
   let const should_color = koshkit_should_color();
   let output = String{allocator};
@@ -369,13 +395,22 @@ fn EvilFiles::execute(
   append_report_column(output, "TYPE", widths.type, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
+  append_report_column(output, "MODE", widths.mode, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
   append_report_column(output, "DEVICE", widths.device, true,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
   append_report_column(output, "SIZE/OFF", widths.size, true,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
+  append_report_column(output, "OFFSET", widths.offset, true,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
   append_report_column(output, "NODE", widths.node, true,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "ENDPOINT", widths.endpoint, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
   append_report_text(output, "NAME", colors::ansi::BOLD_CYAN, should_color);
@@ -397,20 +432,30 @@ fn EvilFiles::execute(
     append_report_column(output, row.type.view(), widths.type, false,
                          colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
+    append_report_column(output, row.mode.view(), widths.mode, false,
+                         colors::ansi::BOLD_MAGENTA, should_color);
+    output += "  ";
     append_report_column(output, row.device.view(), widths.device, true,
                          colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(output, row.size.view(), widths.size, true,
                          colors::ansi::GREEN, should_color);
     output += "  ";
+    append_report_column(output, row.offset.view(), widths.offset, true,
+                         colors::ansi::GREEN, should_color);
+    output += "  ";
     append_report_column(output, row.node.view(), widths.node, true,
                          colors::ansi::GREEN, should_color);
+    output += "  ";
+    append_report_column(output, row.endpoint.view(), widths.endpoint, false,
+                         colors::ansi::CYAN, should_color);
     output += "  ";
     output += row.name.view();
     output += "\n";
   }
 
   ec.print_to_stdout(output);
+  if (!warnings.is_empty()) ec.print_to_stderr(warnings.view());
   return 0;
 }
 
