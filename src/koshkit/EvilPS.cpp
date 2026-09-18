@@ -18,7 +18,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-NUMBER] [-pnaUCM] [--sort key] [--live [seconds]] "
+HELP_SYNOPSIS_DECL("[-NUMBER] [-pAnUChM] [--sort key] [--live [seconds]] "
                    "[--cumulative [seconds]] [pid]");
 
 HELP_DESCRIPTION_DECL("The evilps utility shows running processes as a tree.");
@@ -27,12 +27,13 @@ FLAG(EVILPS_PIDS, Bool, 'p', "show-pids",
      "Show the identifier of each process.");
 FLAG(EVILPS_NUMERIC_SORT, Bool, 'n', "numeric-sort",
      "Sort the children by identifier.");
-FLAG(EVILPS_ARGUMENTS, Bool, 'a', "arguments", "Show the command line.");
+FLAG(EVILPS_ALL, Bool, 'a', "all",
+     "Show process identifiers, owners, processor time, memory, and command "
+     "lines.");
+FLAG(EVILPS_ARGUMENTS, Bool, 'A', "arguments", "Show the command line.");
 FLAG(EVILPS_OWNER, Bool, 'U', "show-owner", "Show the owner of each process.");
 FLAG(EVILPS_CPU, Bool, 'C', "cpu", "Show accumulated processor time.");
 FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
-FLAG(EVILPS_HUMAN, Bool, 'h', "human-readable",
-     "Show a compact process graph with readable resource columns.");
 FLAG(EVILPS_SORT, String, '\0', "sort",
      "Sort children by name, pid, cpu, or memory.");
 static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
@@ -121,7 +122,9 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
     output += "  ";
     append_report_text(output, node.name.view(), colors::ansi::BOLD_GREEN,
                        should_color);
-    if (FLAG_EVILPS_ARGUMENTS.is_enabled() && !node.command_line.is_empty()) {
+    if ((FLAG_EVILPS_ALL.is_enabled() ||
+         FLAG_EVILPS_ARGUMENTS.is_enabled()) &&
+        !node.command_line.is_empty()) {
       output += " ";
       append_report_text(output, node.command_line.view(), colors::ansi::DIM,
                          should_color);
@@ -133,7 +136,7 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
   append_report_text(output, node.name.view(), colors::ansi::BOLD_GREEN,
                      should_color);
 
-  if (FLAG_EVILPS_PIDS.is_enabled()) {
+  if (FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_PIDS.is_enabled()) {
     output += "(";
     append_report_text(
         output, String::from(static_cast<u64>(node.pid), allocator).view(),
@@ -141,7 +144,7 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
     output += ")";
   }
 
-  if (FLAG_EVILPS_OWNER.is_enabled()) {
+  if (FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_OWNER.is_enabled()) {
     let const owner = os::uid_to_username(node.owner_id);
     output += ",";
     append_report_text(output,
@@ -152,10 +155,10 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
   }
 
   let const should_show_cpu =
-      FLAG_EVILPS_CPU.is_enabled() ||
+      FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
       (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "cpu");
   let const should_show_memory =
-      FLAG_EVILPS_MEMORY.is_enabled() ||
+      FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_MEMORY.is_enabled() ||
       (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "memory");
   if (should_show_cpu || should_show_memory) {
     output += " [";
@@ -180,7 +183,8 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
     output += "]";
   }
 
-  if (FLAG_EVILPS_ARGUMENTS.is_enabled() && !node.command_line.is_empty()) {
+  if ((FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_ARGUMENTS.is_enabled()) &&
+      !node.command_line.is_empty()) {
     output += " ";
     append_report_text(output, node.command_line.view(), colors::ansi::DIM,
                        should_color);
@@ -509,7 +513,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const should_read_resources =
-      FLAG_EVILPS_CPU.is_enabled() || FLAG_EVILPS_MEMORY.is_enabled() ||
+      FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
+      FLAG_EVILPS_MEMORY.is_enabled() ||
       (FLAG_EVILPS_SORT.is_set() && (FLAG_EVILPS_SORT.value() == "cpu" ||
                                      FLAG_EVILPS_SORT.value() == "memory"));
   let const should_color = koshkit_should_color();
@@ -576,8 +581,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
             ec, cxt, allocator, operands, operand_locations, output_limit,
             should_read_resources, should_color,
             is_terminal && terminal_rows > 1 ? terminal_rows : 0,
-            scroll_offset, live_search.view(), FLAG_EVILPS_HUMAN.is_enabled(),
-            visible_line_count);
+            scroll_offset, live_search.view(), false, visible_line_count);
         if (status != 0) return status;
         if (visible_line_count > terminal_rows && terminal_rows > 1) {
           let const maximum_offset = visible_line_count - (terminal_rows - 1);
@@ -611,8 +615,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   return render_process_snapshot(ec, cxt, allocator, operands,
                                  operand_locations, output_limit,
                                  should_read_resources, should_color, 0, 0,
-                                 StringView{}, FLAG_EVILPS_HUMAN.is_enabled(),
-                                 output_limit);
+                                 StringView{}, false, output_limit);
 }
 
 } // namespace koshka::koshkit

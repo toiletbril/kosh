@@ -110,22 +110,22 @@ mv
 -l
 -t
 == evilps flags through koshkit:
+--all
 --arguments
 --cpu
 --cumulative
 --help
---human-readable
 --live
 --memory
 --numeric-sort
 --show-owner
 --show-pids
 --sort
+-A
 -C
 -M
 -U
 -a
--h
 -l
 -n
 -p

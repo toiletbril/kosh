@@ -66,7 +66,7 @@ printf 'evilio-default-scope=%s\n' "$default_scope"
 
 disk_report=$("$BIN" -c 'koshkit --color never evilio --cumulative 0.05')
 case $disk_report in
-  DEVICE*READ/S*WRITE/S*"READ OPS/S"*"WRITE OPS/S"*BUSY*"READ LAT"*"WRITE LAT"*"AVG QUEUE"*QUEUE*ERRORS*RETRIES*)
+  DEVICE*READ/0.05s*WRITE/0.05s*"READ OPS/0.05s"*"WRITE OPS/0.05s"*BUSY*"READ LAT"*"WRITE LAT"*"AVG QUEUE"*QUEUE*ERRORS*RETRIES*)
     disk_shape=matched
     ;;
   *) disk_shape=wrong ;;
@@ -95,7 +95,7 @@ printf 'evilio-cumulative-help=%s\n' "$cumulative_help"
 process_report=$("$BIN" -c \
   'koshkit --color never evilio --cumulative=0.05 --ps --count 1')
 case $process_report in
-  *PID*READ/S*WRITE/S*"READ IOPS"*"WRITE IOPS"*COMMAND*)
+  *PID*READ/0.05s*WRITE/0.05s*"READ OPS/0.05s"*"WRITE OPS/0.05s"*COMMAND*)
     process_shape=matched
     ;;
   *) process_shape=wrong ;;
