@@ -114,6 +114,11 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
                               "provide major and minor numbers");
       return 1;
     }
+    if (*major_number > 0xfffu || *minor_number > 0xfffffu) {
+      KOSHKIT_REPORT_ERROR_AT(type_location, "device number is out of range",
+                              "major must fit 12 bits and minor must fit 20 bits");
+      return 1;
+    }
   }
 
   usize name_end = FLAG_MKNOD_TYPE.is_set() ? 1 : 1;
