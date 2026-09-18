@@ -19,6 +19,7 @@ evilio-process-limit=unlimited
 evilnet-single-title=omitted
 evilnet-multiple-titles=omitted
 evilnet-traffic-only=present
+evil-short-indent=none
 evilss-unix=present
 evilps-single-title=omitted
 evilfs-single-title=omitted

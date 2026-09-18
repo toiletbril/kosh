@@ -419,9 +419,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (FLAG_EVIL_SHORT.is_enabled()) {
-    let report = String{allocator};
-    append_indented_report(report, output.view());
-    ec.print_to_stdout(report);
+    ec.print_to_stdout(output);
     return 0;
   }
 
@@ -580,10 +578,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     append_anomaly_report(output, cxt, should_color);
   }
 
-  let report = String{allocator};
-  append_indented_report(report, output.view());
-
-  ec.print_to_stdout(report);
+  ec.print_to_stdout(output);
   return 0;
 }
 

@@ -163,9 +163,16 @@ case $network_traffic_report in
 esac
 printf 'evilnet-traffic-only=%s\n' "$network_traffic_only"
 
+evil_short_report=$($BIN -c 'koshkit --color never evil --short')
+case $evil_short_report in
+  Host:*) evil_short_indent=none ;;
+  *) evil_short_indent=present ;;
+esac
+printf 'evil-short-indent=%s\n' "$evil_short_indent"
+
 unix_socket_report=$("$BIN" -c 'koshkit --color never evilss -x')
 case $unix_socket_report in
-  *u_str*/*|*u_str*'@/'*) unix_socket_shape=present ;;
+  *u_str*/*|*u_str*'@/'*|*u_dgr*/*|*u_seq*/*) unix_socket_shape=present ;;
   *) unix_socket_shape=missing ;;
 esac
 printf 'evilss-unix=%s\n' "$unix_socket_shape"
