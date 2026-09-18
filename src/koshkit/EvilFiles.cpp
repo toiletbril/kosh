@@ -366,10 +366,10 @@ fn EvilFiles::execute(
 
   let warnings = String{allocator};
   if (inaccessible_process_count != 0) {
-    warnings += "Warning: Skipped ";
+    warnings += "\nSkipped ";
     warnings += String::from(inaccessible_process_count, allocator).view();
-    warnings += inaccessible_process_count == 1 ? " inaccessible process.\n"
-                                                 : " inaccessible processes.\n";
+    warnings += inaccessible_process_count == 1 ? " inaccessible process."
+                                                : " inaccessible processes.";
   }
 
   if (FLAG_EVILFILES_TERSE.is_enabled()) {
@@ -378,7 +378,8 @@ fn EvilFiles::execute(
   }
 
   if (rows.is_empty()) {
-    if (!warnings.is_empty()) ec.print_to_stderr(warnings.view());
+    if (!warnings.is_empty())
+      show_message(Warning{warnings.view()}.to_string());
     return 1;
   }
 
@@ -459,7 +460,8 @@ fn EvilFiles::execute(
   }
 
   ec.print_to_stdout(output);
-  if (!warnings.is_empty()) ec.print_to_stderr(warnings.view());
+  if (!warnings.is_empty())
+    show_message(Warning{warnings.view()}.to_string());
   return 0;
 }
 
