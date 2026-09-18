@@ -45,7 +45,7 @@ static fn append_filesystem_id(String &output, StringView name, u64 value,
 static fn append_detailed_filesystem(String &output,
                                      const os::mounted_filesystem &mount,
                                      Allocator allocator,
-                                     bool should_color) throws -> void
+                                     bool should_color) throws -> bool
 {
   output += "  ";
   append_report_text(output, mount.target.view(), colors::ansi::BOLD_BLUE,
@@ -69,7 +69,7 @@ static fn append_detailed_filesystem(String &output,
   append_report_body(output, identity.view(), "    ");
 
   os::filesystem_status status{};
-  if (!os::stat_filesystem(mount.target.view(), status)) return;
+  if (!os::stat_filesystem(mount.target.view(), status)) return false;
 
   let metadata = String{allocator};
   append_filesystem_id(metadata, "Filesystem ID", status.filesystem_id,
@@ -101,6 +101,7 @@ static fn append_detailed_filesystem(String &output,
                       String::from(status.name_max, allocator),
                       colors::ansi::BOLD_CYAN, should_color);
   append_report_body(output, metadata.view(), "      ");
+  return true;
 }
 
 fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
@@ -144,10 +145,21 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   let const should_color = koshkit_should_color();
   if (FLAG_EVILFS_ALL.is_enabled()) {
+    usize skipped_permission_count = 0;
     for (let const &mount : mounts) {
       if (!output.is_empty()) output += "\n";
-      append_detailed_filesystem(output, mount, cxt.scratch_allocator(),
-                                 should_color);
+      let const metadata_available = append_detailed_filesystem(
+          output, mount, cxt.scratch_allocator(), should_color);
+      if (!metadata_available && os::last_system_error_is_permission_denied())
+        skipped_permission_count++;
+    }
+    if (skipped_permission_count != 0) {
+      output += "\n";
+      output += "Warning: skipped ";
+      output += String::from(skipped_permission_count,
+                             cxt.scratch_allocator()).view();
+      output += skipped_permission_count == 1 ? " filesystem" : " filesystems";
+      output += " due to permission denied.\n";
     }
     ec.print_to_stdout(output);
     return mounts.is_empty() ? 1 : 0;
