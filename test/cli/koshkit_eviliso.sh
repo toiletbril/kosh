@@ -18,7 +18,11 @@ printf 'default-shape=%s\n' "$default_shape"
 detail_report=$(run_report --detail)
 detail_shape=matched
 case $detail_report in
-  *"cgroup:"*) ;;
+  *"cgroup:"*"cgroup processes:"*"cgroup process:"*) ;;
+  *) detail_shape=missing ;;
+esac
+case $detail_report in
+  *" ("*", "*")"*) ;;
   *) detail_shape=missing ;;
 esac
 printf 'detail-shape=%s\n' "$detail_shape"

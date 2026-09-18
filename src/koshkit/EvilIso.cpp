@@ -38,7 +38,8 @@ namespace koshka::koshkit {
 
 namespace {
 
-fn append_namespace_report(String &output, bool should_color) throws -> void
+fn append_namespace_report(String &output, bool should_color,
+                           bool should_show_detail) throws -> void
 {
   let body = String{heap_allocator()};
   constexpr StringView names[] = {"cgroup", "ipc",  "mnt",  "net",
@@ -65,6 +66,25 @@ fn append_namespace_report(String &output, bool should_color) throws -> void
     let const process_field = String::from(process_count, heap_allocator());
     append_report_field(body, String{name} + " processes", process_field.view(),
                         colors::ansi::BOLD_CYAN, should_color);
+    if (!should_show_detail) continue;
+
+    for (let const &process : processes) {
+      let const process_namespace = os::read_symlink(
+          String{"/proc/"} + String::from(process.pid, heap_allocator()) +
+              "/ns/" + name,
+          heap_allocator());
+      if (!process_namespace.has_value() ||
+          process_namespace->view() != target->view())
+        continue;
+
+      let identity = String::from(process.pid, heap_allocator());
+      identity += " (";
+      identity += process.name.view();
+      identity += process.pid == os::get_current_process_id() ? ", self)"
+                                                               : ", other)";
+      append_report_field(body, String{name} + " process", identity.view(),
+                          colors::ansi::BOLD_CYAN, should_color);
+    }
   }
   output += body.view();
   output += '\n';
@@ -187,7 +207,9 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const show_runtime = !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
-  if (show_namespaces) append_namespace_report(output, should_color);
+  if (show_namespaces)
+    append_namespace_report(output, should_color,
+                            FLAG_EVILISO_DETAIL.is_enabled());
   if (show_cgroups) append_cgroup_report(output, should_color);
   if (show_sessions) append_session_report(output, should_color);
   if (show_remote) append_remote_report(output, should_color);
