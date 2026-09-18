@@ -298,7 +298,7 @@ fn GoodNode::execute(
     if (report_results[index].error_number != 0) {
       os::set_last_system_error(report_results[index].error_number);
       report_soft_koshkit_error(ec, cxt,
-                                "goodnode: cannot inspect '" + path +
+                                "cannot inspect '" + path +
                                     "': " + os::last_system_error_message());
       exit_status = 1;
       continue;

@@ -300,7 +300,7 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (!os::has_network_socket_listing()) {
-    report_soft_koshkit_error(ec, cxt, "evilss: socket listing is unavailable",
+    report_soft_koshkit_error(ec, cxt, "socket listing is unavailable",
                               "this platform does not expose socket records");
     return 1;
   }

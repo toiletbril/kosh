@@ -242,7 +242,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                             : os::process_detail::Basic);
   if (processes.is_empty()) {
     report_soft_koshkit_error(ec, cxt,
-                              "evilps: the process listing is unavailable",
+                              "the process listing is unavailable",
                               "this platform exposes no process table");
     return 1;
   }

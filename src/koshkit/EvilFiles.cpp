@@ -200,7 +200,7 @@ fn EvilFiles::execute(
 
   if (!os::has_process_open_file_listing()) {
     report_soft_koshkit_error(ec, cxt,
-                              "evilfiles: open file listing is unavailable",
+                              "open file listing is unavailable",
                               "this platform exposes no open file table");
     return 1;
   }
@@ -244,7 +244,7 @@ fn EvilFiles::execute(
   let const processes = os::enumerate_processes();
   if (processes.is_empty()) {
     report_soft_koshkit_error(ec, cxt,
-                              "evilfiles: the process listing is unavailable",
+                              "the process listing is unavailable",
                               "this platform exposes no process table");
     return 1;
   }
