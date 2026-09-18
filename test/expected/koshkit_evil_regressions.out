@@ -1,6 +1,11 @@
 evilps-tree=matched
 evilps-limit=matched
 evilps-pid-labels=matched
+evilps-sampling-help=matched
+evilps-invalid-live=1
+evilps-invalid-cumulative=1
+evilps-live-status=130
+evilps-live-refresh=matched
 evilfs-detail=matched
 evilnet-addresses=matched
 evilnet-all-sections=matched

@@ -18,6 +18,45 @@ case $ps_limited in
 esac
 printf 'evilps-pid-labels=%s\n' "$ps_pid_labels"
 
+evilps_help=$($BIN -c 'koshkit evilps --help')
+case $evilps_help in
+  *'--live[=<seconds>]'*'--cumulative[=<seconds>]'*)
+    evilps_sampling_help=matched
+    ;;
+  *) evilps_sampling_help=wrong ;;
+esac
+printf 'evilps-sampling-help=%s\n' "$evilps_sampling_help"
+
+$BIN -c 'koshkit evilps --live=0' > /dev/null 2>&1
+printf 'evilps-invalid-live=%s\n' "$?"
+$BIN -c 'koshkit evilps --cumulative=0' > /dev/null 2>&1
+printf 'evilps-invalid-cumulative=%s\n' "$?"
+
+evilps_live_path=$TEST_TEMP_DIRECTORY/evilps-live-report
+set -m
+$BIN -c 'koshkit --color never evilps --show-pids --live=0.05 --cumulative=0.1 -1' \
+  > "$evilps_live_path" &
+evilps_live_pid=$!
+set +m
+evilps_live_attempt=0
+while [ ! -s "$evilps_live_path" ] && [ "$evilps_live_attempt" -lt 250 ]; do
+  sleep 0.02
+  evilps_live_attempt=$((evilps_live_attempt + 1))
+done
+sleep 0.3
+if kill -0 "$evilps_live_pid" 2> "$TEST_NULL_DEVICE"; then
+  kill -INT "$evilps_live_pid"
+fi
+wait "$evilps_live_pid"
+printf 'evilps-live-status=%s\n' "$?"
+evilps_live_lines=$(wc -l < "$evilps_live_path")
+if [ "$evilps_live_lines" -ge 2 ]; then
+  evilps_live_refresh=matched
+else
+  evilps_live_refresh=wrong
+fi
+printf 'evilps-live-refresh=%s\n' "$evilps_live_refresh"
+
 fs_report=$($BIN -c 'koshkit --color never evilfs --all')
 case $fs_report in
   *'Source:'*'Volume:'*'UUID:'*'Filesystem ID:'*) fs_detail=matched ;;
