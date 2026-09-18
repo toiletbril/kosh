@@ -18,6 +18,10 @@ printf 'modern-status=%s type=%s\n' "$modern_status" "$modern_type"
   mknod "$root" >/dev/null 2>&1
 printf 'invalid-mode-status=%s\n' "$?"
 
+"$BIN" -c 'koshkit mknod --character --major 4096 --minor 0 "$1/device"' \
+  mknod "$root" >/dev/null 2>&1
+printf 'invalid-device-status=%s\n' "$?"
+
 rm -f "$root/fifo-posix" "$root/fifo-modern"
 if test ! -e "$root/fifo-posix" && test ! -e "$root/fifo-modern"; then
   cleanup=ok
