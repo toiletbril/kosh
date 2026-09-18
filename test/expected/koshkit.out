@@ -84,8 +84,8 @@ mv
 --help
 --logs
 == eviliso flags through koshkit:
---detail
 --cgroups
+--detail
 --help
 --namespaces
 --remote
@@ -112,7 +112,10 @@ mv
 == evilps flags through koshkit:
 --arguments
 --cpu
+--cumulative
 --help
+--human-readable
+--live
 --memory
 --numeric-sort
 --show-owner
@@ -122,6 +125,8 @@ mv
 -M
 -U
 -a
+-h
+-l
 -n
 -p
 == evilss flags through koshkit:
@@ -163,13 +168,17 @@ mv
 --help
 --human-readable
 --latency
+--machine-readable
 --one-event
+--precision
 --recursive
 --timestamp
+--timezone
 -1
 -e
 -h
 -l
+-m
 -r
 -t
 -x
