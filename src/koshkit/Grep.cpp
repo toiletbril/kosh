@@ -11,6 +11,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -28,6 +29,54 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Grep);
 namespace koshka {
 
 namespace koshkit {
+
+static pure fn is_literal_search_pattern(StringView pattern) wontthrow -> bool
+{
+  for (usize index = 0; index < pattern.length; index++) {
+    switch (pattern[index]) {
+      case '.':
+      case '^':
+      case '$':
+      case '*':
+      case '+':
+      case '?':
+      case '(':
+      case ')':
+      case '[':
+      case ']':
+      case '{':
+      case '}':
+      case '|':
+      case '\\': return false;
+      default: break;
+    }
+  }
+
+  return true;
+}
+
+static pure fn contains_ascii_insensitive(StringView value,
+                                           StringView pattern) wontthrow
+    -> bool
+{
+  if (pattern.is_empty()) return true;
+  if (pattern.length > value.length) return false;
+
+  let const last_start = value.length - pattern.length;
+  for (usize start = 0; start <= last_start; start++) {
+    bool is_match = true;
+    for (usize index = 0; index < pattern.length; index++) {
+      if (utils::ascii_to_lower(value[start + index]) !=
+          utils::ascii_to_lower(pattern[index])) {
+        is_match = false;
+        break;
+      }
+    }
+    if (is_match) return true;
+  }
+
+  return false;
+}
 
 Grep::Grep() = default;
 
@@ -49,6 +98,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const pattern = operands[0].view();
   let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
+  let const should_use_literal_search = is_literal_search_pattern(pattern);
 
   os::compiled_regex compiled;
   if (os::compile_search_regex(pattern,
@@ -74,15 +124,20 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
   bool has_any_match = false;
   i32 status = 0;
-  let const do_process_line = [&](StringView source) throws -> void {
-    let const is_match = os::regex_matches_null_terminated(compiled, line);
+  let const do_process_line = [&](StringView source, StringView value) throws
+      -> void {
+    let const is_match = should_use_literal_search
+                             ? (should_ignore_case
+                                    ? contains_ascii_insensitive(value, pattern)
+                                    : value.find_substring(pattern).has_value())
+                             : os::regex_matches_null_terminated(compiled, value);
     if (is_match != should_invert) {
       has_any_match = true;
       if (should_print_names) {
         output += source == "-" ? StringView{"(standard input)"} : source;
         output += ':';
       }
-      output += line;
+      output += value;
       output += '\n';
       if (output.count() >= 65536) {
         ec.print_to_stdout(output);
@@ -109,13 +164,21 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
           delimiter_position++;
         }
 
-        line.append(chunk.content.substring_of_length(
-            position, delimiter_position - position));
-        position = delimiter_position;
-        if (position == chunk.content.length) break;
+        let const segment = chunk.content.substring_of_length(
+            position, delimiter_position - position);
+        if (delimiter_position == chunk.content.length) {
+          line.append(segment);
+          break;
+        }
 
+        if (should_use_literal_search && line.is_empty())
+          do_process_line(source, segment);
+        else {
+          line.append(segment);
+          do_process_line(source, line.view());
+        }
+        position = delimiter_position;
         position++;
-        do_process_line(source);
       }
 
       if (!chunk.is_complete) continue;
@@ -134,7 +197,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         continue;
       }
 
-      if (!line.is_empty()) do_process_line(source);
+      if (!line.is_empty()) do_process_line(source, line.view());
     }
   }
 
