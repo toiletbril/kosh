@@ -49,7 +49,7 @@ run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-disk-report" \
 disk_live_status=$live_status
 disk_live_report=$live_report
 case $disk_live_report in
-  *DEVICE*READ/0.02s*WRITE/0.02s*READ\ OPS/0.02s*WRITE\ OPS/0.02s*BUSY*READ\ LAT*WRITE\ LAT*AVG\ QUEUE*QUEUE*ERRORS*RETRIES*)
+  *ctrl*c*exit*DEVICE*READ/0.02s*WRITE/0.02s*READ\ OPS/0.02s*WRITE\ OPS/0.02s*BUSY*READ\ LAT*WRITE\ LAT*AVG\ QUEUE*QUEUE*ERRORS*RETRIES*)
     disk_live_shape=matched
     ;;
   *) disk_live_shape=wrong ;;
@@ -59,14 +59,14 @@ case $disk_live_report in
   *) disk_live_scope=only-disk-io ;;
 esac
 case $disk_live_report in
-  DEVICE*) disk_live_margin=unindented ;;
+  *ctrl*c*exit*) disk_live_margin=unindented ;;
   *) disk_live_margin=wrong ;;
 esac
 run_live_report "$TEST_TEMP_DIRECTORY/evilio-live-disk-window-report" \
   'koshkit --color never evilio --live=0.05 --cumulative=1.2'
 disk_window_report=$live_report
 case $disk_window_report in
-  *"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
+  *ctrl*c*exit*"READ OPS/1.2s"*"WRITE OPS/1.2s"*)
     disk_window_shape=matched
     ;;
   *) disk_window_shape=wrong ;;

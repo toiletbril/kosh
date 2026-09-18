@@ -575,6 +575,10 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
+  let const sample_label =
+      format_live_duration(sample_duration_seconds, allocator);
+  let const refresh_label =
+      format_live_duration(refresh_interval_seconds, allocator);
   let before_rows = read_process_io_rows(allocator, selected_pid, true);
   if (selected_pid.has_value() && before_rows.is_empty()) return 1;
 
@@ -648,6 +652,8 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
       rows.push(row.row);
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
+    append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
+                             should_color);
     append_process_io_rate_report(output, rows, row_limit, allocator,
                                   should_color, sample_duration_label);
     ec.print_to_stdout(output);
@@ -676,6 +682,10 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
+  let const sample_label =
+      format_live_duration(sample_duration_seconds, allocator);
+  let const refresh_label =
+      format_live_duration(refresh_interval_seconds, allocator);
 
   loop
   {
@@ -746,6 +756,8 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
 
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
+    append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
+                             should_color);
     append_disk_io_report(output, before_snapshot, current_snapshot,
                           elapsed_nanoseconds, true, false, allocator,
                           should_color, sample_duration_label);

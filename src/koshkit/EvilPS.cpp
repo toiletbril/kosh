@@ -583,8 +583,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let live_search = String{allocator};
     usize scroll_offset = 0;
     if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
+    let const is_cursor_hidden = is_terminal && hide_cursor(ec);
     defer
     {
+      if (is_cursor_hidden) show_cursor(ec);
       if (is_alternate_screen_active) leave_alternate_screen(ec);
     };
 
@@ -600,8 +602,21 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       if (last_refresh_nanoseconds == 0 ||
           now - last_refresh_nanoseconds >= refresh_interval_nanoseconds) {
         last_refresh_nanoseconds = now;
-        if (is_terminal) ec.print_to_stdout("\x1b[H\x1b[2J");
         usize visible_line_count = 0;
+        let frame = String{allocator};
+        if (is_terminal) frame += "\x1b[H\x1b[2J";
+        if (is_terminal)
+          append_live_controls_bar(frame,
+                                   format_live_duration(
+                                       FLAG_EVILPS_CUMULATIVE.is_enabled()
+                                           ? cumulative_interval_seconds
+                                           : live_interval_seconds,
+                                       allocator)
+                                       .view(),
+                                   format_live_duration(
+                                       live_interval_seconds, allocator)
+                                       .view(),
+                                   should_color);
         let const status = render_process_snapshot(
             ec, cxt, allocator, operands, operand_locations, output_limit,
             should_read_resources, should_color,
@@ -609,6 +624,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
             line_width_limit, scroll_offset, live_search.view(), false,
             visible_line_count);
         if (status != 0) return status;
+        ec.print_to_stdout(frame);
         if (visible_line_count > terminal_rows && terminal_rows > 1) {
           let const maximum_offset = visible_line_count - (terminal_rows - 1);
           if (scroll_offset == SIZE_MAX || scroll_offset > maximum_offset)

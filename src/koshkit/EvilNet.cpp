@@ -464,8 +464,14 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
   let before = os::read_network_interface_statistics();
   let const is_terminal = colors::stdout_is_a_terminal();
   let const is_alternate = is_terminal && enter_alternate_screen(ec);
+  let const is_cursor_hidden = is_terminal && hide_cursor(ec);
+  let const sample_label =
+      format_live_duration(sample_interval_seconds, allocator);
+  let const refresh_label =
+      format_live_duration(refresh_interval_seconds, allocator);
   defer
   {
+    if (is_cursor_hidden) show_cursor(ec);
     if (is_alternate) leave_alternate_screen(ec);
   };
 
@@ -529,10 +535,13 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
       statistics.push(row.statistics);
     let output = String{allocator};
     let warnings = ArrayList<String>{allocator};
+    if (is_terminal) {
+      append_live_controls_bar(output, sample_label.view(),
+                               refresh_label.view(), should_color);
+      output += "\x1b[H\x1b[2J";
+    }
     append_network_traffic_statistics_report(output, warnings, allocator,
                                              statistics, should_color, true);
-    if (is_terminal)
-      output = String{allocator, "\x1b[H\x1b[2J"} + output.view();
     ec.print_to_stdout(output);
     for (let const &warning : warnings)
       show_message(Warning{warning.view()}.to_string());

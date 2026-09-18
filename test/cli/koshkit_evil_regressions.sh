@@ -18,12 +18,12 @@ case $ps_limited in
 esac
 printf 'evilps-pid-labels=%s\n' "$ps_pid_labels"
 
-ps_human=$($BIN -c 'koshkit --color never evilps --human-readable -3')
-case $ps_human in
-  'PID  PPID  CPU  MEM  COMMAND'*) ps_human_format=matched ;;
-  *) ps_human_format=wrong ;;
+ps_all=$($BIN -c 'koshkit --color never evilps -a -3')
+case $ps_all in
+  *'['*CPU*MEM*']'*) ps_all_format=matched ;;
+  *) ps_all_format=wrong ;;
 esac
-printf 'evilps-human-format=%s\n' "$ps_human_format"
+printf 'evilps-all-format=%s\n' "$ps_all_format"
 
 ps_sorted=$($BIN -c 'koshkit --color never evilps --sort cpu -3')
 if [ -n "$ps_sorted" ]; then ps_sorted_roots=matched; else ps_sorted_roots=wrong; fi

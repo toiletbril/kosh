@@ -1336,6 +1336,32 @@ fn show_cursor(const ExecContext &ec) wontthrow -> void
   unused(write_alternate_screen_sequence(ec, "\x1b[?25h"));
 }
 
+fn append_live_controls_bar(String &output, StringView sample_label,
+                            StringView refresh_label, bool should_color)
+    throws -> void
+{
+  append_report_text(output,
+                     "ctrl+c exit | collection " + sample_label +
+                         " | refresh " + refresh_label,
+                     colors::ansi::DIM, should_color);
+  output += "\n";
+}
+
+fn format_live_duration(f64 seconds, Allocator allocator) throws -> String
+{
+  let const tenths = static_cast<u64>(seconds * 10.0 + 0.5);
+  let result = String::from(tenths / 10, allocator);
+  if (tenths % 10 == 0) {
+    result += "s";
+    return result;
+  }
+
+  result += ".";
+  result += String::from(tenths % 10, allocator).view();
+  result += "s";
+  return result;
+}
+
 cold fn make_flag_help(const FlagList &flags, bool should_color) throws
     -> String
 {
