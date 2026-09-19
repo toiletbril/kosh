@@ -59,7 +59,8 @@ fn More::execute(const ExecContext &ec, EvalContext &cxt,
       return report_usage_error(ec, cxt, args[0].view());
     let const tags = Path{"tags"}.read_entire_file();
     if (!tags.has_value()) {
-      report_soft_koshkit_error(ec, cxt, "more: cannot read tags");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot read tags");
       return 1;
     }
     usize position = 0;
@@ -89,9 +90,9 @@ fn More::execute(const ExecContext &ec, EvalContext &cxt,
       position += line_length + (line_length < remaining.length ? 1 : 0);
     }
     if (tagged_source.is_empty()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "more: tag not found '" +
-                                    String{FLAG_MORE_TAG.value()} + "'");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "tag not found '" +
+                                         String{FLAG_MORE_TAG.value()} + "'");
       return 1;
     }
   }
@@ -109,9 +110,10 @@ fn More::execute(const ExecContext &ec, EvalContext &cxt,
     if (should_buffer) {
       let const input = read_named_or_stdin(ec, source);
       if (!input.has_value()) {
-        report_soft_koshkit_error(ec, cxt,
-                                  "more: cannot read '" + String{source} +
-                                      "': " + os::last_system_error_message());
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot read '" + String{source} +
+                "': " + os::last_system_error_message());
         status = 1;
         continue;
       }
@@ -180,9 +182,9 @@ fn More::execute(const ExecContext &ec, EvalContext &cxt,
 
     let const input = open_named_or_stdin(ec, source);
     if (!input.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "more: cannot read '" + String{source} +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot read '" + String{source} + "': " +
+                                         os::last_system_error_message());
       status = 1;
       continue;
     }

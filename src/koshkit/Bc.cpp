@@ -899,8 +899,8 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     let const parsed = bc_parse_register(*value, runtime.input_base,
                                          runtime.output_base, cxt, allocator);
     if (!parsed.has_value() || *parsed < 2 || *parsed > 16) {
-      report_soft_koshkit_error(
-          ec, cxt, "bc: invalid ibase",
+      report_soft_koshkit_util_error(
+          ec, cxt, "bc", "invalid ibase",
           "ibase must evaluate to an integer from 2 through 16");
       runtime.status = 1;
     } else {
@@ -914,8 +914,8 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     let const parsed = bc_parse_register(*value, runtime.input_base,
                                          runtime.output_base, cxt, allocator);
     if (!parsed.has_value() || *parsed < 2 || *parsed > 16) {
-      report_soft_koshkit_error(
-          ec, cxt, "bc: invalid obase",
+      report_soft_koshkit_util_error(
+          ec, cxt, "bc", "invalid obase",
           "obase must evaluate to an integer from 2 through 16");
       runtime.status = 1;
     } else {
@@ -929,8 +929,8 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     let const parsed = bc_parse_register(*value, runtime.input_base,
                                          runtime.output_base, cxt, allocator);
     if (!parsed.has_value() || *parsed > 100000) {
-      report_soft_koshkit_error(
-          ec, cxt, "bc: invalid scale",
+      report_soft_koshkit_util_error(
+          ec, cxt, "bc", "invalid scale",
           "scale must evaluate to an integer from 0 through 100000");
       runtime.status = 1;
     } else {
@@ -944,7 +944,7 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     if (!should_print || bc_is_assignment(statement)) return;
     bc_print_result(steal(result), ec, cxt, runtime);
   } catch (const Error &error) {
-    report_soft_koshkit_error(ec, cxt, "bc: " + error.to_string());
+    report_soft_koshkit_util_error(ec, cxt, "bc", error.to_string());
     runtime.status = 1;
   }
 }
@@ -1141,10 +1141,10 @@ fn Bc::execute(const ExecContext &ec, EvalContext &cxt,
   for (let const source : sources) {
     let const content = read_named_or_stdin(ec, source);
     if (!content.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "bc: cannot read '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "cannot read '" + String{cxt.scratch_allocator(), source} +
+              "': " + os::last_system_error_message());
       return 1;
     }
     program += content->view();

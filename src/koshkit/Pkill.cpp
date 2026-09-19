@@ -120,9 +120,9 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
         did_signal_any = true;
       } else {
         let const reason = os::last_system_error_message();
-        report_soft_koshkit_error(
-            ec, cxt,
-            "pkill: killing pid " +
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "killing pid " +
                 String::from(process.pid, cxt.scratch_allocator()) +
                 " failed: " + reason);
       }

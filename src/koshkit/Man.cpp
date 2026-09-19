@@ -168,9 +168,9 @@ fn Man::execute(const ExecContext &ec, EvalContext &cxt,
         find_manual_page(paths, section, operands[name_position].view(),
                          cxt.scratch_allocator());
     if (!page.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "man: no manual entry for '" +
-                                    operands[name_position] + "'");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "no manual entry for '" +
+                                         operands[name_position] + "'");
       status = 1;
       continue;
     }
