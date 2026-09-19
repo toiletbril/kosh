@@ -3,8 +3,9 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file implements the evilps utility. It links every visible process to
- * its parent, selects a root, and renders the descendants as an indented tree
- * with optional identifiers, owners, and command lines.
+ * its parent, samples processor counters over bounded sliding windows, selects
+ * a root, and renders the descendants as an indented tree with optional
+ * identifiers, owners, resource values, and command lines.
  */
 
 #include "../CLI.hpp"
@@ -33,7 +34,8 @@ FLAG(EVILPS_ALL, Bool, 'a', "all",
      "lines.");
 FLAG(EVILPS_ARGUMENTS, Bool, 'A', "arguments", "Show the command line.");
 FLAG(EVILPS_OWNER, Bool, 'U', "show-owner", "Show the owner of each process.");
-FLAG(EVILPS_CPU, Bool, 'c', "cpu", "Show accumulated processor time.");
+FLAG(EVILPS_CPU, Bool, 'c', "cpu",
+     "Show accumulated processor time, or rolling utilization when sampled.");
 FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
 FLAG(EVILPS_WIDE, Bool, 'w', "wide",
      "Do not truncate command lines to the terminal width.");
@@ -50,8 +52,8 @@ FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
               "interval defaults to 0.5 seconds.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative",
-              "Collect the process tree over an optional window; without "
-              "--live, wait before collecting.",
+              "Average counters over an optional sliding window; without "
+              "--live, compare snapshots across that interval.",
               is_evilps_sample_duration, "seconds");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -68,20 +70,138 @@ struct tree_node
   i64 pid{0};
   i64 parent_pid{0};
   u64 cpu_milliseconds{0};
+  u64 cpu_percentage_hundredths{0};
   u64 resident_kib{0};
+  u64 start_token{0};
   u32 owner_id{0};
   String name{heap_allocator()};
   String command_line{heap_allocator()};
+  bool has_cpu_percentage{false};
   bool was_rendered{false};
 };
 
-fn compare_nodes(const tree_node &left, const tree_node &right) wontthrow
-    -> bool
+struct live_process_cpu_row
+{
+  i64 pid{0};
+  u64 start_token{0};
+  ArrayList<u64> history_milliseconds{heap_allocator()};
+  ArrayList<u64> history_nanoseconds{heap_allocator()};
+  u64 last_seen_nanoseconds{0};
+};
+
+pure fn interpolate_cpu_milliseconds(u64 before, u64 after,
+                                     u64 elapsed_nanoseconds,
+                                     u64 passed_nanoseconds) wontthrow -> u64
+{
+  if (after < before || elapsed_nanoseconds == 0) return after;
+  return before + static_cast<u64>(
+                      static_cast<u128>(after - before) * passed_nanoseconds /
+                      elapsed_nanoseconds);
+}
+
+fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
+                      u64 window_start_nanoseconds,
+                      u64 now_nanoseconds) wontthrow -> void
+{
+  if (history.history_nanoseconds.count() < 2) return;
+
+  usize oldest = 0;
+  while (oldest + 1 < history.history_nanoseconds.count() &&
+         history.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
+  {
+    oldest++;
+  }
+
+  u64 baseline_milliseconds = history.history_milliseconds[oldest];
+  u64 baseline_nanoseconds = history.history_nanoseconds[oldest];
+  if (baseline_nanoseconds < window_start_nanoseconds &&
+      oldest + 1 < history.history_nanoseconds.count())
+  {
+    let const next_nanoseconds = history.history_nanoseconds[oldest + 1];
+    baseline_milliseconds = interpolate_cpu_milliseconds(
+        baseline_milliseconds, history.history_milliseconds[oldest + 1],
+        next_nanoseconds - baseline_nanoseconds,
+        window_start_nanoseconds - baseline_nanoseconds);
+    baseline_nanoseconds = window_start_nanoseconds;
+  }
+
+  let const current_milliseconds = history.history_milliseconds.back();
+  if (current_milliseconds < baseline_milliseconds ||
+      now_nanoseconds <= baseline_nanoseconds)
+  {
+    return;
+  }
+
+  node.cpu_percentage_hundredths = static_cast<u64>(
+      static_cast<u128>(current_milliseconds - baseline_milliseconds) *
+      10000000000ULL / (now_nanoseconds - baseline_nanoseconds));
+  node.has_cpu_percentage = true;
+}
+
+fn update_cpu_history(ArrayList<tree_node> &nodes,
+                      ArrayList<live_process_cpu_row> &history,
+                      u64 now_nanoseconds,
+                      u64 window_nanoseconds) throws -> void
+{
+  let const window_start_nanoseconds =
+      now_nanoseconds > window_nanoseconds ? now_nanoseconds - window_nanoseconds
+                                           : 0;
+  for (let &node : nodes) {
+    live_process_cpu_row *row = nullptr;
+    for (let &candidate : history) {
+      if (candidate.pid != node.pid ||
+          candidate.start_token != node.start_token)
+        continue;
+      row = &candidate;
+      break;
+    }
+
+    if (row == nullptr) {
+      live_process_cpu_row fresh{};
+      fresh.pid = node.pid;
+      fresh.start_token = node.start_token;
+      fresh.history_milliseconds.push(node.cpu_milliseconds);
+      fresh.history_nanoseconds.push(now_nanoseconds);
+      fresh.last_seen_nanoseconds = now_nanoseconds;
+      history.push(steal(fresh));
+      continue;
+    }
+
+    row->history_milliseconds.push(node.cpu_milliseconds);
+    row->history_nanoseconds.push(now_nanoseconds);
+    row->last_seen_nanoseconds = now_nanoseconds;
+    while (row->history_nanoseconds.count() > 2 &&
+           row->history_nanoseconds[1] <= window_start_nanoseconds)
+    {
+      row->history_milliseconds.remove(0);
+      row->history_nanoseconds.remove(0);
+    }
+    set_cpu_percentage(node, *row, window_start_nanoseconds, now_nanoseconds);
+  }
+
+  for (usize index = history.count(); index > 0; index--) {
+    if (history[index - 1].last_seen_nanoseconds != now_nanoseconds)
+      history.remove(index - 1);
+  }
+}
+
+fn compare_nodes(const tree_node &left, const tree_node &right,
+                 bool is_sampled) wontthrow -> bool
 {
   if (FLAG_EVILPS_SORT.is_set()) {
     let const key = FLAG_EVILPS_SORT.value();
-    if (key == "cpu" && left.cpu_milliseconds != right.cpu_milliseconds)
-      return left.cpu_milliseconds > right.cpu_milliseconds;
+    if (key == "cpu") {
+      if (is_sampled &&
+          left.has_cpu_percentage != right.has_cpu_percentage)
+      {
+        return left.has_cpu_percentage;
+      }
+      let const left_cpu = is_sampled ? left.cpu_percentage_hundredths
+                                      : left.cpu_milliseconds;
+      let const right_cpu = is_sampled ? right.cpu_percentage_hundredths
+                                       : right.cpu_milliseconds;
+      if (left_cpu != right_cpu) return left_cpu > right_cpu;
+    }
     if (key == "memory" && left.resident_kib != right.resident_kib)
       return left.resident_kib > right.resident_kib;
     if (key == "pid") return left.pid < right.pid;
@@ -95,13 +215,45 @@ fn compare_nodes(const tree_node &left, const tree_node &right) wontthrow
   return left.pid < right.pid;
 }
 
-fn sort_nodes(ArrayList<tree_node> &nodes) throws -> void
+fn sort_nodes(ArrayList<tree_node> &nodes, bool is_sampled) throws -> void
 {
-  nodes.sort(compare_nodes);
+  let const do_compare = [is_sampled](const tree_node &left,
+                                      const tree_node &right) {
+    return compare_nodes(left, right, is_sampled);
+  };
+  nodes.sort(do_compare);
+}
+
+fn append_cpu_value(String &output, const tree_node &node, Allocator allocator,
+                    bool is_sampled) throws -> void
+{
+  if (is_sampled) {
+    if (!node.has_cpu_percentage) {
+      output += "-";
+      return;
+    }
+    output += String::from(node.cpu_percentage_hundredths / 100, allocator);
+    output += ".";
+    let const fraction =
+        String::from(node.cpu_percentage_hundredths % 100, allocator);
+    output.append_repeated('0', 2 - fraction.length());
+    output += fraction.view();
+    output += "%";
+    return;
+  }
+
+  output += String::from(node.cpu_milliseconds / 1000, allocator);
+  output += ".";
+  let const milliseconds =
+      String::from(node.cpu_milliseconds % 1000, allocator);
+  output.append_repeated('0', 3 - milliseconds.length());
+  output += milliseconds.view();
+  output += "s";
 }
 
 fn append_label(String &output, const tree_node &node, Allocator allocator,
-                bool should_color, bool should_human) throws -> void
+                bool should_color, bool should_human,
+                bool is_sampled) throws -> void
 {
   if (should_human) {
     append_report_text(output,
@@ -112,14 +264,7 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
         output, String::from(static_cast<u64>(node.parent_pid), allocator).view(),
         colors::ansi::CYAN, should_color);
     output += "  ";
-    let cpu_time = String::from(node.cpu_milliseconds / 1000, allocator);
-    cpu_time += ".";
-    let const milliseconds =
-        String::from(node.cpu_milliseconds % 1000, allocator);
-    cpu_time.append_repeated('0', 3 - milliseconds.length());
-    cpu_time += milliseconds.view();
-    cpu_time += "s";
-    output += cpu_time.view();
+    append_cpu_value(output, node, allocator, is_sampled);
     output += "  ";
     output += format_human_size(node.resident_kib * 1024, allocator).view();
     output += "  ";
@@ -168,14 +313,7 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
     if (should_show_cpu) {
       append_report_text(output, "CPU", colors::ansi::BOLD_CYAN, should_color);
       output += " ";
-      let cpu_time = String::from(node.cpu_milliseconds / 1000, allocator);
-      cpu_time += ".";
-      let const milliseconds =
-          String::from(node.cpu_milliseconds % 1000, allocator);
-      cpu_time.append_repeated('0', 3 - milliseconds.length());
-      cpu_time += milliseconds.view();
-      cpu_time += "s";
-      output += cpu_time.view();
+      append_cpu_value(output, node, allocator, is_sampled);
     }
     if (should_show_cpu && should_show_memory) output += "  ";
     if (should_show_memory) {
@@ -199,7 +337,8 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
 fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
                    const String &prefix, usize depth, Allocator allocator,
                    bool should_color, usize output_limit,
-                   usize &rendered_count, bool should_human) throws -> void
+                   usize &rendered_count, bool should_human,
+                   bool is_sampled) throws -> void
 {
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
 
@@ -224,38 +363,25 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
     append_report_text(output, prefix.view(), colors::ansi::CYAN, should_color);
     append_report_text(output, is_last ? "└── " : "├── ", colors::ansi::CYAN,
                        should_color);
-    append_label(output, nodes[position], allocator, should_color, should_human);
+    append_label(output, nodes[position], allocator, should_color, should_human,
+                 is_sampled);
     rendered_count++;
 
     let child_prefix = String{allocator, prefix.view()};
     child_prefix += is_last ? "    " : "│   ";
     render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
                     allocator, should_color, output_limit, rendered_count,
-                    should_human);
+                    should_human, is_sampled);
   }
 }
 
-fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
-                           Allocator allocator, String &output,
-                           const ArrayList<String> &operands,
-                           const ArrayList<SourceLocation> &operand_locations,
-                           usize output_limit, bool should_read_resources,
-                           bool should_color, u32 viewport_rows,
-                           usize line_width_limit,
-                           usize scroll_offset, StringView search,
-                           bool should_human,
-                           usize &visible_line_count) throws -> i32
+fn read_process_nodes(Allocator allocator, bool should_read_resources,
+                      usize line_width_limit) throws
+    -> ArrayList<tree_node>
 {
   let const processes = os::enumerate_processes(
       should_read_resources ? os::process_detail::ResourceStats
                             : os::process_detail::Basic);
-  if (processes.is_empty()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "the process listing is unavailable",
-                              "this platform exposes no process table");
-    return 1;
-  }
-
   ArrayList<tree_node> nodes{allocator};
   for (let const &process : processes) {
     tree_node node{};
@@ -263,12 +389,12 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     node.parent_pid = process.parent_pid;
     node.cpu_milliseconds = process.cpu_milliseconds;
     node.resident_kib = process.resident_kib;
+    node.start_token = process.start_token;
     node.owner_id = process.owner_id;
     node.name = String{allocator, process.name.view()};
     node.command_line = String{allocator, process.command_line.view()};
     if (line_width_limit != 0 && line_width_limit != SIZE_MAX &&
-        toiletline::display_width(node.command_line.view()) >
-            line_width_limit)
+        toiletline::display_width(node.command_line.view()) > line_width_limit)
     {
       const StringView text = node.command_line.view();
       usize actual_cells = 0;
@@ -280,7 +406,28 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     nodes.push(steal(node));
   }
 
-  sort_nodes(nodes);
+  return nodes;
+}
+
+fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
+                           Allocator allocator, String &output,
+                           ArrayList<tree_node> &nodes,
+                           const ArrayList<String> &operands,
+                           const ArrayList<SourceLocation> &operand_locations,
+                           usize output_limit, bool should_color,
+                           u32 viewport_rows,
+                           usize scroll_offset, StringView search,
+                           bool should_human, bool is_sampled,
+                           usize &visible_line_count) throws -> i32
+{
+  if (nodes.is_empty()) {
+    report_soft_koshkit_error(ec, cxt,
+                              "the process listing is unavailable",
+                              "this platform exposes no process table");
+    return 1;
+  }
+
+  sort_nodes(nodes, is_sampled);
 
   i64 root_pid = 1;
   if (!operands.is_empty()) {
@@ -312,10 +459,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
   if (root_position < nodes.count() && !FLAG_EVILPS_SORT.is_set()) {
     nodes[root_position].was_rendered = true;
     append_label(output, nodes[root_position], allocator, should_color,
-                 should_human);
+                 should_human, is_sampled);
     rendered_count++;
     render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
-                    should_color, output_limit, rendered_count, should_human);
+                    should_color, output_limit, rendered_count, should_human,
+                    is_sampled);
     visible_line_count = 1;
     if (viewport_rows != 0) {
       let const full_output = String{allocator, output.view()};
@@ -361,11 +509,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (FLAG_EVILPS_SORT.is_set()) {
       nodes[position].was_rendered = true;
       append_label(output, nodes[position], allocator, should_color,
-                   should_human);
+                   should_human, is_sampled);
       rendered_count++;
       render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
                       allocator, should_color, output_limit, rendered_count,
-                      should_human);
+                      should_human, is_sampled);
       continue;
     }
 
@@ -383,11 +531,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     nodes[position].was_rendered = true;
     append_label(output, nodes[position], allocator, should_color,
-                 should_human);
+                 should_human, is_sampled);
     rendered_count++;
     render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
                     allocator, should_color, output_limit, rendered_count,
-                    should_human);
+                    should_human, is_sampled);
   }
 
   visible_line_count = rendered_count;
@@ -524,14 +672,15 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  let const should_read_resources =
+  let const should_sample_cpu =
       FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
-      FLAG_EVILPS_MEMORY.is_enabled() ||
-      (FLAG_EVILPS_SORT.is_set() && (FLAG_EVILPS_SORT.value() == "cpu" ||
-                                     FLAG_EVILPS_SORT.value() == "memory"));
+      (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "cpu");
+  let const should_read_resources =
+      should_sample_cpu || FLAG_EVILPS_MEMORY.is_enabled() ||
+      (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "memory");
   let const should_color = koshkit_should_color();
 
-  f64 live_interval_seconds = 1.0;
+  f64 live_interval_seconds = 0.5;
   if (FLAG_EVILPS_LIVE.has_value()) {
     let const parsed = parse_koshkit_duration_seconds(
         FLAG_EVILPS_LIVE.value(), FLAG_EVILPS_LIVE.value_location(), allocator);
@@ -544,7 +693,9 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     live_interval_seconds = parsed;
   }
 
-  f64 cumulative_interval_seconds = 1.0;
+  f64 cumulative_interval_seconds = FLAG_EVILPS_LIVE.is_enabled()
+                                        ? live_interval_seconds
+                                        : 1.0;
   if (FLAG_EVILPS_CUMULATIVE.has_value()) {
     cumulative_interval_seconds = parse_koshkit_duration_seconds(
         FLAG_EVILPS_CUMULATIVE.value(),
@@ -571,10 +722,12 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let const live_allocator = heap_allocator();
     let const is_terminal =
         os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
-    let const refresh_interval_seconds = live_interval_seconds;
-    let const refresh_interval_nanoseconds = static_cast<u64>(
-        refresh_interval_seconds * 1000000000.0);
-    u64 last_refresh_nanoseconds = 0;
+    let const sample_interval_nanoseconds =
+        static_cast<u64>(live_interval_seconds * 1000000000.0);
+    let const window_nanoseconds =
+        static_cast<u64>(cumulative_interval_seconds * 1000000000.0);
+    let history = ArrayList<live_process_cpu_row>{live_allocator};
+    u64 last_sample_nanoseconds = 0;
     bool is_alternate_screen_active = false;
     let live_input = String{live_allocator};
     let live_search = String{live_allocator};
@@ -589,71 +742,95 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
     loop
     {
+      if (last_sample_nanoseconds != 0) {
+        let const before_wait_nanoseconds = os::monotonic_nanos();
+        let const elapsed_nanoseconds =
+            before_wait_nanoseconds - last_sample_nanoseconds;
+        let const wait_nanoseconds =
+            sample_interval_nanoseconds > elapsed_nanoseconds
+                ? sample_interval_nanoseconds - elapsed_nanoseconds
+                : 0;
+        os::sleep_for_seconds(static_cast<f64>(wait_nanoseconds) /
+                              1000000000.0);
+        if (os::INTERRUPT_REQUESTED != 0) {
+          os::INTERRUPT_REQUESTED = 0;
+          return 130;
+        }
+      }
+
       let const now = os::monotonic_nanos();
+      let nodes = read_process_nodes(live_allocator, should_read_resources,
+                                     line_width_limit);
+      if (should_sample_cpu)
+        update_cpu_history(nodes, history, now, window_nanoseconds);
+      last_sample_nanoseconds = now;
       u32 terminal_rows = 0;
       if (is_terminal) {
         u32 terminal_columns = 0;
         if (!os::terminal_size(terminal_columns, terminal_rows))
           terminal_rows = 24;
       }
-      if (last_refresh_nanoseconds == 0 ||
-          now - last_refresh_nanoseconds >= refresh_interval_nanoseconds) {
-        last_refresh_nanoseconds = now;
-        usize visible_line_count = 0;
-        let frame = String{live_allocator};
-        if (is_terminal) frame += "\x1b[H\x1b[2J";
-        append_live_controls_bar(
-            frame,
-            format_live_duration(FLAG_EVILPS_CUMULATIVE.is_enabled()
-                                     ? cumulative_interval_seconds
-                                     : live_interval_seconds,
-                                 live_allocator)
-                .view(),
-            format_live_duration(live_interval_seconds, live_allocator).view(),
-            should_color);
-        let const status = render_process_snapshot(
-            ec, cxt, live_allocator, frame, operands, operand_locations,
-            output_limit,
-            should_read_resources, should_color,
-            is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
-            line_width_limit, scroll_offset, live_search.view(), false,
-            visible_line_count);
-        if (status != 0) return status;
-        ec.print_to_stdout(frame);
-        if (visible_line_count > terminal_rows && terminal_rows > 1) {
-          let const maximum_offset = visible_line_count - (terminal_rows - 1);
-          if (scroll_offset == SIZE_MAX || scroll_offset > maximum_offset)
-            scroll_offset = maximum_offset;
-        } else {
-          scroll_offset = 0;
-        }
+      usize visible_line_count = 0;
+      let frame = String{live_allocator};
+      if (is_terminal) frame += "\x1b[H\x1b[2J";
+      append_live_controls_bar(
+          frame,
+          format_live_duration(cumulative_interval_seconds, live_allocator)
+              .view(),
+          format_live_duration(live_interval_seconds, live_allocator).view(),
+          should_color);
+      let const status = render_process_snapshot(
+          ec, cxt, live_allocator, frame, nodes, operands, operand_locations,
+          output_limit, should_color,
+          is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
+          scroll_offset, live_search.view(), false, true, visible_line_count);
+      if (status != 0) return status;
+      ec.print_to_stdout(frame);
+      if (visible_line_count > terminal_rows && terminal_rows > 1) {
+        let const maximum_offset = visible_line_count - (terminal_rows - 1);
+        if (scroll_offset == SIZE_MAX || scroll_offset > maximum_offset)
+          scroll_offset = maximum_offset;
+      } else {
+        scroll_offset = 0;
       }
 
       if (is_terminal && !poll_live_input(
                               ec.in_fd.value_or(KOSH_STDIN), live_input,
                               live_search, scroll_offset))
         return 0;
-      os::sleep_for_seconds(live_interval_seconds);
-      if (os::INTERRUPT_REQUESTED != 0) {
-        os::INTERRUPT_REQUESTED = 0;
-        return 130;
-      }
     }
   }
 
+  let nodes = read_process_nodes(allocator, should_read_resources,
+                                 line_width_limit);
+  bool is_sampled = false;
   if (FLAG_EVILPS_CUMULATIVE.is_enabled()) {
+    let history = ArrayList<live_process_cpu_row>{allocator};
+    let const before_nanoseconds = os::monotonic_nanos();
+    if (should_sample_cpu)
+      update_cpu_history(nodes, history, before_nanoseconds,
+                         static_cast<u64>(cumulative_interval_seconds *
+                                          1000000000.0));
     os::sleep_for_seconds(cumulative_interval_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
     }
+    nodes = read_process_nodes(allocator, should_read_resources,
+                               line_width_limit);
+    let const after_nanoseconds = os::monotonic_nanos();
+    if (should_sample_cpu)
+      update_cpu_history(nodes, history, after_nanoseconds,
+                         static_cast<u64>(cumulative_interval_seconds *
+                                          1000000000.0));
+    is_sampled = true;
   }
 
   let output = String{allocator};
   let const status = render_process_snapshot(
-      ec, cxt, allocator, output, operands, operand_locations, output_limit,
-      should_read_resources, should_color, 0, line_width_limit, 0, StringView{},
-      false, output_limit);
+      ec, cxt, allocator, output, nodes, operands, operand_locations,
+      output_limit, should_color, 0, 0, StringView{}, false, is_sampled,
+      output_limit);
   if (status == 0) ec.print_to_stdout(output);
   return status;
 }

@@ -2020,15 +2020,16 @@ Visible processes are printed as a parent and child tree. The
 .BR \-a ,
 .BR \-A ,
 .BR \-U ,
-.BR \-C ,
+.BR \-c ,
 and
 .BR \-M
 options show process identifiers, sort numerically, enable every field, show
-command lines, show owners, and show resident memory. The
-.B \-c
-option shows processor time. The
+command lines, show owners, show processor usage, and show resident memory.
+Processor usage is accumulated time in an ordinary report and rolling
+utilization in a sampled report. The
 .B \-\-sort
-option accepts name, pid, cpu, and memory.
+option accepts name, pid, cpu, and memory. CPU sorting uses the value shown in
+the report.
 The
 .B \-NUMBER
 operand limits the output to NUMBER processes.
@@ -2040,15 +2041,17 @@ option is shorthand for
 and
 .B \-\-live
 options refresh the process tree until interrupted. An optional duration sets
-the refresh interval, which defaults to 0.5 seconds. The
+both the collection and refresh interval, which defaults to 0.5 seconds. The
 .B \-\-cumulative
-option accepts an optional collection window. Without
+option accepts an optional sliding window. With
+.BR \-\-live ,
+the window defaults to the live interval. Each refresh keeps the counter
+changes collected during the preceding window, including a proportional
+boundary sample. A new process shows unavailable processor utilization until
+two samples have been collected. Without
 .B \-\-live,
-it waits for that duration before collecting the process tree; with
-.B \-\-live,
-it controls how long each process sample covers while
-.B \-\-live
-continues to control refresh frequency.
+two snapshots are taken across the cumulative interval and the report shows
+their average processor utilization.
 .TP
 .B evilss
 Visible TCP, UDP, and Unix-domain sockets are printed in a table. Address

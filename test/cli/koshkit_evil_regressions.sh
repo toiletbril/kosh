@@ -43,9 +43,32 @@ printf 'evilps-invalid-live=%s\n' "$?"
 $BIN -c 'koshkit evilps --cumulative=0' > /dev/null 2>&1
 printf 'evilps-invalid-cumulative=%s\n' "$?"
 
+"$TEST_SHELL" -c 'while :; do :; done' &
+busy_process_pid=$!
+evilps_ordinary_cpu=$(
+  "$BIN" -c "koshkit --color never evilps --cpu $busy_process_pid"
+)
+case $evilps_ordinary_cpu in
+  *'CPU '*'s]'*) evilps_ordinary_cpu_unit=matched ;;
+  *) evilps_ordinary_cpu_unit=wrong ;;
+esac
+printf 'evilps-ordinary-cpu-unit=%s\n' "$evilps_ordinary_cpu_unit"
+evilps_sampled_cpu=$(
+  "$BIN" -c \
+    "koshkit --color never evilps --cpu --cumulative=0.3 $busy_process_pid"
+)
+kill -TERM "$busy_process_pid"
+wait "$busy_process_pid" 2> "$TEST_NULL_DEVICE"
+case $evilps_sampled_cpu in
+  *'CPU 0.00%'*|*'CPU -'*) evilps_sampled_cpu_unit=wrong ;;
+  *'CPU '*'%'*) evilps_sampled_cpu_unit=matched ;;
+  *) evilps_sampled_cpu_unit=wrong ;;
+esac
+printf 'evilps-sampled-cpu-unit=%s\n' "$evilps_sampled_cpu_unit"
+
 evilps_live_path=$TEST_TEMP_DIRECTORY/evilps-live-report
 set -m
-$BIN -c 'koshkit --color never evilps --show-pids --live=0.05 --cumulative=0.1 -1' \
+"$BIN" -c 'koshkit --color never evilps --cpu --show-pids --live=0.05 --cumulative=0.1 -1' \
   > "$evilps_live_path" &
 evilps_live_pid=$!
 set +m
@@ -67,6 +90,30 @@ else
   evilps_live_refresh=wrong
 fi
 printf 'evilps-live-refresh=%s\n' "$evilps_live_refresh"
+evilps_live_report=$(< "$evilps_live_path")
+case $evilps_live_report in
+  *'ctrl+c to exit. cumulative stats over 0.1s every 0.05s'*)
+    evilps_live_controls=matched
+    ;;
+  *) evilps_live_controls=wrong ;;
+esac
+case $evilps_live_report in
+  *'CPU -'*) evilps_live_initial=matched ;;
+  *) evilps_live_initial=wrong ;;
+esac
+case $evilps_live_report in
+  *'CPU '*'%'*) evilps_live_percentage=matched ;;
+  *) evilps_live_percentage=wrong ;;
+esac
+if [ "$evilps_live_controls" = matched ] &&
+  [ "$evilps_live_initial" = matched ] &&
+  [ "$evilps_live_percentage" = matched ]
+then
+  evilps_live_window=matched
+else
+  evilps_live_window=wrong
+fi
+printf 'evilps-live-window=%s\n' "$evilps_live_window"
 
 fs_report=$($BIN -c 'koshkit --color never evilfs --all')
 case $fs_report in
