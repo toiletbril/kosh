@@ -219,10 +219,6 @@ ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
 CXXFLAGS += -Wno-date-time
 endif
 
-ifeq ($(TARGET), Linux)
-CXXFLAGS += -Wl,-Bsymbolic
-endif
-
 LINK_LIBRARIES := # nothing
 
 ifeq ($(TARGET), Windows_NT)

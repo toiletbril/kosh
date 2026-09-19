@@ -88,7 +88,6 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  let const active_locale = StringView{setlocale(LC_ALL, nullptr)};
   if (operands.is_empty()) {
     let output = String{cxt.scratch_allocator()};
     output += "LANG=";
@@ -112,7 +111,8 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  let const *locale_values = localeconv();
+  const char *active_locale = nullptr;
+  struct lconv *locale_values = nullptr;
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
@@ -124,6 +124,12 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
           "unknown name '" + operand + "'");
       return 1;
     }
+    if ((keyword->value_kind == locale_value_kind::CharacterMap) &&
+        (active_locale == nullptr))
+      active_locale = setlocale(LC_ALL, nullptr);
+    if ((keyword->value_kind != locale_value_kind::CharacterMap) &&
+        (locale_values == nullptr))
+      locale_values = localeconv();
     if (FLAG_LOCALE_CATEGORY.is_enabled()) {
       ec.print_to_stdout(keyword->category);
       ec.print_to_stdout("\n");
@@ -132,9 +138,9 @@ fn Locale::execute(const ExecContext &ec, EvalContext &cxt,
     StringView value;
     switch (keyword->value_kind) {
     case locale_value_kind::CharacterMap: {
-      let lowered = String{cxt.scratch_allocator(), active_locale};
+      let lowered = String{cxt.scratch_allocator(), StringView{active_locale}};
       lowered.lowercase_ascii();
-      value = std::strstr(lowered.c_str(), "utf") != NULL
+      value = std::strstr(lowered.c_str(), "utf") != nullptr
                   ? StringView{"UTF-8"}
                   : StringView{"ANSI_X3.4-1968"};
       break;

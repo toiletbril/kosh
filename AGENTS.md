@@ -92,6 +92,8 @@ changes update this file.
   types, and macros stay behind `src/Platform.hpp` and `os` wrappers.
 - A platform-boundary move preserves each existing platform value unless the
   value is part of the requested behavior change.
+- Linux static PIE links without `-Bsymbolic`. Binding libc locale symbols in
+  the executable corrupts the locale state used by `localeconv()`.
 - Descriptor-rebinding wrappers increment the descriptor epoch. Cached color
   decisions refresh against it. Forks, process groups, filesystems, and processor
   counts also use platform wrappers.
