@@ -11,6 +11,7 @@ evilio-disk-shape=matched
 evilio-disk-scope=only-io
 evilio-disk-row=unindented
 evilio-cumulative-help=named-seconds
+evilio-human-readable=matched
 evilio-process-shape=matched
 evilio-process-scope=only-io
 evilio-process-idle=excluded

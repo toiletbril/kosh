@@ -1952,27 +1952,28 @@ waiting. The
 .B \-a
 option adds processor usage, paging, scheduler state, pressure stalls, disk
 activity, and swap rates from a one second sample.
-Nonzero stall rates and disk failures are highlighted. The
+Nonzero stall rates and disk failures are highlighted. Byte sizes and byte
+rates use compact binary units by default; the
+.BR \-h " and " \-\-human-readable
+options request that representation explicitly. The
 .B \-\-cumulative
 option collects counters for the specified number of seconds before printing;
 its default collection window is one second. With
 .BR \-\-ps ,
 each mode prints per-process data. The
 .BR \-l " and " \-\-live
-options refresh the rate report until interrupted. They only control the
-refresh interval: an optional value sets it in seconds and defaults to 0.5
-seconds. Output uses the alternate screen and restores the previous contents
-on exit.
+options collect and refresh the rate report until interrupted. Their optional
+value sets both intervals in seconds and defaults to 0.5 seconds. Output uses
+the alternate screen and restores the previous contents on exit.
 When both options are present,
 .B \-\-cumulative
-sets the collection window and
+sets the rolling window and
 .B \-\-live
-sets the refresh interval. The
+sets the sampling and refresh interval. The
 .B \-\-cumulative
-option does not change the refresh interval. An optional value on
-.B \-\-live
-sets the refresh interval in seconds. Inactive process and disk rows remain
-visible for at least five seconds or three refresh intervals. The
+option does not change either interval. A counter change remains in the report
+until it leaves the rolling window; inactive process and disk rows follow the
+same window. The
 .BR \-\-ps ,
 .BR \-n ,
 .BR \-p ,

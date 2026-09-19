@@ -74,11 +74,13 @@ mv
 --count
 --cumulative
 --help
+--human-readable
 --live
 --pid
 --ps
 -C
 -a
+-h
 -l
 -n
 -p

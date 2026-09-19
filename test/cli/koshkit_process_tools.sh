@@ -91,6 +91,14 @@ case $evilio_help in
   *) cumulative_help=unclear ;;
 esac
 printf 'evilio-cumulative-help=%s\n' "$cumulative_help"
+case $evilio_help in
+  *'-h, --human-readable'*) human_help=matched ;;
+  *) human_help=missing ;;
+esac
+"$BIN" -c 'koshkit --color never evilio --human-readable' \
+  > "$TEST_NULL_DEVICE"
+if [ "$?" -ne 0 ]; then human_help=failed; fi
+printf 'evilio-human-readable=%s\n' "$human_help"
 
 process_report=$("$BIN" -c \
   'koshkit --color never evilio --cumulative=0.05 --ps --count 1')
