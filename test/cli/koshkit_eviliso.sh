@@ -40,6 +40,13 @@ has_cgroup_section()
   esac
 }
 
+has_namespace_section()
+{
+  printf '%s\n' "$1" | command grep -E \
+    '^TYPE +ID +(PROCESSES|PID +NAME +ROLE) *$' \
+    > "$TEST_NULL_DEVICE" 2>&1
+}
+
 has_session_section()
 {
   printf '%s\n' "$1" | command grep -E \
@@ -49,11 +56,12 @@ has_session_section()
 default_report=$(run_report "")
 default_shape=matched
 case $default_report in
-  *"cgroup:"*"Remote sockets:"*"Runtime:"*)
+  *"Remote sockets:"*"Runtime:"*)
     default_shape=matched
     ;;
   *) default_shape=missing ;;
 esac
+has_namespace_section "$default_report" || default_shape=missing
 has_cgroup_section "$default_report" || default_shape=missing
 has_session_section "$default_report" || default_shape=missing
 printf 'default-shape=%s\n' "$default_shape"
@@ -79,7 +87,7 @@ esac
 printf 'remote-table=%s\n' "$remote_table"
 
 for selector_section in \
-  'namespaces|-n|cgroup:' \
+  'namespaces|-n|namespace-section' \
   'cgroups|-c|cgroup-section' \
   'sessions|-s|session-section' \
   'remote|-r|Remote sockets:' \
@@ -89,7 +97,13 @@ for selector_section in \
   set -- $selector_section
   IFS=$old_ifs
   report=$(run_report "$2")
-  if test "$1" = cgroups; then
+  if test "$1" = namespaces; then
+    if has_namespace_section "$report"; then
+      selector_status=matched
+    else
+      selector_status=missing
+    fi
+  elif test "$1" = cgroups; then
     if has_cgroup_section "$report"; then
       selector_status=matched
     else
@@ -120,33 +134,36 @@ for selector_section in \
     ;;
   cgroups)
     case $report in
-    *"cgroup:"*|*"Remote sockets:"*|*"Runtime:"*)
+    *"Remote sockets:"*|*"Runtime:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   sessions)
     case $report in
-    *"cgroup:"*|*"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*)
+    *"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   remote)
     case $report in
-    *"cgroup:"*|*"HIERARCHY"*|*"Runtime:"*)
+    *"HIERARCHY"*|*"Runtime:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   runtime)
     case $report in
-    *"cgroup:"*|*"HIERARCHY"*|*"Remote sockets:"*)
+    *"HIERARCHY"*|*"Remote sockets:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   esac
+  if test "$1" != namespaces && has_namespace_section "$report"; then
+    selector_scope=wrong
+  fi
   if test "$1" != sessions && has_session_section "$report"; then
     selector_scope=wrong
   fi
@@ -155,9 +172,10 @@ done
 
 combined_report=$(run_report '-n -k')
 case $combined_report in
-*"cgroup:"*"Runtime:"*) combined_scope=matched ;;
+*"Runtime:"*) combined_scope=matched ;;
 *) combined_scope=missing ;;
 esac
+has_namespace_section "$combined_report" || combined_scope=missing
 case $combined_report in
 *"HIERARCHY"*|*"Remote sockets:"*) combined_scope=wrong ;;
 esac
@@ -165,10 +183,11 @@ if has_session_section "$combined_report"; then combined_scope=wrong; fi
 printf 'combined-scope=%s\n' "$combined_scope"
 
 namespace_detail=$(run_report '-a -n')
-case $namespace_detail in
-*"cgroup process:"*) all_scope=matched ;;
-*) all_scope=missing ;;
-esac
+if has_namespace_section "$namespace_detail"; then
+  all_scope=matched
+else
+  all_scope=missing
+fi
 case $namespace_detail in
 *"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*) all_scope=wrong ;;
 esac
@@ -177,16 +196,149 @@ printf 'all-scope=%s\n' "$all_scope"
 
 all_report=$(run_report -a)
 case $all_report in
-*"cgroup:"*"HIERARCHY"*"Remote sockets:"*"Runtime:"*)
+*"HIERARCHY"*"Remote sockets:"*"Runtime:"*)
   all_default_scope=matched
   ;;
-*"cgroup:"*"Membership: unavailable"*"Remote sockets:"*"Runtime:"*)
+*"Membership: unavailable"*"Remote sockets:"*"Runtime:"*)
   all_default_scope=matched
   ;;
 *) all_default_scope=missing ;;
 esac
+has_namespace_section "$all_report" || all_default_scope=missing
 has_session_section "$all_report" || all_default_scope=missing
 printf 'all-default-scope=%s\n' "$all_default_scope"
+
+namespace_synthetic=matched
+if test "${OS-}" != Windows_NT; then
+  namespace_root=$cgroup_work/namespaces
+  namespace_processes=$cgroup_work/namespace-processes
+  mkdir -p \
+    "$namespace_root/self/ns" \
+    "$namespace_root/3/ns" \
+    "$namespace_root/11/ns" \
+    "$namespace_root/17/ns" \
+    "$namespace_root/29/ns" \
+    "$namespace_root/31/ns" || exit 1
+  ln -s 'cgroup:[2]' "$namespace_root/self/ns/cgroup" || exit 1
+  ln -s 'cgroup:[10]' "$namespace_root/3/ns/cgroup" || exit 1
+  ln -s 'cgroup:[2]' "$namespace_root/11/ns/cgroup" || exit 1
+  ln -s 'cgroup:[2]' "$namespace_root/17/ns/cgroup" || exit 1
+  ln -s 'net:[7]' "$namespace_root/11/ns/net" || exit 1
+  printf '%s\n' \
+    '17|kosh-e06-ns-self|self' \
+    '11|kosh-e06-ns-alpha|other' \
+    '3|kosh-e06-ns-zeta|other' \
+    '29|kosh-e06-ns-denied|other' \
+    '31|kosh-e06-ns-exited|other' \
+    > "$namespace_processes"
+  if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
+    namespace_summary=$cgroup_work/namespace-summary
+    KOSH_TEST_EVILISO_NAMESPACE_PROC=$namespace_root \
+      KOSH_TEST_EVILISO_NAMESPACE_PROCESSES=$namespace_processes \
+      "$BIN" -c 'koshkit --color never eviliso -n' \
+      > "$namespace_summary" || namespace_synthetic=wrong
+    namespace_summary_header=no
+    namespace_summary_rows=
+    namespace_net_rows=
+    while IFS= read -r row; do
+      set -- $row
+      if test "$#" -eq 3 && test "$1" = TYPE && test "$2" = ID && \
+          test "$3" = PROCESSES; then
+        namespace_summary_header=yes
+        continue
+      fi
+      test "$#" -eq 3 && test "$1" = cgroup || continue
+      if test -n "$namespace_summary_rows"; then
+        namespace_summary_rows="$namespace_summary_rows|"
+      fi
+      namespace_summary_rows="$namespace_summary_rows$2:$3"
+    done < "$namespace_summary"
+    test "$namespace_summary_header" = yes && \
+      test "$namespace_summary_rows" = \
+      '2:2|10:1|unavailable:2' || namespace_synthetic=wrong
+    while IFS= read -r row; do
+      set -- $row
+      test "$#" -eq 3 && test "$1" = net || continue
+      if test -n "$namespace_net_rows"; then
+        namespace_net_rows="$namespace_net_rows|"
+      fi
+      namespace_net_rows="$namespace_net_rows$2:$3"
+    done < "$namespace_summary"
+    test "$namespace_net_rows" = '7:1|unavailable:4' || \
+      namespace_synthetic=wrong
+
+    namespace_detail_report=$cgroup_work/namespace-detail
+    KOSH_TEST_EVILISO_NAMESPACE_PROC=$namespace_root \
+      KOSH_TEST_EVILISO_NAMESPACE_PROCESSES=$namespace_processes \
+      "$BIN" -c 'koshkit --color never eviliso -a -n' \
+      > "$namespace_detail_report" || namespace_synthetic=wrong
+    namespace_detail_header=no
+    namespace_detail_rows=
+    namespace_net_detail=no
+    while IFS= read -r row; do
+      set -- $row
+      if test "$#" -eq 5 && test "$1" = TYPE && test "$2" = ID && \
+          test "$3" = PID && test "$4" = NAME && test "$5" = ROLE; then
+        namespace_detail_header=yes
+        continue
+      fi
+      test "$#" -eq 5 && test "$1" = cgroup || continue
+      if test -n "$namespace_detail_rows"; then
+        namespace_detail_rows="$namespace_detail_rows|"
+      fi
+      namespace_detail_rows="$namespace_detail_rows$2:$3:$4:$5"
+    done < "$namespace_detail_report"
+    test "$namespace_detail_header" = yes && \
+      test "$namespace_detail_rows" = \
+        '2:11:kosh-e06-ns-alpha:other|2:17:kosh-e06-ns-self:self|10:3:kosh-e06-ns-zeta:other|unavailable:29:kosh-e06-ns-denied:other|unavailable:31:kosh-e06-ns-exited:other' || \
+      namespace_synthetic=wrong
+    while IFS= read -r row; do
+      set -- $row
+      if test "$#" -eq 5 && test "$1" = net && test "$2" = 7 && \
+          test "$3" = 11 && test "$4" = kosh-e06-ns-alpha && \
+          test "$5" = other; then
+        namespace_net_detail=yes
+      fi
+    done < "$namespace_detail_report"
+    test "$namespace_net_detail" = yes || namespace_synthetic=wrong
+    case $(command cat "$namespace_detail_report") in
+    *"cgroup:"*|*"cgroup process:"*) namespace_synthetic=wrong ;;
+    esac
+
+    namespace_unsupported_root=$cgroup_work/namespace-unsupported-root
+    namespace_unsupported_report=$cgroup_work/namespace-unsupported-report
+    mkdir -p "$namespace_unsupported_root" || exit 1
+    KOSH_TEST_EVILISO_NAMESPACE_PROC=$namespace_unsupported_root \
+      KOSH_TEST_EVILISO_NAMESPACE_PROCESSES=$namespace_processes \
+      "$BIN" -c 'koshkit --color never eviliso -a -n' \
+      > "$namespace_unsupported_report" || namespace_synthetic=wrong
+    namespace_unsupported_count=0
+    while IFS= read -r row; do
+      set -- $row
+      test "$1" = TYPE && continue
+      test "$#" -eq 5 && test "$2" = unavailable && \
+        test "$4" = - && test "$5" = self || namespace_synthetic=wrong
+      namespace_unsupported_count=$((namespace_unsupported_count + 1))
+    done < "$namespace_unsupported_report"
+    test "$namespace_unsupported_count" -eq 8 || namespace_synthetic=wrong
+  else
+    namespace_release=$cgroup_work/namespace-release
+    KOSH_TEST_EVILISO_NAMESPACE_PROC=$namespace_root \
+      KOSH_TEST_EVILISO_NAMESPACE_PROCESSES=$namespace_processes \
+      "$BIN" -c 'koshkit --color never eviliso -a -n' \
+      > "$namespace_release" || namespace_synthetic=wrong
+    case $(command cat "$namespace_release") in
+    *kosh-e06-ns-self*|*kosh-e06-ns-denied*|*kosh-e06-ns-exited*)
+      namespace_synthetic=wrong
+      ;;
+    esac
+  fi
+fi
+printf 'namespace-synthetic=%s\n' "$namespace_synthetic"
+if test "$namespace_synthetic" != matched; then
+  command cat "${namespace_summary-$namespace_release}"
+  test -z "${namespace_detail_report-}" || command cat "$namespace_detail_report"
+fi
 
 mkdir -p "$cgroup_work/self" "$cgroup_work/$$" || exit 1
 printf '%s\n' \

@@ -1915,6 +1915,15 @@ or
 .B --all
 option includes detailed rows, including per-process namespace attribution,
 controller membership, login times, and remote peers. The
+.B namespace
+section groups visible process relationships by namespace type and numeric
+identifier and prints their process counts. With
+.BR --all ,
+it prints type, identifier, process ID, process name, and self/other role for
+each relationship. A relationship that cannot be read or disappears during
+collection is retained with an
+.B unavailable
+identifier. The
 .B cgroup
 section prints hierarchy, controller, path, process ID, process name, and
 self/other role columns. With

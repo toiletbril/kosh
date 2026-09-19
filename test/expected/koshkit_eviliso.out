@@ -14,6 +14,7 @@ runtime-scope=matched
 combined-scope=matched
 all-scope=matched
 all-default-scope=matched
+namespace-synthetic=matched
 cgroup-synthetic=matched
 session-synthetic=matched
 help-shape=matched

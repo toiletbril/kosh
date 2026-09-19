@@ -43,59 +43,243 @@ namespace koshka::koshkit {
 
 namespace {
 
+struct namespace_process
+{
+  i64 process_id{0};
+  String name{heap_allocator()};
+  bool is_self{false};
+};
+
+struct namespace_relation
+{
+  StringView type;
+  usize type_index{0};
+  String identifier{heap_allocator()};
+  u64 identifier_value{0};
+  i64 process_id{0};
+  String name{heap_allocator()};
+  StringView role;
+  bool is_identifier_numeric{false};
+  bool is_available{false};
+};
+
+fn eviliso_namespace_processes() throws -> ArrayList<namespace_process>
+{
+#ifndef NDEBUG
+  if (let const *path = std::getenv("KOSH_TEST_EVILISO_NAMESPACE_PROCESSES");
+      path != nullptr && path[0] != '\0')
+  {
+    let processes = ArrayList<namespace_process>{heap_allocator()};
+    let const contents = Path{path}.read_entire_file();
+    if (!contents.has_value()) return processes;
+    for (let const line : utils::split_lines(contents->view())) {
+      let const process_end = line.find_character('|');
+      if (!process_end.has_value()) continue;
+      let const remainder = line.substring(*process_end + 1);
+      let const name_end = remainder.find_character('|');
+      if (!name_end.has_value()) continue;
+      let const process_id =
+          line.substring_of_length(0, *process_end).to<i64>();
+      if (process_id.is_error()) continue;
+      let const name = remainder.substring_of_length(0, *name_end);
+      let const role = remainder.substring(*name_end + 1);
+      if (role != "self" && role != "other") continue;
+      processes.push({
+          process_id.value(),
+          String{heap_allocator(), name},
+          role == "self",
+      });
+    }
+    return processes;
+  }
+#endif
+  let processes = ArrayList<namespace_process>{heap_allocator()};
+  let const self_process_id = os::get_current_process_id();
+  for (let const &process : os::enumerate_processes()) {
+    processes.push({
+        process.pid,
+        process.name.is_empty() ? String{heap_allocator(), "-"}
+                                : String{heap_allocator(), process.name.view()},
+        process.pid == self_process_id,
+    });
+  }
+  return processes;
+}
+
+fn eviliso_namespace_proc_path(StringView suffix,
+                               Allocator allocator) throws -> String
+{
+#ifndef NDEBUG
+  if (let const *root = std::getenv("KOSH_TEST_EVILISO_NAMESPACE_PROC");
+      root != nullptr && root[0] != '\0')
+  {
+    let path = String{allocator, root};
+    path += '/';
+    path += suffix;
+    return path;
+  }
+#endif
+  let path = String{allocator, "/proc/"};
+  path += suffix;
+  return path;
+}
+
+fn namespace_identifier(StringView target, Allocator allocator) throws
+    -> String
+{
+  let const open = target.find_character('[');
+  if (!open.has_value()) return String{allocator, target};
+  let const after_open = target.substring(*open + 1);
+  let const close = after_open.find_character(']');
+  if (!close.has_value()) return String{allocator, target};
+  return String{allocator, after_open.substring_of_length(0, *close)};
+}
+
 fn append_namespace_report(String &output, bool should_color,
                            bool should_show_detail) throws -> void
 {
-  let table = ReportTable{heap_allocator()};
   constexpr StringView names[] = {"cgroup", "ipc",  "mnt",  "net",
                                   "pid",    "time", "user", "uts"};
-  let const processes = os::enumerate_processes();
-  for (let const name : names) {
-    let const target =
-        os::read_symlink(String{"/proc/self/ns/"} + name, heap_allocator());
-    table.add(name, target.has_value() ? target->view() : "unavailable",
-              colors::ansi::BOLD_CYAN);
-    if (!target.has_value()) continue;
-
-    usize process_count = 0;
+  constexpr usize NAME_COUNT = sizeof(names) / sizeof(*names);
+  let processes = eviliso_namespace_processes();
+  if (!Path{eviliso_namespace_proc_path("self/ns", heap_allocator())}
+           .is_directory())
+  {
+    processes.clear();
+    processes.push({
+        os::get_current_process_id(),
+        String{heap_allocator(), "-"},
+        true,
+    });
+  }
+  let relations = ArrayList<namespace_relation>{heap_allocator()};
+  relations.reserve(processes.count() * NAME_COUNT);
+  for (usize type_index = 0; type_index < NAME_COUNT; type_index++) {
+    let const type = names[type_index];
+    let const self_target = os::read_symlink(
+        eviliso_namespace_proc_path(String{"self/ns/"} + type,
+                                    heap_allocator()),
+        heap_allocator());
     for (let const &process : processes) {
-      let const process_namespace = os::read_symlink(
-          String{"/proc/"} + String::from(process.pid, heap_allocator()) +
-              "/ns/" + name,
-          heap_allocator());
-      if (process_namespace.has_value() &&
-          process_namespace->view() == target->view())
-        process_count++;
-    }
-    let const process_field = String::from(process_count, heap_allocator());
-    table.add(String{name} + " processes", process_field.view(),
-              colors::ansi::BOLD_CYAN);
-    if (!should_show_detail) continue;
+      let target = Maybe<String>{};
+      if (process.is_self) {
+        if (self_target.has_value()) {
+          target = String{heap_allocator(), self_target->view()};
+        }
+      } else {
+        target = os::read_symlink(
+            eviliso_namespace_proc_path(
+                String::from(process.process_id, heap_allocator()) + "/ns/" +
+                    type,
+                heap_allocator()),
+            heap_allocator());
+      }
 
-    for (let const &process : processes) {
-      let const process_namespace = os::read_symlink(
-          String{"/proc/"} + String::from(process.pid, heap_allocator()) +
-              "/ns/" + name,
-          heap_allocator());
-      if (!process_namespace.has_value() ||
-          process_namespace->view() != target->view())
-        continue;
-
-      let identity = String::from(process.pid, heap_allocator());
-      identity += " (";
-      identity += process.name.view();
-      identity += process.pid == os::get_current_process_id() ? ", self; "
-                                                              : ", other; ";
-      identity += name;
-      identity += " namespace ";
-      identity += target->view();
-      identity += ")";
-      table.add(String{name} + " process", identity.view(),
-                colors::ansi::BOLD_CYAN);
+      let identifier = target.has_value()
+                           ? namespace_identifier(target->view(),
+                                                  heap_allocator())
+                           : String{heap_allocator(), "unavailable"};
+      let const identifier_value = identifier.view().to<u64>();
+      relations.push({
+          type,
+          type_index,
+          steal(identifier),
+          identifier_value.is_error() ? 0 : identifier_value.value(),
+          process.process_id,
+          String{heap_allocator(), process.name.view()},
+          process.is_self ? StringView{"self"} : StringView{"other"},
+          !identifier_value.is_error(),
+          target.has_value(),
+      });
     }
   }
-  output += table.to_string(should_color, "");
+
+  relations.sort([](const namespace_relation &left,
+                    const namespace_relation &right) {
+    if (left.type_index != right.type_index)
+      return left.type_index < right.type_index;
+    if (left.is_available != right.is_available) return left.is_available;
+    if (left.is_identifier_numeric != right.is_identifier_numeric)
+      return left.is_identifier_numeric;
+    if (left.is_identifier_numeric &&
+        left.identifier_value != right.identifier_value)
+    {
+      return left.identifier_value < right.identifier_value;
+    }
+    if (left.identifier != right.identifier)
+      return left.identifier < right.identifier;
+    return left.process_id < right.process_id;
+  });
+
+  usize type_width = 4;
+  usize identifier_width = 2;
+  usize process_width = 3;
+  usize name_width = 4;
+  for (let const &relation : relations) {
+    if (relation.type.length > type_width) type_width = relation.type.length;
+    if (relation.identifier.length() > identifier_width)
+      identifier_width = relation.identifier.length();
+    let const process_id =
+        String::from(relation.process_id, heap_allocator());
+    if (process_id.length() > process_width) process_width = process_id.length();
+    if (relation.name.length() > name_width) name_width = relation.name.length();
+  }
+
+  let const do_append_column = [&](StringView text, usize width,
+                                   bool is_numeric,
+                                   StringView style = {}) throws {
+    append_report_column(output, text, width, is_numeric, style, should_color);
+    output += "  ";
+  };
+  do_append_column("TYPE", type_width, false, colors::ansi::BOLD_CYAN);
+  do_append_column("ID", identifier_width, true, colors::ansi::BOLD_CYAN);
+  if (should_show_detail) {
+    do_append_column("PID", process_width, true, colors::ansi::BOLD_CYAN);
+    do_append_column("NAME", name_width, false, colors::ansi::BOLD_CYAN);
+    append_report_text(output, "ROLE", colors::ansi::BOLD_CYAN, should_color);
+  } else {
+    append_report_text(output, "PROCESSES", colors::ansi::BOLD_CYAN,
+                       should_color);
+  }
   output += '\n';
+
+  if (should_show_detail) {
+    for (let const &relation : relations) {
+      do_append_column(relation.type, type_width, false,
+                       colors::ansi::BOLD_MAGENTA);
+      do_append_column(relation.identifier.view(), identifier_width, true, {});
+      do_append_column(String::from(relation.process_id, heap_allocator()),
+                       process_width, true, colors::ansi::BOLD_GREEN);
+      do_append_column(relation.name.view(), name_width, false, {});
+      append_report_text(output, relation.role, colors::ansi::BOLD_MAGENTA,
+                         should_color);
+      output += '\n';
+    }
+    return;
+  }
+
+  usize relation_index = 0;
+  while (relation_index < relations.count()) {
+    let const &first = relations[relation_index];
+    usize group_end = relation_index + 1;
+    while (group_end < relations.count()) {
+      let const &candidate = relations[group_end];
+      if (candidate.type != first.type ||
+          candidate.identifier != first.identifier)
+      {
+        break;
+      }
+      group_end++;
+    }
+    do_append_column(first.type, type_width, false,
+                     colors::ansi::BOLD_MAGENTA);
+    do_append_column(first.identifier.view(), identifier_width, true, {});
+    append_report_text(
+        output, String::from(group_end - relation_index, heap_allocator()),
+        colors::ansi::BOLD_GREEN, should_color);
+    output += '\n';
+    relation_index = group_end;
+  }
 }
 
 struct cgroup_membership
