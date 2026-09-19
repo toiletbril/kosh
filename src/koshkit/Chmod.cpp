@@ -33,9 +33,9 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
 {
   os::file_status status{};
   if (!os::stat_path_following(path.text().view(), status)) {
-    report_soft_koshkit_error(ec, cxt,
-                              "chmod: cannot access '" + path.text() +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, "chmod",
+                                   "cannot access '" + path.text() +
+                                       "': " + os::last_system_error_message());
     return false;
   }
 
@@ -46,9 +46,9 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
   bool did_succeed = true;
   if (!os::set_file_mode(path.text().view(), *parsed)) {
-    report_soft_koshkit_error(ec, cxt,
-                              "chmod: cannot change mode of '" + path.text() +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, "chmod",
+                                   "cannot change mode of '" + path.text() +
+                                       "': " + os::last_system_error_message());
     did_succeed = false;
   }
 
@@ -57,9 +57,9 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
   let children = Path::read_directory(path);
   if (!children.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "chmod: cannot read directory '" + path.text() +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, "chmod",
+                                   "cannot read directory '" + path.text() +
+                                       "': " + os::last_system_error_message());
     return false;
   }
 
