@@ -109,10 +109,10 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const input = open_named_or_stdin(ec, source);
   if (!input.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "split: cannot read '" +
-                                  String{cxt.scratch_allocator(), source} +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "cannot read '" +
+                                       String{cxt.scratch_allocator(), source} +
+                                       "': " + os::last_system_error_message());
     return 1;
   }
   defer
@@ -135,9 +135,9 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
     let const descriptor =
         os::open_file_descriptor(name.view(), os::file_open_mode::Truncate);
     if (!descriptor.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "split: cannot create '" + name +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "cannot create '" + name + "': " + os::last_system_error_message());
       return false;
     }
     output_descriptor = *descriptor;
@@ -156,8 +156,8 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
         os::read_fd(input->descriptor, buffer, sizeof(buffer));
     if (!read_count.has_value()) {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(ec, cxt,
-                                "split: " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     os::last_system_error_message());
       return 1;
     }
     if (*read_count == 0) break;
@@ -171,8 +171,8 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
                                     ? static_cast<usize>(remaining)
                                     : *read_count - position;
         if (!os::write_all(output_descriptor, buffer + position, write_count)) {
-          report_soft_koshkit_error(
-              ec, cxt, "split: " + os::last_system_error_message());
+          report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                         os::last_system_error_message());
           return 1;
         }
         position += write_count;
@@ -187,8 +187,8 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
         if (!os::write_all(output_descriptor, buffer + segment_start,
                            position + 1 - segment_start))
         {
-          report_soft_koshkit_error(
-              ec, cxt, "split: " + os::last_system_error_message());
+          report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                         os::last_system_error_message());
           return 1;
         }
         segment_start = position + 1;
@@ -200,8 +200,8 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
         if (!os::write_all(output_descriptor, buffer + segment_start,
                            *read_count - segment_start))
         {
-          report_soft_koshkit_error(
-              ec, cxt, "split: " + os::last_system_error_message());
+          report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                         os::last_system_error_message());
           return 1;
         }
       }

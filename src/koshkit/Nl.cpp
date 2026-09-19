@@ -227,10 +227,10 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
   let const input = open_named_or_stdin(ec, source);
   if (!input.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "nl: cannot read '" +
-                                  String{cxt.scratch_allocator(), source} +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "cannot read '" +
+                                       String{cxt.scratch_allocator(), source} +
+                                       "': " + os::last_system_error_message());
     return 1;
   }
   defer
@@ -250,8 +250,8 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
     if (result == utils::BufferedLineReader::Result::End) break;
     if (result == utils::BufferedLineReader::Result::Error) {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(ec, cxt,
-                                "nl: " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     os::last_system_error_message());
       return 1;
     }
 

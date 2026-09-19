@@ -187,9 +187,9 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
       if (!source_result.content.has_value()) {
         if (!FLAG_PR_NO_ERRORS.is_enabled()) {
           os::set_last_system_error(source_result.error_number);
-          report_soft_koshkit_error(
-              ec, cxt,
-              "pr: cannot read '" + String{sources[source_index]} +
+          report_soft_koshkit_util_error(
+              ec, cxt, args[0].view(),
+              "cannot read '" + String{sources[source_index]} +
                   "': " + os::last_system_error_message());
         }
         status = 1;
@@ -251,10 +251,10 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
     let const content = read_named_or_stdin(ec, source);
     if (!content.has_value()) {
       if (!FLAG_PR_NO_ERRORS.is_enabled())
-        report_soft_koshkit_error(ec, cxt,
-                                  "pr: cannot read '" +
-                                      String{cxt.scratch_allocator(), source} +
-                                      "': " + os::last_system_error_message());
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot read '" + String{cxt.scratch_allocator(), source} +
+                "': " + os::last_system_error_message());
       status = 1;
       continue;
     }

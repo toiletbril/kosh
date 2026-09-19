@@ -62,9 +62,9 @@ static fn write_csplit_part(const ExecContext &ec, EvalContext &cxt,
   let const descriptor =
       os::open_file_descriptor(name.view(), os::file_open_mode::Truncate);
   if (!descriptor.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "csplit: cannot create '" + name +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, "csplit",
+                                   "cannot create '" + name +
+                                       "': " + os::last_system_error_message());
     return false;
   }
   bool is_output_tracked = false;
@@ -82,9 +82,9 @@ static fn write_csplit_part(const ExecContext &ec, EvalContext &cxt,
     if (!os::write_all(*descriptor, lines[line_index].data,
                        lines[line_index].length))
     {
-      report_soft_koshkit_error(ec, cxt,
-                                "csplit: cannot write '" + name +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, "csplit",
+          "cannot write '" + name + "': " + os::last_system_error_message());
       return false;
     }
     byte_count += lines[line_index].length;
@@ -158,9 +158,9 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const content = read_named_or_stdin(ec, operands[0].view());
   if (!content.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "csplit: cannot read '" + operands[0] +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "cannot read '" + operands[0] +
+                                       "': " + os::last_system_error_message());
     return 1;
   }
   let lines =
