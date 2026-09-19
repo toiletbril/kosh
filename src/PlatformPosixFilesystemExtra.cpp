@@ -782,28 +782,32 @@ static fn validate_batched_syscall(const batched_syscall &operation) wontthrow
     return EINVAL;
   }
 
-  switch (operation.syscall_id) {
+  switch (batch_operation_access::get_kind(operation)) {
   case batched_syscall_id::Read:
-    if (operation.fd == KOSH_INVALID_FD ||
-        (operation.output_buffer == nullptr && operation.byte_count != 0))
+    if (batch_operation_access::get_descriptor(operation) == KOSH_INVALID_FD ||
+        (batch_operation_access::get_output_buffer(operation) == nullptr &&
+         operation.byte_count != 0))
     {
       return EINVAL;
     }
     return 0;
   case batched_syscall_id::Write:
   case batched_syscall_id::WriteCurrent:
-    if (operation.fd == KOSH_INVALID_FD ||
-        (operation.input_buffer == nullptr && operation.byte_count != 0))
+    if (batch_operation_access::get_descriptor(operation) == KOSH_INVALID_FD ||
+        (batch_operation_access::get_input_buffer(operation) == nullptr &&
+         operation.byte_count != 0))
     {
       return EINVAL;
     }
     return 0;
   case batched_syscall_id::Lstat:
   case batched_syscall_id::Stat:
-    return operation.path == nullptr || operation.status == nullptr ? EINVAL
-                                                                    : 0;
+    return batch_operation_access::get_path(operation) == nullptr ||
+                   batch_operation_access::get_status(operation) == nullptr
+               ? EINVAL
+               : 0;
   case batched_syscall_id::Exists:
-    return operation.path == nullptr ? EINVAL : 0;
+    return batch_operation_access::get_path(operation) == nullptr ? EINVAL : 0;
   case batched_syscall_id::Invalid: return EINVAL;
   }
 
@@ -817,13 +821,14 @@ execute_batched_syscall_direct(const batched_syscall &operation,
   result = {operation.request_id, 0, validate_batched_syscall(operation)};
   if (result.error_number != 0) return;
 
-  switch (operation.syscall_id) {
+  switch (batch_operation_access::get_kind(operation)) {
   case batched_syscall_id::Read:
     loop
     {
-      let const transferred_byte_count =
-          ::pread(operation.fd, operation.output_buffer, operation.byte_count,
-                  static_cast<off_t>(operation.byte_offset));
+      let const transferred_byte_count = ::pread(
+          batch_operation_access::get_descriptor(operation),
+          batch_operation_access::get_output_buffer(operation),
+          operation.byte_count, static_cast<off_t>(operation.byte_offset));
       if (transferred_byte_count >= 0) {
         result.transferred_byte_count =
             static_cast<usize>(transferred_byte_count);
@@ -837,9 +842,10 @@ execute_batched_syscall_direct(const batched_syscall &operation,
   case batched_syscall_id::Write:
     loop
     {
-      let const transferred_byte_count =
-          ::pwrite(operation.fd, operation.input_buffer, operation.byte_count,
-                   static_cast<off_t>(operation.byte_offset));
+      let const transferred_byte_count = ::pwrite(
+          batch_operation_access::get_descriptor(operation),
+          batch_operation_access::get_input_buffer(operation),
+          operation.byte_count, static_cast<off_t>(operation.byte_offset));
       if (transferred_byte_count >= 0) {
         result.transferred_byte_count =
             static_cast<usize>(transferred_byte_count);
@@ -854,7 +860,9 @@ execute_batched_syscall_direct(const batched_syscall &operation,
     loop
     {
       let const transferred_byte_count =
-          ::write(operation.fd, operation.input_buffer, operation.byte_count);
+          ::write(batch_operation_access::get_descriptor(operation),
+                  batch_operation_access::get_input_buffer(operation),
+                  operation.byte_count);
       if (transferred_byte_count >= 0) {
         result.transferred_byte_count =
             static_cast<usize>(transferred_byte_count);
@@ -866,15 +874,19 @@ execute_batched_syscall_direct(const batched_syscall &operation,
       }
     }
   case batched_syscall_id::Lstat:
-    if (!stat_path(operation.path->text().view(), *operation.status))
+    if (!stat_path(batch_operation_access::get_path(operation)->text().view(),
+                   *batch_operation_access::get_status(operation)))
       result.error_number = errno;
     return;
   case batched_syscall_id::Stat:
-    if (!stat_path_following(operation.path->text().view(), *operation.status))
+    if (!stat_path_following(
+            batch_operation_access::get_path(operation)->text().view(),
+            *batch_operation_access::get_status(operation)))
       result.error_number = errno;
     return;
   case batched_syscall_id::Exists:
-    result.is_existing = path_exists(operation.path->text().view());
+    result.is_existing =
+        path_exists(batch_operation_access::get_path(operation)->text().view());
     return;
   case batched_syscall_id::Invalid: result.error_number = EINVAL; return;
   }
@@ -909,7 +921,8 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
   if (operation_count < 2) return false;
 
   for (usize index = 0; index < operation_count; index++) {
-    if (operations[index].syscall_id != batched_syscall_id::Lstat ||
+    if (batch_operation_access::get_kind(operations[index]) !=
+            batched_syscall_id::Lstat ||
         validate_batched_syscall(operations[index]) != 0)
     {
       return false;
@@ -922,7 +935,8 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
     parent_paths.reserve(operation_count);
     operation_positions.reserve(operation_count);
     for (usize index = 0; index < operation_count; index++) {
-      parent_paths.push(operations[index].path->parent_or_current());
+      parent_paths.push(batch_operation_access::get_path(operations[index])
+                            ->parent_or_current());
       operation_positions.push(index);
     }
     operation_positions.sort([&](usize left, usize right) {
@@ -972,10 +986,11 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
 
         bool has_status = false;
         if (entries.has_value()) {
-          let const filename = operation.path->filename();
+          let const filename =
+              batch_operation_access::get_path(operation)->filename();
           let const *entry = find_directory_status_entry(*entries, filename);
           if (entry != nullptr && entry->has_status) {
-            *operation.status = entry->status;
+            *batch_operation_access::get_status(operation) = entry->status;
             has_status = true;
           }
         }
@@ -1025,7 +1040,7 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
 
   for (usize index = 0; index < operation_count; index++) {
     let const &operation = operations[index];
-    switch (operation.syscall_id) {
+    switch (batch_operation_access::get_kind(operation)) {
     case batched_syscall_id::Read:
     case batched_syscall_id::Write:
       aio_operation_count++;
@@ -1064,32 +1079,38 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
       let const operation_index = operation_start + chunk_index;
       let const &operation = operations[operation_index];
       let &result = results[operation_index];
+      let const operation_kind = batch_operation_access::get_kind(operation);
       result = {operation.request_id, 0, validate_batched_syscall(operation)};
       if (result.error_number != 0) continue;
 
-      if (operation.syscall_id == batched_syscall_id::Lstat ||
-          operation.syscall_id == batched_syscall_id::Stat ||
-          operation.syscall_id == batched_syscall_id::Exists)
-      {
+      switch (operation_kind) {
+      case batched_syscall_id::Lstat:
+      case batched_syscall_id::Stat:
+      case batched_syscall_id::Exists:
         execute_batched_syscall_direct(operation, result);
         continue;
+      case batched_syscall_id::Read:
+      case batched_syscall_id::Write:
+      case batched_syscall_id::WriteCurrent: break;
+      case batched_syscall_id::Invalid: continue;
       }
 
       let &control = controls[chunk_index];
-      control.aio_fildes = operation.fd;
+      control.aio_fildes = batch_operation_access::get_descriptor(operation);
       control.aio_offset = static_cast<off_t>(operation.byte_offset);
-      control.aio_buf = operation.syscall_id == batched_syscall_id::Read
-                            ? operation.output_buffer
-                            : const_cast<char *>(operation.input_buffer);
+      control.aio_buf =
+          operation_kind == batched_syscall_id::Read
+              ? batch_operation_access::get_output_buffer(operation)
+              : const_cast<char *>(
+                    batch_operation_access::get_input_buffer(operation));
       control.aio_nbytes = operation.byte_count;
       control.aio_sigevent.sigev_notify = SIGEV_KEVENT;
       control.aio_sigevent.sigev_signo = queue_descriptor;
       control.aio_sigevent.sigev_value.sival_ptr = &control;
 
-      let const submission_result =
-          operation.syscall_id == batched_syscall_id::Read
-              ? ::aio_read(&control)
-              : ::aio_write(&control);
+      let const submission_result = operation_kind == batched_syscall_id::Read
+                                        ? ::aio_read(&control)
+                                        : ::aio_write(&control);
       if (submission_result != 0) {
         if (errno == EAGAIN || errno == ENOSYS) {
           execute_batched_syscall_direct(operation, result);
@@ -1425,7 +1446,7 @@ static fn io_uring_batch_supports_operations(const io_uring_batch &ring,
     -> bool
 {
   for (usize index = 0; index < operation_count; index++) {
-    switch (operations[index].syscall_id) {
+    switch (batch_operation_access::get_kind(operations[index])) {
     case batched_syscall_id::Read:
       if (!ring.has_read) return false;
       break;
@@ -1439,9 +1460,11 @@ static fn io_uring_batch_supports_operations(const io_uring_batch &ring,
         return false;
       }
       for (usize previous_index = 0; previous_index < index; previous_index++) {
-        if (operations[previous_index].syscall_id ==
+        if (batch_operation_access::get_kind(operations[previous_index]) ==
                 batched_syscall_id::WriteCurrent &&
-            operations[previous_index].fd == operations[index].fd)
+            batch_operation_access::get_descriptor(
+                operations[previous_index]) ==
+                batch_operation_access::get_descriptor(operations[index]))
         {
           return false;
         }
@@ -1467,12 +1490,17 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
   if (operation_count < 8) return false;
   for (usize index = 0; index < operation_count; index++) {
     let const &operation = operations[index];
-    if ((operation.syscall_id == batched_syscall_id::Read ||
-         operation.syscall_id == batched_syscall_id::Write ||
-         operation.syscall_id == batched_syscall_id::WriteCurrent) &&
-        operation.byte_count > UINT32_MAX)
-    {
-      return false;
+    let const operation_kind = batch_operation_access::get_kind(operation);
+    switch (operation_kind) {
+    case batched_syscall_id::Read:
+    case batched_syscall_id::Write:
+    case batched_syscall_id::WriteCurrent:
+      if (operation.byte_count > UINT32_MAX) return false;
+      break;
+    case batched_syscall_id::Lstat:
+    case batched_syscall_id::Stat:
+    case batched_syscall_id::Exists:
+    case batched_syscall_id::Invalid: break;
     }
   }
 
@@ -1519,26 +1547,29 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
       let &entry = ring.submission_entries[submission_index];
       entry = {};
       entry.user_data = operation_index;
-      switch (operation.syscall_id) {
+      switch (batch_operation_access::get_kind(operation)) {
       case batched_syscall_id::Read:
         entry.opcode = IORING_OP_READ;
-        entry.fd = operation.fd;
+        entry.fd = batch_operation_access::get_descriptor(operation);
         entry.off = operation.byte_offset;
-        entry.addr = reinterpret_cast<u64>(operation.output_buffer);
+        entry.addr = reinterpret_cast<u64>(
+            batch_operation_access::get_output_buffer(operation));
         entry.len = static_cast<u32>(operation.byte_count);
         break;
       case batched_syscall_id::Write:
         entry.opcode = IORING_OP_WRITE;
-        entry.fd = operation.fd;
+        entry.fd = batch_operation_access::get_descriptor(operation);
         entry.off = operation.byte_offset;
-        entry.addr = reinterpret_cast<u64>(operation.input_buffer);
+        entry.addr = reinterpret_cast<u64>(
+            batch_operation_access::get_input_buffer(operation));
         entry.len = static_cast<u32>(operation.byte_count);
         break;
       case batched_syscall_id::WriteCurrent:
         entry.opcode = IORING_OP_WRITE;
-        entry.fd = operation.fd;
+        entry.fd = batch_operation_access::get_descriptor(operation);
         entry.off = UINT64_MAX;
-        entry.addr = reinterpret_cast<u64>(operation.input_buffer);
+        entry.addr = reinterpret_cast<u64>(
+            batch_operation_access::get_input_buffer(operation));
         entry.len = static_cast<u32>(operation.byte_count);
         break;
       case batched_syscall_id::Lstat:
@@ -1546,9 +1577,11 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
       case batched_syscall_id::Exists:
         entry.opcode = IORING_OP_STATX;
         entry.fd = AT_FDCWD;
-        entry.addr = reinterpret_cast<u64>(operation.path->c_str());
+        entry.addr = reinterpret_cast<u64>(
+            batch_operation_access::get_path(operation)->c_str());
         entry.len = STATX_BASIC_STATS;
-        entry.statx_flags = operation.syscall_id == batched_syscall_id::Lstat
+        entry.statx_flags = batch_operation_access::get_kind(operation) ==
+                                    batched_syscall_id::Lstat
                                 ? AT_SYMLINK_NOFOLLOW
                                 : 0;
         entry.addr2 = reinterpret_cast<u64>(&status_records[chunk_index]);
@@ -1631,30 +1664,48 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
         let const operation_index = static_cast<usize>(completion.user_data);
         let const chunk_index = operation_index - operation_start;
         let &result = results[operation_index];
-        let const operation_kind = operations[operation_index].syscall_id;
+        let const operation_kind =
+            batch_operation_access::get_kind(operations[operation_index]);
         if (completion.res < 0) {
           let const error_number = -completion.res;
-          if (operation_kind == batched_syscall_id::Exists) {
+          switch (operation_kind) {
+          case batched_syscall_id::Exists:
             execute_batched_syscall_direct(operations[operation_index], result);
-          } else if ((operation_kind == batched_syscall_id::Read ||
-                      operation_kind == batched_syscall_id::Write ||
-                      operation_kind == batched_syscall_id::WriteCurrent) &&
-                     (error_number == EOPNOTSUPP || error_number == EINVAL ||
-                      error_number == ESPIPE))
-          {
-            execute_batched_syscall_direct(operations[operation_index], result);
-          } else {
+            break;
+          case batched_syscall_id::Read:
+          case batched_syscall_id::Write:
+          case batched_syscall_id::WriteCurrent:
+            if (error_number == EOPNOTSUPP || error_number == EINVAL ||
+                error_number == ESPIPE)
+            {
+              execute_batched_syscall_direct(operations[operation_index],
+                                             result);
+            } else {
+              result.error_number = error_number;
+            }
+            break;
+          case batched_syscall_id::Lstat:
+          case batched_syscall_id::Stat:
+          case batched_syscall_id::Invalid:
             result.error_number = error_number;
+            break;
           }
-        } else if (operation_kind == batched_syscall_id::Exists) {
-          result.is_existing = true;
-        } else if (operation_kind == batched_syscall_id::Lstat ||
-                   operation_kind == batched_syscall_id::Stat)
-        {
-          fill_file_status(status_records[chunk_index],
-                           *operations[operation_index].status);
         } else {
-          result.transferred_byte_count = static_cast<usize>(completion.res);
+          switch (operation_kind) {
+          case batched_syscall_id::Exists: result.is_existing = true; break;
+          case batched_syscall_id::Lstat:
+          case batched_syscall_id::Stat:
+            fill_file_status(status_records[chunk_index],
+                             *batch_operation_access::get_status(
+                                 operations[operation_index]));
+            break;
+          case batched_syscall_id::Read:
+          case batched_syscall_id::Write:
+          case batched_syscall_id::WriteCurrent:
+            result.transferred_byte_count = static_cast<usize>(completion.res);
+            break;
+          case batched_syscall_id::Invalid: break;
+          }
         }
         was_completed[chunk_index] = true;
         completion_head++;

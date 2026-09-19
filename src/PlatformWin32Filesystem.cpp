@@ -1549,8 +1549,8 @@ static fn execute_shared_positioned_file_operation(
 {
   LARGE_INTEGER zero{};
   LARGE_INTEGER saved_position{};
-  if (SetFilePointerEx(operation.fd, zero, &saved_position, FILE_CURRENT) ==
-      FALSE)
+  if (SetFilePointerEx(batch_operation_access::get_descriptor(operation), zero,
+                       &saved_position, FILE_CURRENT) == FALSE)
   {
     result.error_number = static_cast<i32>(GetLastError());
     return;
@@ -1558,24 +1558,28 @@ static fn execute_shared_positioned_file_operation(
   defer
   {
     let const was_restored =
-        SetFilePointerEx(operation.fd, saved_position, nullptr, FILE_BEGIN);
+        SetFilePointerEx(batch_operation_access::get_descriptor(operation),
+                         saved_position, nullptr, FILE_BEGIN);
     if (was_restored == FALSE && result.error_number == 0)
       result.error_number = static_cast<i32>(GetLastError());
   };
 
   LARGE_INTEGER requested_position{};
   requested_position.QuadPart = static_cast<LONGLONG>(operation.byte_offset);
-  if (SetFilePointerEx(operation.fd, requested_position, nullptr, FILE_BEGIN) ==
-      FALSE)
+  if (SetFilePointerEx(batch_operation_access::get_descriptor(operation),
+                       requested_position, nullptr, FILE_BEGIN) == FALSE)
   {
     result.error_number = static_cast<i32>(GetLastError());
     return;
   }
 
   let const transferred =
-      operation.syscall_id == batched_syscall_id::Read
-          ? read_fd(operation.fd, operation.output_buffer, operation.byte_count)
-          : write_fd(operation.fd, operation.input_buffer,
+      batch_operation_access::get_kind(operation) == batched_syscall_id::Read
+          ? read_fd(batch_operation_access::get_descriptor(operation),
+                    batch_operation_access::get_output_buffer(operation),
+                    operation.byte_count)
+          : write_fd(batch_operation_access::get_descriptor(operation),
+                     batch_operation_access::get_input_buffer(operation),
                      operation.byte_count);
   if (transferred.has_value()) {
     result.transferred_byte_count = *transferred;
@@ -1612,12 +1616,12 @@ submit_positioned_file_operation(const batched_syscall &operation,
                                  batched_syscall_result &result,
                                  win32_batch_request &request) wontthrow -> void
 {
-  let const desired_access = operation.syscall_id == batched_syscall_id::Read
-                                 ? GENERIC_READ
-                                 : GENERIC_WRITE;
-  request.positioned_handle =
-      ReOpenFile(operation.fd, desired_access,
-                 FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_FLAG_OVERLAPPED);
+  let const operation_kind = batch_operation_access::get_kind(operation);
+  let const desired_access =
+      operation_kind == batched_syscall_id::Read ? GENERIC_READ : GENERIC_WRITE;
+  request.positioned_handle = ReOpenFile(
+      batch_operation_access::get_descriptor(operation), desired_access,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_FLAG_OVERLAPPED);
   if (request.positioned_handle == INVALID_HANDLE_VALUE) {
     execute_shared_positioned_file_operation(operation, result);
     return;
@@ -1633,15 +1637,17 @@ submit_positioned_file_operation(const batched_syscall &operation,
   request.control.OffsetHigh = static_cast<DWORD>(operation.byte_offset >> 32);
   let const requested_byte_count = static_cast<DWORD>(operation.byte_count);
   let const was_started =
-      operation.syscall_id == batched_syscall_id::Read
-          ? ReadFile(request.positioned_handle, operation.output_buffer,
+      operation_kind == batched_syscall_id::Read
+          ? ReadFile(request.positioned_handle,
+                     batch_operation_access::get_output_buffer(operation),
                      requested_byte_count, nullptr, &request.control)
-          : WriteFile(request.positioned_handle, operation.input_buffer,
+          : WriteFile(request.positioned_handle,
+                      batch_operation_access::get_input_buffer(operation),
                       requested_byte_count, nullptr, &request.control);
   if (was_started == FALSE) {
     let const error_number = GetLastError();
     if (error_number != ERROR_IO_PENDING) {
-      if (operation.syscall_id == batched_syscall_id::Read &&
+      if (operation_kind == batched_syscall_id::Read &&
           error_number == ERROR_HANDLE_EOF)
       {
         close_win32_batch_request(request);
@@ -1668,7 +1674,8 @@ static fn finish_positioned_file_operation(const batched_syscall &operation,
                           should_wait ? TRUE : FALSE) == FALSE)
   {
     let const error_number = GetLastError();
-    if (operation.syscall_id == batched_syscall_id::Read &&
+    if (batch_operation_access::get_kind(operation) ==
+            batched_syscall_id::Read &&
         error_number == ERROR_HANDLE_EOF)
     {
       close_win32_batch_request(request);
@@ -1689,7 +1696,9 @@ execute_current_file_operation(const batched_syscall &operation,
                                batched_syscall_result &result) wontthrow -> void
 {
   let const transferred =
-      write_fd(operation.fd, operation.input_buffer, operation.byte_count);
+      write_fd(batch_operation_access::get_descriptor(operation),
+               batch_operation_access::get_input_buffer(operation),
+               operation.byte_count);
   if (transferred.has_value()) {
     result.transferred_byte_count = *transferred;
     return;
@@ -1731,6 +1740,7 @@ fn execute_batch_operations(const batched_syscall *operations,
 
       let const &operation = operations[operation_index];
       let &result = results[operation_index];
+      let const operation_kind = batch_operation_access::get_kind(operation);
       result = {operation.request_id, 0, 0};
       if (operation.byte_count > static_cast<usize>(MAXDWORD) ||
           operation.byte_offset > 0x7fffffffffffffffULL)
@@ -1739,13 +1749,15 @@ fn execute_batch_operations(const batched_syscall *operations,
         continue;
       }
 
-      switch (operation.syscall_id) {
+      switch (operation_kind) {
       case batched_syscall_id::Read:
       case batched_syscall_id::Write: {
-        let const buffer = operation.syscall_id == batched_syscall_id::Read
-                               ? operation.output_buffer
-                               : operation.input_buffer;
-        if (operation.fd == KOSH_INVALID_FD ||
+        let const buffer =
+            operation_kind == batched_syscall_id::Read
+                ? batch_operation_access::get_output_buffer(operation)
+                : batch_operation_access::get_input_buffer(operation);
+        if (batch_operation_access::get_descriptor(operation) ==
+                KOSH_INVALID_FD ||
             (buffer == nullptr && operation.byte_count != 0))
         {
           result.error_number = ERROR_INVALID_PARAMETER;
@@ -1757,8 +1769,10 @@ fn execute_batch_operations(const batched_syscall *operations,
         break;
       }
       case batched_syscall_id::WriteCurrent:
-        if (operation.fd == KOSH_INVALID_FD ||
-            (operation.input_buffer == nullptr && operation.byte_count != 0))
+        if (batch_operation_access::get_descriptor(operation) ==
+                KOSH_INVALID_FD ||
+            (batch_operation_access::get_input_buffer(operation) == nullptr &&
+             operation.byte_count != 0))
         {
           result.error_number = ERROR_INVALID_PARAMETER;
           continue;
@@ -1767,23 +1781,32 @@ fn execute_batch_operations(const batched_syscall *operations,
         execute_current_file_operation(operation, result);
         break;
       case batched_syscall_id::Exists:
-        if (operation.path == nullptr) {
+        if (batch_operation_access::get_path(operation) == nullptr) {
           result.error_number = ERROR_INVALID_PARAMETER;
           continue;
         }
-        result.is_existing = path_exists(operation.path->text().view());
+        result.is_existing = path_exists(
+            batch_operation_access::get_path(operation)->text().view());
         break;
       case batched_syscall_id::Lstat:
       case batched_syscall_id::Stat:
-        if (operation.path == nullptr || operation.status == nullptr) {
+        if (batch_operation_access::get_path(operation) == nullptr ||
+            batch_operation_access::get_status(operation) == nullptr)
+        {
           result.error_number = ERROR_INVALID_PARAMETER;
           continue;
         }
         SetLastError(ERROR_SUCCESS);
-        if (!(operation.syscall_id == batched_syscall_id::Lstat
-                  ? stat_path(operation.path->text().view(), *operation.status)
-                  : stat_path_following(operation.path->text().view(),
-                                        *operation.status)))
+        if (!(operation_kind == batched_syscall_id::Lstat
+                  ? stat_path(batch_operation_access::get_path(operation)
+                                  ->text()
+                                  .view(),
+                              *batch_operation_access::get_status(operation))
+                  : stat_path_following(
+                        batch_operation_access::get_path(operation)
+                            ->text()
+                            .view(),
+                        *batch_operation_access::get_status(operation))))
         {
           result.error_number = static_cast<i32>(GetLastError());
           if (result.error_number == 0) result.error_number = ERROR_GEN_FAILURE;

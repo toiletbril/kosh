@@ -400,9 +400,14 @@ fn execute_batch_operations(const batched_syscall *operations,
     let const &operation = operations[index];
     if (index < sizeof(observed_operations) / sizeof(observed_operations[0]))
       observed_operations[index] = {
-          operation.syscall_id,   operation.fd,        operation.output_buffer,
-          operation.input_buffer, operation.path,      operation.request_id,
-          operation.byte_offset,  operation.byte_count};
+          batch_operation_access::get_kind(operation),
+          batch_operation_access::get_descriptor(operation),
+          batch_operation_access::get_output_buffer(operation),
+          batch_operation_access::get_input_buffer(operation),
+          batch_operation_access::get_path(operation),
+          operation.request_id,
+          operation.byte_offset,
+          operation.byte_count};
 
     let &result = results[index];
     result.request_id = operation.request_id;
@@ -412,34 +417,41 @@ fn execute_batch_operations(const batched_syscall *operations,
     }
     result.transferred_byte_count =
         operation.byte_count + operation.byte_offset;
-    result.error_number = should_validate_operations &&
-                                  operation.fd == KOSH_INVALID_FD
-                              ? 22
-                              : 30 + static_cast<i32>(operation.request_id);
+    result.error_number =
+        should_validate_operations && batch_operation_access::get_descriptor(
+                                          operation) == KOSH_INVALID_FD
+            ? 22
+            : 30 + static_cast<i32>(operation.request_id);
 
-    if (operation.output_buffer != nullptr && operation.byte_count != 0) {
-      operation.output_buffer[0] = static_cast<char>('A' + index);
+    if (batch_operation_access::get_output_buffer(operation) != nullptr &&
+        operation.byte_count != 0)
+    {
+      batch_operation_access::get_output_buffer(operation)[0] =
+          static_cast<char>('A' + index);
     }
 
-    if (operation.syscall_id == batched_syscall_id::Exists) {
+    if (batch_operation_access::get_kind(operation) ==
+        batched_syscall_id::Exists)
+    {
       result.transferred_byte_count = 0;
       result.error_number = 0;
       result.is_existing = should_report_existing;
       continue;
     }
 
-    if (operation.status == nullptr) continue;
+    if (batch_operation_access::get_status(operation) == nullptr) continue;
     if (should_fail_metadata) {
       result.error_number = 90;
       continue;
     }
 
     result.error_number = 0;
-    operation.status->size = 1000 + operation.request_id;
-    operation.status->file_id = 2000 + operation.request_id;
+    batch_operation_access::get_status(operation)->size =
+        1000 + operation.request_id;
+    batch_operation_access::get_status(operation)->file_id =
+        2000 + operation.request_id;
   }
 }
-
 }
 }
 

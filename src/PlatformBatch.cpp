@@ -16,8 +16,8 @@ fn batch_operation::read(descriptor fd, char *buffer, usize byte_count,
 {
   batch_operation operation;
   operation.syscall_id = Kind::Read;
-  operation.fd = fd;
-  operation.output_buffer = buffer;
+  operation.m_secondary.fd = fd;
+  operation.m_primary.output_buffer = buffer;
   operation.byte_count = byte_count;
   operation.byte_offset = byte_offset;
   return operation;
@@ -28,8 +28,8 @@ fn batch_operation::write(descriptor fd, const char *buffer, usize byte_count,
 {
   batch_operation operation;
   operation.syscall_id = Kind::Write;
-  operation.fd = fd;
-  operation.input_buffer = buffer;
+  operation.m_secondary.fd = fd;
+  operation.m_primary.input_buffer = buffer;
   operation.byte_count = byte_count;
   operation.byte_offset = byte_offset;
   return operation;
@@ -40,8 +40,8 @@ fn batch_operation::write_current(descriptor fd, const char *buffer,
 {
   batch_operation operation;
   operation.syscall_id = Kind::WriteCurrent;
-  operation.fd = fd;
-  operation.input_buffer = buffer;
+  operation.m_secondary.fd = fd;
+  operation.m_primary.input_buffer = buffer;
   operation.byte_count = byte_count;
   return operation;
 }
@@ -51,8 +51,8 @@ fn batch_operation::lstat(const Path &path, file_status &status) wontthrow
 {
   batch_operation operation;
   operation.syscall_id = Kind::Lstat;
-  operation.path = &path;
-  operation.status = &status;
+  operation.m_primary.path = &path;
+  operation.m_secondary.status = &status;
   return operation;
 }
 
@@ -61,8 +61,8 @@ fn batch_operation::stat(const Path &path, file_status &status) wontthrow
 {
   batch_operation operation;
   operation.syscall_id = Kind::Stat;
-  operation.path = &path;
-  operation.status = &status;
+  operation.m_primary.path = &path;
+  operation.m_secondary.status = &status;
   return operation;
 }
 
@@ -70,7 +70,7 @@ fn batch_operation::exists(const Path &path) wontthrow -> batch_operation
 {
   batch_operation operation;
   operation.syscall_id = Kind::Exists;
-  operation.path = &path;
+  operation.m_primary.path = &path;
   return operation;
 }
 
@@ -93,8 +93,10 @@ static pure fn is_same_metadata_request(
     const batch_internal::batched_syscall &left,
     const batch_internal::batched_syscall &right) wontthrow -> bool
 {
-  if (left.syscall_id != right.syscall_id) return false;
-  switch (left.syscall_id) {
+  let const left_kind = batch_internal::batch_operation_access::get_kind(left);
+  if (left_kind != batch_internal::batch_operation_access::get_kind(right))
+    return false;
+  switch (left_kind) {
   case batch_operation::Kind::Lstat:
   case batch_operation::Kind::Stat:
   case batch_operation::Kind::Exists: break;
@@ -103,17 +105,21 @@ static pure fn is_same_metadata_request(
   case batch_operation::Kind::WriteCurrent:
   case batch_operation::Kind::Invalid: return false;
   }
-  if (left.path == nullptr || right.path == nullptr) return false;
+  let const *left_path = batch_internal::batch_operation_access::get_path(left);
+  let const *right_path =
+      batch_internal::batch_operation_access::get_path(right);
+  if (left_path == nullptr || right_path == nullptr) return false;
 
-  return left.path->text().view() == right.path->text().view();
+  return left_path->text().view() == right_path->text().view();
 }
 
 static pure fn is_metadata_request(
     const batch_internal::batched_syscall &operation) wontthrow -> bool
 {
-  if (operation.path == nullptr) return false;
+  if (batch_internal::batch_operation_access::get_path(operation) == nullptr)
+    return false;
 
-  switch (operation.syscall_id) {
+  switch (batch_internal::batch_operation_access::get_kind(operation)) {
   case batch_operation::Kind::Lstat:
   case batch_operation::Kind::Stat:
   case batch_operation::Kind::Exists: return true;
@@ -146,10 +152,12 @@ static fn find_canonical_operation_positions(
     for (usize left_index = 0; left_index < operations.count(); left_index++) {
       if (!is_metadata_request(operations[left_index])) continue;
 
-      for (usize right_index = left_index + 1;
-           right_index < operations.count(); right_index++) {
+      for (usize right_index = left_index + 1; right_index < operations.count();
+           right_index++)
+      {
         if (is_same_metadata_request(operations[left_index],
-                                     operations[right_index])) {
+                                     operations[right_index]))
+        {
           has_duplicate_metadata = true;
           break;
         }
@@ -179,9 +187,13 @@ static fn find_canonical_operation_positions(
     let const &operation = operations[index];
     if (!is_metadata_request(operation)) continue;
 
-    let const path = operation.path->text().view();
+    let const path = batch_internal::batch_operation_access::get_path(operation)
+                         ->text()
+                         .view();
     let const kind_hash =
-        static_cast<u64>(operation.syscall_id) * 0x9e3779b97f4a7c15ull;
+        static_cast<u64>(
+            batch_internal::batch_operation_access::get_kind(operation)) *
+        0x9e3779b97f4a7c15ull;
     usize bucket =
         static_cast<usize>(hash_bytes(path) ^ kind_hash) & (bucket_count - 1);
     loop
@@ -253,11 +265,13 @@ fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
 
     let const &operation = m_operations[index];
     let const &optimized_operation = optimized_operations[optimized_position];
-    if (result.error_number == 0 && operation.status != nullptr &&
-        optimized_operation.status != nullptr &&
-        operation.status != optimized_operation.status)
+    let *status = batch_internal::batch_operation_access::get_status(operation);
+    let *optimized_status =
+        batch_internal::batch_operation_access::get_status(optimized_operation);
+    if (result.error_number == 0 && status != nullptr &&
+        optimized_status != nullptr && status != optimized_status)
     {
-      *operation.status = *optimized_operation.status;
+      *status = *optimized_status;
     }
   }
 }
