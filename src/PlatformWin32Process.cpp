@@ -2251,8 +2251,11 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
         FILETIME user_time{};
         if (GetProcessTimes(handle, &creation_time, &exit_time, &kernel_time,
                             &user_time) != 0)
+        {
+          process.start_token = filetime_ticks(creation_time);
           process.cpu_milliseconds =
               (filetime_ticks(kernel_time) + filetime_ticks(user_time)) / 10000;
+        }
 
         PROCESS_MEMORY_COUNTERS memory{};
         memory.cb = sizeof(memory);

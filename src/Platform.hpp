@@ -502,11 +502,12 @@ struct process_entry
   u64 virtual_kib{0};
   u64 resident_kib{0};
   u64 cpu_milliseconds{0};
+  u64 start_token{0};
   u32 owner_id{0};
   char state{'?'};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(process_entry) == 160);
+static_assert(sizeof(usize) != 8 || sizeof(process_entry) == 168);
 
 /* Every process the current user can see, for the koshkit pkill and killall
    utilities to match a name against. Empty on a platform with no process

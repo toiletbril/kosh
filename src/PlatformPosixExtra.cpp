@@ -581,6 +581,9 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
     process.name = String{StringView{record.kp_proc.p_comm}};
     process.owner_id = static_cast<u32>(record.kp_eproc.e_ucred.cr_uid);
     process.state = process_state_letter(record.kp_proc.p_stat);
+    process.start_token =
+        static_cast<u64>(record.kp_proc.p_starttime.tv_sec) * 1000000 +
+        static_cast<u64>(record.kp_proc.p_starttime.tv_usec);
 
     if (include_resource_stats) {
       char path_buffer[PROC_PIDPATHINFO_MAXSIZE];
@@ -760,6 +763,9 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
           if (let const system_ticks = nth_space_field(fields, 12).to<i64>();
               !system_ticks.is_error())
             cpu_tick_count += static_cast<u64>(system_ticks.value());
+          if (let const start_ticks = nth_space_field(fields, 19).to<i64>();
+              !start_ticks.is_error() && start_ticks.value() >= 0)
+            process.start_token = static_cast<u64>(start_ticks.value());
           let const ticks_per_second = ::sysconf(_SC_CLK_TCK);
           if (ticks_per_second > 0)
             process.cpu_milliseconds =
