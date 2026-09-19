@@ -3,6 +3,7 @@ evilps-limit=matched
 evilps-pid-labels=matched
 evilps-all-format=matched
 evilps-sorted-roots=matched
+evilps-sort-prefixes=matched
 evilps-sampling-help=matched
 evilps-invalid-live=1
 evilps-invalid-cumulative=1

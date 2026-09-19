@@ -40,7 +40,7 @@ FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
 FLAG(EVILPS_WIDE, Bool, 'w', "wide",
      "Do not truncate command lines to the terminal width.");
 FLAG(EVILPS_SORT, String, '\0', "sort",
-     "Sort children by name, pid, cpu, or memory.");
+     "Sort children by a unique prefix of name, pid, cpu, or memory.");
 static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
     -> bool
 {
@@ -64,6 +64,44 @@ namespace koshka::koshkit {
 namespace {
 
 constexpr usize MAXIMUM_TREE_DEPTH = 128;
+
+enum class evilps_sort_key : u8
+{
+  Name,
+  Pid,
+  Cpu,
+  Memory,
+};
+
+struct evilps_sort_spec
+{
+  evilps_sort_key key;
+  const char *name;
+};
+
+static constexpr static_string_entry<evilps_sort_spec> SORT_KEY_ENTRIES[] = {
+    {SSK("cpu"),    {evilps_sort_key::Cpu, "cpu"}      },
+    {SSK("memory"), {evilps_sort_key::Memory, "memory"}},
+    {SSK("name"),   {evilps_sort_key::Name, "name"}    },
+    {SSK("pid"),    {evilps_sort_key::Pid, "pid"}      },
+};
+
+static constexpr StaticStringMap SORT_KEYS{SORT_KEY_ENTRIES};
+
+fn resolve_sort_key(StringView value) throws -> Maybe<evilps_sort_key>
+{
+  if (let const exact = SORT_KEYS.find(value); exact.has_value())
+    return exact->key;
+
+  Maybe<evilps_sort_key> match{};
+  for (let const &entry : SORT_KEY_ENTRIES) {
+    if (!StringView{entry.value.name}.starts_with(value)) continue;
+    if (match.has_value()) return None;
+    match = entry.value.key;
+  }
+
+  return match;
+}
 
 struct tree_node
 {
@@ -186,11 +224,12 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
 }
 
 fn compare_nodes(const tree_node &left, const tree_node &right,
+                 Maybe<evilps_sort_key> sort_key,
                  bool is_sampled) wontthrow -> bool
 {
-  if (FLAG_EVILPS_SORT.is_set()) {
-    let const key = FLAG_EVILPS_SORT.value();
-    if (key == "cpu") {
+  if (sort_key.has_value()) {
+    switch (*sort_key) {
+    case evilps_sort_key::Cpu: {
       if (is_sampled &&
           left.has_cpu_percentage != right.has_cpu_percentage)
       {
@@ -201,12 +240,18 @@ fn compare_nodes(const tree_node &left, const tree_node &right,
       let const right_cpu = is_sampled ? right.cpu_percentage_hundredths
                                        : right.cpu_milliseconds;
       if (left_cpu != right_cpu) return left_cpu > right_cpu;
+      break;
     }
-    if (key == "memory" && left.resident_kib != right.resident_kib)
-      return left.resident_kib > right.resident_kib;
-    if (key == "pid") return left.pid < right.pid;
+    case evilps_sort_key::Memory:
+      if (left.resident_kib != right.resident_kib)
+        return left.resident_kib > right.resident_kib;
+      break;
+    case evilps_sort_key::Pid: return left.pid < right.pid;
+    case evilps_sort_key::Name: break;
+    }
+  } else if (FLAG_EVILPS_NUMERIC_SORT.is_enabled()) {
+    return left.pid < right.pid;
   }
-  if (FLAG_EVILPS_NUMERIC_SORT.is_enabled()) return left.pid < right.pid;
 
   if (left.name.view() < right.name.view()) return true;
 
@@ -215,11 +260,13 @@ fn compare_nodes(const tree_node &left, const tree_node &right,
   return left.pid < right.pid;
 }
 
-fn sort_nodes(ArrayList<tree_node> &nodes, bool is_sampled) throws -> void
+fn sort_nodes(ArrayList<tree_node> &nodes,
+              Maybe<evilps_sort_key> sort_key,
+              bool is_sampled) throws -> void
 {
-  let const do_compare = [is_sampled](const tree_node &left,
-                                      const tree_node &right) {
-    return compare_nodes(left, right, is_sampled);
+  let const do_compare = [sort_key, is_sampled](const tree_node &left,
+                                                const tree_node &right) {
+    return compare_nodes(left, right, sort_key, is_sampled);
   };
   nodes.sort(do_compare);
 }
@@ -253,6 +300,7 @@ fn append_cpu_value(String &output, const tree_node &node, Allocator allocator,
 
 fn append_label(String &output, const tree_node &node, Allocator allocator,
                 bool should_color, bool should_human,
+                Maybe<evilps_sort_key> sort_key,
                 bool is_sampled) throws -> void
 {
   if (should_human) {
@@ -304,10 +352,10 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
 
   let const should_show_cpu =
       FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
-      (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "cpu");
+      (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu);
   let const should_show_memory =
       FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_MEMORY.is_enabled() ||
-      (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "memory");
+      (sort_key.has_value() && *sort_key == evilps_sort_key::Memory);
   if (should_show_cpu || should_show_memory) {
     output += " [";
     if (should_show_cpu) {
@@ -338,6 +386,7 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
                    const String &prefix, usize depth, Allocator allocator,
                    bool should_color, usize output_limit,
                    usize &rendered_count, bool should_human,
+                   Maybe<evilps_sort_key> sort_key,
                    bool is_sampled) throws -> void
 {
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
@@ -364,14 +413,14 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
     append_report_text(output, is_last ? "└── " : "├── ", colors::ansi::CYAN,
                        should_color);
     append_label(output, nodes[position], allocator, should_color, should_human,
-                 is_sampled);
+                 sort_key, is_sampled);
     rendered_count++;
 
     let child_prefix = String{allocator, prefix.view()};
     child_prefix += is_last ? "    " : "│   ";
     render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
                     allocator, should_color, output_limit, rendered_count,
-                    should_human, is_sampled);
+                    should_human, sort_key, is_sampled);
   }
 }
 
@@ -417,7 +466,8 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            usize output_limit, bool should_color,
                            u32 viewport_rows,
                            usize scroll_offset, StringView search,
-                           bool should_human, bool is_sampled,
+                           bool should_human,
+                           Maybe<evilps_sort_key> sort_key, bool is_sampled,
                            usize &visible_line_count) throws -> i32
 {
   if (nodes.is_empty()) {
@@ -427,7 +477,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  sort_nodes(nodes, is_sampled);
+  sort_nodes(nodes, sort_key, is_sampled);
 
   i64 root_pid = 1;
   if (!operands.is_empty()) {
@@ -456,14 +506,14 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
   if (should_human) output += "PID  PPID  CPU  MEM  COMMAND\n";
 
-  if (root_position < nodes.count() && !FLAG_EVILPS_SORT.is_set()) {
+  if (root_position < nodes.count() && !sort_key.has_value()) {
     nodes[root_position].was_rendered = true;
     append_label(output, nodes[root_position], allocator, should_color,
-                 should_human, is_sampled);
+                 should_human, sort_key, is_sampled);
     rendered_count++;
     render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
                     should_color, output_limit, rendered_count, should_human,
-                    is_sampled);
+                    sort_key, is_sampled);
     visible_line_count = 1;
     if (viewport_rows != 0) {
       let const full_output = String{allocator, output.view()};
@@ -506,14 +556,14 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     if (nodes[position].was_rendered) continue;
 
-    if (FLAG_EVILPS_SORT.is_set()) {
+    if (sort_key.has_value()) {
       nodes[position].was_rendered = true;
       append_label(output, nodes[position], allocator, should_color,
-                   should_human, is_sampled);
+                   should_human, sort_key, is_sampled);
       rendered_count++;
       render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
                       allocator, should_color, output_limit, rendered_count,
-                      should_human, is_sampled);
+                      should_human, sort_key, is_sampled);
       continue;
     }
 
@@ -531,11 +581,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     nodes[position].was_rendered = true;
     append_label(output, nodes[position], allocator, should_color,
-                 should_human, is_sampled);
+                 should_human, sort_key, is_sampled);
     rendered_count++;
     render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
                     allocator, should_color, output_limit, rendered_count,
-                    should_human, is_sampled);
+                    should_human, sort_key, is_sampled);
   }
 
   visible_line_count = rendered_count;
@@ -659,12 +709,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
+  Maybe<evilps_sort_key> sort_key{};
   if (FLAG_EVILPS_SORT.is_set()) {
-    let const key = FLAG_EVILPS_SORT.value();
-    static constexpr PackedStringKey SORT_KEYS[] = {SSK("name"), SSK("pid"),
-                                                    SSK("cpu"), SSK("memory")};
-    static constexpr StaticStringSet VALID_SORT_KEYS{SORT_KEYS};
-    if (!VALID_SORT_KEYS.contains(key)) {
+    sort_key = resolve_sort_key(FLAG_EVILPS_SORT.value());
+    if (!sort_key.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_EVILPS_SORT.value_location(),
                               "invalid sort key",
                               "use name, pid, cpu, or memory");
@@ -674,10 +722,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const should_sample_cpu =
       FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
-      (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "cpu");
+      (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu);
   let const should_read_resources =
       should_sample_cpu || FLAG_EVILPS_MEMORY.is_enabled() ||
-      (FLAG_EVILPS_SORT.is_set() && FLAG_EVILPS_SORT.value() == "memory");
+      (sort_key.has_value() && *sort_key == evilps_sort_key::Memory);
   let const should_color = koshkit_should_color();
 
   f64 live_interval_seconds = 0.5;
@@ -783,7 +831,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
           ec, cxt, live_allocator, frame, nodes, operands, operand_locations,
           output_limit, should_color,
           is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
-          scroll_offset, live_search.view(), false, true, visible_line_count);
+          scroll_offset, live_search.view(), false, sort_key, true,
+          visible_line_count);
       if (status != 0) return status;
       ec.print_to_stdout(frame);
       if (visible_line_count > terminal_rows && terminal_rows > 1) {
@@ -829,8 +878,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let const status = render_process_snapshot(
       ec, cxt, allocator, output, nodes, operands, operand_locations,
-      output_limit, should_color, 0, 0, StringView{}, false, is_sampled,
-      output_limit);
+      output_limit, should_color, 0, 0, StringView{}, false, sort_key,
+      is_sampled, output_limit);
   if (status == 0) ec.print_to_stdout(output);
   return status;
 }

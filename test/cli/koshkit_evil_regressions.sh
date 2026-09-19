@@ -29,6 +29,17 @@ ps_sorted=$($BIN -c 'koshkit --color never evilps --sort cpu -3')
 if [ -n "$ps_sorted" ]; then ps_sorted_roots=matched; else ps_sorted_roots=wrong; fi
 printf 'evilps-sorted-roots=%s\n' "$ps_sorted_roots"
 
+evilps_sort_prefixes=matched
+for evilps_sort_prefix in n p c m; do
+  if ! "$BIN" -c \
+    "koshkit --color never evilps --sort $evilps_sort_prefix -1" \
+    > "$TEST_NULL_DEVICE"
+  then
+    evilps_sort_prefixes=wrong
+  fi
+done
+printf 'evilps-sort-prefixes=%s\n' "$evilps_sort_prefixes"
+
 evilps_help=$($BIN -c 'koshkit evilps --help')
 case $evilps_help in
   *'--live[=<seconds>]'*'--cumulative[=<seconds>]'*)
