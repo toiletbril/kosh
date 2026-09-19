@@ -88,6 +88,9 @@ printf 'disk-scope=%s\n' "$disk_live_scope"
 printf 'disk-margin=%s\n' "$disk_live_margin"
 printf 'disk-window-shape=%s\n' "$disk_window_shape"
 
+$BIN -c 'koshkit evilio --live=bad' > /dev/null 2>&1
+printf 'rejected-live-status=%s\n' "$?"
+
 help=$($BIN -c 'koshkit evilio --help')
 case $help in
   *"Refresh live output"*"0.5 seconds"*) live_help=described ;;

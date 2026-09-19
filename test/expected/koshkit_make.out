@@ -249,11 +249,18 @@ paren=expanded-name brace=expanded-name short=expanded-name shell=self
 command-flags=yes
 jobs=[j]
 jobs=[j4]
+jobs=[j]
+jobs=[j4]
+jobs=[j4]
+jobs=[j]
+jobs=[j4]
+jobs=[]
 jobs=[j4]
 jobs=[S]
 jobs=[k]
 jobs=[S]
 jobs=[k]
+optional-jobs-help=yes
 recursive-print=yes
 .SUFFIXES: .o .c .y .l .a .sh .f .c~ .y~ .l~ .sh~ .f~
 CC = c99

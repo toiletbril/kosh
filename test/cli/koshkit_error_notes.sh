@@ -265,6 +265,18 @@ echo "=== evilio duration mode location ==="
 echo "=== evilio duration value location ==="
 "$BIN" -c 'koshkit evilio --cumulative=0' 2>&1
 
+echo "=== evilio separate duration value location ==="
+"$BIN" -c 'koshkit evilio --cumulative 0' 2>&1
+
+echo "=== evilio rejected duration value location ==="
+"$BIN" -c 'koshkit evilio --cumulative=bad' 2>&1
+
+echo "=== make rejected optional value location ==="
+"$BIN" -c 'koshkit make --jobs=x' 2>&1
+
+echo "=== make rejected bundled optional value location ==="
+"$BIN" -c 'koshkit make -jx' 2>&1
+
 echo "=== evilio process limit location ==="
 "$BIN" -c 'koshkit evilio -0' 2>&1
 

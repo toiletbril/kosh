@@ -7,5 +7,6 @@ disk-shape=matched
 disk-scope=only-disk-io
 disk-margin=unindented
 disk-window-shape=matched
+rejected-live-status=2
 live-help=described
 cumulative-help=described

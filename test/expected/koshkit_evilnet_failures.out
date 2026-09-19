@@ -1,4 +1,8 @@
 failure-shape=matched
 failure-scope=isolated
 live-conflict-status=2
+bare-cumulative-status=0
+invalid-live-status=2
+invalid-cumulative-status=2
 help-shape=matched
+sampling-help-shape=matched

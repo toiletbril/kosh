@@ -420,6 +420,24 @@ note: a sample duration requires --cumulative.
      1 |  koshkit evilio --cumulative=0
        |                              ^
 note: the duration must be greater than zero.
+=== evilio separate duration value location ===
+1:29: error: evilio: invalid duration.
+     1 |  koshkit evilio --cumulative 0
+       |                              ^
+note: the duration must be greater than zero.
+=== evilio rejected duration value location ===
+1:16: error: koshkit evilio: Invalid value 'bad' for '--cumulative'.
+     1 |  koshkit evilio --cumulative=bad
+       |                 ^~~~~~~~~~~~~~~~
+=== make rejected optional value location ===
+1:14: error: koshkit make: Invalid value 'x' for '--jobs'.
+     1 |  koshkit make --jobs=x
+       |               ^~~~~~~~
+=== make rejected bundled optional value location ===
+1:14: error: koshkit make: Unknown flag '-x'.
+     1 |  koshkit make -jx
+       |               ^~~
+note: Use `--` before an operand that begins with a dash.
 === evilio process limit location ===
 1:16: error: evilio: invalid count.
      1 |  koshkit evilio -0

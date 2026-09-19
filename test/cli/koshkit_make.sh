@@ -842,11 +842,21 @@ all:
 EOF
 "$BIN" -c 'koshkit make -j4 -j -f jobs.mk all'
 "$BIN" -c 'koshkit make -j -j4 -f jobs.mk all'
+"$BIN" -c 'koshkit make --jobs -f jobs.mk all'
+"$BIN" -c 'koshkit make --jobs=4 -f jobs.mk all'
+"$BIN" -c 'koshkit make --jobs 4 -f jobs.mk all'
+"$BIN" -c 'koshkit make --jobs= -f jobs.mk all'
+"$BIN" -c 'koshkit make -j4 -f jobs.mk all; koshkit make -f jobs.mk all'
 MAKEFLAGS=j4 "$BIN" -c 'koshkit make -f jobs.mk all'
 MAKEFLAGS=kS "$BIN" -c 'koshkit make -f jobs.mk all'
 MAKEFLAGS=Sk "$BIN" -c 'koshkit make -f jobs.mk all'
 MAKEFLAGS=k "$BIN" -c 'koshkit make -S -f jobs.mk all'
 MAKEFLAGS=S "$BIN" -c 'koshkit make -k -f jobs.mk all'
+make_help=$("$BIN" -c 'koshkit make --help')
+case $make_help in
+  *'--jobs[=<...>]'*) echo optional-jobs-help=yes ;;
+  *) echo optional-jobs-help=no ;;
+esac
 cat > recursive-print.mk <<'EOF'
 all:
 	@$(MAKE) -f recursive-print-child.mk show

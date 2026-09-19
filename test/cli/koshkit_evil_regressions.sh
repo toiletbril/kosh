@@ -53,6 +53,10 @@ $BIN -c 'koshkit evilps --live=0' > /dev/null 2>&1
 printf 'evilps-invalid-live=%s\n' "$?"
 $BIN -c 'koshkit evilps --cumulative=0' > /dev/null 2>&1
 printf 'evilps-invalid-cumulative=%s\n' "$?"
+$BIN -c 'koshkit evilps --live=bad' > /dev/null 2>&1
+printf 'evilps-rejected-live=%s\n' "$?"
+$BIN -c 'koshkit evilps --cumulative=bad' > /dev/null 2>&1
+printf 'evilps-rejected-cumulative=%s\n' "$?"
 
 "$TEST_SHELL" -c 'while :; do :; done' &
 busy_process_pid=$!
