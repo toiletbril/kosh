@@ -40,15 +40,22 @@ has_cgroup_section()
   esac
 }
 
+has_session_section()
+{
+  printf '%s\n' "$1" | command grep -E \
+    '^USER +TERMINAL( +LOGIN TIME)? *$' > "$TEST_NULL_DEVICE" 2>&1
+}
+
 default_report=$(run_report "")
 default_shape=matched
 case $default_report in
-  *"cgroup:"*"Count:"*"Remote sockets:"*"Runtime:"*)
+  *"cgroup:"*"Remote sockets:"*"Runtime:"*)
     default_shape=matched
     ;;
   *) default_shape=missing ;;
 esac
 has_cgroup_section "$default_report" || default_shape=missing
+has_session_section "$default_report" || default_shape=missing
 printf 'default-shape=%s\n' "$default_shape"
 
 cgroup_detail_report=$(run_report '-a -c')
@@ -74,7 +81,7 @@ printf 'remote-table=%s\n' "$remote_table"
 for selector_section in \
   'namespaces|-n|cgroup:' \
   'cgroups|-c|cgroup-section' \
-  'sessions|-s|Count:' \
+  'sessions|-s|session-section' \
   'remote|-r|Remote sockets:' \
   'runtime|-k|Runtime:'; do
   old_ifs=$IFS
@@ -84,6 +91,12 @@ for selector_section in \
   report=$(run_report "$2")
   if test "$1" = cgroups; then
     if has_cgroup_section "$report"; then
+      selector_status=matched
+    else
+      selector_status=missing
+    fi
+  elif test "$1" = sessions; then
+    if has_session_section "$report"; then
       selector_status=matched
     else
       selector_status=missing
@@ -100,14 +113,14 @@ for selector_section in \
   case $1 in
   namespaces)
     case $report in
-    *"HIERARCHY"*|*"Count:"*|*"Remote sockets:"*|*"Runtime:"*)
+    *"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   cgroups)
     case $report in
-    *"cgroup:"*|*"Count:"*|*"Remote sockets:"*|*"Runtime:"*)
+    *"cgroup:"*|*"Remote sockets:"*|*"Runtime:"*)
       selector_scope=wrong
       ;;
     esac
@@ -121,19 +134,22 @@ for selector_section in \
     ;;
   remote)
     case $report in
-    *"cgroup:"*|*"HIERARCHY"*|*"Count:"*|*"Runtime:"*)
+    *"cgroup:"*|*"HIERARCHY"*|*"Runtime:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   runtime)
     case $report in
-    *"cgroup:"*|*"HIERARCHY"*|*"Count:"*|*"Remote sockets:"*)
+    *"cgroup:"*|*"HIERARCHY"*|*"Remote sockets:"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   esac
+  if test "$1" != sessions && has_session_section "$report"; then
+    selector_scope=wrong
+  fi
   printf '%s-scope=%s\n' "$1" "$selector_scope"
 done
 
@@ -143,8 +159,9 @@ case $combined_report in
 *) combined_scope=missing ;;
 esac
 case $combined_report in
-*"HIERARCHY"*|*"Count:"*|*"Remote sockets:"*) combined_scope=wrong ;;
+*"HIERARCHY"*|*"Remote sockets:"*) combined_scope=wrong ;;
 esac
+if has_session_section "$combined_report"; then combined_scope=wrong; fi
 printf 'combined-scope=%s\n' "$combined_scope"
 
 namespace_detail=$(run_report '-a -n')
@@ -153,20 +170,22 @@ case $namespace_detail in
 *) all_scope=missing ;;
 esac
 case $namespace_detail in
-*"HIERARCHY"*|*"Count:"*|*"Remote sockets:"*|*"Runtime:"*) all_scope=wrong ;;
+*"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*) all_scope=wrong ;;
 esac
+if has_session_section "$namespace_detail"; then all_scope=wrong; fi
 printf 'all-scope=%s\n' "$all_scope"
 
 all_report=$(run_report -a)
 case $all_report in
-*"cgroup:"*"HIERARCHY"*"Count:"*"Remote sockets:"*"Runtime:"*)
+*"cgroup:"*"HIERARCHY"*"Remote sockets:"*"Runtime:"*)
   all_default_scope=matched
   ;;
-*"cgroup:"*"Membership: unavailable"*"Count:"*"Remote sockets:"*"Runtime:"*)
+*"cgroup:"*"Membership: unavailable"*"Remote sockets:"*"Runtime:"*)
   all_default_scope=matched
   ;;
 *) all_default_scope=missing ;;
 esac
+has_session_section "$all_report" || all_default_scope=missing
 printf 'all-default-scope=%s\n' "$all_default_scope"
 
 mkdir -p "$cgroup_work/self" "$cgroup_work/$$" || exit 1
@@ -279,6 +298,52 @@ fi
 printf 'cgroup-synthetic=%s\n' "$cgroup_synthetic"
 if test "$cgroup_synthetic" != matched; then
   command cat "$synthetic_report"
+fi
+
+session_fixture=$cgroup_work/sessions
+printf '%s\n' \
+  'zeta|pts/9|0' \
+  'alpha|tty2|200' \
+  'alpha|tty1|100' \
+  > "$session_fixture"
+session_synthetic=matched
+if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
+  session_default=$(TZ=UTC KOSH_TEST_EVILISO_SESSIONS=$session_fixture \
+    "$BIN" -c 'koshkit --color never eviliso -s')
+  expected_session_default=$(printf '%s\n' \
+    'USER   TERMINAL' \
+    'alpha  tty1    ' \
+    'alpha  tty2    ' \
+    'zeta   pts/9   ')
+  test "$session_default" = "$expected_session_default" || \
+    session_synthetic=wrong
+  session_detail=$(TZ=UTC KOSH_TEST_EVILISO_SESSIONS=$session_fixture \
+    "$BIN" -c 'koshkit --color never eviliso -a -s')
+  expected_session_detail=$(printf '%s\n' \
+    'USER   TERMINAL  LOGIN TIME         ' \
+    'alpha  tty1      1970-01-01 00:01:40' \
+    'alpha  tty2      1970-01-01 00:03:20' \
+    'zeta   pts/9     unavailable        ')
+  test "$session_detail" = "$expected_session_detail" || \
+    session_synthetic=wrong
+  empty_sessions=$cgroup_work/empty-sessions
+  : > "$empty_sessions"
+  empty_session_report=$(KOSH_TEST_EVILISO_SESSIONS=$empty_sessions \
+    "$BIN" -c 'koshkit --color never eviliso -a -s')
+  test "$empty_session_report" = 'USER  TERMINAL  LOGIN TIME' || \
+    session_synthetic=wrong
+else
+  session_report=$(TZ=UTC KOSH_TEST_EVILISO_SESSIONS=$session_fixture \
+    "$BIN" -c 'koshkit --color never eviliso -a -s')
+  case $session_report in
+  *zeta*pts/9*) session_synthetic=wrong ;;
+  esac
+fi
+printf 'session-synthetic=%s\n' "$session_synthetic"
+if test "$session_synthetic" != matched; then
+  printf 'session-default=<%s>\n' "$session_default"
+  printf 'session-detail=<%s>\n' "$session_detail"
+  printf 'session-empty=<%s>\n' "${empty_session_report-}"
 fi
 
 help=$($BIN -c 'koshkit eviliso --help')

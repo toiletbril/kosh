@@ -339,26 +339,106 @@ fn append_cgroup_report(String &output, bool should_color,
   }
 }
 
+fn eviliso_sessions() throws -> ArrayList<os::user_session>
+{
+#ifndef NDEBUG
+  if (let const *path = std::getenv("KOSH_TEST_EVILISO_SESSIONS");
+      path != nullptr && path[0] != '\0')
+  {
+    let sessions = ArrayList<os::user_session>{heap_allocator()};
+    let const contents = Path{path}.read_entire_file();
+    if (!contents.has_value()) return sessions;
+    for (let const line : utils::split_lines(contents->view())) {
+      let const user_end = line.find_character('|');
+      if (!user_end.has_value()) continue;
+      let const remainder = line.substring(*user_end + 1);
+      let const terminal_end = remainder.find_character('|');
+      if (!terminal_end.has_value()) continue;
+      let const user = line.substring_of_length(0, *user_end);
+      let const terminal =
+          remainder.substring_of_length(0, *terminal_end);
+      let const login_time = remainder.substring(*terminal_end + 1).to<i64>();
+      if (user.is_empty() || terminal.is_empty() || login_time.is_error())
+        continue;
+      sessions.push({
+          String{heap_allocator(), user},
+          String{heap_allocator(), terminal},
+          login_time.value(),
+      });
+    }
+    return sessions;
+  }
+#endif
+  return os::logged_in_users();
+}
+
+struct session_report_row
+{
+  String user{heap_allocator()};
+  String terminal{heap_allocator()};
+  String login_time{heap_allocator()};
+};
+
 fn append_session_report(String &output, bool should_color,
                          bool should_show_detail) throws -> void
 {
-  let table = ReportTable{heap_allocator()};
-  let const sessions = os::logged_in_users();
-  table.add("Count", String::from(sessions.count(), heap_allocator()).view(),
-            colors::ansi::BOLD_CYAN);
+  let sessions = eviliso_sessions();
+  sessions.sort([](const os::user_session &left,
+                   const os::user_session &right) {
+    if (left.user != right.user) return left.user < right.user;
+    if (left.terminal != right.terminal) return left.terminal < right.terminal;
+    return left.login_time < right.login_time;
+  });
+
+  let rows = ArrayList<session_report_row>{heap_allocator()};
+  usize user_width = 4;
+  usize terminal_width = 8;
+  usize login_time_width = 10;
   for (let const &session : sessions) {
-    let text = String{heap_allocator(), session.user.view()};
-    text += '@';
-    text += session.terminal.view();
-    table.add("Session", text.view(), colors::ansi::BOLD_CYAN);
-    if (!should_show_detail) continue;
-    table.add(
-        "Login time",
-        utils::format_unix_timestamp(session.login_time, "%Y-%m-%d %H:%M:%S")
-            .view(),
-        colors::ansi::BOLD_CYAN);
+    let login_time = String{heap_allocator()};
+    if (should_show_detail) {
+      login_time = session.login_time == 0
+                       ? String{heap_allocator(), "unavailable"}
+                       : utils::format_unix_timestamp(
+                             session.login_time, "%Y-%m-%d %H:%M:%S");
+    }
+    rows.push({
+        String{heap_allocator(), session.user.view()},
+        String{heap_allocator(), session.terminal.view()},
+        steal(login_time),
+    });
+    let const &row = rows[rows.count() - 1];
+    if (row.user.length() > user_width) user_width = row.user.length();
+    if (row.terminal.length() > terminal_width)
+      terminal_width = row.terminal.length();
+    if (row.login_time.length() > login_time_width)
+      login_time_width = row.login_time.length();
   }
-  output += table.to_string(should_color, "");
+
+  append_report_column(output, "USER", user_width, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "TERMINAL", terminal_width, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  if (should_show_detail) {
+    output += "  ";
+    append_report_column(output, "LOGIN TIME", login_time_width, false,
+                         colors::ansi::BOLD_CYAN, should_color);
+  }
+  output += '\n';
+  for (let const &row : rows) {
+    append_report_column(output, row.user.view(), user_width, false,
+                         colors::ansi::BOLD_GREEN, should_color);
+    output += "  ";
+    append_report_column(output, row.terminal.view(), terminal_width, false, {},
+                         should_color);
+    if (should_show_detail) {
+      output += "  ";
+      append_report_column(output, row.login_time.view(), login_time_width,
+                           false, {}, should_color);
+    }
+    output += '\n';
+  }
 }
 
 pure fn remote_state_name(os::network_socket_state state) wontthrow

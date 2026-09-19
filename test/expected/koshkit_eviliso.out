@@ -15,5 +15,6 @@ combined-scope=matched
 all-scope=matched
 all-default-scope=matched
 cgroup-synthetic=matched
+session-synthetic=matched
 help-shape=matched
 unprivileged-status=0

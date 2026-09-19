@@ -1920,7 +1920,10 @@ section prints hierarchy, controller, path, process ID, process name, and
 self/other role columns. With
 .BR --all ,
 it adds other processes only when their complete cgroup membership matches a
-self membership. The
+self membership. Sessions are printed as user and terminal rows. With
+.BR --all ,
+each row also includes its login time; an unavailable timestamp is shown
+explicitly. The
 .B \-\-remote
 option lists each remote peer with its protocol, state, queues, local and peer
 endpoints, socket identifier, process, owner, network namespace, orchestrator,
