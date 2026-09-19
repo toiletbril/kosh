@@ -236,7 +236,7 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
 }
 
 fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
-                           Allocator allocator,
+                           Allocator allocator, String &output,
                            const ArrayList<String> &operands,
                            const ArrayList<SourceLocation> &operand_locations,
                            usize output_limit, bool should_read_resources,
@@ -305,7 +305,6 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     break;
   }
 
-  let output = String{allocator};
   usize rendered_count = 0;
 
   if (should_human) output += "PID  PPID  CPU  MEM  COMMAND\n";
@@ -343,7 +342,6 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
       }
       visible_line_count = line_number;
     }
-    ec.print_to_stdout(output);
     return 0;
   }
 
@@ -418,7 +416,6 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     }
     visible_line_count = line_number;
   }
-  ec.print_to_stdout(output);
   return 0;
 }
 
@@ -571,16 +568,16 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (FLAG_EVILPS_LIVE.is_enabled()) {
-    let const is_terminal = colors::stdout_is_a_terminal();
-    let const refresh_interval_seconds =
-        FLAG_EVILPS_CUMULATIVE.is_enabled() ? cumulative_interval_seconds
-                                            : live_interval_seconds;
+    let const live_allocator = heap_allocator();
+    let const is_terminal =
+        os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
+    let const refresh_interval_seconds = live_interval_seconds;
     let const refresh_interval_nanoseconds = static_cast<u64>(
         refresh_interval_seconds * 1000000000.0);
     u64 last_refresh_nanoseconds = 0;
     bool is_alternate_screen_active = false;
-    let live_input = String{allocator};
-    let live_search = String{allocator};
+    let live_input = String{live_allocator};
+    let live_search = String{live_allocator};
     usize scroll_offset = 0;
     if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
     let const is_cursor_hidden = is_terminal && hide_cursor(ec);
@@ -603,24 +600,22 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
           now - last_refresh_nanoseconds >= refresh_interval_nanoseconds) {
         last_refresh_nanoseconds = now;
         usize visible_line_count = 0;
-        let frame = String{allocator};
+        let frame = String{live_allocator};
         if (is_terminal) frame += "\x1b[H\x1b[2J";
-        if (is_terminal)
-          append_live_controls_bar(frame,
-                                   format_live_duration(
-                                       FLAG_EVILPS_CUMULATIVE.is_enabled()
-                                           ? cumulative_interval_seconds
-                                           : live_interval_seconds,
-                                       allocator)
-                                       .view(),
-                                   format_live_duration(
-                                       live_interval_seconds, allocator)
-                                       .view(),
-                                   should_color);
+        append_live_controls_bar(
+            frame,
+            format_live_duration(FLAG_EVILPS_CUMULATIVE.is_enabled()
+                                     ? cumulative_interval_seconds
+                                     : live_interval_seconds,
+                                 live_allocator)
+                .view(),
+            format_live_duration(live_interval_seconds, live_allocator).view(),
+            should_color);
         let const status = render_process_snapshot(
-            ec, cxt, allocator, operands, operand_locations, output_limit,
+            ec, cxt, live_allocator, frame, operands, operand_locations,
+            output_limit,
             should_read_resources, should_color,
-            is_terminal && terminal_rows > 1 ? terminal_rows : 0,
+            is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
             line_width_limit, scroll_offset, live_search.view(), false,
             visible_line_count);
         if (status != 0) return status;
@@ -654,11 +649,13 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  return render_process_snapshot(ec, cxt, allocator, operands,
-                                 operand_locations, output_limit,
-                                 should_read_resources, should_color, 0,
-                                 line_width_limit, 0, StringView{}, false,
-                                 output_limit);
+  let output = String{allocator};
+  let const status = render_process_snapshot(
+      ec, cxt, allocator, output, operands, operand_locations, output_limit,
+      should_read_resources, should_color, 0, line_width_limit, 0, StringView{},
+      false, output_limit);
+  if (status == 0) ec.print_to_stdout(output);
+  return status;
 }
 
 } // namespace koshka::koshkit
