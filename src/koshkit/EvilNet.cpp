@@ -118,7 +118,6 @@ fn append_network_traffic_statistics_report(
     }
   }
 
-  output += "\n\n";
   append_report_column(output, "NAME", name_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
   const StringView HEADERS[] = {
@@ -138,8 +137,6 @@ fn append_network_traffic_statistics_report(
     append_report_column(output, HEADERS[index], WIDTHS[index], true,
                          colors::ansi::BOLD_CYAN, should_color);
   }
-  output += "\n";
-
   for (let const &entry : statistics) {
     append_report_column(output, entry.interface_name.view(), name_width, false,
                          colors::ansi::BOLD_GREEN, should_color);
@@ -443,9 +440,9 @@ fn sample_network_statistics(
 
 struct live_network_row
 {
-  os::network_interface_statistics_entry statistics;
-  u64 last_seen_nanoseconds{0};
-  u64 idle_nanoseconds{0};
+  String interface_name{heap_allocator()};
+  ArrayList<os::network_interface_statistics_entry> history{heap_allocator()};
+  ArrayList<u64> history_nanoseconds{heap_allocator()};
 };
 
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
@@ -498,30 +495,32 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let const now = os::monotonic_nanos();
     if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
       let const current = os::read_network_interface_statistics();
-      let const sampled = sample_network_statistics(
-          before, current, now - last_sample_nanoseconds, allocator);
-      for (let const &entry : sampled) {
+      for (let const &entry : current) {
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
-          if (retained[index].statistics.interface_name.view() !=
+          if (retained[index].interface_name.view() !=
               entry.interface_name.view())
             continue;
-          let const idle_nanoseconds =
-              now - retained[index].last_seen_nanoseconds;
-          retained[index].statistics = entry;
-          retained[index].idle_nanoseconds = idle_nanoseconds;
-          retained[index].last_seen_nanoseconds = now;
+          retained[index].history.push(entry);
+          retained[index].history_nanoseconds.push(now);
           is_known = true;
           break;
         }
-        if (!is_known) retained.push(live_network_row{entry, now});
+        if (!is_known) {
+          live_network_row row_entry{};
+          row_entry.interface_name =
+              String{allocator, entry.interface_name.view()};
+          row_entry.history.push(entry);
+          row_entry.history_nanoseconds.push(now);
+          retained.push(steal(row_entry));
+        }
       }
       for (usize index = retained.count(); index > 0; index--) {
         let const position = index - 1;
-        if (now - retained[position].last_seen_nanoseconds >= falloff_nanoseconds)
+        if (now - retained[position].history_nanoseconds.back() >=
+            falloff_nanoseconds)
           retained.remove(position);
       }
-      before = steal(current);
       last_sample_nanoseconds = now;
     }
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) {
@@ -530,29 +529,56 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     last_refresh_nanoseconds = now;
     retained.sort([](const live_network_row &left,
                      const live_network_row &right) {
-      return left.statistics.interface_name < right.statistics.interface_name;
+      return left.interface_name.view() < right.interface_name.view();
     });
     let statistics =
         ArrayList<os::network_interface_statistics_entry>{allocator};
     statistics.reserve(retained.count());
     for (let const &row : retained) {
-      let entry = row.statistics;
-      if (row.idle_nanoseconds != 0) {
-        let const decayed_factor =
-            row.idle_nanoseconds >= falloff_nanoseconds
-                ? u64{0}
-                : 1000 - row.idle_nanoseconds * 1000 / falloff_nanoseconds;
-        if (entry.has_field(os::network_statistics_field::ReceiveBytes))
-          entry.receive_bytes = entry.receive_bytes * decayed_factor / 1000;
-        if (entry.has_field(os::network_statistics_field::TransmitBytes))
-          entry.transmit_bytes =
-              entry.transmit_bytes * decayed_factor / 1000;
-        if (entry.has_field(os::network_statistics_field::ReceivePackets))
+      usize oldest = 0;
+      while (oldest + 1 < row.history_nanoseconds.count() &&
+             row.history_nanoseconds[oldest + 1] <
+                 last_sample_nanoseconds - falloff_nanoseconds)
+        oldest++;
+
+      let const window_nanoseconds =
+          row.history_nanoseconds.back() - row.history_nanoseconds[oldest];
+      let entry = row.history.back();
+      entry.interface_name = String{allocator, row.interface_name.view()};
+      if (window_nanoseconds != 0) {
+        let const &oldest_entry = row.history[oldest];
+        if (entry.has_field(os::network_statistics_field::ReceiveBytes) &&
+            oldest_entry.has_field(os::network_statistics_field::ReceiveBytes))
+        {
+          entry.receive_bytes = network_counter_rate(oldest_entry.receive_bytes,
+                                                     entry.receive_bytes,
+                                                     window_nanoseconds);
+        }
+        if (entry.has_field(os::network_statistics_field::TransmitBytes) &&
+            oldest_entry.has_field(os::network_statistics_field::TransmitBytes))
+        {
+          entry.transmit_bytes = network_counter_rate(
+              oldest_entry.transmit_bytes, entry.transmit_bytes,
+                                            window_nanoseconds);
+        }
+        if (entry.has_field(os::network_statistics_field::ReceivePackets) &&
+            oldest_entry.has_field(
+                os::network_statistics_field::ReceivePackets))
+        {
           entry.receive_packet_count =
-              entry.receive_packet_count * decayed_factor / 1000;
-        if (entry.has_field(os::network_statistics_field::TransmitPackets))
+              network_counter_rate(oldest_entry.receive_packet_count,
+                                   entry.receive_packet_count,
+                                   window_nanoseconds);
+        }
+        if (entry.has_field(os::network_statistics_field::TransmitPackets) &&
+            oldest_entry.has_field(
+                os::network_statistics_field::TransmitPackets))
+        {
           entry.transmit_packet_count =
-              entry.transmit_packet_count * decayed_factor / 1000;
+              network_counter_rate(oldest_entry.transmit_packet_count,
+                                   entry.transmit_packet_count,
+                                   window_nanoseconds);
+        }
       }
       statistics.push(entry);
     }
