@@ -1915,6 +1915,12 @@ or
 .B --all
 option includes detailed rows, including per-process namespace attribution,
 controller membership, login times, and remote peers. The
+.B cgroup
+section prints hierarchy, controller, path, process ID, process name, and
+self/other role columns. With
+.BR --all ,
+it adds other processes only when their complete cgroup membership matches a
+self membership. The
 .B \-\-remote
 option lists each remote peer with its protocol, state, queues, local and peer
 endpoints, socket identifier, process, owner, network namespace, orchestrator,

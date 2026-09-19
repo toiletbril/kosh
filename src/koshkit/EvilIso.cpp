@@ -16,6 +16,8 @@
 #include "../Toiletline.hpp"
 #include "../Utils.hpp"
 
+#include <cstdlib>
+
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r] [-k]");
@@ -96,10 +98,90 @@ fn append_namespace_report(String &output, bool should_color,
   output += '\n';
 }
 
+struct cgroup_membership
+{
+  String hierarchy{heap_allocator()};
+  u64 hierarchy_value{0};
+  String controller{heap_allocator()};
+  String path{heap_allocator()};
+};
+
+fn cgroup_proc_path(StringView suffix, Allocator allocator) throws -> String
+{
+#ifndef NDEBUG
+  if (let const *root = std::getenv("KOSH_TEST_CGROUP_PROC");
+      root != nullptr && root[0] != '\0')
+  {
+    let path = String{allocator, root};
+    path += '/';
+    path += suffix;
+    return path;
+  }
+#endif
+  let path = String{allocator, "/proc/"};
+  path += suffix;
+  return path;
+}
+
+fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
+    -> ArrayList<cgroup_membership>
+{
+  let memberships = ArrayList<cgroup_membership>{allocator};
+  for (let const line : utils::split_lines(text)) {
+    let const first_separator = line.find_character(':');
+    if (!first_separator.has_value()) continue;
+    let const remainder = line.substring(*first_separator + 1);
+    let const second_separator = remainder.find_character(':');
+    if (!second_separator.has_value()) continue;
+    let const hierarchy = line.substring_of_length(0, *first_separator);
+    let const controller =
+        remainder.substring_of_length(0, *second_separator);
+    let const path = remainder.substring(*second_separator + 1);
+    if (hierarchy.is_empty() || path.is_empty()) continue;
+    let const hierarchy_value = hierarchy.to<u64>();
+    if (hierarchy_value.is_error()) continue;
+    let const controller_name =
+        controller.is_empty() ? StringView{"unified"} : controller;
+    bool is_known = false;
+    for (let const &membership : memberships) {
+      if (membership.hierarchy.view() == hierarchy &&
+          membership.controller.view() == controller_name &&
+          membership.path.view() == path)
+      {
+        is_known = true;
+        break;
+      }
+    }
+    if (is_known) continue;
+    memberships.push({
+        String{allocator, hierarchy},
+        hierarchy_value.value(),
+        String{allocator, controller_name},
+        String{allocator, path},
+    });
+  }
+  return memberships;
+}
+
+struct cgroup_report_row
+{
+  String hierarchy{heap_allocator()};
+  u64 hierarchy_value{0};
+  String controller{heap_allocator()};
+  String path{heap_allocator()};
+  String process_id{heap_allocator()};
+  i64 process_id_value{0};
+  u64 process_start_token{0};
+  String name{heap_allocator()};
+  StringView role;
+};
+
 fn append_cgroup_report(String &output, bool should_color,
                         bool should_show_detail) throws -> void
 {
-  let const contents = Path{"/proc/self/cgroup"}.read_entire_file();
+  let const contents =
+      Path{cgroup_proc_path("self/cgroup", heap_allocator())}
+          .read_entire_file();
   let table = ReportTable{heap_allocator()};
   if (!contents.has_value()) {
     table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
@@ -107,73 +189,153 @@ fn append_cgroup_report(String &output, bool should_color,
     return;
   }
 
-  StringView text = contents->view();
-  usize index = 0;
-  while (!text.is_empty()) {
-    usize line_end = 0;
-    while (line_end < text.length && text[line_end] != '\n')
-      line_end++;
-    let const line = text.substring_of_length(0, line_end);
-    if (line_end < text.length)
-      text = text.substring(line_end + 1);
-    else
-      text = StringView{};
-    if (line.is_empty()) continue;
-    table.add(String{"Controller "} + String::from(index++, heap_allocator()),
-              line, colors::ansi::BOLD_CYAN);
+  let const self_memberships =
+      parse_cgroup_memberships(contents->view(), heap_allocator());
+  if (self_memberships.is_empty()) {
+    table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
+    output += table.to_string(should_color, "");
+    return;
   }
-  output += table.to_string(should_color, "");
 
-  if (!should_show_detail) return;
-
-  let member_rows = ArrayList<const os::process_entry *>{heap_allocator()};
-  let const processes = os::enumerate_processes();
-  for (let const &process : processes) {
-    let const member =
-        Path{String{"/proc/"} + String::from(process.pid, heap_allocator()) +
-             "/cgroup"}
-            .read_entire_file();
-    if (!member.has_value()) continue;
-    if (member->view().find_substring("name=systemd:/").has_value() ||
-        member->view().find_substring("name=elogind:/").has_value())
-      member_rows.push(&process);
-  }
-  if (member_rows.is_empty()) return;
-
-  usize pid_width = 3;
-  usize name_width = 4;
-  for (let const *process : member_rows) {
-    let pid = String::from(process->pid, heap_allocator());
-    if (pid.length() > pid_width) pid_width = pid.length();
-    if (process->name.length() > name_width) {
-      name_width = process->name.length();
+  let const self_process_id = os::get_current_process_id();
+  let self_name = String{heap_allocator(), "-"};
+  if (let const name =
+          Path{cgroup_proc_path("self/comm", heap_allocator())}
+              .read_entire_file();
+      name.has_value())
+  {
+    for (let const line : utils::split_lines(name->view())) {
+      if (!line.is_empty()) self_name = String{heap_allocator(), line};
+      break;
     }
   }
 
-  output += "\n";
-  append_report_column(output, "PID", pid_width, false, colors::ansi::BOLD_CYAN,
-                       should_color);
-  output += "  ";
-  append_report_column(output, "NAME", name_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "ROLE", 5, false, colors::ansi::BOLD_CYAN,
-                       should_color);
-  output += "\n";
-  for (let const *process : member_rows) {
-    append_report_column(
-        output, String::from(process->pid, heap_allocator()).view(), pid_width,
-        false, colors::ansi::BOLD_GREEN, should_color);
+  let rows = ArrayList<cgroup_report_row>{heap_allocator()};
+  for (let const &membership : self_memberships) {
+    rows.push({
+        String{heap_allocator(), membership.hierarchy.view()},
+        membership.hierarchy_value,
+        String{heap_allocator(), membership.controller.view()},
+        String{heap_allocator(), membership.path.view()},
+        String::from(self_process_id, heap_allocator()),
+        self_process_id,
+        0,
+        String{heap_allocator(), self_name.view()},
+        "self",
+    });
+  }
+
+  if (should_show_detail) {
+    let const processes =
+        os::enumerate_processes(os::process_detail::ResourceStats);
+    let candidate_rows = ArrayList<cgroup_report_row>{heap_allocator()};
+    for (let const &process : processes) {
+      if (process.pid == self_process_id) continue;
+      let const process_contents =
+          Path{cgroup_proc_path(
+                   String::from(process.pid, heap_allocator()) + "/cgroup",
+                   heap_allocator())}
+              .read_entire_file();
+      if (!process_contents.has_value()) continue;
+      let const memberships =
+          parse_cgroup_memberships(process_contents->view(), heap_allocator());
+      for (let const &membership : memberships) {
+        for (let const &self_membership : self_memberships) {
+          if (membership.hierarchy != self_membership.hierarchy ||
+              membership.controller != self_membership.controller ||
+              membership.path != self_membership.path)
+          {
+            continue;
+          }
+          candidate_rows.push({
+              String{heap_allocator(), membership.hierarchy.view()},
+              membership.hierarchy_value,
+              String{heap_allocator(), membership.controller.view()},
+              String{heap_allocator(), membership.path.view()},
+              String::from(process.pid, heap_allocator()),
+              process.pid,
+              process.start_token,
+              process.name.is_empty()
+                  ? String{heap_allocator(), "-"}
+                  : String{heap_allocator(), process.name.view()},
+              "other",
+          });
+          break;
+        }
+      }
+    }
+    let const current_processes =
+        os::enumerate_processes(os::process_detail::ResourceStats);
+    for (let &row : candidate_rows) {
+      if (row.process_start_token == 0) continue;
+      for (let const &process : current_processes) {
+        if (process.pid != row.process_id_value ||
+            process.start_token == 0 ||
+            process.start_token != row.process_start_token)
+        {
+          continue;
+        }
+        row.name = process.name.is_empty()
+                       ? String{heap_allocator(), "-"}
+                       : String{heap_allocator(), process.name.view()};
+        rows.push(steal(row));
+        break;
+      }
+    }
+  }
+
+  rows.sort([](const cgroup_report_row &left,
+               const cgroup_report_row &right) {
+    if (left.hierarchy_value != right.hierarchy_value)
+      return left.hierarchy_value < right.hierarchy_value;
+    if (left.controller != right.controller)
+      return left.controller < right.controller;
+    if (left.path != right.path) return left.path < right.path;
+    return left.process_id_value < right.process_id_value;
+  });
+
+  usize hierarchy_width = 9;
+  usize controller_width = 10;
+  usize path_width = 4;
+  usize process_width = 3;
+  usize name_width = 4;
+  for (let const &row : rows) {
+    if (row.hierarchy.length() > hierarchy_width)
+      hierarchy_width = row.hierarchy.length();
+    if (row.controller.length() > controller_width)
+      controller_width = row.controller.length();
+    if (row.path.length() > path_width) path_width = row.path.length();
+    if (row.process_id.length() > process_width)
+      process_width = row.process_id.length();
+    if (row.name.length() > name_width) name_width = row.name.length();
+  }
+
+  let const do_append_column = [&](StringView text, usize width,
+                                   bool is_numeric,
+                                   StringView style = {}) throws {
+    append_report_column(output, text, width, is_numeric, style, should_color);
     output += "  ";
-    append_report_column(output, process->name.view(), name_width, false, {},
-                         should_color);
-    output += "  ";
-    append_report_text(output,
-                       process->pid == os::get_current_process_id()
-                           ? StringView{"self"}
-                           : StringView{"other"},
-                       colors::ansi::BOLD_MAGENTA, should_color);
-    output += "\n";
+  };
+  do_append_column("HIERARCHY", hierarchy_width, true,
+                   colors::ansi::BOLD_CYAN);
+  do_append_column("CONTROLLER", controller_width, false,
+                   colors::ansi::BOLD_CYAN);
+  do_append_column("PATH", path_width, false, colors::ansi::BOLD_CYAN);
+  do_append_column("PID", process_width, true, colors::ansi::BOLD_CYAN);
+  do_append_column("NAME", name_width, false, colors::ansi::BOLD_CYAN);
+  append_report_text(output, "ROLE", colors::ansi::BOLD_CYAN, should_color);
+  output += '\n';
+  for (let const &row : rows) {
+    do_append_column(row.hierarchy.view(), hierarchy_width, true,
+                     colors::ansi::BOLD_GREEN);
+    do_append_column(row.controller.view(), controller_width, false, {});
+    do_append_column(row.path.view(), path_width, false, {});
+    do_append_column(row.process_id.view(), process_width, true,
+                     colors::ansi::BOLD_GREEN);
+    do_append_column(row.name.view(), name_width, false, {});
+    append_report_text(output, row.role, colors::ansi::BOLD_MAGENTA,
+                       should_color);
+    output += '\n';
   }
 }
 
