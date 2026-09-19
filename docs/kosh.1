@@ -1914,12 +1914,19 @@ socket, and runtime sections. With no selector, all sections are shown. The
 or
 .B --all
 option includes detailed rows, including per-process namespace attribution,
-controller membership, login times, and remote peers. Otherwise
+controller membership, login times, and remote peers. The
+.B \-\-remote
+option lists each remote peer with its protocol, state, queues, local and peer
+endpoints, socket identifier, process, owner, network namespace, orchestrator,
+runtime, container, and cgroup memberships. Command lines, process names, and
+cgroup memberships are shortened to keep the table usable. A dash marks
+information that disappeared or could not be read.
+Otherwise
 .BR -n , -c , -s ,
 and
 .B -r
 select namespaces, cgroups, sessions, and remote sockets; the
-.B \\-k
+.B \-k
 option selects container and Kubernetes runtime evidence.
 .TP
 .B evildisk

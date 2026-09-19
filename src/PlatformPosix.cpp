@@ -81,8 +81,30 @@ static fn linux_socket_address(StringView encoded, bool is_ipv6,
 struct linux_socket_owner
 {
   u64 inode{0};
+  u64 start_token{0};
   u32 pid{0};
+  bool has_start_token{false};
 };
+
+static fn linux_process_start_token(StringView process_directory) throws
+    -> Maybe<u64>
+{
+  let const stat = Path{String{process_directory} + "/stat"}.read_entire_file();
+  if (!stat.has_value()) return None;
+  usize after_name_position = stat->count();
+  for (usize position = stat->count(); position > 0; position--) {
+    if (stat->view()[position - 1] == ')') {
+      after_name_position = position;
+      break;
+    }
+  }
+  if (after_name_position >= stat->count()) return None;
+  let const start_token =
+      nth_space_field(stat->view().substring(after_name_position), 19)
+          .to<u64>();
+  if (start_token.is_error()) return None;
+  return start_token.value();
+}
 
 static pure fn linux_unix_socket_field(StringView text, usize index) wontthrow
     -> StringView
@@ -126,32 +148,47 @@ static fn linux_unix_sockets(bool should_include_process_ids,
     if (inode.is_error()) continue;
     let const type = linux_unix_socket_field(line, 4);
     let const state = linux_unix_socket_field(line, 5);
-    let process_id = u32{0};
-    if (should_include_process_ids && owners != nullptr) {
-      for (let const &owner : *owners)
-        if (owner.inode == inode.value()) {
-          process_id = owner.pid;
-          break;
-        }
-    }
     let path = linux_unix_socket_field(line, 7);
-    let const unix_type = type == "0002"
-                              ? network_unix_socket_type::Datagram
-                              : (type == "0005"
-                                     ? network_unix_socket_type::SequentialPacket
-                                     : network_unix_socket_type::Stream);
-    let const row_state = state == "01"
-                              ? network_socket_state::Listen
-                              : (state == "03"
-                                     ? network_socket_state::Established
-                                     : network_socket_state::Unconnected);
-    result.push(network_socket_entry{
-        String{allocator, path},
-        String{allocator},
-        inode.value(), 0, 0,
-        process_id, 0, 0, network_socket_protocol::Unix,
-        network_address_family::IPv4, row_state, unix_type
-    });
+    let const unix_type =
+        type == "0002"
+            ? network_unix_socket_type::Datagram
+            : (type == "0005" ? network_unix_socket_type::SequentialPacket
+                              : network_unix_socket_type::Stream);
+    let const row_state =
+        state == "01" ? network_socket_state::Listen
+                      : (state == "03" ? network_socket_state::Established
+                                       : network_socket_state::Unconnected);
+    let const do_push_socket = [&](u32 process_id, u64 start_token,
+                                   bool has_start_token) throws {
+      let socket = network_socket_entry{
+          String{allocator, path},
+          String{allocator},
+          inode.value(),
+          0,
+          0,
+          0,
+          process_id,
+          0,
+          0,
+          network_socket_protocol::Unix,
+          network_address_family::IPv4,
+          row_state,
+          unix_type
+      };
+      socket.owner_start_token = start_token;
+      socket.has_owner_start_token = has_start_token;
+      result.push(steal(socket));
+    };
+    bool has_process_owner = false;
+    if (should_include_process_ids && owners != nullptr) {
+      for (let const &owner : *owners) {
+        if (owner.inode == inode.value()) {
+          do_push_socket(owner.pid, owner.start_token, owner.has_start_token);
+          has_process_owner = true;
+        }
+      }
+    }
+    if (!has_process_owner) do_push_socket(0, 0, false);
   }
   return result;
 }
@@ -170,6 +207,9 @@ static fn linux_socket_owners(Allocator allocator) throws
     let const name = StringView{entry->d_name};
     let const parsed_pid = name.to<u32>();
     if (parsed_pid.is_error()) continue;
+
+    let const process_directory = String{"/proc/"} + name;
+    let const start_token = linux_process_start_token(process_directory.view());
 
     char descriptor_path[80];
     let const path_length = std::snprintf(
@@ -201,13 +241,15 @@ static fn linux_socket_owners(Allocator allocator) throws
       if (inode.is_error()) continue;
       bool is_known = false;
       for (let const &owner : owners) {
-        if (owner.inode == inode.value()) {
+        if (owner.inode == inode.value() && owner.pid == parsed_pid.value()) {
           is_known = true;
           break;
         }
       }
       if (!is_known)
-        owners.push(linux_socket_owner{inode.value(), parsed_pid.value()});
+        owners.push(linux_socket_owner{inode.value(), start_token.value_or(0),
+                                       parsed_pid.value(),
+                                       start_token.has_value()});
     }
     ::closedir(descriptor_directory);
   }
@@ -222,7 +264,6 @@ static fn linux_network_sockets_from_file(
     -> ArrayList<network_socket_entry>
 {
   let result = ArrayList<network_socket_entry>{allocator};
-  unused(should_include_process_ids);
   const String path_string{path};
   let const is_ipv6 = path == StringView{"/proc/net/tcp6"} ||
                       path == StringView{"/proc/net/udp6"};
@@ -245,6 +286,7 @@ static fn linux_network_sockets_from_file(
     let const peer = nth_space_field(line, 2);
     let const state = nth_space_field(line, 3);
     let const queues = nth_space_field(line, 4);
+    let const owner_word = nth_space_field(line, 7);
     let const inode_word = nth_space_field(line, 9);
     let const local_separator = local.find_character(':');
     let const peer_separator = peer.find_character(':');
@@ -267,6 +309,7 @@ static fn linux_network_sockets_from_file(
         queues.substring(*queue_separator + 1), int_base::hex);
     let const send_queue = utils::parse_integer_in_base_u64(
         queues.substring_of_length(0, *queue_separator), int_base::hex);
+    let const owner_id = owner_word.to<u32>();
     let const inode = inode_word.to<u64>();
     if (!local_address.has_value() || !peer_address.has_value() ||
         local_port.is_error() || peer_port.is_error() ||
@@ -274,29 +317,43 @@ static fn linux_network_sockets_from_file(
         send_queue.is_error() || inode.is_error())
       continue;
 
-    u32 process_id = 0;
+    let const do_push_socket = [&](u32 process_id, u64 start_token,
+                                   bool has_start_token) throws {
+      let socket = network_socket_entry{
+          String{allocator, local_address->view()},
+          String{allocator, peer_address->view() },
+          inode.value(),
+          receive_queue.value(),
+          send_queue.value(),
+          0,
+          process_id,
+          static_cast<u16>(local_port.value()),
+          static_cast<u16>(peer_port.value()),
+          protocol,
+          is_ipv6 ? network_address_family::IPv6 : network_address_family::IPv4,
+          protocol == network_socket_protocol::Udp
+              ? network_socket_state::Unconnected
+              : linux_socket_state(state_value.value()),
+      };
+      if (!owner_id.is_error()) {
+        socket.owner_id = owner_id.value();
+        socket.has_owner_id = true;
+      }
+      socket.owner_start_token = start_token;
+      socket.has_owner_start_token = has_start_token;
+      result.push(steal(socket));
+    };
+
+    bool has_process_owner = false;
     if (should_include_process_ids && owners != nullptr) {
-      for (let const &owner : *owners)
+      for (let const &owner : *owners) {
         if (owner.inode == inode.value()) {
-          process_id = owner.pid;
-          break;
+          do_push_socket(owner.pid, owner.start_token, owner.has_start_token);
+          has_process_owner = true;
         }
+      }
     }
-    result.push(network_socket_entry{
-        steal(*local_address),
-        steal(*peer_address),
-        inode.value(),
-        receive_queue.value(),
-        send_queue.value(),
-        process_id,
-        static_cast<u16>(local_port.value()),
-        static_cast<u16>(peer_port.value()),
-        protocol,
-        is_ipv6 ? network_address_family::IPv6 : network_address_family::IPv4,
-        protocol == network_socket_protocol::Udp
-            ? network_socket_state::Unconnected
-            : linux_socket_state(state_value.value()),
-    });
+    if (!has_process_owner) do_push_socket(0, 0, false);
   }
 
   return result;
@@ -912,12 +969,13 @@ fn network_sockets(bool should_include_process_ids) throws
       let const &internet = protocol == network_socket_protocol::Tcp
                                 ? info.soi_proto.pri_tcp.tcpsi_ini
                                 : info.soi_proto.pri_in;
-      result.push(network_socket_entry{
+      let entry = network_socket_entry{
           socket_address(internet, true, family),
           socket_address(internet, false, family),
           info.soi_so,
           info.soi_rcv.sbi_cc,
           info.soi_snd.sbi_cc,
+          0,
           should_include_process_ids ? static_cast<u32>(process.pid) : 0,
           ntohs(static_cast<u16>(internet.insi_lport)),
           ntohs(static_cast<u16>(internet.insi_fport)),
@@ -926,7 +984,13 @@ fn network_sockets(bool should_include_process_ids) throws
           protocol == network_socket_protocol::Tcp
               ? socket_state_of(info.soi_proto.pri_tcp.tcpsi_state)
               : network_socket_state::Unconnected,
-      });
+          network_unix_socket_type::Stream,
+      };
+      entry.owner_start_token = process.start_token;
+      entry.owner_id = process.owner_id;
+      entry.has_owner_start_token = process.start_token != 0;
+      entry.has_owner_id = true;
+      result.push(steal(entry));
     }
   }
 #elif defined __linux__

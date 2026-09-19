@@ -13,6 +13,7 @@
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Toiletline.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -28,7 +29,8 @@ FLAG(EVILISO_ALL, Bool, 'a', "all",
 FLAG(EVILISO_NAMESPACES, Bool, 'n', "namespaces", "Report process namespaces.");
 FLAG(EVILISO_CGROUPS, Bool, 'c', "cgroups", "Report cgroup membership.");
 FLAG(EVILISO_SESSIONS, Bool, 's', "sessions", "Report login sessions.");
-FLAG(EVILISO_REMOTE, Bool, 'r', "remote", "Report remote-capable sockets.");
+FLAG(EVILISO_REMOTE, Bool, 'r', "remote",
+     "List remote peers and their owning processes.");
 FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
      "Report container and Kubernetes runtime evidence.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -81,7 +83,7 @@ fn append_namespace_report(String &output, bool should_color,
       identity += " (";
       identity += process.name.view();
       identity += process.pid == os::get_current_process_id() ? ", self; "
-                                                               : ", other; ";
+                                                              : ", other; ";
       identity += name;
       identity += " namespace ";
       identity += target->view();
@@ -109,7 +111,8 @@ fn append_cgroup_report(String &output, bool should_color,
   usize index = 0;
   while (!text.is_empty()) {
     usize line_end = 0;
-    while (line_end < text.length && text[line_end] != '\n') line_end++;
+    while (line_end < text.length && text[line_end] != '\n')
+      line_end++;
     let const line = text.substring_of_length(0, line_end);
     if (line_end < text.length)
       text = text.substring(line_end + 1);
@@ -126,9 +129,10 @@ fn append_cgroup_report(String &output, bool should_color,
   let member_rows = ArrayList<const os::process_entry *>{heap_allocator()};
   let const processes = os::enumerate_processes();
   for (let const &process : processes) {
-    let const member = Path{String{"/proc/"} +
-                            String::from(process.pid, heap_allocator()) +
-                            "/cgroup"}.read_entire_file();
+    let const member =
+        Path{String{"/proc/"} + String::from(process.pid, heap_allocator()) +
+             "/cgroup"}
+            .read_entire_file();
     if (!member.has_value()) continue;
     if (member->view().find_substring("name=systemd:/").has_value() ||
         member->view().find_substring("name=elogind:/").has_value())
@@ -147,8 +151,8 @@ fn append_cgroup_report(String &output, bool should_color,
   }
 
   output += "\n";
-  append_report_column(output, "PID", pid_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
+  append_report_column(output, "PID", pid_width, false, colors::ansi::BOLD_CYAN,
+                       should_color);
   output += "  ";
   append_report_column(output, "NAME", name_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
@@ -157,10 +161,9 @@ fn append_cgroup_report(String &output, bool should_color,
                        should_color);
   output += "\n";
   for (let const *process : member_rows) {
-    append_report_column(output,
-                         String::from(process->pid, heap_allocator()).view(),
-                         pid_width, false, colors::ansi::BOLD_GREEN,
-                         should_color);
+    append_report_column(
+        output, String::from(process->pid, heap_allocator()).view(), pid_width,
+        false, colors::ansi::BOLD_GREEN, should_color);
     output += "  ";
     append_report_column(output, process->name.view(), name_width, false, {},
                          should_color);
@@ -187,17 +190,166 @@ fn append_session_report(String &output, bool should_color,
     text += session.terminal.view();
     table.add("Session", text.view(), colors::ansi::BOLD_CYAN);
     if (!should_show_detail) continue;
-    table.add("Login time",
-              utils::format_unix_timestamp(session.login_time,
-                                           "%Y-%m-%d %H:%M:%S")
-                  .view(),
-              colors::ansi::BOLD_CYAN);
+    table.add(
+        "Login time",
+        utils::format_unix_timestamp(session.login_time, "%Y-%m-%d %H:%M:%S")
+            .view(),
+        colors::ansi::BOLD_CYAN);
   }
   output += table.to_string(should_color, "");
 }
 
+pure fn remote_state_name(os::network_socket_state state) wontthrow
+    -> StringView
+{
+  switch (state) {
+  case os::network_socket_state::Unconnected: return "UNCONN";
+  case os::network_socket_state::Listen: return "LISTEN";
+  case os::network_socket_state::SynSent: return "SYN-SENT";
+  case os::network_socket_state::SynReceived: return "SYN-RECV";
+  case os::network_socket_state::Established: return "ESTAB";
+  case os::network_socket_state::CloseWait: return "CLOSE-WAIT";
+  case os::network_socket_state::FinWait1: return "FIN-WAIT-1";
+  case os::network_socket_state::Closing: return "CLOSING";
+  case os::network_socket_state::LastAck: return "LAST-ACK";
+  case os::network_socket_state::FinWait2: return "FIN-WAIT-2";
+  case os::network_socket_state::TimeWait: return "TIME-WAIT";
+  case os::network_socket_state::Closed: return "CLOSED";
+  case os::network_socket_state::Unknown: return "UNKNOWN";
+  }
+
+  unreachable("unknown network socket state");
+}
+
+fn remote_endpoint(StringView address, u16 port,
+                   os::network_address_family family,
+                   Allocator allocator) throws -> String
+{
+  let result = String{allocator};
+  if (family == os::network_address_family::IPv6) result += "[";
+  result += address.is_empty() ? StringView{"*"} : address;
+  if (family == os::network_address_family::IPv6) result += "]";
+  result += ":";
+  result += port == 0 ? StringView{"*"} : String::from(port, allocator).view();
+  return result;
+}
+
+fn remote_process_cgroups(i64 process_id, Allocator allocator) throws -> String
+{
+  let const contents =
+      Path{String{"/proc/"} + String::from(process_id, allocator) + "/cgroup"}
+          .read_entire_file();
+  if (!contents.has_value()) return String{allocator, "-"};
+
+  let paths = ArrayList<String>{allocator};
+  for (let const line : utils::split_lines(contents->view())) {
+    let const first_separator = line.find_character(':');
+    if (!first_separator.has_value()) continue;
+    let const remainder = line.substring(*first_separator + 1);
+    let const second_separator = remainder.find_character(':');
+    if (!second_separator.has_value()) continue;
+    let const path = remainder.substring(*second_separator + 1);
+    if (path.is_empty()) continue;
+    bool is_known = false;
+    for (let const &known : paths) {
+      if (known.view() == path) {
+        is_known = true;
+        break;
+      }
+    }
+    if (!is_known) paths.push(String{allocator, path});
+  }
+
+  if (paths.is_empty()) return String{allocator, "-"};
+  let result = String{allocator};
+  for (let const &path : paths) {
+    if (!result.is_empty()) result += ",";
+    result += path.view();
+  }
+  return result;
+}
+
+pure fn remote_runtime_name(StringView cgroup) wontthrow -> StringView
+{
+  if (cgroup.find_substring("containerd").has_value()) return "containerd";
+  if (cgroup.find_substring("crio").has_value()) return "cri-o";
+  if (cgroup.find_substring("docker").has_value()) return "docker";
+  if (cgroup.find_substring("libpod").has_value()) return "podman";
+  return "-";
+}
+
+pure fn remote_orchestrator_name(StringView cgroup) wontthrow -> StringView
+{
+  return cgroup.find_substring("kubepods").has_value() ? "kubernetes" : "-";
+}
+
+fn remote_container_id(StringView cgroups, Allocator allocator) throws -> String
+{
+  usize best_start = 0;
+  usize best_length = 0;
+  usize position = 0;
+  while (position < cgroups.length) {
+    let const byte = cgroups[position];
+    let const is_hexadecimal = (byte >= '0' && byte <= '9') ||
+                               (byte >= 'a' && byte <= 'f') ||
+                               (byte >= 'A' && byte <= 'F');
+    if (!is_hexadecimal) {
+      position++;
+      continue;
+    }
+    let const start = position;
+    while (position < cgroups.length) {
+      let const candidate = cgroups[position];
+      if (!((candidate >= '0' && candidate <= '9') ||
+            (candidate >= 'a' && candidate <= 'f') ||
+            (candidate >= 'A' && candidate <= 'F')))
+      {
+        break;
+      }
+      position++;
+    }
+    let const length = position - start;
+    let const prefix_start = start > 32 ? start - 32 : 0;
+    let const prefix =
+        cgroups.substring_of_length(prefix_start, start - prefix_start);
+    let const has_runtime_marker =
+        prefix.find_substring("docker").has_value() ||
+        prefix.find_substring("containerd").has_value() ||
+        prefix.find_substring("crio").has_value() ||
+        prefix.find_substring("libpod").has_value();
+    if (length == 64 && has_runtime_marker && length > best_length) {
+      best_start = start;
+      best_length = length;
+    }
+  }
+  if (best_length == 0) return String{allocator, "-"};
+  return String{allocator,
+                cgroups.substring_of_length(best_start, best_length)};
+}
+
+fn remote_table_text(StringView text, usize maximum_cells,
+                     Allocator allocator) throws -> String
+{
+  let result = String{allocator};
+  result.reserve(text.length);
+  for (usize position = 0; position < text.length; position++) {
+    let const byte = text[position];
+    result.push((static_cast<unsigned char>(byte) < 32 || byte == 127) ? ' '
+                                                                       : byte);
+  }
+  if (toiletline::display_width(result.view()) > maximum_cells) {
+    usize actual_cells = 0;
+    let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+        result.view(), maximum_cells - 3, actual_cells);
+    result.truncate(kept_bytes);
+    result += "...";
+  }
+  return result;
+}
+
 fn append_remote_report(String &output, bool should_color,
-                        bool should_show_detail) throws -> void
+                        bool should_show_rows, bool should_show_detail) throws
+    -> void
 {
   let table = ReportTable{heap_allocator()};
   if (!os::has_network_socket_listing()) {
@@ -206,97 +358,363 @@ fn append_remote_report(String &output, bool should_color,
     return;
   }
 
-  let const sockets = os::network_sockets(false);
-  usize remote_count = 0;
+  let sockets = os::network_sockets(should_show_detail);
+  sockets.sort([](const os::network_socket_entry &left,
+                  const os::network_socket_entry &right) {
+    if (left.peer_address != right.peer_address) {
+      return left.peer_address < right.peer_address;
+    }
+    if (left.peer_port != right.peer_port) {
+      return left.peer_port < right.peer_port;
+    }
+    if (left.local_address != right.local_address) {
+      return left.local_address < right.local_address;
+    }
+    if (left.local_port != right.local_port) {
+      return left.local_port < right.local_port;
+    }
+    if (left.protocol != right.protocol) return left.protocol < right.protocol;
+    if (left.state != right.state) return left.state < right.state;
+    if (left.identity != right.identity) return left.identity < right.identity;
+    return left.process_id < right.process_id;
+  });
+
+  let socket_identities = ArrayList<u64>{heap_allocator()};
+  let remote_identities = ArrayList<u64>{heap_allocator()};
+  usize zero_identity_count = 0;
+  usize remote_zero_identity_count = 0;
   for (let const &socket : sockets) {
-    if (!socket.peer_address.is_empty() && socket.peer_port != 0)
-      remote_count++;
+    let const is_remote =
+        !socket.peer_address.is_empty() && socket.peer_port != 0;
+    if (socket.identity == 0) {
+      zero_identity_count++;
+      if (is_remote) remote_zero_identity_count++;
+    } else {
+      socket_identities.push(socket.identity);
+      if (is_remote) remote_identities.push(socket.identity);
+    }
   }
+  socket_identities.sort();
+  remote_identities.sort();
+  let const do_count_unique = [](const ArrayList<u64> &identities) {
+    usize count = 0;
+    u64 previous = 0;
+    for (let const identity : identities) {
+      if (count == 0 || identity != previous) count++;
+      previous = identity;
+    }
+    return count;
+  };
+  let const socket_count =
+      zero_identity_count + do_count_unique(socket_identities);
+  let const remote_count =
+      remote_zero_identity_count + do_count_unique(remote_identities);
   table.add("Remote sockets",
             String::from(remote_count, heap_allocator()).view(),
             colors::ansi::BOLD_CYAN);
   table.add("Total sockets",
-            String::from(sockets.count(), heap_allocator()).view(),
+            String::from(socket_count, heap_allocator()).view(),
             colors::ansi::BOLD_CYAN);
   output += table.to_string(should_color, "");
-  if (should_show_detail) {
-    struct remote_peer_row
+  if (!should_show_rows) return;
+
+  struct remote_peer_row
+  {
+    StringView family;
+    StringView protocol;
+    StringView state;
+    String local{heap_allocator()};
+    String peer{heap_allocator()};
+    String socket_id{heap_allocator()};
+    String process_id{heap_allocator()};
+    String owner_id{heap_allocator()};
+    String user{heap_allocator()};
+    String name{heap_allocator()};
+    String command{heap_allocator()};
+    String net_namespace{heap_allocator()};
+    String orchestrator{heap_allocator()};
+    String runtime{heap_allocator()};
+    String container{heap_allocator()};
+    String cgroup{heap_allocator()};
+    u64 receive_queue_bytes{0};
+    u64 send_queue_bytes{0};
+  };
+
+  struct remote_process_context
+  {
+    i64 process_id{0};
+    u64 start_token{0};
+    u32 owner_id{0};
+    String name{heap_allocator()};
+    String command{heap_allocator()};
+    String net_namespace{heap_allocator()};
+    String orchestrator{heap_allocator()};
+    String runtime{heap_allocator()};
+    String container{heap_allocator()};
+    String cgroups{heap_allocator()};
+    bool is_available{false};
+  };
+
+  struct remote_user_context
+  {
+    u32 owner_id{0};
+    String name{heap_allocator()};
+  };
+
+  let const processes =
+      should_show_detail
+          ? os::enumerate_processes(os::process_detail::ResourceStats)
+          : ArrayList<os::process_entry>{heap_allocator()};
+  let process_contexts = ArrayList<remote_process_context>{heap_allocator()};
+  let user_contexts = ArrayList<remote_user_context>{heap_allocator()};
+  let const self_net_namespace =
+      os::read_symlink("/proc/self/ns/net", heap_allocator());
+  let const do_get_user = [&](u32 process_id, u32 owner_id) throws -> String {
+    for (let const &context : user_contexts) {
+      if (context.owner_id == owner_id) {
+        return String{heap_allocator(), context.name.view()};
+      }
+    }
+    let name = String::from(owner_id, heap_allocator());
+    if (let const resolved =
+            os::process_owner_name(process_id, owner_id, heap_allocator());
+        resolved.has_value())
     {
-      String peer{heap_allocator()};
-      StringView state;
-      StringView protocol;
-      String process{heap_allocator()};
-    };
-    let remote_rows = ArrayList<remote_peer_row>{heap_allocator()};
-    for (let const &socket : sockets) {
-      if (socket.peer_address.is_empty() || socket.peer_port == 0) continue;
-      let text = String{heap_allocator()};
-      text += socket.peer_address.view();
-      text += ":";
-      text += String::from(socket.peer_port, heap_allocator()).view();
-      StringView state = "-";
-      switch (socket.state) {
-      case os::network_socket_state::Established: state = "ESTABLISHED"; break;
-      case os::network_socket_state::Listen: state = "LISTEN"; break;
-      case os::network_socket_state::SynSent: state = "SYN-SENT"; break;
-      case os::network_socket_state::SynReceived: state = "SYN-RECV"; break;
-      case os::network_socket_state::CloseWait: state = "CLOSE-WAIT"; break;
-      case os::network_socket_state::FinWait1: state = "FIN-WAIT-1"; break;
-      case os::network_socket_state::FinWait2: state = "FIN-WAIT-2"; break;
-      case os::network_socket_state::Closing: state = "CLOSING"; break;
-      case os::network_socket_state::LastAck: state = "LAST-ACK"; break;
-      case os::network_socket_state::TimeWait: state = "TIME-WAIT"; break;
-      case os::network_socket_state::Closed: state = "CLOSED"; break;
-      default: break;
-      }
-      remote_rows.push(remote_peer_row{
-          steal(text),
-          state,
-          socket.protocol == os::network_socket_protocol::Udp
-              ? StringView{"UDP"}
-              : StringView{"TCP"},
-          socket.process_id == 0
-              ? String{heap_allocator(), "-"}
-              : String::from(socket.process_id, heap_allocator())});
+      name = steal(*resolved);
     }
-    if (remote_rows.is_empty()) return;
+    user_contexts.push(remote_user_context{owner_id, steal(name)});
+    return String{heap_allocator(),
+                  user_contexts[user_contexts.count() - 1].name.view()};
+  };
+  let remote_rows = ArrayList<remote_peer_row>{heap_allocator()};
+  u64 previous_identity = 0;
+  u32 previous_process_id = 0;
+  bool has_previous_owner = false;
+  for (let const &socket : sockets) {
+    if (socket.peer_address.is_empty() || socket.peer_port == 0) continue;
+    if (socket.identity != 0 && has_previous_owner &&
+        socket.identity == previous_identity &&
+        socket.process_id == previous_process_id)
+    {
+      continue;
+    }
+    previous_identity = socket.identity;
+    previous_process_id = socket.process_id;
+    has_previous_owner = socket.identity != 0;
 
-    usize peer_width = 4;
-    usize process_width = 7;
-    for (let const &row : remote_rows) {
-      if (row.peer.length() > peer_width) peer_width = row.peer.length();
-      if (row.process.length() > process_width) {
-        process_width = row.process.length();
+    remote_peer_row row{};
+    row.family =
+        socket.family == os::network_address_family::IPv6 ? "IPv6" : "IPv4";
+    row.protocol =
+        socket.protocol == os::network_socket_protocol::Udp ? "UDP" : "TCP";
+    row.state = remote_state_name(socket.state);
+    row.local = remote_endpoint(socket.local_address.view(), socket.local_port,
+                                socket.family, heap_allocator());
+    row.peer = remote_endpoint(socket.peer_address.view(), socket.peer_port,
+                               socket.family, heap_allocator());
+    row.socket_id = socket.identity == 0
+                        ? String{heap_allocator(), "-"}
+                        : String::from(socket.identity, heap_allocator());
+    row.receive_queue_bytes = socket.receive_queue_bytes;
+    row.send_queue_bytes = socket.send_queue_bytes;
+    if (should_show_detail) {
+      row.process_id = socket.process_id == 0
+                           ? String{heap_allocator(), "-"}
+                           : String::from(socket.process_id, heap_allocator());
+      row.owner_id = socket.has_owner_id
+                         ? String::from(socket.owner_id, heap_allocator())
+                         : String{heap_allocator(), "-"};
+      row.user = "-";
+      row.name = "-";
+      row.command = "-";
+      row.net_namespace =
+          self_net_namespace.has_value()
+              ? String{heap_allocator(), self_net_namespace->view()}
+              : String{heap_allocator(), "-"};
+      row.orchestrator = "-";
+      row.runtime = "-";
+      row.container = "-";
+      row.cgroup = "-";
+      if (socket.has_owner_id) {
+        row.user = do_get_user(socket.process_id, socket.owner_id);
+      }
+
+      const remote_process_context *process_context = nullptr;
+      for (let const &context : process_contexts) {
+        if (context.process_id == socket.process_id &&
+            context.start_token == socket.owner_start_token)
+        {
+          process_context = &context;
+          break;
+        }
+      }
+      if (process_context == nullptr && socket.process_id != 0 &&
+          socket.has_owner_start_token)
+      {
+        remote_process_context context{};
+        context.process_id = socket.process_id;
+        context.start_token = socket.owner_start_token;
+        for (let const &process : processes) {
+          if (process.pid != socket.process_id) continue;
+          if (process.start_token != socket.owner_start_token) break;
+          context.owner_id = process.owner_id;
+          context.name = process.name.is_empty()
+                             ? String{heap_allocator(), "-"}
+                             : remote_table_text(process.name.view(), 48,
+                                                 heap_allocator());
+          context.command = process.command_line.is_empty()
+                                ? String{heap_allocator(), "-"}
+                                : remote_table_text(process.command_line.view(),
+                                                    96, heap_allocator());
+          if (let net_namespace = os::read_symlink(
+                  String{"/proc/"} +
+                      String::from(socket.process_id, heap_allocator()) +
+                      "/ns/net",
+                  heap_allocator());
+              net_namespace.has_value())
+          {
+            context.net_namespace = steal(*net_namespace);
+          }
+          context.cgroups =
+              remote_process_cgroups(socket.process_id, heap_allocator());
+          context.orchestrator =
+              remote_orchestrator_name(context.cgroups.view());
+          context.runtime = remote_runtime_name(context.cgroups.view());
+          context.container =
+              remote_container_id(context.cgroups.view(), heap_allocator());
+          context.cgroups =
+              remote_table_text(context.cgroups.view(), 120, heap_allocator());
+          context.is_available = true;
+          break;
+        }
+        process_contexts.push(steal(context));
+        process_context = &process_contexts[process_contexts.count() - 1];
+      }
+      if (process_context != nullptr && process_context->is_available) {
+        if (!socket.has_owner_id) {
+          row.owner_id =
+              String::from(process_context->owner_id, heap_allocator());
+          row.user = do_get_user(socket.process_id, process_context->owner_id);
+        }
+        row.name = process_context->name;
+        row.command = process_context->command;
+        if (!process_context->net_namespace.is_empty()) {
+          row.net_namespace = process_context->net_namespace;
+        }
+        row.cgroup = process_context->cgroups;
+        row.orchestrator = process_context->orchestrator;
+        row.runtime = process_context->runtime;
+        row.container = process_context->container;
       }
     }
+    remote_rows.push(steal(row));
+  }
 
-    output += "\n";
-    append_report_column(output, "PEER", peer_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "  ";
-    append_report_column(output, "STATE", 11, false, colors::ansi::BOLD_CYAN,
-                         should_color);
-    output += "  ";
-    append_report_column(output, "PROTO", 5, false, colors::ansi::BOLD_CYAN,
-                         should_color);
-    output += "  ";
-    append_report_column(output, "PROCESS", process_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "\n";
-    for (let const &row : remote_rows) {
-      append_report_column(output, row.peer.view(), peer_width, false,
-                           colors::ansi::BOLD_GREEN, should_color);
-      output += "  ";
-      append_report_column(output, row.state, 11, false,
-                           colors::ansi::BOLD_MAGENTA, should_color);
-      output += "  ";
-      append_report_column(output, row.protocol, 5, false,
-                           colors::ansi::BOLD_MAGENTA, should_color);
-      output += "  ";
-      append_report_column(output, row.process.view(), process_width, false, {},
-                           should_color);
-      output += "\n";
+  usize local_width = 5;
+  usize peer_width = 4;
+  usize receive_width = 6;
+  usize send_width = 6;
+  usize process_width = 3;
+  usize socket_width = 6;
+  usize owner_width = 3;
+  usize user_width = 4;
+  usize name_width = 4;
+  usize command_width = 7;
+  usize namespace_width = 5;
+  usize orchestrator_width = 12;
+  usize runtime_width = 7;
+  usize container_width = 9;
+  usize cgroup_width = 6;
+  for (let const &row : remote_rows) {
+    if (row.local.length() > local_width) local_width = row.local.length();
+    if (row.peer.length() > peer_width) peer_width = row.peer.length();
+    let const receive = String::from(row.receive_queue_bytes, heap_allocator());
+    let const send = String::from(row.send_queue_bytes, heap_allocator());
+    if (receive.length() > receive_width) receive_width = receive.length();
+    if (send.length() > send_width) send_width = send.length();
+    if (!should_show_detail) continue;
+    if (row.socket_id.length() > socket_width)
+      socket_width = row.socket_id.length();
+    if (row.process_id.length() > process_width)
+      process_width = row.process_id.length();
+    if (row.owner_id.length() > owner_width)
+      owner_width = row.owner_id.length();
+    if (row.user.length() > user_width) user_width = row.user.length();
+    if (row.name.length() > name_width) name_width = row.name.length();
+    if (row.command.length() > command_width)
+      command_width = row.command.length();
+    if (row.net_namespace.length() > namespace_width) {
+      namespace_width = row.net_namespace.length();
     }
+    if (row.orchestrator.length() > orchestrator_width)
+      orchestrator_width = row.orchestrator.length();
+    if (row.runtime.length() > runtime_width)
+      runtime_width = row.runtime.length();
+    if (row.container.length() > container_width)
+      container_width = row.container.length();
+    if (row.cgroup.length() > cgroup_width) cgroup_width = row.cgroup.length();
+  }
+
+  let const do_append_column = [&](StringView text, usize width,
+                                   bool is_numeric,
+                                   StringView style = {}) throws {
+    output += "  ";
+    append_report_column(output, text, width, is_numeric, style, should_color);
+  };
+  output += "\n";
+  append_report_column(output, "FAMILY", 6, false, colors::ansi::BOLD_CYAN,
+                       should_color);
+  do_append_column("PROTO", 5, false, colors::ansi::BOLD_CYAN);
+  do_append_column("STATE", 10, false, colors::ansi::BOLD_CYAN);
+  do_append_column("RECV-Q", receive_width, true, colors::ansi::BOLD_CYAN);
+  do_append_column("SEND-Q", send_width, true, colors::ansi::BOLD_CYAN);
+  do_append_column("LOCAL", local_width, false, colors::ansi::BOLD_CYAN);
+  do_append_column("PEER", peer_width, false, colors::ansi::BOLD_CYAN);
+  if (should_show_detail) {
+    do_append_column("SOCKET", socket_width, true, colors::ansi::BOLD_CYAN);
+    do_append_column("PID", process_width, true, colors::ansi::BOLD_CYAN);
+    do_append_column("UID", owner_width, true, colors::ansi::BOLD_CYAN);
+    do_append_column("USER", user_width, false, colors::ansi::BOLD_CYAN);
+    do_append_column("NAME", name_width, false, colors::ansi::BOLD_CYAN);
+    do_append_column("COMMAND", command_width, false, colors::ansi::BOLD_CYAN);
+    do_append_column("NETNS", namespace_width, false, colors::ansi::BOLD_CYAN);
+    do_append_column("ORCHESTRATOR", orchestrator_width, false,
+                     colors::ansi::BOLD_CYAN);
+    do_append_column("RUNTIME", runtime_width, false, colors::ansi::BOLD_CYAN);
+    do_append_column("CONTAINER", container_width, false,
+                     colors::ansi::BOLD_CYAN);
+    do_append_column("CGROUP", cgroup_width, false, colors::ansi::BOLD_CYAN);
+  }
+  output += "\n";
+
+  for (let const &row : remote_rows) {
+    append_report_column(output, row.family, 6, false,
+                         colors::ansi::BOLD_MAGENTA, should_color);
+    do_append_column(row.protocol, 5, false, colors::ansi::BOLD_MAGENTA);
+    do_append_column(row.state, 10, false, colors::ansi::BOLD_GREEN);
+    do_append_column(String::from(row.receive_queue_bytes, heap_allocator()),
+                     receive_width, true, colors::ansi::GREEN);
+    do_append_column(String::from(row.send_queue_bytes, heap_allocator()),
+                     send_width, true, colors::ansi::GREEN);
+    do_append_column(row.local.view(), local_width, false,
+                     colors::ansi::BOLD_CYAN);
+    do_append_column(row.peer.view(), peer_width, false, colors::ansi::CYAN);
+    if (should_show_detail) {
+      do_append_column(row.socket_id.view(), socket_width, true,
+                       colors::ansi::YELLOW);
+      do_append_column(row.process_id.view(), process_width, true,
+                       colors::ansi::YELLOW);
+      do_append_column(row.owner_id.view(), owner_width, true, {});
+      do_append_column(row.user.view(), user_width, false, {});
+      do_append_column(row.name.view(), name_width, false, {});
+      do_append_column(row.command.view(), command_width, false, {});
+      do_append_column(row.net_namespace.view(), namespace_width, false, {});
+      do_append_column(row.orchestrator.view(), orchestrator_width, false, {});
+      do_append_column(row.runtime.view(), runtime_width, false, {});
+      do_append_column(row.container.view(), container_width, false, {});
+      do_append_column(row.cgroup.view(), cgroup_width, false, {});
+    }
+    output += "\n";
   }
 }
 
@@ -366,7 +784,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_EVILISO_NAMESPACES.is_enabled() ||
       FLAG_EVILISO_CGROUPS.is_enabled() || FLAG_EVILISO_SESSIONS.is_enabled() ||
       FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled();
-  let const show_namespaces = !any_selector || FLAG_EVILISO_NAMESPACES.is_enabled();
+  let const show_namespaces =
+      !any_selector || FLAG_EVILISO_NAMESPACES.is_enabled();
   let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
   let const show_sessions = !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
   let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
@@ -379,11 +798,12 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   if (show_cgroups)
     append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_sessions)
-    append_session_report(output, should_color,
-                          FLAG_EVILISO_ALL.is_enabled());
+    append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_remote)
-    append_remote_report(output, should_color,
-                         FLAG_EVILISO_ALL.is_enabled());
+    append_remote_report(
+        output, should_color,
+        FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled(),
+        FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled());
   if (show_runtime) append_runtime_report(output, should_color);
   ec.print_to_stdout(output);
   return 0;

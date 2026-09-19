@@ -1551,6 +1551,7 @@ struct network_socket_entry
   u64 identity{0};
   u64 receive_queue_bytes{0};
   u64 send_queue_bytes{0};
+  u64 owner_start_token{0};
   u32 process_id{0};
   u16 local_port{0};
   u16 peer_port{0};
@@ -1558,6 +1559,9 @@ struct network_socket_entry
   network_address_family family{network_address_family::IPv4};
   network_socket_state state{network_socket_state::Unknown};
   network_unix_socket_type unix_type{network_unix_socket_type::Stream};
+  u32 owner_id{0};
+  bool has_owner_start_token{false};
+  bool has_owner_id{false};
 };
 
 fn has_network_socket_listing() wontthrow -> bool;

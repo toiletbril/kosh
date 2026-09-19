@@ -33,11 +33,23 @@ case $all_report in
   *) detail_shape=missing ;;
 esac
 case $all_report in
-  *"Controller 0:"*"Login time:"*"PEER"*"STATE"*"PROTO"*"PROCESS"*\
-*"PID"*"NAME"*"ROLE"*) ;;
+  *"Controller 0:"*"Login time:"*"FAMILY"*"PROTO"*"STATE"*"LOCAL"*\
+*"PEER"*"PID"*"USER"*"NAME"*"COMMAND"*"NETNS"*"ORCHESTRATOR"*"RUNTIME"*\
+*"CONTAINER"*"CGROUP"*"ROLE"*) ;;
   *) detail_shape=missing ;;
 esac
 printf 'detail-shape=%s\n' "$detail_shape"
+
+remote_report=$(run_report --remote)
+case $remote_report in
+  *"Remote sockets:"*"Total sockets:"*"FAMILY"*"PROTO"*"STATE"*"RECV-Q"*\
+*"SEND-Q"*"LOCAL"*"PEER"*"SOCKET"*"PID"*"UID"*"USER"*"NAME"*\
+*"COMMAND"*"NETNS"*"ORCHESTRATOR"*"RUNTIME"*"CONTAINER"*"CGROUP"*)
+    remote_table=matched
+    ;;
+  *) remote_table=missing ;;
+esac
+printf 'remote-table=%s\n' "$remote_table"
 
 namespaces_only=$(run_report --namespaces)
 case $namespaces_only in
