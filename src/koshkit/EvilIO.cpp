@@ -197,18 +197,20 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
 
 struct live_process_row
 {
-  io_row row;
-  u64 last_seen_nanoseconds{0};
-  u64 idle_nanoseconds{0};
+  i64 pid{0};
+  String name{heap_allocator()};
+  ArrayList<os::process_io_status> history{heap_allocator()};
+  ArrayList<u64> history_nanoseconds{heap_allocator()};
 };
 
 fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
                                  bool should_color,
                                  StringView duration_suffix,
-                                 const ArrayList<u64> *idle_nanoseconds_list,
-                                 u64 falloff_nanoseconds) throws -> void
+                                 const ArrayList<u64> *idle_nanoseconds_list)
+    throws -> void
 {
+  unused(idle_nanoseconds_list);
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
   output += "  ";
@@ -230,53 +232,34 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
   let const shown_count = rows.count() < row_limit ? rows.count() : row_limit;
   for (usize index = 0; index < shown_count; index++) {
     let const &row = rows[index];
-    u64 decayed_factor = 1000;
-    if (idle_nanoseconds_list != nullptr &&
-        index < idle_nanoseconds_list->count())
-    {
-      let const idle = (*idle_nanoseconds_list)[index];
-      /* A row fades linearly to zero across the collection window after its
-         last activity, then reads as zero until it is dropped. */
-      decayed_factor = idle == 0
-                           ? 1000
-                           : idle >= falloff_nanoseconds
-                                 ? 0
-                                 : 1000 - idle * 1000 / falloff_nanoseconds;
-    }
     append_report_column(output, String::from(row.pid, allocator).view(), 8,
                          true, colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
     append_report_column(
         output,
         format_human_size(
-            row.status.read_bytes * decayed_factor / 1000, allocator)
+            row.status.read_bytes, allocator)
             .view(),
         10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
         output,
         format_human_size(
-            row.status.written_bytes * decayed_factor / 1000, allocator)
+            row.status.written_bytes, allocator)
             .view(),
         10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
         output,
         row.status.has_operation_counts
-            ? String::from(row.status.read_operation_count * decayed_factor /
-                               1000,
-                           allocator)
-                  .view()
+            ? String::from(row.status.read_operation_count, allocator).view()
             : StringView{"-"},
         10, true, {}, should_color);
     output += "  ";
     append_report_column(
         output,
         row.status.has_operation_counts
-            ? String::from(row.status.write_operation_count * decayed_factor /
-                               1000,
-                           allocator)
-                  .view()
+            ? String::from(row.status.write_operation_count, allocator).view()
             : StringView{"-"},
         11, true, {}, should_color);
     output += "  ";
@@ -607,9 +590,6 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
       format_live_duration(sample_duration_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
-  let before_rows = read_process_io_rows(allocator, selected_pid, true);
-  if (selected_pid.has_value() && before_rows.is_empty()) return 1;
-
   loop
   {
     let const before_wait_nanoseconds = os::monotonic_nanos();
@@ -638,31 +618,32 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
       let after_rows = read_process_io_rows(allocator, selected_pid, true);
       if (selected_pid.has_value() && after_rows.is_empty()) return 1;
 
-      let const sampled_rows = sample_process_io_rows(
-          before_rows, after_rows, now - last_sample_nanoseconds, allocator);
-      for (let const &row : sampled_rows) {
+      for (let const &row : after_rows) {
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
-          if (retained[index].row.pid != row.pid) continue;
-          let const idle_nanoseconds =
-              now - retained[index].last_seen_nanoseconds;
-          retained[index].row = row;
-          retained[index].idle_nanoseconds = idle_nanoseconds;
-          retained[index].last_seen_nanoseconds = now;
+          if (retained[index].pid != row.pid) continue;
+          retained[index].history.push(row.status);
+          retained[index].history_nanoseconds.push(now);
           is_known = true;
           break;
         }
-        if (!is_known) retained.push(live_process_row{row, now});
+        if (!is_known) {
+          live_process_row entry{};
+          entry.pid = row.pid;
+          entry.name = String{allocator, row.name.view()};
+          entry.history.push(row.status);
+          entry.history_nanoseconds.push(now);
+          retained.push(steal(entry));
+        }
       }
       for (usize index = retained.count(); index > 0; index--) {
         let const position = index - 1;
-        if (now - retained[position].last_seen_nanoseconds >=
+        if (now - retained[position].history_nanoseconds.back() >=
             falloff_nanoseconds)
         {
           retained.remove(position);
         }
       }
-      before_rows = steal(after_rows);
       last_sample_nanoseconds = now;
     }
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
@@ -670,20 +651,64 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     last_refresh_nanoseconds = now;
     retained.sort(
         [](const live_process_row &left, const live_process_row &right) {
-          let const left_total = saturated_sum(left.row.status.read_bytes,
-                                               left.row.status.written_bytes);
-          let const right_total = saturated_sum(right.row.status.read_bytes,
-                                                right.row.status.written_bytes);
+          let const &left_status = left.history.back();
+          let const &right_status = right.history.back();
+          let const left_total = saturated_sum(left_status.read_bytes,
+                                               left_status.written_bytes);
+          let const right_total = saturated_sum(right_status.read_bytes,
+                                                right_status.written_bytes);
           if (left_total != right_total) return left_total > right_total;
-          return left.row.pid < right.row.pid;
+          return left.pid < right.pid;
         });
     let rows = ArrayList<io_row>{allocator};
     rows.reserve(retained.count());
-    let idle_nanoseconds_list = ArrayList<u64>{allocator};
-    for (let const &row : retained)
-    {
-      rows.push(row.row);
-      idle_nanoseconds_list.push(row.idle_nanoseconds);
+    for (let const &row : retained) {
+      /* Boxcar average: the rate over everything collected inside the
+         window, from the oldest sample still in it to the newest. */
+      usize oldest = 0;
+      while (oldest + 1 < row.history_nanoseconds.count() &&
+             row.history_nanoseconds[oldest + 1] <
+                 last_sample_nanoseconds - falloff_nanoseconds)
+        oldest++;
+
+      let const oldest_nanoseconds = row.history_nanoseconds[oldest];
+      let const window_nanoseconds =
+          row.history_nanoseconds.back() - oldest_nanoseconds;
+      let const &newest_status = row.history.back();
+      let const &oldest_status = row.history[oldest];
+
+      os::process_io_status status{0, 0, 0, 0, false};
+      if (window_nanoseconds != 0) {
+        if (let const read_rate =
+                counter_rate(oldest_status.read_bytes,
+                             newest_status.read_bytes, window_nanoseconds);
+            read_rate.has_value())
+          status.read_bytes = *read_rate;
+        if (let const write_rate = counter_rate(oldest_status.written_bytes,
+                                                newest_status.written_bytes,
+                                                window_nanoseconds);
+            write_rate.has_value())
+          status.written_bytes = *write_rate;
+        if (oldest_status.has_operation_counts &&
+            newest_status.has_operation_counts)
+        {
+          if (let const read_rate = counter_rate(
+                  oldest_status.read_operation_count,
+                  newest_status.read_operation_count, window_nanoseconds);
+              read_rate.has_value()) {
+            status.read_operation_count = *read_rate;
+            status.has_operation_counts = true;
+          }
+          if (let const write_rate = counter_rate(
+                  oldest_status.write_operation_count,
+                  newest_status.write_operation_count, window_nanoseconds);
+              write_rate.has_value()) {
+            status.write_operation_count = *write_rate;
+            status.has_operation_counts = true;
+          }
+        }
+      }
+      rows.push(io_row{String{allocator, row.name.view()}, row.pid, status});
     }
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
@@ -691,16 +716,16 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                              should_color);
     append_process_io_rate_report(
         output, rows, row_limit, allocator, should_color,
-        sample_duration_label, &idle_nanoseconds_list, falloff_nanoseconds);
+        sample_duration_label, nullptr);
     ec.print_to_stdout(output);
   }
 }
 
 struct live_disk_row
 {
-  os::disk_io_status status;
-  u64 last_seen_nanoseconds{0};
-  u64 idle_nanoseconds{0};
+  String name{heap_allocator()};
+  ArrayList<os::disk_io_status> history{heap_allocator()};
+  ArrayList<u64> history_nanoseconds{heap_allocator()};
 };
 
 fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
@@ -709,7 +734,6 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
                     StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
-  let before_snapshot = os::read_disk_io_snapshot(allocator);
   let retained = ArrayList<live_disk_row>{allocator};
   let const sample_interval_nanoseconds =
       static_cast<u64>(sample_duration_seconds * 1000000000.0);
@@ -745,28 +769,31 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
       return 130;
     }
 
-    let after_snapshot = os::read_disk_io_snapshot(allocator);
     let const now = os::monotonic_nanos();
     let const did_sample =
         now - last_sample_nanoseconds >= sample_interval_nanoseconds;
     if (did_sample) {
+      let after_snapshot = os::read_disk_io_snapshot(allocator);
       for (let const &disk : after_snapshot.disks) {
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
-          if (retained[index].status.name != disk.name) continue;
-          let const idle_nanoseconds =
-              now - retained[index].last_seen_nanoseconds;
-          retained[index].status = disk;
-          retained[index].idle_nanoseconds = idle_nanoseconds;
-          retained[index].last_seen_nanoseconds = now;
+          if (retained[index].name != disk.name) continue;
+          retained[index].history.push(disk);
+          retained[index].history_nanoseconds.push(now);
           is_known = true;
           break;
         }
-        if (!is_known) retained.push(live_disk_row{disk, now});
+        if (!is_known) {
+          live_disk_row entry{};
+          entry.name = String{allocator, disk.name.view()};
+          entry.history.push(disk);
+          entry.history_nanoseconds.push(now);
+          retained.push(steal(entry));
+        }
       }
       for (usize index = retained.count(); index > 0; index--) {
         let const position = index - 1;
-        if (now - retained[position].last_seen_nanoseconds >=
+        if (now - retained[position].history_nanoseconds.back() >=
             falloff_nanoseconds)
         {
           retained.remove(position);
@@ -775,53 +802,39 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
       last_sample_nanoseconds = now;
     }
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) {
-      if (did_sample) before_snapshot = steal(after_snapshot);
       continue;
     }
 
     last_refresh_nanoseconds = now;
-    let current_snapshot = os::disk_io_snapshot{};
-    current_snapshot.sampled_at_nanoseconds =
-        after_snapshot.sampled_at_nanoseconds;
-    current_snapshot.disks.reserve(retained.count());
+    let after_snapshot = os::disk_io_snapshot{};
+    after_snapshot.sampled_at_nanoseconds = now;
+    after_snapshot.disks.reserve(retained.count());
+    let before_snapshot = os::disk_io_snapshot{};
+    before_snapshot.sampled_at_nanoseconds =
+        now > falloff_nanoseconds ? now - falloff_nanoseconds : 0;
     for (let const &row : retained)
     {
-      let status = row.status;
-      if (row.idle_nanoseconds != 0) {
-        let const decayed_factor =
-            row.idle_nanoseconds >= falloff_nanoseconds
-                ? u64{0}
-                : 1000 - row.idle_nanoseconds * 1000 / falloff_nanoseconds;
-        if (status.has_field(os::disk_io_field::ReadBytes))
-          status.read_bytes = status.read_bytes * decayed_factor / 1000;
-        if (status.has_field(os::disk_io_field::WrittenBytes))
-          status.written_bytes = status.written_bytes * decayed_factor / 1000;
-        if (status.has_field(os::disk_io_field::ReadOperations))
-          status.read_operation_count =
-              status.read_operation_count * decayed_factor / 1000;
-        if (status.has_field(os::disk_io_field::WriteOperations))
-          status.write_operation_count =
-              status.write_operation_count * decayed_factor / 1000;
-      }
-      current_snapshot.disks.push(status);
+      usize oldest = 0;
+      while (oldest + 1 < row.history_nanoseconds.count() &&
+             row.history_nanoseconds[oldest + 1] <
+                 last_sample_nanoseconds - falloff_nanoseconds)
+        oldest++;
+
+      after_snapshot.disks.push(row.history.back());
+      before_snapshot.disks.push(row.history[oldest]);
     }
     u64 elapsed_nanoseconds = 0;
-    if (after_snapshot.sampled_at_nanoseconds >=
-        before_snapshot.sampled_at_nanoseconds)
-    {
-      elapsed_nanoseconds = after_snapshot.sampled_at_nanoseconds -
-                            before_snapshot.sampled_at_nanoseconds;
-    }
+    elapsed_nanoseconds = after_snapshot.sampled_at_nanoseconds -
+                          before_snapshot.sampled_at_nanoseconds;
 
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_disk_io_report(output, before_snapshot, current_snapshot,
+    append_disk_io_report(output, before_snapshot, after_snapshot,
                           elapsed_nanoseconds, true, false, allocator,
                           should_color, sample_duration_label);
     ec.print_to_stdout(output);
-    if (did_sample) before_snapshot = steal(after_snapshot);
   }
 }
 
@@ -1135,7 +1148,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
                                   should_color, sample_duration_label.view(),
-                                  nullptr, 0);
+                                  nullptr);
     ec.print_to_stdout(output);
     return selected_pid.has_value() && after_rows.is_empty() ? 1 : 0;
   }
