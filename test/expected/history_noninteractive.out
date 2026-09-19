@@ -185,6 +185,18 @@ rc=1
     1  startup-event
     2  shared-event
     3  local-event
+== history -S explicitly replaces the private branch ==
+    1  sync base
+synced
+    1  sync base
+    2  sync peer
+== history --sync accepts the long form ==
+rc=0
+    1  sync base
+    2  sync peer
+    3  sync second peer
+== history sync rejects operands ==
+rc=1
 == KOSH_HISTORY_SIZE controls the visible retained window ==
     4  four
     5  five

@@ -263,6 +263,19 @@ cat "$dir/sync-output"
 echo "== a new shell starts with every durable history branch =="
 KOSH_HISTORY_FILE="$dir/synchronized" "$BIN" --no-init-files -c 'history'
 
+printf 'sync base\n' > "$dir/explicit-sync"
+echo "== history -S explicitly replaces the private branch =="
+KOSH_HISTORY_FILE="$dir/explicit-sync" "$BIN" --no-init-files -c \
+  'history >/dev/null; printf "sync peer\n" >> "$KOSH_HISTORY_FILE"; \
+history; history -S; echo synced; history'
+echo "== history --sync accepts the long form =="
+KOSH_HISTORY_FILE="$dir/explicit-sync" "$BIN" --no-init-files -c \
+  'printf "sync second peer\n" >> "$KOSH_HISTORY_FILE"; \
+history --sync; echo "rc=$?"; history'
+echo "== history sync rejects operands =="
+KOSH_HISTORY_FILE="$dir/explicit-sync" "$BIN" --no-init-files -c \
+  'history -S extra 2>/dev/null; echo "rc=$?"'
+
 printf 'one\ntwo\nthree\nfour\nfive\n' > "$dir/limit"
 echo "== KOSH_HISTORY_SIZE controls the visible retained window =="
 KOSH_HISTORY_FILE="$dir/limit" "$BIN" --no-init-files -c \
