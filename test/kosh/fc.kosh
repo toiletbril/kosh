@@ -37,6 +37,14 @@ seed_fc_history
 fc -s false
 echo "rc=$?"
 
+echo '== rewrite a private event without importing a peer =='
+seed_fc_history
+printf 'echo peer\n' >> "$KOSH_HISTORY_FILE"
+history -s 'echo local-old'
+fc -s old=new 'echo local'
+fc -ln -2
+cat "$KOSH_HISTORY_FILE"
+
 write_explicit_fc()
 {
   printf 'edited_value=explicit\n' > "$1"

@@ -57,8 +57,15 @@ def run_session(directory, shell_path, calc_path):
         os.execv(binary, [binary, "-Q", "-i"])
 
     read_until_idle(master, 3)
-    for line in (b"echo shell-one\n", b"koshkit calc -i\n", b"2+2\n",
-                 b"111*3\n", b"\x04", b"echo shell-two\n"):
+    for line in (b"echo shell-one\n", b"koshkit calc -i\n", b"2+2\n"):
+        os.write(master, line)
+        read_until_idle(master, 1)
+
+    with open(shell_path, "ab") as handle:
+        handle.write(b"peer-event\n")
+
+    for line in (b"111*3\n", b"\x04", b"echo shell-two\n",
+                 b"history > branch-history\n"):
         os.write(master, line)
         read_until_idle(master, 1)
 
@@ -81,10 +88,12 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         shell_path = os.path.join(directory, "shell-history")
         calc_path = os.path.join(directory, "calc-history")
+        branch_path = os.path.join(directory, "branch-history")
         run_session(directory, shell_path, calc_path)
 
         shell_history = read_file(shell_path)
         calc_history = read_file(calc_path)
+        branch_history = read_file(branch_path)
 
     shell_history_keeps_shell_commands = (
         b"echo shell-one" in shell_history
@@ -101,6 +110,7 @@ def main():
         b"echo shell-one" not in calc_history
         and b"echo shell-two" not in calc_history
     )
+    shell_branch_omits_peer_commands = b"peer-event" not in branch_history
 
     results = {
         "SHELL_HISTORY_KEEPS_SHELL_COMMANDS": (
@@ -113,6 +123,7 @@ def main():
             calc_history_keeps_calc_expressions
         ),
         "CALC_HISTORY_OMITS_SHELL_COMMANDS": calc_history_omits_shell_commands,
+        "SHELL_BRANCH_OMITS_PEER_COMMANDS": shell_branch_omits_peer_commands,
     }
 
     for name, value in results.items():

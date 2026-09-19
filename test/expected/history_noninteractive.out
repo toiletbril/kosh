@@ -116,7 +116,7 @@ rc=0,0,0
     2  beta
     3  alpha
 == an equal size replacement refreshes append state ==
-    1  second
+    1  first
     2  third
 == a mode change on the backing file keeps the store readable ==
 rc=0
@@ -127,6 +127,28 @@ rc=0
 == history deletion preserves legacy high-byte records ==
 rc=0
 1
+== deletion rejects a startup receipt from a replaced file ==
+rc=1
+    1  same
+    2  local
+durable
+same
+peer
+local
+== fc rejects a startup receipt from a replaced file ==
+rc=1
+    1  same
+durable
+same
+peer
+== a promoted startup tail keeps its original receipt ==
+rc=1
+    1  same
+    2  local
+durable
+same
+peer
+local
 == a range deletion renumbers before the next store ==
 rc=0,0
     1  third
@@ -155,18 +177,19 @@ rc=1
 == malformed UTF-8 stored bytes \364\220\200\200 leave existing history intact ==
 rc=1
     1  valid
-== running shells reload history written by another instance ==
-    1  shared-event
+== running shells keep their startup history branch private ==
+    1  startup-event
+    1  startup-event
+    2  local-event
+== a new shell starts with every durable history branch ==
+    1  startup-event
+    2  shared-event
+    3  local-event
 == KOSH_HISTORY_SIZE controls the visible retained window ==
     4  four
     5  five
-    1  one
-    2  two
-    3  three
     4  four
     5  five
-    2  two
-    3  three
     4  four
     5  five
     6  six
@@ -229,10 +252,48 @@ rc=0
 == a concurrent deletion and store leave a readable store ==
 rc=0,0
 rc=0
-== a store after an external append keeps both records ==
+== a store after an external append keeps its private branch ==
+    1  grow one
+    2  growthree
+== a new shell sees every externally appended record ==
     1  grow one
     2  grow two
     3  growthree
+== a missing startup file freezes an empty private branch ==
+    1  local-missing
+== a new shell sees both missing-file branches ==
+    1  peer-missing
+    2  local-missing
+== a peer unterminated tail stays separate from a local append ==
+    1  tail one
+    2  local-tail
+== a new shell reads separate peer and local tail records ==
+    1  tail one
+    2  peer-tail
+    3  local-tail
+== deleting a local event preserves an unseen peer ==
+    1  delete base
+== a fresh shell sees the preserved peer after local deletion ==
+    1  delete base
+    2  delete peer
+== deleting a startup event keeps the private local event ==
+    1  startup local
+== a fresh shell sees the peer and local event after startup deletion ==
+    1  startup peer
+    2  startup local
+== operandless history append leaves the private branch unchanged ==
+    1  append base
+    2  append local
+== a fresh shell sees every append branch ==
+    1  append base
+    2  append peer
+    3  append local
+== operandless history write keeps only the private branch ==
+    1  write base
+    2  write local
+== a fresh shell sees the private branch written without peers ==
+    1  write base
+    2  write local
 == a named write preserves a symlink target ==
 rc=0 link=0
 symlinked
