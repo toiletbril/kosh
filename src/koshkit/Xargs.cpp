@@ -202,8 +202,8 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_XARGS_PROMPT.is_enabled()) FLAG_XARGS_TRACE.enable();
   let const input = read_fd_to_string(ec.in_fd.value_or(KOSH_STDIN));
   if (!input.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "xargs: " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   os::last_system_error_message());
     return 1;
   }
 

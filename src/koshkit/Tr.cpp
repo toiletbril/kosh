@@ -222,8 +222,9 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
         os::read_fd(ec.in_fd.value_or(KOSH_STDIN), input, sizeof(input));
     if (!read_count.has_value()) {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(
-          ec, cxt, "tr: read failed: " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "read failed: " +
+                                         os::last_system_error_message());
       return 1;
     }
     if (*read_count == 0) break;

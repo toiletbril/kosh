@@ -52,10 +52,10 @@ fn Tsort::execute(const ExecContext &ec, EvalContext &cxt,
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
   let const content = read_named_or_stdin(ec, source);
   if (!content.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "tsort: cannot read '" +
-                                  String{cxt.scratch_allocator(), source} +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "cannot read '" +
+                                       String{cxt.scratch_allocator(), source} +
+                                       "': " + os::last_system_error_message());
     return 1;
   }
 
@@ -76,8 +76,8 @@ fn Tsort::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if ((tokens.count() & 1u) != 0) {
-    report_soft_koshkit_error(ec, cxt,
-                              "tsort: input contains an odd number of tokens");
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "input contains an odd number of tokens");
     return 1;
   }
 
@@ -146,7 +146,8 @@ fn Tsort::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   if (emitted_count != vertices.count()) {
-    report_soft_koshkit_error(ec, cxt, "tsort: input contains a cycle");
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "input contains a cycle");
     status = 1;
 
     for (let &vertex : vertices)

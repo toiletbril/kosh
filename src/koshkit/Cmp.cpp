@@ -131,9 +131,9 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
   let const left_input = open_named_or_stdin(ec, operands[0].view());
   if (!left_input.has_value()) {
     if (!FLAG_CMP_SILENT.is_enabled())
-      report_soft_koshkit_error(ec, cxt,
-                                "cmp: cannot read '" + operands[0] +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot read '" + operands[0] + "': " +
+                                         os::last_system_error_message());
     return 2;
   }
   defer
@@ -144,9 +144,9 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
   let const right_input = open_named_or_stdin(ec, operands[1].view());
   if (!right_input.has_value()) {
     if (!FLAG_CMP_SILENT.is_enabled())
-      report_soft_koshkit_error(ec, cxt,
-                                "cmp: cannot read '" + operands[1] +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot read '" + operands[1] + "': " +
+                                         os::last_system_error_message());
     return 2;
   }
   defer
@@ -184,8 +184,8 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
     if (!refill_readers(left, right, batch, results)) {
       if (os::INTERRUPT_REQUESTED) return 130;
       if (!FLAG_CMP_SILENT.is_enabled())
-        report_soft_koshkit_error(ec, cxt,
-                                  "cmp: " + os::last_system_error_message());
+        report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                       os::last_system_error_message());
       return 2;
     }
 
@@ -200,12 +200,12 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
       if (left_result == right_result) break;
       has_difference = true;
       if (!FLAG_CMP_SILENT.is_enabled())
-        report_soft_koshkit_error(ec, cxt,
-                                  "cmp: end of file on '" +
-                                      (left_result == byte_read_result::End
-                                           ? operands[0]
-                                           : operands[1]) +
-                                      "'");
+        report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                       "end of file on '" +
+                                           (left_result == byte_read_result::End
+                                                ? operands[0]
+                                                : operands[1]) +
+                                           "'");
       break;
     }
 

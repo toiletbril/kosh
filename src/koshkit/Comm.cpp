@@ -58,9 +58,9 @@ fn Comm::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const left_input = open_named_or_stdin(ec, operands[0].view());
   if (!left_input.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "comm: cannot read '" + operands[0] +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "cannot read '" + operands[0] +
+                                       "': " + os::last_system_error_message());
     return 2;
   }
   defer
@@ -70,9 +70,9 @@ fn Comm::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const right_input = open_named_or_stdin(ec, operands[1].view());
   if (!right_input.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "comm: cannot read '" + operands[1] +
-                                  "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "cannot read '" + operands[1] +
+                                       "': " + os::last_system_error_message());
     return 2;
   }
   defer
@@ -95,8 +95,8 @@ fn Comm::execute(const ExecContext &ec, EvalContext &cxt,
         right_result == utils::BufferedLineReader::Result::Error)
     {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(ec, cxt,
-                                "comm: " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     os::last_system_error_message());
       return 2;
     }
     if (left_result == utils::BufferedLineReader::Result::End &&
