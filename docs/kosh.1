@@ -1981,6 +1981,33 @@ and
 .B \-NUMBER
 options otherwise print only lifetime process I/O counters. They show every
 process, limit the table, select one process, or limit the table to NUMBER rows.
+The
+.B \-\-sort
+option orders rows by a full metric name or its shortest unambiguous prefix.
+Process reports accept
+.BR pid ,
+.BR read ,
+.BR write ,
+.BR read-ops ,
+and
+.BR write-ops .
+Disk reports accept
+.BR read ,
+.BR write ,
+.BR read-ops ,
+.BR write-ops ,
+.BR busy ,
+.BR read-latency ,
+.BR write-latency ,
+.BR average-queue ,
+.BR queue ,
+.BR errors ,
+and
+.BR retries .
+Metrics sort from largest to smallest, unavailable values sort last, and ties
+use the process identifier or device name. Process identifiers sort from
+smallest to largest. Busy, latency, and average queue values require a sampled
+report. Live reports sort the values from the displayed rolling window.
 .TP
 .B evillogs
 Core dump settings, recognized dump reports, and known log directories are

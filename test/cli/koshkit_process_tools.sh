@@ -100,6 +100,24 @@ esac
 if [ "$?" -ne 0 ]; then human_help=failed; fi
 printf 'evilio-human-readable=%s\n' "$human_help"
 
+evilio_sort_keys=matched
+for evilio_sort_key in read write read-ops write-ops busy read-latency \
+  write-latency average-queue queue errors retries; do
+  "$BIN" -c \
+    "koshkit --color never evilio --cumulative=0.01 --sort $evilio_sort_key" \
+    > "$TEST_NULL_DEVICE" 2>&1 || evilio_sort_keys=wrong
+done
+for evilio_sort_key in a b e q read-l read-o ret write-l write-o; do
+  "$BIN" -c \
+    "koshkit --color never evilio --cumulative=0.01 --sort $evilio_sort_key" \
+    > "$TEST_NULL_DEVICE" 2>&1 || evilio_sort_keys=wrong
+done
+for evilio_sort_key in p read write read-o write-o; do
+  "$BIN" -c "koshkit --color never evilio --ps -1 --sort $evilio_sort_key" \
+    > "$TEST_NULL_DEVICE" 2>&1 || evilio_sort_keys=wrong
+done
+printf 'evilio-sort-keys=%s\n' "$evilio_sort_keys"
+
 process_report=$("$BIN" -c \
   'koshkit --color never evilio --cumulative=0.05 --ps --count 1')
 case $process_report in

@@ -78,6 +78,7 @@ mv
 --live
 --pid
 --ps
+--sort
 -C
 -a
 -h

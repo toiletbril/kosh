@@ -464,6 +464,31 @@ note: use --all without --cumulative or --live.
      1 |  koshkit evilio --all --live
        |                       ^~~~~~
 note: use --all without --cumulative or --live.
+=== evilio invalid sort location ===
+1:23: error: evilio: Invalid sort key.
+     1 |  koshkit evilio --sort nowhere
+       |                        ^~~~~~~
+note: Use pid, read, write, read-ops, write-ops, busy, read-latency, write-latency, average-queue, queue, errors, or retries.
+=== evilio ambiguous sort location ===
+1:23: error: evilio: Ambiguous sort key.
+     1 |  koshkit evilio --sort r
+       |                        ^
+note: Matches read, read-latency, read-ops, retries; use a longer prefix.
+=== evilio process sort mode location ===
+1:28: error: evilio: Sort key is unavailable for process reports.
+     1 |  koshkit evilio --ps --sort busy
+       |                             ^~~~
+note: Use pid, read, write, read-ops, or write-ops.
+=== evilio disk sort mode location ===
+1:23: error: evilio: Sort key is unavailable for disk reports.
+     1 |  koshkit evilio --sort pid
+       |                        ^~~
+note: Use read, write, read-ops, write-ops, busy, read-latency, write-latency, average-queue, queue, errors, or retries.
+=== evilio sampled sort mode location ===
+1:23: error: evilio: Sort key is unavailable without sampling.
+     1 |  koshkit evilio --sort busy
+       |                        ^~~~
+note: Use --all, --cumulative, or --live with busy, read-latency, write-latency, or average-queue.
 === basename extra operand location ===
 1:30: error: basename: extra operand 'extra'.
      1 |  koshkit basename path suffix extra

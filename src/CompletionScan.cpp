@@ -42,6 +42,19 @@ static constexpr StringView DATE_FORMAT_CANDIDATES[] = {
     "+%W", "+%x", "+%X", "+%y", "+%Y", "+%z", "+%Z",
 };
 
+static constexpr StringView EVILIO_SORT_CANDIDATES[] = {
+    "average-queue", "busy",  "errors",        "pid",
+    "queue",         "read",  "read-latency",  "read-ops",
+    "retries",       "write", "write-latency", "write-ops",
+};
+
+static constexpr StringView EVILPS_SORT_CANDIDATES[] = {
+    "cpu",
+    "memory",
+    "name",
+    "pid",
+};
+
 static fn previous_settled_word(StringView line, usize token_start) wontthrow
     -> StringView
 {
@@ -721,6 +734,22 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
           do_push_matching(candidate);
         if (!candidates.is_empty()) return candidates;
         return None;
+      }
+
+      if (previous_word == "--sort") {
+        if (*util_for_flags == koshkit::Utility::Kind::EvilIO) {
+          for (let const candidate : EVILIO_SORT_CANDIDATES)
+            do_push_matching(candidate);
+        } else if (*util_for_flags == koshkit::Utility::Kind::EvilPS) {
+          for (let const candidate : EVILPS_SORT_CANDIDATES)
+            do_push_matching(candidate);
+        }
+        if (!candidates.is_empty()) return candidates;
+        if (*util_for_flags == koshkit::Utility::Kind::EvilIO ||
+            *util_for_flags == koshkit::Utility::Kind::EvilPS)
+        {
+          return None;
+        }
       }
 
       if (wants_operand) return None;

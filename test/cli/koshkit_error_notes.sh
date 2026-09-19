@@ -292,6 +292,21 @@ echo "=== evilio later all location ==="
 echo "=== evilio live mode location ==="
 "$BIN" -c 'koshkit evilio --all --live' 2>&1
 
+echo "=== evilio invalid sort location ==="
+"$BIN" -c 'koshkit evilio --sort nowhere' 2>&1
+
+echo "=== evilio ambiguous sort location ==="
+"$BIN" -c 'koshkit evilio --sort r' 2>&1
+
+echo "=== evilio process sort mode location ==="
+"$BIN" -c 'koshkit evilio --ps --sort busy' 2>&1
+
+echo "=== evilio disk sort mode location ==="
+"$BIN" -c 'koshkit evilio --sort pid' 2>&1
+
+echo "=== evilio sampled sort mode location ==="
+"$BIN" -c 'koshkit evilio --sort busy' 2>&1
+
 echo "=== basename extra operand location ==="
 "$BIN" -c 'koshkit basename path suffix extra' 2>&1
 

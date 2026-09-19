@@ -39,6 +39,12 @@ echo "== koshkit pkill joined signal form:"
 "$BIN" --debug-complete-at 'koshkit pkill --signal=TE' </dev/null
 echo "== koshkit killall signal prefix:"
 "$BIN" --debug-complete-at 'koshkit killall -s KI' </dev/null
+echo "== koshkit evilio sort values:"
+"$BIN" --debug-complete-at 'koshkit evilio --sort read-' </dev/null
+echo "== bare evilio sort values:"
+"$BIN" --debug-complete-at 'evilio --sort write-' </dev/null
+echo "== koshkit evilps sort prefix:"
+"$BIN" --debug-complete-at 'koshkit evilps --sort m' </dev/null
 echo "== debug logging levels:"
 "$BIN" --debug-complete-at 'kosh -X ' </dev/null
 echo "== debug logging joined form:"

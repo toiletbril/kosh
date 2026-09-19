@@ -12,12 +12,13 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-ah] [-C [seconds]] [--live [seconds]] [--cumulative "
-                   "[seconds]] "
+                   "[seconds]] [--sort key] "
                    "[--ps | -NUMBER | -n count | -p pid]");
 
 HELP_DESCRIPTION_DECL(
@@ -44,6 +45,8 @@ FLAG_OPTIONAL(EVILIO_LIVE, 'l', "live",
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
+FLAG(EVILIO_SORT, String, '\0', "sort",
+     "Sort by a full metric name or its shortest unambiguous prefix.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilIO);
@@ -51,6 +54,92 @@ REGISTER_KOSHKIT_UTIL_FLAGS(EvilIO);
 namespace koshka::koshkit {
 
 namespace {
+
+enum class evilio_sort_key : u8
+{
+  Pid,
+  Read,
+  Write,
+  ReadOperations,
+  WriteOperations,
+  Busy,
+  ReadLatency,
+  WriteLatency,
+  AverageQueue,
+  Queue,
+  Errors,
+  Retries,
+};
+
+struct evilio_sort_spec
+{
+  evilio_sort_key key;
+  const char *name;
+  bool is_process_metric;
+  bool is_disk_metric;
+};
+
+static constexpr static_string_entry<evilio_sort_spec> SORT_KEY_ENTRIES[] = {
+    {SSK("average-queue"),
+     {evilio_sort_key::AverageQueue, "average-queue", false, true}           },
+    {SSK("busy"),          {evilio_sort_key::Busy, "busy", false, true}      },
+    {SSK("errors"),        {evilio_sort_key::Errors, "errors", false, true}  },
+    {SSK("pid"),           {evilio_sort_key::Pid, "pid", true, false}        },
+    {SSK("queue"),         {evilio_sort_key::Queue, "queue", false, true}    },
+    {SSK("read"),          {evilio_sort_key::Read, "read", true, true}       },
+    {SSK("read-latency"),
+     {evilio_sort_key::ReadLatency, "read-latency", false, true}             },
+    {SSK("read-ops"),
+     {evilio_sort_key::ReadOperations, "read-ops", true, true}               },
+    {SSK("retries"),       {evilio_sort_key::Retries, "retries", false, true}},
+    {SSK("write"),         {evilio_sort_key::Write, "write", true, true}     },
+    {SSK("write-latency"),
+     {evilio_sort_key::WriteLatency, "write-latency", false, true}           },
+    {SSK("write-ops"),
+     {evilio_sort_key::WriteOperations, "write-ops", true, true}             },
+};
+
+static constexpr StaticStringMap SORT_KEYS{SORT_KEY_ENTRIES};
+
+struct evilio_sort_resolution
+{
+  Maybe<evilio_sort_key> key{};
+  usize match_count{0};
+  String matches{heap_allocator()};
+};
+
+fn resolve_sort_key(StringView value, Allocator allocator) throws
+    -> evilio_sort_resolution
+{
+  evilio_sort_resolution result{};
+  result.matches = String{allocator};
+  if (let const exact = SORT_KEYS.find(value); exact.has_value()) {
+    result.key = exact->key;
+    result.match_count = 1;
+    result.matches += exact->name;
+    return result;
+  }
+
+  for (let const &entry : SORT_KEY_ENTRIES) {
+    if (!StringView{entry.value.name}.starts_with(value)) continue;
+    if (!result.matches.is_empty()) result.matches += ", ";
+    result.matches += entry.value.name;
+    result.key = entry.value.key;
+    result.match_count++;
+  }
+
+  return result;
+}
+
+pure fn find_sort_spec(evilio_sort_key key) wontthrow
+    -> const evilio_sort_spec *
+{
+  for (let const &entry : SORT_KEY_ENTRIES) {
+    if (entry.value.key == key) return &entry.value;
+  }
+
+  return nullptr;
+}
 
 struct io_row
 {
@@ -62,6 +151,51 @@ struct io_row
 pure fn saturated_sum(u64 left, u64 right) wontthrow -> u64
 {
   return left > UINT64_MAX - right ? UINT64_MAX : left + right;
+}
+
+pure fn process_sort_value(const io_row &row, evilio_sort_key key) wontthrow
+    -> Maybe<u64>
+{
+  switch (key) {
+  case evilio_sort_key::Pid: return static_cast<u64>(row.pid);
+  case evilio_sort_key::Read: return row.status.read_bytes;
+  case evilio_sort_key::Write: return row.status.written_bytes;
+  case evilio_sort_key::ReadOperations:
+    return row.status.has_operation_counts
+               ? Maybe<u64>{row.status.read_operation_count}
+               : Maybe<u64>{};
+  case evilio_sort_key::WriteOperations:
+    return row.status.has_operation_counts
+               ? Maybe<u64>{row.status.write_operation_count}
+               : Maybe<u64>{};
+  default: return None;
+  }
+}
+
+fn sort_process_rows(ArrayList<io_row> &rows,
+                     Maybe<evilio_sort_key> sort_key) throws -> void
+{
+  let const do_compare = [sort_key](const io_row &left, const io_row &right) {
+    if (!sort_key.has_value()) {
+      let const left_total =
+          saturated_sum(left.status.read_bytes, left.status.written_bytes);
+      let const right_total =
+          saturated_sum(right.status.read_bytes, right.status.written_bytes);
+      if (left_total != right_total) return left_total > right_total;
+      return left.pid < right.pid;
+    }
+
+    if (*sort_key == evilio_sort_key::Pid) return left.pid < right.pid;
+    let const left_value = process_sort_value(left, *sort_key);
+    let const right_value = process_sort_value(right, *sort_key);
+    if (left_value.has_value() != right_value.has_value())
+      return left_value.has_value();
+    if (left_value.has_value() && *left_value != *right_value) {
+      return *left_value > *right_value;
+    }
+    return left.pid < right.pid;
+  };
+  rows.sort(do_compare);
 }
 
 pure fn counter_delta(u64 before, u64 after) wontthrow -> Maybe<u64>
@@ -137,7 +271,8 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
 
 fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
                           const ArrayList<io_row> &after_rows,
-                          u64 elapsed_nanoseconds, Allocator allocator) throws
+                          u64 elapsed_nanoseconds, Allocator allocator,
+                          Maybe<evilio_sort_key> sort_key) throws
     -> ArrayList<io_row>
 {
   let sampled_rows = ArrayList<io_row>{allocator};
@@ -185,14 +320,7 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
     });
   }
 
-  sampled_rows.sort([](const io_row &left, const io_row &right) {
-    let const left_total =
-        saturated_sum(left.status.read_bytes, left.status.written_bytes);
-    let const right_total =
-        saturated_sum(right.status.read_bytes, right.status.written_bytes);
-    if (left_total != right_total) return left_total > right_total;
-    return left.pid < right.pid;
-  });
+  sort_process_rows(sampled_rows, sort_key);
 
   return sampled_rows;
 }
@@ -210,9 +338,8 @@ pure fn interpolate_counter(u64 before, u64 after, u64 elapsed_nanoseconds,
                             u64 passed_nanoseconds) wontthrow -> u64
 {
   if (after < before || elapsed_nanoseconds == 0) return after;
-  return before + static_cast<u64>(
-                      static_cast<u128>(after - before) * passed_nanoseconds /
-                      elapsed_nanoseconds);
+  return before + static_cast<u64>(static_cast<u128>(after - before) *
+                                   passed_nanoseconds / elapsed_nanoseconds);
 }
 
 fn get_process_window_status(const live_process_row &row,
@@ -234,12 +361,12 @@ fn get_process_window_status(const live_process_row &row,
     let const elapsed_nanoseconds = next_nanoseconds - before_nanoseconds;
     let const passed_nanoseconds =
         window_start_nanoseconds - before_nanoseconds;
-    before.read_bytes = interpolate_counter(
-        before.read_bytes, next.read_bytes, elapsed_nanoseconds,
-        passed_nanoseconds);
-    before.written_bytes = interpolate_counter(
-        before.written_bytes, next.written_bytes, elapsed_nanoseconds,
-        passed_nanoseconds);
+    before.read_bytes =
+        interpolate_counter(before.read_bytes, next.read_bytes,
+                            elapsed_nanoseconds, passed_nanoseconds);
+    before.written_bytes =
+        interpolate_counter(before.written_bytes, next.written_bytes,
+                            elapsed_nanoseconds, passed_nanoseconds);
     if (before.has_operation_counts && next.has_operation_counts) {
       before.read_operation_count = interpolate_counter(
           before.read_operation_count, next.read_operation_count,
@@ -264,12 +391,12 @@ fn get_process_window_status(const live_process_row &row,
       rate.has_value())
     status.written_bytes = *rate;
   if (before.has_operation_counts && newest.has_operation_counts) {
-    let const read_rate = counter_rate(before.read_operation_count,
-                                       newest.read_operation_count,
-                                       elapsed_nanoseconds);
-    let const write_rate = counter_rate(before.write_operation_count,
-                                        newest.write_operation_count,
-                                        elapsed_nanoseconds);
+    let const read_rate =
+        counter_rate(before.read_operation_count, newest.read_operation_count,
+                     elapsed_nanoseconds);
+    let const write_rate =
+        counter_rate(before.write_operation_count, newest.write_operation_count,
+                     elapsed_nanoseconds);
     if (read_rate.has_value() && write_rate.has_value()) {
       status.read_operation_count = *read_rate;
       status.write_operation_count = *write_rate;
@@ -279,12 +406,10 @@ fn get_process_window_status(const live_process_row &row,
   return status;
 }
 
-fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
-                                 usize row_limit, Allocator allocator,
-                                 bool should_color,
-                                 StringView duration_suffix,
-                                 const ArrayList<u64> *idle_nanoseconds_list)
-    throws -> void
+fn append_process_io_rate_report(
+    String &output, const ArrayList<io_row> &rows, usize row_limit,
+    Allocator allocator, bool should_color, StringView duration_suffix,
+    const ArrayList<u64> *idle_nanoseconds_list) throws -> void
 {
   unused(idle_nanoseconds_list);
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
@@ -312,17 +437,11 @@ fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                          true, colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
     append_report_column(
-        output,
-        format_human_size(
-            row.status.read_bytes, allocator)
-            .view(),
-        10, true, colors::ansi::GREEN, should_color);
+        output, format_human_size(row.status.read_bytes, allocator).view(), 10,
+        true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
-        output,
-        format_human_size(
-            row.status.written_bytes, allocator)
-            .view(),
+        output, format_human_size(row.status.written_bytes, allocator).view(),
         10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
@@ -367,19 +486,260 @@ fn percent_text(u64 part, u64 total, Allocator allocator) throws -> String
   return result;
 }
 
-fn append_disk_io_report(String &output,
-                         const os::disk_io_snapshot &before_snapshot,
-                         const os::disk_io_snapshot &after_snapshot,
-                         u64 elapsed_nanoseconds, bool is_sampled,
-                         bool should_include_heading, Allocator allocator,
-                         bool should_color,
+struct disk_io_row
+{
+  String name{heap_allocator()};
+  Maybe<u64> read{};
+  Maybe<u64> write{};
+  Maybe<u64> read_operations{};
+  Maybe<u64> write_operations{};
+  Maybe<u64> busy_tenths{};
+  Maybe<u64> read_latency_nanoseconds{};
+  Maybe<u64> write_latency_nanoseconds{};
+  Maybe<u64> average_queue_tenths{};
+  Maybe<u64> queue{};
+  Maybe<u64> errors{};
+  Maybe<u64> retries{};
+};
+
+pure fn disk_failure_total(const os::disk_io_status *before,
+                           const os::disk_io_status &after, bool is_sampled,
+                           os::disk_io_field read_field,
+                           os::disk_io_field write_field,
+                           u64 os::disk_io_status::*read_member,
+                           u64 os::disk_io_status::*write_member) wontthrow
+    -> Maybe<u64>
+{
+  u64 total = 0;
+  bool has_total = false;
+  if (after.has_field(read_field)) {
+    let value = Maybe<u64>{after.*read_member};
+    if (is_sampled) {
+      value = before != nullptr && before->has_field(read_field)
+                  ? counter_delta(before->*read_member, after.*read_member)
+                  : Maybe<u64>{};
+    }
+    if (value.has_value()) {
+      total = saturated_sum(total, *value);
+      has_total = true;
+    }
+  }
+  if (after.has_field(write_field)) {
+    let value = Maybe<u64>{after.*write_member};
+    if (is_sampled) {
+      value = before != nullptr && before->has_field(write_field)
+                  ? counter_delta(before->*write_member, after.*write_member)
+                  : Maybe<u64>{};
+    }
+    if (value.has_value()) {
+      total = saturated_sum(total, *value);
+      has_total = true;
+    }
+  }
+
+  return has_total ? Maybe<u64>{total} : Maybe<u64>{};
+}
+
+fn make_disk_io_rows(const os::disk_io_snapshot &before_snapshot,
+                     const os::disk_io_snapshot &after_snapshot,
+                     u64 elapsed_nanoseconds, bool is_sampled,
+                     Allocator allocator) throws -> ArrayList<disk_io_row>
+{
+  let rows = ArrayList<disk_io_row>{allocator};
+  rows.reserve(after_snapshot.disks.count());
+  for (let const &after : after_snapshot.disks) {
+    let const before = find_disk_io_status(before_snapshot, after.name.view());
+    disk_io_row row{};
+    row.name = String{allocator, after.name.view()};
+    if (is_sampled) {
+      if (before != nullptr) {
+        if (before->has_field(os::disk_io_field::ReadBytes) &&
+            after.has_field(os::disk_io_field::ReadBytes))
+        {
+          row.read = counter_rate(before->read_bytes, after.read_bytes,
+                                  elapsed_nanoseconds);
+        }
+        if (before->has_field(os::disk_io_field::WrittenBytes) &&
+            after.has_field(os::disk_io_field::WrittenBytes))
+        {
+          row.write = counter_rate(before->written_bytes, after.written_bytes,
+                                   elapsed_nanoseconds);
+        }
+        if (before->has_field(os::disk_io_field::ReadOperations) &&
+            after.has_field(os::disk_io_field::ReadOperations))
+        {
+          row.read_operations =
+              counter_rate(before->read_operation_count,
+                           after.read_operation_count, elapsed_nanoseconds);
+        }
+        if (before->has_field(os::disk_io_field::WriteOperations) &&
+            after.has_field(os::disk_io_field::WriteOperations))
+        {
+          row.write_operations =
+              counter_rate(before->write_operation_count,
+                           after.write_operation_count, elapsed_nanoseconds);
+        }
+      }
+    } else {
+      if (after.has_field(os::disk_io_field::ReadBytes))
+        row.read = after.read_bytes;
+      if (after.has_field(os::disk_io_field::WrittenBytes))
+        row.write = after.written_bytes;
+      if (after.has_field(os::disk_io_field::ReadOperations))
+        row.read_operations = after.read_operation_count;
+      if (after.has_field(os::disk_io_field::WriteOperations))
+        row.write_operations = after.write_operation_count;
+    }
+
+    if (is_sampled && before != nullptr && elapsed_nanoseconds != 0) {
+      if (before->has_field(os::disk_io_field::BusyTime) &&
+          after.has_field(os::disk_io_field::BusyTime))
+      {
+        if (let const delta = counter_delta(before->busy_time_nanoseconds,
+                                            after.busy_time_nanoseconds);
+            delta.has_value())
+        {
+          let const busy =
+              *delta < elapsed_nanoseconds ? *delta : elapsed_nanoseconds;
+          row.busy_tenths = static_cast<u64>(static_cast<u128>(busy) * 1000 /
+                                             elapsed_nanoseconds);
+        }
+      } else if (before->has_field(os::disk_io_field::IdleTime) &&
+                 after.has_field(os::disk_io_field::IdleTime))
+      {
+        if (let const idle = counter_delta(before->idle_time_nanoseconds,
+                                           after.idle_time_nanoseconds);
+            idle.has_value())
+        {
+          let const busy =
+              *idle < elapsed_nanoseconds ? elapsed_nanoseconds - *idle : 0;
+          row.busy_tenths = static_cast<u64>(static_cast<u128>(busy) * 1000 /
+                                             elapsed_nanoseconds);
+        }
+      }
+
+      if (before->has_field(os::disk_io_field::ReadTime) &&
+          after.has_field(os::disk_io_field::ReadTime) &&
+          before->has_field(os::disk_io_field::ReadOperations) &&
+          after.has_field(os::disk_io_field::ReadOperations))
+      {
+        let const time = counter_delta(before->read_time_nanoseconds,
+                                       after.read_time_nanoseconds);
+        let const operations = counter_delta(before->read_operation_count,
+                                             after.read_operation_count);
+        if (time.has_value() && operations.has_value() && *operations != 0) {
+          row.read_latency_nanoseconds = *time / *operations;
+        }
+      }
+      if (before->has_field(os::disk_io_field::WriteTime) &&
+          after.has_field(os::disk_io_field::WriteTime) &&
+          before->has_field(os::disk_io_field::WriteOperations) &&
+          after.has_field(os::disk_io_field::WriteOperations))
+      {
+        let const time = counter_delta(before->write_time_nanoseconds,
+                                       after.write_time_nanoseconds);
+        let const operations = counter_delta(before->write_operation_count,
+                                             after.write_operation_count);
+        if (time.has_value() && operations.has_value() && *operations != 0) {
+          row.write_latency_nanoseconds = *time / *operations;
+        }
+      }
+      if (before->has_field(os::disk_io_field::WeightedBusyTime) &&
+          after.has_field(os::disk_io_field::WeightedBusyTime))
+      {
+        if (let const weighted =
+                counter_delta(before->weighted_busy_time_nanoseconds,
+                              after.weighted_busy_time_nanoseconds);
+            weighted.has_value())
+        {
+          row.average_queue_tenths = static_cast<u64>(
+              static_cast<u128>(*weighted) * 10 / elapsed_nanoseconds);
+        }
+      }
+    }
+
+    if (after.has_field(os::disk_io_field::QueueDepth))
+      row.queue = after.queue_depth;
+    row.errors = disk_failure_total(
+        before, after, is_sampled, os::disk_io_field::ReadErrors,
+        os::disk_io_field::WriteErrors, &os::disk_io_status::read_error_count,
+        &os::disk_io_status::write_error_count);
+    row.retries = disk_failure_total(
+        before, after, is_sampled, os::disk_io_field::ReadRetries,
+        os::disk_io_field::WriteRetries, &os::disk_io_status::read_retry_count,
+        &os::disk_io_status::write_retry_count);
+    rows.push(steal(row));
+  }
+
+  return rows;
+}
+
+pure fn disk_sort_value(const disk_io_row &row, evilio_sort_key key) wontthrow
+    -> Maybe<u64>
+{
+  switch (key) {
+  case evilio_sort_key::Read: return row.read;
+  case evilio_sort_key::Write: return row.write;
+  case evilio_sort_key::ReadOperations: return row.read_operations;
+  case evilio_sort_key::WriteOperations: return row.write_operations;
+  case evilio_sort_key::Busy: return row.busy_tenths;
+  case evilio_sort_key::ReadLatency: return row.read_latency_nanoseconds;
+  case evilio_sort_key::WriteLatency: return row.write_latency_nanoseconds;
+  case evilio_sort_key::AverageQueue: return row.average_queue_tenths;
+  case evilio_sort_key::Queue: return row.queue;
+  case evilio_sort_key::Errors: return row.errors;
+  case evilio_sort_key::Retries: return row.retries;
+  default: return None;
+  }
+}
+
+fn sort_disk_rows(ArrayList<disk_io_row> &rows,
+                  Maybe<evilio_sort_key> sort_key) throws -> void
+{
+  if (!sort_key.has_value()) return;
+  let const do_compare = [sort_key](const disk_io_row &left,
+                                    const disk_io_row &right) {
+    let const left_value = disk_sort_value(left, *sort_key);
+    let const right_value = disk_sort_value(right, *sort_key);
+    if (left_value.has_value() != right_value.has_value())
+      return left_value.has_value();
+    if (left_value.has_value() && *left_value != *right_value) {
+      return *left_value > *right_value;
+    }
+    return left.name.view() < right.name.view();
+  };
+  rows.sort(do_compare);
+}
+
+pure fn sort_key_needs_sample(evilio_sort_key key) wontthrow -> bool
+{
+  switch (key) {
+  case evilio_sort_key::Busy:
+  case evilio_sort_key::ReadLatency:
+  case evilio_sort_key::WriteLatency:
+  case evilio_sort_key::AverageQueue: return true;
+  default: return false;
+  }
+}
+
+fn tenths_text(u64 tenths, Allocator allocator,
+               bool should_append_percent) throws -> String
+{
+  let result = String::from(tenths / 10, allocator);
+  result += ".";
+  result += String::from(tenths % 10, allocator).view();
+  if (should_append_percent) result += "%";
+  return result;
+}
+
+fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
+                         bool is_sampled, bool should_include_heading,
+                         Allocator allocator, bool should_color,
                          StringView duration_suffix = "/S") throws -> void
 {
-  if (after_snapshot.disks.is_empty() && !is_sampled) return;
+  if (rows.is_empty() && !is_sampled) return;
 
-  if (should_include_heading) {
-    output += "\n";
-  }
+  if (should_include_heading) output += "\n";
   append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                        should_color);
   let const do_append_header = [&](StringView text, usize width)
@@ -391,12 +751,10 @@ fn append_disk_io_report(String &output,
   do_append_header(is_sampled ? String{"READ"} + duration_suffix : "READ", 10);
   do_append_header(is_sampled ? String{"WRITE"} + duration_suffix : "WRITTEN",
                    10);
-  do_append_header(is_sampled ? String{"READ OPS"} + duration_suffix
-                              : "READ OPS",
-                   11);
-  do_append_header(is_sampled ? String{"WRITE OPS"} + duration_suffix
-                              : "WRITE OPS",
-                   12);
+  do_append_header(
+      is_sampled ? String{"READ OPS"} + duration_suffix : "READ OPS", 11);
+  do_append_header(
+      is_sampled ? String{"WRITE OPS"} + duration_suffix : "WRITE OPS", 12);
   if (is_sampled) {
     do_append_header("BUSY", 7);
     do_append_header("READ LAT", 9);
@@ -408,248 +766,100 @@ fn append_disk_io_report(String &output,
   do_append_header("RETRIES", 8);
   output += "\n";
 
-  for (let const &after : after_snapshot.disks) {
-    let const before = find_disk_io_status(before_snapshot, after.name.view());
-    append_report_column(output, after.name.view(), 16, false,
+  for (let const &row : rows) {
+    append_report_column(output, row.name.view(), 16, false,
                          colors::ansi::BOLD_GREEN, should_color);
-    let read_value = Maybe<u64>{};
-    let write_value = Maybe<u64>{};
-    let read_operation_value = Maybe<u64>{};
-    let write_operation_value = Maybe<u64>{};
-    if (is_sampled) {
-      if (before != nullptr) {
-        if (before->has_field(os::disk_io_field::ReadBytes) &&
-            after.has_field(os::disk_io_field::ReadBytes))
-        {
-          read_value = counter_rate(before->read_bytes, after.read_bytes,
-                                    elapsed_nanoseconds);
-        }
-        if (before->has_field(os::disk_io_field::WrittenBytes) &&
-            after.has_field(os::disk_io_field::WrittenBytes))
-        {
-          write_value = counter_rate(before->written_bytes, after.written_bytes,
-                                     elapsed_nanoseconds);
-        }
-        if (before->has_field(os::disk_io_field::ReadOperations) &&
-            after.has_field(os::disk_io_field::ReadOperations))
-        {
-          read_operation_value =
-              counter_rate(before->read_operation_count,
-                           after.read_operation_count, elapsed_nanoseconds);
-        }
-        if (before->has_field(os::disk_io_field::WriteOperations) &&
-            after.has_field(os::disk_io_field::WriteOperations))
-        {
-          write_operation_value =
-              counter_rate(before->write_operation_count,
-                           after.write_operation_count, elapsed_nanoseconds);
-        }
-      }
-    } else {
-      if (after.has_field(os::disk_io_field::ReadBytes))
-        read_value = after.read_bytes;
-      if (after.has_field(os::disk_io_field::WrittenBytes))
-        write_value = after.written_bytes;
-      if (after.has_field(os::disk_io_field::ReadOperations))
-        read_operation_value = after.read_operation_count;
-      if (after.has_field(os::disk_io_field::WriteOperations))
-        write_operation_value = after.write_operation_count;
-    }
     output += "  ";
     append_report_column(output,
-                         read_value.has_value()
-                             ? format_human_size(*read_value, allocator).view()
+                         row.read.has_value()
+                             ? format_human_size(*row.read, allocator).view()
                              : StringView{"-"},
                          10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(output,
-                         write_value.has_value()
-                             ? format_human_size(*write_value, allocator).view()
+                         row.write.has_value()
+                             ? format_human_size(*row.write, allocator).view()
                              : StringView{"-"},
                          10, true, colors::ansi::GREEN, should_color);
     output += "  ";
     append_report_column(
         output,
-        read_operation_value.has_value()
-            ? String::from(*read_operation_value, allocator).view()
+        row.read_operations.has_value()
+            ? String::from(*row.read_operations, allocator).view()
             : StringView{"-"},
         11, true, {}, should_color);
     output += "  ";
     append_report_column(
         output,
-        write_operation_value.has_value()
-            ? String::from(*write_operation_value, allocator).view()
+        row.write_operations.has_value()
+            ? String::from(*row.write_operations, allocator).view()
             : StringView{"-"},
         12, true, {}, should_color);
     if (is_sampled) {
-      let busy = String{allocator};
-      if (before != nullptr && elapsed_nanoseconds != 0 &&
-          before->has_field(os::disk_io_field::BusyTime) &&
-          after.has_field(os::disk_io_field::BusyTime))
-      {
-        let const delta = counter_delta(before->busy_time_nanoseconds,
-                                        after.busy_time_nanoseconds);
-        if (delta.has_value()) {
-          busy = percent_text(
-              *delta < elapsed_nanoseconds ? *delta : elapsed_nanoseconds,
-              elapsed_nanoseconds, allocator);
-        }
-      } else if (before != nullptr && elapsed_nanoseconds != 0 &&
-                 before->has_field(os::disk_io_field::IdleTime) &&
-                 after.has_field(os::disk_io_field::IdleTime))
-      {
-        let const idle = counter_delta(before->idle_time_nanoseconds,
-                                       after.idle_time_nanoseconds);
-        if (idle.has_value()) {
-          busy = percent_text(
-              *idle < elapsed_nanoseconds ? elapsed_nanoseconds - *idle : 0,
-              elapsed_nanoseconds, allocator);
-        }
-      }
+      output += "  ";
+      append_report_column(
+          output,
+          row.busy_tenths.has_value()
+              ? tenths_text(*row.busy_tenths, allocator, true).view()
+              : StringView{"-"},
+          7, true, {}, should_color);
       output += "  ";
       append_report_column(output,
-                           busy.is_empty() ? StringView{"-"} : busy.view(), 7,
-                           true, {}, should_color);
-
-      let read_latency = String{allocator};
-      if (before != nullptr && before->has_field(os::disk_io_field::ReadTime) &&
-          after.has_field(os::disk_io_field::ReadTime) &&
-          before->has_field(os::disk_io_field::ReadOperations) &&
-          after.has_field(os::disk_io_field::ReadOperations))
-      {
-        let const time = counter_delta(before->read_time_nanoseconds,
-                                       after.read_time_nanoseconds);
-        let const operations = counter_delta(before->read_operation_count,
-                                             after.read_operation_count);
-        if (time.has_value() && operations.has_value() && *operations != 0) {
-          read_latency = utils::format_duration_nanoseconds(*time / *operations,
-                                                            allocator);
-        }
-      }
-      output += "  ";
-      append_report_column(output,
-                           read_latency.is_empty() ? StringView{"-"}
-                                                   : read_latency.view(),
+                           row.read_latency_nanoseconds.has_value()
+                               ? utils::format_duration_nanoseconds(
+                                     *row.read_latency_nanoseconds, allocator)
+                                     .view()
+                               : StringView{"-"},
                            9, true, {}, should_color);
-
-      let write_latency = String{allocator};
-      if (before != nullptr &&
-          before->has_field(os::disk_io_field::WriteTime) &&
-          after.has_field(os::disk_io_field::WriteTime) &&
-          before->has_field(os::disk_io_field::WriteOperations) &&
-          after.has_field(os::disk_io_field::WriteOperations))
-      {
-        let const time = counter_delta(before->write_time_nanoseconds,
-                                       after.write_time_nanoseconds);
-        let const operations = counter_delta(before->write_operation_count,
-                                             after.write_operation_count);
-        if (time.has_value() && operations.has_value() && *operations != 0) {
-          write_latency = utils::format_duration_nanoseconds(
-              *time / *operations, allocator);
-        }
-      }
       output += "  ";
       append_report_column(output,
-                           write_latency.is_empty() ? StringView{"-"}
-                                                    : write_latency.view(),
+                           row.write_latency_nanoseconds.has_value()
+                               ? utils::format_duration_nanoseconds(
+                                     *row.write_latency_nanoseconds, allocator)
+                                     .view()
+                               : StringView{"-"},
                            9, true, {}, should_color);
-
-      let average_queue = String{allocator};
-      if (before != nullptr && elapsed_nanoseconds != 0 &&
-          before->has_field(os::disk_io_field::WeightedBusyTime) &&
-          after.has_field(os::disk_io_field::WeightedBusyTime))
-      {
-        let const weighted =
-            counter_delta(before->weighted_busy_time_nanoseconds,
-                          after.weighted_busy_time_nanoseconds);
-        if (weighted.has_value()) {
-          let const tenths = static_cast<u64>(static_cast<u128>(*weighted) *
-                                              10 / elapsed_nanoseconds);
-          average_queue = String::from(tenths / 10, allocator);
-          average_queue += ".";
-          average_queue += String::from(tenths % 10, allocator).view();
-        }
-      }
       output += "  ";
-      append_report_column(output,
-                           average_queue.is_empty() ? StringView{"-"}
-                                                    : average_queue.view(),
-                           9, true, {}, should_color);
+      append_report_column(
+          output,
+          row.average_queue_tenths.has_value()
+              ? tenths_text(*row.average_queue_tenths, allocator, false).view()
+              : StringView{"-"},
+          9, true, {}, should_color);
     }
     output += "  ";
     append_report_column(output,
-                         after.has_field(os::disk_io_field::QueueDepth)
-                             ? String::from(after.queue_depth, allocator).view()
+                         row.queue.has_value()
+                             ? String::from(*row.queue, allocator).view()
                              : StringView{"-"},
                          7, true, {}, should_color);
-    let const do_failure_total =
-        [&](os::disk_io_field read_field, os::disk_io_field write_field,
-            u64 os::disk_io_status::*read_member,
-            u64 os::disk_io_status::*write_member) wontthrow -> Maybe<u64> {
-      u64 total = 0;
-      bool has_total = false;
-      if (after.has_field(read_field)) {
-        let value = Maybe<u64>{after.*read_member};
-        if (is_sampled) {
-          value = before != nullptr && before->has_field(read_field)
-                      ? counter_delta(before->*read_member, after.*read_member)
-                      : Maybe<u64>{};
-        }
-        if (value.has_value()) {
-          total = saturated_sum(total, *value);
-          has_total = true;
-        }
-      }
-      if (after.has_field(write_field)) {
-        let value = Maybe<u64>{after.*write_member};
-        if (is_sampled) {
-          value =
-              before != nullptr && before->has_field(write_field)
-                  ? counter_delta(before->*write_member, after.*write_member)
-                  : Maybe<u64>{};
-        }
-        if (value.has_value()) {
-          total = saturated_sum(total, *value);
-          has_total = true;
-        }
-      }
-      return has_total ? Maybe<u64>{total} : Maybe<u64>{};
-    };
-    let const error_count = do_failure_total(
-        os::disk_io_field::ReadErrors, os::disk_io_field::WriteErrors,
-        &os::disk_io_status::read_error_count,
-        &os::disk_io_status::write_error_count);
     output += "  ";
     append_report_column(
         output,
-        error_count.has_value() ? String::from(*error_count, allocator).view()
-                                : StringView{"-"},
+        row.errors.has_value() ? String::from(*row.errors, allocator).view()
+                               : StringView{"-"},
         8, true,
-        error_count.has_value() && *error_count != 0 ? colors::ansi::BOLD_RED
-                                                     : colors::ansi::GREEN,
+        row.errors.has_value() && *row.errors != 0 ? colors::ansi::BOLD_RED
+                                                   : colors::ansi::GREEN,
         should_color);
-    let const retry_count = do_failure_total(
-        os::disk_io_field::ReadRetries, os::disk_io_field::WriteRetries,
-        &os::disk_io_status::read_retry_count,
-        &os::disk_io_status::write_retry_count);
     output += "  ";
     append_report_column(
         output,
-        retry_count.has_value() ? String::from(*retry_count, allocator).view()
+        row.retries.has_value() ? String::from(*row.retries, allocator).view()
                                 : StringView{"-"},
         8, true,
-        retry_count.has_value() && *retry_count != 0 ? colors::ansi::BOLD_RED
+        row.retries.has_value() && *row.retries != 0 ? colors::ansi::BOLD_RED
                                                      : colors::ansi::GREEN,
         should_color);
     output += "\n";
   }
   if (should_include_heading) output += "\n";
 }
-
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
-                       usize row_limit, f64 window_seconds,
-                       f64 sample_interval_seconds, f64 refresh_interval_seconds,
-                       bool is_terminal, bool should_color,
+                       usize row_limit, Maybe<evilio_sort_key> sort_key,
+                       f64 window_seconds, f64 sample_interval_seconds,
+                       f64 refresh_interval_seconds, bool is_terminal,
+                       bool should_color,
                        StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
@@ -662,8 +872,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
-  let const sample_label =
-      format_live_duration(window_seconds, allocator);
+  let const sample_label = format_live_duration(window_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
   let baseline_rows = read_process_io_rows(allocator, selected_pid, true);
@@ -754,29 +963,23 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     last_refresh_nanoseconds = now;
     let rows = ArrayList<io_row>{allocator};
     rows.reserve(retained.count());
-    let const window_start =
-        last_sample_nanoseconds > falloff_nanoseconds
-            ? last_sample_nanoseconds - falloff_nanoseconds
-            : 0;
+    let const window_start = last_sample_nanoseconds > falloff_nanoseconds
+                                 ? last_sample_nanoseconds - falloff_nanoseconds
+                                 : 0;
     for (let const &row : retained) {
-      rows.push(io_row{String{allocator, row.name.view()}, row.pid,
-                       get_process_window_status(row, window_start)});
+      rows.push(io_row{
+          String{allocator, row.name.view()},
+          row.pid,
+          get_process_window_status(row, window_start)
+      });
     }
-    rows.sort([](const io_row &left, const io_row &right) {
-      let const left_total =
-          saturated_sum(left.status.read_bytes, left.status.written_bytes);
-      let const right_total =
-          saturated_sum(right.status.read_bytes, right.status.written_bytes);
-      if (left_total != right_total) return left_total > right_total;
-      return left.pid < right.pid;
-    });
+    sort_process_rows(rows, sort_key);
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_process_io_rate_report(
-        output, rows, row_limit, allocator, should_color,
-        sample_duration_label, nullptr);
+    append_process_io_rate_report(output, rows, row_limit, allocator,
+                                  should_color, sample_duration_label, nullptr);
     ec.print_to_stdout(output);
   }
 }
@@ -809,9 +1012,9 @@ fn get_disk_window_status(const live_disk_row &row,
     let const passed_nanoseconds =
         window_start_nanoseconds - before_nanoseconds;
     let const do_interpolate = [&](u64 os::disk_io_status::*member) {
-      before.*member = interpolate_counter(before.*member, next.*member,
-                                           elapsed_nanoseconds,
-                                           passed_nanoseconds);
+      before.*member =
+          interpolate_counter(before.*member, next.*member, elapsed_nanoseconds,
+                              passed_nanoseconds);
     };
     do_interpolate(&os::disk_io_status::read_bytes);
     do_interpolate(&os::disk_io_status::written_bytes);
@@ -858,7 +1061,8 @@ fn get_disk_window_status(const live_disk_row &row,
 fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
                     f64 sample_interval_seconds, f64 refresh_interval_seconds,
                     bool is_terminal, bool should_color,
-                    StringView sample_duration_label) throws -> i32
+                    StringView sample_duration_label,
+                    Maybe<evilio_sort_key> sort_key) throws -> i32
 {
   let const allocator = heap_allocator();
   let retained = ArrayList<live_disk_row>{allocator};
@@ -870,8 +1074,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
-  let const sample_label =
-      format_live_duration(window_seconds, allocator);
+  let const sample_label = format_live_duration(window_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
   let baseline_snapshot = os::read_disk_io_snapshot(allocator);
@@ -889,10 +1092,9 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
     let const now_before_wait = os::monotonic_nanos();
     let const sample_elapsed = now_before_wait - last_sample_nanoseconds;
     let const refresh_elapsed = now_before_wait - last_refresh_nanoseconds;
-    let const until_sample =
-        sample_interval_nanoseconds > sample_elapsed
-            ? sample_interval_nanoseconds - sample_elapsed
-            : 0;
+    let const until_sample = sample_interval_nanoseconds > sample_elapsed
+                                 ? sample_interval_nanoseconds - sample_elapsed
+                                 : 0;
     let const until_refresh =
         refresh_interval_nanoseconds > refresh_elapsed
             ? refresh_interval_nanoseconds - refresh_elapsed
@@ -963,12 +1165,10 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
     let before_snapshot = os::disk_io_snapshot{};
     before_snapshot.sampled_at_nanoseconds = 0;
     before_snapshot.disks.reserve(retained.count());
-    let const window_start =
-        last_sample_nanoseconds > falloff_nanoseconds
-            ? last_sample_nanoseconds - falloff_nanoseconds
-            : 0;
-    for (let const &row : retained)
-    {
+    let const window_start = last_sample_nanoseconds > falloff_nanoseconds
+                                 ? last_sample_nanoseconds - falloff_nanoseconds
+                                 : 0;
+    for (let const &row : retained) {
       let sampled = get_disk_window_status(row, window_start);
       let baseline = os::disk_io_status{};
       baseline.name = String{allocator, row.name.view()};
@@ -977,14 +1177,16 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
       after_snapshot.disks.push(steal(sampled));
     }
     let const elapsed_nanoseconds = 1000000000ULL;
+    let rows = make_disk_io_rows(before_snapshot, after_snapshot,
+                                 elapsed_nanoseconds, true, allocator);
+    sort_disk_rows(rows, sort_key);
 
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_disk_io_report(output, before_snapshot, after_snapshot,
-                          elapsed_nanoseconds, true, false, allocator,
-                          should_color, sample_duration_label);
+    append_disk_io_report(output, rows, true, false, allocator, should_color,
+                          sample_duration_label);
     ec.print_to_stdout(output);
   }
 }
@@ -1243,6 +1445,55 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();
 
+  Maybe<evilio_sort_key> sort_key{};
+  if (FLAG_EVILIO_SORT.is_set()) {
+    let const resolved = resolve_sort_key(FLAG_EVILIO_SORT.value(), allocator);
+    if (resolved.match_count == 0) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_EVILIO_SORT.value_location(), "Invalid sort key",
+          "Use pid, read, write, read-ops, write-ops, busy, read-latency, "
+          "write-latency, average-queue, queue, errors, or retries");
+      return 1;
+    }
+    if (resolved.match_count > 1) {
+      let note = String{allocator, "Matches "};
+      note += resolved.matches.view();
+      note += "; use a longer prefix";
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_SORT.value_location(),
+                              "Ambiguous sort key", note.view());
+      return 1;
+    }
+
+    sort_key = resolved.key;
+    let const spec = find_sort_spec(*sort_key);
+    if (should_show_processes && (spec == nullptr || !spec->is_process_metric))
+    {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILIO_SORT.value_location(),
+                              "Sort key is unavailable for process reports",
+                              "Use pid, read, write, read-ops, or write-ops");
+      return 1;
+    }
+    if (!should_show_processes && (spec == nullptr || !spec->is_disk_metric)) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_EVILIO_SORT.value_location(),
+          "Sort key is unavailable for disk reports",
+          "Use read, write, read-ops, write-ops, busy, read-latency, "
+          "write-latency, average-queue, queue, errors, or retries");
+      return 1;
+    }
+    if (!should_show_processes && sort_key_needs_sample(*sort_key) &&
+        !FLAG_EVILIO_ALL.is_enabled() && !FLAG_EVILIO_CUMULATIVE.is_enabled() &&
+        !FLAG_EVILIO_LIVE.is_enabled())
+    {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_EVILIO_SORT.value_location(),
+          "Sort key is unavailable without sampling",
+          "Use --all, --cumulative, or --live with busy, read-latency, "
+          "write-latency, or average-queue");
+      return 1;
+    }
+  }
+
   if (FLAG_EVILIO_ALL.is_enabled() &&
       (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled()))
   {
@@ -1271,15 +1522,15 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     };
 
     if (should_show_processes) {
-      return run_live_process_io(
-          ec, selected_pid, row_limit, sample_duration_seconds,
-          live_interval_seconds, refresh_interval_seconds, is_terminal,
-          should_color, sample_duration_label.view());
+      return run_live_process_io(ec, selected_pid, row_limit, sort_key,
+                                 sample_duration_seconds, live_interval_seconds,
+                                 refresh_interval_seconds, is_terminal,
+                                 should_color, sample_duration_label.view());
     }
 
     return run_live_disk_io(ec, sample_duration_seconds, live_interval_seconds,
                             refresh_interval_seconds, is_terminal, should_color,
-                            sample_duration_label.view());
+                            sample_duration_label.view(), sort_key);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {
@@ -1294,7 +1545,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     let const elapsed_nanoseconds =
         os::monotonic_nanos() - started_at_nanoseconds;
     let const sampled_rows = sample_process_io_rows(
-        before_rows, after_rows, elapsed_nanoseconds, allocator);
+        before_rows, after_rows, elapsed_nanoseconds, allocator, sort_key);
     let output = String{allocator};
     append_process_io_rate_report(output, sampled_rows, row_limit, allocator,
                                   should_color, sample_duration_label.view(),
@@ -1322,14 +1573,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
         has_operation_counts = true;
       }
     }
-    rows.sort([](const io_row &left, const io_row &right) {
-      let const left_total =
-          saturated_sum(left.status.read_bytes, left.status.written_bytes);
-      let const right_total =
-          saturated_sum(right.status.read_bytes, right.status.written_bytes);
-      if (left_total != right_total) return left_total > right_total;
-      return left.pid < right.pid;
-    });
+    sort_process_rows(rows, sort_key);
 
     let output = String{allocator};
     append_process_io_report(output, rows, row_limit, total_read_bytes,
@@ -1673,11 +1917,16 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (!disk_after.disks.is_empty() || FLAG_EVILIO_CUMULATIVE.is_enabled()) {
-    append_disk_io_report(
-        output, disk_before, disk_after, elapsed_nanoseconds,
+    let disk_rows = make_disk_io_rows(
+        disk_before, disk_after, elapsed_nanoseconds,
         FLAG_EVILIO_ALL.is_enabled() || FLAG_EVILIO_CUMULATIVE.is_enabled(),
-        !FLAG_EVILIO_CUMULATIVE.is_enabled(), allocator, should_color,
-        sample_duration_label.view());
+        allocator);
+    sort_disk_rows(disk_rows, sort_key);
+    append_disk_io_report(output, disk_rows,
+                          FLAG_EVILIO_ALL.is_enabled() ||
+                              FLAG_EVILIO_CUMULATIVE.is_enabled(),
+                          !FLAG_EVILIO_CUMULATIVE.is_enabled(), allocator,
+                          should_color, sample_duration_label.view());
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {

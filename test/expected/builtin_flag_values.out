@@ -43,6 +43,14 @@ QUIT
 TERM
 == koshkit killall signal prefix:
 KILL
+== koshkit evilio sort values:
+read-latency
+read-ops
+== bare evilio sort values:
+write-latency
+write-ops
+== koshkit evilps sort prefix:
+memory
 == debug logging levels:
 all
 debug
