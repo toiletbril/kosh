@@ -271,6 +271,9 @@ changes update this file.
   dash where the two shells disagree.
 - Redirect a build or a suite into a log file and echo its status, then read the
   log. A pipe reports the status of the last command in the pipeline.
+- Resolve redirected log paths from the command runner's working directory;
+  a nested tool's `-C` option does not change where the parent shell opens a
+  redirection.
 - Do not embed direct recursive removal in a probe. Use an accepted cleanup
   owner, or leave a bounded temporary directory for system cleanup.
 - Reduce a high-volume fixture to its failing section before enabling shell
