@@ -1341,23 +1341,31 @@ fn append_live_controls_bar(String &output, StringView sample_label,
     throws -> void
 {
   append_report_text(output,
-                     "ctrl+c exit | collection " + sample_label +
-                         " | refresh " + refresh_label,
+                     "ctrl+c to exit. cumulative stats over " + sample_label +
+                         " every " + refresh_label,
                      colors::ansi::DIM, should_color);
+  output += "\n";
   output += "\n";
 }
 
 fn format_live_duration(f64 seconds, Allocator allocator) throws -> String
 {
-  let const tenths = static_cast<u64>(seconds * 10.0 + 0.5);
-  let result = String::from(tenths / 10, allocator);
-  if (tenths % 10 == 0) {
-    result += "s";
-    return result;
+  let const nanoseconds = static_cast<u64>(seconds * 1000000000.0 + 0.5);
+  let result = String::from(nanoseconds / 1000000000ULL, allocator);
+  u64 fraction = nanoseconds % 1000000000ULL;
+  if (fraction != 0) {
+    usize digit_count = 9;
+    while (fraction % 10 == 0) {
+      fraction /= 10;
+      digit_count--;
+    }
+    let const fraction_text = String::from(fraction, allocator);
+    result += ".";
+    for (usize index = fraction_text.length(); index < digit_count; index++)
+      result += "0";
+    result += fraction_text.view();
   }
 
-  result += ".";
-  result += String::from(tenths % 10, allocator).view();
   result += "s";
   return result;
 }
