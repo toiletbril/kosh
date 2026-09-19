@@ -20,6 +20,14 @@ rc=127
 === set -o koshkit passes bare Koshka utility flags ===
 Host: void
 === set -o koshkit passes bare POSIX utility flags ===
+=== set -o koshkit leaves unknown names unresolved ===
+rc=1
+=== set -o koshkit preserves builtin precedence ===
+builtin
+=== set -o koshkit preserves alias precedence ===
+alias
+=== set -o koshkit preserves function precedence ===
+function
 === --enable-koshkit turns bare names on ===
 1
 2

@@ -33,6 +33,18 @@ echo "=== set -o koshkit passes bare Koshka utility flags ==="
 echo "=== set -o koshkit passes bare POSIX utility flags ==="
 "$BIN" -c 'PATH=; set -o koshkit; ls --help' >/dev/null
 
+echo "=== set -o koshkit leaves unknown names unresolved ==="
+"$BIN" -c 'PATH=; set -o koshkit; command -v KOSH_NOT_A_UTILITY; echo "rc=$?"'
+
+echo "=== set -o koshkit preserves builtin precedence ==="
+"$BIN" -c 'PATH=; set -o koshkit; echo builtin'
+
+echo "=== set -o koshkit preserves alias precedence ==="
+"$BIN" -c "PATH=; set -o koshkit; alias seq='echo alias'; seq"
+
+echo "=== set -o koshkit preserves function precedence ==="
+"$BIN" -c 'PATH=; set -o koshkit; seq() { echo function; }; seq'
+
 echo "=== --enable-koshkit turns bare names on ==="
 "$BIN" --enable-koshkit -c 'PATH=; seq 3'
 
