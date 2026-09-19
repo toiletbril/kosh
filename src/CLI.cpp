@@ -329,8 +329,8 @@ fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
                    StringView program_name,
                    bool should_accept_negative_number_operand,
                    bool should_allow_options_after_operands,
-                   bool should_accept_unknown_flag_operand) throws
-    -> ArrayList<String>
+                   bool should_accept_unknown_flag_operand,
+                   Allocator allocator) throws -> ArrayList<String>
 {
   reset_flags(flags);
 
@@ -357,7 +357,7 @@ fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
                        operand_locations, program_name,
                        should_accept_negative_number_operand,
                        should_allow_options_after_operands,
-                       should_accept_unknown_flag_operand);
+                       should_accept_unknown_flag_operand, allocator);
   } catch (...) {
     reset_flags(flags);
     throw;
@@ -435,19 +435,19 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                StringView program_name,
                bool should_accept_negative_number_operand,
                bool should_allow_options_after_operands,
-               bool should_accept_unknown_flag_operand) throws
-    -> ArrayList<String>
+               bool should_accept_unknown_flag_operand,
+               Allocator allocator) throws -> ArrayList<String>
 {
   ASSERT(argc >= 0);
 
-  if (argc == 0) return ArrayList<String>{heap_allocator()};
+  if (argc == 0) return ArrayList<String>{allocator};
 
   ASSERT(argv != nullptr);
 
   LOG(Debug, "parsing %d command line arguments", argc);
 
   u32 position = 0;
-  let args = ArrayList<String>{heap_allocator()};
+  let args = ArrayList<String>{allocator};
 
   /* When the caller asks for operand locations, each surviving operand records
      the source span of the argv token it came from, so a builtin can caret the
@@ -800,10 +800,15 @@ fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
     -> util_operands_result
 {
   let operand_locations = ArrayList<SourceLocation>{allocator};
-  let operands = parse_flags_vec(
-      flags, args, 0, NULL, arg_locations, &operand_locations, {},
-      should_accept_negative_number_operand,
-      should_allow_options_after_operands, should_accept_unknown_flag_operand);
+  let operands =
+      parse_flags_vec(flags, args, 0, NULL, arg_locations, &operand_locations,
+                      {}, should_accept_negative_number_operand,
+                      should_allow_options_after_operands,
+                      should_accept_unknown_flag_operand, allocator);
+  ASSERT(operands.allocator() == allocator);
+  ASSERT(operand_locations.allocator() == allocator);
+  ASSERT(operands.count() == operand_locations.count());
+
   if (!operands.is_empty()) operands.remove(0);
   if (!operand_locations.is_empty()) operand_locations.remove(0);
 

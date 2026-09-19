@@ -301,7 +301,8 @@ fn parse_flags_vec(const FlagList &flags, const ArrayList<String> &args,
                    StringView program_name = StringView{},
                    bool should_accept_negative_number_operand = false,
                    bool should_allow_options_after_operands = false,
-                   bool should_accept_unknown_flag_operand = false) throws
+                   bool should_accept_unknown_flag_operand = false,
+                   Allocator allocator = heap_allocator()) throws
     -> ArrayList<String>;
 fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                usize base_position = 0,
@@ -311,7 +312,8 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                StringView program_name = StringView{},
                bool should_accept_negative_number_operand = false,
                bool should_allow_options_after_operands = false,
-               bool should_accept_unknown_flag_operand = false) throws
+               bool should_accept_unknown_flag_operand = false,
+               Allocator allocator = heap_allocator()) throws
     -> ArrayList<String>;
 struct util_operands_result
 {
