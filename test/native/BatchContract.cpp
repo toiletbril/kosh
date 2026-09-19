@@ -254,6 +254,33 @@ fn test_exists_results_and_deduplication() throws -> void
          "a missing path is not a batch error");
 }
 
+fn test_many_duplicate_metadata_operations() throws -> void
+{
+  constexpr usize OPERATION_COUNT = 64;
+  let batch = Batch{uncached_heap_allocator()};
+  let path = Path{};
+  file_status statuses[OPERATION_COUNT]{};
+  batch.reserve(OPERATION_COUNT);
+  for (usize index = 0; index < OPERATION_COUNT; index++)
+    batch.add(batch_operation::lstat(path, statuses[index]));
+
+  reset_observations();
+  let const results = batch.execute();
+  expect(observed_operation_count == 1,
+         "many duplicate metadata requests collapse to one operation");
+  if (results.count() != OPERATION_COUNT) {
+    expect(false, "many duplicate results expand to the request count");
+    return;
+  }
+
+  for (usize index = 0; index < OPERATION_COUNT; index++) {
+    expect(results[index].request_id == index,
+           "many duplicate results preserve request order");
+    expect(statuses[index].size == 1000,
+           "many duplicate requests publish every status destination");
+  }
+}
+
 fn test_zero_partial_and_aliased_operations() throws -> void
 {
   let batch = Batch{heap_allocator()};
@@ -340,6 +367,7 @@ fn run_batch_contract() -> int
     test_metadata_deduplication();
     test_failed_metadata_deduplication();
     test_exists_results_and_deduplication();
+    test_many_duplicate_metadata_operations();
     test_zero_partial_and_aliased_operations();
     test_invalid_operation_result();
     test_interrupted_batch();
