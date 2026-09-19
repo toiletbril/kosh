@@ -266,6 +266,16 @@ def main():
         )
         backspace_widens_the_list = b"<alpha-one>" in widened
 
+        # The first Ctrl-W erases the common-prefix hyphen and the second
+        # erases alpha. Tab still belongs to the open menu and accepts its
+        # first row. A closed menu would only restore the alpha- prefix.
+        _, _, word_erased = run_menu(
+            directory, "tree", typed, [b"\x17", b"\x17", b"\t"]
+        )
+        whole_word_backspace_keeps_menu_open = (
+            b"<alpha-one>" in word_erased
+        )
+
         # A search that matches nothing keeps the menu open on the row that says
         # so, and the erase that follows brings the list back for the Tab.
         emptied, _, recovered = run_menu(
@@ -421,6 +431,9 @@ def main():
                 a_fuzzy_search_reaches_a_candidate
             ),
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
+            "WHOLE_WORD_BACKSPACE_KEEPS_MENU_OPEN": (
+                whole_word_backspace_keeps_menu_open
+            ),
             "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
                 an_empty_search_keeps_the_menu_open
             ),
