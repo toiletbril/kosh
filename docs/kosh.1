@@ -1199,13 +1199,15 @@ recording and preserves the previous exit status. Both history options are
 enabled by default in an interactive shell and disabled in a noninteractive
 shell.
 .PP
-Each submitted command is appended to the shared history immediately. A command
-that duplicates the preceding event is skipped. Running shell instances reload
-the file before recall, search, and listing. A multiline command is stored as
-one event, and its embedded newlines are preserved. KOSH_HISTORY_SIZE bounds the
-retained and stored history and defaults to 4096. A value of zero disables
-history retention and storage. A history file that exists and cannot be read is
-reported once at startup, and the session begins with an empty history.
+Each shell loads one private history branch at startup. Submitted commands are
+appended to the shared file immediately without importing commands written by
+other running shells. Recall, expansion, listing, and editing use the private
+branch. A command that duplicates the preceding private event is skipped. A
+multiline command is stored as one event, and its embedded newlines are
+preserved. KOSH_HISTORY_SIZE bounds retained and stored history and defaults to
+4096. A value of zero disables history retention and storage. A history file
+that exists and cannot be read is reported once at startup, and the session
+begins with an empty history.
 .PP
 The
 .B ignoreeof
@@ -1262,12 +1264,16 @@ option reads the same way, and an operand names a file whose already read bytes
 are skipped. The
 .B \-w
 option writes the list to the history file, and an operand names a file that is
-replaced. The
+replaced. Without an operand it replaces the shared file with this shell's
+private branch. The
 .B \-a
 option writes the list to the history file, and an operand names a file that
 receives the events this shell has not written to a named file yet. The written
 events are bounded by
 .BR KOSH_HISTORY_SIZE .
+Without an operand,
+.B \-a
+does nothing because accepted events are already appended immediately.
 The
 .B \-c
 option clears the stored history, and

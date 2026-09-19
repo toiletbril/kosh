@@ -772,6 +772,7 @@ static constexpr char KOSH_CALC_HISTORY_FILE[] = ".kosh_calc_history";
 
 static os::file_status HISTORY_FILE_STATUS{};
 static bool HAS_HISTORY_FILE_STATUS = false;
+static bool CAN_REWRITE_HISTORY = false;
 
 /* A rename that commits leaves the file correct even when the reload that
    follows it fails. A caller that only wrote bytes accepts the second outcome,
@@ -784,6 +785,8 @@ enum class history_replacement : u8
 };
 
 static fn load_history(const Path &path, bool should_allow_missing)
+    -> koshka::ErrorOr<koshka::Ok>;
+static fn ensure_history_loaded(const Path &path, bool should_allow_missing)
     -> koshka::ErrorOr<koshka::Ok>;
 static fn sync_history(const Path &path, bool should_allow_missing)
     -> koshka::ErrorOr<koshka::Ok>;
@@ -807,6 +810,111 @@ static fn get_calc_history_file_path() -> koshka::Maybe<koshka::Path>
 
 static bool IS_CALC_HISTORY_ACTIVE = false;
 
+struct history_snapshot
+{
+  String path{koshka::heap_allocator()};
+  String encoded_contents{koshka::heap_allocator()};
+  koshka::ArrayList<usize> offsets{koshka::heap_allocator()};
+  koshka::ArrayList<usize> durable_offsets{koshka::heap_allocator()};
+  os::file_status file_status{};
+  usize total_count{0};
+  usize last_event_number{0};
+  usize file_byte_count{0};
+  usize entry_limit{TL_HISTORY_MAX_SIZE};
+  usize buffer_byte_offset{0};
+  usize buffer_start_byte_offset{0};
+  bool is_enabled{true};
+  bool is_file_bad{false};
+  bool does_file_end_with_newline{true};
+  bool has_buffer{false};
+  bool is_buffer_loaded{false};
+  bool has_file_status{false};
+  bool can_rewrite{false};
+  bool is_valid{false};
+};
+
+static history_snapshot SHELL_HISTORY_SNAPSHOT{};
+static history_snapshot CALC_HISTORY_SNAPSHOT{};
+
+static fn capture_history_snapshot(history_snapshot &snapshot) -> void
+{
+  snapshot.path.clear();
+  if (::itl_g_history_path != nullptr)
+    snapshot.path.append(StringView{::itl_g_history_path});
+
+  snapshot.encoded_contents.clear();
+  snapshot.has_buffer = ::itl_g_history_read_buffer != nullptr;
+  if (snapshot.has_buffer) {
+    snapshot.encoded_contents.append(StringView{
+        ::itl_g_history_read_buffer->data, ::itl_g_history_read_buffer->size});
+  }
+
+  snapshot.offsets.clear();
+  snapshot.durable_offsets.clear();
+  snapshot.offsets.reserve(::itl_g_history_count);
+  snapshot.durable_offsets.reserve(::itl_g_history_count);
+  for (usize index = 0; index < ::itl_g_history_count; index++) {
+    let const slot = (::itl_g_history_head + index) % TL_HISTORY_MAX_SIZE;
+    snapshot.offsets.push(::itl_g_history_offsets[slot]);
+    snapshot.durable_offsets.push(::itl_g_history_durable_offsets[slot]);
+  }
+  snapshot.file_status = HISTORY_FILE_STATUS;
+  snapshot.total_count = ::itl_g_history_total_count;
+  snapshot.last_event_number = ::itl_g_last_history_event_number;
+  snapshot.file_byte_count = ::itl_g_history_file_size;
+  snapshot.entry_limit = ::itl_g_history_limit;
+  snapshot.buffer_byte_offset = ::itl_g_history_read_buffer_offset;
+  snapshot.buffer_start_byte_offset = ::itl_g_history_read_buffer_start;
+  snapshot.is_enabled = ::itl_g_history_enabled;
+  snapshot.is_file_bad = ::itl_g_history_file_is_bad;
+  snapshot.does_file_end_with_newline = ::itl_g_history_ends_with_newline;
+  snapshot.is_buffer_loaded = ::itl_g_history_read_buffer_loaded;
+  snapshot.has_file_status = HAS_HISTORY_FILE_STATUS;
+  snapshot.can_rewrite = CAN_REWRITE_HISTORY;
+  snapshot.is_valid = true;
+}
+
+static fn restore_history_snapshot(const history_snapshot &snapshot) -> void
+{
+  ::itl_g_history_free();
+
+  if (!snapshot.path.is_empty()) {
+    ::itl_g_history_path =
+        static_cast<char *>(::itl_malloc(snapshot.path.count() + 1));
+    std::memcpy(::itl_g_history_path, snapshot.path.data(),
+                snapshot.path.count());
+    ::itl_g_history_path[snapshot.path.count()] = '\0';
+  }
+
+  for (usize index = 0; index < snapshot.offsets.count(); index++) {
+    ::itl_g_history_offsets[index] = snapshot.offsets[index];
+    ::itl_g_history_durable_offsets[index] = snapshot.durable_offsets[index];
+  }
+  ::itl_g_history_head = 0;
+  ::itl_g_history_count = snapshot.offsets.count();
+  ::itl_g_history_total_count = snapshot.total_count;
+  ::itl_g_last_history_event_number = snapshot.last_event_number;
+  ::itl_g_history_file_size = snapshot.file_byte_count;
+  ::itl_g_history_limit = snapshot.entry_limit;
+  ::itl_g_history_enabled = snapshot.is_enabled;
+  ::itl_g_history_file_is_bad = snapshot.is_file_bad;
+  ::itl_g_history_ends_with_newline = snapshot.does_file_end_with_newline;
+
+  if (snapshot.has_buffer) {
+    ::itl_g_history_read_buffer = ::itl_char_buf_alloc();
+    ::itl_char_buf_append_bytes(::itl_g_history_read_buffer,
+                                snapshot.encoded_contents.data(),
+                                snapshot.encoded_contents.count());
+  }
+  ::itl_g_history_read_buffer_loaded = snapshot.is_buffer_loaded;
+  ::itl_g_history_read_buffer_offset = snapshot.buffer_byte_offset;
+  ::itl_g_history_read_buffer_start = snapshot.buffer_start_byte_offset;
+
+  HISTORY_FILE_STATUS = snapshot.file_status;
+  HAS_HISTORY_FILE_STATUS = snapshot.has_file_status;
+  CAN_REWRITE_HISTORY = snapshot.can_rewrite;
+}
+
 /* Every read and append resolves the file the swap currently points at. A calc
    prompt never reloads the shell file over the calc entries. */
 static fn get_active_history_file_path() -> koshka::Maybe<koshka::Path>
@@ -816,33 +924,32 @@ static fn get_active_history_file_path() -> koshka::Maybe<koshka::Path>
   return get_history_file_path();
 }
 
-/* The history is swapped to the calc file on entry and back on leave, so the
-   two histories never mix. The shell history is dumped first for a later
-   reload. */
 fn enter_calc_history() -> void
 {
-  if (koshka::Maybe<koshka::Path> shell = get_history_file_path();
-      shell.has_value())
-    ::tl_history_dump(shell->c_str());
+  capture_history_snapshot(SHELL_HISTORY_SNAPSHOT);
 
   IS_CALC_HISTORY_ACTIVE = true;
 
-  if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
-      calc.has_value())
+  if (CALC_HISTORY_SNAPSHOT.is_valid) {
+    restore_history_snapshot(CALC_HISTORY_SNAPSHOT);
+    CALC_HISTORY_SNAPSHOT = history_snapshot{};
+  } else if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
+             calc.has_value())
+  {
     unused(load_history(*calc, true));
+  }
 }
 
 fn leave_calc_history() -> void
 {
-  if (koshka::Maybe<koshka::Path> calc = get_calc_history_file_path();
-      calc.has_value())
-    ::tl_history_dump(calc->c_str());
+  capture_history_snapshot(CALC_HISTORY_SNAPSHOT);
 
   IS_CALC_HISTORY_ACTIVE = false;
 
-  if (koshka::Maybe<koshka::Path> shell = get_history_file_path();
-      shell.has_value())
-    unused(load_history(*shell, true));
+  if (SHELL_HISTORY_SNAPSHOT.is_valid) {
+    restore_history_snapshot(SHELL_HISTORY_SNAPSHOT);
+    SHELL_HISTORY_SNAPSHOT = history_snapshot{};
+  }
 }
 
 fn get_history_path() -> koshka::Maybe<koshka::Path>
@@ -861,30 +968,59 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return koshka::Error{os::last_system_error_message()};
   defer { os::release_process_lock(lock.take()); };
-  TRY(sync_history(*path, true));
-  if (::itl_g_history_count == 0) return koshka::Success;
-
-  let const first_offset = ::itl_history_index_to_offset(0);
-  if (first_offset == 0) return koshka::Success;
-
-  let const contents = path->read_entire_file();
-  if (!contents.has_value())
-    return koshka::Error{os::last_system_error_message()};
-  if (first_offset > contents->count())
+  TRY(ensure_history_loaded(*path, true));
+  if (!::itl_history_ensure_read_buffer() && ::itl_g_history_count != 0)
     return koshka::Error{"the file contains invalid data"};
 
-  let const retained = contents->view().substring(first_offset);
+  let written = String{koshka::heap_allocator()};
+  let durable_offsets = koshka::ArrayList<usize>{koshka::heap_allocator()};
+  durable_offsets.reserve(::itl_g_history_count);
+  let const private_contents =
+      ::itl_g_history_read_buffer == nullptr
+          ? StringView{}
+          : StringView{::itl_g_history_read_buffer->data,
+                       ::itl_g_history_read_buffer->size};
+  for (usize index = 0; index < ::itl_g_history_count; index++) {
+    let const start_offset = ::itl_history_index_to_offset(index);
+    if (start_offset < ::itl_g_history_read_buffer_offset)
+      return koshka::Error{"the file contains invalid data"};
+    let const start_offset_in_buffer =
+        start_offset - ::itl_g_history_read_buffer_offset;
+    usize end_offset_in_buffer = start_offset_in_buffer;
+    bool is_escape_pending = false;
+    bool did_find_end = false;
+    while (end_offset_in_buffer < private_contents.length) {
+      let const byte = private_contents[end_offset_in_buffer++];
+      if (is_escape_pending) {
+        is_escape_pending = false;
+      } else if (byte == '\\') {
+        is_escape_pending = true;
+      } else if (byte == '\n') {
+        did_find_end = true;
+        break;
+      }
+    }
+    if (!did_find_end) return koshka::Error{"the file contains invalid data"};
+    durable_offsets.push(written.count());
+    written.append(private_contents.substring_of_length(
+        start_offset_in_buffer, end_offset_in_buffer - start_offset_in_buffer));
+  }
+
   if (!commit_history_replacement(*path, parent, ".kosh_history_write",
-                                  retained))
+                                  written.view()))
   {
     return koshka::Error{os::last_system_error_message()};
   }
 
-  /* The rename dropped a leading span and left the retained bytes untouched.
-     The shift describes the new file exactly and a rescan would only read it
-     back. */
-  ::itl_history_offsets_shift(first_offset);
+  for (usize index = 0; index < ::itl_g_history_count; index++) {
+    let const slot = (::itl_g_history_head + index) % TL_HISTORY_MAX_SIZE;
+    ::itl_g_history_durable_offsets[slot] = durable_offsets[index];
+  }
+  ::itl_g_history_file_size = written.count();
+  ::itl_g_history_file_is_bad = false;
   record_history_file_status(*path);
+  CAN_REWRITE_HISTORY =
+      HAS_HISTORY_FILE_STATUS && HISTORY_FILE_STATUS.has_file_identity;
   return koshka::Success;
 }
 
@@ -892,6 +1028,7 @@ static fn load_history(const Path &path, bool should_allow_missing)
     -> koshka::ErrorOr<koshka::Ok>
 {
   HAS_HISTORY_FILE_STATUS = false;
+  CAN_REWRITE_HISTORY = false;
   for (int attempt_index = 0; attempt_index < HISTORY_RACE_ATTEMPT_COUNT;
        attempt_index++)
   {
@@ -910,7 +1047,19 @@ static fn load_history(const Path &path, bool should_allow_missing)
 
       let status_after = os::file_status{};
       if (!os::stat_path_following(path.text().view(), status_after)) {
-        if (os::last_system_error_is_missing_file()) return koshka::Success;
+        if (os::last_system_error_is_missing_file()) {
+          ::itl_history_offsets_reset();
+          ::itl_g_last_history_event_number = 0;
+          ::itl_g_history_file_size = 0;
+          ::itl_g_history_ends_with_newline = true;
+          ::itl_g_history_file_is_bad = false;
+          CAN_REWRITE_HISTORY = false;
+          ::itl_g_history_read_buffer = ::itl_char_buf_alloc();
+          ::itl_g_history_read_buffer_loaded = true;
+          ::itl_g_history_read_buffer_offset = 0;
+          ::itl_g_history_read_buffer_start = 0;
+          return koshka::Success;
+        }
 
         return koshka::Error{os::last_system_error_message()};
       }
@@ -927,6 +1076,7 @@ static fn load_history(const Path &path, bool should_allow_missing)
 
     HISTORY_FILE_STATUS = status_after;
     HAS_HISTORY_FILE_STATUS = true;
+    CAN_REWRITE_HISTORY = status_after.has_file_identity;
     return koshka::Success;
   }
 
@@ -942,6 +1092,18 @@ static fn sync_history(const Path &path, bool should_allow_missing)
       !::itl_g_history_file_is_bad && HAS_HISTORY_FILE_STATUS &&
       os::stat_path_following(path.text().view(), status) &&
       os::file_status_matches(HISTORY_FILE_STATUS, status))
+  {
+    return koshka::Success;
+  }
+
+  return load_history(path, should_allow_missing);
+}
+
+static fn ensure_history_loaded(const Path &path, bool should_allow_missing)
+    -> koshka::ErrorOr<koshka::Ok>
+{
+  if (::itl_g_history_path != nullptr &&
+      StringView{::itl_g_history_path} == path.text().view())
   {
     return koshka::Success;
   }
@@ -991,6 +1153,22 @@ static fn record_history_file_status(const Path &path) -> void
   }
 }
 
+static fn update_history_rewrite_safety_after_append(
+    bool was_empty, const os::file_status &previous_status,
+    bool had_previous_status, const os::file_status &appended_status) -> void
+{
+  if (!appended_status.has_file_identity) {
+    CAN_REWRITE_HISTORY = false;
+  } else if (had_previous_status && previous_status.has_file_identity) {
+    CAN_REWRITE_HISTORY =
+        CAN_REWRITE_HISTORY &&
+        previous_status.device_id == appended_status.device_id &&
+        previous_status.file_id == appended_status.file_id;
+  } else {
+    CAN_REWRITE_HISTORY = was_empty;
+  }
+}
+
 fn history_read() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_file_path();
@@ -1024,9 +1202,7 @@ fn set_history_enabled(bool is_enabled) -> void
 
 fn set_history_limit(usize entry_count) -> void
 {
-  let const previous_limit = ::itl_g_history_limit;
   ::tl_set_history_limit(entry_count);
-  if (::itl_g_history_limit > previous_limit) HAS_HISTORY_FILE_STATUS = false;
 }
 
 struct history_event
@@ -1037,7 +1213,9 @@ struct history_event
 
 fn get_newest_history_event_number() -> koshka::Maybe<usize>
 {
-  if (history_read().is_error()) return koshka::None;
+  let const path = get_history_file_path();
+  if (!path.has_value() || ensure_history_loaded(*path, true).is_error())
+    return koshka::None;
   if (::itl_g_history_count == 0) return koshka::None;
 
   return ::itl_g_history_total_count;
@@ -1053,7 +1231,7 @@ fn get_history_events(koshka::Allocator allocator,
 
   /* The load is allowed to miss the file. An absent history reads as an empty
      list and a damaged or unreadable file reads as a failure. */
-  TRY(sync_history(*path, true));
+  TRY(ensure_history_loaded(*path, true));
   if (::itl_g_history_count == 0) return events;
   if (!::itl_history_ensure_read_buffer())
     return koshka::Error{"the file contains invalid data"};
@@ -1090,7 +1268,9 @@ static fn find_history_event(koshka::Allocator allocator,
                              koshka::Maybe<usize> before_event_number,
                              Match do_match) -> koshka::Maybe<history_event>
 {
-  if (history_read().is_error()) return koshka::None;
+  let const path = get_history_file_path();
+  if (!path.has_value() || ensure_history_loaded(*path, true).is_error())
+    return koshka::None;
   if (::itl_g_history_count == 0) return koshka::None;
   if (!::itl_history_ensure_read_buffer()) return koshka::None;
 
@@ -1172,7 +1352,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return koshka::None;
   defer { os::release_process_lock(lock.take()); };
-  if (sync_history(*path, true).is_error()) return koshka::None;
+  if (ensure_history_loaded(*path, true).is_error()) return koshka::None;
   if (::itl_g_history_limit == 0) return ::itl_g_history_total_count;
 
   itl_string_t *entry = ::itl_string_alloc();
@@ -1180,7 +1360,14 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   if (!::itl_string_from_bytes(entry, command.data, command.length))
     return koshka::None;
 
+  let const was_empty = ::itl_g_history_total_count == 0;
+  let const previous_status = HISTORY_FILE_STATUS;
+  let const had_previous_status = HAS_HISTORY_FILE_STATUS;
   if (!::itl_history_append_to_file(entry, false, false)) return koshka::None;
+  let appended_status = os::file_status{};
+  unused(os::stat_path_following(path->text().view(), appended_status));
+  update_history_rewrite_safety_after_append(
+      was_empty, previous_status, had_previous_status, appended_status);
   record_history_file_status(*path);
 
   return ::itl_g_last_history_event_number;
@@ -1211,7 +1398,7 @@ fn history_rewrite_event(usize number, StringView expected,
   let lock = os::acquire_process_lock(parent.text().view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
-  if (history_read().is_error()) return false;
+  if (ensure_history_loaded(*path, false).is_error()) return false;
   if (::itl_g_history_count == 0) return false;
 
   let const first_number =
@@ -1221,14 +1408,55 @@ fn history_rewrite_event(usize number, StringView expected,
   }
 
   let const index = number - first_number;
-  let const start_offset = ::itl_history_index_to_offset(index);
+  let const slot = (::itl_g_history_head + index) % TL_HISTORY_MAX_SIZE;
+  let const private_start_offset = ::itl_g_history_offsets[slot];
+  let const durable_start_offset = ::itl_g_history_durable_offsets[slot];
   let const contents = path->read_entire_file();
   if (!contents.has_value()) return false;
-  usize end_offset = start_offset;
+  let current_status = os::file_status{};
+  if (!os::stat_path_following(path->text().view(), current_status))
+    return false;
+  if (!CAN_REWRITE_HISTORY || !HAS_HISTORY_FILE_STATUS ||
+      !HISTORY_FILE_STATUS.has_file_identity ||
+      !current_status.has_file_identity ||
+      HISTORY_FILE_STATUS.device_id != current_status.device_id ||
+      HISTORY_FILE_STATUS.file_id != current_status.file_id)
+  {
+    return false;
+  }
+
+  usize durable_end_offset = durable_start_offset;
   bool is_escape_pending = false;
   bool did_find_end = false;
-  while (end_offset < contents->count()) {
-    let const byte = (*contents)[end_offset++];
+  while (durable_end_offset < contents->count()) {
+    let const byte = (*contents)[durable_end_offset++];
+    if (is_escape_pending) {
+      is_escape_pending = false;
+    } else if (byte == '\\') {
+      is_escape_pending = true;
+    } else if (byte == '\n') {
+      did_find_end = true;
+      break;
+    }
+  }
+  if (!did_find_end) return false;
+  let const durable_record = contents->substring_of_length(
+      durable_start_offset, durable_end_offset - durable_start_offset);
+
+  if (!::itl_history_ensure_read_buffer() ||
+      private_start_offset < ::itl_g_history_read_buffer_offset)
+  {
+    return false;
+  }
+  let const private_contents = StringView{::itl_g_history_read_buffer->data,
+                                          ::itl_g_history_read_buffer->size};
+  let const private_start_offset_in_buffer =
+      private_start_offset - ::itl_g_history_read_buffer_offset;
+  usize private_end_offset_in_buffer = private_start_offset_in_buffer;
+  is_escape_pending = false;
+  did_find_end = false;
+  while (private_end_offset_in_buffer < private_contents.length) {
+    let const byte = private_contents[private_end_offset_in_buffer++];
     if (is_escape_pending) {
       is_escape_pending = false;
       continue;
@@ -1246,34 +1474,84 @@ fn history_rewrite_event(usize number, StringView expected,
 
   char decoded[ITL_STRING_MAX_LEN + 1];
   usize decoded_size = 0;
-  if (!::itl_history_ensure_read_buffer() ||
-      !::itl_history_decode_entry_buffered(start_offset, decoded,
+  if (!::itl_history_decode_entry_buffered(private_start_offset, decoded,
                                            sizeof(decoded), &decoded_size) ||
       koshka::StringView{decoded, decoded_size} != expected)
   {
     return false;
   }
 
-  let rewritten = koshka::String{koshka::heap_allocator()};
-  rewritten.append(contents->substring_of_length(0, start_offset));
-
+  let encoded_replacements = koshka::String{koshka::heap_allocator()};
+  let replacement_byte_offsets =
+      koshka::ArrayList<usize>{koshka::heap_allocator()};
   for (let const &replacement : replacements) {
     if (replacement.count() > ITL_HISTORY_ENTRY_MAX_BYTES) return false;
-    itl_string_t *entry = ::itl_string_alloc();
-    defer { ITL_STRING_FREE(entry); };
-    if (!::itl_string_from_bytes(entry, replacement.data(),
-                                 replacement.count()))
-      return false;
-    itl_char_buf_t *encoded = ::itl_char_buf_alloc();
-    defer { ITL_CHAR_BUF_FREE(encoded); };
-    ::itl_char_buf_append_string_escaped(encoded, entry);
-    rewritten.append(koshka::StringView{encoded->data, encoded->size});
-    rewritten.push('\n');
+    replacement_byte_offsets.push(encoded_replacements.count());
+    encode_history_record(encoded_replacements, replacement.view());
   }
 
-  rewritten.append(contents->substring(end_offset));
+  let expected_encoded = koshka::String{koshka::heap_allocator()};
+  encode_history_record(expected_encoded, expected);
+  if (durable_record != expected_encoded.view()) {
+    return false;
+  }
+
+  let durable_rewritten = koshka::String{koshka::heap_allocator()};
+  durable_rewritten.reserve(contents->count() -
+                            (durable_end_offset - durable_start_offset) +
+                            encoded_replacements.count());
+  durable_rewritten.append(
+      contents->substring_of_length(0, durable_start_offset));
+  durable_rewritten.append(encoded_replacements.view());
+  durable_rewritten.append(contents->substring(durable_end_offset));
+
+  let private_rewritten = koshka::String{koshka::heap_allocator()};
+  private_rewritten.reserve(
+      private_contents.length -
+      (private_end_offset_in_buffer - private_start_offset_in_buffer) +
+      encoded_replacements.count());
+  private_rewritten.append(
+      private_contents.substring_of_length(0, private_start_offset_in_buffer));
+  private_rewritten.append(encoded_replacements.view());
+  private_rewritten.append(
+      private_contents.substring(private_end_offset_in_buffer));
+
+  let private_offsets = koshka::ArrayList<usize>{koshka::heap_allocator()};
+  let durable_offsets = koshka::ArrayList<usize>{koshka::heap_allocator()};
+  let const private_removed_byte_count =
+      private_end_offset_in_buffer - private_start_offset_in_buffer;
+  let const durable_removed_byte_count =
+      durable_end_offset - durable_start_offset;
+  let const resulting_count = ::itl_g_history_count - 1 + replacements.count();
+  private_offsets.reserve(resulting_count);
+  durable_offsets.reserve(resulting_count);
+  for (usize old_index = 0; old_index < index; old_index++) {
+    let const old_slot =
+        (::itl_g_history_head + old_index) % TL_HISTORY_MAX_SIZE;
+    private_offsets.push(::itl_g_history_offsets[old_slot] -
+                         ::itl_g_history_read_buffer_offset);
+    durable_offsets.push(::itl_g_history_durable_offsets[old_slot]);
+  }
+  for (let const replacement_byte_offset : replacement_byte_offsets) {
+    private_offsets.push(private_start_offset_in_buffer +
+                         replacement_byte_offset);
+    durable_offsets.push(durable_start_offset + replacement_byte_offset);
+  }
+  for (usize old_index = index + 1; old_index < ::itl_g_history_count;
+       old_index++)
+  {
+    let const old_slot =
+        (::itl_g_history_head + old_index) % TL_HISTORY_MAX_SIZE;
+    private_offsets.push(
+        ::itl_g_history_offsets[old_slot] - ::itl_g_history_read_buffer_offset -
+        private_removed_byte_count + encoded_replacements.count());
+    durable_offsets.push(::itl_g_history_durable_offsets[old_slot] -
+                         durable_removed_byte_count +
+                         encoded_replacements.count());
+  }
+
   let replacement_path = koshka::os::write_to_named_temp_file(
-      path->parent(), ".kosh_history_fc", rewritten.view());
+      path->parent(), ".kosh_history_fc", durable_rewritten.view());
   if (!replacement_path.has_value()) return false;
   defer { unused(koshka::os::remove_file(replacement_path->text().view())); };
 
@@ -1288,7 +1566,39 @@ fn history_rewrite_event(usize number, StringView expected,
   {
     return false;
   }
-  return !load_history(*path, false).is_error();
+
+  let const new_total_count =
+      ::itl_g_history_total_count - 1 + replacements.count();
+  let const retained_count = private_offsets.count() < ::itl_g_history_limit
+                                 ? private_offsets.count()
+                                 : ::itl_g_history_limit;
+  let const first_retained_index = private_offsets.count() - retained_count;
+  for (usize new_index = 0; new_index < retained_count; new_index++) {
+    ::itl_g_history_offsets[new_index] =
+        private_offsets[first_retained_index + new_index];
+    ::itl_g_history_durable_offsets[new_index] =
+        durable_offsets[first_retained_index + new_index];
+  }
+  ::itl_g_history_head = 0;
+  ::itl_g_history_count = retained_count;
+  ::itl_g_history_total_count = new_total_count;
+  ::itl_g_last_history_event_number = 0;
+  ::itl_g_history_file_size = durable_rewritten.count();
+  ::itl_g_history_ends_with_newline =
+      private_rewritten.is_empty() || private_rewritten.back() == '\n';
+  ::itl_g_history_file_is_bad = false;
+  ::itl_history_read_fd_invalidate();
+  ::itl_g_history_read_buffer = ::itl_char_buf_alloc();
+  ::itl_char_buf_append_bytes(::itl_g_history_read_buffer,
+                              private_rewritten.data(),
+                              private_rewritten.count());
+  ::itl_g_history_read_buffer_loaded = true;
+  ::itl_g_history_read_buffer_offset = 0;
+  ::itl_g_history_read_buffer_start = 0;
+  record_history_file_status(*path);
+  CAN_REWRITE_HISTORY =
+      HAS_HISTORY_FILE_STATUS && HISTORY_FILE_STATUS.has_file_identity;
+  return CAN_REWRITE_HISTORY;
 }
 
 static fn strip_ansi_color(StringView text) throws -> String;
@@ -1610,9 +1920,25 @@ fn get_input(const String &prompt) -> input_result
       utils::debug_program_path_candidate_count();
 #endif
   let const history_path = get_active_history_file_path();
-  if (history_path.has_value()) unused(sync_history(*history_path, true));
+  if (history_path.has_value())
+    unused(ensure_history_loaded(*history_path, true));
   ::itl_g_last_history_event_number = 0;
+  let const previous_history_total_count = ::itl_g_history_total_count;
+  let const was_history_empty = previous_history_total_count == 0;
+  let const previous_history_status = HISTORY_FILE_STATUS;
+  let const had_previous_history_status = HAS_HISTORY_FILE_STATUS;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
+  if (history_path.has_value() &&
+      ::itl_g_history_total_count != previous_history_total_count)
+  {
+    let appended_status = os::file_status{};
+    unused(
+        os::stat_path_following(history_path->text().view(), appended_status));
+    update_history_rewrite_safety_after_append(
+        was_history_empty, previous_history_status, had_previous_history_status,
+        appended_status);
+    record_history_file_status(*history_path);
+  }
   COMPLETION_BASE_DIRECTORY = nullptr;
   COMPLETION_RESULT = nullptr;
 #if !defined NDEBUG

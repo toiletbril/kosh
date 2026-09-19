@@ -112,11 +112,6 @@ static fn history_target_needs_separator(const Path &target) throws
 static fn print_history_list(const ExecContext &ec, EvalContext &cxt,
                              usize wanted_count) throws -> bool
 {
-  if (let const result = toiletline::history_read(); result.is_error()) {
-    report_history_file_failure(ec, cxt, "read", result.error().message());
-    return false;
-  }
-
   let const read_events =
       toiletline::get_history_events(cxt.scratch_allocator());
   if (read_events.is_error()) {
@@ -520,7 +515,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             "Pass a writable path, e.g. `history -w ~/.kosh_history`");
         return 1;
       }
-    } else {
+    } else if (FLAG_HISTORY_WRITE.is_enabled()) {
       if (let const result = toiletline::history_write(); result.is_error()) {
         report_history_file_failure(ec, cxt, "write", result.error().message());
         return 1;
@@ -541,11 +536,6 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (FLAG_HISTORY_DELETE.is_set()) {
-    if (let const result = toiletline::history_read(); result.is_error()) {
-      report_history_file_failure(ec, cxt, "read", result.error().message());
-      return 1;
-    }
-
     let const read_events =
         toiletline::get_history_events(cxt.scratch_allocator());
     if (read_events.is_error()) {

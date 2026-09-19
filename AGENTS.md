@@ -52,6 +52,10 @@ changes update this file.
 - `src/Toiletline.cpp` defines the vendored editor configuration macros itself
   and cannot include `src/Toiletline.hpp`. A declaration that source must see
   belongs in a light header such as `src/ToiletlineHistory.hpp`.
+- Each shell loads history once at startup and then keeps a private branch with
+  session-local event numbers. Normal prompts and accepted-command appends do
+  not import peer records. Only explicit history synchronization replaces the
+  branch; cross-shell search uses a separate read-only file snapshot.
 - Owned source normalizes CRLF before lexing, analysis, evaluation, and
   diagnostics. A lone carriage return remains data.
 - Analysis streams one top-level and-or chain in two passes. The first gathers
