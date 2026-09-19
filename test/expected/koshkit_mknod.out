@@ -4,7 +4,17 @@ invalid-mode-status=1
 invalid-device-status=1
 missing-major-status=1 check=ok
 missing-minor-status=1 check=ok
+invalid-major-status=1 check=ok
+invalid-minor-status=1 check=ok
+masked-major-check=ok
+fifo-number-check=ok
+hybrid-named-check=ok
+hybrid-major-check=ok
+hybrid-minor-check=ok
+unused-operand-check=ok
+posix-device-check=ok
 device-check=ok
+type-device-check=ok
 help-examples=present
 redirected-error=plain
 named-extra-status=1

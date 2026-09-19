@@ -144,10 +144,12 @@ cli_tests: $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh cli
 
 ifneq ($(TARGET), Linux)
-NON_LINUX_SKIPPED_CLI_NAMES := cli_koshkit_eviliso_loopback
+NON_LINUX_SKIPPED_CLI_NAMES := \
+	cli_koshkit_eviliso_loopback \
+	cli_koshkit_mknod
 
 $(NON_LINUX_SKIPPED_CLI_NAMES):
-	@printf "\t%-64s skipped, requires Linux procfs\n" \
+	@printf "\t%-64s skipped, requires Linux\n" \
 		"cli/$(patsubst cli_%,%,$@).sh"
 endif
 

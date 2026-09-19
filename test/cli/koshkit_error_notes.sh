@@ -349,6 +349,24 @@ echo "=== chown specification location ==="
 echo "=== chown group location ==="
 "$BIN" -c 'koshkit chown :KOSH_MISSING_GROUP LICENSE' 2>&1
 
+echo "=== mknod major value location ==="
+"$BIN" -c 'koshkit mknod --block --major not-a-major --minor 2 node' 2>&1
+
+echo "=== mknod minor value location ==="
+"$BIN" -c 'koshkit mknod node b 1 not-a-minor' 2>&1
+
+echo "=== mknod unused operand location ==="
+"$BIN" -c 'koshkit mknod --major 1 --minor 2 --block node extra' 2>&1
+
+echo "=== mknod major range location ==="
+"$BIN" -c 'koshkit mknod --character --major 4096 --minor 2 node' 2>&1
+
+echo "=== mknod large major range location ==="
+"$BIN" -c 'koshkit mknod --character --major 4294967296 --minor 2 node' 2>&1
+
+echo "=== mknod minor range location ==="
+"$BIN" -c 'koshkit mknod node c 1 1048576' 2>&1
+
 echo "=== cut position list location ==="
 "$BIN" -c 'koshkit cut -b 0' 2>&1
 

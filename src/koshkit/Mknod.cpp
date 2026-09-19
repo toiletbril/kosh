@@ -43,11 +43,11 @@ static constexpr u32 FIFO_TYPE = 0010000;
 static constexpr u32 CHARACTER_TYPE = 0020000;
 static constexpr u32 BLOCK_TYPE = 0060000;
 
-fn parse_device_number(StringView text) throws -> Maybe<u32>
+fn parse_device_number(StringView text) throws -> Maybe<u64>
 {
   let const parsed = utils::parse_decimal_u64(text);
-  if (parsed.is_error() || parsed.value() > UINT32_MAX) return None;
-  return static_cast<u32>(parsed.value());
+  if (parsed.is_error()) return None;
+  return parsed.value();
 }
 
 pure fn node_type(StringView text) wontthrow -> Maybe<u32>
@@ -128,49 +128,99 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const is_fifo = *type == FIFO_TYPE;
+  if (is_fifo && (FLAG_MKNOD_MAJOR.is_set() || FLAG_MKNOD_MINOR.is_set())) {
+    KOSHKIT_REPORT_ERROR_AT(
+        FLAG_MKNOD_MAJOR.is_set() ? FLAG_MKNOD_MAJOR.value_location()
+                                  : FLAG_MKNOD_MINOR.value_location(),
+        "Device numbers require a character or block node",
+        "remove --major and --minor or choose a device node type");
+    return 1;
+  }
+
   let const has_named_type = named_type_count != 0;
-  usize number_index = has_named_type ? 1 : 2;
-  Maybe<u32> major_number;
-  Maybe<u32> minor_number;
-  if (FLAG_MKNOD_MAJOR.is_set())
-    major_number = parse_device_number(FLAG_MKNOD_MAJOR.value());
-  if (FLAG_MKNOD_MINOR.is_set())
-    minor_number = parse_device_number(FLAG_MKNOD_MINOR.value());
+  usize next_operand_index = has_named_type ? 1 : 2;
+  StringView major_text{};
+  StringView minor_text{};
+  SourceLocation major_location = type_location;
+  SourceLocation minor_location = type_location;
+  bool has_major_text = false;
+  bool has_minor_text = false;
+  Maybe<u64> major_number;
+  Maybe<u64> minor_number;
+  if (FLAG_MKNOD_MAJOR.is_set()) {
+    major_text = FLAG_MKNOD_MAJOR.value();
+    major_location = FLAG_MKNOD_MAJOR.value_location();
+    has_major_text = true;
+  }
+  if (FLAG_MKNOD_MINOR.is_set()) {
+    minor_text = FLAG_MKNOD_MINOR.value();
+    minor_location = FLAG_MKNOD_MINOR.value_location();
+    has_minor_text = true;
+  }
   if (!is_fifo) {
-    if (!major_number.has_value() && operands.count() > number_index)
-      major_number = parse_device_number(operands[number_index++].view());
-    if (!minor_number.has_value() && operands.count() > number_index)
-      minor_number = parse_device_number(operands[number_index++].view());
-    if (!major_number.has_value()) {
+    if (!has_major_text && operands.count() > next_operand_index) {
+      major_text = operands[next_operand_index].view();
+      major_location = operand_locations[next_operand_index++];
+      has_major_text = true;
+    }
+    if (!has_major_text) {
       KOSHKIT_REPORT_ERROR_AT(type_location, "Missing major device number",
                               "provide a major device number");
       return 1;
     }
-    if (!minor_number.has_value()) {
+    major_number = parse_device_number(major_text);
+    if (!major_number.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(major_location,
+                              "Invalid major device number '" +
+                                  String{allocator, major_text} + "'",
+                              "use an unsigned decimal integer");
+      return 1;
+    }
+    if (!has_minor_text && operands.count() > next_operand_index) {
+      minor_text = operands[next_operand_index].view();
+      minor_location = operand_locations[next_operand_index++];
+      has_minor_text = true;
+    }
+    if (!has_minor_text) {
       KOSHKIT_REPORT_ERROR_AT(type_location, "Missing minor device number",
                               "provide a minor device number");
       return 1;
     }
-    if (*major_number > 0xfffu || *minor_number > 0xfffffu) {
-      KOSHKIT_REPORT_ERROR_AT(type_location, "Device number is out of range",
-                              "major must fit 12 bits and minor must fit 20 bits");
+    minor_number = parse_device_number(minor_text);
+    if (!minor_number.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(minor_location,
+                              "Invalid minor device number '" +
+                                  String{allocator, minor_text} + "'",
+                              "use an unsigned decimal integer");
+      return 1;
+    }
+    if (*major_number > 0xfffu) {
+      KOSHKIT_REPORT_ERROR_AT(major_location,
+                              "Major device number '" +
+                                  String{allocator, major_text} +
+                                  "' is out of range",
+                              "use a major device number that fits 12 bits");
+      return 1;
+    }
+    if (*minor_number > 0xfffffu) {
+      KOSHKIT_REPORT_ERROR_AT(minor_location,
+                              "Minor device number '" +
+                                  String{allocator, minor_text} +
+                                  "' is out of range",
+                              "use a minor device number that fits 20 bits");
       return 1;
     }
   }
 
-  let const maximum_operand_count = has_named_type
-                                        ? (is_fifo ? usize{1} : usize{3})
-                                        : (is_fifo ? usize{2} : usize{4});
-  if (operands.count() > maximum_operand_count) {
-    KOSHKIT_REPORT_ERROR_AT(operand_locations[maximum_operand_count],
+  if (operands.count() > next_operand_index) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[next_operand_index],
                             "Too many operands",
                             "provide one name and one node specification");
     return 1;
   }
   u32 mode = 0666;
   if (FLAG_MKNOD_MODE.is_set()) {
-    let const parsed =
-        parse_file_mode(FLAG_MKNOD_MODE.value(), mode, 0, false);
+    let const parsed = parse_file_mode(FLAG_MKNOD_MODE.value(), mode, 0, false);
     if (!parsed.has_value())
     {
       KOSHKIT_REPORT_ERROR_AT(FLAG_MKNOD_MODE.value_location(),
@@ -183,10 +233,11 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   let const &name = operands[0];
-  let const did_create = is_fifo
-                             ? os::make_fifo(name.view(), mode)
-                             : os::make_device_node(name.view(), mode | *type,
-                                                    *major_number, *minor_number);
+  let const did_create =
+      is_fifo ? os::make_fifo(name.view(), mode)
+              : os::make_device_node(name.view(), mode | *type,
+                                     static_cast<u32>(*major_number),
+                                     static_cast<u32>(*minor_number));
   if (!did_create) {
     report_soft_koshkit_error(
         ec, cxt, "mknod: Cannot create '" + name +

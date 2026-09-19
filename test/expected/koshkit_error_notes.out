@@ -565,6 +565,36 @@ note: use owner, owner:group, or :group.
      1 |  koshkit chown :KOSH_MISSING_GROUP LICENSE
        |                ^~~~~~~~~~~~~~~~~~~
 note: use a group name or an unsigned decimal group id.
+=== mknod major value location ===
+1:31: error: mknod: Invalid major device number 'not-a-major'.
+     1 |  koshkit mknod --block --major not-a-major --minor 2 node
+       |                                ^~~~~~~~~~~
+note: use an unsigned decimal integer.
+=== mknod minor value location ===
+1:24: error: mknod: Invalid minor device number 'not-a-minor'.
+     1 |  koshkit mknod node b 1 not-a-minor
+       |                         ^~~~~~~~~~~
+note: use an unsigned decimal integer.
+=== mknod unused operand location ===
+1:48: error: mknod: Too many operands.
+     1 |  koshkit mknod --major 1 --minor 2 --block node extra
+       |                                                 ^~~~~
+note: provide one name and one node specification.
+=== mknod major range location ===
+1:35: error: mknod: Major device number '4096' is out of range.
+     1 |  koshkit mknod --character --major 4096 --minor 2 node
+       |                                    ^~~~
+note: use a major device number that fits 12 bits.
+=== mknod large major range location ===
+1:35: error: mknod: Major device number '4294967296' is out of range.
+     1 |  koshkit mknod --character --major 4294967296 --minor 2 node
+       |                                    ^~~~~~~~~~
+note: use a major device number that fits 12 bits.
+=== mknod minor range location ===
+1:24: error: mknod: Minor device number '1048576' is out of range.
+     1 |  koshkit mknod node c 1 1048576
+       |                         ^~~~~~~
+note: use a minor device number that fits 20 bits.
 === cut position list location ===
 1:16: error: cut: invalid position list '0'.
      1 |  koshkit cut -b 0
