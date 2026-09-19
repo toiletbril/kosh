@@ -145,6 +145,7 @@ _kosh_fc_complete()
 }
 
 complete -F _kosh_fc_complete fc
+complete -W '-c -d -n -r -a -w -p -s -S --sync --help' history
 complete -W '-r -R -p --help' hash
 complete -c -W '--help --posix -p -R' time
 

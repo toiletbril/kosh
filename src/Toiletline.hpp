@@ -52,6 +52,7 @@ bool is_history_contents_valid(StringView contents);
 void encode_history_record(String &output, StringView command);
 koshka::ErrorOr<koshka::Ok> history_write();
 koshka::ErrorOr<koshka::Ok> history_read();
+koshka::ErrorOr<koshka::Ok> sync_history();
 koshka::ErrorOr<koshka::Ok> history_clear();
 void set_history_enabled(bool is_enabled);
 void set_history_limit(usize entry_count);

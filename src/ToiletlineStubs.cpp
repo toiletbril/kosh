@@ -592,6 +592,19 @@ fn history_read() -> koshka::ErrorOr<koshka::Ok>
   return koshka::internal::load_no_editor_history(*path, false);
 }
 
+fn sync_history() -> koshka::ErrorOr<koshka::Ok>
+{
+  let const path = get_history_path();
+  if (!path.has_value()) return koshka::Error{"the path is unavailable"};
+  let const parent = path->parent_or_current();
+  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  if (!lock.has_value())
+    return koshka::Error{koshka::os::last_system_error_message()};
+  defer { koshka::os::release_process_lock(lock.take()); };
+
+  return koshka::internal::load_no_editor_history(*path, true);
+}
+
 fn history_clear() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_path();

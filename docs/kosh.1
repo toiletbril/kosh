@@ -1254,6 +1254,8 @@ option clears the cache. The
 option records path as the location of each name.
 .TP
 .B "history [\-cnrwaps] [\-d selector] [operand]"
+.br
+.B "history {\-S|\-\-sync}"
 Without a maintenance option the stored events are listed, and a numeric
 operand limits the listing to that many newest events. The
 .B \-r
@@ -1274,6 +1276,12 @@ events are bounded by
 Without an operand,
 .B \-a
 does nothing because accepted events are already appended immediately.
+The
+.B \-S
+and
+.B \-\-sync
+forms explicitly replace the private branch with a locked snapshot of the
+shared history file and accept no operand.
 The
 .B \-c
 option clears the stored history, and

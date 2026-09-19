@@ -19,7 +19,7 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-c] [-d offset] [-r|-n|-a|-w] [-p arg ...] [count]",
-                   "-s [arg ...]");
+                   "-s [arg ...]", "-S|--sync");
 HELP_DESCRIPTION_DECL(
     "The history builtin lists and maintains the interactive command history.");
 
@@ -31,6 +31,7 @@ FLAG(HISTORY_READ, Bool, 'r', "", "Read the history file into the list.");
 FLAG(HISTORY_WRITE, Bool, 'w', "", "Write the history list to the file.");
 FLAG(HISTORY_PRINT, Bool, 'p', "", "Print the operands, storing nothing.");
 FLAG(HISTORY_STORE, Bool, 's', "", "Store the operands as a history event.");
+FLAG(HISTORY_SYNC, Bool, 'S', "sync", "Reload the shared history explicitly.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(History);
@@ -428,6 +429,21 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     LOG(Debug, "history clearing the list");
     if (let const result = toiletline::history_clear(); result.is_error()) {
       report_history_file_failure(ec, cxt, "clear", result.error().message());
+      return 1;
+    }
+
+    did_maintain_list = true;
+  }
+
+  if (FLAG_HISTORY_SYNC.is_enabled()) {
+    LOG(Debug, "history synchronizing the private branch");
+    if (args.count() > 1) {
+      report_soft_builtin_error(ec, cxt, ec.arg_location_at(1),
+                                "history sync takes no operand");
+      return 1;
+    }
+    if (let const result = toiletline::sync_history(); result.is_error()) {
+      report_history_file_failure(ec, cxt, "sync", result.error().message());
       return 1;
     }
 
