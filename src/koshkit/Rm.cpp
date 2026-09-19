@@ -158,19 +158,19 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
   for (const String &operand : operands) {
     if (names_dot_or_dotdot(operand.view())) {
-      report_soft_koshkit_error(ec, cxt,
-                                "rm: refusing to remove '.' or '..' directory: "
-                                "skipping '" +
-                                    operand + "'");
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "refusing to remove '.' or '..' directory: "
+          "skipping '" +
+              operand + "'");
       status = 1;
       continue;
     }
 
     if (names_root_directory(operand.view())) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "rm: refusing to remove the root directory: skipping '" + operand +
-              "'");
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "refusing to remove the root directory: skipping '" + operand + "'");
       status = 1;
       continue;
     }
@@ -178,9 +178,9 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
     let const target = Path{operand.view()};
     if (!target.exists() && !target.is_symbolic_link()) {
       if (should_force) continue;
-      report_soft_koshkit_error(ec, cxt,
-                                "rm: cannot remove '" + operand +
-                                    "': no such file or directory");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot remove '" + operand +
+                                         "': no such file or directory");
       status = 1;
       continue;
     }
@@ -197,9 +197,9 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
                                               : removal_mode::SinglePath,
                                  should_prompt))
     {
-      report_soft_koshkit_error(ec, cxt,
-                                "rm: cannot remove '" + operand +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot remove '" + operand + "': " +
+                                         os::last_system_error_message());
       status = 1;
     }
   }

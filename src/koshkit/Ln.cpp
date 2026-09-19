@@ -89,8 +89,9 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
           os::last_system_error_is_missing_file()
               ? String{cxt.scratch_allocator(), "No such file or directory"}
               : os::last_system_error_message();
-      report_soft_koshkit_error(
-          ec, cxt, "ln: cannot create link '" + link + "': " + reason);
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot create link '" + link +
+                                         "': " + reason);
       status = 1;
     }
   }

@@ -239,9 +239,9 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
                                      static_cast<u32>(*major_number),
                                      static_cast<u32>(*minor_number));
   if (!did_create) {
-    report_soft_koshkit_error(
-        ec, cxt, "mknod: Cannot create '" + name +
-                       "': " + os::last_system_error_message());
+    report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                   "Cannot create '" + name +
+                                       "': " + os::last_system_error_message());
     status = 1;
   }
   return status;
