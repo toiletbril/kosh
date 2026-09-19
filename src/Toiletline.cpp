@@ -808,6 +808,51 @@ static fn get_calc_history_file_path() -> koshka::Maybe<koshka::Path>
   return resolve_history_path("KOSH_CALC_HISTORY", KOSH_CALC_HISTORY_FILE);
 }
 
+static String HISTORY_SEARCH_SNAPSHOT{koshka::heap_allocator()};
+
+static fn provide_history_search_snapshot(const char **out_contents,
+                                          size_t *out_size) -> int
+{
+  if (out_contents == nullptr || out_size == nullptr) return 0;
+
+  try {
+    let const path = get_history_file_path();
+    if (!path.has_value()) return 0;
+    let const parent = path->parent_or_current();
+    let lock = os::acquire_process_lock(parent.text().view());
+    if (!lock.has_value()) return 0;
+    defer { os::release_process_lock(lock.take()); };
+
+    for (int attempt_index = 0; attempt_index < HISTORY_RACE_ATTEMPT_COUNT;
+         attempt_index++)
+    {
+      let status_before = os::file_status{};
+      if (!os::stat_path_following(path->text().view(), status_before)) {
+        if (!os::last_system_error_is_missing_file()) return 0;
+
+        HISTORY_SEARCH_SNAPSHOT.clear();
+        *out_contents = HISTORY_SEARCH_SNAPSHOT.data();
+        *out_size = 0;
+        return 1;
+      }
+
+      let contents = path->read_entire_file();
+      if (!contents.has_value()) continue;
+      let status_after = os::file_status{};
+      if (!os::stat_path_following(path->text().view(), status_after)) continue;
+      if (!os::file_status_matches(status_before, status_after)) continue;
+      if (!is_history_contents_valid(contents->view())) return 0;
+
+      HISTORY_SEARCH_SNAPSHOT = contents.take();
+      *out_contents = HISTORY_SEARCH_SNAPSHOT.data();
+      *out_size = HISTORY_SEARCH_SNAPSHOT.count();
+      return 1;
+    }
+  } catch (...) {}
+
+  return 0;
+}
+
 static bool IS_CALC_HISTORY_ACTIVE = false;
 
 struct history_snapshot
@@ -1825,6 +1870,8 @@ fn initialize() -> void
             koshka::os::last_system_error_message(),
         "The input is not a terminal, pass `-` to read stdin or `-c`/`-s`"};
   }
+
+  ::tl_set_history_search_snapshot_callback(provide_history_search_snapshot);
 }
 
 static fn compact_history_file(usize entry_limit) -> bool
@@ -1877,6 +1924,8 @@ fn exit(usize history_size_limit) -> void
             koshka::os::last_system_error_message(),
         "The terminal may be left in raw mode, run `reset` to recover"};
   }
+
+  ::tl_set_history_search_snapshot_callback(nullptr);
 
   ::tl_set_wake_callback(nullptr);
   JOB_CONTEXT = nullptr;

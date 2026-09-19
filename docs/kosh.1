@@ -2259,8 +2259,9 @@ answers beside it, reading
 .B selecting completions
 for the candidates of a token and
 .B incremental history search
-for the history of the session. The terminal height bounds the number of rows,
-and a count row names the part that is drawn.
+for a stable snapshot of the shared history file. Opening the search does not
+replace or merge the session's private history. The terminal height bounds the
+number of rows, and a count row names the part that is drawn.
 .PP
 A printable key is inserted into the token, and the menu is drawn again from the
 candidates that still match. A candidate matches when the token opens it, when
