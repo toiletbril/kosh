@@ -99,6 +99,23 @@ struct linux_unix_socket_peer
   u64 peer_identity{0};
 };
 
+static fn linux_socket_proc_path(StringView suffix, Allocator allocator) throws
+    -> String
+{
+#ifndef NDEBUG
+  if (let const *root = std::getenv("KOSH_TEST_SOCKET_PROC");
+      root != nullptr && root[0] != '\0')
+  {
+    let path = String{allocator, root};
+    path += suffix;
+    return path;
+  }
+#endif
+  let path = String{allocator, "/proc"};
+  path += suffix;
+  return path;
+}
+
 static fn linux_unix_socket_peers(Allocator allocator) throws
     -> ArrayList<linux_unix_socket_peer>
 {
@@ -271,7 +288,8 @@ static fn linux_unix_sockets(bool should_include_process_ids,
   let result = ArrayList<network_socket_entry>{allocator};
   let const peers = linux_unix_socket_peers(allocator);
   char buffer[1024 * 1024];
-  let const length = read_small_file("/proc/net/unix", buffer, sizeof(buffer));
+  let const path = linux_socket_proc_path("/net/unix", allocator);
+  let const length = read_small_file(path.c_str(), buffer, sizeof(buffer));
   if (length == 0) return result;
 
   let const text = StringView{buffer, length};
@@ -341,7 +359,8 @@ static fn linux_socket_owners(Allocator allocator) throws
     -> ArrayList<linux_socket_owner>
 {
   let owners = ArrayList<linux_socket_owner>{allocator};
-  DIR *proc_directory = ::opendir("/proc");
+  let const proc_path = linux_socket_proc_path({}, allocator);
+  DIR *proc_directory = ::opendir(proc_path.c_str());
   if (proc_directory == nullptr) return owners;
   defer { ::closedir(proc_directory); };
 
@@ -352,16 +371,11 @@ static fn linux_socket_owners(Allocator allocator) throws
     let const parsed_pid = name.to<u32>();
     if (parsed_pid.is_error()) continue;
 
-    let const process_directory = String{"/proc/"} + name;
+    let const process_directory = proc_path + "/" + name;
     let const start_token = linux_process_start_token(process_directory.view());
 
-    char descriptor_path[80];
-    let const path_length = std::snprintf(
-        descriptor_path, sizeof(descriptor_path), "/proc/%s/fd", entry->d_name);
-    if (path_length <= 0 ||
-        static_cast<usize>(path_length) >= sizeof(descriptor_path))
-      continue;
-    DIR *descriptor_directory = ::opendir(descriptor_path);
+    let const descriptor_path = process_directory + "/fd";
+    DIR *descriptor_directory = ::opendir(descriptor_path.c_str());
     if (descriptor_directory == nullptr) continue;
 
     let const descriptor_directory_fd = ::dirfd(descriptor_directory);
@@ -402,15 +416,13 @@ static fn linux_socket_owners(Allocator allocator) throws
 }
 
 static fn linux_network_sockets_from_file(
-    StringView path, network_socket_protocol protocol,
+    StringView path, network_socket_protocol protocol, bool is_ipv6,
     bool should_include_process_ids,
     const ArrayList<linux_socket_owner> *owners, Allocator allocator) throws
     -> ArrayList<network_socket_entry>
 {
   let result = ArrayList<network_socket_entry>{allocator};
   const String path_string{path};
-  let const is_ipv6 = path == StringView{"/proc/net/tcp6"} ||
-                      path == StringView{"/proc/net/udp6"};
   char buffer[1024 * 1024];
   let const length =
       read_small_file(path_string.c_str(), buffer, sizeof(buffer));
@@ -1145,18 +1157,21 @@ fn network_sockets(bool should_include_process_ids) throws
   if (should_include_process_ids) owners = linux_socket_owners(allocator);
   struct linux_socket_source
   {
-    StringView path;
+    StringView suffix;
     network_socket_protocol protocol;
+    bool is_ipv6;
   };
   constexpr linux_socket_source SOURCES[] = {
-      {"/proc/net/tcp",  network_socket_protocol::Tcp},
-      {"/proc/net/tcp6", network_socket_protocol::Tcp},
-      {"/proc/net/udp",  network_socket_protocol::Udp},
-      {"/proc/net/udp6", network_socket_protocol::Udp},
+      {"/net/tcp",  network_socket_protocol::Tcp, false},
+      {"/net/tcp6", network_socket_protocol::Tcp, true },
+      {"/net/udp",  network_socket_protocol::Udp, false},
+      {"/net/udp6", network_socket_protocol::Udp, true },
   };
   for (let const &source : SOURCES) {
+    let const path = linux_socket_proc_path(source.suffix, allocator);
     let entries = linux_network_sockets_from_file(
-        source.path, source.protocol, should_include_process_ids,
+        path.view(), source.protocol, source.is_ipv6,
+        should_include_process_ids,
         should_include_process_ids ? &owners : nullptr, allocator);
     for (let &entry : entries)
       result.push(steal(entry));
