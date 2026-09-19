@@ -163,6 +163,26 @@ def main():
         for suffix in ("Fusion", "Render"):
             open(os.path.join(wide, long_candidate_prefix + suffix), "w").close()
 
+        semantic = os.path.join(directory, "semantic")
+        os.mkdir(semantic)
+        for name in ("--stale-one", "--stale-two"):
+            open(os.path.join(semantic, name), "w").close()
+        fake_bin = os.path.join(directory, "bin")
+        os.mkdir(fake_bin)
+        tailscale = os.path.join(fake_bin, "tailscale")
+        with open(tailscale, "w") as fake:
+            fake.write(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = status ]; then\n"
+                "  printf 'OPTIONS\\n  --json  Print JSON\\n"
+                "  --peers  Print peers\\n'\n"
+                "else\n"
+                "  printf 'SUBCOMMANDS\\n  status  Show status\\n"
+                "  stop  Stop Tailscale\\n'\n"
+                "fi\n"
+            )
+        os.chmod(tailscale, 0o755)
+
         typed = "printf '<%s>\\n' alpha"
         tall_typed = "printf '<%s>\\n' menu"
         deep_typed = "printf '<%s>\\n' deep"
@@ -274,6 +294,19 @@ def main():
         )
         whole_word_backspace_keeps_menu_open = (
             b"<alpha-one>" in word_erased
+        )
+
+        semantic_menu, _, _ = run_menu(
+            directory,
+            "semantic",
+            "tailscale s",
+            [b"atus --"],
+            environment={
+                "PATH": fake_bin + os.pathsep + os.environ.get("PATH", "")
+            },
+        )
+        each_new_word_regathers_completions = (
+            b"--json" in semantic_menu and b"--peers" in semantic_menu
         )
 
         # A search that matches nothing keeps the menu open on the row that says
@@ -433,6 +466,9 @@ def main():
             "BACKSPACE_WIDENS_THE_LIST": backspace_widens_the_list,
             "WHOLE_WORD_BACKSPACE_KEEPS_MENU_OPEN": (
                 whole_word_backspace_keeps_menu_open
+            ),
+            "EACH_NEW_WORD_REGATHERS_COMPLETIONS": (
+                each_new_word_regathers_completions
             ),
             "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
                 an_empty_search_keeps_the_menu_open
