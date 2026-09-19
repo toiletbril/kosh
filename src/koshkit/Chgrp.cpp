@@ -59,28 +59,15 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  let const should_recurse = FLAG_CHGRP_RECURSIVE.is_enabled();
-  let traversal_position = FLAG_CHGRP_COMMAND_LINE_FOLLOW.position();
-  if (FLAG_CHGRP_FOLLOW.position() > traversal_position)
-    traversal_position = FLAG_CHGRP_FOLLOW.position();
-  if (FLAG_CHGRP_PHYSICAL.position() > traversal_position)
-    traversal_position = FLAG_CHGRP_PHYSICAL.position();
-  let const should_follow_nested =
-      FLAG_CHGRP_FOLLOW.position() == traversal_position &&
-      traversal_position != 0;
-  let const should_follow_command_line =
-      should_follow_nested ||
-      (FLAG_CHGRP_COMMAND_LINE_FOLLOW.position() == traversal_position &&
-       traversal_position != 0);
-  let const should_follow_argument =
-      !FLAG_CHGRP_NO_DEREFERENCE.is_enabled() &&
-      (!should_recurse || should_follow_command_line);
   i32 status = 0;
 
   for (usize index = 1; index < operands.count(); index++)
     if (!utils::change_path_ownership(
             ec, cxt, "chgrp", Path{operands[index].view()}, -1, *group_id,
-            should_recurse, should_follow_argument, should_follow_nested))
+            FLAG_CHGRP_RECURSIVE.is_enabled(),
+            FLAG_CHGRP_NO_DEREFERENCE.is_enabled(),
+            FLAG_CHGRP_COMMAND_LINE_FOLLOW.position(),
+            FLAG_CHGRP_FOLLOW.position(), FLAG_CHGRP_PHYSICAL.position()))
       status = 1;
 
   return status;

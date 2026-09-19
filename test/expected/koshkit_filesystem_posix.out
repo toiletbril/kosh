@@ -58,6 +58,64 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "chgrp=$?"]
   [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$root/ownership/tree/child" "$root/ownership/loop/child"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "$root/ownership/missing" "$root/ownership/tree/broken"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "$root/ownership/loop" "$root/ownership/loop/child/back"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-h" "$uid:$gid" "$root/ownership/tree/broken"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-no-dereference=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "$uid:$gid" "$root/ownership/tree/broken"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-dereference=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-P" "$uid:$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-physical=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-H" "$uid:$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-arguments=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-H" "$uid:$gid" "$root/ownership/tree/broken"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-argument-dereference=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-L" "$uid:$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-logical=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-L" "-P" "$uid:$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-logical-physical=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-P" "-L" "$uid:$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-physical-logical=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chown" "-R" "-L" "$uid:$gid" "$root/ownership/loop"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chown-loop=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chgrp" "-h" "$gid" "$root/ownership/tree/broken"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chgrp-no-dereference=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chgrp" "-R" "-P" "$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chgrp-physical=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chgrp" "-R" "-H" "$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chgrp-arguments=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "chgrp" "-R" "-L" "$gid" "$root/ownership/tree"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "chgrp-logical=$?"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "ln" "-s" "$root/mode" "$root/ln-symbolic"]
   [CompoundListCondition, None]
     [ConditionalCommand]
@@ -336,6 +394,443 @@
   Unquoted "koshkit"
 ]
 [Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree/child"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/loop/child"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/missing"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree/broken"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/loop"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/loop/child/back"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-h"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree/broken"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-no-dereference="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree/broken"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-dereference="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-physical="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-H"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-arguments="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-H"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree/broken"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-argument-dereference="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-logical="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-logical-physical="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-physical-logical="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chown"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Variable "uid"
+  DoubleQuoted ":"
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/loop"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chown-loop="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chgrp"
+]
+[Word
+  Unquoted "-h"
+]
+[Word
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree/broken"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chgrp-no-dereference="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chgrp"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-P"
+]
+[Word
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chgrp-physical="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chgrp"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-H"
+]
+[Word
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chgrp-arguments="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "chgrp"
+]
+[Word
+  Unquoted "-R"
+]
+[Word
+  Unquoted "-L"
+]
+[Word
+  Variable "gid"
+]
+[Word
+  Variable "root"
+  DoubleQuoted "/ownership/tree"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "chgrp-logical="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "ln"
 ]
 [Word
@@ -486,6 +981,19 @@ chmod-umask=-rw-r--r--
 chown=0
 chown-name=0
 chgrp=0
+chown-no-dereference=0
+chown-dereference=1
+chown-physical=0
+chown-arguments=0
+chown-argument-dereference=1
+chown-logical=1
+chown-logical-physical=0
+chown-physical-logical=1
+chown-loop=1
+chgrp-no-dereference=0
+chgrp-physical=0
+chgrp-arguments=0
+chgrp-logical=1
 ln-symbolic=0
 mkfifo=prw-------
 mkfifo-existing=1

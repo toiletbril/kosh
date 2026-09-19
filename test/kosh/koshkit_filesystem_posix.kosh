@@ -38,6 +38,44 @@ echo "chown-name=$?"
 koshkit chgrp "$gid" "$root/mode"
 echo "chgrp=$?"
 
+koshkit mkdir -p "$root/ownership/tree/child" "$root/ownership/loop/child"
+koshkit ln -s "$root/ownership/missing" "$root/ownership/tree/broken"
+koshkit ln -s "$root/ownership/loop" "$root/ownership/loop/child/back"
+
+koshkit chown -h "$uid:$gid" "$root/ownership/tree/broken"
+echo "chown-no-dereference=$?"
+koshkit chown "$uid:$gid" "$root/ownership/tree/broken" \
+  2> "$TEST_NULL_DEVICE"
+echo "chown-dereference=$?"
+koshkit chown -R -P "$uid:$gid" "$root/ownership/tree"
+echo "chown-physical=$?"
+koshkit chown -R -H "$uid:$gid" "$root/ownership/tree"
+echo "chown-arguments=$?"
+koshkit chown -R -H "$uid:$gid" "$root/ownership/tree/broken" \
+  2> "$TEST_NULL_DEVICE"
+echo "chown-argument-dereference=$?"
+koshkit chown -R -L "$uid:$gid" "$root/ownership/tree" \
+  2> "$TEST_NULL_DEVICE"
+echo "chown-logical=$?"
+koshkit chown -R -L -P "$uid:$gid" "$root/ownership/tree"
+echo "chown-logical-physical=$?"
+koshkit chown -R -P -L "$uid:$gid" "$root/ownership/tree" \
+  2> "$TEST_NULL_DEVICE"
+echo "chown-physical-logical=$?"
+koshkit chown -R -L "$uid:$gid" "$root/ownership/loop" \
+  2> "$TEST_NULL_DEVICE"
+echo "chown-loop=$?"
+
+koshkit chgrp -h "$gid" "$root/ownership/tree/broken"
+echo "chgrp-no-dereference=$?"
+koshkit chgrp -R -P "$gid" "$root/ownership/tree"
+echo "chgrp-physical=$?"
+koshkit chgrp -R -H "$gid" "$root/ownership/tree"
+echo "chgrp-arguments=$?"
+koshkit chgrp -R -L "$gid" "$root/ownership/tree" \
+  2> "$TEST_NULL_DEVICE"
+echo "chgrp-logical=$?"
+
 koshkit ln -s "$root/mode" "$root/ln-symbolic"
 [[ -L "$root/ln-symbolic" ]]
 echo "ln-symbolic=$?"

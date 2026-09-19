@@ -63,11 +63,12 @@ static fn change_path_ownership_recursive(
   }
 
   if (!should_recurse) return true;
+  if (is_symlink && !should_follow_symlink) return true;
+
   os::file_status followed_status{};
   if (!os::stat_path_following(path.text().view(), followed_status))
     return true;
   if (os::file_type_letter(followed_status.mode) != 'd') return true;
-  if (is_symlink && !should_follow_symlink) return true;
 
   if (followed_status.has_file_identity) {
     for (let const &identity : active_directories) {
@@ -102,11 +103,10 @@ static fn change_path_ownership_recursive(
   bool did_succeed = true;
   for (const String &name : *children) {
     let child = PathBuilder{path.text().view()}.append(name.view()).build();
-    let const child_is_symlink = child.is_symbolic_link();
     if (!change_path_ownership_recursive(
             ec, cxt, utility_name, child, owner_id, group_id, true,
-            child_is_symlink && should_follow_nested_symlinks,
-            should_follow_nested_symlinks, active_directories))
+            should_follow_nested_symlinks, should_follow_nested_symlinks,
+            active_directories))
       did_succeed = false;
   }
 
@@ -132,15 +132,32 @@ fn resolve_group_id(StringView text) throws -> Maybe<u32>
 fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
                          StringView utility_name, const Path &path,
                          i64 owner_id, i64 group_id, bool should_recurse,
-                         bool should_follow_symlink,
-                         bool should_follow_nested_symlinks) throws -> bool
+                         bool should_not_dereference,
+                         usize command_line_follow_position,
+                         usize follow_position, usize physical_position) throws
+    -> bool
 {
+  let traversal_position = command_line_follow_position;
+  if (follow_position > traversal_position)
+    traversal_position = follow_position;
+  if (physical_position > traversal_position)
+    traversal_position = physical_position;
+
+  let const should_follow_nested =
+      follow_position == traversal_position && traversal_position != 0;
+  let const should_follow_command_line =
+      should_follow_nested ||
+      (command_line_follow_position == traversal_position &&
+       traversal_position != 0);
+  let const should_follow_argument =
+      !should_not_dereference &&
+      (!should_recurse || should_follow_command_line);
   let active_directories =
       ArrayList<ownership_directory_identity>{cxt.scratch_allocator()};
 
   return change_path_ownership_recursive(
       ec, cxt, utility_name, path, owner_id, group_id, should_recurse,
-      should_follow_symlink, should_follow_nested_symlinks, active_directories);
+      should_follow_argument, should_follow_nested, active_directories);
 }
 
 } /* namespace koshka::utils */

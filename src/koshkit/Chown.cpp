@@ -96,28 +96,15 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
     group_id = *resolved;
   }
 
-  let const should_recurse = FLAG_CHOWN_RECURSIVE.is_enabled();
-  let traversal_position = FLAG_CHOWN_COMMAND_LINE_FOLLOW.position();
-  if (FLAG_CHOWN_FOLLOW.position() > traversal_position)
-    traversal_position = FLAG_CHOWN_FOLLOW.position();
-  if (FLAG_CHOWN_PHYSICAL.position() > traversal_position)
-    traversal_position = FLAG_CHOWN_PHYSICAL.position();
-  let const should_follow_nested =
-      FLAG_CHOWN_FOLLOW.position() == traversal_position &&
-      traversal_position != 0;
-  let const should_follow_command_line =
-      should_follow_nested ||
-      (FLAG_CHOWN_COMMAND_LINE_FOLLOW.position() == traversal_position &&
-       traversal_position != 0);
-  let const should_follow_argument =
-      !FLAG_CHOWN_NO_DEREFERENCE.is_enabled() &&
-      (!should_recurse || should_follow_command_line);
   i32 status = 0;
 
   for (usize index = 1; index < operands.count(); index++)
     if (!utils::change_path_ownership(
             ec, cxt, "chown", Path{operands[index].view()}, owner_id, group_id,
-            should_recurse, should_follow_argument, should_follow_nested))
+            FLAG_CHOWN_RECURSIVE.is_enabled(),
+            FLAG_CHOWN_NO_DEREFERENCE.is_enabled(),
+            FLAG_CHOWN_COMMAND_LINE_FOLLOW.position(),
+            FLAG_CHOWN_FOLLOW.position(), FLAG_CHOWN_PHYSICAL.position()))
       status = 1;
 
   return status;

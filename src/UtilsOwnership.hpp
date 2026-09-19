@@ -25,8 +25,10 @@ fn resolve_group_id(StringView text) throws -> Maybe<u32>;
 fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
                          StringView utility_name, const Path &path,
                          i64 owner_id, i64 group_id, bool should_recurse,
-                         bool should_follow_symlink,
-                         bool should_follow_nested_symlinks) throws -> bool;
+                         bool should_not_dereference,
+                         usize command_line_follow_position,
+                         usize follow_position, usize physical_position) throws
+    -> bool;
 
 } /* namespace utils */
 
