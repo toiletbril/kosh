@@ -13,6 +13,7 @@ import pty
 import select
 import signal
 import struct
+import subprocess
 import sys
 import tempfile
 import termios
@@ -56,7 +57,16 @@ def read_until_idle(master, timeout, required_output=None):
     return output
 
 
-def run_history_search(directory, keys, rows=24):
+def run_history_search(
+    directory,
+    keys,
+    rows=24,
+    add_peer=False,
+    no_completion=False,
+    recall_before_search=False,
+    post_search_keys=(),
+    tail_source=None,
+):
     """Seed the history, press ctrl-R, send the keys, then submit the line.
 
     The transcript is split at ctrl-R. A check can tell what the search drew
@@ -73,15 +83,44 @@ def run_history_search(directory, keys, rows=24):
         os.environ["HOME"] = directory
         os.environ["KOSH_HISTORY_FILE"] = history_file
         os.chdir(directory)
-        os.execv(
+        arguments = [
             binary,
-            [binary, "--norc", "--no-diagnostics", "--tab-selector", "plain"],
-        )
+            "--norc",
+            "--no-diagnostics",
+            "--tab-selector",
+            "plain",
+        ]
+        if no_completion:
+            arguments.append("--no-completion")
+        os.execv(binary, arguments)
 
     read_until_idle(master, 3)
     for command in SEEDED_COMMANDS:
         os.write(master, command.encode() + b"\n")
         read_until_idle(master, 2)
+
+    if add_peer:
+        peer_environment = os.environ.copy()
+        peer_environment["HOME"] = directory
+        peer_environment["KOSH_HISTORY_FILE"] = history_file
+        subprocess.run(
+            [
+                binary,
+                "--no-init-files",
+                "-c",
+                "history -s 'echo PEER-ONLY-HISTORY'",
+            ],
+            env=peer_environment,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    if recall_before_search:
+        os.write(master, b"\x1b[A")
+        read_until_idle(master, 1)
+        os.write(master, b"\x15")
+        read_until_idle(master, 1)
 
     os.write(master, b"\x12")
     search = read_until_idle(master, 2)
@@ -90,11 +129,17 @@ def run_history_search(directory, keys, rows=24):
         os.write(master, key)
         search += read_until_idle(master, 1)
 
+    for key in post_search_keys:
+        os.write(master, key)
+        search += read_until_idle(master, 1)
+
     # Accepting a match only rewrites the line. The run needs a submit of its
     # own.
     os.write(master, b"\n")
     search += read_until_idle(master, 2)
-    os.write(master, b"printf 'MARKER-%s\\n' END\nexit\n")
+    if tail_source is None:
+        tail_source = "printf 'MARKER-%s\\n' END"
+    os.write(master, tail_source.encode() + b"\nexit\n")
     tail = read_until_idle(master, 2)
     os.close(master)
 
@@ -172,6 +217,42 @@ def main():
         unmatched, _ = run_history_search(directory, [b"zzz", b"\n"])
         an_unmatched_query_accepts_nothing = b"<three>" not in unmatched
 
+        private_history_path = os.path.join(directory, "private-history")
+        peer_search, peer_marker = run_history_search(
+            directory,
+            [b"PEER-ONLY", b"\t"],
+            add_peer=True,
+            recall_before_search=True,
+            post_search_keys=(b"\x1b[A", b"\x1b[B", b"\x15"),
+            tail_source=(
+                f"history > {private_history_path}; "
+                "printf 'PEER-MARKER-%s\\n' END"
+            ),
+        )
+        with open(private_history_path, encoding="utf-8") as private_history:
+            private_listing = private_history.read()
+        search_reads_peer_history = (
+            b"echo PEER-ONLY-HISTORY" in peer_search
+        )
+        search_does_not_merge_peer_history = (
+            "echo PEER-ONLY-HISTORY" not in private_listing
+            and SEEDED_COMMANDS[-1] in private_listing
+            and b"PEER-MARKER-END" in peer_marker
+        )
+        accepted_peer_returns_to_private_navigation = (
+            SEEDED_COMMANDS[-1].encode() in peer_search
+        )
+
+        no_completion_search, _ = run_history_search(
+            directory,
+            [b"PEER-ONLY", b"\x1b"],
+            add_peer=True,
+            no_completion=True,
+        )
+        no_completion_still_reads_peer_history = (
+            b"echo PEER-ONLY-HISTORY" in no_completion_search
+        )
+
         prompt_stays_usable = b"MARKER-END" in marker
 
         results = {
@@ -190,6 +271,16 @@ def main():
             "CONTROL_G_LEAVES_THE_LINE_ALONE": control_g_leaves_the_line_alone,
             "AN_UNMATCHED_QUERY_ACCEPTS_NOTHING": (
                 an_unmatched_query_accepts_nothing
+            ),
+            "SEARCH_READS_PEER_HISTORY": search_reads_peer_history,
+            "SEARCH_DOES_NOT_MERGE_PEER_HISTORY": (
+                search_does_not_merge_peer_history
+            ),
+            "ACCEPTED_PEER_RETURNS_TO_PRIVATE_NAVIGATION": (
+                accepted_peer_returns_to_private_navigation
+            ),
+            "NO_COMPLETION_STILL_READS_PEER_HISTORY": (
+                no_completion_still_reads_peer_history
             ),
             "PROMPT_STAYS_USABLE": prompt_stays_usable,
         }

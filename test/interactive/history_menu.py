@@ -13,6 +13,7 @@ import pty
 import select
 import signal
 import struct
+import subprocess
 import sys
 import tempfile
 import termios
@@ -54,7 +55,7 @@ def read_until_idle(master, timeout, required_output=None):
     return output
 
 
-def run_history_menu(directory, typed, keys, rows=24):
+def run_history_menu(directory, typed, keys, rows=24, add_peer=False):
     """Seed the history, type the words, press ctrl-R, and send the keys.
 
     The transcript is split at ctrl-R. A check can tell what the menu drew from
@@ -77,6 +78,25 @@ def run_history_menu(directory, typed, keys, rows=24):
     for command in SEEDED_COMMANDS:
         os.write(master, command.encode() + b"\n")
         read_until_idle(master, 2)
+
+    if add_peer:
+        peer_environment = os.environ.copy()
+        peer_environment["HOME"] = directory
+        peer_environment["KOSH_HISTORY_FILE"] = os.path.join(
+            directory, "history"
+        )
+        subprocess.run(
+            [
+                binary,
+                "--no-init-files",
+                "-c",
+                "history -s 'echo PEER-ONLY-HISTORY'",
+            ],
+            env=peer_environment,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     if typed:
         os.write(master, typed.encode())
@@ -214,6 +234,11 @@ def main():
         )
         an_unmatched_line_survives = b"<zzz>" in unmatched
 
+        peer, _ = run_history_menu(
+            directory, "PEER-ONLY", [b"\t"], add_peer=True
+        )
+        menu_reads_peer_history = b"PEER-ONLY-HISTORY" in peer
+
         prompt_stays_usable = b"MARKER-END" in marker
 
         results = {
@@ -241,6 +266,7 @@ def main():
             ),
             "ESCAPE_LEAVES_THE_LINE_ALONE": escape_leaves_the_line_alone,
             "AN_UNMATCHED_LINE_SURVIVES": an_unmatched_line_survives,
+            "MENU_READS_PEER_HISTORY": menu_reads_peer_history,
             "PROMPT_STAYS_USABLE": prompt_stays_usable,
         }
 
