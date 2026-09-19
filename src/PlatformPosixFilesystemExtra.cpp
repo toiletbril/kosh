@@ -1686,6 +1686,13 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
             break;
           case batched_syscall_id::Lstat:
           case batched_syscall_id::Stat:
+            if (error_number == EOPNOTSUPP || error_number == EINVAL) {
+              execute_batched_syscall_direct(operations[operation_index],
+                                             result);
+            } else {
+              result.error_number = error_number;
+            }
+            break;
           case batched_syscall_id::Invalid:
             result.error_number = error_number;
             break;
