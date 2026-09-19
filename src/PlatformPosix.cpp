@@ -24,6 +24,13 @@
 #include <syslog.h>
 #include <utmpx.h>
 
+#if defined __linux__
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <linux/sock_diag.h>
+#include <linux/unix_diag.h>
+#endif
+
 namespace koshka {
 namespace os {
 
@@ -86,6 +93,137 @@ struct linux_socket_owner
   bool has_start_token{false};
 };
 
+struct linux_unix_socket_peer
+{
+  u64 identity{0};
+  u64 peer_identity{0};
+};
+
+static fn linux_unix_socket_peers(Allocator allocator) throws
+    -> ArrayList<linux_unix_socket_peer>
+{
+  let peers = ArrayList<linux_unix_socket_peer>{allocator};
+  let const descriptor =
+      ::socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_SOCK_DIAG);
+  if (descriptor < 0) return peers;
+  defer { ::close(descriptor); };
+
+  struct
+  {
+    struct nlmsghdr header;
+    struct unix_diag_req request;
+  } message{};
+  message.header.nlmsg_len = NLMSG_LENGTH(sizeof(message.request));
+  message.header.nlmsg_type = SOCK_DIAG_BY_FAMILY;
+  message.header.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+  message.header.nlmsg_seq = 1;
+  message.request.sdiag_family = AF_UNIX;
+  message.request.udiag_states = UINT32_MAX;
+  message.request.udiag_show = UDIAG_SHOW_PEER;
+  struct sockaddr_nl kernel{};
+  kernel.nl_family = AF_NETLINK;
+  if (::sendto(descriptor, &message, message.header.nlmsg_len, 0,
+               reinterpret_cast<struct sockaddr *>(&kernel),
+               sizeof(kernel)) < 0)
+    return peers;
+
+  let const deadline_nanos = monotonic_nanos() + 1000000000;
+  bool is_done = false;
+  bool is_valid = true;
+  while (!is_done && is_valid) {
+    let const now_nanos = monotonic_nanos();
+    if (now_nanos == 0 || now_nanos >= deadline_nanos) break;
+    let const remaining_nanos = deadline_nanos - now_nanos;
+    let const timeout_milliseconds =
+        static_cast<int>((remaining_nanos + 999999) / 1000000);
+    struct pollfd waited{};
+    waited.fd = descriptor;
+    waited.events = POLLIN;
+    if (::poll(&waited, 1, timeout_milliseconds) <= 0 ||
+        (waited.revents & POLLIN) == 0)
+      break;
+
+    alignas(struct nlmsghdr) char buffer[64 * 1024]{};
+    struct iovec vector{buffer, sizeof(buffer)};
+    struct msghdr response{};
+    response.msg_iov = &vector;
+    response.msg_iovlen = 1;
+    let const received = ::recvmsg(descriptor, &response, MSG_TRUNC);
+    if (received <= 0 || static_cast<usize>(received) > sizeof(buffer) ||
+        (response.msg_flags & MSG_TRUNC) != 0)
+    {
+      is_valid = false;
+      break;
+    }
+    u32 remaining = static_cast<u32>(received);
+    for (let *header = reinterpret_cast<struct nlmsghdr *>(buffer);
+         NLMSG_OK(header, remaining); header = NLMSG_NEXT(header, remaining))
+    {
+      if (header->nlmsg_seq != 1) continue;
+      if ((header->nlmsg_flags & NLM_F_DUMP_INTR) != 0) {
+        is_valid = false;
+        break;
+      }
+      if (header->nlmsg_type == NLMSG_DONE) {
+        is_done = true;
+        break;
+      }
+      if (header->nlmsg_type == NLMSG_ERROR ||
+          header->nlmsg_len < NLMSG_LENGTH(sizeof(struct unix_diag_msg)))
+      {
+        is_valid = false;
+        break;
+      }
+
+      let *diagnostic =
+          reinterpret_cast<struct unix_diag_msg *>(NLMSG_DATA(header));
+      int attribute_length = static_cast<int>(
+          header->nlmsg_len - NLMSG_LENGTH(sizeof(*diagnostic)));
+      let *attribute = reinterpret_cast<struct rtattr *>(diagnostic + 1);
+      for (; RTA_OK(attribute, attribute_length);
+           attribute = RTA_NEXT(attribute, attribute_length))
+      {
+        if (attribute->rta_type != UNIX_DIAG_PEER ||
+            RTA_PAYLOAD(attribute) < sizeof(u32))
+          continue;
+        u32 peer_identity = 0;
+        std::memcpy(&peer_identity, RTA_DATA(attribute), sizeof(peer_identity));
+        if (peer_identity != 0)
+          peers.push(
+              linux_unix_socket_peer{diagnostic->udiag_ino, peer_identity});
+      }
+    }
+  }
+  if (!is_done || !is_valid)
+    return ArrayList<linux_unix_socket_peer>{allocator};
+  peers.sort([](const linux_unix_socket_peer &left,
+                const linux_unix_socket_peer &right) {
+    return left.identity < right.identity;
+  });
+  return peers;
+}
+
+static pure fn linux_unix_peer_identity(
+    const ArrayList<linux_unix_socket_peer> &peers, u64 identity) wontthrow
+    -> u64
+{
+  usize first = 0;
+  usize count = peers.count();
+  while (count != 0) {
+    let const step = count / 2;
+    let const position = first + step;
+    if (peers[position].identity < identity) {
+      first = position + 1;
+      count -= step + 1;
+    } else {
+      count = step;
+    }
+  }
+  if (first < peers.count() && peers[first].identity == identity)
+    return peers[first].peer_identity;
+  return 0;
+}
+
 static fn linux_process_start_token(StringView process_directory) throws
     -> Maybe<u64>
 {
@@ -131,6 +269,7 @@ static fn linux_unix_sockets(bool should_include_process_ids,
     -> ArrayList<network_socket_entry>
 {
   let result = ArrayList<network_socket_entry>{allocator};
+  let const peers = linux_unix_socket_peers(allocator);
   char buffer[1024 * 1024];
   let const length = read_small_file("/proc/net/unix", buffer, sizeof(buffer));
   if (length == 0) return result;
@@ -146,6 +285,8 @@ static fn linux_unix_sockets(bool should_include_process_ids,
     }
     let const inode = linux_unix_socket_field(line, 6).to<u64>();
     if (inode.is_error()) continue;
+    let const flags = utils::parse_integer_in_base_u64(
+        linux_unix_socket_field(line, 3), int_base::hex);
     let const type = linux_unix_socket_field(line, 4);
     let const state = linux_unix_socket_field(line, 5);
     let path = linux_unix_socket_field(line, 7);
@@ -154,16 +295,19 @@ static fn linux_unix_sockets(bool should_include_process_ids,
             ? network_unix_socket_type::Datagram
             : (type == "0005" ? network_unix_socket_type::SequentialPacket
                               : network_unix_socket_type::Stream);
+    let const is_listener =
+        !flags.is_error() && (flags.value() & 0x00010000u) != 0;
     let const row_state =
-        state == "01" ? network_socket_state::Listen
-                      : (state == "03" ? network_socket_state::Established
-                                       : network_socket_state::Unconnected);
+        is_listener ? network_socket_state::Listen
+                    : (state == "03" ? network_socket_state::Established
+                                     : network_socket_state::Unconnected);
     let const do_push_socket = [&](u32 process_id, u64 start_token,
                                    bool has_start_token) throws {
       let socket = network_socket_entry{
           String{allocator, path},
           String{allocator},
           inode.value(),
+          linux_unix_peer_identity(peers, inode.value()),
           0,
           0,
           0,
@@ -323,6 +467,7 @@ static fn linux_network_sockets_from_file(
           String{allocator, local_address->view()},
           String{allocator, peer_address->view() },
           inode.value(),
+          0,
           receive_queue.value(),
           send_queue.value(),
           0,
@@ -973,6 +1118,7 @@ fn network_sockets(bool should_include_process_ids) throws
           socket_address(internet, true, family),
           socket_address(internet, false, family),
           info.soi_so,
+          0,
           info.soi_rcv.sbi_cc,
           info.soi_snd.sbi_cc,
           0,

@@ -221,6 +221,13 @@ pure fn remote_state_name(os::network_socket_state state) wontthrow
   unreachable("unknown network socket state");
 }
 
+pure fn is_remote_socket(const os::network_socket_entry &socket) wontthrow
+    -> bool
+{
+  return socket.protocol != os::network_socket_protocol::Unix &&
+         !socket.peer_address.is_empty() && socket.peer_port != 0;
+}
+
 fn remote_endpoint(StringView address, u16 port,
                    os::network_address_family family,
                    Allocator allocator) throws -> String
@@ -384,8 +391,7 @@ fn append_remote_report(String &output, bool should_color,
   usize zero_identity_count = 0;
   usize remote_zero_identity_count = 0;
   for (let const &socket : sockets) {
-    let const is_remote =
-        !socket.peer_address.is_empty() && socket.peer_port != 0;
+    let const is_remote = is_remote_socket(socket);
     if (socket.identity == 0) {
       zero_identity_count++;
       if (is_remote) remote_zero_identity_count++;
@@ -491,7 +497,7 @@ fn append_remote_report(String &output, bool should_color,
   u32 previous_process_id = 0;
   bool has_previous_owner = false;
   for (let const &socket : sockets) {
-    if (socket.peer_address.is_empty() || socket.peer_port == 0) continue;
+    if (!is_remote_socket(socket)) continue;
     if (socket.identity != 0 && has_previous_owner &&
         socket.identity == previous_identity &&
         socket.process_id == previous_process_id)

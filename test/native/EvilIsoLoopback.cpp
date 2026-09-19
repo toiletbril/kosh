@@ -21,6 +21,7 @@
 #include <pwd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 namespace {
@@ -44,12 +45,40 @@ struct process_context
   char cgroups[121]{"-"};
 };
 
+struct unix_socket_set
+{
+  int listener{-1};
+  int client{-1};
+  int accepted{-1};
+  int unconnected{-1};
+  ino_t listener_inode{0};
+  ino_t client_inode{0};
+  ino_t accepted_inode{0};
+  ino_t unconnected_inode{0};
+};
+
+constexpr char UNIX_LISTENER_PATH[] = "eviliso-unix-listener";
+constexpr char UNIX_CLIENT_PATH[] = "eviliso-unix-client";
+constexpr char UNIX_UNCONNECTED_PATH[] = "eviliso-unix-unconnected";
+
 fn close_connection(loopback_connection &connection) -> void
 {
   if (connection.accepted >= 0) ::close(connection.accepted);
   if (connection.client >= 0) ::close(connection.client);
   if (connection.listener >= 0) ::close(connection.listener);
   connection = {};
+}
+
+fn close_unix_sockets(unix_socket_set &sockets) -> void
+{
+  if (sockets.unconnected >= 0) ::close(sockets.unconnected);
+  if (sockets.accepted >= 0) ::close(sockets.accepted);
+  if (sockets.client >= 0) ::close(sockets.client);
+  if (sockets.listener >= 0) ::close(sockets.listener);
+  ::unlink(UNIX_UNCONNECTED_PATH);
+  ::unlink(UNIX_CLIENT_PATH);
+  ::unlink(UNIX_LISTENER_PATH);
+  sockets = {};
 }
 
 fn socket_port(const struct sockaddr_storage &address) -> uint16_t
@@ -163,6 +192,96 @@ fn is_optional_ipv6_error(int error_number) -> bool
 {
   return error_number == EAFNOSUPPORT || error_number == EPROTONOSUPPORT ||
          error_number == EADDRNOTAVAIL || error_number == ENETUNREACH;
+}
+
+fn forward_marker(const loopback_connection &input,
+                  const loopback_connection &output) -> bool
+{
+  char marker = 'F';
+  char received = 0;
+  if (::send(input.client, &marker, 1, 0) != 1 ||
+      ::recv(input.accepted, &received, 1, MSG_WAITALL) != 1 ||
+      received != marker || ::send(output.client, &received, 1, 0) != 1)
+    return false;
+  received = 0;
+  return ::recv(output.accepted, &received, 1, MSG_WAITALL) == 1 &&
+         received == marker;
+}
+
+fn bind_unix_socket(int descriptor, const char *path) -> bool
+{
+  struct sockaddr_un address{};
+  address.sun_family = AF_UNIX;
+  let const length = std::strlen(path);
+  if (length >= sizeof(address.sun_path)) return false;
+  std::memcpy(address.sun_path, path, length + 1);
+  return ::bind(descriptor, reinterpret_cast<struct sockaddr *>(&address),
+                sizeof(address)) == 0;
+}
+
+fn open_unix_sockets(unix_socket_set &sockets) -> bool
+{
+  ::unlink(UNIX_UNCONNECTED_PATH);
+  ::unlink(UNIX_CLIENT_PATH);
+  ::unlink(UNIX_LISTENER_PATH);
+
+  sockets.listener = ::socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sockets.listener < 0 ||
+      !bind_unix_socket(sockets.listener, UNIX_LISTENER_PATH) ||
+      ::listen(sockets.listener, 1) != 0)
+  {
+    close_unix_sockets(sockets);
+    return false;
+  }
+
+  sockets.client = ::socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sockets.client < 0 || !bind_unix_socket(sockets.client, UNIX_CLIENT_PATH))
+  {
+    close_unix_sockets(sockets);
+    return false;
+  }
+  struct sockaddr_un listener_address{};
+  listener_address.sun_family = AF_UNIX;
+  std::memcpy(listener_address.sun_path, UNIX_LISTENER_PATH,
+              sizeof(UNIX_LISTENER_PATH));
+  if (::connect(sockets.client,
+                reinterpret_cast<struct sockaddr *>(&listener_address),
+                sizeof(listener_address)) != 0)
+  {
+    close_unix_sockets(sockets);
+    return false;
+  }
+  sockets.accepted = ::accept(sockets.listener, nullptr, nullptr);
+  if (sockets.accepted < 0) {
+    close_unix_sockets(sockets);
+    return false;
+  }
+
+  sockets.unconnected = ::socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sockets.unconnected < 0 ||
+      !bind_unix_socket(sockets.unconnected, UNIX_UNCONNECTED_PATH))
+  {
+    close_unix_sockets(sockets);
+    return false;
+  }
+
+  struct stat listener_status{};
+  struct stat client_status{};
+  struct stat accepted_status{};
+  struct stat unconnected_status{};
+  if (::fstat(sockets.listener, &listener_status) != 0 ||
+      ::fstat(sockets.client, &client_status) != 0 ||
+      ::fstat(sockets.accepted, &accepted_status) != 0 ||
+      ::fstat(sockets.unconnected, &unconnected_status) != 0)
+  {
+    close_unix_sockets(sockets);
+    return false;
+  }
+  sockets.listener_inode = listener_status.st_ino;
+  sockets.client_inode = client_status.st_ino;
+  sockets.accepted_inode = accepted_status.st_ino;
+  sockets.unconnected_inode = unconnected_status.st_ino;
+  return true;
 }
 
 fn is_hexadecimal(char byte) -> bool
@@ -291,6 +410,35 @@ fn main(int argument_count, char **) -> int
     return 5;
   }
 
+  loopback_connection forward_input{};
+  if (!open_loopback(AF_INET, forward_input, error_number)) {
+    close_connection(ipv6);
+    close_connection(ipv4);
+    ::close(release_descriptor);
+    return 6;
+  }
+  loopback_connection forward_output{};
+  if (!open_loopback(AF_INET, forward_output, error_number) ||
+      !forward_marker(forward_input, forward_output))
+  {
+    close_connection(forward_output);
+    close_connection(forward_input);
+    close_connection(ipv6);
+    close_connection(ipv4);
+    ::close(release_descriptor);
+    return 7;
+  }
+
+  unix_socket_set unix_sockets{};
+  if (!open_unix_sockets(unix_sockets)) {
+    close_connection(forward_output);
+    close_connection(forward_input);
+    close_connection(ipv6);
+    close_connection(ipv4);
+    ::close(release_descriptor);
+    return 8;
+  }
+
   char user_name[128]{};
   let const user_id = ::getuid();
   if (let const *password = ::getpwuid(user_id); password != nullptr) {
@@ -311,30 +459,54 @@ fn main(int argument_count, char **) -> int
 
   process_context context{};
   if (!read_process_context(context)) {
+    close_unix_sockets(unix_sockets);
+    close_connection(forward_output);
+    close_connection(forward_input);
     close_connection(ipv6);
     close_connection(ipv4);
     ::close(release_descriptor);
-    return 6;
+    return 9;
   }
 
-  std::printf(
-      "READY %ld %u %s %s %u %u %llu %llu %u %u %u %llu %llu "
-      "%s %s %s %s\n",
-      static_cast<long>(::getpid()), static_cast<unsigned>(user_id), user_name,
-      network_namespace, static_cast<unsigned>(ipv4.server_port),
-      static_cast<unsigned>(ipv4.client_port),
-      static_cast<unsigned long long>(ipv4.server_inode),
-      static_cast<unsigned long long>(ipv4.client_inode), has_ipv6 ? 1u : 0u,
-      static_cast<unsigned>(ipv6.server_port),
-      static_cast<unsigned>(ipv6.client_port),
-      static_cast<unsigned long long>(ipv6.server_inode),
-      static_cast<unsigned long long>(ipv6.client_inode), context.orchestrator,
-      context.runtime, context.container, context.cgroups);
+  std::printf("READY %ld %u %s %s %u %u %llu %llu %u %u %u %llu %llu "
+              "%u %u %llu %llu %u %u %llu %llu "
+              "%s %llu %s %llu %llu %s %llu "
+              "%s %s %s %s\n",
+              static_cast<long>(::getpid()), static_cast<unsigned>(user_id),
+              user_name, network_namespace,
+              static_cast<unsigned>(ipv4.server_port),
+              static_cast<unsigned>(ipv4.client_port),
+              static_cast<unsigned long long>(ipv4.server_inode),
+              static_cast<unsigned long long>(ipv4.client_inode),
+              has_ipv6 ? 1u : 0u, static_cast<unsigned>(ipv6.server_port),
+              static_cast<unsigned>(ipv6.client_port),
+              static_cast<unsigned long long>(ipv6.server_inode),
+              static_cast<unsigned long long>(ipv6.client_inode),
+              static_cast<unsigned>(forward_input.server_port),
+              static_cast<unsigned>(forward_input.client_port),
+              static_cast<unsigned long long>(forward_input.server_inode),
+              static_cast<unsigned long long>(forward_input.client_inode),
+              static_cast<unsigned>(forward_output.server_port),
+              static_cast<unsigned>(forward_output.client_port),
+              static_cast<unsigned long long>(forward_output.server_inode),
+              static_cast<unsigned long long>(forward_output.client_inode),
+              UNIX_LISTENER_PATH,
+              static_cast<unsigned long long>(unix_sockets.listener_inode),
+              UNIX_CLIENT_PATH,
+              static_cast<unsigned long long>(unix_sockets.client_inode),
+              static_cast<unsigned long long>(unix_sockets.accepted_inode),
+              UNIX_UNCONNECTED_PATH,
+              static_cast<unsigned long long>(unix_sockets.unconnected_inode),
+              context.orchestrator, context.runtime, context.container,
+              context.cgroups);
   if (std::fflush(stdout) != 0) {
+    close_unix_sockets(unix_sockets);
+    close_connection(forward_output);
+    close_connection(forward_input);
     close_connection(ipv6);
     close_connection(ipv4);
     ::close(release_descriptor);
-    return 7;
+    return 10;
   }
 
   struct pollfd waited{};
@@ -345,8 +517,11 @@ fn main(int argument_count, char **) -> int
   let const was_released = poll_status > 0 && (waited.revents & POLLIN) != 0 &&
                            ::read(release_descriptor, &release_byte, 1) == 1;
 
+  close_unix_sockets(unix_sockets);
+  close_connection(forward_output);
+  close_connection(forward_input);
   close_connection(ipv6);
   close_connection(ipv4);
   ::close(release_descriptor);
-  return was_released ? 0 : 8;
+  return was_released ? 0 : 11;
 }

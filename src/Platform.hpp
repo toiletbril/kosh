@@ -1549,6 +1549,7 @@ struct network_socket_entry
   String local_address{heap_allocator()};
   String peer_address{heap_allocator()};
   u64 identity{0};
+  u64 peer_identity{0};
   u64 receive_queue_bytes{0};
   u64 send_queue_bytes{0};
   u64 owner_start_token{0};

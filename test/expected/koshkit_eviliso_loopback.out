@@ -1,4 +1,8 @@
 helper-ready=matched
 helper-release=matched
 ipv4-remote-rows=matched
+forwarded-ipv4-rows=matched
+evilss-unix-states=matched
+evilss-unix-peers=matched
+eviliso-unix-exclusion=matched
 ipv6-remote-contract=matched
