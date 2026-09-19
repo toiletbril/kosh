@@ -6,7 +6,8 @@
  * It covers request ordering, result reuse, metadata deduplication, existence
  * results, and failed metadata requests without depending on a platform
  * filesystem. Minimal allocation definitions keep the test independent from
- * the shell entrypoint.
+ * the shell entrypoint. A bounded release profile mode repeats the same matrix
+ * so CPU, cache, and allocation tools measure Batch work instead of startup.
  */
 
 #include "Platform.hpp"
@@ -326,6 +327,14 @@ fn test_oversized_mixed_batch() throws -> void
 
 fn run_batch_contract() -> int
 {
+  execution_count = 0;
+  observed_operation_count = 0;
+  failure_count = 0;
+  should_fail_metadata = false;
+  should_report_existing = true;
+  should_validate_operations = false;
+  should_interrupt = false;
+
   try {
     test_io_order_and_reuse();
     test_metadata_deduplication();
@@ -341,6 +350,15 @@ fn run_batch_contract() -> int
   }
 
   return failure_count == 0 ? 0 : 1;
+}
+
+fn run_batch_profile() -> int
+{
+  constexpr usize PROFILE_ITERATION_COUNT = 10000;
+  for (usize index = 0; index < PROFILE_ITERATION_COUNT; index++)
+    if (run_batch_contract() != 0) return 1;
+
+  return 0;
 }
 
 }
@@ -458,15 +476,19 @@ fn execute_batch_operations(const batched_syscall *operations,
 #if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
 fn wmain(int argument_count, wchar_t **arguments) -> int
 {
-  unused(argument_count);
-  unused(arguments);
+  if (argument_count == 2 && lstrcmpW(arguments[1], L"--profile") == 0) {
+    return run_batch_profile();
+  }
+
   return run_batch_contract();
 }
 #else
 fn main(int argument_count, char **arguments) -> int
 {
-  unused(argument_count);
-  unused(arguments);
+  if (argument_count == 2 && std::strcmp(arguments[1], "--profile") == 0) {
+    return run_batch_profile();
+  }
+
   return run_batch_contract();
 }
 #endif
