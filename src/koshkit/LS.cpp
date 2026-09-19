@@ -630,9 +630,9 @@ static fn render_directory_block(
 {
   ArrayList<listing_entry> entries{allocator};
   if (!collect_directory(Path{directory}, options, allocator, entries)) {
-    report_soft_koshkit_error(ec, cxt,
-                              "ls: cannot open directory '" +
-                                  String{allocator, directory} + "'");
+    report_soft_koshkit_util_error(ec, cxt, "ls",
+                                   "cannot open directory '" +
+                                       String{allocator, directory} + "'");
     status = 2;
     return;
   }
@@ -673,6 +673,7 @@ static fn resolve_color_mode(const ExecContext &ec, EvalContext &cxt,
 }
 
 static fn resolve_depth_limit(const ExecContext &ec, EvalContext &cxt,
+                              StringView utility_name,
                               listing_options &options) throws -> bool
 {
   if (!FLAG_LS_LEVEL.is_set()) return true;
@@ -680,9 +681,9 @@ static fn resolve_depth_limit(const ExecContext &ec, EvalContext &cxt,
   let const parsed =
       utils::parse_integer_in_base(FLAG_LS_LEVEL.value(), int_base::decimal);
   if (parsed.is_error() || parsed.value() < 1) {
-    report_soft_koshkit_error(
-        ec, cxt,
-        "ls: invalid level '" +
+    report_soft_koshkit_util_error(
+        ec, cxt, utility_name,
+        "invalid level '" +
             String{cxt.scratch_allocator(), FLAG_LS_LEVEL.value()} + "'",
         "the level is a positive whole number");
     return false;
@@ -711,7 +712,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   listing_options options{};
   if (!resolve_color_mode(ec, cxt, options.should_color)) return 2;
 
-  if (!resolve_depth_limit(ec, cxt, options)) return 2;
+  if (!resolve_depth_limit(ec, cxt, args[0].view(), options)) return 2;
 
   options.should_classify = FLAG_LS_CLASSIFY.is_enabled();
   options.is_long = FLAG_LS_LONG.is_enabled();
@@ -778,10 +779,10 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize index = 0; index < targets.count(); index++) {
     let const target = targets[index];
     if (target_results[index].error_number != 0) {
-      report_soft_koshkit_error(ec, cxt,
-                                "ls: cannot access '" +
-                                    String{allocator, target} +
-                                    "': no such file or directory");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot access '" +
+                                         String{allocator, target} +
+                                         "': no such file or directory");
       status = 2;
       continue;
     }

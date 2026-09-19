@@ -59,9 +59,9 @@ fn Sync::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (!os::sync_filesystems()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "sync: cannot flush the mounted filesystems: " +
-                                    os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot flush the mounted filesystems: " +
+                                         os::last_system_error_message());
       return 1;
     }
 

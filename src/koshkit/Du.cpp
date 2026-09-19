@@ -68,9 +68,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   os::file_status queried_status{};
   if (known_status == nullptr) {
     if (!os::stat_path(path.text().view(), queried_status)) {
-      report_soft_koshkit_error(ec, cxt,
-                                "du: cannot read '" + path.text() +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, "du",
+                                     "cannot read '" + path.text() + "': " +
+                                         os::last_system_error_message());
       has_failure = true;
       return None;
     }
@@ -89,9 +89,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   }
 
   if (known_status->blocks > UINT64_MAX / 512) {
-    report_soft_koshkit_error(ec, cxt,
-                              "du: cannot read '" + path.text() +
-                                  "': the total size is too large");
+    report_soft_koshkit_util_error(ec, cxt, "du",
+                                   "cannot read '" + path.text() +
+                                       "': the total size is too large");
     has_failure = true;
     return None;
   }
@@ -101,9 +101,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     u64 total_bytes = allocated_size_bytes;
     let children = os::list_directory_status(path.text().view(), allocator);
     if (!children.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "du: cannot read '" + path.text() +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, "du",
+                                     "cannot read '" + path.text() + "': " +
+                                         os::last_system_error_message());
       has_failure = true;
       return None;
     }
@@ -129,9 +129,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         continue;
       }
       if (child_size->size_bytes > UINT64_MAX - total_bytes) {
-        report_soft_koshkit_error(ec, cxt,
-                                  "du: cannot read '" + child.text() +
-                                      "': the total size is too large");
+        report_soft_koshkit_util_error(ec, cxt, "du",
+                                       "cannot read '" + child.text() +
+                                           "': the total size is too large");
         has_failure = true;
         return None;
       }
@@ -213,9 +213,9 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     let const &target = targets[index];
     if (!is_target_status_known[index]) {
       os::set_last_system_error(target_results[index].error_number);
-      report_soft_koshkit_error(ec, cxt,
-                                "du: cannot access '" + target.text() +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot access '" + target.text() + "': " +
+                                         os::last_system_error_message());
       status = 1;
       continue;
     }

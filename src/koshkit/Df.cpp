@@ -64,9 +64,9 @@ fn Df::execute(const ExecContext &ec, EvalContext &cxt,
   for (const os::mounted_filesystem &mounted : filesystems) {
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
-      report_soft_koshkit_error(ec, cxt,
-                                "df: cannot read '" + mounted.target +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "cannot read '" + mounted.target + "': " +
+                                         os::last_system_error_message());
       status = 1;
       continue;
     }

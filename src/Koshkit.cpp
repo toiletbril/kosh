@@ -980,6 +980,16 @@ cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
   report_soft_koshkit_error(ec, cxt, String{utility_name} + ": " + message);
 }
 
+cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
+                                                EvalContext &cxt,
+                                                StringView utility_name,
+                                                StringView message,
+                                                StringView note) throws -> void
+{
+  report_soft_koshkit_util_error(ec, cxt, utility_name, message);
+  show_message(Note{String{note}}.to_string());
+}
+
 cold noinline fn report_soft_koshkit_util_error(
     const ExecContext &ec, EvalContext &cxt, SourceLocation location,
     StringView utility_name, StringView message) throws -> void

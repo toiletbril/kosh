@@ -132,9 +132,9 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
   let children = os::list_directory_status(path_text, allocator);
   if (!children.has_value()) {
     if (!os::path_is_readable(path_text)) {
-      report_soft_koshkit_error(ec, cxt,
-                                "find: '" + String{allocator, display} +
-                                    "': Permission denied");
+      report_soft_koshkit_util_error(ec, cxt, "find",
+                                     "'" + String{allocator, display} +
+                                         "': Permission denied");
       exit_status = 1;
     }
 
@@ -307,9 +307,9 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize root_index = 0; root_index < roots.count(); root_index++) {
     let const root = roots[root_index];
     if (results[root_index].error_number != 0) {
-      report_soft_koshkit_error(ec, cxt,
-                                "find: '" + String{allocator, root} +
-                                    "': no such file or directory");
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "'" + String{allocator, root} +
+                                         "': no such file or directory");
       status = 1;
       continue;
     }
