@@ -202,10 +202,10 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
       if (chunk.error_number != 0) {
         line.clear();
         os::set_last_system_error(chunk.error_number);
-        report_soft_koshkit_error(ec, cxt,
-                                  "cut: cannot read '" +
-                                      String{cxt.scratch_allocator(), source} +
-                                      "': " + os::last_system_error_message());
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot read '" + String{cxt.scratch_allocator(), source} +
+                "': " + os::last_system_error_message());
         status = 1;
       } else if (!line.is_empty()) {
         do_process_line(line.view());

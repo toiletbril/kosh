@@ -161,10 +161,10 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
       if (chunk.error_number != 0) {
         run.clear();
         os::set_last_system_error(chunk.error_number);
-        report_soft_koshkit_error(ec, cxt,
-                                  "strings: cannot read '" +
-                                      String{cxt.scratch_allocator(), source} +
-                                      "': " + os::last_system_error_message());
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot read '" + String{cxt.scratch_allocator(), source} +
+                "': " + os::last_system_error_message());
         status = 1;
       } else {
         do_flush();

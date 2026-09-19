@@ -204,10 +204,10 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
     let const &state = source_states[source_index];
     if (state.error_number != 0) {
       os::set_last_system_error(state.error_number);
-      report_soft_koshkit_error(
-          ec, cxt,
-          "wc: " + String{cxt.scratch_allocator(), sources[source_index]} +
-              ": " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          String{cxt.scratch_allocator(), sources[source_index]} + ": " +
+              os::last_system_error_message());
       status = 1;
       continue;
     }

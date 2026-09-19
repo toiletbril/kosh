@@ -92,10 +92,10 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
     if (result == utils::BufferedLineReader::Result::End) break;
     if (result == utils::BufferedLineReader::Result::Error) {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(
-          ec, cxt,
-          "uniq: " + String{cxt.scratch_allocator(), source} + ": " +
-              os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     String{cxt.scratch_allocator(), source} +
+                                         ": " +
+                                         os::last_system_error_message());
       return 1;
     }
     let const line = reader.get_line();

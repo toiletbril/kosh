@@ -82,10 +82,10 @@ fn Unexpand::execute(
   for (let const source : sources) {
     let const content = read_named_or_stdin(ec, source);
     if (!content.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "unexpand: cannot read '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "': " + os::last_system_error_message());
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "cannot read '" + String{cxt.scratch_allocator(), source} +
+              "': " + os::last_system_error_message());
       status = 1;
       continue;
     }
