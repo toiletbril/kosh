@@ -34,7 +34,8 @@ for TEST_FILE in "$@"; do
   case $TEST_NAME in
   command_substitution_interrupt|fg_terminal_handoff|history_behavior|\
     history_noninteractive|read_behavior|language_server|koshkit_fuser|\
-    koshkit_evil_regressions|koshkit_process_tools|koshkit_timeout|\
+    koshkit_evil_regressions|koshkit_eviliso_loopback|koshkit_process_tools|\
+    koshkit_timeout|\
     transaction_lock_lifetime|\
     subshell_spawn_state|wait_on_stopped_job|\
     trap_action_return|trap_action_loop_control|\

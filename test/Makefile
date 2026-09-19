@@ -12,6 +12,7 @@ ARCH ?= $(shell uname -m)
 NO_TOILETLINE ?= 0
 IS_NONDEBUG_BUILD := $(if $(filter rel prof cov cosmo,$(MODE)),1,0)
 export IS_NONDEBUG_BUILD
+BUILD_VARIANT_SUFFIX := $(if $(filter 1,$(NO_TOILETLINE)),-no-toiletline,)
 ifeq ($(OS), Windows_NT)
 TARGET ?= Windows_NT
 else
@@ -73,6 +74,11 @@ RESOLVED_BIN := $(strip $(shell \
 # recipe fail with a bare status of 127.
 override BIN := $(if $(RESOLVED_BIN),$(RESOLVED_BIN),$(BIN))
 export BIN
+ifeq ($(TARGET), Linux)
+export TEST_EVILISO_LOOPBACK := $(abspath \
+	../src/o/$(TARGET)/$(MODE)$(BUILD_VARIANT_SUFFIX)/eviliso-loop)
+EVILISO_LOOPBACK_DEPENDENCY := eviliso_loopback_helper
+endif
 ifeq ($(OS), Windows_NT)
 SHELL := $(BIN)
 endif
@@ -105,12 +111,17 @@ clean:
 	@rm -rf $(FAILED_LIST).d
 	@rm -rf "$(CURDIR)/.test-work"
 
-test: batch_contract_test $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+test: batch_contract_test $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) \
+	$(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh all
 
 batch_contract_test:
 	@$(MAKE) -C ../src MODE='$(MODE)' TARGET='$(TARGET)' ARCH='$(ARCH)' \
 		NO_TOILETLINE='$(NO_TOILETLINE)' batch_contract_test
+
+eviliso_loopback_helper:
+	@$(MAKE) -C ../src MODE='$(MODE)' TARGET='$(TARGET)' ARCH='$(ARCH)' \
+		NO_TOILETLINE='$(NO_TOILETLINE)' eviliso_loopback
 
 verify_koshkit_diff: $(BIN)
 	@if test ! -x '$(BIN)'; then \
@@ -127,8 +138,18 @@ cli_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@BIN='$(BIN)' DIFF_FLAGS='$(DIFF_FLAGS)' FAILED_LIST='$(FAILED_LIST)' \
 		$(SHELL) run-cli-test.sh '$(SHELL)' cli/$*.sh
 
-cli_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+cli_koshkit_eviliso_loopback: $(EVILISO_LOOPBACK_DEPENDENCY)
+
+cli_tests: $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh cli
+
+ifneq ($(TARGET), Linux)
+NON_LINUX_SKIPPED_CLI_NAMES := cli_koshkit_eviliso_loopback
+
+$(NON_LINUX_SKIPPED_CLI_NAMES):
+	@printf "\t%-64s skipped, requires Linux procfs\n" \
+		"cli/$(patsubst cli_%,%,$@).sh"
+endif
 
 build_%: expected/%.out $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@rm -f '$(FAILED_LIST)' && rm -rf '$(FAILED_LIST).d'
@@ -225,7 +246,8 @@ highlight_tests: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh highlight
 
 SKIPPED_TEST_NAMES := $(WINDOWS_SKIPPED_TEST_NAMES)
-SKIPPED_CLI_INPUT := $(patsubst cli_%,cli/%.sh,$(WINDOWS_SKIPPED_CLI_NAMES))
+SKIPPED_CLI_INPUT := $(patsubst cli_%,cli/%.sh,\
+	$(WINDOWS_SKIPPED_CLI_NAMES) $(NON_LINUX_SKIPPED_CLI_NAMES))
 SKIPPED_BUILD_INPUT := \
 	$(patsubst build_%,build/%.sh,$(WINDOWS_SKIPPED_BUILD_NAMES))
 SKIPPED_COMPLETION_INPUT := \
@@ -246,7 +268,7 @@ diagnostic_tty_test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 
 REFILL ?=
 
-refill: $(BIN)
+refill: $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN)
 	@REFILL='$(REFILL)' $(SHELL) run-refill.sh '$(SHELL)'
 
 
@@ -295,6 +317,7 @@ bench: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 		BASH_SPEEDUP_REQUIRED='$(BASH_SPEEDUP_REQUIRED)' \
 		$(SHELL) run-bench-test.sh
 
-.PHONY: test clean batch_contract_test verify_koshkit_diff kosh_tests refill \
+.PHONY: test clean batch_contract_test eviliso_loopback_helper \
+	verify_koshkit_diff kosh_tests refill \
 		compatdiff dashdiff bashdiff mimicrydiff bench build_tests completion_tests \
 		diagnostic_tty_test cli_tests highlight_tests

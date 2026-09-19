@@ -3,6 +3,17 @@
 TEST_SHELL_COMMAND=$1
 REFILL_STATUS=0
 
+word_is_listed()
+{
+  WORD=$1
+  WORDS=$2
+
+  case " $WORDS " in
+  *" $WORD "*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
 # Refills one harness and keeps the first failing status. The named runner
 # receives the refill flag and the remaining operands.
 refill_harness()
@@ -25,7 +36,10 @@ if [ -n "${REFILL-}" ]; then
 
     if [ -f "cli/$TEST_NAME.sh" ]; then
       DID_FIND_TEST=yes
-      refill_harness run-cli-test.sh "$TEST_SHELL_COMMAND" "cli/$TEST_NAME.sh"
+      if ! word_is_listed "cli/$TEST_NAME.sh" "$SKIPPED_CLI_INPUT"; then
+        refill_harness run-cli-test.sh "$TEST_SHELL_COMMAND" \
+          "cli/$TEST_NAME.sh"
+      fi
     fi
 
     if [ -f "build/$TEST_NAME.sh" ]; then
@@ -62,7 +76,14 @@ for TEST_FILE in kosh/*.kosh; do
 done
 
 refill_harness run-kosh-test.sh $NATIVE_TEST_NAMES
-refill_harness run-cli-test.sh "$TEST_SHELL_COMMAND" cli/*.sh
+ACTIVE_CLI_INPUT=
+for TEST_FILE in cli/*.sh; do
+  if word_is_listed "$TEST_FILE" "$SKIPPED_CLI_INPUT"; then
+    continue
+  fi
+  ACTIVE_CLI_INPUT="$ACTIVE_CLI_INPUT $TEST_FILE"
+done
+refill_harness run-cli-test.sh "$TEST_SHELL_COMMAND" $ACTIVE_CLI_INPUT
 refill_harness run-build-test.sh "$TEST_SHELL_COMMAND" build/*.sh
 refill_harness run-completion-test.sh "$TEST_SHELL_COMMAND" completion/*.sh
 refill_harness run-highlight-test.sh "$TEST_SHELL_COMMAND" highlight/*.sh

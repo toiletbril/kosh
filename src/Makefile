@@ -79,9 +79,13 @@ BATCH_CONTRACT_SOURCE := ../test/native/BatchContract.cpp
 BATCH_CONTRACT_OBJECT := $(OBJECT_DIRECTORY)/tests/BatchContract.o
 BATCH_CONTRACT_BINARY := $(OBJECT_DIRECTORY)/batch-contract-test$(if \
 	$(filter Windows_NT,$(TARGET)),.exe,)
+EVILISO_LOOPBACK_SOURCE := ../test/native/EvilIsoLoopback.cpp
+EVILISO_LOOPBACK_OBJECT := $(OBJECT_DIRECTORY)/tests/EvilIsoLoopback.o
+EVILISO_LOOPBACK_BINARY := $(OBJECT_DIRECTORY)/eviliso-loop
 REGEX_OBJECTS := $(REGEX_SOURCES:%=$(OBJECT_DIRECTORY)/vendor/regex/%.o)
 OBJECTS := $(SOURCES:%.cpp=$(OBJECT_DIRECTORY)/%.o) $(REGEX_OBJECTS)
-DEPENDENCY_FILES := $(OBJECTS:.o=.d) $(BATCH_CONTRACT_OBJECT:.o=.d)
+DEPENDENCY_FILES := $(OBJECTS:.o=.d) $(BATCH_CONTRACT_OBJECT:.o=.d) \
+	$(EVILISO_LOOPBACK_OBJECT:.o=.d)
 
 MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)
@@ -454,6 +458,22 @@ batch_contract: $(BATCH_CONTRACT_BINARY)
 batch_contract_test: $(BATCH_CONTRACT_BINARY)
 	$(BATCH_CONTRACT_BINARY)
 
+ifeq ($(TARGET), Linux)
+$(EVILISO_LOOPBACK_OBJECT): $(EVILISO_LOOPBACK_SOURCE) Makefile | dirs
+	mkdir -p $(dir $@)
+	printf "\tCompiling %-42s $@... %-12s\r" $< ' '
+	$(CXX) $(CXXFLAGS) -I. -MMD -MP -c $< -o $@
+
+$(EVILISO_LOOPBACK_BINARY): $(EVILISO_LOOPBACK_OBJECT)
+	printf "\tLinking $(EVILISO_LOOPBACK_BINARY)... %-64s\r" ' '
+	$(CXX) $(CXXFLAGS) $(LINKER_SELECTION_FLAG) $^ $(LINK_LIBRARIES) -o $@
+
+eviliso_loopback: $(EVILISO_LOOPBACK_BINARY)
+else
+eviliso_loopback:
+	@printf "EvilIso loopback helper requires Linux.\n"
+endif
+
 # Linking.
 $(LINKED_OUTPUT_PATH): $(OBJECTS)
 	printf "\tLinking $(LINKED_OUTPUT_PATH)... %-64s\r" ' '
@@ -546,6 +566,6 @@ clean:
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
 .PHONY: dirs force_commit_hash force_commit_hash_objects batch_contract \
-	batch_contract_test kosh install uninstall tidy fmt clean
+	batch_contract_test eviliso_loopback kosh install uninstall tidy fmt clean
 
 -include $(DEPENDENCY_FILES)
