@@ -201,7 +201,81 @@ struct live_process_row
   String name{heap_allocator()};
   ArrayList<os::process_io_status> history{heap_allocator()};
   ArrayList<u64> history_nanoseconds{heap_allocator()};
+  u64 last_seen_nanoseconds{0};
 };
+
+pure fn interpolate_counter(u64 before, u64 after, u64 elapsed_nanoseconds,
+                            u64 passed_nanoseconds) wontthrow -> u64
+{
+  if (after < before || elapsed_nanoseconds == 0) return after;
+  return before + static_cast<u64>(
+                      static_cast<u128>(after - before) * passed_nanoseconds /
+                      elapsed_nanoseconds);
+}
+
+fn get_process_window_status(const live_process_row &row,
+                             u64 window_start_nanoseconds) wontthrow
+    -> os::process_io_status
+{
+  usize oldest = 0;
+  while (oldest + 1 < row.history_nanoseconds.count() &&
+         row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
+    oldest++;
+
+  let before = row.history[oldest];
+  u64 before_nanoseconds = row.history_nanoseconds[oldest];
+  if (before_nanoseconds < window_start_nanoseconds &&
+      oldest + 1 < row.history.count())
+  {
+    let const &next = row.history[oldest + 1];
+    let const next_nanoseconds = row.history_nanoseconds[oldest + 1];
+    let const elapsed_nanoseconds = next_nanoseconds - before_nanoseconds;
+    let const passed_nanoseconds =
+        window_start_nanoseconds - before_nanoseconds;
+    before.read_bytes = interpolate_counter(
+        before.read_bytes, next.read_bytes, elapsed_nanoseconds,
+        passed_nanoseconds);
+    before.written_bytes = interpolate_counter(
+        before.written_bytes, next.written_bytes, elapsed_nanoseconds,
+        passed_nanoseconds);
+    if (before.has_operation_counts && next.has_operation_counts) {
+      before.read_operation_count = interpolate_counter(
+          before.read_operation_count, next.read_operation_count,
+          elapsed_nanoseconds, passed_nanoseconds);
+      before.write_operation_count = interpolate_counter(
+          before.write_operation_count, next.write_operation_count,
+          elapsed_nanoseconds, passed_nanoseconds);
+    }
+    before_nanoseconds = window_start_nanoseconds;
+  }
+
+  let const &newest = row.history.back();
+  let const elapsed_nanoseconds =
+      row.history_nanoseconds.back() - before_nanoseconds;
+  os::process_io_status status{0, 0, 0, 0, false};
+  if (let const rate = counter_rate(before.read_bytes, newest.read_bytes,
+                                    elapsed_nanoseconds);
+      rate.has_value())
+    status.read_bytes = *rate;
+  if (let const rate = counter_rate(before.written_bytes, newest.written_bytes,
+                                    elapsed_nanoseconds);
+      rate.has_value())
+    status.written_bytes = *rate;
+  if (before.has_operation_counts && newest.has_operation_counts) {
+    let const read_rate = counter_rate(before.read_operation_count,
+                                       newest.read_operation_count,
+                                       elapsed_nanoseconds);
+    let const write_rate = counter_rate(before.write_operation_count,
+                                        newest.write_operation_count,
+                                        elapsed_nanoseconds);
+    if (read_rate.has_value() && write_rate.has_value()) {
+      status.read_operation_count = *read_rate;
+      status.write_operation_count = *write_rate;
+      status.has_operation_counts = true;
+    }
+  }
+  return status;
+}
 
 fn append_process_io_rate_report(String &output, const ArrayList<io_row> &rows,
                                  usize row_limit, Allocator allocator,
@@ -571,25 +645,37 @@ fn append_disk_io_report(String &output,
 }
 
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
-                       usize row_limit, f64 sample_duration_seconds,
-                       f64 refresh_interval_seconds, f64 falloff_seconds,
+                       usize row_limit, f64 window_seconds,
+                       f64 sample_interval_seconds, f64 refresh_interval_seconds,
                        bool is_terminal, bool should_color,
                        StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
-      static_cast<u64>(falloff_seconds * 1000000000.0);
+      static_cast<u64>(window_seconds * 1000000000.0);
   let const sample_interval_nanoseconds =
-      static_cast<u64>(sample_duration_seconds * 1000000000.0);
+      static_cast<u64>(sample_interval_seconds * 1000000000.0);
   let const refresh_interval_nanoseconds =
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
   let const sample_label =
-      format_live_duration(sample_duration_seconds, allocator);
+      format_live_duration(window_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
+  let baseline_rows = read_process_io_rows(allocator, selected_pid, true);
+  if (selected_pid.has_value() && baseline_rows.is_empty()) return 1;
+  for (let const &row : baseline_rows) {
+    live_process_row entry{};
+    entry.pid = row.pid;
+    entry.name = String{allocator, row.name.view()};
+    entry.history.push(row.status);
+    entry.history_nanoseconds.push(last_sample_nanoseconds);
+    entry.last_seen_nanoseconds = last_sample_nanoseconds;
+    retained.push(steal(entry));
+  }
+
   loop
   {
     let const before_wait_nanoseconds = os::monotonic_nanos();
@@ -624,6 +710,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
           if (retained[index].pid != row.pid) continue;
           retained[index].history.push(row.status);
           retained[index].history_nanoseconds.push(now);
+          retained[index].last_seen_nanoseconds = now;
           is_known = true;
           break;
         }
@@ -633,15 +720,29 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
           entry.name = String{allocator, row.name.view()};
           entry.history.push(row.status);
           entry.history_nanoseconds.push(now);
+          entry.last_seen_nanoseconds = now;
           retained.push(steal(entry));
         }
       }
       for (usize index = retained.count(); index > 0; index--) {
         let const position = index - 1;
-        if (now - retained[position].history_nanoseconds.back() >=
+        if (retained[position].history_nanoseconds.back() != now) {
+          retained[position].history.push(retained[position].history.back());
+          retained[position].history_nanoseconds.push(now);
+        }
+        if (now - retained[position].last_seen_nanoseconds >=
             falloff_nanoseconds)
         {
           retained.remove(position);
+          continue;
+        }
+        let const window_start =
+            now > falloff_nanoseconds ? now - falloff_nanoseconds : 0;
+        while (retained[position].history_nanoseconds.count() > 2 &&
+               retained[position].history_nanoseconds[1] <= window_start)
+        {
+          retained[position].history.remove(0);
+          retained[position].history_nanoseconds.remove(0);
         }
       }
       last_sample_nanoseconds = now;
@@ -649,67 +750,24 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
 
     last_refresh_nanoseconds = now;
-    retained.sort(
-        [](const live_process_row &left, const live_process_row &right) {
-          let const &left_status = left.history.back();
-          let const &right_status = right.history.back();
-          let const left_total = saturated_sum(left_status.read_bytes,
-                                               left_status.written_bytes);
-          let const right_total = saturated_sum(right_status.read_bytes,
-                                                right_status.written_bytes);
-          if (left_total != right_total) return left_total > right_total;
-          return left.pid < right.pid;
-        });
     let rows = ArrayList<io_row>{allocator};
     rows.reserve(retained.count());
+    let const window_start =
+        last_sample_nanoseconds > falloff_nanoseconds
+            ? last_sample_nanoseconds - falloff_nanoseconds
+            : 0;
     for (let const &row : retained) {
-      /* Boxcar average: the rate over everything collected inside the
-         window, from the oldest sample still in it to the newest. */
-      usize oldest = 0;
-      while (oldest + 1 < row.history_nanoseconds.count() &&
-             row.history_nanoseconds[oldest + 1] <
-                 last_sample_nanoseconds - falloff_nanoseconds)
-        oldest++;
-
-      let const oldest_nanoseconds = row.history_nanoseconds[oldest];
-      let const window_nanoseconds =
-          row.history_nanoseconds.back() - oldest_nanoseconds;
-      let const &newest_status = row.history.back();
-      let const &oldest_status = row.history[oldest];
-
-      os::process_io_status status{0, 0, 0, 0, false};
-      if (window_nanoseconds != 0) {
-        if (let const read_rate =
-                counter_rate(oldest_status.read_bytes,
-                             newest_status.read_bytes, window_nanoseconds);
-            read_rate.has_value())
-          status.read_bytes = *read_rate;
-        if (let const write_rate = counter_rate(oldest_status.written_bytes,
-                                                newest_status.written_bytes,
-                                                window_nanoseconds);
-            write_rate.has_value())
-          status.written_bytes = *write_rate;
-        if (oldest_status.has_operation_counts &&
-            newest_status.has_operation_counts)
-        {
-          if (let const read_rate = counter_rate(
-                  oldest_status.read_operation_count,
-                  newest_status.read_operation_count, window_nanoseconds);
-              read_rate.has_value()) {
-            status.read_operation_count = *read_rate;
-            status.has_operation_counts = true;
-          }
-          if (let const write_rate = counter_rate(
-                  oldest_status.write_operation_count,
-                  newest_status.write_operation_count, window_nanoseconds);
-              write_rate.has_value()) {
-            status.write_operation_count = *write_rate;
-            status.has_operation_counts = true;
-          }
-        }
-      }
-      rows.push(io_row{String{allocator, row.name.view()}, row.pid, status});
+      rows.push(io_row{String{allocator, row.name.view()}, row.pid,
+                       get_process_window_status(row, window_start)});
     }
+    rows.sort([](const io_row &left, const io_row &right) {
+      let const left_total =
+          saturated_sum(left.status.read_bytes, left.status.written_bytes);
+      let const right_total =
+          saturated_sum(right.status.read_bytes, right.status.written_bytes);
+      if (left_total != right_total) return left_total > right_total;
+      return left.pid < right.pid;
+    });
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
@@ -726,27 +784,103 @@ struct live_disk_row
   String name{heap_allocator()};
   ArrayList<os::disk_io_status> history{heap_allocator()};
   ArrayList<u64> history_nanoseconds{heap_allocator()};
+  u64 last_seen_nanoseconds{0};
 };
 
-fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
-                    f64 refresh_interval_seconds, f64 falloff_seconds,
+fn get_disk_window_status(const live_disk_row &row,
+                          u64 window_start_nanoseconds) throws
+    -> os::disk_io_status
+{
+  usize oldest = 0;
+  while (oldest + 1 < row.history_nanoseconds.count() &&
+         row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
+    oldest++;
+
+  let before = row.history[oldest];
+  u64 before_nanoseconds = row.history_nanoseconds[oldest];
+  if (before_nanoseconds < window_start_nanoseconds &&
+      oldest + 1 < row.history.count())
+  {
+    let const &next = row.history[oldest + 1];
+    let const elapsed_nanoseconds =
+        row.history_nanoseconds[oldest + 1] - before_nanoseconds;
+    let const passed_nanoseconds =
+        window_start_nanoseconds - before_nanoseconds;
+    let const do_interpolate = [&](u64 os::disk_io_status::*member) {
+      before.*member = interpolate_counter(before.*member, next.*member,
+                                           elapsed_nanoseconds,
+                                           passed_nanoseconds);
+    };
+    do_interpolate(&os::disk_io_status::read_bytes);
+    do_interpolate(&os::disk_io_status::written_bytes);
+    do_interpolate(&os::disk_io_status::read_operation_count);
+    do_interpolate(&os::disk_io_status::write_operation_count);
+    do_interpolate(&os::disk_io_status::read_time_nanoseconds);
+    do_interpolate(&os::disk_io_status::write_time_nanoseconds);
+    do_interpolate(&os::disk_io_status::busy_time_nanoseconds);
+    do_interpolate(&os::disk_io_status::idle_time_nanoseconds);
+    do_interpolate(&os::disk_io_status::weighted_busy_time_nanoseconds);
+    do_interpolate(&os::disk_io_status::read_error_count);
+    do_interpolate(&os::disk_io_status::write_error_count);
+    do_interpolate(&os::disk_io_status::read_retry_count);
+    do_interpolate(&os::disk_io_status::write_retry_count);
+    before_nanoseconds = window_start_nanoseconds;
+  }
+
+  let const &newest = row.history.back();
+  let sampled = newest;
+  sampled.name = String{heap_allocator(), row.name.view()};
+  let const elapsed_nanoseconds =
+      row.history_nanoseconds.back() - before_nanoseconds;
+  let const do_sample = [&](u64 os::disk_io_status::*member) {
+    let const rate =
+        counter_rate(before.*member, newest.*member, elapsed_nanoseconds);
+    sampled.*member = rate.has_value() ? *rate : 0;
+  };
+  do_sample(&os::disk_io_status::read_bytes);
+  do_sample(&os::disk_io_status::written_bytes);
+  do_sample(&os::disk_io_status::read_operation_count);
+  do_sample(&os::disk_io_status::write_operation_count);
+  do_sample(&os::disk_io_status::read_time_nanoseconds);
+  do_sample(&os::disk_io_status::write_time_nanoseconds);
+  do_sample(&os::disk_io_status::busy_time_nanoseconds);
+  do_sample(&os::disk_io_status::idle_time_nanoseconds);
+  do_sample(&os::disk_io_status::weighted_busy_time_nanoseconds);
+  do_sample(&os::disk_io_status::read_error_count);
+  do_sample(&os::disk_io_status::write_error_count);
+  do_sample(&os::disk_io_status::read_retry_count);
+  do_sample(&os::disk_io_status::write_retry_count);
+  return sampled;
+}
+
+fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
+                    f64 sample_interval_seconds, f64 refresh_interval_seconds,
                     bool is_terminal, bool should_color,
                     StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
   let retained = ArrayList<live_disk_row>{allocator};
-  let const sample_interval_nanoseconds =
-      static_cast<u64>(sample_duration_seconds * 1000000000.0);
   let const falloff_nanoseconds =
-      static_cast<u64>(falloff_seconds * 1000000000.0);
+      static_cast<u64>(window_seconds * 1000000000.0);
+  let const sample_interval_nanoseconds =
+      static_cast<u64>(sample_interval_seconds * 1000000000.0);
   let const refresh_interval_nanoseconds =
       static_cast<u64>(refresh_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
   let const sample_label =
-      format_live_duration(sample_duration_seconds, allocator);
+      format_live_duration(window_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
+  let baseline_snapshot = os::read_disk_io_snapshot(allocator);
+  for (let const &disk : baseline_snapshot.disks) {
+    live_disk_row entry{};
+    entry.name = String{allocator, disk.name.view()};
+    entry.history.push(disk);
+    entry.history_nanoseconds.push(last_sample_nanoseconds);
+    entry.last_seen_nanoseconds = last_sample_nanoseconds;
+    retained.push(steal(entry));
+  }
 
   loop
   {
@@ -780,6 +914,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
           if (retained[index].name != disk.name) continue;
           retained[index].history.push(disk);
           retained[index].history_nanoseconds.push(now);
+          retained[index].last_seen_nanoseconds = now;
           is_known = true;
           break;
         }
@@ -788,15 +923,29 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
           entry.name = String{allocator, disk.name.view()};
           entry.history.push(disk);
           entry.history_nanoseconds.push(now);
+          entry.last_seen_nanoseconds = now;
           retained.push(steal(entry));
         }
       }
       for (usize index = retained.count(); index > 0; index--) {
         let const position = index - 1;
-        if (now - retained[position].history_nanoseconds.back() >=
+        if (retained[position].history_nanoseconds.back() != now) {
+          retained[position].history.push(retained[position].history.back());
+          retained[position].history_nanoseconds.push(now);
+        }
+        if (now - retained[position].last_seen_nanoseconds >=
             falloff_nanoseconds)
         {
           retained.remove(position);
+          continue;
+        }
+        let const window_start =
+            now > falloff_nanoseconds ? now - falloff_nanoseconds : 0;
+        while (retained[position].history_nanoseconds.count() > 2 &&
+               retained[position].history_nanoseconds[1] <= window_start)
+        {
+          retained[position].history.remove(0);
+          retained[position].history_nanoseconds.remove(0);
         }
       }
       last_sample_nanoseconds = now;
@@ -807,25 +956,25 @@ fn run_live_disk_io(const ExecContext &ec, f64 sample_duration_seconds,
 
     last_refresh_nanoseconds = now;
     let after_snapshot = os::disk_io_snapshot{};
-    after_snapshot.sampled_at_nanoseconds = now;
+    after_snapshot.sampled_at_nanoseconds = 1000000000ULL;
     after_snapshot.disks.reserve(retained.count());
     let before_snapshot = os::disk_io_snapshot{};
-    before_snapshot.sampled_at_nanoseconds =
-        now > falloff_nanoseconds ? now - falloff_nanoseconds : 0;
+    before_snapshot.sampled_at_nanoseconds = 0;
+    before_snapshot.disks.reserve(retained.count());
+    let const window_start =
+        last_sample_nanoseconds > falloff_nanoseconds
+            ? last_sample_nanoseconds - falloff_nanoseconds
+            : 0;
     for (let const &row : retained)
     {
-      usize oldest = 0;
-      while (oldest + 1 < row.history_nanoseconds.count() &&
-             row.history_nanoseconds[oldest + 1] <
-                 last_sample_nanoseconds - falloff_nanoseconds)
-        oldest++;
-
-      after_snapshot.disks.push(row.history.back());
-      before_snapshot.disks.push(row.history[oldest]);
+      let sampled = get_disk_window_status(row, window_start);
+      let baseline = os::disk_io_status{};
+      baseline.name = String{allocator, row.name.view()};
+      baseline.available_fields = sampled.available_fields;
+      before_snapshot.disks.push(steal(baseline));
+      after_snapshot.disks.push(steal(sampled));
     }
-    u64 elapsed_nanoseconds = 0;
-    elapsed_nanoseconds = after_snapshot.sampled_at_nanoseconds -
-                          before_snapshot.sampled_at_nanoseconds;
+    let const elapsed_nanoseconds = 1000000000ULL;
 
     let output = String{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
@@ -1088,7 +1237,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                                           ? cumulative_duration_seconds
                                           : live_interval_seconds;
   let const refresh_interval_seconds = live_interval_seconds;
-  let const falloff_seconds = sample_duration_seconds;
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
       selected_pid.has_value() || process_limit_operand.has_value();
@@ -1123,12 +1271,12 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     if (should_show_processes) {
       return run_live_process_io(
           ec, selected_pid, row_limit, sample_duration_seconds,
-          refresh_interval_seconds, falloff_seconds, is_terminal, should_color,
-          sample_duration_label.view());
+          live_interval_seconds, refresh_interval_seconds, is_terminal,
+          should_color, sample_duration_label.view());
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds, refresh_interval_seconds,
-                            falloff_seconds, is_terminal, should_color,
+    return run_live_disk_io(ec, sample_duration_seconds, live_interval_seconds,
+                            refresh_interval_seconds, is_terminal, should_color,
                             sample_duration_label.view());
   }
 
