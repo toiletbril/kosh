@@ -458,7 +458,8 @@ changes update this file.
   for generated text.
 - Run ordering assertions against clean state before unrelated entries can
   affect container iteration.
-- Remove a focused runner result file before invoking the runner.
+- Remove a focused runner result file before invoking the runner. When direct
+  removal is filtered, move it to a bounded temporary backup instead.
 - Disable unrelated analysis when a probe isolates runtime behavior, or prefer
   positional operands after `--` in harness-only source.
 - Assign a runtime shell variable through source when the test depends on its
