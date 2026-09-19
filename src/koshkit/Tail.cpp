@@ -104,9 +104,9 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     let const content = read_named_or_stdin(ec, sources[source_index]);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "tail: cannot open '" +
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "cannot open '" +
               String{cxt.scratch_allocator(), sources[source_index]} +
               "': " + os::last_system_error_message());
       status = 1;

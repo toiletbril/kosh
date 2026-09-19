@@ -57,8 +57,9 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
   for (const String &operand : operands) {
     let const fd = os::open_file_descriptor(operand.view(), mode);
     if (!fd.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt, "tee: " + operand + ": " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     operand + ": " +
+                                         os::last_system_error_message());
       status = 1;
       continue;
     }
@@ -82,8 +83,9 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
         os::read_fd(ec.in_fd.value_or(KOSH_STDIN), buffer, sizeof(buffer));
     if (!read_size.has_value()) {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(
-          ec, cxt, "tee: read failed: " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     "read failed: " +
+                                         os::last_system_error_message());
       return 1;
     }
     if (*read_size == 0) break;
@@ -132,10 +134,9 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
         } else {
           reason = "write made no progress";
         }
-        report_soft_koshkit_error(
-            ec, cxt,
-            "tee: " +
-                String{cxt.scratch_allocator(), output_names[output_position]} +
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            String{cxt.scratch_allocator(), output_names[output_position]} +
                 ": " + reason);
         os::close_fd(output_descriptors[output_position]);
         output_descriptors.remove(output_position);

@@ -125,10 +125,9 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
         if (!chunk.is_complete || chunk.error_number == 0) continue;
 
         os::set_last_system_error(chunk.error_number);
-        report_soft_koshkit_error(
-            ec, cxt,
-            "cat: " +
-                String{cxt.scratch_allocator(), sources[chunk.source_index]} +
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            String{cxt.scratch_allocator(), sources[chunk.source_index]} +
                 ": " + os::last_system_error_message());
         status = 1;
       }
@@ -145,10 +144,10 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
     let const content = read_named_or_stdin(ec, source);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "cat: " + String{cxt.scratch_allocator(), source} + ": " +
-              os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                     String{cxt.scratch_allocator(), source} +
+                                         ": " +
+                                         os::last_system_error_message());
       status = 1;
       continue;
     }

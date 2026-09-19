@@ -181,9 +181,9 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       let const opened_fd = os::open_file_descriptor(sources[source_index],
                                                      os::file_open_mode::Read);
       if (!opened_fd.has_value()) {
-        report_soft_koshkit_error(
-            ec, cxt,
-            "head: cannot open '" +
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot open '" +
                 String{cxt.scratch_allocator(), sources[source_index]} +
                 "': " + os::last_system_error_message());
         status = 1;
@@ -215,9 +215,9 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!text.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "head: cannot read '" +
+      report_soft_koshkit_util_error(
+          ec, cxt, args[0].view(),
+          "cannot read '" +
               String{cxt.scratch_allocator(), sources[source_index]} +
               "': " + os::last_system_error_message());
       status = 1;
