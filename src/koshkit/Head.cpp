@@ -29,52 +29,6 @@ namespace koshka {
 
 namespace koshkit {
 
-/* Stopping at max_lines keeps an endless producer such as yes from running
-   forever, since reading to the end would never return. */
-static fn read_up_to_lines(os::descriptor fd, u64 max_lines,
-                           Allocator allocator) throws -> Maybe<String>
-{
-  String out{allocator};
-  u64 line_count = 0;
-  char buffer[4096];
-  while (line_count < max_lines) {
-    if (os::INTERRUPT_REQUESTED) break;
-    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-    if (!read_count.has_value()) return None;
-    if (*read_count == 0) break;
-    usize span_length = 0;
-    while (span_length < *read_count && line_count < max_lines) {
-      if (buffer[span_length] == '\n') line_count++;
-      span_length++;
-    }
-    out.append(StringView{buffer, span_length});
-  }
-
-  return out;
-}
-
-static fn read_up_to_bytes(os::descriptor fd, u64 max_bytes,
-                           Allocator allocator) throws -> Maybe<String>
-{
-  String out{allocator};
-  u64 byte_count = 0;
-  char buffer[4096];
-  while (byte_count < max_bytes) {
-    if (os::INTERRUPT_REQUESTED) break;
-    let const remaining_count = max_bytes - byte_count;
-    let const request_count = remaining_count < sizeof(buffer)
-                                  ? static_cast<usize>(remaining_count)
-                                  : sizeof(buffer);
-    let const read_count = os::read_fd(fd, buffer, request_count);
-    if (!read_count.has_value()) return None;
-    if (*read_count == 0) break;
-    out.append(StringView{buffer, *read_count});
-    byte_count += *read_count;
-  }
-
-  return out;
-}
-
 static fn read_all(os::descriptor fd, Allocator allocator) throws
     -> Maybe<String>
 {
@@ -171,59 +125,8 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       source_list_from_operands(operands, cxt.scratch_allocator());
 
   let const should_print_headers = sources.count() > 1;
-  i32 status = 0;
-  for (usize source_index = 0; source_index < sources.count(); source_index++) {
-    os::descriptor fd;
-    bool was_opened = false;
-    if (sources[source_index] == "-") {
-      fd = ec.in_fd.value_or(KOSH_STDIN);
-    } else {
-      let const opened_fd = os::open_file_descriptor(sources[source_index],
-                                                     os::file_open_mode::Read);
-      if (!opened_fd.has_value()) {
-        report_soft_koshkit_util_error(
-            ec, cxt, args[0].view(),
-            "cannot open '" +
-                String{cxt.scratch_allocator(), sources[source_index]} +
-                "': " + os::last_system_error_message());
-        status = 1;
-        continue;
-      }
-      fd = *opened_fd;
-      was_opened = true;
-    }
-
-    let text = Maybe<String>{};
-    let text_view = StringView{};
-    if (is_all_but_last) {
-      text = read_all(fd, cxt.scratch_allocator());
-      if (text.has_value()) {
-        let const keep_length =
-            is_byte_mode
-                ? byte_prefix_length_dropping_last(text->view(), count)
-                : line_prefix_length_dropping_last(text->view(), count);
-        text_view = text->view().substring_of_length(0, keep_length);
-      }
-    } else {
-      text = is_byte_mode
-                 ? read_up_to_bytes(fd, count, cxt.scratch_allocator())
-                 : read_up_to_lines(fd, count, cxt.scratch_allocator());
-      if (text.has_value()) text_view = text->view();
-    }
-
-    if (was_opened) os::close_fd(fd);
-    /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
-    if (os::INTERRUPT_REQUESTED) return 130;
-    if (!text.has_value()) {
-      report_soft_koshkit_util_error(
-          ec, cxt, args[0].view(),
-          "cannot read '" +
-              String{cxt.scratch_allocator(), sources[source_index]} +
-              "': " + os::last_system_error_message());
-      status = 1;
-      continue;
-    }
-
+  let const do_print_source = [&](usize source_index, StringView text)
+                                  throws -> void {
     let output = String{cxt.scratch_allocator()};
     if (should_print_headers) {
       if (source_index > 0) output += '\n';
@@ -231,8 +134,164 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       output += sources[source_index];
       output += " <==\n";
     }
-    output += text_view;
+    output += text;
     ec.print_to_stdout(output);
+  };
+
+  i32 status = 0;
+  if (is_all_but_last) {
+    for (usize source_index = 0; source_index < sources.count(); source_index++)
+    {
+      os::descriptor fd;
+      bool was_opened = false;
+      if (sources[source_index] == "-") {
+        fd = ec.in_fd.value_or(KOSH_STDIN);
+      } else {
+        let const opened_fd = os::open_file_descriptor(
+            sources[source_index], os::file_open_mode::Read);
+        if (!opened_fd.has_value()) {
+          report_soft_koshkit_util_error(
+              ec, cxt, args[0].view(),
+              "cannot open '" +
+                  String{cxt.scratch_allocator(), sources[source_index]} +
+                  "': " + os::last_system_error_message());
+          status = 1;
+          continue;
+        }
+        fd = *opened_fd;
+        was_opened = true;
+      }
+
+      let const text = read_all(fd, cxt.scratch_allocator());
+      if (was_opened) os::close_fd(fd);
+      if (os::INTERRUPT_REQUESTED) return 130;
+      if (!text.has_value()) {
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot read '" +
+                String{cxt.scratch_allocator(), sources[source_index]} +
+                "': " + os::last_system_error_message());
+        status = 1;
+        continue;
+      }
+
+      let const keep_length =
+          is_byte_mode ? byte_prefix_length_dropping_last(text->view(), count)
+                       : line_prefix_length_dropping_last(text->view(), count);
+      do_print_source(source_index,
+                      text->view().substring_of_length(0, keep_length));
+    }
+
+    return status;
+  }
+
+  usize read_byte_count = 4096;
+  if (count == 0) {
+    read_byte_count = 0;
+  } else if (is_byte_mode && count < read_byte_count) {
+    read_byte_count = static_cast<usize>(count);
+  }
+
+  let source_results = ArrayList<source_read_result>{cxt.scratch_allocator()};
+  let line_counts = ArrayList<u64>{cxt.scratch_allocator()};
+  let open_error_flags = ArrayList<u8>{cxt.scratch_allocator()};
+  source_results.reserve(sources.count());
+  line_counts.reserve(sources.count());
+  open_error_flags.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    source_results.push({None, 0, false});
+    line_counts.push(0);
+    open_error_flags.push(0);
+  }
+
+  let reader =
+      SourceBatchReader{ec, sources, cxt.scratch_allocator(), read_byte_count};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  usize next_source_index = 0;
+  loop
+  {
+    let const read_result = reader.read_next(chunks);
+    bool is_reader_complete = false;
+    switch (read_result) {
+    case SourceBatchReader::ReadResult::Chunks: break;
+    case SourceBatchReader::ReadResult::Complete:
+      is_reader_complete = true;
+      break;
+    case SourceBatchReader::ReadResult::Interrupted: return 130;
+    }
+
+    for (let const &chunk : chunks) {
+      let &result = source_results[chunk.source_index];
+      result.is_complete = chunk.is_complete;
+      if (chunk.error_number != 0) {
+        result.content.reset();
+        result.error_number = chunk.error_number;
+        open_error_flags[chunk.source_index] = chunk.was_open_error ? 1 : 0;
+        continue;
+      }
+      if (!result.content.has_value())
+        result.content = String{heap_allocator()};
+
+      usize append_count = chunk.content.length;
+      if (is_byte_mode) {
+        let const accumulated_count =
+            static_cast<u64>(result.content->length());
+        let const remaining_count = count - accumulated_count;
+        if (remaining_count < append_count)
+          append_count = static_cast<usize>(remaining_count);
+      } else {
+        for (usize byte_index = 0; byte_index < chunk.content.length;
+             byte_index++)
+        {
+          if (chunk.content[byte_index] != '\n') continue;
+
+          line_counts[chunk.source_index]++;
+          if (line_counts[chunk.source_index] == count) {
+            append_count = byte_index + 1;
+            break;
+          }
+        }
+      }
+      result.content->append(
+          chunk.content.substring_of_length(0, append_count));
+
+      let const has_reached_limit =
+          is_byte_mode ? static_cast<u64>(result.content->length()) == count
+                       : line_counts[chunk.source_index] == count;
+      if (has_reached_limit && !result.is_complete) {
+        reader.finish_source(chunk.source_index);
+        result.is_complete = true;
+      } else if (is_byte_mode && !result.is_complete) {
+        let const remaining_count =
+            count - static_cast<u64>(result.content->length());
+        reader.set_source_read_byte_count(
+            chunk.source_index, remaining_count < read_byte_count
+                                    ? static_cast<usize>(remaining_count)
+                                    : read_byte_count);
+      }
+    }
+
+    while (next_source_index < source_results.count() &&
+           source_results[next_source_index].is_complete)
+    {
+      let &result = source_results[next_source_index];
+      if (!result.content.has_value()) {
+        os::set_last_system_error(result.error_number);
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            String{open_error_flags[next_source_index] != 0 ? "cannot open '"
+                                                            : "cannot read '"} +
+                sources[next_source_index] +
+                "': " + os::last_system_error_message());
+        status = 1;
+      } else {
+        do_print_source(next_source_index, result.content->view());
+        result.content.reset();
+      }
+      next_source_index++;
+    }
+
+    if (is_reader_complete) break;
   }
 
   return status;

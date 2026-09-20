@@ -224,6 +224,33 @@ note: order the endpoints from the lower byte to the higher byte.
 --- seq into head ---
 1
 2
+--- head batches regular prefix reads ---
+3902117615 701
+--- head bounds multi-chunk prefix reads ---
+812508710 5000
+1830648734 3893
+103894
+--- head handles zero bytes without reading data ---
+status=0
+--- head reads later files after a missing operand ---
+==> cat-first.txt <==
+first
+1:1: error: head: cannot open 'missing.txt': No such file or directory.
+     1 |  koshkit head -n 1 cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+==> cat-last.txt <==
+last
+status=1
+--- head preserves a standard-input source barrier ---
+==> cat-first.txt <==
+first
+
+==> - <==
+middle
+
+==> cat-last.txt <==
+last
 --- head minimum signed drop count ---
 status=0
 --- tee then read back ---

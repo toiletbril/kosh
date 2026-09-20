@@ -378,7 +378,8 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 
 SourceBatchReader::SourceBatchReader(const ExecContext &ec,
                                      const ArrayList<StringView> &sources,
-                                     Allocator allocator) throws
+                                     Allocator allocator,
+                                     usize read_byte_count) throws
     : m_ec(ec),
       m_sources(sources),
       m_readers(allocator),
@@ -386,7 +387,8 @@ SourceBatchReader::SourceBatchReader(const ExecContext &ec,
       m_results(allocator),
       m_reader_positions(allocator),
       m_metadata_paths(allocator),
-      m_metadata_statuses(allocator)
+      m_metadata_statuses(allocator),
+      m_read_byte_count(read_byte_count)
 {
   constexpr usize READER_COUNT = 16;
   m_readers.reserve(READER_COUNT);
@@ -411,6 +413,48 @@ fn SourceBatchReader::close_reader(Reader &reader) wontthrow -> void
   reader.is_complete = true;
 }
 
+fn SourceBatchReader::finish_source(usize source_index) wontthrow -> void
+{
+  for (let &reader : m_readers) {
+    if (reader.source_index != source_index) continue;
+
+    close_reader(reader);
+    reader.pending_byte_count = 0;
+    reader.pending_error_number = 0;
+    reader.has_pending_chunk = false;
+    return;
+  }
+
+  if (m_sequential_reader.has_value() &&
+      m_sequential_reader->source_index == source_index)
+  {
+    close_reader(*m_sequential_reader);
+    m_sequential_reader->pending_byte_count = 0;
+    m_sequential_reader->pending_error_number = 0;
+    m_sequential_reader->has_pending_chunk = false;
+  }
+}
+
+fn SourceBatchReader::set_source_read_byte_count(usize source_index,
+                                                 usize byte_count) wontthrow
+    -> void
+{
+  let const bounded_count =
+      byte_count < m_read_byte_count ? byte_count : m_read_byte_count;
+  for (let &reader : m_readers) {
+    if (reader.source_index != source_index) continue;
+
+    reader.read_byte_count = bounded_count;
+    return;
+  }
+
+  if (m_sequential_reader.has_value() &&
+      m_sequential_reader->source_index == source_index)
+  {
+    m_sequential_reader->read_byte_count = bounded_count;
+  }
+}
+
 fn SourceBatchReader::retire_completed_readers() throws -> void
 {
   for (usize remaining_count = m_readers.count(); remaining_count > 0;
@@ -432,7 +476,6 @@ fn SourceBatchReader::retire_completed_readers() throws -> void
 fn SourceBatchReader::fill_readers() throws -> void
 {
   constexpr usize READER_COUNT = 16;
-  constexpr usize READ_BYTE_COUNT = 64 * 1024;
 
   if (m_readers.is_empty()) should_defer_source = false;
 
@@ -445,8 +488,9 @@ fn SourceBatchReader::fill_readers() throws -> void
     let const source = m_sources[source_index];
     if (source == "-") {
       Reader reader;
-      reader.buffer.reserve(READ_BYTE_COUNT);
+      reader.buffer.reserve(m_read_byte_count);
       reader.source_index = source_index;
+      reader.read_byte_count = m_read_byte_count;
       reader.descriptor = m_ec.in_fd.value_or(KOSH_STDIN);
       m_sequential_reader = steal(reader);
       m_source_index++;
@@ -507,6 +551,7 @@ fn SourceBatchReader::fill_readers() throws -> void
       reader.pending_error_number = os::get_last_system_error_number();
       reader.is_complete = true;
       reader.has_pending_chunk = true;
+      reader.was_open_error = true;
       m_readers.push(steal(reader));
       m_source_index++;
       break;
@@ -520,8 +565,9 @@ fn SourceBatchReader::fill_readers() throws -> void
     }
 
     Reader reader;
-    reader.buffer.reserve(READ_BYTE_COUNT);
+    reader.buffer.reserve(m_read_byte_count);
     reader.source_index = source_index;
+    reader.read_byte_count = m_read_byte_count;
     reader.descriptor = *descriptor;
     reader.should_close = true;
     m_source_index++;
@@ -537,18 +583,21 @@ fn SourceBatchReader::fill_readers() throws -> void
 
 fn SourceBatchReader::read_seekable() throws -> ReadResult
 {
-  constexpr usize READ_BYTE_COUNT = 64 * 1024;
-
   m_batch.clear();
   m_reader_positions.clear();
   for (usize reader_index = 0; reader_index < m_readers.count(); reader_index++)
   {
     let &reader = m_readers[reader_index];
     if (reader.has_pending_chunk || reader.is_complete) continue;
+    if (reader.read_byte_count == 0) {
+      close_reader(reader);
+      reader.has_pending_chunk = true;
+      continue;
+    }
 
-    m_batch.add(os::batch_operation::read(reader.descriptor,
-                                          reader.buffer.begin(),
-                                          READ_BYTE_COUNT, reader.byte_offset));
+    m_batch.add(
+        os::batch_operation::read(reader.descriptor, reader.buffer.begin(),
+                                  reader.read_byte_count, reader.byte_offset));
     m_reader_positions.push(reader_index);
   }
   if (m_batch.count() == 0) return ReadResult::Chunks;
@@ -583,13 +632,16 @@ fn SourceBatchReader::read_seekable() throws -> ReadResult
 
 fn SourceBatchReader::read_sequential() throws -> ReadResult
 {
-  constexpr usize READ_BYTE_COUNT = 64 * 1024;
-
   let &reader = *m_sequential_reader;
   if (reader.has_pending_chunk || reader.is_complete) return ReadResult::Chunks;
+  if (reader.read_byte_count == 0) {
+    close_reader(reader);
+    reader.has_pending_chunk = true;
+    return ReadResult::Chunks;
+  }
 
-  let const read_count =
-      os::read_fd(reader.descriptor, reader.buffer.begin(), READ_BYTE_COUNT);
+  let const read_count = os::read_fd(reader.descriptor, reader.buffer.begin(),
+                                     reader.read_byte_count);
   if (!read_count.has_value()) {
     if (os::INTERRUPT_REQUESTED) return ReadResult::Interrupted;
 
@@ -625,7 +677,8 @@ fn SourceBatchReader::append_pending_chunks(ArrayList<Chunk> &chunks,
 
     chunks.push({
         StringView{reader.buffer.begin(), reader.pending_byte_count},
-        reader.source_index, reader.pending_error_number, reader.is_complete
+        reader.source_index, reader.pending_error_number, reader.is_complete,
+        reader.was_open_error
     });
     reader.pending_byte_count = 0;
     reader.pending_error_number = 0;

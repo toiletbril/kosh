@@ -176,6 +176,22 @@ echo "--- tr reverse range ---"
 printf "abc\n" | "$BIN" -c 'koshkit tr a-c z-x'
 echo "--- seq into head ---"
 "$BIN" -c 'koshkit seq 5 | koshkit head -n 2'
+echo "--- head batches regular prefix reads ---"
+"$BIN" -c 'koshkit head -n 1 batch-source-*.txt | koshkit cksum'
+echo "--- head bounds multi-chunk prefix reads ---"
+"$BIN" -c 'koshkit head -c 5000 batch-input.txt | koshkit cksum'
+"$BIN" -c 'koshkit head -n 1000 batch-input.txt | koshkit cksum'
+"$BIN" -c 'koshkit cat batch-input.txt' | "$BIN" -c \
+  'koshkit head -c 5000 >/dev/null; koshkit wc -c'
+echo "--- head handles zero bytes without reading data ---"
+"$BIN" -c 'koshkit head -c 0 cat-first.txt; printf "status=%s\n" "$?"'
+echo "--- head reads later files after a missing operand ---"
+"$BIN" -c \
+  'koshkit head -n 1 cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- head preserves a standard-input source barrier ---"
+printf 'middle\nextra\n' | "$BIN" -c \
+  'koshkit head -n 1 cat-first.txt - cat-last.txt'
 echo "--- head minimum signed drop count ---"
 printf 'one\ntwo\n' | "$BIN" -c 'koshkit head -n -9223372036854775808'
 echo "status=$?"

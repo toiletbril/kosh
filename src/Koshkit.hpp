@@ -655,14 +655,19 @@ public:
     usize source_index{0};
     i32 error_number{0};
     bool is_complete{false};
+    bool was_open_error{false};
   };
 
   SourceBatchReader(const ExecContext &ec, const ArrayList<StringView> &sources,
-                    Allocator allocator) throws;
+                    Allocator allocator,
+                    usize read_byte_count = 64 * 1024) throws;
   ~SourceBatchReader();
 
   fn read_next(ArrayList<Chunk> &chunks) throws -> ReadResult;
   fn read_next_ordered(ArrayList<Chunk> &chunks) throws -> ReadResult;
+  fn finish_source(usize source_index) wontthrow -> void;
+  fn set_source_read_byte_count(usize source_index, usize byte_count) wontthrow
+      -> void;
 
   SourceBatchReader(const SourceBatchReader &) = delete;
   fn operator=(const SourceBatchReader &)->SourceBatchReader & = delete;
@@ -674,11 +679,13 @@ private:
     u64 byte_offset{0};
     usize source_index{0};
     usize pending_byte_count{0};
+    usize read_byte_count{0};
     os::descriptor descriptor{KOSH_INVALID_FD};
     i32 pending_error_number{0};
     bool should_close{false};
     bool is_complete{false};
     bool has_pending_chunk{false};
+    bool was_open_error{false};
   };
 
   static fn close_reader(Reader &reader) wontthrow -> void;
@@ -700,6 +707,7 @@ private:
   ArrayList<usize> m_reader_positions;
   ArrayList<Path> m_metadata_paths;
   ArrayList<os::file_status> m_metadata_statuses;
+  usize m_read_byte_count;
   usize m_source_index{0};
   bool should_defer_source{false};
 };
