@@ -35,6 +35,63 @@ koshkit file -M magic-continuation magic-child
 printf '%s\n' 'invalid line' '0 string hello greeting' > magic-malformed
 printf hello > magic-hello
 koshkit file -M magic-malformed magic-hello
+printf '%s\n' '9000 string MARK far-string' > magic-far
+koshkit head -c 9000 /dev/zero > magic-far-exact
+printf MARK >> magic-far-exact
+koshkit head -c 9000 /dev/zero > magic-far-short
+printf MAR >> magic-far-short
+koshkit file -M magic-far magic-far-exact magic-far-short
+printf '%s\n' '10000 uC 7 far-number' > magic-far-number
+koshkit head -c 10000 /dev/zero > magic-number-data
+printf '\007' >> magic-number-data
+koshkit file -M magic-far-number magic-number-data
+koshkit file -m magic-zero text
+printf '%s\n' \
+  '65534 string A end-65535' \
+  '65535 string B end-65536' \
+  '65536 string C end-65537' > magic-boundaries
+printf A | dd of=magic-end-65535 bs=1 seek=65534 2> "$TEST_NULL_DEVICE"
+printf B | dd of=magic-end-65536 bs=1 seek=65535 2> "$TEST_NULL_DEVICE"
+printf C | dd of=magic-end-65537 bs=1 seek=65536 2> "$TEST_NULL_DEVICE"
+koshkit file -M magic-boundaries \
+  magic-end-65535 magic-end-65536 magic-end-65537
+printf '%s\n' '0 string M parent' '>70000 string Z child' \
+  > magic-far-continuation
+printf M > magic-continuation-data
+printf Z | dd of=magic-continuation-data bs=1 seek=70000 conv=notrunc \
+  2> "$TEST_NULL_DEVICE"
+koshkit file -M magic-far-continuation magic-continuation-data
+dd if=/dev/zero of=magic-sparse bs=1 count=1 seek=1073741823 \
+  2> "$TEST_NULL_DEVICE"
+printf MARK | dd of=magic-sparse bs=1 seek=9000 conv=notrunc \
+  2> "$TEST_NULL_DEVICE"
+koshkit file -M magic-far magic-sparse
+printf '%s\n' '9000 string Z far-no-match' > magic-far-default
+koshkit yes A | koshkit tr -d '\n' | koshkit head -c 9000 \
+  > magic-default-data
+printf '\0' >> magic-default-data
+koshkit file -m magic-far-default magic-default-data
+printf '%s\n' '0 string MATCH batch-match' > magic-batch
+printf MATCH > magic-m-option
+koshkit file -m magic-batch magic-m-option
+for batch_index in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 \
+  19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34; do
+  printf MATCH > "magic-probe-$batch_index"
+done
+koshkit file -M magic-batch magic-probe-*
+(koshkit file -M magic-batch magic-probe-01 absent magic-probe-18) \
+  2> "$TEST_NULL_DEVICE"
+echo "file-magic-missing=$?"
+koshkit ln -s magic-far-exact magic-far-link
+koshkit file -M magic-far magic-far-link
+koshkit file -h -M magic-far magic-far-link
+koshkit file -h -L -M magic-far magic-far-link
+koshkit file -L -h -M magic-far magic-far-link
+koshkit mkfifo magic-fifo
+printf M > magic-short
+koshkit file -M magic-batch empty magic-short magic-fifo
+printf MATCH > -
+koshkit file -M magic-batch -- -
 
 format_rows='png|\211PNG\r\n\032\n
 jpeg|\377\330\377

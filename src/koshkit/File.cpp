@@ -955,6 +955,169 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
     if (probe_count != 0) do_flush_probes();
   }
 
+  let custom_sample_descriptions = ArrayList<String>{allocator};
+  let custom_sample_error_numbers = ArrayList<i32>{allocator};
+  let custom_sample_ready = Bitset{allocator};
+  let custom_sample_errors = Bitset{allocator};
+  let custom_sample_open_errors = Bitset{allocator};
+  bool was_custom_sampling_interrupted = false;
+  let const should_batch_custom_samples =
+      !FLAG_FILE_REGULAR_ONLY.is_enabled() && !magic_rules.is_empty();
+  if (should_batch_custom_samples) {
+    custom_sample_descriptions.reserve(operands.count());
+    custom_sample_error_numbers.reserve(operands.count());
+    for (usize operand_position = 0; operand_position < operands.count();
+         operand_position++)
+    {
+      custom_sample_descriptions.push(String{allocator});
+      custom_sample_error_numbers.push(0);
+    }
+    custom_sample_ready.reset(operands.count());
+    custom_sample_errors.reset(operands.count());
+    custom_sample_open_errors.reset(operands.count());
+
+    usize sample_byte_count = 1;
+    for (let const &rule : magic_rules) {
+      if (rule.offset > SIZE_MAX) continue;
+
+      let const offset = static_cast<usize>(rule.offset);
+      let const width = rule.kind == file_magic_kind::String
+                            ? rule.expected_text.count()
+                            : rule.byte_count;
+      if (width > SIZE_MAX - offset) continue;
+
+      let const rule_end = offset + width;
+      if (rule_end > sample_byte_count) sample_byte_count = rule_end;
+    }
+    if (should_apply_default_tests &&
+        sample_byte_count < FILE_CONTENT_SAMPLE_BYTE_COUNT)
+    {
+      sample_byte_count = FILE_CONTENT_SAMPLE_BYTE_COUNT;
+    }
+
+    for (usize operand_position = 0; operand_position < operands.count();
+         operand_position++)
+    {
+      if (metadata_results[operand_position].error_number != 0 ||
+          os::file_type_letter(file_statuses[operand_position].mode) != 'l' ||
+          !should_follow)
+      {
+        continue;
+      }
+
+      unused(os::stat_path_following(operands[operand_position].view(),
+                                     file_statuses[operand_position]));
+    }
+
+    let sample_sources = ArrayList<StringView>{allocator};
+    let sample_operand_positions = ArrayList<usize>{allocator};
+    for (usize operand_position = 0; operand_position < operands.count();
+         operand_position++)
+    {
+      if (metadata_results[operand_position].error_number != 0 ||
+          os::file_type_letter(file_statuses[operand_position].mode) != '-')
+      {
+        continue;
+      }
+
+      sample_sources.push(operands[operand_position].view());
+      sample_operand_positions.push(operand_position);
+    }
+
+    let source_results = ArrayList<source_read_result>{allocator};
+    source_results.reserve(sample_sources.count());
+    for (usize source_index = 0; source_index < sample_sources.count();
+         source_index++)
+    {
+      source_results.push({None, 0, false});
+    }
+
+    let const read_byte_count =
+        sample_byte_count < 64 * 1024 ? sample_byte_count : usize{64 * 1024};
+    let reader = SourceBatchReader{ec, sample_sources, allocator,
+                                   read_byte_count, false};
+    let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
+    loop
+    {
+      let const read_result = reader.read_next(chunks);
+      bool is_reader_complete = false;
+      switch (read_result) {
+      case SourceBatchReader::ReadResult::Chunks: break;
+      case SourceBatchReader::ReadResult::Complete:
+        is_reader_complete = true;
+        break;
+      case SourceBatchReader::ReadResult::Interrupted:
+        was_custom_sampling_interrupted = true;
+        break;
+      }
+
+      for (let const &chunk : chunks) {
+        let &result = source_results[chunk.source_index];
+        result.is_complete = chunk.is_complete;
+        if (chunk.error_number != 0) {
+          result.content.reset();
+          result.error_number = chunk.error_number;
+        } else {
+          if (!result.content.has_value())
+            result.content = String{heap_allocator()};
+          result.content->append(chunk.content);
+
+          if (result.content->length() == sample_byte_count &&
+              !result.is_complete)
+          {
+            reader.finish_source(chunk.source_index);
+            result.is_complete = true;
+          } else if (!result.is_complete) {
+            let const remaining_count =
+                sample_byte_count - result.content->length();
+            reader.set_source_read_byte_count(chunk.source_index,
+                                              remaining_count < read_byte_count
+                                                  ? remaining_count
+                                                  : read_byte_count);
+          }
+        }
+
+        if (!result.is_complete) continue;
+
+        let const operand_position =
+            sample_operand_positions[chunk.source_index];
+        custom_sample_ready.set(operand_position);
+        if (!result.content.has_value()) {
+          custom_sample_errors.set(operand_position);
+          if (chunk.was_open_error)
+            custom_sample_open_errors.set(operand_position);
+          custom_sample_error_numbers[operand_position] = result.error_number;
+          continue;
+        }
+
+        let const sample = result.content->view();
+        if (sample.is_empty()) {
+          custom_sample_descriptions[operand_position] =
+              String{allocator, "empty"};
+        } else if (let magic_description =
+                       match_magic_rules(magic_rules, sample, allocator);
+                   magic_description.has_value())
+        {
+          custom_sample_descriptions[operand_position] =
+              magic_description.take();
+        } else if (should_apply_default_tests) {
+          let const fallback_sample = sample.substring_of_length(
+              0, sample.length < FILE_CONTENT_SAMPLE_BYTE_COUNT
+                     ? sample.length
+                     : FILE_CONTENT_SAMPLE_BYTE_COUNT);
+          custom_sample_descriptions[operand_position] =
+              String{allocator, file_content_description(fallback_sample)};
+        } else {
+          custom_sample_descriptions[operand_position] =
+              String{allocator, "data"};
+        }
+        result.content.reset();
+      }
+
+      if (is_reader_complete || was_custom_sampling_interrupted) break;
+    }
+  }
+
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
@@ -973,7 +1136,7 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
     let const is_symbolic_link = os::file_type_letter(file_status.mode) == 'l';
     if (is_symbolic_link) {
       let const target = os::read_symlink(operand.view(), allocator);
-      if (!should_follow ||
+      if (!should_follow || should_batch_custom_samples ||
           !os::stat_path_following(operand.view(), file_status))
       {
         let description = operand + ": symbolic link";
@@ -1013,45 +1176,30 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       }
       description += default_description->view();
     } else {
-      let const descriptor =
-          os::open_file_descriptor(operand.view(), os::file_open_mode::Read);
-      if (!descriptor.has_value()) {
+      if (custom_sample_errors[operand_position]) {
+        os::set_last_system_error(
+            custom_sample_error_numbers[operand_position]);
         report_soft_koshkit_util_error(
             ec, cxt, operand_locations[operand_position], args[0].view(),
-            "cannot open '" + operand +
-                "': " + os::last_system_error_message());
+            String{custom_sample_open_errors[operand_position]
+                       ? "cannot open '"
+                       : "cannot read '"} +
+                operand + "': " + os::last_system_error_message());
         status = 1;
         continue;
       }
-      defer { os::close_fd(*descriptor); };
-
-      let const contents = os::read_fd_to_string(*descriptor, allocator);
-      if (!contents.has_value()) {
-        report_soft_koshkit_util_error(
-            ec, cxt, operand_locations[operand_position], args[0].view(),
-            "cannot read '" + operand +
-                "': " + os::last_system_error_message());
-        status = 1;
-        continue;
+      if (!custom_sample_ready[operand_position]) {
+        ASSERT(was_custom_sampling_interrupted,
+               "custom file sample completed without a result");
+        return 130;
       }
-      if (contents->is_empty()) {
-        description += "empty";
-      } else if (let const magic_description = match_magic_rules(
-                     magic_rules, contents->view(), allocator);
-                 magic_description.has_value())
-      {
-        description += magic_description->view();
-      } else if (should_apply_default_tests) {
-        description += file_content_description(contents->view());
-      } else {
-        description += "data";
-      }
+      description += custom_sample_descriptions[operand_position].view();
     }
 
     ec.print_to_stdout(operand + ": " + description + "\n");
   }
 
-  return status;
+  return was_custom_sampling_interrupted ? 130 : status;
 }
 
 } // namespace koshka::koshkit

@@ -11,6 +11,14 @@ sym: text
      1 |  koshkit file nums.txt stamp sym missing.txt
        |                                  ^~~~~~~~~~~
 file-status=1
+--- custom file samples preserve merged-stream operand order ---
+magic-good-a: batch-match
+1:42: error: file: cannot open 'missing-magic': No such file or directory.
+     1 |  koshkit file -M magic-batch magic-good-a missing-magic magic-good-b
+       |                                           ^~~~~~~~~~~~~
+magic-good-b: batch-match
+custom-file-status=1
+custom-file-unreadable=ok
 --- stat preserves nonadjacent repeated operands ---
 nums.txt=6
 stamp=0
@@ -26,6 +34,10 @@ lrwxrwxrwx 1 8 sym
 a
 batch-a
 batch-b
+magic-batch
+magic-good-a
+magic-good-b
+magic-unreadable
 moved.txt
 nums.txt
 stamp

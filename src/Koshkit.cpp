@@ -378,8 +378,8 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 
 SourceBatchReader::SourceBatchReader(const ExecContext &ec,
                                      const ArrayList<StringView> &sources,
-                                     Allocator allocator,
-                                     usize read_byte_count) throws
+                                     Allocator allocator, usize read_byte_count,
+                                     bool should_treat_dash_as_stdin) throws
     : m_ec(ec),
       m_sources(sources),
       m_readers(allocator),
@@ -388,7 +388,8 @@ SourceBatchReader::SourceBatchReader(const ExecContext &ec,
       m_reader_positions(allocator),
       m_metadata_paths(allocator),
       m_metadata_statuses(allocator),
-      m_read_byte_count(read_byte_count)
+      m_read_byte_count(read_byte_count),
+      m_should_treat_dash_as_stdin(should_treat_dash_as_stdin)
 {
   constexpr usize READER_COUNT = 16;
   m_readers.reserve(READER_COUNT);
@@ -486,7 +487,7 @@ fn SourceBatchReader::fill_readers() throws -> void
   {
     let const source_index = m_source_index;
     let const source = m_sources[source_index];
-    if (source == "-") {
+    if (m_should_treat_dash_as_stdin && source == "-") {
       Reader reader;
       reader.buffer.reserve(m_read_byte_count);
       reader.source_index = source_index;
@@ -512,7 +513,7 @@ fn SourceBatchReader::fill_readers() throws -> void
              candidate_index++)
         {
           let const candidate = m_sources[candidate_index];
-          if (candidate == "-") break;
+          if (m_should_treat_dash_as_stdin && candidate == "-") break;
 
           m_metadata_paths.push(Path{candidate});
           m_metadata_statuses.push({});

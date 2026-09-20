@@ -659,8 +659,8 @@ public:
   };
 
   SourceBatchReader(const ExecContext &ec, const ArrayList<StringView> &sources,
-                    Allocator allocator,
-                    usize read_byte_count = 64 * 1024) throws;
+                    Allocator allocator, usize read_byte_count = 64 * 1024,
+                    bool should_treat_dash_as_stdin = true) throws;
   ~SourceBatchReader();
 
   fn read_next(ArrayList<Chunk> &chunks) throws -> ReadResult;
@@ -709,6 +709,7 @@ private:
   ArrayList<os::file_status> m_metadata_statuses;
   usize m_read_byte_count;
   usize m_source_index{0};
+  bool m_should_treat_dash_as_stdin;
   bool should_defer_source{false};
 };
 
