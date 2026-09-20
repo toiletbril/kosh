@@ -16,6 +16,10 @@ echo "--- wc -l ---"
 : > empty.txt
 printf 'first\n' > cat-first.txt
 printf 'last\n' > cat-last.txt
+printf 'abc' > transform-first.txt
+printf '\tx\n' > transform-tabs.txt
+printf '        x\n' > transform-blanks.txt
+printf 'def\n' > transform-second.txt
 for batch_source_index in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18; do
   printf 'source-%s\n' "$batch_source_index" > "batch-source-$batch_source_index.txt"
 done
@@ -26,6 +30,14 @@ echo "--- cat multi-chunk input with a missing operand ---"
 echo "--- cat preserves bounded source-window order ---"
 "$BIN" -c \
   'koshkit cat batch-source-18.txt batch-source-01.txt batch-source-17.txt batch-source-02.txt batch-source-16.txt batch-source-03.txt batch-source-15.txt batch-source-04.txt batch-source-14.txt batch-source-05.txt batch-source-13.txt batch-source-06.txt batch-source-12.txt batch-source-07.txt batch-source-11.txt batch-source-08.txt batch-source-10.txt batch-source-09.txt'
+echo "--- transformed sources preserve boundaries ---"
+"$BIN" -c 'koshkit expand -t 4 transform-first.txt transform-tabs.txt'
+"$BIN" -c 'koshkit unexpand transform-first.txt transform-blanks.txt' | cat -v
+"$BIN" -c 'koshkit fold -w 4 transform-first.txt transform-second.txt'
+echo "--- transformed utilities batch source windows ---"
+"$BIN" -c 'koshkit expand batch-source-*.txt | koshkit cksum'
+"$BIN" -c 'koshkit unexpand batch-source-*.txt | koshkit cksum'
+"$BIN" -c 'koshkit fold batch-source-*.txt | koshkit cksum'
 echo "--- cat reads standard input between files ---"
 printf 'middle\n' | "$BIN" -c \
   'koshkit cat cat-first.txt - cat-last.txt'

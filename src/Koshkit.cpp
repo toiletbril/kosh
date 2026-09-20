@@ -691,7 +691,7 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
   let results = ArrayList<source_read_result>{allocator};
   results.reserve(sources.count());
   for (usize source_index = 0; source_index < sources.count(); source_index++)
-    results.push({None, 0});
+    results.push({None, 0, false});
 
   let reader = SourceBatchReader{ec, sources, allocator};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
@@ -706,6 +706,7 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
 
     for (let const &chunk : chunks) {
       let &result = results[chunk.source_index];
+      result.is_complete = chunk.is_complete;
       if (chunk.error_number != 0) {
         result.content.reset();
         result.error_number = chunk.error_number;

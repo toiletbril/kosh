@@ -636,6 +636,7 @@ struct source_read_result
 {
   Maybe<String> content;
   i32 error_number{0};
+  bool is_complete{false};
 };
 
 class SourceBatchReader

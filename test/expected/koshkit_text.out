@@ -32,6 +32,15 @@ source-11
 source-08
 source-10
 source-09
+--- transformed sources preserve boundaries ---
+abc    x
+abc	x
+abc
+def
+--- transformed utilities batch source windows ---
+531297043 180
+531297043 180
+531297043 180
 --- cat reads standard input between files ---
 first
 middle
