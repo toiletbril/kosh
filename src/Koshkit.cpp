@@ -698,9 +698,11 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
   loop
   {
     let const read_result = reader.read_next(chunks);
-    if (read_result == SourceBatchReader::ReadResult::Complete) break;
-    if (read_result == SourceBatchReader::ReadResult::Interrupted)
-      return results;
+    switch (read_result) {
+    case SourceBatchReader::ReadResult::Chunks: break;
+    case SourceBatchReader::ReadResult::Complete:
+    case SourceBatchReader::ReadResult::Interrupted: return results;
+    }
 
     for (let const &chunk : chunks) {
       let &result = results[chunk.source_index];
@@ -709,8 +711,7 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
         result.error_number = chunk.error_number;
         continue;
       }
-      if (!result.content.has_value())
-        result.content = String{heap_allocator()};
+      if (!result.content.has_value()) result.content = String{allocator};
       result.content->append(chunk.content);
     }
   }
