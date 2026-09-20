@@ -26,6 +26,7 @@ SELECTED_SGR = b"\x1b[7m"
 GHOST_SGR = b"\x1b[90m"
 HIGHLIGHT_RESET = b"\x1b[0m"
 CLEAR_BELOW = b"\x1b[0J"
+NO_MATCHES = b"no matches, erase to widen the search"
 
 
 def read_until_idle(master, timeout, required_output=None, required_count=1):
@@ -67,6 +68,8 @@ def run_menu(
     key_outputs=None,
     first_open_output=None,
     key_required_outputs=(),
+    key_blocked_completions=(),
+    key_early_outputs=None,
 ):
     """Type the words, press the opening key twice, send the keys, and submit.
 
@@ -126,6 +129,20 @@ def run_menu(
 
     for index, key in enumerate(keys):
         os.write(master, key)
+        if index < len(key_blocked_completions):
+            blocked_completion = key_blocked_completions[index]
+        else:
+            blocked_completion = None
+        if blocked_completion is not None:
+            started_path, release_path = blocked_completion
+            deadline = time.monotonic() + 2
+            while not os.path.exists(started_path) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            early_output = read_until_idle(master, 2, b"loading...")
+            if key_early_outputs is not None:
+                key_early_outputs.append(early_output)
+            open(release_path, "w").close()
+            menu += early_output
         required = (
             key_required_outputs[index]
             if index < len(key_required_outputs)
@@ -194,6 +211,12 @@ def main():
             fake.write(
                 "#!/bin/sh\n"
                 "if [ \"$1\" = status ]; then\n"
+                "  if [ -n \"${KOSH_TEST_COMPLETION_STARTED-}\" ]; then\n"
+                "    : > \"$KOSH_TEST_COMPLETION_STARTED\"\n"
+                "    while [ ! -e \"$KOSH_TEST_COMPLETION_RELEASE\" ]; do\n"
+                "      sleep 0.01\n"
+                "    done\n"
+                "  fi\n"
                 "  printf 'OPTIONS\\n  --json  Print JSON\\n"
                 "  --peers  Print peers\\n'\n"
                 "else\n"
@@ -347,15 +370,40 @@ def main():
             and b"<alpha-one>" in word_erased
         )
 
+        empty_word_outputs = []
+        run_menu(
+            directory,
+            "tree",
+            typed,
+            [b"\x7f"] * 7 + [b"\x07"],
+            key_outputs=empty_word_outputs,
+            key_required_outputs=(SELECTED_SGR,) * 6 + (NO_MATCHES,),
+        )
+        exact_empty_word_keeps_menu_open = (
+            len(empty_word_outputs) == 8
+            and SELECTED_SGR in empty_word_outputs[5]
+        )
+        erase_across_word_boundary_keeps_menu_open = (
+            len(empty_word_outputs) == 8
+            and NO_MATCHES in empty_word_outputs[6]
+        )
+
+        completion_started = os.path.join(directory, "completion-started")
+        completion_release = os.path.join(directory, "completion-release")
+        semantic_early_outputs = []
         semantic_menu, _, _ = run_menu(
             directory,
             "semantic",
             "tailscale s",
             [b"atus --"],
             environment={
-                "PATH": fake_bin + os.pathsep + os.environ.get("PATH", "")
+                "PATH": fake_bin + os.pathsep + os.environ.get("PATH", ""),
+                "KOSH_TEST_COMPLETION_STARTED": completion_started,
+                "KOSH_TEST_COMPLETION_RELEASE": completion_release,
             },
             first_key_required=b"--json",
+            key_blocked_completions=((completion_started, completion_release),),
+            key_early_outputs=semantic_early_outputs,
         )
         each_new_word_regathers_completions = (
             b"--json" in semantic_menu and b"--peers" in semantic_menu
@@ -369,6 +417,11 @@ def main():
             loading_position >= 0
             and replacement_position > loading_position
             and final_candidate_position > replacement_position
+        )
+        loading_is_visible_while_gathering = (
+            len(semantic_early_outputs) == 1
+            and b"loading..." in semantic_early_outputs[0]
+            and os.path.exists(completion_started)
         )
 
         _, _, large_tail = run_menu(
@@ -566,10 +619,19 @@ def main():
             "WHOLE_WORD_BACKSPACE_KEEPS_MENU_OPEN": (
                 whole_word_backspace_keeps_menu_open
             ),
+            "EXACT_EMPTY_WORD_KEEPS_MENU_OPEN": (
+                exact_empty_word_keeps_menu_open
+            ),
+            "ERASE_ACROSS_WORD_BOUNDARY_KEEPS_MENU_OPEN": (
+                erase_across_word_boundary_keeps_menu_open
+            ),
             "EACH_NEW_WORD_REGATHERS_COMPLETIONS": (
                 each_new_word_regathers_completions
             ),
             "REGATHER_SHOWS_LOADING_ROW": regather_shows_loading_row,
+            "LOADING_IS_VISIBLE_WHILE_GATHERING": (
+                loading_is_visible_while_gathering
+            ),
             "LARGE_FILE_MENU_REUSES_WARM_INDEX": (
                 large_file_menu_reuses_warm_index
             ),
