@@ -13,6 +13,25 @@
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 status=1
 578497766 108905 cat-output.txt
+--- cat preserves bounded source-window order ---
+source-18
+source-01
+source-17
+source-02
+source-16
+source-03
+source-15
+source-04
+source-14
+source-05
+source-13
+source-06
+source-12
+source-07
+source-11
+source-08
+source-10
+source-09
 --- cat reads standard input between files ---
 first
 middle

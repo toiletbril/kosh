@@ -682,13 +682,13 @@ private:
 
   static fn close_reader(Reader &reader) wontthrow -> void;
   fn retire_completed_readers() throws -> void;
-  fn fill_readers(bool should_preserve_open_order) throws -> void;
+  fn fill_readers() throws -> void;
   fn read_seekable() throws -> ReadResult;
   fn read_sequential() throws -> ReadResult;
   fn append_pending_chunks(ArrayList<Chunk> &chunks,
                            bool should_emit_one) throws -> void;
-  fn read_next_internal(ArrayList<Chunk> &chunks, bool should_emit_one,
-                        bool should_preserve_open_order) throws -> ReadResult;
+  fn read_next_internal(ArrayList<Chunk> &chunks, bool should_emit_one) throws
+      -> ReadResult;
 
   const ExecContext &m_ec;
   const ArrayList<StringView> &m_sources;
@@ -697,7 +697,10 @@ private:
   os::Batch m_batch;
   ArrayList<os::batch_result> m_results;
   ArrayList<usize> m_reader_positions;
+  ArrayList<Path> m_metadata_paths;
+  ArrayList<os::file_status> m_metadata_statuses;
   usize m_source_index{0};
+  bool should_defer_source{false};
 };
 
 fn read_named_or_stdin_batch(const ExecContext &ec,
