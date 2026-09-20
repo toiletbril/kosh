@@ -134,7 +134,7 @@ static pure fn is_metadata_request(
 
 static fn find_canonical_operation_positions(
     const ArrayList<batch_internal::batched_syscall> &operations,
-    ArrayList<usize> &canonical_positions) throws -> bool
+    ArrayList<usize> &canonical_positions) throws -> usize
 {
   constexpr usize LINEAR_METADATA_LIMIT = 8;
   usize metadata_count = 0;
@@ -144,7 +144,7 @@ static fn find_canonical_operation_positions(
   if (metadata_count < 2 ||
       metadata_count > ArrayList<usize>::MAXIMUM_ELEMENT_COUNT / 4)
   {
-    return false;
+    return 0;
   }
 
   if (metadata_count <= LINEAR_METADATA_LIMIT) {
@@ -165,7 +165,7 @@ static fn find_canonical_operation_positions(
       if (has_duplicate_metadata) break;
     }
 
-    if (!has_duplicate_metadata) return false;
+    if (!has_duplicate_metadata) return 0;
   }
 
   canonical_positions.clear();
@@ -183,6 +183,7 @@ static fn find_canonical_operation_positions(
     buckets.push(SIZE_MAX);
 
   bool has_repeated_request = false;
+  usize unique_operation_count = operations.count() - metadata_count;
   for (usize index = 0; index < operations.count(); index++) {
     let const &operation = operations[index];
     if (!is_metadata_request(operation)) continue;
@@ -201,6 +202,7 @@ static fn find_canonical_operation_positions(
       let const existing_position = buckets[bucket];
       if (existing_position == SIZE_MAX) {
         buckets[bucket] = index;
+        unique_operation_count++;
         break;
       }
       if (is_same_metadata_request(operations[existing_position], operation)) {
@@ -213,13 +215,15 @@ static fn find_canonical_operation_positions(
     }
   }
 
-  return has_repeated_request;
+  return has_repeated_request ? unique_operation_count : 0;
 }
 
 fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
 {
   let canonical_positions = ArrayList<usize>{m_operations.allocator()};
-  if (!find_canonical_operation_positions(m_operations, canonical_positions)) {
+  let const unique_operation_count =
+      find_canonical_operation_positions(m_operations, canonical_positions);
+  if (unique_operation_count == 0) {
     results.clear();
     results.reserve(m_operations.count());
     for (usize index = 0; index < m_operations.count(); index++)
@@ -232,36 +236,37 @@ fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
 
   let optimized_operations =
       ArrayList<batch_internal::batched_syscall>{m_operations.allocator()};
-  let optimized_positions = ArrayList<usize>{m_operations.allocator()};
-  optimized_operations.reserve(m_operations.count());
-  optimized_positions.reserve(m_operations.count());
+  optimized_operations.reserve(unique_operation_count);
   for (usize index = 0; index < m_operations.count(); index++) {
     let const canonical_position = canonical_positions[index];
     if (canonical_position != index) {
-      optimized_positions.push(optimized_positions[canonical_position]);
+      canonical_positions[index] = canonical_positions[canonical_position];
       continue;
     }
 
-    optimized_positions.push(optimized_operations.count());
+    canonical_positions[index] = optimized_operations.count();
     optimized_operations.push(m_operations[index]);
   }
 
-  let optimized_results = ArrayList<batch_result>{m_operations.allocator()};
-  optimized_results.reserve(optimized_operations.count());
+  results.clear();
+  results.reserve(m_operations.count());
   for (usize index = 0; index < optimized_operations.count(); index++)
-    optimized_results.push({});
+    results.push({});
 
   batch_internal::execute_batch_operations(optimized_operations.begin(),
                                            optimized_operations.count(),
-                                           optimized_results.begin());
+                                           results.begin());
 
-  results.clear();
-  results.reserve(m_operations.count());
-  for (usize index = 0; index < m_operations.count(); index++) {
-    let const optimized_position = optimized_positions[index];
-    let result = optimized_results[optimized_position];
+  while (results.count() < m_operations.count())
+    results.push({});
+  for (usize remaining_count = m_operations.count(); remaining_count != 0;
+       remaining_count--)
+  {
+    let const index = remaining_count - 1;
+    let const optimized_position = canonical_positions[index];
+    let result = results[optimized_position];
     result.request_id = index;
-    results.push(result);
+    results[index] = result;
 
     let const &operation = m_operations[index];
     let const &optimized_operation = optimized_operations[optimized_position];
