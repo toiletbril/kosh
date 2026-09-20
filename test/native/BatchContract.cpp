@@ -37,6 +37,7 @@ bool should_fail_metadata = false;
 bool should_report_existing = true;
 bool should_validate_operations = false;
 bool should_interrupt = false;
+bool should_report_partial_transfer = false;
 
 fn expect(bool is_true, const char *message) wontthrow -> void
 {
@@ -53,8 +54,24 @@ fn reset_observations() wontthrow -> void
     operation = {};
 }
 
+fn test_empty_batch() throws -> void
+{
+  let const initial_execution_count = execution_count;
+  let batch = Batch{heap_allocator()};
+  let results = ArrayList<batch_result>{heap_allocator()};
+  results.push({19, 23, 29});
+
+  reset_observations();
+  batch.execute(results);
+  expect(execution_count == initial_execution_count + 1 &&
+             observed_operation_count == 0,
+         "an empty batch invokes the backend without operations");
+  expect(results.is_empty(), "an empty batch clears reused results");
+}
+
 fn test_io_order_and_reuse() throws -> void
 {
+  let const initial_execution_count = execution_count;
   let batch = Batch{heap_allocator()};
   let results = ArrayList<batch_result>{heap_allocator()};
   char read_buffer[4]{};
@@ -72,7 +89,8 @@ fn test_io_order_and_reuse() throws -> void
 
   reset_observations();
   batch.execute(results);
-  expect(execution_count == 1, "execute invokes the backend once");
+  expect(execution_count == initial_execution_count + 1,
+         "execute invokes the backend once");
   expect(observed_operation_count == 3,
          "the backend receives every queued operation");
   if (results.count() != 3) {
@@ -129,7 +147,8 @@ fn test_io_order_and_reuse() throws -> void
   batch.add(batch_operation::read(KOSH_STDIN, read_buffer, 1, 3));
   reset_observations();
   batch.execute(results);
-  expect(execution_count == 2, "a reused queue invokes the backend again");
+  expect(execution_count == initial_execution_count + 2,
+         "a reused queue invokes the backend again");
   if (results.count() != 1) {
     expect(false, "execute clears a reused result vector");
     return;
@@ -281,6 +300,60 @@ fn test_many_duplicate_metadata_operations() throws -> void
   }
 }
 
+fn test_hashed_mixed_metadata_operations() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  let path = Path{};
+  file_status lstat_statuses[4]{};
+  file_status stat_statuses[4]{};
+  char read_buffer[1]{};
+  const char write_buffer[1]{'x'};
+
+  batch.add(batch_operation::lstat(path, lstat_statuses[0]));
+  batch.add(batch_operation::read(KOSH_STDIN, read_buffer, 1, 7));
+  batch.add(batch_operation::stat(path, stat_statuses[0]));
+  batch.add(batch_operation::exists(path));
+  batch.add(batch_operation::lstat(path, lstat_statuses[1]));
+  batch.add(batch_operation::write(KOSH_STDOUT, write_buffer, 1, 9));
+  batch.add(batch_operation::stat(path, stat_statuses[1]));
+  batch.add(batch_operation::exists(path));
+  batch.add(batch_operation::lstat(path, lstat_statuses[2]));
+  batch.add(batch_operation::stat(path, stat_statuses[2]));
+  batch.add(batch_operation::exists(path));
+  batch.add(batch_operation::lstat(path, lstat_statuses[3]));
+  batch.add(batch_operation::stat(path, stat_statuses[3]));
+
+  reset_observations();
+  let const results = batch.execute();
+  expect(observed_operation_count == 5,
+         "hashed mixed metadata keeps three kinds and both transfers");
+  expect(observed_operations[0].syscall_id == batch_operation::Kind::Lstat &&
+             observed_operations[1].syscall_id == batch_operation::Kind::Read &&
+             observed_operations[2].syscall_id == batch_operation::Kind::Stat &&
+             observed_operations[3].syscall_id ==
+                 batch_operation::Kind::Exists &&
+             observed_operations[4].syscall_id == batch_operation::Kind::Write,
+         "hashed mixed operations preserve first-occurrence order");
+  if (results.count() != 13) {
+    expect(false, "hashed mixed results expand to the request count");
+    return;
+  }
+
+  for (usize index = 0; index < results.count(); index++)
+    expect(results[index].request_id == index,
+           "hashed mixed results preserve request order");
+  for (let const &status : lstat_statuses)
+    expect(status.size == 1000, "hashed lstat results reach every destination");
+  for (let const &status : stat_statuses)
+    expect(status.size == 1002, "hashed stat results reach every destination");
+  expect(results[3].is_existing && results[7].is_existing &&
+             results[10].is_existing,
+         "hashed existence results reach every duplicate");
+  expect(results[1].transferred_byte_count == 8 &&
+             results[5].transferred_byte_count == 10,
+         "hashed mixed transfers preserve backend results");
+}
+
 fn test_zero_partial_and_aliased_operations() throws -> void
 {
   let batch = Batch{heap_allocator()};
@@ -302,17 +375,48 @@ fn test_zero_partial_and_aliased_operations() throws -> void
          "aliased metadata destinations receive the canonical result");
 }
 
+fn test_partial_transfers() throws -> void
+{
+  let batch = Batch{heap_allocator()};
+  char read_buffer[5]{};
+  const char write_buffer[4]{};
+  const char current_write_buffer[3]{};
+  batch.add(
+      batch_operation::read(KOSH_STDIN, read_buffer, sizeof(read_buffer)));
+  batch.add(
+      batch_operation::write(KOSH_STDOUT, write_buffer, sizeof(write_buffer)));
+  batch.add(batch_operation::write_current(KOSH_STDOUT, current_write_buffer,
+                                           sizeof(current_write_buffer)));
+
+  should_report_partial_transfer = true;
+  let const results = batch.execute();
+  should_report_partial_transfer = false;
+  expect(results.count() == 3 && results[0].transferred_byte_count == 2 &&
+             results[1].transferred_byte_count == 2 &&
+             results[2].transferred_byte_count == 1,
+         "partial transfer counts are preserved");
+  expect(results[0].error_number == 0 && results[1].error_number == 0 &&
+             results[2].error_number == 0,
+         "partial transfers remain successful");
+}
+
 fn test_invalid_operation_result() throws -> void
 {
   let batch = Batch{heap_allocator()};
   char buffer[1]{};
   batch.add(batch_operation::read(KOSH_INVALID_FD, buffer, sizeof(buffer)));
+  batch.add(batch_operation::read(KOSH_STDIN, nullptr, 1));
+  batch.add(batch_operation::write(KOSH_STDOUT, nullptr, 1));
+  batch.add(batch_operation::read(KOSH_STDIN, nullptr, 0));
 
   should_validate_operations = true;
   let const results = batch.execute();
   should_validate_operations = false;
-  expect(results.count() == 1 && results[0].error_number == 22,
-         "invalid operations return their validation error");
+  expect(results.count() == 4 && results[0].error_number == 22 &&
+             results[1].error_number == 22 && results[2].error_number == 22,
+         "invalid descriptors and nonempty null buffers return errors");
+  expect(results[3].error_number != 22,
+         "a zero-length transfer permits a null buffer");
 }
 
 fn test_interrupted_batch() throws -> void
@@ -334,7 +438,7 @@ fn test_interrupted_batch() throws -> void
          "interrupted metadata requests do not publish status data");
 }
 
-fn test_oversized_mixed_batch() throws -> void
+fn test_oversized_batch() throws -> void
 {
   let batch = Batch{heap_allocator()};
   char buffer[1]{};
@@ -361,17 +465,21 @@ fn run_batch_contract() -> int
   should_report_existing = true;
   should_validate_operations = false;
   should_interrupt = false;
+  should_report_partial_transfer = false;
 
   try {
+    test_empty_batch();
     test_io_order_and_reuse();
     test_metadata_deduplication();
     test_failed_metadata_deduplication();
     test_exists_results_and_deduplication();
     test_many_duplicate_metadata_operations();
+    test_hashed_mixed_metadata_operations();
     test_zero_partial_and_aliased_operations();
+    test_partial_transfers();
     test_invalid_operation_result();
     test_interrupted_batch();
-    test_oversized_mixed_batch();
+    test_oversized_batch();
   } catch (...) {
     std::fprintf(stderr, "Batch contract failed with an exception.\n");
     return 1;
@@ -461,13 +569,51 @@ fn execute_batch_operations(const batched_syscall *operations,
       result.error_number = 4;
       continue;
     }
+    let const operation_kind = batch_operation_access::get_kind(operation);
     result.transferred_byte_count =
         operation.byte_count + operation.byte_offset;
-    result.error_number =
-        should_validate_operations && batch_operation_access::get_descriptor(
-                                          operation) == KOSH_INVALID_FD
-            ? 22
-            : 30 + static_cast<i32>(operation.request_id);
+    result.error_number = 30 + static_cast<i32>(operation.request_id);
+    if (should_report_partial_transfer) {
+      switch (operation_kind) {
+      case batched_syscall_id::Read:
+      case batched_syscall_id::Write:
+      case batched_syscall_id::WriteCurrent:
+        result.transferred_byte_count = operation.byte_count / 2;
+        result.error_number = 0;
+        break;
+      case batched_syscall_id::Lstat:
+      case batched_syscall_id::Stat:
+      case batched_syscall_id::Exists:
+      case batched_syscall_id::Invalid: break;
+      }
+    }
+    if (should_validate_operations) {
+      switch (operation_kind) {
+      case batched_syscall_id::Read:
+        if (batch_operation_access::get_descriptor(operation) ==
+                KOSH_INVALID_FD ||
+            (batch_operation_access::get_output_buffer(operation) == nullptr &&
+             operation.byte_count != 0))
+        {
+          result.error_number = 22;
+        }
+        break;
+      case batched_syscall_id::Write:
+      case batched_syscall_id::WriteCurrent:
+        if (batch_operation_access::get_descriptor(operation) ==
+                KOSH_INVALID_FD ||
+            (batch_operation_access::get_input_buffer(operation) == nullptr &&
+             operation.byte_count != 0))
+        {
+          result.error_number = 22;
+        }
+        break;
+      case batched_syscall_id::Invalid: result.error_number = 22; break;
+      case batched_syscall_id::Lstat:
+      case batched_syscall_id::Stat:
+      case batched_syscall_id::Exists: break;
+      }
+    }
 
     if (batch_operation_access::get_output_buffer(operation) != nullptr &&
         operation.byte_count != 0)
@@ -476,9 +622,7 @@ fn execute_batch_operations(const batched_syscall *operations,
           static_cast<char>('A' + index);
     }
 
-    if (batch_operation_access::get_kind(operation) ==
-        batched_syscall_id::Exists)
-    {
+    if (operation_kind == batched_syscall_id::Exists) {
       result.transferred_byte_count = 0;
       result.error_number = 0;
       result.is_existing = should_report_existing;
