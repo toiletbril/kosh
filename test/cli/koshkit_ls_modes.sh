@@ -6,12 +6,16 @@ BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 d=$(mktemp -d) || exit 1
 cd "$d" || exit 1
 
-mkdir -p sub/deep empty sized
+mkdir -p sub/deep empty sized .symlink-batch
 printf 'aaa\n' > plain.txt
 printf '#!/bin/sh\n' > run.sh
 chmod +x run.sh
 ln -s plain.txt good-link
 ln -s nowhere bad-link
+for link_index in 1 2 3 4; do
+  ln -s ../plain.txt ".symlink-batch/good-$link_index"
+  ln -s nowhere ".symlink-batch/bad-$link_index"
+done
 : > sub/inner.txt
 : > sub/deep/leaf.txt
 # The size sort reads regular files alone, because the size a directory reports
@@ -34,6 +38,10 @@ echo "--- color never is bare ---"
 "$BIN" -c 'koshkit --color never ls -F'
 echo "--- color always ---"
 "$BIN" -c 'koshkit --color always ls -F' | cat -v
+echo "--- batched symlink colors ---"
+"$BIN" -c 'koshkit --color always ls -1 .symlink-batch' | cat -v
+echo "--- explicit symlink colors ---"
+"$BIN" -c 'koshkit --color always ls -1 good-link' | cat -v
 echo "--- redirected output carries no escape ---"
 "$BIN" -c 'koshkit ls -F' | cat -v
 echo "--- human total ---"

@@ -46,6 +46,17 @@ plain.txt
 ^[[1;32mrun.sh^[[0m*
 ^[[1;34msized^[[0m/
 ^[[1;34msub^[[0m/
+--- batched symlink colors ---
+^[[1;31mbad-1^[[0m
+^[[1;31mbad-2^[[0m
+^[[1;31mbad-3^[[0m
+^[[1;31mbad-4^[[0m
+^[[1;36mgood-1^[[0m
+^[[1;36mgood-2^[[0m
+^[[1;36mgood-3^[[0m
+^[[1;36mgood-4^[[0m
+--- explicit symlink colors ---
+^[[1;36mgood-link^[[0m
 --- redirected output carries no escape ---
 bad-link@
 empty/

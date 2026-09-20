@@ -224,23 +224,12 @@ static pure fn decorated_width(const listing_entry &entry,
   return entry.name.count() + (has_suffix ? 1 : 0);
 }
 
-static fn classify_status(const Path &path, const os::file_status &status,
-                          bool should_detect_broken_links) wontthrow
-    -> entry_type
+static fn classify_status(const os::file_status &status) wontthrow -> entry_type
 {
   switch (os::file_type_letter(status.mode)) {
   case 'd': return entry_type::Directory;
 
-  case 'l': {
-    if (!should_detect_broken_links) return entry_type::Symlink;
-
-    os::file_status target_status{};
-    if (!os::stat_path_following(path.text().view(), target_status)) {
-      return entry_type::BrokenSymlink;
-    }
-
-    return entry_type::Symlink;
-  }
+  case 'l': return entry_type::Symlink;
 
   case 'p': return entry_type::Fifo;
 
@@ -256,13 +245,12 @@ static fn classify_status(const Path &path, const os::file_status &status,
                                     : entry_type::Regular;
 }
 
-static fn set_entry_status(listing_entry &entry, const Path &path,
-                           const os::file_status &status,
-                           const listing_options &options) wontthrow -> void
+static fn set_entry_status(listing_entry &entry,
+                           const os::file_status &status) wontthrow -> void
 {
   entry.status = status;
   entry.has_status = true;
-  entry.type = classify_status(path, entry.status, options.should_color);
+  entry.type = classify_status(entry.status);
 }
 
 static fn
@@ -286,20 +274,55 @@ make_entry(const Path &path, StringView name, const listing_options &options,
   if (known_entry != nullptr) {
     if (!known_entry->has_status) return entry;
 
-    set_entry_status(entry, path, known_entry->status, options);
+    set_entry_status(entry, known_entry->status);
     return entry;
   }
 
   os::file_status status{};
   if (os::stat_path(path.text().view(), status))
-    set_entry_status(entry, path, status, options);
+    set_entry_status(entry, status);
 
   return entry;
 }
 
-static fn sort_entries(ArrayList<listing_entry> &entries,
-                       const listing_options &options) throws -> void
+static fn prepare_entries(ArrayList<listing_entry> &entries,
+                          const listing_options &options, StringView directory,
+                          bool is_name_path, Allocator allocator) throws -> void
 {
+  if (options.should_color) {
+    let symlink_paths = ArrayList<Path>{allocator};
+    let symlink_statuses = ArrayList<os::file_status>{allocator};
+    for (const listing_entry &entry : entries) {
+      if (entry.type != entry_type::Symlink) continue;
+
+      symlink_paths.push(
+          is_name_path
+              ? Path{entry.name.view()}
+              : PathBuilder{directory}.append(entry.name.view()).build());
+      symlink_statuses.push({});
+    }
+
+    if (!symlink_paths.is_empty()) {
+      let batch = os::Batch{allocator};
+      batch.reserve(symlink_paths.count());
+      for (usize index = 0; index < symlink_paths.count(); index++) {
+        batch.add(os::batch_operation::stat(symlink_paths[index],
+                                            symlink_statuses[index]));
+      }
+
+      let const results = batch.execute();
+      usize symlink_index = 0;
+      for (listing_entry &entry : entries) {
+        if (entry.type != entry_type::Symlink) continue;
+
+        if (results[symlink_index].error_number != 0) {
+          entry.type = entry_type::BrokenSymlink;
+        }
+        symlink_index++;
+      }
+    }
+  }
+
   let const do_compare = [&options](const listing_entry &a,
                                     const listing_entry &b) wontthrow -> bool {
     switch (options.key) {
@@ -357,7 +380,7 @@ static fn collect_directory(const Path &directory,
                               child.child.kind, allocator, &child));
     }
 
-    sort_entries(entries, options);
+    prepare_entries(entries, options, directory_text, false, allocator);
     return true;
   }
 
@@ -383,7 +406,7 @@ static fn collect_directory(const Path &directory,
                             allocator));
   }
 
-  sort_entries(entries, options);
+  prepare_entries(entries, options, directory_text, false, allocator);
   return true;
 }
 
@@ -812,8 +835,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
       let entry = listing_entry{allocator};
       entry.name = String{allocator, targets[target_index]};
       if (file_results[index].error_number == 0) {
-        set_entry_status(entry, target_paths[target_index],
-                         file_statuses[index], options);
+        set_entry_status(entry, file_statuses[index]);
       }
       file_entries.push(steal(entry));
     }
@@ -830,7 +852,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
       file_entries.count() + dir_targets.count() > 1;
 
   if (!file_entries.is_empty()) {
-    sort_entries(file_entries, options);
+    prepare_entries(file_entries, options, StringView{}, true, allocator);
     render_entries(file_entries, options, false, uid_cache, gid_cache, output,
                    allocator);
   }
