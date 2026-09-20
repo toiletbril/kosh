@@ -28,6 +28,10 @@ echo "--- cat multi-chunk input with a missing operand ---"
 "$BIN" -c \
   'koshkit cat batch-input.txt cat-first.txt missing.txt cat-last.txt > cat-output.txt; printf "status=%s\n" "$?"; koshkit cksum cat-output.txt' \
   2>&1
+echo "--- numbered cat reads later files after a missing operand ---"
+"$BIN" -c \
+  'koshkit cat -n cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"' \
+  2>&1
 echo "--- cat preserves bounded source-window order ---"
 "$BIN" -c \
   'koshkit cat batch-source-18.txt batch-source-01.txt batch-source-17.txt batch-source-02.txt batch-source-16.txt batch-source-03.txt batch-source-15.txt batch-source-04.txt batch-source-14.txt batch-source-05.txt batch-source-13.txt batch-source-06.txt batch-source-12.txt batch-source-07.txt batch-source-11.txt batch-source-08.txt batch-source-10.txt batch-source-09.txt'
@@ -39,6 +43,7 @@ echo "--- transformed utilities batch source windows ---"
 "$BIN" -c 'koshkit expand batch-source-*.txt | koshkit cksum'
 "$BIN" -c 'koshkit unexpand batch-source-*.txt | koshkit cksum'
 "$BIN" -c 'koshkit fold batch-source-*.txt | koshkit cksum'
+"$BIN" -c 'koshkit cat -n batch-source-*.txt | koshkit cksum'
 echo "--- od and bc batch source windows ---"
 "$BIN" -c 'koshkit od -An -tc batch-source-*.txt | koshkit cksum'
 "$BIN" -c 'koshkit bc bc-source-*.txt | koshkit cksum'
@@ -128,6 +133,18 @@ echo "--- pr merge with a missing operand ---"
 echo "--- pr merge suppresses a missing warning ---"
 "$BIN" -c \
   'koshkit pr -r -t -m -s , sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- pr batches normal source windows ---"
+"$BIN" -c 'koshkit pr -t batch-source-*.txt | koshkit cksum'
+echo "--- pr numbering resets for each source ---"
+"$BIN" -c 'koshkit pr -t -n cat-first.txt cat-last.txt'
+echo "--- pr reads later files after a missing operand ---"
+"$BIN" -c \
+  'koshkit pr -t sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
+  2>&1
+echo "--- pr normal mode suppresses a missing warning ---"
+"$BIN" -c \
+  'koshkit pr -r -t sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
   2>&1
 echo "--- grep an ---"
 "$BIN" -c 'koshkit grep an fruit.txt'

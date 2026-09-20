@@ -13,6 +13,13 @@
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 status=1
 578497766 108905 cat-output.txt
+--- numbered cat reads later files after a missing operand ---
+1:1: error: cat: missing.txt: No such file or directory.
+     1 |  koshkit cat -n cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     1	first
+     2	last
+status=1
 --- cat preserves bounded source-window order ---
 source-18
 source-01
@@ -41,6 +48,7 @@ def
 531297043 180
 531297043 180
 531297043 180
+4268480856 306
 --- od and bc batch source windows ---
 4065386139 816
 229785650 36
@@ -160,6 +168,26 @@ status=1
 --- pr merge suppresses a missing warning ---
 zulu,middle
 alpha,beta
+status=1
+--- pr batches normal source windows ---
+531297043 180
+--- pr numbering resets for each source ---
+    1	first
+    1	last
+--- pr reads later files after a missing operand ---
+1:1: error: pr: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit pr -t sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+zulu
+alpha
+middle
+beta
+status=1
+--- pr normal mode suppresses a missing warning ---
+zulu
+alpha
+middle
+beta
 status=1
 --- grep an ---
 banana

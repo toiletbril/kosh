@@ -117,8 +117,11 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
     loop
     {
       let const read_result = reader.read_next_ordered(chunks);
-      if (read_result == SourceBatchReader::ReadResult::Complete) break;
-      if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
+      switch (read_result) {
+      case SourceBatchReader::ReadResult::Chunks: break;
+      case SourceBatchReader::ReadResult::Complete: return status;
+      case SourceBatchReader::ReadResult::Interrupted: return 130;
+      }
 
       for (let const &chunk : chunks) {
         if (!chunk.content.is_empty()) ec.print_to_stdout(chunk.content);
@@ -132,32 +135,72 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
         status = 1;
       }
     }
-
-    return status;
   }
 
   let output = String{cxt.scratch_allocator()};
   i64 line_number = 1;
   let is_at_output_line_start = true;
   i32 status = 0;
-  for (let const &source : sources) {
-    let const content = read_named_or_stdin(ec, source);
-    if (os::INTERRUPT_REQUESTED) return 130;
-    if (!content.has_value()) {
-      report_soft_koshkit_util_error(ec, cxt, args[0].view(),
-                                     String{cxt.scratch_allocator(), source} +
-                                         ": " +
-                                         os::last_system_error_message());
-      status = 1;
-      continue;
+
+  let source_results = ArrayList<source_read_result>{cxt.scratch_allocator()};
+  source_results.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++)
+    source_results.push({None, 0, false});
+
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  usize next_source_index = 0;
+  loop
+  {
+    let const read_result = reader.read_next(chunks);
+    bool is_reader_complete = false;
+    switch (read_result) {
+    case SourceBatchReader::ReadResult::Chunks: break;
+    case SourceBatchReader::ReadResult::Complete:
+      is_reader_complete = true;
+      break;
+    case SourceBatchReader::ReadResult::Interrupted: return 130;
     }
-    let const should_highlight_source =
-        should_highlight_output &&
-        Path{source}.is_shell_source(content->view()) &&
-        !content->view().find_character('\0').has_value();
-    append_cat_source(output, content->view(), FLAG_CAT_NUMBER.is_enabled(),
-                      should_highlight_source, line_number,
-                      is_at_output_line_start, cxt);
+
+    for (let const &chunk : chunks) {
+      let &result = source_results[chunk.source_index];
+      result.is_complete = chunk.is_complete;
+      if (chunk.error_number != 0) {
+        result.content.reset();
+        result.error_number = chunk.error_number;
+        continue;
+      }
+      if (!result.content.has_value())
+        result.content = String{heap_allocator()};
+      result.content->append(chunk.content);
+    }
+
+    while (next_source_index < source_results.count() &&
+           source_results[next_source_index].is_complete)
+    {
+      let &result = source_results[next_source_index];
+      let const source = sources[next_source_index];
+      if (!result.content.has_value()) {
+        os::set_last_system_error(result.error_number);
+        report_soft_koshkit_util_error(ec, cxt, args[0].view(),
+                                       String{cxt.scratch_allocator(), source} +
+                                           ": " +
+                                           os::last_system_error_message());
+        status = 1;
+      } else {
+        let const should_highlight_source =
+            should_highlight_output &&
+            Path{source}.is_shell_source(result.content->view()) &&
+            !result.content->view().find_character('\0').has_value();
+        append_cat_source(output, result.content->view(),
+                          FLAG_CAT_NUMBER.is_enabled(), should_highlight_source,
+                          line_number, is_at_output_line_start, cxt);
+        result.content.reset();
+      }
+      next_source_index++;
+    }
+
+    if (is_reader_complete) break;
   }
 
   ec.print_to_stdout(output);
