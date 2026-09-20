@@ -25,15 +25,19 @@ binary = os.path.abspath(sys.argv[1])
 SELECTED_SGR = b"\x1b[7m"
 GHOST_SGR = b"\x1b[90m"
 HIGHLIGHT_RESET = b"\x1b[0m"
+CLEAR_BELOW = b"\x1b[0J"
 
 
-def read_until_idle(master, timeout, required_output=None):
+def read_until_idle(master, timeout, required_output=None, required_count=1):
     output = b""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         readable, _, _ = select.select([master], [], [], 0.1)
         if master not in readable:
-            if output and (required_output is None or required_output in output):
+            if output and (
+                required_output is None
+                or output.count(required_output) >= required_count
+            ):
                 break
             continue
         try:
@@ -60,6 +64,9 @@ def run_menu(
     open_key=b"\t",
     opened_required=None,
     first_key_required=None,
+    key_outputs=None,
+    first_open_output=None,
+    key_required_outputs=(),
 ):
     """Type the words, press the opening key twice, send the keys, and submit.
 
@@ -91,10 +98,16 @@ def run_menu(
     # The first press only inserts the common prefix. The menu belongs to the
     # second one.
     os.write(master, open_key)
-    read_until_idle(master, 2)
+    first_opened = read_until_idle(master, 2, CLEAR_BELOW, 2)
+    if first_open_output is not None:
+        first_open_output.append(first_opened)
 
     os.write(master, open_key)
-    menu = read_until_idle(master, 2, opened_required)
+    menu = read_until_idle(
+        master,
+        2,
+        SELECTED_SGR if opened_required is None else opened_required,
+    )
     resized_menu = b""
 
     for key in keys_before_resize:
@@ -113,8 +126,15 @@ def run_menu(
 
     for index, key in enumerate(keys):
         os.write(master, key)
-        required = first_key_required if index == 0 else None
-        menu += read_until_idle(master, 1, required)
+        required = (
+            key_required_outputs[index]
+            if index < len(key_required_outputs)
+            else first_key_required if index == 0 else None
+        )
+        key_output = read_until_idle(master, 1, required)
+        menu += key_output
+        if key_outputs is not None:
+            key_outputs.append(key_output)
 
     os.write(master, b"\n")
     tail = read_until_idle(master, 2, b"MARKER-END")
@@ -183,17 +203,40 @@ def main():
             )
         os.chmod(tailscale, 0o755)
 
+        large = os.path.join(directory, "large")
+        os.mkdir(large)
+        for prefix in ("a", "b"):
+            for index in range(384):
+                open(
+                    os.path.join(large, "bulk-%s-%03d" % (prefix, index)),
+                    "w",
+                ).close()
+
         typed = "printf '<%s>\\n' alpha"
         tall_typed = "printf '<%s>\\n' menu"
         deep_typed = "printf '<%s>\\n' deep"
         wide_typed = "printf '<%s>\\n' Blackmagic"
 
+        first_open_output = []
         opened, _, _ = run_menu(
             directory,
             "tree",
             typed,
             [],
             opened_required=GHOST_SGR + b"one" + HIGHLIGHT_RESET,
+            first_open_output=first_open_output,
+        )
+        initial_loading_position = (
+            first_open_output[0].find(b"loading...")
+            if len(first_open_output) == 1
+            else -1
+        )
+        initial_completion_shows_loading_row = (
+            initial_loading_position >= 0
+            and first_open_output[0].find(
+                CLEAR_BELOW, initial_loading_position + len(b"loading...")
+            )
+            > initial_loading_position
         )
         menu_lists_every_candidate = (
             b"alpha-one" in opened
@@ -289,11 +332,19 @@ def main():
         # The first Ctrl-W erases the common-prefix hyphen and the second
         # erases alpha. Tab still belongs to the open menu and accepts its
         # first row. A closed menu would only restore the alpha- prefix.
+        word_erase_outputs = []
         _, _, word_erased = run_menu(
-            directory, "tree", typed, [b"\x17", b"\x17", b"\t"]
+            directory,
+            "tree",
+            typed,
+            [b"\x17", b"\x17", b"\t"],
+            key_outputs=word_erase_outputs,
+            key_required_outputs=(SELECTED_SGR, SELECTED_SGR),
         )
         whole_word_backspace_keeps_menu_open = (
-            b"<alpha-one>" in word_erased
+            len(word_erase_outputs) == 3
+            and SELECTED_SGR in word_erase_outputs[1]
+            and b"<alpha-one>" in word_erased
         )
 
         semantic_menu, _, _ = run_menu(
@@ -304,9 +355,54 @@ def main():
             environment={
                 "PATH": fake_bin + os.pathsep + os.environ.get("PATH", "")
             },
+            first_key_required=b"--json",
         )
         each_new_word_regathers_completions = (
             b"--json" in semantic_menu and b"--peers" in semantic_menu
+        )
+        loading_position = semantic_menu.find(b"loading...")
+        final_candidate_position = semantic_menu.find(b"--json")
+        replacement_position = semantic_menu.find(
+            CLEAR_BELOW, loading_position + len(b"loading...")
+        )
+        regather_shows_loading_row = (
+            loading_position >= 0
+            and replacement_position > loading_position
+            and final_candidate_position > replacement_position
+        )
+
+        _, _, large_tail = run_menu(
+            directory,
+            "large",
+            "printf '<%s>\\n' bulk",
+            [b"a", b"\x7f", b"z", b"z", b"\x07"],
+            environment={"KOSH_TEST_EDITOR_STATS": "1"},
+            key_required_outputs=(
+                SELECTED_SGR,
+                SELECTED_SGR,
+                b"no matches",
+                b"no matches",
+            ),
+        )
+        metrics_start = large_tail.find(b"editor-refresh ")
+        metrics_end = large_tail.find(b"\n", metrics_start)
+        metrics_line = (
+            large_tail[metrics_start:metrics_end]
+            if metrics_start >= 0 and metrics_end >= 0
+            else b""
+        )
+        metrics = dict(
+            field.split(b"=", 1)
+            for field in metrics_line.split()[1:]
+            if b"=" in field
+        )
+        large_file_menu_reuses_warm_index = (
+            metrics.get(b"stats") == b"0"
+            and metrics.get(b"reads") == b"0"
+            and metrics.get(b"sorts") == b"0"
+        )
+        large_file_menu_filters_without_regather = (
+            metrics.get(b"listings") == b"3"
         )
 
         # A search that matches nothing keeps the menu open on the row that says
@@ -443,6 +539,9 @@ def main():
         results = {
             "MENU_LISTS_EVERY_CANDIDATE": menu_lists_every_candidate,
             "MENU_OPENS_WITH_FIRST_SELECTION": menu_opens_with_first_selection,
+            "INITIAL_COMPLETION_SHOWS_LOADING_ROW": (
+                initial_completion_shows_loading_row
+            ),
             "HELP_ROW_NAMES_THE_SOURCE": help_row_names_the_source,
             "SELECTED_HIGHLIGHT_ENDS_AFTER_ENTRY": (
                 selected_highlight_ends_after_entry
@@ -469,6 +568,13 @@ def main():
             ),
             "EACH_NEW_WORD_REGATHERS_COMPLETIONS": (
                 each_new_word_regathers_completions
+            ),
+            "REGATHER_SHOWS_LOADING_ROW": regather_shows_loading_row,
+            "LARGE_FILE_MENU_REUSES_WARM_INDEX": (
+                large_file_menu_reuses_warm_index
+            ),
+            "LARGE_FILE_MENU_FILTERS_WITHOUT_REGATHER": (
+                large_file_menu_filters_without_regather
             ),
             "AN_EMPTY_SEARCH_KEEPS_THE_MENU_OPEN": (
                 an_empty_search_keeps_the_menu_open

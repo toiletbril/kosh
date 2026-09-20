@@ -132,6 +132,7 @@ bool HIGHLIGHT_STYLED_UNDERLINES_ENABLED = false;
 usize DEBUG_COMPLETION_CWD_CAPTURE_COUNT = 0;
 usize DEBUG_COMPLETION_SOURCE_SCAN_COUNT = 0;
 usize DEBUG_COMPLETION_MATERIALIZED_COUNT = 0;
+usize DEBUG_COMPLETION_LISTING_COUNT = 0;
 #endif
 
 koshka::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{
@@ -526,9 +527,13 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
      swallowed. */
   try {
     let const is_explicit_completion = for_listing != 0;
-    if (is_explicit_completion)
+    if (is_explicit_completion) {
+#if !defined NDEBUG
+      DEBUG_COMPLETION_LISTING_COUNT++;
+#endif
       COMPLETION_CONTEXT->get_program_resolver().begin_explicit_completion(
           koshka::ProgramResolver::CompletionRefresh::Cached);
+    }
     defer
     {
       if (is_explicit_completion)
@@ -1972,6 +1977,7 @@ fn get_input(const String &prompt) -> input_result
       ::itl_g_debug_history_buffer_load_count;
   let const source_scan_count_before = DEBUG_COMPLETION_SOURCE_SCAN_COUNT;
   let const materialized_count_before = DEBUG_COMPLETION_MATERIALIZED_COUNT;
+  let const listing_count_before = DEBUG_COMPLETION_LISTING_COUNT;
   let const directory_stat_count_before = utils::debug_directory_stat_count();
   let const directory_read_count_before = utils::debug_directory_read_count();
   let const directory_sort_count_before = utils::debug_directory_sort_count();
@@ -2062,6 +2068,10 @@ fn get_input(const String &prompt) -> input_result
         " materialized=" +
         koshka::String::from(DEBUG_COMPLETION_MATERIALIZED_COUNT -
                                  materialized_count_before,
+                             koshka::heap_allocator()) +
+        " listings=" +
+        koshka::String::from(DEBUG_COMPLETION_LISTING_COUNT -
+                                 listing_count_before,
                              koshka::heap_allocator()) +
         "\n");
   }
