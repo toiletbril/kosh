@@ -1138,17 +1138,60 @@ fn Bc::execute(const ExecContext &ec, EvalContext &cxt,
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
   String program{cxt.scratch_allocator()};
-  for (let const source : sources) {
-    let const content = read_named_or_stdin(ec, source);
-    if (!content.has_value()) {
-      report_soft_koshkit_util_error(
-          ec, cxt, args[0].view(),
-          "cannot read '" + String{cxt.scratch_allocator(), source} +
-              "': " + os::last_system_error_message());
-      return 1;
+
+  let source_results = ArrayList<source_read_result>{cxt.scratch_allocator()};
+  source_results.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++)
+    source_results.push({None, 0, false});
+
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  usize next_source_index = 0;
+  loop
+  {
+    let const read_result = reader.read_next(chunks);
+    bool is_reader_complete = false;
+    switch (read_result) {
+    case SourceBatchReader::ReadResult::Chunks: break;
+    case SourceBatchReader::ReadResult::Complete:
+      is_reader_complete = true;
+      break;
+    case SourceBatchReader::ReadResult::Interrupted: return 130;
     }
-    program += content->view();
-    program += '\n';
+
+    for (let const &chunk : chunks) {
+      let &result = source_results[chunk.source_index];
+      result.is_complete = chunk.is_complete;
+      if (chunk.error_number != 0) {
+        result.content.reset();
+        result.error_number = chunk.error_number;
+        continue;
+      }
+      if (!result.content.has_value())
+        result.content = String{heap_allocator()};
+      result.content->append(chunk.content);
+    }
+
+    while (next_source_index < source_results.count() &&
+           source_results[next_source_index].is_complete)
+    {
+      let &result = source_results[next_source_index];
+      if (!result.content.has_value()) {
+        os::set_last_system_error(result.error_number);
+        report_soft_koshkit_util_error(
+            ec, cxt, args[0].view(),
+            "cannot read '" +
+                String{cxt.scratch_allocator(), sources[next_source_index]} +
+                "': " + os::last_system_error_message());
+        return 1;
+      }
+      program += result.content->view();
+      program += '\n';
+      result.content.reset();
+      next_source_index++;
+    }
+
+    if (is_reader_complete) break;
   }
   program = bc_strip_comments(program.view(), cxt.scratch_allocator());
 
