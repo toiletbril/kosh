@@ -40,6 +40,68 @@ for evilps_sort_prefix in n p c m; do
 done
 printf 'evilps-sort-prefixes=%s\n' "$evilps_sort_prefixes"
 
+evilio_process_sort_keys=matched
+for evilio_sort_key in pid read write read-ops write-ops; do
+  if ! "$BIN" -c \
+    "koshkit --color never evilio --ps --sort $evilio_sort_key -3" \
+    > "$TEST_NULL_DEVICE" 2>&1
+  then
+    evilio_process_sort_keys=wrong
+  fi
+done
+printf 'evilio-process-sort-keys=%s\n' "$evilio_process_sort_keys"
+
+evilio_disk_sort_keys=matched
+for evilio_sort_key in read write read-ops write-ops busy read-latency \
+  write-latency average-queue queue errors retries
+do
+  if ! "$BIN" -c \
+    "koshkit --color never evilio --all --sort $evilio_sort_key" \
+    > "$TEST_NULL_DEVICE" 2>&1
+  then
+    evilio_disk_sort_keys=wrong
+  fi
+done
+printf 'evilio-disk-sort-keys=%s\n' "$evilio_disk_sort_keys"
+
+evilio_ambiguous_sort=$(
+  "$BIN" -c 'koshkit evilio --ps --sort r -1' 2>&1
+)
+case $evilio_ambiguous_sort in
+  *'Ambiguous sort key'*) evilio_ambiguous_sort_status=matched ;;
+  *) evilio_ambiguous_sort_status=wrong ;;
+esac
+printf 'evilio-ambiguous-sort=%s\n' "$evilio_ambiguous_sort_status"
+
+evilio_unavailable_sort=$(
+  "$BIN" -c 'koshkit evilio --ps --sort busy -1' 2>&1
+)
+case $evilio_unavailable_sort in
+  *'unavailable for process reports'*) evilio_unavailable_sort_status=matched ;;
+  *) evilio_unavailable_sort_status=wrong ;;
+esac
+printf 'evilio-unavailable-sort=%s\n' "$evilio_unavailable_sort_status"
+
+evilio_live_sort_path=$TEST_TEMP_DIRECTORY/evilio-live-sort-report
+set -m
+"$BIN" -c \
+  'koshkit --color never evilio --ps --sort read --live=0.05 --cumulative=0.1' \
+  > "$evilio_live_sort_path" &
+evilio_live_sort_pid=$!
+set +m
+sleep 0.30
+if kill -0 "$evilio_live_sort_pid" 2> "$TEST_NULL_DEVICE"; then
+  kill -INT "$evilio_live_sort_pid"
+fi
+wait "$evilio_live_sort_pid"
+printf 'evilio-live-sort-status=%s\n' "$?"
+evilio_live_sort_report=$(< "$evilio_live_sort_path")
+case $evilio_live_sort_report in
+  *'READ/0.1s'*'ctrl+c to exit'*) evilio_live_sort_update=matched ;;
+  *) evilio_live_sort_update=wrong ;;
+esac
+printf 'evilio-live-sort=%s\n' "$evilio_live_sort_update"
+
 evilps_help=$($BIN -c 'koshkit evilps --help')
 case $evilps_help in
   *'--live[=<seconds>]'*'--cumulative[=<seconds>]'*)
