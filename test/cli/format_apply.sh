@@ -136,6 +136,8 @@ printf 'case x in\nx) echo arm\nesac\necho top\n' | "$BIN" --format
 printf 'if true; then echo dash; fi\n' | "$BIN" --format -
 printf '{ echo brace; } >&2\n( echo sub ) >&2\nfor i in 1; do echo "\044i"; done >/dev/null\nwhile false; do :; done 2>/dev/null\ncase x in x) :;; esac >/dev/null 2>&1\nif true; then echo cond; fi >/dev/null\n{ echo both; } >/dev/null 2>&1\n' |
   "$BIN" --format
+printf '# keep one blank line below\n\n\necho after-comment\n' |
+  "$BIN" --format
 
 cat > "$root/compound-redirect.sh" <<'EOF'
 target=$1

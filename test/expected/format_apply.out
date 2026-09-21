@@ -148,6 +148,9 @@ fi >/dev/null
 {
   echo both
 } >/dev/null 2>&1
+# keep one blank line below
+
+echo after-comment
 compound-redirect-equivalent=yes captured=yes
 local value=one
 

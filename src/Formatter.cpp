@@ -36,14 +36,17 @@ struct format_piece
   format_piece_kind kind;
   bool is_at_line_start{false};
   bool should_strip_tabs{false};
+  bool should_keep_blank_line{false};
 
   format_piece(StringView text, usize source_position, format_piece_kind kind,
-               bool is_at_line_start, bool should_strip_tabs = false) wontthrow
+               bool is_at_line_start, bool should_strip_tabs = false,
+               bool should_keep_blank_line = false) wontthrow
       : text{text},
         source_position{static_cast<u32>(source_position)},
         kind{kind},
         is_at_line_start{is_at_line_start},
-        should_strip_tabs{should_strip_tabs}
+        should_strip_tabs{should_strip_tabs},
+        should_keep_blank_line{should_keep_blank_line}
   {}
 };
 
@@ -293,6 +296,7 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
   usize position = 0;
   usize line_start = 0;
   bool has_code_on_line = false;
+  bool has_comment_on_line = false;
   bool is_expecting_heredoc_delimiter = false;
   bool should_pending_heredoc_strip_tabs = false;
 
@@ -339,13 +343,20 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
           }
         }
       }
-      pieces.push(format_piece{
-          StringView{"\n", 1},
-          position, format_piece_kind::Newline,
-          !has_code_on_line
-      });
+      pieces.push(format_piece{StringView{"\n", 1}, position,
+                               format_piece_kind::Newline, !has_code_on_line});
       position++;
+      if (pending_heredocs.is_empty() && has_comment_on_line &&
+          position < source.length &&
+          source[position] == '\n')
+      {
+        pieces.push(format_piece{StringView{"\n", 1}, position,
+                                 format_piece_kind::Newline, true, false,
+                                 true});
+        while (position < source.length && source[position] == '\n') position++;
+      }
       has_code_on_line = false;
+      has_comment_on_line = false;
 
       for (let const &pending : pending_heredocs) {
         let const body_start = position;
@@ -397,6 +408,7 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
       pieces.push(format_piece{
           source.substring_of_length(line_start, end_position - line_start),
           line_start, format_piece_kind::Comment, true});
+      has_comment_on_line = true;
       position = end_position;
       continue;
     }
@@ -407,6 +419,7 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
       pieces.push(format_piece{
           source.substring_of_length(position, end_position - position),
           position, format_piece_kind::Comment, false});
+      has_comment_on_line = true;
       position = end_position;
       continue;
     }
@@ -1216,6 +1229,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       continue;
     }
     if (piece.kind == format_piece_kind::Newline) {
+      if (piece.should_keep_blank_line) {
+        writer.ensure_blank_line();
+        continue;
+      }
       if (!is_waiting_for_continued_statement) {
         if (is_current_statement_declaration ||
             has_continued_declaration_statement)
