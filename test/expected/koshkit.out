@@ -109,6 +109,7 @@ mv
 --failures
 --help
 --live
+--sort
 --traffic
 -C
 -a

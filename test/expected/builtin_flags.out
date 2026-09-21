@@ -49,6 +49,7 @@ nounset
 == set annoying diagnostics name:
 annoying-diagnostics
 == kosh binary flags:
+--block
 == kosh no-traces flag:
 --no-traces
 == kosh no-annoying flag:
