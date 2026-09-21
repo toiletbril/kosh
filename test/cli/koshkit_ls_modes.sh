@@ -23,9 +23,25 @@ done
 printf 'a\n' > sized/small
 printf 'bbbbb\n' > sized/medium
 printf 'cccccccccc\n' > sized/large
+: > .hidden.txt
+mkdir .hidden-dir
+: > sized/tie-a
+: > sized/tie-b
+long_name=abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
+: > "$long_name"
 
 echo "--- plain ---"
 "$BIN" -c 'koshkit ls'
+echo "--- all entries ---"
+"$BIN" -c 'koshkit ls -a'
+echo "--- almost all entries ---"
+"$BIN" -c 'koshkit ls -A'
+echo "--- multiple roots ---"
+"$BIN" -c 'koshkit ls plain.txt sub'
+echo "--- equal-size names ---"
+"$BIN" -c 'koshkit ls -S sized'
+echo "--- long name ---"
+"$BIN" -c 'koshkit ls -1' | grep "$long_name"
 echo "--- classify ---"
 "$BIN" -c 'koshkit ls -F'
 echo "--- reverse name ---"

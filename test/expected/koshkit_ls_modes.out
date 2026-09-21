@@ -1,4 +1,5 @@
 --- plain ---
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 bad-link
 empty
 good-link
@@ -6,7 +7,48 @@ plain.txt
 run.sh
 sized
 sub
+--- all entries ---
+.
+..
+.hidden-dir
+.hidden.txt
+.symlink-batch
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
+bad-link
+empty
+good-link
+plain.txt
+run.sh
+sized
+sub
+--- almost all entries ---
+.hidden-dir
+.hidden.txt
+.symlink-batch
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
+bad-link
+empty
+good-link
+plain.txt
+run.sh
+sized
+sub
+--- multiple roots ---
+plain.txt
+
+sub:
+deep
+inner.txt
+--- equal-size names ---
+large
+medium
+small
+tie-a
+tie-b
+--- long name ---
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 --- classify ---
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 bad-link@
 empty/
 good-link@
@@ -22,15 +64,21 @@ plain.txt
 good-link
 empty
 bad-link
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 --- sort by size ---
 large
 medium
 small
+tie-a
+tie-b
 --- sort by size reversed ---
+tie-b
+tie-a
 small
 medium
 large
 --- color never is bare ---
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 bad-link@
 empty/
 good-link@
@@ -39,6 +87,7 @@ run.sh*
 sized/
 sub/
 --- color always ---
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 ^[[1;31mbad-link^[[0m@
 ^[[1;34mempty^[[0m/
 ^[[1;36mgood-link^[[0m@
@@ -58,6 +107,7 @@ plain.txt
 --- explicit symlink colors ---
 ^[[1;36mgood-link^[[0m
 --- redirected output carries no escape ---
+abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz.txt
 bad-link@
 empty/
 good-link@
