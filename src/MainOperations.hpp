@@ -879,14 +879,14 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   let &prompt_arena = context.get_prompt_command_arena();
   if (cached_ast != nullptr && cached_text.view() == command->view()) {
     run_script_contents(cached_text, context, ast_arena,
-                        StringView{"PROMPT_COMMAND"}, cached_ast);
+                        StringView{"$PROMPT_COMMAND"}, cached_ast);
   } else {
     prompt_arena.reset();
     context.set_prompt_command_cached_ast(nullptr);
     cached_text = String{command->view()};
     Expression *parsed_ast = nullptr;
     run_script_contents(cached_text, context, prompt_arena,
-                        StringView{"PROMPT_COMMAND"}, nullptr, &parsed_ast);
+                        StringView{"$PROMPT_COMMAND"}, nullptr, &parsed_ast);
     context.set_prompt_command_cached_ast(parsed_ast);
   }
 
