@@ -659,7 +659,8 @@ cold fn list_directory_status(StringView dir, Allocator allocator) throws
   paths.reserve(entries.count());
   batch.reserve(entries.count());
   for (let const &entry : entries)
-    paths.push(PathBuilder{dir}.append(entry.child.name.view()).build());
+    paths.push(
+        PathBuilder{dir, allocator}.append(entry.child.name.view()).build());
   for (usize index = 0; index < entries.count(); index++)
     batch.add(batch_operation::lstat(paths[index], entries[index].status));
 

@@ -102,7 +102,9 @@ static fn change_path_ownership_recursive(
 
   bool did_succeed = true;
   for (const String &name : *children) {
-    let child = PathBuilder{path.text().view()}.append(name.view()).build();
+    let child = PathBuilder{path.text().view(), cxt.scratch_allocator()}
+                    .append(name.view())
+                    .build();
     if (!change_path_ownership_recursive(
             ec, cxt, utility_name, child, owner_id, group_id, true,
             should_follow_nested_symlinks, should_follow_nested_symlinks,

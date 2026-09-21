@@ -161,9 +161,10 @@ static fn copy_path(const ExecContext &ec, StringView source,
       };
 
     for (let const &name : *names) {
-      let const child_source = PathBuilder{source}.append(name.view()).build();
+      let const child_source =
+          PathBuilder{source, allocator}.append(name.view()).build();
       let const child_destination =
-          PathBuilder{destination}.append(name.view()).build();
+          PathBuilder{destination, allocator}.append(name.view()).build();
       copy_path(ec, child_source.text().view(), child_destination.text().view(),
                 is_recursive, should_force, should_preserve, is_verbose,
                 allocator);

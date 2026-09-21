@@ -67,7 +67,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   for (let const &child_entry : *children) {
     if (child_entry.child.kind == Path::entry_kind::Symlink) continue;
 
-    let child = PathBuilder{path.text().view()}
+    let child = PathBuilder{path.text().view(), cxt.scratch_allocator()}
                     .append(child_entry.child.name.view())
                     .build();
     if (!change_mode(ec, cxt, child, expression, true)) did_succeed = false;
