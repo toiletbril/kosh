@@ -2004,7 +2004,7 @@ its default collection window is one second. With
 each mode prints per-process data. The
 .BR \-l " and " \-\-live
 options collect and refresh the rate report until interrupted. Their optional
-value sets both intervals in seconds and defaults to 0.5 seconds. Output uses
+value sets the refresh cadence in seconds and defaults to 0.5 seconds. Output uses
 the alternate screen and restores the previous contents on exit.
 When both options are present,
 .B \-\-cumulative
@@ -2110,11 +2110,12 @@ option is shorthand for
 and
 .B \-\-live
 options refresh the process tree until interrupted. An optional duration sets
-both the collection and refresh interval, which defaults to 0.5 seconds. The
+the refresh cadence, which defaults to 0.5 seconds. The
 .B \-\-cumulative
 option accepts an optional sliding window. With
 .BR \-\-live ,
-the window defaults to the live interval. Each refresh keeps the counter
+the window defaults to one second unless an explicit cumulative value is given.
+Each refresh keeps the counter
 changes collected during the preceding window, including a proportional
 boundary sample. A new process shows unavailable processor utilization until
 two samples have been collected. Without
