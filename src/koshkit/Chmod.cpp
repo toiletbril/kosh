@@ -55,7 +55,8 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   if (!should_recurse || os::file_type_letter(status.mode) != 'd')
     return did_succeed;
 
-  let children = Path::read_directory(path);
+  let children =
+      os::list_directory_status(path.text().view(), cxt.scratch_allocator());
   if (!children.has_value()) {
     report_soft_koshkit_util_error(ec, cxt, "chmod",
                                    "cannot read directory '" + path.text() +
@@ -63,9 +64,12 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
     return false;
   }
 
-  for (const String &name : *children) {
-    let child = PathBuilder{path.text().view()}.append(name.view()).build();
-    if (child.is_symbolic_link()) continue;
+  for (let const &child_entry : *children) {
+    if (child_entry.child.kind == Path::entry_kind::Symlink) continue;
+
+    let child = PathBuilder{path.text().view()}
+                    .append(child_entry.child.name.view())
+                    .build();
     if (!change_mode(ec, cxt, child, expression, true)) did_succeed = false;
   }
 
