@@ -31,6 +31,13 @@
 
 namespace koshka {
 
+static pure fn is_prompt_special_variable(StringView name) wontthrow -> bool
+{
+  return name == "PROMPT_COMMAND" ||
+         (name.length == 3 && name[0] == 'P' && name[1] == 'S' &&
+          name[2] >= '0' && name[2] <= '4');
+}
+
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
                          bool should_error_exit, String shell_name,
@@ -200,6 +207,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   }
 
   m_shell_variables.set(name, value);
+  if (is_prompt_special_variable(name))
+    m_special_variable_definition_locations.set(name, m_current_location);
   if (is_exported(name)) {
     if (m_subshell_depth > 0)
       m_environment_undo_log.push(environment_undo_entry{
@@ -814,6 +823,8 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   LOG(All, "removing variable '%.*s' from the store and the environment",
       static_cast<int>(name.length), name.data);
   m_shell_variables.erase(name);
+  if (is_prompt_special_variable(name))
+    m_special_variable_definition_locations.erase(name);
   record_environment_change(name);
   os::unset_environment_variable(name);
   unmark_exported(name);
@@ -822,6 +833,14 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
     m_program_resolver.assign_path(os::get_environment_variable("PATH"));
   if (name == "IGNOREEOF")
     m_runtime.set_option(shell_option_id::Ignoreeof, false);
+}
+
+pure fn EvalContext::special_variable_definition_location(
+    StringView name) const wontthrow -> Maybe<SourceLocation>
+{
+  let const *location = m_special_variable_definition_locations.find(name);
+  if (location == nullptr) return None;
+  return *location;
 }
 
 fn EvalContext::record_environment_change(StringView name) throws -> void

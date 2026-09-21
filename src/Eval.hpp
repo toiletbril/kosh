@@ -415,6 +415,8 @@ public:
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
+  pure fn special_variable_definition_location(StringView name) const wontthrow
+      -> Maybe<SourceLocation>;
   fn disable_ignoreeof() throws -> void;
   fn restore_temporary_shell_variable(
       StringView name, const Maybe<String> &previous_value) throws -> void;
@@ -2044,6 +2046,8 @@ protected:
 
   mutable BumpArena m_scratch_arena{};
   StringMap<String> m_shell_variables{heap_allocator()};
+  StringMap<SourceLocation> m_special_variable_definition_locations{
+      heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   StringMap<completion_spec> m_completion_specs{heap_allocator()};
   Maybe<completion_spec> m_default_completion_spec{};

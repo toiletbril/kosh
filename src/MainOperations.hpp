@@ -877,18 +877,26 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   let &cached_text = context.get_prompt_command_cached_text();
   let cached_ast = context.get_prompt_command_cached_ast();
   let &prompt_arena = context.get_prompt_command_arena();
+  let i32 status = EXIT_SUCCESS;
   if (cached_ast != nullptr && cached_text.view() == command->view()) {
-    run_script_contents(cached_text, context, ast_arena,
-                        StringView{"$PROMPT_COMMAND"}, cached_ast);
+    status = run_script_contents(cached_text, context, ast_arena,
+                                 StringView{"$PROMPT_COMMAND"}, cached_ast);
   } else {
     prompt_arena.reset();
     context.set_prompt_command_cached_ast(nullptr);
     cached_text = String{command->view()};
     Expression *parsed_ast = nullptr;
-    run_script_contents(cached_text, context, prompt_arena,
-                        StringView{"$PROMPT_COMMAND"}, nullptr, &parsed_ast);
+    status = run_script_contents(cached_text, context, prompt_arena,
+                                 StringView{"$PROMPT_COMMAND"}, nullptr,
+                                 &parsed_ast);
     context.set_prompt_command_cached_ast(parsed_ast);
   }
+
+  if (status != EXIT_SUCCESS)
+    if (let const definition =
+            context.special_variable_definition_location("PROMPT_COMMAND");
+        definition.has_value())
+      context.print_source_backtrace(definition);
 
   context.set_last_exit_status(saved_exit_status);
   context.set_last_command_duration_nanos(saved_command_duration_nanos);

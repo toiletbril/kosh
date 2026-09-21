@@ -2570,9 +2570,14 @@ fn build_prompt(EvalContext &context) -> String
         SourceLocation{0, guarded.count(), source_name};
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view(), &source_location).view());
-  } catch (const koshka::ErrorBase &) {
+  } catch (const koshka::ErrorBase &error) {
     /* A prompt draw error leaves the template standing rather than taking down
        the shell. */
+    koshka::show_message(error.to_string());
+    if (let const definition =
+            context.special_variable_definition_location("PS1");
+        definition.has_value())
+      context.print_source_backtrace(definition);
     expanded = ps1_template;
   }
   context.set_last_exit_status(saved_status);
@@ -2609,7 +2614,12 @@ fn render_ps0(EvalContext &context) -> String
     let const source_location = SourceLocation{0, guarded.count(), source_name};
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view(), &source_location).view());
-  } catch (const koshka::ErrorBase &) {
+  } catch (const koshka::ErrorBase &error) {
+    koshka::show_message(error.to_string());
+    if (let const definition =
+            context.special_variable_definition_location("PS0");
+        definition.has_value())
+      context.print_source_backtrace(definition);
     context.set_last_exit_status(saved_status);
     return String{koshka::heap_allocator()};
   }
