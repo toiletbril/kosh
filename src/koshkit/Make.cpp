@@ -598,7 +598,7 @@ struct make_runtime_flags
 static fn apply_makeflags(StringView text, make_runtime_flags &flags,
                           Allocator allocator) throws -> void
 {
-  for (const String &word : split_makeflags_words(text, allocator)) {
+  for (let const &word : split_makeflags_words(text, allocator)) {
     if (word.is_empty() || is_command_line_assignment(word.view())) continue;
     let letters = word.view();
     if (letters == "--") break;
@@ -1098,8 +1098,8 @@ static fn restore_make_variable(makefile &mk,
 static fn make_wildcard(EvalContext &cxt, StringView patterns) throws -> String
 {
   let result = String{cxt.scratch_allocator()};
-  for (const String &pattern : split_words(patterns, cxt.scratch_allocator())) {
-    for (const String &match :
+  for (let const &pattern : split_words(patterns, cxt.scratch_allocator())) {
+    for (let const &match :
          os::glob_matches(pattern.view(), cxt.scratch_allocator()))
     {
       if (!result.is_empty()) result += ' ';
@@ -1331,7 +1331,7 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     for (StringView word : split_word_views(source.view(), allocator)) {
       bool is_matched = literal_patterns.find(word) != nullptr;
       if (!is_matched)
-        for (const make_pattern &pattern : wildcard_patterns)
+        for (let const &pattern : wildcard_patterns)
           if (match_make_pattern(pattern, word).has_value()) {
             is_matched = true;
             break;
@@ -2026,7 +2026,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
   ArrayList<conditional_state> conditionals{cxt.scratch_allocator()};
 
   let const do_is_active = [&]() -> bool {
-    for (const conditional_state &state : conditionals)
+    for (let const &state : conditionals)
       if (!state.is_branch_active) return false;
     return true;
   };
@@ -2213,7 +2213,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
       if (statement_word == "undefine") {
         let const names = expand(
             cxt, mk, trim(statement.substring(statement_word.length)), 0);
-        for (const String &name :
+        for (let const &name :
              split_words(names.view(), cxt.scratch_allocator()))
           if (mk.command_variable_names.find(name.view()) == nullptr)
             mk.remove_variable(name.view());
@@ -2223,7 +2223,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
       }
       if (statement_word == "unexport") {
         let const names = trim(statement.substring(statement_word.length));
-        for (const String &name : split_words(names, cxt.scratch_allocator())) {
+        for (let const &name : split_words(names, cxt.scratch_allocator())) {
           mk.exported_variable_names.erase(name.view());
           mk.unexported_variable_names.set(name.view(), true);
         }
@@ -2240,7 +2240,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
           continue;
         }
         if (!after_export.find_character('=').has_value()) {
-          for (const String &name :
+          for (let const &name :
                split_words(after_export, cxt.scratch_allocator()))
           {
             mk.exported_variable_names.set(name.view(), true);
@@ -2282,7 +2282,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
               cxt, mk, trim(statement.substring_of_length(0, *colon)), 0);
           current_rule_indices.clear();
           current_pattern_indices.clear();
-          for (const String &target :
+          for (let const &target :
                split_words(targets.view(), cxt.scratch_allocator()))
           {
             make_rule *rule = mk.find_mutable_rule(target.view());
@@ -2311,7 +2311,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
         let const prerequisites = expand(cxt, mk, prerequisite_text, 0);
         current_rule_indices.clear();
         current_pattern_indices.clear();
-        for (const String &target :
+        for (let const &target :
              split_words(targets.view(), cxt.scratch_allocator()))
         {
           let parsed_target =
@@ -2329,35 +2329,35 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
           {
             switch (*special_target) {
             case make_special_target::Phony:
-              for (const String &phony : new_prerequisites)
+              for (let const &phony : new_prerequisites)
                 mk.phony_targets.set(phony.view(), true);
               continue;
             case make_special_target::Ignore:
               if (new_prerequisites.is_empty())
                 mk.should_ignore_errors = true;
               else
-                for (const String &ignored : new_prerequisites)
+                for (let const &ignored : new_prerequisites)
                   mk.ignored_targets.set(ignored.view(), true);
               break;
             case make_special_target::Silent:
               if (new_prerequisites.is_empty())
                 mk.is_silent = true;
               else
-                for (const String &silent : new_prerequisites)
+                for (let const &silent : new_prerequisites)
                   mk.silent_targets.set(silent.view(), true);
               break;
             case make_special_target::Precious:
               if (new_prerequisites.is_empty())
                 mk.is_every_target_precious = true;
               else
-                for (const String &precious : new_prerequisites)
+                for (let const &precious : new_prerequisites)
                   mk.precious_targets.set(precious.view(), true);
               break;
             case make_special_target::Suffixes:
               if (new_prerequisites.is_empty()) {
                 mk.suffixes.clear();
               } else {
-                for (const String &suffix : new_prerequisites)
+                for (let const &suffix : new_prerequisites)
                   if (!mk.suffixes.find(suffix.view()).has_value())
                     mk.suffixes.push(suffix.clone());
               }
@@ -2367,7 +2367,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
           }
           let is_inference_rule = false;
           if (!normalized_target.view().find_character('/').has_value())
-            for (const String &source_suffix : mk.suffixes) {
+            for (let const &source_suffix : mk.suffixes) {
               if (normalized_target.view() == source_suffix.view()) {
                 is_inference_rule = true;
                 break;
@@ -2377,7 +2377,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
 
               let const target_suffix = normalized_target.view().substring(
                   source_suffix.view().length);
-              for (const String &known_suffix : mk.suffixes)
+              for (let const &known_suffix : mk.suffixes)
                 if (target_suffix == known_suffix.view()) {
                   is_inference_rule = true;
                   break;
@@ -2467,10 +2467,10 @@ static fn parse_makefile(EvalContext &cxt,
     });
   }
   if (should_use_builtin_rules)
-    for (const char *suffix : {".o", ".c", ".y", ".l", ".a", ".sh", ".f", ".c~",
+    for (let const *suffix : {".o", ".c", ".y", ".l", ".a", ".sh", ".f", ".c~",
                                ".y~", ".l~", ".sh~", ".f~"})
       mk.suffixes.push(String{cxt.scratch_allocator(), suffix});
-  for (const String &assignment : command_assignments) {
+  for (let const &assignment : command_assignments) {
     let const equals = assignment.view().find_character('=');
     ASSERT(equals.has_value());
     apply_assignment(cxt, mk, assignment.view().substring_of_length(0, *equals),
@@ -2523,12 +2523,12 @@ static fn parse_makefile(EvalContext &cxt,
                     cxt.scratch_allocator());
   }
   if (should_use_builtin_rules && !makefile_flags.should_disable_builtin_rules)
-    for (const builtin_rule_entry &entry : BUILTIN_RULE_ENTRIES) {
+    for (let const &entry : BUILTIN_RULE_ENTRIES) {
       if (mk.find_rule(entry.target) != nullptr) continue;
 
       make_rule rule{cxt.scratch_allocator()};
       rule.target = entry.target;
-      for (const char *recipe_line : entry.recipe_lines) {
+      for (let const *recipe_line : entry.recipe_lines) {
         if (recipe_line == nullptr) break;
         rule.recipe_lines.push(String{cxt.scratch_allocator(), recipe_line});
       }
@@ -2571,18 +2571,18 @@ static fn is_make_target_supplyable(EvalContext &cxt, makefile &mk,
   active_targets.set(goal, true);
   defer { active_targets.erase(goal); };
 
-  for (const make_pattern_rule &pattern_rule : mk.pattern_rules) {
+  for (let const &pattern_rule : mk.pattern_rules) {
     let const &pattern = pattern_rule.rule;
     if (pattern.recipe_lines.is_empty()) continue;
     let const stem = match_make_pattern(pattern_rule.pattern, goal);
     if (!stem.has_value()) continue;
 
     bool are_prerequisites_supplyable = true;
-    for (const String &prerequisite : pattern.prerequisites) {
+    for (let const &prerequisite : pattern.prerequisites) {
       let substituted = String{cxt.scratch_allocator()};
       append_make_replacement(substituted, prerequisite.view(), *stem, true);
       let const expanded = expand(cxt, mk, substituted.view(), 0);
-      for (const String &word :
+      for (let const &word :
            split_words(expanded.view(), cxt.scratch_allocator()))
         if (!is_make_target_supplyable(cxt, mk, word.view(), active_targets,
                                        supplyability_cache))
@@ -2599,7 +2599,7 @@ static fn is_make_target_supplyable(EvalContext &cxt, makefile &mk,
   }
 
   StringView target_suffix;
-  for (const String &suffix : mk.suffixes) {
+  for (let const &suffix : mk.suffixes) {
     let const candidate = suffix.view();
     if (goal.length >= candidate.length &&
         goal.substring(goal.length - candidate.length) == candidate)
@@ -2608,7 +2608,7 @@ static fn is_make_target_supplyable(EvalContext &cxt, makefile &mk,
       break;
     }
   }
-  for (const String &source_suffix_string : mk.suffixes) {
+  for (let const &source_suffix_string : mk.suffixes) {
     let rule_name = source_suffix_string.clone();
     rule_name += target_suffix;
     if (mk.find_rule(rule_name.view()) == nullptr) continue;
@@ -2666,17 +2666,17 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   }
 
   if (explicit_rule != nullptr) {
-    for (const String &prerequisite : explicit_rule->prerequisites)
+    for (let const &prerequisite : explicit_rule->prerequisites)
       explicit_prerequisites.push(prerequisite.clone());
-    for (const String &recipe : explicit_rule->recipe_lines)
+    for (let const &recipe : explicit_rule->recipe_lines)
       recipe_lines.push(recipe.clone());
-    for (const String &assignment : explicit_rule->variable_assignments)
+    for (let const &assignment : explicit_rule->variable_assignments)
       target_assignments.push(assignment.clone());
     explicit_rule = nullptr;
 
-    for (const String &prerequisite : explicit_prerequisites) {
+    for (let const &prerequisite : explicit_prerequisites) {
       let const expanded = expand(cxt, mk, prerequisite.view(), 0);
-      for (const String &word :
+      for (let const &word :
            split_words(expanded.view(), cxt.scratch_allocator()))
         prerequisites.push(word.clone());
     }
@@ -2697,11 +2697,11 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       pattern_rule.pattern.suffix = stored_pattern_rule.pattern.suffix.clone();
       pattern_rule.pattern.has_wildcard =
           stored_pattern_rule.pattern.has_wildcard;
-      for (const String &prerequisite : stored_pattern_rule.rule.prerequisites)
+      for (let const &prerequisite : stored_pattern_rule.rule.prerequisites)
         pattern_rule.rule.prerequisites.push(prerequisite.clone());
-      for (const String &recipe : stored_pattern_rule.rule.recipe_lines)
+      for (let const &recipe : stored_pattern_rule.rule.recipe_lines)
         pattern_rule.rule.recipe_lines.push(recipe.clone());
-      for (const String &assignment :
+      for (let const &assignment :
            stored_pattern_rule.rule.variable_assignments)
         pattern_rule.rule.variable_assignments.push(assignment.clone());
 
@@ -2712,11 +2712,11 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
 
       ArrayList<String> candidate{cxt.scratch_allocator()};
       bool is_every_prerequisite_supplyable = true;
-      for (const String &prerequisite : pattern.prerequisites) {
+      for (let const &prerequisite : pattern.prerequisites) {
         let substituted = String{cxt.scratch_allocator()};
         append_make_replacement(substituted, prerequisite.view(), *stem, true);
         let const expanded = expand(cxt, mk, substituted.view(), 0);
-        for (const String &word :
+        for (let const &word :
              split_words(expanded.view(), cxt.scratch_allocator()))
         {
           if (!is_make_target_supplyable(cxt, mk, word.view(),
@@ -2741,10 +2741,10 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       for (String &prerequisite : candidate)
         inferred_prerequisites.push(steal(prerequisite));
       recipe_lines.clear();
-      for (const String &recipe : pattern.recipe_lines)
+      for (let const &recipe : pattern.recipe_lines)
         recipe_lines.push(recipe.clone());
       target_assignments.clear();
-      for (const String &assignment : pattern.variable_assignments)
+      for (let const &assignment : pattern.variable_assignments)
         target_assignments.push(assignment.clone());
       target_stem = String{cxt.scratch_allocator(), *stem};
     }
@@ -2756,7 +2756,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       let const inference_target =
           archive_member.is_empty() ? goal : automatic_target.view();
       let target_suffix = StringView{};
-      for (const String &suffix : mk.suffixes) {
+      for (let const &suffix : mk.suffixes) {
         let const candidate = suffix.view();
         if (inference_target.length >= candidate.length &&
             inference_target.substring(inference_target.length -
@@ -2767,7 +2767,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
         }
       }
 
-      for (const String &source_suffix_string : mk.suffixes) {
+      for (let const &source_suffix_string : mk.suffixes) {
         let const source_suffix = source_suffix_string.view();
         let rule_name = source_suffix_string.clone();
         rule_name += target_suffix;
@@ -2796,7 +2796,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
         inferred_first_prerequisite = source.clone();
         prerequisites.push(steal(source));
         recipe_lines.clear();
-        for (const String &recipe : suffix_rule->recipe_lines)
+        for (let const &recipe : suffix_rule->recipe_lines)
           recipe_lines.push(recipe.clone());
         target_stem = stem.clone();
         break;
@@ -2807,7 +2807,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       if (const make_rule *fallback = mk.find_rule(".DEFAULT");
           fallback != nullptr)
       {
-        for (const String &recipe : fallback->recipe_lines)
+        for (let const &recipe : fallback->recipe_lines)
           recipe_lines.push(recipe.clone());
         inferred_first_prerequisite = String{cxt.scratch_allocator(), goal};
       } else {
@@ -2827,7 +2827,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   if (target_stem.is_empty()) {
     let const stem_source = archive_member.is_empty() ? automatic_target.view()
                                                       : archive_member.view();
-    for (const String &suffix : mk.suffixes) {
+    for (let const &suffix : mk.suffixes) {
       let const suffix_text = suffix.view();
       if (stem_source.length <= suffix_text.length ||
           stem_source.substring(stem_source.length - suffix_text.length) !=
@@ -2843,7 +2843,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   /* The saved values restore in reverse so a repeated += unwinds cleanly. */
   let saved_variables =
       ArrayList<make_variable_snapshot>{cxt.scratch_allocator()};
-  for (const String &assignment : target_assignments) {
+  for (let const &assignment : target_assignments) {
     let const name = assignment_variable_name(assignment.view());
     saved_variables.push(save_make_variable(mk, name, cxt.scratch_allocator()));
     let const equals = assignment.view().find_character('=');
@@ -2860,7 +2860,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   ArrayList<String> normal_prerequisites{cxt.scratch_allocator()};
   ArrayList<String> order_only_prerequisites{cxt.scratch_allocator()};
   bool is_order_only_section = false;
-  for (const String &prerequisite : prerequisites) {
+  for (let const &prerequisite : prerequisites) {
     if (prerequisite.view() == "|") {
       is_order_only_section = true;
       continue;
@@ -2876,7 +2876,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   defer { active_targets.erase(goal); };
   let has_outdated_prerequisite = false;
   let did_prerequisite_fail = false;
-  for (const String &prerequisite : normal_prerequisites) {
+  for (let const &prerequisite : normal_prerequisites) {
     try {
       has_outdated_prerequisite |=
           build_target(ec, cxt, mk, prerequisite.view(), active_targets,
@@ -2887,7 +2887,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       report_soft_koshkit_error(ec, cxt, error.message().view());
     }
   }
-  for (const String &prerequisite : order_only_prerequisites) {
+  for (let const &prerequisite : order_only_prerequisites) {
     try {
       build_target(ec, cxt, mk, prerequisite.view(), active_targets,
                    completed_target_results, options);
@@ -2916,7 +2916,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
                        mk.phony_targets.find(goal) != nullptr ||
                        !was_target_existing || has_outdated_prerequisite;
   if (!is_out_of_date)
-    for (const String &prerequisite : normal_prerequisites) {
+    for (let const &prerequisite : normal_prerequisites) {
       let const prerequisite_path = Path{prerequisite.view()};
       let is_prerequisite_newer = prerequisite_path.is_newer_than(target_path);
       if (!archive_member.is_empty()) {
@@ -2967,7 +2967,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   String all_prereqs{cxt.scratch_allocator()};
   String repeated_prereqs{cxt.scratch_allocator()};
   String newer_prereqs{cxt.scratch_allocator()};
-  for (const String &prerequisite : normal_prerequisites) {
+  for (let const &prerequisite : normal_prerequisites) {
     if (!repeated_prereqs.is_empty()) repeated_prereqs += ' ';
     repeated_prereqs += prerequisite.view();
 
@@ -3029,7 +3029,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   let const should_ignore_target_errors =
       options.should_ignore_errors || mk.ignored_targets.find(goal) != nullptr;
 
-  for (const String &recipe : recipe_lines) {
+  for (let const &recipe : recipe_lines) {
     let body = recipe.view();
     bool is_silent = false;
     bool should_ignore_errors = false;
@@ -3407,7 +3407,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   }
   if (let inherited_makeflags = os::get_environment_variable("MAKEFLAGS");
       inherited_makeflags.has_value())
-    for (const String &word : split_makeflags_words(inherited_makeflags->view(),
+    for (let const &word : split_makeflags_words(inherited_makeflags->view(),
                                                     cxt.scratch_allocator()))
     {
       if (word.is_empty()) continue;
@@ -3557,7 +3557,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   if (runtime_flags.is_silent) makeflags += 's';
   if (runtime_flags.should_touch) makeflags += 't';
 
-  for (const String &assignment : command_assignments) {
+  for (let const &assignment : command_assignments) {
     if (assignment_variable_name(assignment.view()) == StringView{"MAKEFLAGS"})
       continue;
     if (!makeflags.is_empty()) makeflags += ' ';
@@ -3587,7 +3587,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
         runtime_flags.does_environment_override,
         !runtime_flags.should_disable_builtin_rules, makeflags.view());
   } catch (const ErrorWithLocation &error) {
-    for (const make_source_document &document : make_sources) {
+    for (let const &document : make_sources) {
       if (document.source_name_index != error.location().source_name_index)
         continue;
       show_message(error.to_string(document.source.view(), &cxt));
@@ -3633,7 +3633,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
         });
         os::unset_environment_variable(name);
       });
-  for (const make_variable &variable : mk.variables) {
+  for (let const &variable : mk.variables) {
     if (variable.name.view() == StringView{"MAKEFLAGS"}) continue;
     if (variable.name.view() == StringView{"SHELL"} &&
         mk.exported_variable_names.find(variable.name.view()) == nullptr)
@@ -3666,31 +3666,31 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (runtime_flags.is_print_database) {
     let suffix_description = String{cxt.scratch_allocator(), ".SUFFIXES:"};
-    for (const String &suffix : mk.suffixes)
+    for (let const &suffix : mk.suffixes)
       suffix_description += " " + suffix;
     suffix_description += '\n';
     ec.print_to_stdout(suffix_description);
-    for (const auto &entry : BUILTIN_VARIABLE_ENTRIES)
+    for (let const &entry : BUILTIN_VARIABLE_ENTRIES)
       ec.print_to_stdout(entry.key.to_string() + " = " + entry.value + "\n");
-    for (const make_variable &variable : mk.variables)
+    for (let const &variable : mk.variables)
       ec.print_to_stdout(variable.name + " = " + variable.value + "\n");
-    for (const make_rule &rule : mk.rules) {
+    for (let const &rule : mk.rules) {
       let description = rule.target + ":";
-      for (const String &prerequisite : rule.prerequisites)
+      for (let const &prerequisite : rule.prerequisites)
         description += " " + prerequisite;
       description += '\n';
       ec.print_to_stdout(description);
-      for (const String &recipe : rule.recipe_lines)
+      for (let const &recipe : rule.recipe_lines)
         ec.print_to_stdout("\t" + recipe + "\n");
     }
-    for (const make_pattern_rule &pattern_rule : mk.pattern_rules) {
+    for (let const &pattern_rule : mk.pattern_rules) {
       let const &rule = pattern_rule.rule;
       let description = rule.target + ":";
-      for (const String &prerequisite : rule.prerequisites)
+      for (let const &prerequisite : rule.prerequisites)
         description += " " + prerequisite;
       description += '\n';
       ec.print_to_stdout(description);
-      for (const String &recipe : rule.recipe_lines)
+      for (let const &recipe : rule.recipe_lines)
         ec.print_to_stdout("\t" + recipe + "\n");
     }
   }
@@ -3769,7 +3769,7 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   sources.push(make_source_document{
       steal(*source), intern_source_name(makefile.view())});
   let const mk = parse_makefile(cxt, sources, command_assignments, false, true);
-  for (const make_rule &rule : mk.rules) {
+  for (let const &rule : mk.rules) {
     let const name = rule.target.view();
     if (name.is_empty() || name[0] == '.') continue;
     targets.push(rule.target.clone());

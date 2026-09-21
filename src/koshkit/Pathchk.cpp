@@ -58,7 +58,7 @@ fn Pathchk::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_check_hyphen = FLAG_PATHCHK_LEADING_HYPHEN.is_enabled();
   i32 status = 0;
 
-  for (const String &operand : operands) {
+  for (let const &operand : operands) {
     let const path = operand.view();
     i64 path_limit = 256;
     i64 name_limit = 14;

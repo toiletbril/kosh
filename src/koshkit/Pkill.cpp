@@ -112,7 +112,7 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
   let const self_pid = os::get_shell_process_id();
   let const processes = os::enumerate_processes();
   bool did_signal_any = false;
-  for (const os::process_entry &process : processes) {
+  for (let const &process : processes) {
     if (process.pid == self_pid) continue;
     if (process.name.find_substring(pattern, 0).has_value()) {
       if (os::signal_process(os::process_from_pid(process.pid), signal_number))

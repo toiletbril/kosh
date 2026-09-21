@@ -103,7 +103,7 @@ namespace {
 static fn command_word_is_glob(const Word &word) wontthrow -> bool
 {
   bool has_open_bracket = false;
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::UnquotedText) continue;
     for (usize i = 0; i < segment.text.count(); i++) {
       let const c = segment.text[i];

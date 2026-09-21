@@ -175,7 +175,7 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_TOUCH_MODIFICATION.is_enabled() || !FLAG_TOUCH_ACCESS.is_enabled();
 
   i32 status = 0;
-  for (const String &operand : operands) {
+  for (let const &operand : operands) {
     if (!Path{operand.view()}.exists()) {
       if (FLAG_TOUCH_NO_CREATE.is_enabled()) continue;
 

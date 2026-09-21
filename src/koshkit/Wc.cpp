@@ -235,7 +235,7 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   let const field_width = decimal_digit_count(max_count);
 
   let output = String{cxt.scratch_allocator()};
-  for (const wc_row &row : rows)
+  for (let const &row : rows)
     append_counts(output, row.line_count, row.word_count, row.byte_count,
                   should_show_lines, should_show_words, should_show_bytes,
                   row.name, field_width);

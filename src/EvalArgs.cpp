@@ -34,7 +34,7 @@ constexpr char BRACE_OPAQUE_MARKER = '\x01';
 
 pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
 {
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::UnquotedText) continue;
     if (segment.text.find_character('{').has_value()) return true;
   }
@@ -200,7 +200,7 @@ fn brace_group_alternatives(StringView content, Allocator alloc) throws
     let alternatives = ArrayList<String>{alloc};
     alternatives.reserve(comma_positions.count() + 1);
     usize start = 0;
-    for (const usize comma : comma_positions) {
+    for (let const comma : comma_positions) {
       alternatives.push(
           String{alloc, content.substring_of_length(start, comma - start)});
       start = comma + 1;
@@ -265,11 +265,11 @@ fn brace_expand_text(StringView text, Allocator alloc, usize depth = 0) throws
   let const postamble = text.substring(group->close + 1);
   let const post_expansions = brace_expand_text(postamble, alloc, depth + 1);
 
-  for (const String &alternative : group->alternatives) {
-    for (const String &expanded_alt :
+  for (let const &alternative : group->alternatives) {
+    for (let const &expanded_alt :
          brace_expand_text(alternative.view(), alloc, depth + 1))
     {
-      for (const String &expanded_post : post_expansions) {
+      for (let const &expanded_post : post_expansions) {
         let combined = String{alloc, preamble};
         combined.append(expanded_alt.view());
         combined.append(expanded_post.view());
@@ -284,7 +284,7 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
 {
   let opaque_segments = ArrayList<const WordSegment *>{alloc};
   let word_template = String{alloc};
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (usize byte_index = 0; byte_index < segment.text.count();
            byte_index++)
@@ -307,7 +307,7 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
 
   let words = ArrayList<Word>{alloc};
   words.reserve(expanded.count());
-  for (const String &produced : expanded) {
+  for (let const &produced : expanded) {
     let out = Word{};
     let run = String{alloc};
     for (usize i = 0; i < produced.count(); i++) {
@@ -544,7 +544,7 @@ hot fn EvalContext::process_args(
                            previous_suppress_test_warning);
   };
 
-  for (const Token *token : args) {
+  for (let const *token : args) {
     let const location = token->source_location();
     try {
       let fallback_word = Maybe<Word>{};
@@ -602,7 +602,7 @@ hot fn EvalContext::process_args(
             false
         });
         let const &value = assignment_token->value_word();
-        for (const WordSegment &value_segment : value.segments)
+        for (let const &value_segment : value.segments)
           fallback_word->segments.push(value_segment);
         word = &*fallback_word;
       } else {
@@ -661,7 +661,7 @@ hot fn EvalContext::process_args(
           if (only.kind == WordSegment::Kind::VariableReference &&
               only.is_in_double_quotes && only.text.view() == "@")
           {
-            for (const String &param : m_positional_params) {
+            for (let const &param : m_positional_params) {
               expanded_args.push(
                   String{expanded_args.allocator(), param.view()});
               do_record_location(location);
@@ -676,7 +676,7 @@ hot fn EvalContext::process_args(
            fall through to the full machine. */
         if (!did_take_fast_path) {
           let is_single_field = !expandable.segments.is_empty();
-          for (const WordSegment &segment : expandable.segments) {
+          for (let const &segment : expandable.segments) {
             if (!is_single_field) break;
 
             if (segment.is_tilde_candidate() && !segment.text.is_empty() &&
@@ -713,7 +713,7 @@ hot fn EvalContext::process_args(
 
           if (is_single_field) {
             let value = String{expanded_args.allocator()};
-            for (const WordSegment &segment : expandable.segments) {
+            for (let const &segment : expandable.segments) {
               switch (segment.kind) {
               case WordSegment::Kind::VariableReference: {
                 let const spec = segment.text.view();
@@ -772,7 +772,7 @@ hot fn EvalContext::process_args(
           shell_option_state(shell_option_id::Braceexpand) &&
           word_has_brace_candidate(*word))
       {
-        for (const Word &brace_word : expand_braces(*word, scratch_allocator()))
+        for (let const &brace_word : expand_braces(*word, scratch_allocator()))
           do_expand_one_word(brace_word);
       } else {
         do_expand_one_word(*word);

@@ -134,7 +134,7 @@ static fn cached_id_name(u32 id, id_name_kind kind,
                          ArrayList<id_name_entry> &cache,
                          Allocator allocator) throws -> StringView
 {
-  for (const id_name_entry &entry : cache)
+  for (let const &entry : cache)
     if (entry.id == id) return entry.name.view();
   let const looked_up = kind == id_name_kind::Owner ? os::uid_to_username(id)
                                                     : os::gid_to_groupname(id);
@@ -292,7 +292,7 @@ static fn prepare_entries(ArrayList<listing_entry> &entries,
   if (options.should_color) {
     let symlink_paths = ArrayList<Path>{allocator};
     let symlink_statuses = ArrayList<os::file_status>{allocator};
-    for (const listing_entry &entry : entries) {
+    for (let const &entry : entries) {
       if (entry.type != entry_type::Symlink) continue;
 
       if (is_name_path) {
@@ -373,7 +373,7 @@ static fn collect_directory(const Path &directory,
                               Path::entry_kind::Directory, allocator));
     }
 
-    for (const os::directory_status_entry &child : *children) {
+    for (let const &child : *children) {
       if (!options.is_showing_dot_names && child.child.name.starts_with(".")) {
         continue;
       }
@@ -400,7 +400,7 @@ static fn collect_directory(const Path &directory,
                             Path::entry_kind::Directory, allocator));
   }
 
-  for (const Path::directory_child &child : *children) {
+  for (let const &child : *children) {
     if (!options.is_showing_dot_names && child.name.starts_with(".")) continue;
 
     if (options.needs_type) {
@@ -462,7 +462,7 @@ static fn render_long_entries(const ArrayList<long_entry> &entries,
   usize owner_width = 0;
   usize group_width = 0;
   usize size_width = 0;
-  for (const long_entry &entry : entries) {
+  for (let const &entry : entries) {
     if (entry.link_count.count() > link_width)
       link_width = entry.link_count.count();
     if (entry.owner.count() > owner_width) owner_width = entry.owner.count();
@@ -470,7 +470,7 @@ static fn render_long_entries(const ArrayList<long_entry> &entries,
     if (entry.size.count() > size_width) size_width = entry.size.count();
   }
 
-  for (const long_entry &entry : entries) {
+  for (let const &entry : entries) {
     output += entry.mode_string.view();
     output += ' ';
     append_padded(output, entry.link_count.view(), link_width, true);
@@ -513,7 +513,7 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
   ArrayList<usize> widths{allocator};
   cells.reserve(count);
   widths.reserve(count);
-  for (const listing_entry &entry : entries) {
+  for (let const &entry : entries) {
     let cell = String{allocator};
     append_decorated_name(cell, entry, options);
     cells.push(steal(cell));
@@ -524,7 +524,7 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
   u32 terminal_rows = 0;
   let const is_terminal = os::terminal_size(terminal_columns, terminal_rows);
   if (options.is_one_per_line || !is_terminal) {
-    for (const String &cell : cells) {
+    for (let const &cell : cells) {
       output += cell.view();
       output += '\n';
     }
@@ -583,7 +583,7 @@ static fn long_total_blocks(const ArrayList<long_entry> &entries,
                             Allocator allocator) throws -> String
 {
   u64 total_512_blocks = 0;
-  for (const long_entry &entry : entries)
+  for (let const &entry : entries)
     total_512_blocks += entry.blocks;
   if (FLAG_LS_HUMAN.is_enabled())
     return "total " + format_human_size(total_512_blocks * 512, allocator);
@@ -604,7 +604,7 @@ static fn render_entries(const ArrayList<listing_entry> &entries,
 
   ArrayList<long_entry> rows{allocator};
   rows.reserve(entries.count());
-  for (const listing_entry &entry : entries)
+  for (let const &entry : entries)
     rows.push(
         build_long_entry(entry, options, uid_cache, gid_cache, allocator));
 
@@ -686,7 +686,7 @@ static fn render_directory_block(
 
   if (options.has_depth_limit && depth + 1 >= options.max_depth) return;
 
-  for (const listing_entry &entry : entries) {
+  for (let const &entry : entries) {
     if (os::INTERRUPT_REQUESTED) return;
     if (entry.type != entry_type::Directory) continue;
 
@@ -784,7 +784,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty())
     targets.push(StringView{"."});
   else
-    for (const String &operand : operands)
+    for (let const &operand : operands)
       targets.push(operand.view());
 
   targets.sort();
@@ -872,7 +872,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   bool has_printed_block = !file_entries.is_empty();
-  for (const StringView &target : dir_targets) {
+  for (let const &target : dir_targets) {
     if (os::INTERRUPT_REQUESTED) break;
     if (!options.is_tree) {
       render_directory_block(target, options, 0, should_print_headers,

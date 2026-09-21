@@ -54,7 +54,7 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
   let batch = os::Batch{cxt.scratch_allocator()};
   let batch_results = ArrayList<os::batch_result>{cxt.scratch_allocator()};
   i32 status = 0;
-  for (const String &operand : operands) {
+  for (let const &operand : operands) {
     let const fd = os::open_file_descriptor(operand.view(), mode);
     if (!fd.has_value()) {
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),

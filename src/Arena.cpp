@@ -185,7 +185,7 @@ hot fn BumpArena::owns(const opaque *pointer) const wontthrow -> bool
 fn BumpArena::bytes_used() const wontthrow -> usize
 {
   usize total = 0;
-  for (const block &block : m_blocks)
+  for (let const &block : m_blocks)
     total += block.used;
   return total;
 }

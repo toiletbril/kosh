@@ -128,7 +128,7 @@ fn builtin_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
     let collected = ArrayList<String>{heap_allocator()};
-    for (const static_string_entry<Builtin::Kind> &entry : BUILTIN_ENTRIES)
+    for (let const &entry : BUILTIN_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
   }();

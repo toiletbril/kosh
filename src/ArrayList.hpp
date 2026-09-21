@@ -33,7 +33,7 @@ public:
   ArrayList(std::initializer_list<T> elements) : ArrayList(heap_allocator())
   {
     reserve(elements.size());
-    for (const T &element : elements)
+    for (let const &element : elements)
       push(element);
   }
 

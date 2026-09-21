@@ -1285,7 +1285,7 @@ fn probe_tcp_connect(StringView host, u16 port,
   }
 
   connect_probe_result result = connect_probe_result::Unreachable;
-  for (const struct addrinfo *candidate = resolved; candidate != nullptr;
+  for (let const *candidate = resolved; candidate != nullptr;
        candidate = candidate->ai_next)
   {
     result = probe_one_address(candidate, timeout_milliseconds);

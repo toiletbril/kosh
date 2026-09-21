@@ -67,7 +67,7 @@ fn util_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
     let collected = ArrayList<String>{heap_allocator()};
-    for (const static_string_entry<Utility::Kind> &entry : KOSHKIT_ENTRIES)
+    for (let const &entry : KOSHKIT_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
   }();
@@ -205,7 +205,7 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
   ASSERT(chosen.has_value());
 
   /* The scan stops at --, where a later --version is an operand. */
-  for (const String &operand : operands) {
+  for (let const &operand : operands) {
     if (operand == "--") break;
     if (operand == "--version") {
       show_version();

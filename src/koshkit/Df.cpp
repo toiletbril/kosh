@@ -61,7 +61,7 @@ fn Df::execute(const ExecContext &ec, EvalContext &cxt,
           os::mounted_filesystem{operand.clone(), operand.clone()});
   }
 
-  for (const os::mounted_filesystem &mounted : filesystems) {
+  for (let const &mounted : filesystems) {
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),

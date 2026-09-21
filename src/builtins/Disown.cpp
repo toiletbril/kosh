@@ -51,13 +51,13 @@ fn Disown::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (should_keep_stopped) cxt.update_jobs();
 
     let ids = ArrayList<i32>{cxt.scratch_allocator()};
-    for (const job &job : cxt.jobs()) {
+    for (let const &job : cxt.jobs()) {
       if (!should_keep_stopped || job.state == job::State::Running) {
         ids.push(job.id);
       }
     }
 
-    for (const i32 id : ids)
+    for (let const id : ids)
       cxt.remove_job(id);
 
     return 0;

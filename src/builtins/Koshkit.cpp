@@ -103,7 +103,7 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
-  for (const String &name : koshkit::util_names())
+  for (let const &name : koshkit::util_names())
     sorted_names.push(name.clone());
   sorted_names.sort();
 

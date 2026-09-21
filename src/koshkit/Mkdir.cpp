@@ -107,7 +107,7 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
       (0777u & ~os::get_file_creation_mask()) | owner_write_and_search_bits;
 
   i32 status = 0;
-  for (const String &operand : operands) {
+  for (let const &operand : operands) {
     if (should_make_parents) {
       let const text = operand.view();
 

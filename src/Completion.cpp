@@ -394,7 +394,7 @@ collect_command_names(StringView token, command_match_mode match_mode,
     do_add(builtin_name.view());
 
   if (context.koshkit_utilities_are_reachable()) {
-    for (const String &util_name : koshkit::util_names()) {
+    for (let const &util_name : koshkit::util_names()) {
       if (!token_is_glob && !collector.allows_fuzzy_fallback() &&
           !utils::smart_case_prefix_matches(util_name.view(), token,
                                             is_case_sensitive))

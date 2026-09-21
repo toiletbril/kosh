@@ -42,7 +42,7 @@ struct uid_name_cache_entry
 static fn owner_name_for_uid(u32 uid, ArrayList<uid_name_cache_entry> &cache,
                              Allocator allocator) throws -> String
 {
-  for (const uid_name_cache_entry &entry : cache)
+  for (let const &entry : cache)
     if (entry.uid == uid) return entry.name.clone();
 
   let const looked_up = os::uid_to_username(uid);
@@ -81,7 +81,7 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   usize vsz_width = 3;
   usize rss_width = 3;
 
-  for (const os::process_entry &process : processes) {
+  for (let const &process : processes) {
     let owner = owner_name_for_uid(process.owner_id, uid_cache, allocator);
     if (owner.count() > user_width) user_width = owner.count();
     let const pid_text = String::from(process.pid, allocator);
@@ -143,7 +143,7 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   bool should_show_aux = FLAG_PS_ALL.is_enabled() ||
                          FLAG_PS_USER_FMT.is_enabled() ||
                          FLAG_PS_NO_TTY.is_enabled();
-  for (const String &operand : operands)
+  for (let const &operand : operands)
     if (operand.view() == "aux") should_show_aux = true;
 
   let const processes = os::enumerate_processes(
@@ -158,7 +158,7 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   output += "  PID CMD\n";
-  for (const os::process_entry &process : processes) {
+  for (let const &process : processes) {
     let const pid = String::from(process.pid, cxt.scratch_allocator());
     output.append_repeated(' ', pid.count() < 5 ? 5 - pid.count() : 0);
     output += pid.view();

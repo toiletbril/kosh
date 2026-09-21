@@ -362,7 +362,7 @@ fn internal::complete_from_process_arguments(StringView line, StringView token,
   let const processes = os::enumerate_processes();
   let candidates = ArrayList<String>{completion_allocator()};
   let seen = HashSet{completion_allocator()};
-  for (const os::process_entry &process : processes) {
+  for (let const &process : processes) {
     if (is_by_name) {
       let const name = process.name.view();
       if (name.is_empty() || !name.starts_with(token) || !seen.add(name)) {
@@ -461,7 +461,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
           koshkit::collect_makefile_targets(context, makefile_path);
       let filtered = ArrayList<String>{heap_allocator()};
       let seen = HashSet{heap_allocator()};
-      for (const String &name : intrinsic_targets) {
+      for (let const &name : intrinsic_targets) {
         if (make_target_is_artifact(name.view(), make_directory) ||
             !seen.add(name.view()))
           continue;
@@ -559,7 +559,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
 static fn append_flag_forms(const FlagList &flags, StringView token_filter,
                             ArrayList<String> &out) throws -> void
 {
-  for (const Flag *flag : flags) {
+  for (let const *flag : flags) {
     if (flag->short_name() != '\0') {
       let form = String{"-"};
       form.push(flag->short_name());
@@ -699,7 +699,7 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
 
     if (should_offer_util_names) {
       let names = ArrayList<String>{heap_allocator()};
-      for (const String &name : koshkit::util_names())
+      for (let const &name : koshkit::util_names())
         if (name.view().starts_with(token)) names.push(String{name.view()});
       if (!names.is_empty()) return names;
       return None;

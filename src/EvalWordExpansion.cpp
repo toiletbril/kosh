@@ -175,7 +175,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     }
   };
 
-  for (const WordSegment &segment : *segments) {
+  for (let const &segment : *segments) {
     let const segment_text =
         StringView{segment.text.data(), segment.text.count()};
     switch (segment.kind) {
@@ -597,7 +597,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const is_star = segment_text[name_end + 1] == '*';
             let const elements = collect_array_elements(array_name);
             let is_every_element_empty = true;
-            for (const String &element : elements)
+            for (let const &element : elements)
               if (!element.is_empty()) {
                 is_every_element_empty = false;
                 break;
@@ -748,7 +748,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
       !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~';
   let has_colon_tilde = false;
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (!segment.is_tilde_candidate()) continue;
     if (segment.text.find_substring(":~").has_value()) {
       has_colon_tilde = true;
@@ -768,7 +768,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   }
 
   let result = String{scratch_allocator()};
-  for (const WordSegment &segment : *segments) {
+  for (let const &segment : *segments) {
     let const segment_text = segment.text.view();
     switch (segment.kind) {
     case WordSegment::Kind::VariableReference: {
@@ -816,7 +816,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       active_out.push(is_active);
   };
 
-  for (const WordSegment &segment : *segments) {
+  for (let const &segment : *segments) {
     let const segment_text = segment.text.view();
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
@@ -967,7 +967,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
         expanded != nullptr)
     {
       fields.reserve(expanded->count());
-      for (const String &word : *expanded)
+      for (let const &word : *expanded)
         fields.push_managed(word.view());
     }
   } catch (const ErrorBase &error) {
