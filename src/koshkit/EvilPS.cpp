@@ -741,9 +741,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     live_interval_seconds = parsed;
   }
 
-  f64 cumulative_interval_seconds = FLAG_EVILPS_LIVE.is_enabled()
-                                        ? live_interval_seconds
-                                        : 1.0;
+  f64 cumulative_interval_seconds = 1.0;
   if (FLAG_EVILPS_CUMULATIVE.has_value()) {
     cumulative_interval_seconds = parse_koshkit_duration_seconds(
         FLAG_EVILPS_CUMULATIVE.value(),

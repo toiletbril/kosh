@@ -1437,9 +1437,13 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILIO_CUMULATIVE.is_enabled())
     sample_duration_label =
         String{allocator, "/"} + cumulative_duration_label.view() + "s";
+  else if (FLAG_EVILIO_LIVE.is_enabled())
+    sample_duration_label = String{allocator, "/1s"};
   let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
                                           ? cumulative_duration_seconds
-                                          : live_interval_seconds;
+                                          : (FLAG_EVILIO_LIVE.is_enabled()
+                                                 ? 1.0
+                                                 : live_interval_seconds);
   let const refresh_interval_seconds = live_interval_seconds;
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
