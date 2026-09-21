@@ -97,7 +97,7 @@ case $help in
   *) live_help=missing ;;
 esac
 case $help in
-  *"Collect activity over an optional"*"window; the default is one second."*)
+  *"M-second rolling window"*)
     cumulative_help=described
     ;;
   *) cumulative_help=missing ;;
