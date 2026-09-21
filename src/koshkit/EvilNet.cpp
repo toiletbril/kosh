@@ -379,19 +379,15 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   return true;
 }
 
-pure fn network_counter_rate(u64 before, u64 after,
-                             u64 elapsed_nanoseconds) wontthrow -> u64
+pure fn network_counter_delta(u64 before, u64 after) wontthrow -> u64
 {
-  if (after < before || elapsed_nanoseconds == 0) return 0;
-
-  return static_cast<u64>(static_cast<u128>(after - before) * 1000000000ULL /
-                          elapsed_nanoseconds);
+  return after < before ? 0 : after - before;
 }
 
 fn sample_network_statistics(
     const ArrayList<os::network_interface_statistics_entry> &before,
     const ArrayList<os::network_interface_statistics_entry> &after,
-    u64 elapsed_nanoseconds, Allocator allocator)
+    Allocator allocator)
     throws -> ArrayList<os::network_interface_statistics_entry>
 {
   let sampled = ArrayList<os::network_interface_statistics_entry>{allocator};
@@ -410,42 +406,36 @@ fn sample_network_statistics(
     if (previous != nullptr) {
       if (entry.has_field(os::network_statistics_field::ReceiveBytes) &&
           previous->has_field(os::network_statistics_field::ReceiveBytes))
-        result.receive_bytes = network_counter_rate(
-            previous->receive_bytes, entry.receive_bytes, elapsed_nanoseconds);
+        result.receive_bytes =
+            network_counter_delta(previous->receive_bytes, entry.receive_bytes);
       if (entry.has_field(os::network_statistics_field::TransmitBytes) &&
           previous->has_field(os::network_statistics_field::TransmitBytes))
-        result.transmit_bytes = network_counter_rate(
-            previous->transmit_bytes, entry.transmit_bytes, elapsed_nanoseconds);
+        result.transmit_bytes = network_counter_delta(previous->transmit_bytes,
+                                                      entry.transmit_bytes);
       if (entry.has_field(os::network_statistics_field::ReceivePackets) &&
           previous->has_field(os::network_statistics_field::ReceivePackets))
-        result.receive_packet_count = network_counter_rate(
-            previous->receive_packet_count, entry.receive_packet_count,
-            elapsed_nanoseconds);
+        result.receive_packet_count = network_counter_delta(
+            previous->receive_packet_count, entry.receive_packet_count);
       if (entry.has_field(os::network_statistics_field::TransmitPackets) &&
           previous->has_field(os::network_statistics_field::TransmitPackets))
-        result.transmit_packet_count = network_counter_rate(
-            previous->transmit_packet_count, entry.transmit_packet_count,
-            elapsed_nanoseconds);
+        result.transmit_packet_count = network_counter_delta(
+            previous->transmit_packet_count, entry.transmit_packet_count);
       if (entry.has_field(os::network_statistics_field::ReceiveErrors) &&
           previous->has_field(os::network_statistics_field::ReceiveErrors))
-        result.receive_error_count = network_counter_rate(
-            previous->receive_error_count, entry.receive_error_count,
-            elapsed_nanoseconds);
+        result.receive_error_count = network_counter_delta(
+            previous->receive_error_count, entry.receive_error_count);
       if (entry.has_field(os::network_statistics_field::TransmitErrors) &&
           previous->has_field(os::network_statistics_field::TransmitErrors))
-        result.transmit_error_count = network_counter_rate(
-            previous->transmit_error_count, entry.transmit_error_count,
-            elapsed_nanoseconds);
+        result.transmit_error_count = network_counter_delta(
+            previous->transmit_error_count, entry.transmit_error_count);
       if (entry.has_field(os::network_statistics_field::ReceiveDrops) &&
           previous->has_field(os::network_statistics_field::ReceiveDrops))
-        result.receive_drop_count = network_counter_rate(
-            previous->receive_drop_count, entry.receive_drop_count,
-            elapsed_nanoseconds);
+        result.receive_drop_count = network_counter_delta(
+            previous->receive_drop_count, entry.receive_drop_count);
       if (entry.has_field(os::network_statistics_field::TransmitDrops) &&
           previous->has_field(os::network_statistics_field::TransmitDrops))
-        result.transmit_drop_count = network_counter_rate(
-            previous->transmit_drop_count, entry.transmit_drop_count,
-            elapsed_nanoseconds);
+        result.transmit_drop_count = network_counter_delta(
+            previous->transmit_drop_count, entry.transmit_drop_count);
     }
     sampled.push(steal(result));
   }
@@ -516,12 +506,9 @@ fn get_network_window_status(const live_network_row &row,
   let sampled = row.history.back();
   sampled.interface_name = String{allocator, row.interface_name.view()};
   let const &newest = row.history.back();
-  let const elapsed_nanoseconds =
-      row.history_nanoseconds.back() - before_nanoseconds;
   let const do_sample =
       [&](u64 os::network_interface_statistics_entry::*member) {
-        sampled.*member = network_counter_rate(
-            before.*member, newest.*member, elapsed_nanoseconds);
+        sampled.*member = network_counter_delta(before.*member, newest.*member);
       };
   do_sample(&os::network_interface_statistics_entry::receive_bytes);
   do_sample(&os::network_interface_statistics_entry::transmit_bytes);
@@ -757,16 +744,13 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   if (should_show_traffic && !should_show_failures) {
     if (FLAG_EVILNET_CUMULATIVE.is_enabled()) {
       let const before = os::read_network_interface_statistics();
-      let const started_at_nanoseconds = os::monotonic_nanos();
       os::sleep_for_seconds(window_seconds);
       if (os::INTERRUPT_REQUESTED != 0) {
         os::INTERRUPT_REQUESTED = 0;
         return 130;
       }
       let const after = os::read_network_interface_statistics();
-      let const sampled = sample_network_statistics(
-          before, after, os::monotonic_nanos() - started_at_nanoseconds,
-          allocator);
+      let const sampled = sample_network_statistics(before, after, allocator);
       let duration_suffix = String{allocator, "/"};
       duration_suffix += format_live_duration(window_seconds, allocator).view();
       traffic_count = append_network_traffic_statistics_report(
