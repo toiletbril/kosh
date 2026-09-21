@@ -166,8 +166,8 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
     if (os::INTERRUPT_REQUESTED) return false;
     if (!child.has_status) continue;
 
-    let const child_path =
-        PathBuilder{path.text().view()}.append(child.child.name.view()).build();
+    let child_path = path.clone();
+    child_path.append(child.child.name.view());
 
     if (find_inode(child_path, child.status, inode, found_path, allocator))
       return true;

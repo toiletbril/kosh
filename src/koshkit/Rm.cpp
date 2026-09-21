@@ -53,8 +53,8 @@ fn remove_path(StringView path, removal_mode mode, Allocator allocator,
     let names = os::list_directory_status(path, allocator);
     if (names.has_value())
       for (let const &entry : *names) {
-        let const child =
-            PathBuilder{path, allocator}.append(entry.child.name.view()).build();
+        let child = Path{path, allocator};
+        child.append(entry.child.name.view());
         if (!remove_path(child.text().view(), mode, allocator, entry.child.kind))
           return false;
       }
@@ -87,8 +87,8 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
     let names = os::list_directory_status(path, allocator);
     if (names.has_value())
       for (let const &entry : *names) {
-        let const child =
-            PathBuilder{path, allocator}.append(entry.child.name.view()).build();
+        let child = Path{path, allocator};
+        child.append(entry.child.name.view());
         if (!remove_path_with_prompt(ec, child.text().view(), mode,
                                      should_prompt, allocator,
                                      entry.child.kind))
@@ -126,8 +126,8 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
         names.has_value())
     {
       for (let const &entry : *names) {
-        let const child =
-            PathBuilder{path, allocator}.append(entry.child.name.view()).build();
+        let child = Path{path, allocator};
+        child.append(entry.child.name.view());
         report_dry_run_removal(ec, cxt, child.text().view(), mode,
                                should_prompt, allocator, entry.child.kind);
       }

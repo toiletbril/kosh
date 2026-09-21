@@ -171,14 +171,10 @@ static fn copy_path(const ExecContext &ec, StringView source,
       };
 
     for (let const &entry : *names) {
-      let const child_source =
-          PathBuilder{source, allocator}
-              .append(entry.child.name.view())
-              .build();
-      let const child_destination =
-          PathBuilder{destination, allocator}
-              .append(entry.child.name.view())
-              .build();
+      let child_source = Path{source, allocator};
+      child_source.append(entry.child.name.view());
+      let child_destination = Path{destination, allocator};
+      child_destination.append(entry.child.name.view());
       copy_path(ec, child_source.text().view(), child_destination.text().view(),
                 is_recursive, should_force, should_preserve, is_verbose,
                 allocator,
@@ -288,7 +284,9 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
          into a destroyed temporary. */
       let const source_path = Path{source};
       let const leaf = source_path.filename();
-      target = PathBuilder{destination}.append(leaf).build().text();
+      let target_path = Path{destination};
+      target_path.append(leaf);
+      target = target_path.text();
     }
 
     if (should_prompt && Path{target.view()}.exists() &&

@@ -116,9 +116,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     for (let const &child_entry : *children) {
       if (os::INTERRUPT_REQUESTED) return None;
 
-      let const child = PathBuilder{path.text().view(), allocator}
-                            .append(child_entry.child.name.view())
-                            .build();
+      let child = Path{path.text().view(), allocator};
+      child.append(child_entry.child.name.view());
       let const child_status =
           child_entry.has_status ? &child_entry.status : nullptr;
       let const child_size =
