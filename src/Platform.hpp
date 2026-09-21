@@ -1278,6 +1278,8 @@ fn reference_current_directory() wontthrow -> DirectoryReference;
 fn restore_current_directory(const DirectoryReference &reference) wontthrow
     -> bool;
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>;
+cold fn list_directory(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<String>>;
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>;
 cold fn list_directory_typed(StringView dir, Allocator allocator) throws

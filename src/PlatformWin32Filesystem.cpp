@@ -592,10 +592,16 @@ fn restore_current_directory(const DirectoryReference &reference) wontthrow
 
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 {
-  const String dir_string{dir};
-  let entries = list_directory_typed(dir);
+  return list_directory(dir, heap_allocator());
+}
+
+cold fn list_directory(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<String>>
+{
+  const String dir_string{allocator, dir};
+  let entries = list_directory_typed(dir, allocator);
   if (!entries.has_value()) return None;
-  let names = ArrayList<String>{heap_allocator()};
+  let names = ArrayList<String>{allocator};
   names.reserve(entries->count());
   for (let &entry : *entries)
     names.push(steal(entry.name));

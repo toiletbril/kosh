@@ -152,7 +152,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
 
     let const did_destination_exist = Path{destination}.is_directory();
     os::make_directory(destination, 0700);
-    Maybe<ArrayList<String>> names = Path::read_directory(source_path);
+    let names = Path::read_directory(source_path, allocator);
     if (!names.has_value())
       throw Error{
           "unable to read the directory '" + String{allocator, source}

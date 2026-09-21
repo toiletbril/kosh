@@ -34,16 +34,18 @@ namespace koshka {
 
 namespace koshkit {
 
-fn remove_path(StringView path, removal_mode mode) throws -> bool
+fn remove_path(StringView path, removal_mode mode, Allocator allocator) throws
+    -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
   if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
-    Maybe<ArrayList<String>> names = Path::read_directory(target);
+    let names = Path::read_directory(target, allocator);
     if (names.has_value())
       for (const String &name : *names) {
-        let const child = PathBuilder{path}.append(name.view()).build();
-        if (!remove_path(child.text().view(), mode)) return false;
+        let const child =
+            PathBuilder{path, allocator}.append(name.view()).build();
+        if (!remove_path(child.text().view(), mode, allocator)) return false;
       }
     return os::remove_directory(path);
   }
@@ -51,20 +53,22 @@ fn remove_path(StringView path, removal_mode mode) throws -> bool
 }
 
 static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
-                                  removal_mode mode, bool should_prompt) throws
+                                  removal_mode mode, bool should_prompt,
+                                  Allocator allocator) throws
     -> bool
 {
-  if (!should_prompt) return remove_path(path, mode);
+  if (!should_prompt) return remove_path(path, mode, allocator);
 
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
   if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
-    Maybe<ArrayList<String>> names = Path::read_directory(target);
+    let names = Path::read_directory(target, allocator);
     if (names.has_value())
       for (const String &name : *names) {
-        let const child = PathBuilder{path}.append(name.view()).build();
+        let const child =
+            PathBuilder{path, allocator}.append(name.view()).build();
         if (!remove_path_with_prompt(ec, child.text().view(), mode,
-                                     should_prompt))
+                                     should_prompt, allocator))
           return false;
       }
     if (!confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
@@ -78,18 +82,20 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
 
 static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
                                  StringView path, removal_mode mode,
-                                 bool should_prompt) throws -> void
+                                 bool should_prompt, Allocator allocator) throws
+    -> void
 {
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
   if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
-    if (Maybe<ArrayList<String>> names = Path::read_directory(target);
+    if (let names = Path::read_directory(target, allocator);
         names.has_value())
     {
       for (const String &name : *names) {
-        let const child = PathBuilder{path}.append(name.view()).build();
+        let const child =
+            PathBuilder{path, allocator}.append(name.view()).build();
         report_dry_run_removal(ec, cxt, child.text().view(), mode,
-                               should_prompt);
+                               should_prompt, allocator);
       }
     }
   }
@@ -150,6 +156,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
   let const is_recursive =
       FLAG_RM_RECURSIVE_R.is_enabled() || FLAG_RM_RECURSIVE_UPPER.is_enabled();
   let const is_dry_run = FLAG_RM_DRY_RUN.is_enabled();
+  let const allocator = cxt.scratch_allocator();
 
   if (operands.is_empty() && !should_force) {
     return report_usage_error(ec, cxt, args[0].view());
@@ -188,14 +195,14 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
       report_dry_run_removal(ec, cxt, operand.view(),
                              is_recursive ? removal_mode::Recursive
                                           : removal_mode::SinglePath,
-                             should_prompt);
+                             should_prompt, allocator);
       continue;
     }
 
     if (!remove_path_with_prompt(ec, operand.view(),
                                  is_recursive ? removal_mode::Recursive
                                               : removal_mode::SinglePath,
-                                 should_prompt))
+                                 should_prompt, allocator))
     {
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),
                                      "cannot remove '" + operand + "': " +

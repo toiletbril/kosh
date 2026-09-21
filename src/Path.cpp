@@ -384,6 +384,12 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   return os::list_directory(dir.text().view());
 }
 
+cold fn Path::read_directory(const Path &dir, Allocator allocator) throws
+    -> Maybe<ArrayList<String>>
+{
+  return os::list_directory(dir.text().view(), allocator);
+}
+
 cold fn Path::read_directory_typed(const Path &dir) throws
     -> Maybe<ArrayList<directory_child>>
 {
