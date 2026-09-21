@@ -1,0 +1,5 @@
+command executable=./executable
+directory=./directory/
+symlinks=./symlink-directory/
+./symlink-executable
+duplicate-path=duplicate
