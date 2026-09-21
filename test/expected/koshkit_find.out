@@ -1,6 +1,7 @@
 --- find all ---
 .
 ./a
+./a/MiXeD.TxT
 ./a/b
 ./a/b/c
 ./a/b/c/three.txt
@@ -15,6 +16,16 @@
 --- find -name *.txt ---
 ./a/b/c/three.txt
 ./a/one.txt
+--- find -iname *.TXT ---
+./a/MiXeD.TxT
+./a/b/c/three.txt
+./a/one.txt
+--- find escaped metacharacter ---
+./a/literal[bracket].txt
+--- find slash-containing no match ---
+status=0
+--- find no match ---
+status=0
 --- find -type d ---
 .
 ./a
@@ -51,7 +62,7 @@ long/abcdefghijklmnopqrstuvwxyz/segment/leaf
 1:16: error: find: unknown predicate '-bogus'.
      1 |  koshkit find . -bogus
        |                 ^~~~~~
-note: Use `-name`, `-type`, `-maxdepth`, `-mindepth`, or `-print`.
+note: Use `-name`, `-iname`, `-type`, `-maxdepth`, `-mindepth`, or `-print`.
 --- find missing -name argument ---
 1:16: error: find: -name expects a pattern.
      1 |  koshkit find . -name

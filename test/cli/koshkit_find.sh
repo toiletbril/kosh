@@ -8,6 +8,7 @@ cd "$d" || exit 1
 
 "$BIN" -c 'koshkit mkdir -p a/b/c'
 "$BIN" -c 'koshkit touch a/one.txt'
+"$BIN" -c 'koshkit touch a/MiXeD.TxT'
 "$BIN" -c 'koshkit touch a/b/two.log'
 "$BIN" -c 'koshkit touch a/b/c/three.txt'
 "$BIN" -c 'koshkit ln -sf missing broken'
@@ -19,6 +20,15 @@ echo "--- find all ---"
 "$BIN" -c 'koshkit find .'
 echo "--- find -name *.txt ---"
 "$BIN" -c 'koshkit find . -name "*.txt"'
+echo "--- find -iname *.TXT ---"
+"$BIN" -c 'koshkit find . -iname "*.TXT"'
+"$BIN" -c 'koshkit touch "a/literal[bracket].txt"'
+echo "--- find escaped metacharacter ---"
+"$BIN" -c 'koshkit find . -name "literal\[bracket\].txt"'
+echo "--- find slash-containing no match ---"
+"$BIN" -c 'koshkit find . -iname "a/*.TXT"; printf "status=%s\\n" "$?"'
+echo "--- find no match ---"
+"$BIN" -c 'koshkit find . -iname "*.does-not-exist"; printf "status=%s\\n" "$?"'
 echo "--- find -type d ---"
 "$BIN" -c 'koshkit find . -type d'
 echo "--- find -maxdepth 1 ---"

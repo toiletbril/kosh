@@ -18,7 +18,7 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL(
-    "[path ...] [-name glob] [-type fdl] [-maxdepth n] [-mindepth n]");
+    "[path ...] [-name glob] [-iname glob] [-type fdl] [-maxdepth n] [-mindepth n]");
 
 HELP_DESCRIPTION_DECL(
     "The find utility walks each path and prints every entry under it.");
@@ -34,7 +34,8 @@ namespace koshkit {
 struct find_options
 {
   const ArrayList<StringView> *name_patterns{nullptr};
-  const Bitset *glob_active{nullptr};
+  const ArrayList<bool> *name_pattern_ignore_case{nullptr};
+  const ArrayList<Bitset> *name_pattern_masks{nullptr};
   char type_filter{0};
   i64 max_depth{-1};
   i64 min_depth{0};
@@ -45,6 +46,7 @@ enum class find_predicate_kind : uchar
   Help,
   Print,
   Name,
+  Iname,
   Type,
   MaximumDepth,
   MinimumDepth,
@@ -55,6 +57,7 @@ static constexpr static_string_entry<find_predicate_kind>
         {SSK("--help"),    find_predicate_kind::Help        },
         {SSK("-print"),    find_predicate_kind::Print       },
         {SSK("-name"),     find_predicate_kind::Name        },
+        {SSK("-iname"),    find_predicate_kind::Iname       },
         {SSK("-type"),     find_predicate_kind::Type        },
         {SSK("-maxdepth"), find_predicate_kind::MaximumDepth},
         {SSK("-mindepth"), find_predicate_kind::MinimumDepth},
@@ -62,7 +65,8 @@ static constexpr static_string_entry<find_predicate_kind>
 static constexpr StaticStringMap FIND_PREDICATES{FIND_PREDICATE_ENTRIES};
 
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
-                             const find_options &options) throws -> bool
+                             const find_options &options,
+                             Allocator allocator) throws -> bool
 {
   if (static_cast<i64>(depth) < options.min_depth) return false;
   if (options.max_depth >= 0 && static_cast<i64>(depth) > options.max_depth) {
@@ -82,9 +86,32 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
   default: break;
   }
 
+  bool should_fold_filename = false;
+  if (options.name_pattern_ignore_case != nullptr)
+    for (let const ignore_case : *options.name_pattern_ignore_case)
+      should_fold_filename = should_fold_filename || ignore_case;
+
+  let const original_filename = filename;
+  String folded_filename{allocator};
+  /* Keep -iname locale-independent: ASCII letters fold, while UTF-8 bytes
+     remain exact so traversal does not depend on the process locale. */
+  if (should_fold_filename) {
+    folded_filename.reserve(filename.length);
+    for (usize index = 0; index < filename.length; index++)
+      folded_filename.push(utils::ascii_to_lower(filename[index]));
+    filename = folded_filename.view();
+  }
+
   if (options.name_patterns != nullptr) {
-    for (let const &pattern : *options.name_patterns) {
-      if (!utils::glob_matches(pattern, filename, *options.glob_active, 0))
+    for (usize index = 0; index < options.name_patterns->count(); index++) {
+      let const pattern = (*options.name_patterns)[index];
+      let const should_ignore_case =
+          options.name_pattern_ignore_case != nullptr &&
+          (*options.name_pattern_ignore_case)[index];
+      let const candidate =
+          should_ignore_case ? folded_filename.view() : original_filename;
+      if (!utils::glob_matches(pattern, candidate,
+                               (*options.name_pattern_masks)[index], 0))
         return false;
     }
   }
@@ -119,7 +146,7 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
   }
   let const filename = path_text.substring(filename_start);
 
-  if (find_entry_matches(type_letter, filename, depth, options)) {
+  if (find_entry_matches(type_letter, filename, depth, options, allocator)) {
     output += display;
     output += '\n';
   }
@@ -189,8 +216,11 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
 {
   ArrayList<StringView> roots{cxt.scratch_allocator()};
   ArrayList<StringView> name_patterns{cxt.scratch_allocator()};
+  ArrayList<bool> name_pattern_ignore_case{cxt.scratch_allocator()};
+  ArrayList<String> matcher_name_storage{cxt.scratch_allocator()};
+  ArrayList<StringView> matcher_name_patterns{cxt.scratch_allocator()};
+  ArrayList<Bitset> matcher_name_masks{cxt.scratch_allocator()};
   find_options options{};
-  Bitset name_glob_active{cxt.scratch_allocator()};
 
   /* The flag parser is bypassed, a predicate such as -name is not a
      single-letter flag bundle. An empty argument is a start path, not a
@@ -214,7 +244,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
           arg_locations[index],
           "unknown predicate '" + String{cxt.scratch_allocator(), predicate} +
               "'",
-          "Use `-name`, `-type`, `-maxdepth`, `-mindepth`, or `-print`");
+          "Use `-name`, `-iname`, `-type`, `-maxdepth`, `-mindepth`, or `-print`");
       return 1;
     }
 
@@ -228,13 +258,20 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
          and needs no action. */
       break;
     case find_predicate_kind::Name:
+    case find_predicate_kind::Iname:
       if (index + 1 >= args.count()) {
         KOSHKIT_REPORT_ERROR_AT(
-            arg_locations[index], "-name expects a pattern",
-            "Pass a glob after `-name`, e.g. `-name '*.c'`");
+            arg_locations[index],
+            String{cxt.scratch_allocator(), predicate} +
+                " expects a pattern",
+            *predicate_kind == find_predicate_kind::Iname
+                ? StringView{"Pass a glob after `-iname`, e.g. `-iname '*.c'`"}
+                : StringView{"Pass a glob after `-name`, e.g. `-name '*.c'`"});
         return 1;
       }
       name_patterns.push(args[index + 1].view());
+      name_pattern_ignore_case.push(*predicate_kind ==
+                                    find_predicate_kind::Iname);
       index++;
       break;
     case find_predicate_kind::Type: {
@@ -287,18 +324,29 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (!name_patterns.is_empty()) {
-    usize longest_pattern_length = 0;
-    for (let const &pattern : name_patterns) {
-      if (pattern.length > longest_pattern_length)
-        longest_pattern_length = pattern.length;
+    matcher_name_storage.reserve(name_patterns.count());
+    matcher_name_patterns.reserve(name_patterns.count());
+    matcher_name_masks.reserve(name_patterns.count());
+    for (usize pattern_index = 0; pattern_index < name_patterns.count();
+         pattern_index++) {
+      let decoded = utils::decode_shell_word(
+          name_patterns[pattern_index], cxt.scratch_allocator());
+      if (name_pattern_ignore_case[pattern_index]) {
+        String folded{cxt.scratch_allocator()};
+        folded.reserve(decoded.text.length());
+        for (usize character_index = 0; character_index < decoded.text.length();
+             character_index++)
+          folded.push(utils::ascii_to_lower(decoded.text[character_index]));
+        matcher_name_storage.push(steal(folded));
+      } else {
+        matcher_name_storage.push(steal(decoded.text));
+      }
+      matcher_name_patterns.push(matcher_name_storage.back().view());
+      matcher_name_masks.push(steal(decoded.glob_active));
     }
-
-    name_glob_active.reserve(longest_pattern_length);
-    for (usize i = 0; i < longest_pattern_length; i++)
-      name_glob_active.push(true);
-
-    options.name_patterns = &name_patterns;
-    options.glob_active = &name_glob_active;
+    options.name_patterns = &matcher_name_patterns;
+    options.name_pattern_ignore_case = &name_pattern_ignore_case;
+    options.name_pattern_masks = &matcher_name_masks;
   }
 
   if (roots.is_empty()) roots.push(StringView{"."});
