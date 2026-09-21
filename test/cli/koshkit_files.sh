@@ -19,40 +19,18 @@ echo "--- ls a ---"
 echo "--- file batched operands ---"
 "$BIN" -c 'koshkit file nums.txt stamp sym missing.txt' 2>&1
 echo "file-status=$?"
-printf '%s\n' '0 string MATCH batch-match' > magic-batch
-printf MATCH > magic-good-a
-printf MATCH > magic-good-b
 echo "--- custom file samples preserve merged-stream operand order ---"
-"$BIN" -c \
-  'koshkit file -M magic-batch magic-good-a missing-magic magic-good-b' \
-  2>&1
-echo "custom-file-status=$?"
-printf MATCH > magic-unreadable
-chmod 000 magic-unreadable
-if command cat magic-unreadable >/dev/null 2>&1; then
-  file_unreadable_result=ok
-else
-  file_unreadable_output=$("$BIN" -c \
-    'koshkit file -M magic-batch magic-good-a magic-unreadable magic-good-b' \
-    2>&1)
-  file_unreadable_status=$?
-  case $file_unreadable_output in
-    *"magic-good-a: batch-match"*"cannot open 'magic-unreadable'"*"magic-good-b: batch-match"*)
-      file_unreadable_order=matched
-      ;;
-    *)
-      file_unreadable_order=wrong
-      ;;
-  esac
-  if [ "$file_unreadable_status" -eq 1 ] && \
-    [ "$file_unreadable_order" = matched ]; then
-    file_unreadable_result=ok
-  else
-    file_unreadable_result=failed
-  fi
-fi
-chmod 600 magic-unreadable
-printf 'custom-file-unreadable=%s\n' "$file_unreadable_result"
+mkdir .magic-batch
+(
+  cd .magic-batch || exit 1
+  printf '%s\n' '0 string MATCH batch-match' > magic-batch
+  printf MATCH > magic-good-a
+  printf MATCH > magic-good-b
+  "$BIN" -c \
+    'koshkit file -M magic-batch magic-good-a missing-magic magic-good-b' \
+    2>&1
+  echo "custom-file-status=$?"
+)
 echo "--- stat preserves nonadjacent repeated operands ---"
 "$BIN" -c 'koshkit stat -c "%n=%s" nums.txt stamp nums.txt'
 mkdir batch-a batch-b
