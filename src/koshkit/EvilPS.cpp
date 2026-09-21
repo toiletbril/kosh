@@ -207,6 +207,10 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
       continue;
     }
 
+    if (node.cpu_milliseconds < row->history_milliseconds.back()) {
+      row->history_milliseconds.clear();
+      row->history_nanoseconds.clear();
+    }
     row->history_milliseconds.push(node.cpu_milliseconds);
     row->history_nanoseconds.push(now_nanoseconds);
     row->last_seen_nanoseconds = now_nanoseconds;
