@@ -481,29 +481,4 @@ fn Path::is_shell_source(StringView source) const throws -> bool
          detect_mimic_shell_from_source(source).has_value();
 }
 
-PathBuilder::PathBuilder(Allocator allocator) : m_text(allocator) {}
-
-PathBuilder::PathBuilder(StringView root) : m_text(root) {}
-
-PathBuilder::PathBuilder(StringView root, Allocator allocator)
-    : m_text(allocator, root)
-{}
-
-fn PathBuilder::append(StringView component) throws -> PathBuilder &
-{
-  append_path_component(m_text, component);
-  return *this;
-}
-
-fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
-{
-  m_text.append(bytes);
-  return *this;
-}
-
-fn PathBuilder::build() const throws -> Path
-{
-  return Path{m_text.view(), m_text.allocator()};
-}
-
 } /* namespace koshka */

@@ -147,23 +147,4 @@ private:
   String m_text{heap_allocator()};
 };
 
-class PathBuilder
-{
-public:
-  PathBuilder() = default;
-  explicit PathBuilder(Allocator allocator);
-  explicit PathBuilder(StringView root);
-  PathBuilder(StringView root, Allocator allocator);
-
-  /* A separator is inserted unless the builder is empty or the component starts
-     at a root. */
-  fn append(StringView component) throws -> PathBuilder &;
-  fn append_raw(StringView bytes) throws -> PathBuilder &;
-
-  mustuse fn build() const throws -> Path;
-
-private:
-  String m_text{heap_allocator()};
-};
-
 } /* namespace koshka */
