@@ -152,8 +152,16 @@ echo "--- grep -v apple ---"
 "$BIN" -c 'koshkit grep -v apple fruit.txt'
 echo "--- grep -i APPLE ---"
 "$BIN" -c 'koshkit grep -i APPLE fruit.txt'
+echo "--- grep no match status ---"
+"$BIN" -c 'koshkit grep absent fruit.txt; printf "status=%s\n" "$?"'
+echo "--- grep invalid pattern status ---"
+"$BIN" -c 'koshkit grep "[" fruit.txt; printf "status=%s\n" "$?"' 2>&1
 echo "--- grep stdin ---"
 printf 'pear\nplum\n' | "$BIN" -c 'koshkit grep plum'
+echo "--- grep repeated stdin ---"
+printf 'pear\n' | "$BIN" -c 'koshkit grep pear - -'
+echo "--- grep stream and file ordering ---"
+printf 'pear\n' | "$BIN" -c 'koshkit grep pear fruit.txt -'
 echo "--- grep unterminated final line ---"
 printf 'tail' | "$BIN" -c 'koshkit grep tail'
 printf 'pear\n' > pear.txt

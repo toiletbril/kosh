@@ -197,8 +197,19 @@ cherry
 --- grep -i APPLE ---
 apple
 apple
+--- grep no match status ---
+status=1
+--- grep invalid pattern status ---
+1:14: error: grep: the pattern '[' is not a valid regex.
+     1 |  koshkit grep "[" fruit.txt; printf "status=%s\n" "$?"
+       |               ^~~
+status=2
 --- grep stdin ---
 plum
+--- grep repeated stdin ---
+(standard input):pear
+--- grep stream and file ordering ---
+(standard input):pear
 --- grep unterminated final line ---
 tail
 --- grep multiple files ---
