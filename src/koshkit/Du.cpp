@@ -209,6 +209,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   usize size_width = 0;
   i32 status = 0;
   bool has_failure = false;
+  bool was_interrupted = false;
   for (usize index = 0; index < targets.count(); index++) {
     let const &target = targets[index];
     if (!is_target_status_known[index]) {
@@ -224,7 +225,10 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
         total_size(ec, cxt, target, has_failure,
                    FLAG_DU_SUMMARY.is_enabled() ? nullptr : &output_rows,
                    size_width, seen_links, allocator, &target_statuses[index]);
-    if (os::INTERRUPT_REQUESTED) return 130;
+    if (os::INTERRUPT_REQUESTED) {
+      was_interrupted = true;
+      break;
+    }
     if (!total.has_value()) {
       status = 1;
       continue;
@@ -246,6 +250,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     append_size_line(output, row, size_width, should_color);
 
   ec.print_to_stdout(output);
+  if (was_interrupted) return 130;
   if (has_failure) status = 1;
   return status;
 }
