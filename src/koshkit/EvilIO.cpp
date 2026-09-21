@@ -147,6 +147,7 @@ struct io_row
 {
   String name{heap_allocator()};
   i64 pid{0};
+  u64 start_token{0};
   os::process_io_status status{};
 };
 
@@ -260,7 +261,7 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
 
     rows.push(io_row{
         String{allocator, process.name.view()},
-        process.pid, status
+        process.pid, process.start_token, status
     });
   }
 
@@ -286,7 +287,8 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
       before_position++;
     }
     if (before_position == before_rows.count() ||
-        before_rows[before_position].pid != after.pid)
+        before_rows[before_position].pid != after.pid ||
+        before_rows[before_position].start_token != after.start_token)
     {
       continue;
     }
@@ -318,7 +320,7 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
 
     sampled_rows.push(io_row{
         String{allocator, after.name.view()},
-        after.pid, status
+        after.pid, after.start_token, status
     });
   }
 
@@ -330,6 +332,7 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
 struct live_process_row
 {
   i64 pid{0};
+  u64 start_token{0};
   String name{heap_allocator()};
   ArrayList<os::process_io_status> history{heap_allocator()};
   ArrayList<u64> history_nanoseconds{heap_allocator()};
@@ -876,6 +879,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
   for (let const &row : baseline_rows) {
     live_process_row entry{};
     entry.pid = row.pid;
+    entry.start_token = row.start_token;
     entry.name = String{allocator, row.name.view()};
     entry.history.push(row.status);
     entry.history_nanoseconds.push(last_sample_nanoseconds);
@@ -914,7 +918,9 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
       for (let const &row : after_rows) {
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
-          if (retained[index].pid != row.pid) continue;
+          if (retained[index].pid != row.pid ||
+              retained[index].start_token != row.start_token)
+            continue;
           retained[index].history.push(row.status);
           retained[index].history_nanoseconds.push(now);
           retained[index].last_seen_nanoseconds = now;
@@ -924,6 +930,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
         if (!is_known) {
           live_process_row entry{};
           entry.pid = row.pid;
+          entry.start_token = row.start_token;
           entry.name = String{allocator, row.name.view()};
           entry.history.push(row.status);
           entry.history_nanoseconds.push(now);
@@ -965,7 +972,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     for (let const &row : retained) {
       rows.push(io_row{
           String{allocator, row.name.view()},
-          row.pid,
+          row.pid, row.start_token,
           get_process_window_status(row, window_start)
       });
     }
