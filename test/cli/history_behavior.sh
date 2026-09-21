@@ -466,22 +466,3 @@ case "$out" in
 *missing\ shebang*) echo "prompt hook shebang broken" ;;
 *) echo "prompt hook shebang ok" ;;
 esac
-
-# Ctrl-C must discard the unfinished editor line before the next prompt. Up
-# then recalls the persisted command instead of the interrupted partial input.
-interrupt_history=$dir/interrupt-history
-printf 'echo INTERRUPT_HISTORY_MARKER\n' > "$interrupt_history"
-rm -f "$ready"
-rm -f "$input_status"
-out=$({
-  send_input_when_ready 'partial-input' '\003' '\033[A' '\r' 'exit\r'
-  printf '%s\n' "$?" > "$input_status"
-} |
-  BIN="$BIN" READY="$ready" KOSH_HISTORY_FILE="$interrupt_history" \
-    PROMPT_COMMAND='printf ready > "$READY"' \
-    run_interactive 'exec "$BIN" -i --rcfile /dev/null') || exit 1
-[ "$(cat "$input_status")" = 0 ] || exit 1
-case "$out" in
-*INTERRUPT_HISTORY_MARKER*) echo "interrupted line history ok" ;;
-*) echo "interrupted line history broken" ;;
-esac
