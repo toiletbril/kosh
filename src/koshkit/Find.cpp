@@ -96,18 +96,19 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
                     StringView path_text, StringView display, usize depth,
                     const find_options &options, String &output,
                     i32 &exit_status, Allocator allocator,
-                    const os::file_status *known_status = nullptr) throws
+                    const os::file_status *known_status = nullptr,
+                    char known_type_letter = 0) throws
     -> void
 {
   /* The stat reads the symlink, not its target, and a failed stat yields the
      marker '\0' that matches no -type filter and is not descended. */
   os::file_status queried_status{};
-  if (known_status == nullptr && os::stat_path(path_text, queried_status))
-  {
-    known_status = &queried_status;
+  if (known_status == nullptr && known_type_letter == 0) {
+    if (os::stat_path(path_text, queried_status)) known_status = &queried_status;
   }
   let const type_letter =
-      known_status != nullptr ? os::file_type_letter(known_status->mode) : '\0';
+      known_status != nullptr ? os::file_type_letter(known_status->mode)
+      : known_type_letter;
 
   usize filename_start = 0;
   for (usize index = path_text.length; index > 0; index--) {
@@ -129,7 +130,8 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
     return;
   }
 
-  let children = os::list_directory_status(path_text, allocator);
+  let children =
+      Path::read_directory_typed(Path{path_text, allocator}, allocator);
   if (!children.has_value()) {
     if (!os::path_is_readable(path_text)) {
       report_soft_koshkit_util_error(ec, cxt, "find",
@@ -140,9 +142,9 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
 
     return;
   }
-  children->sort([](const os::directory_status_entry &left,
-                    const os::directory_status_entry &right) {
-    return left.child.name.view() < right.child.name.view();
+  children->sort([](const Path::directory_child &left,
+                    const Path::directory_child &right) {
+    return left.name.view() < right.name.view();
   });
 
   for (let const &child_entry : *children) {
@@ -152,11 +154,25 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
     if (!child_display.is_empty() && child_display.back() != '/') {
       child_display += '/';
     }
-    child_display += child_entry.child.name.view();
-    let const child_status =
-        child_entry.has_status ? &child_entry.status : nullptr;
+    child_display += child_entry.name.view();
+    os::file_status child_status_value{};
+    const os::file_status *child_status = nullptr;
+    char child_type_letter = 0;
+    if (child_entry.kind == Path::entry_kind::Unknown) {
+      if (os::stat_path(child_display.view(), child_status_value))
+        child_status = &child_status_value;
+    } else {
+      switch (child_entry.kind) {
+      case Path::entry_kind::Directory: child_type_letter = 'd'; break;
+      case Path::entry_kind::Regular: child_type_letter = '-'; break;
+      case Path::entry_kind::Symlink: child_type_letter = 'l'; break;
+      case Path::entry_kind::Other: child_type_letter = '?'; break;
+      case Path::entry_kind::Unknown: break;
+      }
+    }
     find_walk(ec, cxt, child_display.view(), child_display.view(), depth + 1,
-              options, output, exit_status, allocator, child_status);
+              options, output, exit_status, allocator, child_status,
+              child_type_letter);
   }
 }
 
