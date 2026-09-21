@@ -48,6 +48,7 @@ goodfsw_onefs_result=$(BIN="$BIN" python3 \
   "$(dirname "$0")/goodfsw_onefs.py")
 printf 'goodfsw-one-file-system-result=%s\n' "$goodfsw_onefs_result"
 
+
 node_root=$TEST_TEMP_DIRECTORY/goodnode-batch
 node_path=$node_root
 node_depth=24
