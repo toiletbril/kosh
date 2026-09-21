@@ -80,7 +80,9 @@ static fn source_file_status(StringView source) throws -> Maybe<os::file_status>
 static fn copy_path(const ExecContext &ec, StringView source,
                     StringView destination, bool is_recursive,
                     bool should_force, bool should_preserve, bool is_verbose,
-                    Allocator allocator) throws -> void
+                    Allocator allocator,
+                    const os::file_status *known_lstat = nullptr) throws
+    -> void
 {
   let const source_path = Path{source};
   let const destination_path = Path{destination};
@@ -95,8 +97,12 @@ static fn copy_path(const ExecContext &ec, StringView source,
     };
   }
   let const source_status = source_file_status(source);
+  let const is_source_symlink =
+      known_lstat != nullptr
+          ? os::file_type_letter(known_lstat->mode) == 'l'
+          : source_path.is_symbolic_link();
 
-  if (source_path.is_symbolic_link() && is_recursive) {
+  if (is_source_symlink && is_recursive) {
     if (let const target = os::read_symlink(source, allocator)) {
       /* Symlink creation fails when the path is already present, so an existing
          destination is removed first. */
@@ -131,7 +137,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       source_status.has_value()
           ? os::file_type_letter(source_status->mode) == 'd'
           : source_path.is_directory();
-  if (is_source_directory && !source_path.is_symbolic_link()) {
+  if (is_source_directory && !is_source_symlink) {
     if (!is_recursive)
       throw Error{
           "'" + String{allocator, source}
@@ -156,7 +162,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
 
     let const did_destination_exist = Path{destination}.is_directory();
     os::make_directory(destination, 0700);
-    let names = Path::read_directory(source_path, allocator);
+    let names = os::list_directory_status(source, allocator);
     if (!names.has_value())
       throw Error{
           "unable to read the directory '" + String{allocator, source}
@@ -164,14 +170,19 @@ static fn copy_path(const ExecContext &ec, StringView source,
           "': " + os::last_system_error_message()
       };
 
-    for (let const &name : *names) {
+    for (let const &entry : *names) {
       let const child_source =
-          PathBuilder{source, allocator}.append(name.view()).build();
+          PathBuilder{source, allocator}
+              .append(entry.child.name.view())
+              .build();
       let const child_destination =
-          PathBuilder{destination, allocator}.append(name.view()).build();
+          PathBuilder{destination, allocator}
+              .append(entry.child.name.view())
+              .build();
       copy_path(ec, child_source.text().view(), child_destination.text().view(),
                 is_recursive, should_force, should_preserve, is_verbose,
-                allocator);
+                allocator,
+                entry.has_status ? &entry.status : nullptr);
     }
 
     if (source_status.has_value() &&
