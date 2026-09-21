@@ -84,7 +84,9 @@ def run_pty(binary, command, key=None):
         "blank_separator": bool(frame_parts) and all(
             count == 1 for count in blank_counts
         ),
-        "sort_cycle": b"SORT tree" in output and b"SORT name" in output,
+        "sort_cycle": all(marker in output for marker in (
+            b"SORT tree", b"SORT name", b"SORT pid", b"SORT cpu",
+            b"SORT memory")),
     }
 
 
@@ -129,7 +131,7 @@ def main():
         ("evilio-pty", "koshkit --color never evilio --ps --live=0.05 "
          "--cumulative=0.1", None),
         ("evilps-pty", "koshkit --color never evilps --cpu --live=0.05 "
-         "--cumulative=0.1 -1", b"s\n"),
+         "--cumulative=0.1 -1", b"s\n" * 5),
     ):
         result = run_pty(binary, command, key if name == "evilps-pty" else None)
         requirements = {"status": 130, "resized": True,
