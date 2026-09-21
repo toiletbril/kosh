@@ -15,6 +15,7 @@ evilnet-help-controls=matched
 evilio-completion-controls=matched
 evilnet-completion-controls=matched
 evilps-completion-controls=matched
+evil-manpage-controls=matched
 evilnet-sort-keys=matched
 evilnet-ambiguous-sort=matched
 evilnet-live-sort-status=130

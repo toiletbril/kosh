@@ -145,6 +145,17 @@ printf 'evilio-completion-controls=%s\n' "$evilio_completion_controls"
 printf 'evilnet-completion-controls=%s\n' "$evilnet_completion_controls"
 printf 'evilps-completion-controls=%s\n' "$evilps_completion_controls"
 
+evil_manpage=$(< ../docs/kosh.1)
+if printf '%s\n' "$evil_manpage" | grep -Fq '\-\-sort' &&
+  printf '%s\n' "$evil_manpage" | grep -Fq 'sets the refresh cadence' &&
+  printf '%s\n' "$evil_manpage" | grep -Fq 'defaults to one second unless an explicit cumulative value is given'
+then
+  evil_manpage_controls=matched
+else
+  evil_manpage_controls=wrong
+fi
+printf 'evil-manpage-controls=%s\n' "$evil_manpage_controls"
+
 evilnet_sort_keys=matched
 for evilnet_sort_key in name rx tx rx-packets tx-packets rx-errors \
   tx-errors rx-drops tx-drops
