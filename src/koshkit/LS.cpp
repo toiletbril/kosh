@@ -359,7 +359,7 @@ static fn collect_directory(const Path &directory,
                             ArrayList<listing_entry> &entries) throws -> bool
 {
   let const directory_text = directory.view();
-  if (options.needs_full_status) {
+  if (options.needs_full_status || options.needs_type) {
     let const children = os::list_directory_status(directory_text, allocator);
     if (!children.has_value()) return false;
 
