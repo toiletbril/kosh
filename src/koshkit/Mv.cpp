@@ -186,11 +186,11 @@ fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
     let target = String{cxt.scratch_allocator(), destination};
-    if (is_destination_directory)
-      target = PathBuilder{destination}
-                   .append(Path{source}.filename())
-                   .build()
-                   .text();
+    if (is_destination_directory) {
+      let target_path = Path{destination};
+      target_path.append(Path{source}.filename());
+      target = target_path.text();
+    }
 
     if (Path{source}.is_same_file_as(Path{target.view()})) {
       report_soft_koshkit_util_error(

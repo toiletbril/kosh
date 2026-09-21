@@ -643,27 +643,26 @@ static fn read_native_filesystem_error_counters(
     if (!selected->volume_uuid.is_empty() &&
         filesystem_name == selected->volume_uuid)
     {
-      filesystem_root =
-          PathBuilder{sysfs_root.text().view()}.append(filesystem_name).build();
+      filesystem_root = sysfs_root.clone();
+      filesystem_root.append(filesystem_name.view());
       break;
     }
 
     let const device_name = Path{selected->source.view()}.filename();
     if (device_name.is_empty()) continue;
-    let const device_path = PathBuilder{sysfs_root.text().view()}
-                                .append(filesystem_name)
-                                .append("devices")
-                                .append(device_name)
-                                .build();
+    let device_path = sysfs_root.clone();
+    device_path.append(filesystem_name.view());
+    device_path.append("devices");
+    device_path.append(device_name);
     if (!device_path.exists()) continue;
-    filesystem_root =
-        PathBuilder{sysfs_root.text().view()}.append(filesystem_name).build();
+    filesystem_root = sysfs_root.clone();
+    filesystem_root.append(filesystem_name.view());
     break;
   }
   if (filesystem_root.is_empty()) return false;
 
-  let const devinfo =
-      PathBuilder{filesystem_root.text().view()}.append("devinfo").build();
+  let devinfo = filesystem_root.clone();
+  devinfo.append("devinfo");
   let const device_ids = Path::read_directory(devinfo);
   if (!device_ids.has_value() || device_ids->is_empty()) return false;
 
@@ -686,10 +685,9 @@ static fn read_native_filesystem_error_counters(
   };
 
   for (let const &device_id : *device_ids) {
-    let const stats_path = PathBuilder{devinfo.text().view()}
-                               .append(device_id)
-                               .append("error_stats")
-                               .build();
+    let stats_path = devinfo.clone();
+    stats_path.append(device_id.view());
+    stats_path.append("error_stats");
     let const contents = stats_path.read_entire_file();
     if (!contents.has_value()) return false;
 

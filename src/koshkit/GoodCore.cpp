@@ -106,8 +106,9 @@ fn copy_into_root(const Path &stage, StringView source) throws -> bool
   let const relative = stripped_root(source);
   if (relative.is_empty()) return false;
 
-  let const destination =
-      PathBuilder{stage.text()}.append("root").append(relative).build();
+  let destination = stage.clone();
+  destination.append("root");
+  destination.append(relative);
   if (!make_directories(destination.parent(), 0700)) return false;
 
   return copy_file_contents(source, destination.text().view(), false) ==
@@ -337,14 +338,16 @@ fn GoodCore::execute(
   let const stage = *stage_directory;
   defer { remove_stage(stage, allocator); };
 
-  let const dump_directory = PathBuilder{stage.text()}.append("dump").build();
+  let dump_directory = stage.clone();
+  dump_directory.append("dump");
   if (!os::make_directory(dump_directory.text().view(), 0700)) {
     report_soft_koshkit_error(ec, cxt, "cannot create dump directory",
                               os::last_system_error_message());
     return 1;
   }
 
-  let core = PathBuilder{dump_directory.text()}.append("core").build();
+  let core = dump_directory.clone();
+  core.append("core");
   if (has_pid) {
     print_progress(ec, should_show_progress, "capturing process core");
 #if defined __APPLE__
@@ -452,8 +455,8 @@ fn GoodCore::execute(
       }
     }
   }
-  let const metadata_path =
-      PathBuilder{stage.text()}.append("INFO.txt").build();
+  let metadata_path = stage.clone();
+  metadata_path.append("INFO.txt");
   if (!write_text_file(metadata_path.text().view(), metadata.view())) {
     report_soft_koshkit_error(ec, cxt, "cannot write metadata",
                               os::last_system_error_message());

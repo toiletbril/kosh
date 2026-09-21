@@ -64,11 +64,11 @@ fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const target = operands[i].view();
     let link = String{cxt.scratch_allocator(), destination};
-    if (is_destination_directory)
-      link = PathBuilder{destination}
-                 .append(Path{target}.filename())
-                 .build()
-                 .text();
+    if (is_destination_directory) {
+      let link_path = Path{destination};
+      link_path.append(Path{target}.filename());
+      link = link_path.text();
+    }
 
     if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link.view());
 
