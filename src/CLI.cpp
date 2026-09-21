@@ -1105,7 +1105,8 @@ fn append_report_column(String &output, StringView text, usize width,
                         bool is_right_aligned, StringView style,
                         bool should_color) throws -> void
 {
-  let const padding_length = text.length < width ? width - text.length : 0;
+  let const text_width = toiletline::display_width(text);
+  let const padding_length = text_width < width ? width - text_width : 0;
   if (is_right_aligned) output.append_repeated(' ', padding_length);
 
   append_report_text(output, text, style, should_color);
