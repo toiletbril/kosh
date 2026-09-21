@@ -269,6 +269,11 @@ make_entry(const Path &path, StringView name, const listing_options &options,
       entry.type = entry_type::Directory;
       return entry;
     }
+    if (kind == Path::entry_kind::Symlink) {
+      entry.type = entry_type::Symlink;
+      return entry;
+    }
+    if (!options.should_classify && !options.should_color) return entry;
   }
 
   if (known_entry != nullptr) {
@@ -359,7 +364,10 @@ static fn collect_directory(const Path &directory,
                             ArrayList<listing_entry> &entries) throws -> bool
 {
   let const directory_text = directory.view();
-  if (options.needs_full_status || options.needs_type) {
+  let const should_collect_status =
+      options.needs_full_status ||
+      (options.needs_type && (options.should_color || options.should_classify));
+  if (should_collect_status) {
     let const children = os::list_directory_status(directory_text, allocator);
     if (!children.has_value()) return false;
 
