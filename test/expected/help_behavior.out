@@ -8,7 +8,7 @@ rc=1
 rc=0
 == help formatting modes:
 cd - The cd builtin changes the working directory.
-history: history [-c] [-d offset] [-r|-n|-a|-w] [-p arg ...] [count] or history -s [arg ...]
+history: history [-c] [-d offset] [-r|-n|-a|-w] [-p arg ...] [count] or history -s [arg ...] or history -S|--sync
 NAME
     cd - The cd builtin changes the working directory.
 
