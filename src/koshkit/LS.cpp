@@ -374,11 +374,7 @@ static fn collect_directory(const Path &directory,
         continue;
       }
 
-      let const child_path =
-          PathBuilder{directory_text, allocator}
-              .append(child.child.name.view())
-              .build();
-      entries.push(make_entry(child_path, child.child.name.view(), options,
+      entries.push(make_entry(directory, child.child.name.view(), options,
                               child.child.kind, allocator, &child));
     }
 
@@ -404,12 +400,17 @@ static fn collect_directory(const Path &directory,
   for (const Path::directory_child &child : *children) {
     if (!options.is_showing_dot_names && child.name.starts_with(".")) continue;
 
-    let const child_path =
-        PathBuilder{directory_text, allocator}
-            .append(child.name.view())
-            .build();
-    entries.push(make_entry(child_path, child.name.view(), options, child.kind,
-                            allocator));
+    if (options.needs_type) {
+      let const child_path =
+          PathBuilder{directory_text, allocator}
+              .append(child.name.view())
+              .build();
+      entries.push(make_entry(child_path, child.name.view(), options,
+                              child.kind, allocator));
+    } else {
+      entries.push(make_entry(directory, child.name.view(), options, child.kind,
+                              allocator));
+    }
   }
 
   prepare_entries(entries, options, directory_text, false, allocator);
