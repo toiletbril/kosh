@@ -1034,52 +1034,64 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
     let full_path = directory.clone();
     full_path.push_component(program_name);
 
+    let candidate_paths = ArrayList<Path>{heap_allocator()};
+    let candidate_statuses = ArrayList<os::file_status>{heap_allocator()};
+    let candidate_batch = os::Batch{heap_allocator()};
+
     if (name_info.extension == os::program_extension::None) {
       for (let const &suffix : os::PROGRAM_SUFFIXES) {
-        let suffixed_path = Maybe<Path>{};
         if (!suffix.text.is_empty())
-          suffixed_path = Path{(full_path.text() + suffix.text).view()};
-        let const &try_path =
-            suffixed_path.has_value() ? *suffixed_path : full_path;
+          candidate_paths.push(
+              Path{(full_path.text() + suffix.text).view()});
+        else
+          candidate_paths.push(full_path.clone());
 
-#if !defined NDEBUG
-        DEBUG_PROGRAM_PATH_CANDIDATE_COUNT++;
-#endif
-        if (!try_path.is_regular_file()) continue;
-        let const is_runnable = try_path.is_executable();
-        let const is_match = requirement == Requirement::Regular || is_runnable;
-        if (is_match) {
-          result.push(try_path);
-          if ((cache_policy == CachePolicy::Remember ||
-               cache_policy == CachePolicy::RememberUnchecked) &&
-              is_runnable)
-          {
-            cache_resolved_path(key, try_path, suffix.extension, true);
-          }
-          return result;
-        }
-        if (requirement == Requirement::Execution && !blocked.has_value()) {
-          blocked = CachedPath{try_path, suffix.extension};
-        }
+        candidate_statuses.push({});
       }
     } else {
+      candidate_paths.push(steal(full_path));
+      candidate_statuses.push({});
+    }
+
+    candidate_batch.reserve(candidate_paths.count());
+    for (usize index = 0; index < candidate_paths.count(); index++)
+      candidate_batch.add(os::batch_operation::stat(candidate_paths[index],
+                                                    candidate_statuses[index]));
+
 #if !defined NDEBUG
-      DEBUG_PROGRAM_PATH_CANDIDATE_COUNT++;
+    DEBUG_PROGRAM_PATH_CANDIDATE_COUNT += candidate_paths.count();
 #endif
-      if (!full_path.is_regular_file()) continue;
-      let const is_runnable = full_path.is_executable();
+    let const candidate_results = candidate_batch.execute();
+    for (usize index = 0; index < candidate_paths.count(); index++) {
+      if (candidate_results[index].error_number != 0 ||
+          os::file_type_letter(candidate_statuses[index].mode) != '-')
+        continue;
+
+      let const is_runnable = candidate_paths[index].is_executable();
       let const is_match = requirement == Requirement::Regular || is_runnable;
       if (is_match) {
-        result.push(full_path);
+        let const extension =
+            name_info.extension == os::program_extension::None
+                ? os::PROGRAM_SUFFIXES[index].extension
+                : name_info.extension;
+        result.push(steal(candidate_paths[index]));
         if ((cache_policy == CachePolicy::Remember ||
              cache_policy == CachePolicy::RememberUnchecked) &&
             is_runnable)
         {
-          cache_resolved_path(key, full_path, name_info.extension, false);
+          cache_resolved_path(key, result.back(), extension,
+                              name_info.extension == os::program_extension::None);
         }
         return result;
-      } else if (requirement == Requirement::Execution && !blocked.has_value())
-        blocked = CachedPath{full_path, name_info.extension};
+      }
+
+      if (requirement == Requirement::Execution && !blocked.has_value()) {
+        let const extension =
+            name_info.extension == os::program_extension::None
+                ? os::PROGRAM_SUFFIXES[index].extension
+                : name_info.extension;
+        blocked = CachedPath{candidate_paths[index].clone(), extension};
+      }
     }
   }
 
