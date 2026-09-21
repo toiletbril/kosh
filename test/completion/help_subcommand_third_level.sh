@@ -36,13 +36,18 @@ cat > "$dir/man/man1/docker-compose.1" <<'EOF'
 .SH SYNOPSIS
 \fBdocker\fR \fBcompose\fR
 EOF
+cat > "$dir/man/man1/docker-run.1" <<'EOF'
+.TH DOCKER-RUN 1
+.SH SYNOPSIS
+\fBdocker\fR \fBrun\fR
+EOF
 echo "== first-level subcommands:"
-MANPATH= PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker ' </dev/null
+MANPATH="$dir/man" PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker ' </dev/null
 echo "== help fallback after a nonmatching man subcommand:"
 MANPATH="$dir/man" PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker r' </dev/null
 echo "== second-level sub-subcommands from 'docker compose --help':"
-MANPATH= PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose ' </dev/null
+MANPATH="$dir/man" PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose ' </dev/null
 echo "== third-level options from 'docker compose config --help':"
-MANPATH= PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose config --' </dev/null
+MANPATH="$dir/man" PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose config --' </dev/null
 echo "== an unknown deeper word does not fork:"
-MANPATH= PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose bogus --' </dev/null
+MANPATH="$dir/man" PATH="$dir${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'docker compose bogus --' </dev/null
