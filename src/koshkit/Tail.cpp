@@ -64,71 +64,140 @@ struct tail_block
   u64 offset;
 };
 
-static fn read_regular_tail(os::descriptor descriptor, u64 file_size,
-                            bool is_byte_mode, u64 count, Allocator allocator)
-    throws -> Maybe<String>
+struct regular_tail_state
 {
-  let blocks = ArrayList<tail_block>{allocator};
-  u64 next_end = file_size;
-  u64 start_offset = 0;
-  u64 remaining_newline_count = count;
-  bool has_boundary = is_byte_mode;
+  usize source_index{0};
+  os::descriptor descriptor{KOSH_INVALID_FD};
+  u64 file_size{0};
+  u64 next_end{0};
+  u64 start_offset{0};
+  u64 remaining_newline_count{0};
+  bool is_byte_mode{false};
+  bool has_boundary{false};
+  bool is_done{false};
+  bool has_error{false};
+  ArrayList<char> buffer{heap_allocator()};
+  ArrayList<tail_block> blocks{heap_allocator()};
+};
 
-  if (count == 0 || file_size == 0) return String{allocator};
+static fn read_regular_tails(ArrayList<regular_tail_state> &states,
+                             ArrayList<Maybe<String>> &outputs,
+                             Allocator allocator) throws -> void
+{
+  let batch = os::Batch{allocator};
+  let results = ArrayList<os::batch_result>{allocator};
+  let operation_states = ArrayList<usize>{allocator};
+  defer
+  {
+    for (let &state : states)
+      if (state.descriptor != KOSH_INVALID_FD)
+        unused(os::close_fd(state.descriptor));
+  };
 
-  if (is_byte_mode)
-    start_offset = file_size > count ? file_size - count : 0;
-
-  while (next_end > 0 && (!has_boundary || next_end > start_offset)) {
-    let const block_size = next_end > TAIL_BLOCK_BYTE_COUNT
-                              ? TAIL_BLOCK_BYTE_COUNT
-                              : static_cast<usize>(next_end);
-    let const block_offset = next_end - block_size;
-    char bytes[TAIL_BLOCK_BYTE_COUNT];
-    let batch = os::Batch{allocator};
-    let results = ArrayList<os::batch_result>{allocator};
-    batch.add(os::batch_operation::read(descriptor, bytes, block_size,
-                                        block_offset));
-    batch.execute(results);
-    if (results.is_empty() || results[0].error_number != 0) return None;
-
-    let const transferred = results[0].transferred_byte_count;
-    if (transferred == 0) break;
-
-    let block = String{allocator};
-    block.append(StringView{bytes, transferred});
-    blocks.push({block.take(), block_offset});
-
-    if (!is_byte_mode) {
-      for (usize position = transferred; position > 0; position--) {
-        let const absolute = block_offset + position - 1;
-        if (absolute + 1 == file_size && bytes[position - 1] == '\n') continue;
-        if (bytes[position - 1] != '\n') continue;
-
-        if (--remaining_newline_count == 0) {
-          start_offset = absolute;
-          has_boundary = true;
-          break;
-        }
-      }
+  for (let &state : states) {
+    if (state.file_size == 0 || state.remaining_newline_count == 0) {
+      state.is_done = true;
+      outputs[state.source_index] = String{allocator};
+      continue;
     }
 
-    next_end = block_offset;
-    if (transferred < block_size) break;
+    if (state.is_byte_mode) {
+      state.start_offset = state.file_size > state.remaining_newline_count
+                               ? state.file_size - state.remaining_newline_count
+                               : 0;
+      state.has_boundary = true;
+    }
   }
 
-  let output = String{allocator};
-  for (usize index = blocks.count(); index-- > 0;) {
-    let const &block = blocks[index];
-    if (block.offset + block.content.length() <= start_offset) continue;
+  loop
+  {
+    batch.clear();
+    results.clear();
+    operation_states.clear();
+    let has_pending = false;
+    for (usize state_index = 0; state_index < states.count(); state_index++) {
+      let &state = states[state_index];
+      if (state.is_done || state.has_error || state.next_end == 0) continue;
 
-    let const skip_count = start_offset > block.offset
-                               ? static_cast<usize>(start_offset - block.offset)
-                               : usize{0};
-    output += block.content.substring(skip_count);
+      let const block_size = state.next_end > TAIL_BLOCK_BYTE_COUNT
+                                 ? TAIL_BLOCK_BYTE_COUNT
+                                 : static_cast<usize>(state.next_end);
+      state.buffer.clear();
+      state.buffer.reserve(block_size);
+      for (usize byte_index = 0; byte_index < block_size; byte_index++)
+        state.buffer.push(0);
+
+      let const block_offset = state.next_end - block_size;
+      batch.add(os::batch_operation::read(
+          state.descriptor, state.buffer.begin(), block_size, block_offset));
+      operation_states.push(state_index);
+      has_pending = true;
+    }
+    if (!has_pending) break;
+
+    batch.execute(results);
+    for (usize result_index = 0; result_index < results.count();
+         result_index++) {
+      let &state = states[operation_states[result_index]];
+      let const &result = results[result_index];
+      if (result.error_number != 0) {
+        state.has_error = true;
+        state.is_done = true;
+        continue;
+      }
+
+      let const transferred = result.transferred_byte_count;
+      if (transferred == 0) {
+        state.is_done = true;
+        continue;
+      }
+
+      let const block_size = state.buffer.count();
+      let const block_offset = state.next_end - block_size;
+      let block = String{allocator};
+      block.append(StringView{state.buffer.begin(), transferred});
+      state.blocks.push({steal(block), block_offset});
+
+      if (!state.is_byte_mode) {
+        for (usize position = transferred; position > 0; position--) {
+          let const absolute = block_offset + position - 1;
+          if (absolute + 1 == state.file_size &&
+              state.buffer[position - 1] == '\n')
+            continue;
+          if (state.buffer[position - 1] != '\n') continue;
+
+          if (--state.remaining_newline_count == 0) {
+            state.start_offset = absolute;
+            state.has_boundary = true;
+            state.is_done = true;
+            break;
+          }
+        }
+      }
+
+      state.next_end = block_offset;
+      if (transferred < block_size ||
+          (state.has_boundary && state.next_end <= state.start_offset))
+        state.is_done = true;
+    }
   }
 
-  return output;
+  for (let &state : states) {
+    if (state.has_error) continue;
+    let output = String{allocator};
+    for (usize block_index = state.blocks.count(); block_index-- > 0;) {
+      let const &block = state.blocks[block_index];
+      if (block.offset + block.content.length() <= state.start_offset)
+        continue;
+
+      let const skip_count = state.start_offset > block.offset
+                                 ? static_cast<usize>(state.start_offset -
+                                                       block.offset)
+                                 : usize{0};
+      output += block.content.substring(skip_count);
+    }
+    outputs[state.source_index] = steal(output);
+  }
 }
 
 Tail::Tail() = default;
@@ -203,28 +272,58 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
           metadata_results[result_index].error_number;
   }
 
+  let positioned_contents = ArrayList<Maybe<String>>{allocator};
+  let positioned_attempted = ArrayList<bool>{allocator};
+  let regular_states = ArrayList<regular_tail_state>{allocator};
+  positioned_contents.reserve(sources.count());
+  positioned_attempted.reserve(sources.count());
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    positioned_contents.push(None);
+    positioned_attempted.push(false);
+  }
+  if (origin == count_origin::FromEnd) {
+    for (usize source_index = 0; source_index < sources.count();
+         source_index++) {
+      if (sources[source_index] == "" || sources[source_index] == "-" ||
+          metadata_errors[source_index] != 0 ||
+          os::file_type_letter(statuses[source_index].mode) != '-')
+        continue;
+
+      let const descriptor = os::open_file_descriptor(
+          sources[source_index], os::file_open_mode::Read);
+      if (!descriptor.has_value()) continue;
+      let const file_size = os::regular_descriptor_file_size(*descriptor);
+      if (!file_size.has_value()) {
+        unused(os::close_fd(*descriptor));
+        continue;
+      }
+
+      positioned_attempted[source_index] = true;
+      regular_tail_state state{};
+      state.source_index = source_index;
+      state.descriptor = *descriptor;
+      state.file_size = *file_size;
+      state.next_end = *file_size;
+      state.remaining_newline_count = static_cast<u64>(count);
+      state.is_byte_mode = is_byte_mode;
+      state.buffer = ArrayList<char>{allocator};
+      state.blocks = ArrayList<tail_block>{allocator};
+      state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
+      state.blocks.reserve(2);
+      regular_states.push(steal(state));
+    }
+    read_regular_tails(regular_states, positioned_contents, allocator);
+  }
+
   let const should_print_headers = sources.count() > 1;
   let output = String{cxt.scratch_allocator()};
   i32 status = 0;
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
     Maybe<String> content;
     bool did_use_positioned_read = false;
-    if (origin == count_origin::FromEnd && sources[source_index] != "-") {
-      if (metadata_errors[source_index] == 0 &&
-          os::file_type_letter(statuses[source_index].mode) == '-') {
-        let const descriptor = os::open_file_descriptor(
-            sources[source_index], os::file_open_mode::Read);
-        if (descriptor.has_value()) {
-          let const file_size = os::regular_descriptor_file_size(*descriptor);
-          if (file_size.has_value()) {
-            content = read_regular_tail(
-                *descriptor, *file_size, is_byte_mode,
-                static_cast<u64>(count), cxt.scratch_allocator());
-            did_use_positioned_read = true;
-          }
-          unused(os::close_fd(*descriptor));
-        }
-      }
+    if (positioned_attempted[source_index]) {
+      content = steal(positioned_contents[source_index]);
+      did_use_positioned_read = true;
     }
     if (!did_use_positioned_read)
       content = read_named_or_stdin(ec, sources[source_index]);

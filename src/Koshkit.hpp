@@ -615,7 +615,8 @@ enum class removal_mode : u8
   Recursive,
 };
 
-fn remove_path(StringView path, removal_mode mode) throws -> bool;
+fn remove_path(StringView path, removal_mode mode, Allocator allocator) throws
+    -> bool;
 
 enum class copy_file_result : u8
 {

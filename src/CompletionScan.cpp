@@ -889,7 +889,7 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
   }
 
   if (builtin_kind.has_value() &&
-      *builtin_kind == Builtin::Kind::Command && wants_operand &&
+      *builtin_kind == Builtin::Kind::CommandBuiltin && wants_operand &&
       !os::has_directory_separator(token))
   {
     usize settled_word_count = 0;

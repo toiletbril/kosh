@@ -219,9 +219,9 @@ fn collect_core_libraries(EvalContext &cxt, StringView core, StringView binary,
   }
 }
 
-fn remove_stage(const Path &stage) throws -> void
+fn remove_stage(const Path &stage, Allocator allocator) throws -> void
 {
-  unused(remove_path(stage.text().view(), removal_mode::Recursive));
+  unused(remove_path(stage.text().view(), removal_mode::Recursive, allocator));
 }
 
 } // namespace
@@ -335,7 +335,7 @@ fn GoodCore::execute(
     return 1;
   }
   let const stage = *stage_directory;
-  defer { remove_stage(stage); };
+  defer { remove_stage(stage, allocator); };
 
   let const dump_directory = PathBuilder{stage.text()}.append("dump").build();
   if (!os::make_directory(dump_directory.text().view(), 0700)) {

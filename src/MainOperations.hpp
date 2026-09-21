@@ -877,7 +877,7 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   let &cached_text = context.get_prompt_command_cached_text();
   let cached_ast = context.get_prompt_command_cached_ast();
   let &prompt_arena = context.get_prompt_command_arena();
-  let i32 status = EXIT_SUCCESS;
+  i32 status = EXIT_SUCCESS;
   if (cached_ast != nullptr && cached_text.view() == command->view()) {
     status = run_script_contents(cached_text, context, ast_arena,
                                  StringView{"$PROMPT_COMMAND"}, cached_ast);

@@ -2565,15 +2565,15 @@ fn build_prompt(EvalContext &context) -> String
   String guarded = guard_prompt_backslashes(ps1_template.view());
   String expanded{koshka::heap_allocator()};
   try {
-    let const source_name = intern_source_name("$PS1");
+    let const source_name = koshka::intern_source_name("$PS1");
     let const source_location =
-        SourceLocation{0, guarded.count(), source_name};
+        koshka::SourceLocation{0, guarded.count(), source_name};
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view(), &source_location).view());
   } catch (const koshka::ErrorBase &error) {
     /* A prompt draw error leaves the template standing rather than taking down
        the shell. */
-    koshka::show_message(error.to_string());
+    koshka::show_message(error.to_string(guarded.view(), &context));
     if (let const definition =
             context.special_variable_definition_location("PS1");
         definition.has_value())
@@ -2610,12 +2610,13 @@ fn render_ps0(EvalContext &context) -> String
   String guarded = guard_prompt_backslashes(ps0->view());
   String expanded{koshka::heap_allocator()};
   try {
-    let const source_name = intern_source_name("$PS0");
-    let const source_location = SourceLocation{0, guarded.count(), source_name};
+    let const source_name = koshka::intern_source_name("$PS0");
+    let const source_location =
+        koshka::SourceLocation{0, guarded.count(), source_name};
     expanded = unguard_prompt_backslashes(
         context.expand_heredoc_body(guarded.view(), &source_location).view());
   } catch (const koshka::ErrorBase &error) {
-    koshka::show_message(error.to_string());
+    koshka::show_message(error.to_string(guarded.view(), &context));
     if (let const definition =
             context.special_variable_definition_location("PS0");
         definition.has_value())
