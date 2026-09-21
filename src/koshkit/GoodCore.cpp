@@ -565,10 +565,7 @@ fn GoodCore::execute(
               colors::ansi::GREEN);
 
     let result = String{allocator};
-    append_report_text(result, "GOODCORE", colors::ansi::BOLD_BLUE,
-                       should_color);
-    result += "\n";
-    result += table.to_string(should_color, "  ").view();
+    result += table.to_string(should_color, "").view();
     ec.print_to_stdout(result);
   }
 
