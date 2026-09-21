@@ -230,7 +230,7 @@ fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
 {
   let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   let const pattern_text = String{heap_allocator(), pattern};
-  int compile_flags = 0;
+  int compile_flags = REG_NOSUB;
   if (is_case_insensitive) compile_flags |= REG_ICASE;
 
   if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
@@ -283,7 +283,7 @@ fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
 {
   let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   const String pattern_text{heap_allocator(), pattern};
-  int compile_flags = REG_NOSUB;
+  int compile_flags = 0;
   if (is_case_insensitive) compile_flags |= REG_ICASE;
 
   if (regcomp(&out.re, pattern_text.c_str(), compile_flags) != 0)
