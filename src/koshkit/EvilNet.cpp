@@ -439,6 +439,40 @@ pure fn network_counter_delta(u64 before, u64 after) wontthrow -> u64
   return after < before ? 0 : after - before;
 }
 
+pure fn network_counter_reset(
+    const os::network_interface_statistics_entry &before,
+    const os::network_interface_statistics_entry &after) wontthrow -> bool
+{
+  let const did_reset =
+      [&](os::network_statistics_field field,
+          u64 os::network_interface_statistics_entry::*member) {
+        return before.has_field(field) && after.has_field(field) &&
+               after.*member < before.*member;
+      };
+  return did_reset(os::network_statistics_field::ReceiveBytes,
+                   &os::network_interface_statistics_entry::receive_bytes) ||
+         did_reset(os::network_statistics_field::TransmitBytes,
+                   &os::network_interface_statistics_entry::transmit_bytes) ||
+         did_reset(
+             os::network_statistics_field::ReceivePackets,
+             &os::network_interface_statistics_entry::receive_packet_count) ||
+         did_reset(
+             os::network_statistics_field::TransmitPackets,
+             &os::network_interface_statistics_entry::transmit_packet_count) ||
+         did_reset(
+             os::network_statistics_field::ReceiveErrors,
+             &os::network_interface_statistics_entry::receive_error_count) ||
+         did_reset(
+             os::network_statistics_field::TransmitErrors,
+             &os::network_interface_statistics_entry::transmit_error_count) ||
+         did_reset(
+             os::network_statistics_field::ReceiveDrops,
+             &os::network_interface_statistics_entry::receive_drop_count) ||
+         did_reset(
+             os::network_statistics_field::TransmitDrops,
+             &os::network_interface_statistics_entry::transmit_drop_count);
+}
+
 fn sample_network_statistics(
     const ArrayList<os::network_interface_statistics_entry> &before,
     const ArrayList<os::network_interface_statistics_entry> &after,
@@ -643,6 +677,10 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
           if (retained[index].interface_name.view() !=
               entry.interface_name.view())
             continue;
+          if (network_counter_reset(retained[index].history.back(), entry)) {
+            retained[index].history.clear();
+            retained[index].history_nanoseconds.clear();
+          }
           retained[index].history.push(entry);
           retained[index].history_nanoseconds.push(now);
           retained[index].last_seen_nanoseconds = now;
