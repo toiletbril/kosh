@@ -61,7 +61,8 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
 
-  for (usize index = 1; index < operands.count(); index++)
+  for (usize index = 1; index < operands.count(); index++) {
+    if (os::INTERRUPT_REQUESTED) return 130;
     if (!utils::change_path_ownership(
             ec, cxt, "chgrp", Path{operands[index].view()}, -1, *group_id,
             FLAG_CHGRP_RECURSIVE.is_enabled(),
@@ -69,6 +70,8 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
             FLAG_CHGRP_COMMAND_LINE_FOLLOW.position(),
             FLAG_CHGRP_FOLLOW.position(), FLAG_CHGRP_PHYSICAL.position()))
       status = 1;
+    if (os::INTERRUPT_REQUESTED) return 130;
+  }
 
   return status;
 }

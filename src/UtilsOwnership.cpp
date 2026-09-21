@@ -110,6 +110,7 @@ static fn change_path_ownership_recursive(
 
   bool did_succeed = true;
   for (let const &child_entry : *children) {
+    if (os::INTERRUPT_REQUESTED) return did_succeed;
     let child = Path{path.text().view(), cxt.scratch_allocator()};
     child.append(child_entry.child.name.view());
     let const child_status =
