@@ -44,6 +44,7 @@ public:
 
   Path() = default;
   explicit Path(StringView text);
+  Path(StringView text, Allocator allocator);
 
   mustuse fn clone() const throws -> Path { return Path{*this}; }
 
@@ -143,7 +144,9 @@ class PathBuilder
 {
 public:
   PathBuilder() = default;
+  explicit PathBuilder(Allocator allocator);
   explicit PathBuilder(StringView root);
+  PathBuilder(StringView root, Allocator allocator);
 
   /* A separator is inserted unless the builder is empty or the component starts
      at a root. */

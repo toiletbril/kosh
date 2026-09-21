@@ -19,6 +19,8 @@ namespace koshka {
 
 Path::Path(StringView text) : m_text(text) {}
 
+Path::Path(StringView text, Allocator allocator) : m_text(allocator, text) {}
+
 hot fn Path::text() const wontthrow -> const String & { return m_text; }
 
 hot fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
@@ -455,7 +457,13 @@ fn Path::is_shell_source(StringView source) const throws -> bool
          detect_mimic_shell_from_source(source).has_value();
 }
 
+PathBuilder::PathBuilder(Allocator allocator) : m_text(allocator) {}
+
 PathBuilder::PathBuilder(StringView root) : m_text(root) {}
+
+PathBuilder::PathBuilder(StringView root, Allocator allocator)
+    : m_text(allocator, root)
+{}
 
 fn PathBuilder::append(StringView component) throws -> PathBuilder &
 {
@@ -469,6 +477,9 @@ fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
   return *this;
 }
 
-fn PathBuilder::build() const throws -> Path { return Path{m_text}; }
+fn PathBuilder::build() const throws -> Path
+{
+  return Path{m_text.view(), m_text.allocator()};
+}
 
 } /* namespace koshka */
