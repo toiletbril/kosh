@@ -44,7 +44,7 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
       [](const Path &candidate, bool should_preserve_extended_prefix)
           wontthrow -> Maybe<Path> {
     let const wide_candidate =
-        utf8_to_wide(candidate.text().view(), heap_allocator());
+        utf8_to_wide(candidate.view(), heap_allocator());
     if (!wide_candidate.has_value()) return koshka::None;
     let const handle = CreateFileW(
         wide_candidate->begin(), 0,
@@ -83,7 +83,7 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
     return Path{resolved};
   };
 
-  let const text = path.text().view();
+  let const text = path.view();
   if (text.is_empty()) return koshka::None;
   let const has_extended_prefix =
       text.length >= 4 && is_directory_separator(text[0]) &&
@@ -811,7 +811,7 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
   }
 
   let const wide_directory =
-      utf8_to_wide(directory.text().view(), heap_allocator());
+      utf8_to_wide(directory.view(), heap_allocator());
   if (!wide_directory.has_value()) return None;
   let const wide_prefix = utf8_to_wide(prefix, heap_allocator());
   if (!wide_prefix.has_value()) return None;
@@ -885,7 +885,7 @@ fn make_temp_directory(const Path &directory, StringView prefix) throws
     let candidate = Path{directory.text()};
     candidate.append(directory_name.view());
     let const wide_candidate =
-        utf8_to_wide(candidate.text().view(), heap_allocator());
+        utf8_to_wide(candidate.view(), heap_allocator());
     if (wide_candidate.has_value() &&
         CreateDirectoryW(wide_candidate->begin(), nullptr) != 0)
     {

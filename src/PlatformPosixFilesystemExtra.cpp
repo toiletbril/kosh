@@ -621,7 +621,7 @@ static fn read_native_filesystem_error_counters(
     if (filesystem.type != "btrfs") continue;
 
     let const target = filesystem.target.view();
-    let const subject = absolute_path.text().view();
+    let const subject = absolute_path.view();
     let const is_root = target == "/";
     let const is_same = subject == target;
     let const is_descendant = subject.starts_with(target) &&
@@ -938,8 +938,8 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
       operation_positions.push(index);
     }
     operation_positions.sort([&](usize left, usize right) {
-      let const left_parent = parent_paths[left].text().view();
-      let const right_parent = parent_paths[right].text().view();
+      let const left_parent = parent_paths[left].view();
+      let const right_parent = parent_paths[right].view();
       if (left_parent != right_parent) return left_parent < right_parent;
       return left < right;
     });
@@ -951,8 +951,7 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
       usize group_end = group_start + 1;
       while (group_end < operation_count) {
         let const candidate_position = operation_positions[group_end];
-        if (parent_paths[candidate_position].text().view() !=
-            group_parent.text().view())
+        if (parent_paths[candidate_position].view() != group_parent.view())
         {
           break;
         }
@@ -966,7 +965,7 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
         continue;
       }
 
-      let entries = list_directory_status_bulk(group_parent.text().view(),
+    let entries = list_directory_status_bulk(group_parent.view(),
                                                heap_allocator());
       if (entries.has_value()) {
         entries->sort([](const directory_status_entry &left,
