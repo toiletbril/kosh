@@ -44,6 +44,10 @@ goodfsw_interrupt_status=$(BIN="$BIN" INTERRUPT_ROOT="$interrupt_root" \
   python3 "$(dirname "$0")/goodfsw_interrupt.py")
 printf 'goodfsw-interrupt-status=%s\n' "$goodfsw_interrupt_status"
 
+goodfsw_onefs_result=$(BIN="$BIN" python3 \
+  "$(dirname "$0")/goodfsw_onefs.py")
+printf 'goodfsw-one-file-system-result=%s\n' "$goodfsw_onefs_result"
+
 node_root=$TEST_TEMP_DIRECTORY/goodnode-batch
 node_path=$node_root
 node_depth=24

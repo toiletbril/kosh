@@ -5,6 +5,7 @@ event=Updated
 kind=IsFile
 goodfsw-one-file-system-help=present
 goodfsw-interrupt-status=130
+goodfsw-one-file-system-result=skipped
 goodnode-status=0
 goodnode-path=matched
 evilio-default-shape=wrong
