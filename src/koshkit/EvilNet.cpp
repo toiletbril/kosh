@@ -30,12 +30,14 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
 FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
-              "Refresh live traffic at an optional interval; the default is "
-              "0.5 seconds.",
+              Live,
+              "Refresh live traffic every N seconds; the default is 0.5 "
+              "seconds. N controls cadence, not the rolling window.",
               is_evilnet_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative",
-              "Measure traffic over an optional sampling window; the default "
-              "is one second.",
+              Live,
+              "Measure traffic over an M-second rolling window; the default is "
+              "one second.",
               is_evilnet_sample_duration, "seconds");
 FLAG(EVILNET_FAILURES, Bool, 'f', "failures",
      "Show TCP failure and packet-loss telemetry only.");

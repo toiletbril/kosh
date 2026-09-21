@@ -48,12 +48,14 @@ static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
 FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
-              "Refresh the process tree until interrupted; the optional "
-              "interval defaults to 0.5 seconds.",
+              Live,
+              "Refresh the process tree every N seconds until interrupted; the "
+              "default is 0.5 seconds. N controls cadence, not the window.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative",
-              "Average counters over an optional sliding window; without "
-              "--live, compare snapshots across that interval.",
+              Live,
+              "Average counters over an M-second sliding window; without "
+              "--live, compare snapshots across M seconds.",
               is_evilps_sample_duration, "seconds");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

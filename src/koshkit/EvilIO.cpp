@@ -35,13 +35,15 @@ FLAG(EVILIO_ALL, Bool, 'a', "all", "Include sampled system activity.");
 FLAG(EVILIO_HUMAN, Bool, 'h', "human-readable",
      "Print byte values with compact binary units such as 4.0K or 1.5M.");
 FLAG_OPTIONAL(EVILIO_CUMULATIVE, 'C', "cumulative",
-              "Collect activity over an optional window; the default is one "
-              "second.",
+              Live,
+              "Use an M-second rolling window for sampled activity; the "
+              "default is one second.",
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG_OPTIONAL(EVILIO_LIVE, 'l', "live",
-              "Refresh live output at an optional interval; the default is 0.5 "
-              "seconds.",
+              Live,
+              "Refresh live output every N seconds; the default is 0.5 seconds. "
+              "N controls cadence, not the rolling window.",
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");

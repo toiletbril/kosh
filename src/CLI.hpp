@@ -132,6 +132,7 @@ enum class flag_section : u8
   Compat,
   Auxiliary,
   Kosh,
+  Live,
   Debug,
 };
 

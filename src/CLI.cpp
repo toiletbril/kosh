@@ -1534,7 +1534,7 @@ cold fn make_flag_help(const FlagList &flags, bool should_color) throws
       "OPTIONS",           "POSIX OPTIONS",
       "BASH OPTIONS",      "COMPATIBILITY OPTIONS",
       "AUXILIARY OPTIONS", "KOSHKA OPTIONS",
-      "DEBUG OPTIONS"};
+      "LIVE OPTIONS",      "DEBUG OPTIONS"};
   for (u8 section = 0; section < countof(SECTION_HEADERS); section++) {
     bool was_header_printed = false;
     for (let const flag : flags) {
