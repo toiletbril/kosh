@@ -880,7 +880,8 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   i32 status = EXIT_SUCCESS;
   if (cached_ast != nullptr && cached_text.view() == command->view()) {
     status = run_script_contents(cached_text, context, ast_arena,
-                                 StringView{"$PROMPT_COMMAND"}, cached_ast);
+                                 StringView{"$PROMPT_COMMAND"}, cached_ast,
+                                 nullptr, None, nullptr, nullptr, false);
   } else {
     prompt_arena.reset();
     context.set_prompt_command_cached_ast(nullptr);
@@ -888,7 +889,7 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
     Expression *parsed_ast = nullptr;
     status = run_script_contents(cached_text, context, prompt_arena,
                                  StringView{"$PROMPT_COMMAND"}, nullptr,
-                                 &parsed_ast);
+                                 &parsed_ast, None, nullptr, nullptr, false);
     context.set_prompt_command_cached_ast(parsed_ast);
   }
 

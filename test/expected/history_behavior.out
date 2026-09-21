@@ -10,3 +10,5 @@ history size ok
 zero history size storage ok
 history option ok
 ignoreeof ok
+prompt hook shebang ok
+interrupted line history ok

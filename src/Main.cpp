@@ -1343,7 +1343,10 @@ fn kosh_main(int argc, char **argv) -> int
           case TL_PRESSED_INTERRUPT:
             koshka::print("^C");
             koshka::flush();
-            break;
+            input.clear();
+            toiletline::set_input(input);
+            history_event_number = koshka::None;
+            continue;
           case TL_PRESSED_SUSPEND:
             koshka::print("^Z");
             koshka::flush();
