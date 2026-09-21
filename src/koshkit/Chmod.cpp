@@ -29,10 +29,14 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Chmod);
 namespace koshka::koshkit {
 
 static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
-                      StringView expression, bool should_recurse) throws -> bool
+                      StringView expression, bool should_recurse,
+                      const os::file_status *known_status = nullptr) throws
+    -> bool
 {
   os::file_status status{};
-  if (!os::stat_path_following(path.text().view(), status)) {
+  if (known_status != nullptr) {
+    status = *known_status;
+  } else if (!os::stat_path_following(path.text().view(), status)) {
     report_soft_koshkit_util_error(ec, cxt, "chmod",
                                    "cannot access '" + path.text() +
                                        "': " + os::last_system_error_message());
@@ -70,7 +74,13 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
     let child = PathBuilder{path.text().view(), cxt.scratch_allocator()}
                     .append(child_entry.child.name.view())
                     .build();
-    if (!change_mode(ec, cxt, child, expression, true)) did_succeed = false;
+    let const child_status =
+        child_entry.has_status &&
+                os::file_type_letter(child_entry.status.mode) != 'l'
+            ? &child_entry.status
+            : nullptr;
+    if (!change_mode(ec, cxt, child, expression, true, child_status))
+      did_succeed = false;
   }
 
   return did_succeed;
