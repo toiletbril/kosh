@@ -315,6 +315,10 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     }
     find_walk(ec, cxt, root, root, 0, options, output, status, allocator,
               &root_statuses[root_index]);
+    if (os::INTERRUPT_REQUESTED) {
+      ec.print_to_stdout(output);
+      return 130;
+    }
   }
 
   ec.print_to_stdout(output);

@@ -624,10 +624,12 @@ static fn render_tree_level(StringView directory,
                             String &prefix, String &output,
                             Allocator allocator) throws -> void
 {
+  if (os::INTERRUPT_REQUESTED) return;
   ArrayList<listing_entry> entries{allocator};
   if (!collect_directory(Path{directory}, options, allocator, entries)) return;
 
   for (usize index = 0; index < entries.count(); index++) {
+    if (os::INTERRUPT_REQUESTED) return;
     const listing_entry &entry = entries[index];
     let const is_last = index + 1 == entries.count();
 
@@ -643,7 +645,8 @@ static fn render_tree_level(StringView directory,
 
     let const kept_length = prefix.count();
     prefix += is_last ? StringView{"    "} : StringView{"│   "};
-    let const child = PathBuilder{directory}.append(entry.name.view()).build();
+    let const child =
+        PathBuilder{directory, allocator}.append(entry.name.view()).build();
     render_tree_level(child.text().view(), options, depth + 1, prefix, output,
                       allocator);
     prefix.truncate(kept_length);
@@ -657,6 +660,7 @@ static fn render_directory_block(
     String &output, const ExecContext &ec, EvalContext &cxt, i32 &status,
     Allocator allocator) throws -> void
 {
+  if (os::INTERRUPT_REQUESTED) return;
   ArrayList<listing_entry> entries{allocator};
   if (!collect_directory(Path{directory}, options, allocator, entries)) {
     report_soft_koshkit_util_error(ec, cxt, "ls",
@@ -681,11 +685,13 @@ static fn render_directory_block(
   if (options.has_depth_limit && depth + 1 >= options.max_depth) return;
 
   for (const listing_entry &entry : entries) {
+    if (os::INTERRUPT_REQUESTED) return;
     if (entry.type != entry_type::Directory) continue;
 
     if (is_dot_or_dotdot(entry.name.view())) continue;
 
-    let const child = PathBuilder{directory}.append(entry.name.view()).build();
+    let const child =
+        PathBuilder{directory, allocator}.append(entry.name.view()).build();
     render_directory_block(child.text().view(), options, depth + 1, true,
                            uid_cache, gid_cache, has_printed_block, output, ec,
                            cxt, status, allocator);
@@ -865,6 +871,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
 
   bool has_printed_block = !file_entries.is_empty();
   for (const StringView &target : dir_targets) {
+    if (os::INTERRUPT_REQUESTED) break;
     if (!options.is_tree) {
       render_directory_block(target, options, 0, should_print_headers,
                              uid_cache, gid_cache, has_printed_block, output,
@@ -882,6 +889,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   ec.print_to_stdout(output);
+  if (os::INTERRUPT_REQUESTED) return 130;
   return status;
 }
 
