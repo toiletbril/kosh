@@ -670,9 +670,11 @@ cold fn list_directory_status(StringView dir, Allocator allocator) throws
   let batch = Batch{allocator};
   paths.reserve(entries.count());
   batch.reserve(entries.count());
-  for (let const &entry : entries)
-    paths.push(
-        PathBuilder{dir, allocator}.append(entry.child.name.view()).build());
+  for (let const &entry : entries) {
+    let path = Path{dir, allocator};
+    path.append(entry.child.name.view());
+    paths.push(steal(path));
+  }
   for (usize index = 0; index < entries.count(); index++)
     batch.add(batch_operation::lstat(paths[index], entries[index].status));
 
@@ -880,8 +882,8 @@ fn make_temp_directory(const Path &directory, StringView prefix) throws
     directory_name += String::from(GetTickCount64(), heap_allocator()).view();
     directory_name += "_";
     directory_name += String::from(attempt, heap_allocator()).view();
-    let const candidate =
-        PathBuilder{directory.text()}.append(directory_name).build();
+    let candidate = Path{directory.text()};
+    candidate.append(directory_name.view());
     let const wide_candidate =
         utf8_to_wide(candidate.text().view(), heap_allocator());
     if (wide_candidate.has_value() &&

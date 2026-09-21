@@ -295,10 +295,13 @@ static fn prepare_entries(ArrayList<listing_entry> &entries,
     for (const listing_entry &entry : entries) {
       if (entry.type != entry_type::Symlink) continue;
 
-      symlink_paths.push(
-          is_name_path
-              ? Path{entry.name.view()}
-              : PathBuilder{directory}.append(entry.name.view()).build());
+      if (is_name_path) {
+        symlink_paths.push(Path{entry.name.view()});
+      } else {
+        let path = Path{directory, allocator};
+        path.append(entry.name.view());
+        symlink_paths.push(steal(path));
+      }
       symlink_statuses.push({});
     }
 
@@ -364,9 +367,10 @@ static fn collect_directory(const Path &directory,
     if (options.is_listing_dot_and_dotdot) {
       entries.push(make_entry(directory, StringView{"."}, options,
                               Path::entry_kind::Directory, allocator));
-      entries.push(make_entry(
-          PathBuilder{directory_text}.append(StringView{".."}).build(),
-          StringView{".."}, options, Path::entry_kind::Directory, allocator));
+      let parent = Path{directory_text};
+      parent.append(StringView{".."});
+      entries.push(make_entry(parent, StringView{".."}, options,
+                              Path::entry_kind::Directory, allocator));
     }
 
     for (const os::directory_status_entry &child : *children) {
@@ -390,21 +394,18 @@ static fn collect_directory(const Path &directory,
   if (options.is_listing_dot_and_dotdot) {
     entries.push(make_entry(directory, StringView{"."}, options,
                             Path::entry_kind::Directory, allocator));
-    entries.push(make_entry(
-        PathBuilder{directory_text, allocator}
-            .append(StringView{".."})
-            .build(),
-        StringView{".."}, options, Path::entry_kind::Directory, allocator));
+    let parent = Path{directory_text, allocator};
+    parent.append(StringView{".."});
+    entries.push(make_entry(parent, StringView{".."}, options,
+                            Path::entry_kind::Directory, allocator));
   }
 
   for (const Path::directory_child &child : *children) {
     if (!options.is_showing_dot_names && child.name.starts_with(".")) continue;
 
     if (options.needs_type) {
-      let const child_path =
-          PathBuilder{directory_text, allocator}
-              .append(child.name.view())
-              .build();
+      let child_path = Path{directory_text, allocator};
+      child_path.append(child.name.view());
       entries.push(make_entry(child_path, child.name.view(), options,
                               child.kind, allocator));
     } else {
@@ -646,8 +647,8 @@ static fn render_tree_level(StringView directory,
 
     let const kept_length = prefix.count();
     prefix += is_last ? StringView{"    "} : StringView{"│   "};
-    let const child =
-        PathBuilder{directory, allocator}.append(entry.name.view()).build();
+    let child = Path{directory, allocator};
+    child.append(entry.name.view());
     render_tree_level(child.text().view(), options, depth + 1, prefix, output,
                       allocator);
     prefix.truncate(kept_length);
@@ -691,8 +692,8 @@ static fn render_directory_block(
 
     if (is_dot_or_dotdot(entry.name.view())) continue;
 
-    let const child =
-        PathBuilder{directory, allocator}.append(entry.name.view()).build();
+    let child = Path{directory, allocator};
+    child.append(entry.name.view());
     render_directory_block(child.text().view(), options, depth + 1, true,
                            uid_cache, gid_cache, has_printed_block, output, ec,
                            cxt, status, allocator);

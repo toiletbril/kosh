@@ -241,12 +241,9 @@ fn append_core_dump_report(String &output, Allocator allocator,
 
   let const home = os::get_environment_variable("HOME");
   if (home.has_value()) {
-    directories.push(
-        String{allocator, PathBuilder{home->view()}
-                              .append("Library/Logs/DiagnosticReports")
-                              .build()
-                              .text()
-                              .view()});
+    let directory = Path{home->view(), allocator};
+    directory.append("Library/Logs/DiagnosticReports");
+    directories.push(String{allocator, directory.text().view()});
   }
 
   usize total_dump_count = 0;
@@ -419,8 +416,8 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
     if (!child_entry.has_status) continue;
 
     let const &child = child_entry.child;
-    let const child_path =
-        PathBuilder{directory}.append(child.name.view()).build();
+    let child_path = Path{directory};
+    child_path.append(child.name.view());
 
     let entry = log_entry{};
     entry.name = String{allocator, child.name.view()};

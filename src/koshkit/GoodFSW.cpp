@@ -250,7 +250,8 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
     let const &child = child_entry.child;
     if (child.name.view() == "." || child.name.view() == "..") continue;
 
-    let const child_path = PathBuilder{path}.append(child.name.view()).build();
+    let child_path = path.clone();
+    child_path.append(child.name.view());
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
     scan_path(child_path.text().view(), entries, is_recursive, depth + 1,

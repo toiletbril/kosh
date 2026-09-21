@@ -392,8 +392,9 @@ cold static fn list_directory_status_fallback(StringView dir,
   paths.reserve(entries.count());
   batch.reserve(entries.count());
   for (let const &entry : entries) {
-    paths.push(
-        PathBuilder{dir, allocator}.append(entry.child.name.view()).build());
+    let path = Path{dir, allocator};
+    path.append(entry.child.name.view());
+    paths.push(steal(path));
   }
   for (usize index = 0; index < entries.count(); index++)
     batch.add(batch_operation::lstat(paths[index], entries[index].status));
@@ -518,8 +519,8 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 
   let const temp_dir = Path::temp_directory();
 
-  let const path_template_path =
-      PathBuilder{temp_dir.text()}.append("kosh_heredoc_XXXXXX").build();
+  let path_template_path = Path{temp_dir.text()};
+  path_template_path.append("kosh_heredoc_XXXXXX");
 
   /* mkstemp rewrites the XXXXXX suffix in place, so the template is mutable. */
   const String &path_template_text = path_template_path.text();
@@ -552,8 +553,8 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
   if (prefix.find_character('/').has_value()) return None;
   let file_name = String{heap_allocator(), prefix};
   file_name += "_XXXXXX";
-  let const path_template_path =
-      PathBuilder{directory.text()}.append(file_name).build();
+  let path_template_path = Path{directory.text()};
+  path_template_path.append(file_name.view());
   let path_template = ArrayList<char>{heap_allocator()};
   path_template.reserve(path_template_path.count() + 1);
   for (usize index = 0; index < path_template_path.count(); index++)
@@ -583,8 +584,8 @@ fn make_temp_directory(const Path &directory, StringView prefix) throws
   if (prefix.find_character('/').has_value()) return None;
   let directory_name = String{heap_allocator(), prefix};
   directory_name += "_XXXXXX";
-  let const path_template_path =
-      PathBuilder{directory.text()}.append(directory_name).build();
+  let path_template_path = Path{directory.text()};
+  path_template_path.append(directory_name.view());
   let path_template = ArrayList<char>{heap_allocator()};
   path_template.reserve(path_template_path.count() + 1);
   for (usize index = 0; index < path_template_path.count(); index++)
