@@ -187,6 +187,24 @@ case $evilnet_live_sort_report in
 esac
 printf 'evilnet-live-sort=%s\n' "$evilnet_live_sort_update"
 
+evilio_cumulative_heading=$(
+  "$BIN" -c 'koshkit --color never evilio --ps --cumulative=0.2 -1'
+)
+case $evilio_cumulative_heading in
+  *'READ/0.2s'*'WRITE/0.2s'*) evilio_cumulative_heading_status=matched ;;
+  *) evilio_cumulative_heading_status=wrong ;;
+esac
+printf 'evilio-cumulative-heading=%s\n' "$evilio_cumulative_heading_status"
+
+evilnet_cumulative_heading=$(
+  "$BIN" -c 'koshkit --color never evilnet --traffic --cumulative=0.2'
+)
+case $evilnet_cumulative_heading in
+  *'/0.2s'*) evilnet_cumulative_heading_status=matched ;;
+  *) evilnet_cumulative_heading_status=wrong ;;
+esac
+printf 'evilnet-cumulative-heading=%s\n' "$evilnet_cumulative_heading_status"
+
 evilps_help=$($BIN -c 'koshkit evilps --help')
 case $evilps_help in
   *'--live[=<seconds>]'*'--cumulative[=<seconds>]'*)
