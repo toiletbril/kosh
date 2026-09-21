@@ -381,27 +381,21 @@ fn get_process_window_status(const live_process_row &row,
   }
 
   let const &newest = row.history.back();
-  let const elapsed_nanoseconds =
-      row.history_nanoseconds.back() - before_nanoseconds;
   os::process_io_status status{0, 0, 0, 0, false};
-  if (let const rate = counter_rate(before.read_bytes, newest.read_bytes,
-                                    elapsed_nanoseconds);
-      rate.has_value())
-    status.read_bytes = *rate;
-  if (let const rate = counter_rate(before.written_bytes, newest.written_bytes,
-                                    elapsed_nanoseconds);
-      rate.has_value())
-    status.written_bytes = *rate;
+  if (let const delta = counter_delta(before.read_bytes, newest.read_bytes);
+      delta.has_value())
+    status.read_bytes = *delta;
+  if (let const delta = counter_delta(before.written_bytes, newest.written_bytes);
+      delta.has_value())
+    status.written_bytes = *delta;
   if (before.has_operation_counts && newest.has_operation_counts) {
-    let const read_rate =
-        counter_rate(before.read_operation_count, newest.read_operation_count,
-                     elapsed_nanoseconds);
-    let const write_rate =
-        counter_rate(before.write_operation_count, newest.write_operation_count,
-                     elapsed_nanoseconds);
-    if (read_rate.has_value() && write_rate.has_value()) {
-      status.read_operation_count = *read_rate;
-      status.write_operation_count = *write_rate;
+    let const read_delta =
+        counter_delta(before.read_operation_count, newest.read_operation_count);
+    let const write_delta = counter_delta(before.write_operation_count,
+                                          newest.write_operation_count);
+    if (read_delta.has_value() && write_delta.has_value()) {
+      status.read_operation_count = *read_delta;
+      status.write_operation_count = *write_delta;
       status.has_operation_counts = true;
     }
   }
@@ -1037,12 +1031,9 @@ fn get_disk_window_status(const live_disk_row &row,
   let const &newest = row.history.back();
   let sampled = newest;
   sampled.name = String{heap_allocator(), row.name.view()};
-  let const elapsed_nanoseconds =
-      row.history_nanoseconds.back() - before_nanoseconds;
   let const do_sample = [&](u64 os::disk_io_status::*member) {
-    let const rate =
-        counter_rate(before.*member, newest.*member, elapsed_nanoseconds);
-    sampled.*member = rate.has_value() ? *rate : 0;
+    let const delta = counter_delta(before.*member, newest.*member);
+    sampled.*member = delta.has_value() ? *delta : 0;
   };
   do_sample(&os::disk_io_status::read_bytes);
   do_sample(&os::disk_io_status::written_bytes);
