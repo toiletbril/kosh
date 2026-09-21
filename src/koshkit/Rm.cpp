@@ -56,7 +56,7 @@ fn remove_path(StringView path, removal_mode mode, Allocator allocator,
         if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
-        if (!remove_path(child.text().view(), mode, allocator, entry.child.kind))
+        if (!remove_path(child.view(), mode, allocator, entry.child.kind))
           return false;
       }
     return os::remove_directory(path);
@@ -91,7 +91,7 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
         if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
-        if (!remove_path_with_prompt(ec, child.text().view(), mode,
+        if (!remove_path_with_prompt(ec, child.view(), mode,
                                      should_prompt, allocator,
                                      entry.child.kind))
           return false;
@@ -131,7 +131,7 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
         if (os::INTERRUPT_REQUESTED) return;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
-        report_dry_run_removal(ec, cxt, child.text().view(), mode,
+        report_dry_run_removal(ec, cxt, child.view(), mode,
                                should_prompt, allocator, entry.child.kind);
       }
     }

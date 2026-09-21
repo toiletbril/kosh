@@ -46,7 +46,7 @@ static fn change_path_ownership_recursive(
   os::file_status path_status{};
   if (known_path_status != nullptr) {
     path_status = *known_path_status;
-  } else if (!os::stat_path(path.text().view(), path_status)) {
+  } else if (!os::stat_path(path.view(), path_status)) {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
         utility_name + ": cannot access '" + path.text() +
@@ -56,7 +56,7 @@ static fn change_path_ownership_recursive(
 
   let const is_symlink = os::file_type_letter(path_status.mode) == 'l';
   let const does_follow = !is_symlink || should_follow_symlink;
-  if (!os::set_file_owner(path.text().view(), owner_id, group_id, does_follow))
+  if (!os::set_file_owner(path.view(), owner_id, group_id, does_follow))
   {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
@@ -70,7 +70,7 @@ static fn change_path_ownership_recursive(
 
   os::file_status followed_status{};
   if (is_symlink) {
-    if (!os::stat_path_following(path.text().view(), followed_status))
+    if (!os::stat_path_following(path.view(), followed_status))
       return true;
   } else {
     followed_status = path_status;
@@ -99,7 +99,7 @@ static fn change_path_ownership_recursive(
   };
 
   let children =
-      os::list_directory_status(path.text().view(), cxt.scratch_allocator());
+      os::list_directory_status(path.view(), cxt.scratch_allocator());
   if (!children.has_value()) {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
@@ -111,7 +111,7 @@ static fn change_path_ownership_recursive(
   bool did_succeed = true;
   for (let const &child_entry : *children) {
     if (os::INTERRUPT_REQUESTED) return did_succeed;
-    let child = Path{path.text().view(), cxt.scratch_allocator()};
+    let child = Path{path.view(), cxt.scratch_allocator()};
     child.append(child_entry.child.name.view());
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;

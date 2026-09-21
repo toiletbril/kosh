@@ -150,8 +150,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
         Path{destination}.to_absolute().normalized();
     let source_prefix = source_absolute.text().clone();
     source_prefix.push(os::DIRECTORY_SEPARATOR);
-    if (destination_absolute.text().view() == source_absolute.text().view() ||
-        destination_absolute.text().view().starts_with(source_prefix.view()))
+    if (destination_absolute.view() == source_absolute.view() ||
+        destination_absolute.view().starts_with(source_prefix.view()))
     {
       throw ErrorWithDetails{
           "cannot copy '" + String{allocator, source}
@@ -176,7 +176,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       child_source.append(entry.child.name.view());
       let child_destination = Path{destination, allocator};
       child_destination.append(entry.child.name.view());
-      copy_path(ec, child_source.text().view(), child_destination.text().view(),
+      copy_path(ec, child_source.view(), child_destination.view(),
                 is_recursive, should_force, should_preserve, is_verbose,
                 allocator,
                 entry.has_status ? &entry.status : nullptr);

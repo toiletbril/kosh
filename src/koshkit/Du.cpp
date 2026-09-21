@@ -67,7 +67,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
 {
   os::file_status queried_status{};
   if (known_status == nullptr) {
-    if (!os::stat_path(path.text().view(), queried_status)) {
+    if (!os::stat_path(path.view(), queried_status)) {
       report_soft_koshkit_util_error(ec, cxt, "du",
                                      "cannot read '" + path.text() + "': " +
                                          os::last_system_error_message());
@@ -99,7 +99,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   let const allocated_size_bytes = known_status->blocks * 512;
   if (type_letter == 'd') {
     u64 total_bytes = allocated_size_bytes;
-    let children = os::list_directory_status(path.text().view(), allocator);
+    let children = os::list_directory_status(path.view(), allocator);
     if (!children.has_value()) {
       report_soft_koshkit_util_error(ec, cxt, "du",
                                      "cannot read '" + path.text() + "': " +
@@ -116,7 +116,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     for (let const &child_entry : *children) {
       if (os::INTERRUPT_REQUESTED) return None;
 
-      let child = Path{path.text().view(), allocator};
+      let child = Path{path.view(), allocator};
       child.append(child_entry.child.name.view());
       let const child_status =
           child_entry.has_status ? &child_entry.status : nullptr;
@@ -138,14 +138,14 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     }
 
     if (output_rows != nullptr)
-      append_output_row(*output_rows, total_bytes, path.text().view(),
+      append_output_row(*output_rows, total_bytes, path.view(),
                         size_width, allocator);
 
     return du_size_result{total_bytes, true};
   }
 
   if (output_rows != nullptr)
-    append_output_row(*output_rows, allocated_size_bytes, path.text().view(),
+    append_output_row(*output_rows, allocated_size_bytes, path.view(),
                       size_width, allocator);
 
   return du_size_result{allocated_size_bytes, true};
@@ -233,7 +233,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
     if (FLAG_DU_SUMMARY.is_enabled() && total->should_emit)
-      append_output_row(output_rows, total->size_bytes, target.text().view(),
+      append_output_row(output_rows, total->size_bytes, target.view(),
                         size_width, allocator);
   }
 

@@ -279,7 +279,7 @@ make_entry(const Path &path, StringView name, const listing_options &options,
   }
 
   os::file_status status{};
-  if (os::stat_path(path.text().view(), status))
+  if (os::stat_path(path.view(), status))
     set_entry_status(entry, status);
 
   return entry;
@@ -358,7 +358,7 @@ static fn collect_directory(const Path &directory,
                             const listing_options &options, Allocator allocator,
                             ArrayList<listing_entry> &entries) throws -> bool
 {
-  let const directory_text = directory.text().view();
+  let const directory_text = directory.view();
   if (options.needs_full_status) {
     let const children = os::list_directory_status(directory_text, allocator);
     if (!children.has_value()) return false;
@@ -649,7 +649,7 @@ static fn render_tree_level(StringView directory,
     prefix += is_last ? StringView{"    "} : StringView{"│   "};
     let child = Path{directory, allocator};
     child.append(entry.name.view());
-    render_tree_level(child.text().view(), options, depth + 1, prefix, output,
+    render_tree_level(child.view(), options, depth + 1, prefix, output,
                       allocator);
     prefix.truncate(kept_length);
   }
@@ -694,7 +694,7 @@ static fn render_directory_block(
 
     let child = Path{directory, allocator};
     child.append(entry.name.view());
-    render_directory_block(child.text().view(), options, depth + 1, true,
+    render_directory_block(child.view(), options, depth + 1, true,
                            uid_cache, gid_cache, has_printed_block, output, ec,
                            cxt, status, allocator);
   }

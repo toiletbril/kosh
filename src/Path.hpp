@@ -49,6 +49,7 @@ public:
   mustuse fn clone() const throws -> Path { return Path{*this}; }
 
   hot mustuse pure fn text() const wontthrow -> const String &;
+  hot mustuse pure fn view() const wontthrow -> StringView;
   hot mustuse pure fn c_str() const wontthrow -> const char *;
   hot mustuse pure fn count() const wontthrow -> usize;
   hot mustuse pure fn is_empty() const wontthrow -> bool;

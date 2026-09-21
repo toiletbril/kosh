@@ -36,7 +36,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   os::file_status status{};
   if (known_status != nullptr) {
     status = *known_status;
-  } else if (!os::stat_path_following(path.text().view(), status)) {
+  } else if (!os::stat_path_following(path.view(), status)) {
     report_soft_koshkit_util_error(ec, cxt, "chmod",
                                    "cannot access '" + path.text() +
                                        "': " + os::last_system_error_message());
@@ -49,7 +49,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   ASSERT(parsed.has_value());
 
   bool did_succeed = true;
-  if (!os::set_file_mode(path.text().view(), *parsed)) {
+  if (!os::set_file_mode(path.view(), *parsed)) {
     report_soft_koshkit_util_error(ec, cxt, "chmod",
                                    "cannot change mode of '" + path.text() +
                                        "': " + os::last_system_error_message());
@@ -61,7 +61,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
     return did_succeed;
 
   let children =
-      os::list_directory_status(path.text().view(), cxt.scratch_allocator());
+      os::list_directory_status(path.view(), cxt.scratch_allocator());
   if (!children.has_value()) {
     report_soft_koshkit_util_error(ec, cxt, "chmod",
                                    "cannot read directory '" + path.text() +
@@ -73,7 +73,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
     if (os::INTERRUPT_REQUESTED) return did_succeed;
     if (child_entry.child.kind == Path::entry_kind::Symlink) continue;
 
-    let child = Path{path.text().view(), cxt.scratch_allocator()};
+    let child = Path{path.view(), cxt.scratch_allocator()};
     child.append(child_entry.child.name.view());
     let const child_status =
         child_entry.has_status &&

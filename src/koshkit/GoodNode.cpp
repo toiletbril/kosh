@@ -159,7 +159,7 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
   }
   if (os::file_type_letter(status.mode) != 'd') return false;
 
-  let children = os::list_directory_status(path.text().view(), allocator);
+  let children = os::list_directory_status(path.view(), allocator);
   if (!children.has_value()) return false;
 
   for (let const &child : *children) {
@@ -179,8 +179,8 @@ fn find_inode(const Path &path, const os::file_status &status, u64 inode,
 pure fn path_is_beneath(const Path &root, const Path &candidate) wontthrow
     -> bool
 {
-  let const root_text = root.text().view();
-  let const candidate_text = candidate.text().view();
+  let const root_text = root.view();
+  let const candidate_text = candidate.view();
   if (candidate_text == root_text) return true;
   if (root_text.is_empty() || !candidate_text.starts_with(root_text))
     return false;
@@ -238,7 +238,7 @@ fn GoodNode::execute(
     let const inode = static_cast<u64>(parsed.value());
     if (let canonical_root = os::canonical_path(root_path);
         canonical_root.has_value() &&
-        canonical_root->text().view() == root_path.text().view())
+        canonical_root->view() == root_path.view())
     {
       let const direct_path =
           os::path_from_file_id(canonical_root->text().view(), inode);
@@ -256,7 +256,7 @@ fn GoodNode::execute(
 
     if (found.is_empty()) {
       os::file_status root_status{};
-      if (os::stat_path(root_path.text().view(), root_status))
+      if (os::stat_path(root_path.view(), root_status))
         unused(find_inode(root_path, root_status, inode, found, allocator));
     }
 

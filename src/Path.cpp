@@ -23,6 +23,8 @@ Path::Path(StringView text, Allocator allocator) : m_text(allocator, text) {}
 
 hot fn Path::text() const wontthrow -> const String & { return m_text; }
 
+hot fn Path::view() const wontthrow -> StringView { return m_text.view(); }
+
 hot fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
 
 hot fn Path::count() const wontthrow -> usize { return m_text.count(); }

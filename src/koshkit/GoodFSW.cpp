@@ -254,7 +254,7 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
     child_path.append(child.name.view());
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
-    scan_path(child_path.text().view(), entries, is_recursive, depth + 1,
+    scan_path(child_path.view(), entries, is_recursive, depth + 1,
               allocator, child_status);
   }
 }
