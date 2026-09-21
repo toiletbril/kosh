@@ -624,7 +624,9 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 }
 
 fn poll_live_input(os::descriptor input_fd, String &input, String &search,
-                   usize &scroll_offset) wontthrow -> bool
+                   usize &scroll_offset, Maybe<evilps_sort_key> &sort_key,
+                   bool &should_sample_cpu, bool &should_read_resources) wontthrow
+    -> bool
 {
   if (os::wait_for_fd_readable(input_fd, 0) <= 0) return true;
 
@@ -649,6 +651,22 @@ fn poll_live_input(os::descriptor input_fd, String &input, String &search,
     }
     if (byte == 'G') {
       scroll_offset = SIZE_MAX;
+      continue;
+    }
+    if (byte == 's' || byte == 'S') {
+      if (!sort_key.has_value()) sort_key = evilps_sort_key::Name;
+      else {
+        switch (*sort_key) {
+          case evilps_sort_key::Name: sort_key = evilps_sort_key::Pid; break;
+          case evilps_sort_key::Pid: sort_key = evilps_sort_key::Cpu; break;
+          case evilps_sort_key::Cpu: sort_key = evilps_sort_key::Memory; break;
+          case evilps_sort_key::Memory: sort_key = None; break;
+        }
+      }
+      if (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu)
+        should_sample_cpu = true;
+      if (sort_key.has_value() && *sort_key == evilps_sort_key::Memory)
+        should_read_resources = true;
       continue;
     }
     if (byte == '/') {
@@ -726,10 +744,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  let const should_sample_cpu =
+  bool should_sample_cpu =
       FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
       (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu);
-  let const should_read_resources =
+  bool should_read_resources =
       should_sample_cpu || FLAG_EVILPS_MEMORY.is_enabled() ||
       (sort_key.has_value() && *sort_key == evilps_sort_key::Memory);
   let const should_color = koshkit_should_color();
@@ -832,6 +850,13 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
               .view(),
           format_live_duration(live_interval_seconds, live_allocator).view(),
           should_color);
+      frame += "SORT ";
+      if (!sort_key.has_value()) frame += "tree";
+      else if (*sort_key == evilps_sort_key::Name) frame += "name";
+      else if (*sort_key == evilps_sort_key::Pid) frame += "pid";
+      else if (*sort_key == evilps_sort_key::Cpu) frame += "cpu";
+      else frame += "memory";
+      frame += " | s sort | / search | q quit\n";
       let const status = render_process_snapshot(
           ec, cxt, live_allocator, frame, nodes, operands, operand_locations,
           output_limit, should_color,
@@ -850,7 +875,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
       if (is_terminal && !poll_live_input(
                               ec.in_fd.value_or(KOSH_STDIN), live_input,
-                              live_search, scroll_offset))
+                              live_search, scroll_offset, sort_key,
+                              should_sample_cpu, should_read_resources))
         return 0;
     }
   }
