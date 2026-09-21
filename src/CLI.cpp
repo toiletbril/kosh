@@ -1193,6 +1193,16 @@ static fn append_report_grid(String &output,
     }
   }
 
+  let const append_grid_column = [&](String &target, StringView text,
+                                     usize width, bool is_right_aligned,
+                                     StringView style) throws -> void {
+    let const text_width = toiletline::display_width(text);
+    let const padding_length = text_width < width ? width - text_width : 0;
+    if (is_right_aligned) target.append_repeated(' ', padding_length);
+    append_report_text(target, text, style, should_color);
+    if (!is_right_aligned) target.append_repeated(' ', padding_length);
+  };
+
   let const append_row = [&](const ArrayList<report_table_cell> &row) throws {
     output += indentation;
     for (usize index = 0; index < columns.count(); index++) {
@@ -1201,10 +1211,9 @@ static fn append_report_grid(String &output,
       let const style = index < row.count() && !row[index].style.is_empty()
                             ? row[index].style
                             : columns[index].style;
-      append_report_column(
+      append_grid_column(
           output, text, widths[index],
-          columns[index].alignment == report_table_alignment::Right, style,
-          should_color);
+          columns[index].alignment == report_table_alignment::Right, style);
       if (index + 1 < columns.count()) output += "  ";
     }
     output += '\n';
