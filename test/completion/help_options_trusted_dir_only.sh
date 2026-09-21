@@ -23,6 +23,9 @@ SH
 }
 write_probe "$trusted/act"
 write_probe "$trusted/helpprobe"
+write_probe "$trusted/clickhouse"
+write_probe "$trusted/postgres"
+write_probe "$trusted/vertica"
 write_probe "$untrusted/act"
 
 rm -f "$marker"
@@ -30,6 +33,17 @@ echo "== allowlisted command in a trusted directory offers its --help options:"
 PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" --debug-complete-at 'act --mark' </dev/null
 echo "== and was forked:"
 if [ -f "$marker" ]; then echo "forked"; else echo "not forked"; fi
+
+for database_help_command in clickhouse postgres vertica; do
+  rm -f "$marker"
+  PATH="$trusted${TEST_PATH_SEPARATOR}$TEST_SYSTEM_PATH" "$BIN" \
+    --debug-complete-at "$database_help_command --mark" </dev/null
+  if [ -f "$marker" ]; then
+    echo "$database_help_command help allowlisted"
+  else
+    echo "$database_help_command help missing"
+  fi
+done
 
 rm -f "$marker"
 echo "== a command not on the allowlist is never forked, even when trusted:"

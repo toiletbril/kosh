@@ -2,6 +2,12 @@
 --marker-option
 == and was forked:
 forked
+--marker-option
+clickhouse help allowlisted
+--marker-option
+postgres help allowlisted
+--marker-option
+vertica help allowlisted
 == a command not on the allowlist is never forked, even when trusted:
 == and was never forked:
 not forked
