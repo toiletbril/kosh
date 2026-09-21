@@ -57,6 +57,7 @@ static fn parse_tail_count(StringView spec, count_origin &origin_out,
 }
 
 constexpr usize TAIL_BLOCK_BYTE_COUNT = 64 * 1024;
+constexpr usize TAIL_ACTIVE_SOURCE_COUNT = 16;
 
 struct tail_block
 {
@@ -312,8 +313,15 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
       state.blocks.reserve(2);
       regular_states.push(steal(state));
+
+      if (regular_states.count() == TAIL_ACTIVE_SOURCE_COUNT) {
+        read_regular_tails(regular_states, positioned_contents, allocator);
+        regular_states.clear();
+        if (os::INTERRUPT_REQUESTED) return 130;
+      }
     }
-    read_regular_tails(regular_states, positioned_contents, allocator);
+    if (regular_states.count() != 0)
+      read_regular_tails(regular_states, positioned_contents, allocator);
     if (os::INTERRUPT_REQUESTED) return 130;
   }
 
