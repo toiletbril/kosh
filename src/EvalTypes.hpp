@@ -411,6 +411,8 @@ struct saved_frame_trap
 
 fn record_directory_access(StringView directory, Allocator allocator) throws
     -> void;
+fn z_completion_candidates(StringView query, Allocator allocator) throws
+    -> ArrayList<String>;
 
 /* A warning the evaluator can silence for the span of a construct.
    UnsetReference exempts an unset name entirely, so neither the warning nor the

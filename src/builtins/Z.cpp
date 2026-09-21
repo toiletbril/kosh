@@ -167,6 +167,23 @@ static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
 
 } /* namespace */
 
+fn z_completion_candidates(StringView query, Allocator allocator) throws
+    -> ArrayList<String>
+{
+  let entries = read_frecency_store(allocator);
+
+  let candidates = ArrayList<String>{allocator};
+  for (let const &entry : entries) {
+    if (!query.is_empty() && !contains_ignore_case(entry.path.view(), query))
+      continue;
+
+    let const directory = Path{entry.path.view()}.to_absolute().normalized();
+    if (!directory.is_directory()) continue;
+    candidates.push(String{allocator, directory.c_str()});
+  }
+  return candidates;
+}
+
 fn record_directory_access(StringView directory, Allocator allocator) throws
     -> void
 {

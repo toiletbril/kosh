@@ -888,6 +888,14 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Z &&
+      wants_operand)
+  {
+    let z_candidates = z_completion_candidates(token, heap_allocator());
+    if (!z_candidates.is_empty()) return z_candidates;
+    return None;
+  }
+
   if (builtin_kind.has_value() &&
       *builtin_kind == Builtin::Kind::CommandBuiltin && wants_operand &&
       !os::has_directory_separator(token))
