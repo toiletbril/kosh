@@ -1,4 +1,5 @@
 command executable=./executable
+permission-mutation=./executable
 directory=./directory/
 symlinks=./symlink-directory/
 ./symlink-executable

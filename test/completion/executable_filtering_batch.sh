@@ -30,6 +30,17 @@ case "$command_result" in
 esac
 printf 'command executable=%s\n' "$command_result"
 
+chmod -x "$dir/executable"
+blocked_result=$($BIN --debug-complete-at './e' </dev/null)
+[ -z "$blocked_result" ] || exit 1
+chmod +x "$dir/executable"
+restored_result=$($BIN --debug-complete-at './e' </dev/null)
+case "$restored_result" in
+    *executable*) ;;
+    *) exit 1 ;;
+esac
+printf 'permission-mutation=%s\n' "$restored_result"
+
 directory_result=$($BIN --debug-complete-at './d' </dev/null)
 case "$directory_result" in
     *directory*) ;;
