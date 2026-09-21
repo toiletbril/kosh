@@ -40,10 +40,13 @@ static fn change_path_ownership_recursive(
     const ExecContext &ec, EvalContext &cxt, StringView utility_name,
     const Path &path, i64 owner_id, i64 group_id, bool should_recurse,
     bool should_follow_symlink, bool should_follow_nested_symlinks,
-    ArrayList<ownership_directory_identity> &active_directories) throws -> bool
+    ArrayList<ownership_directory_identity> &active_directories,
+    const os::file_status *known_path_status = nullptr) throws -> bool
 {
   os::file_status path_status{};
-  if (!os::stat_path(path.text().view(), path_status)) {
+  if (known_path_status != nullptr) {
+    path_status = *known_path_status;
+  } else if (!os::stat_path(path.text().view(), path_status)) {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
         utility_name + ": cannot access '" + path.text() +
@@ -66,8 +69,12 @@ static fn change_path_ownership_recursive(
   if (is_symlink && !should_follow_symlink) return true;
 
   os::file_status followed_status{};
-  if (!os::stat_path_following(path.text().view(), followed_status))
-    return true;
+  if (is_symlink) {
+    if (!os::stat_path_following(path.text().view(), followed_status))
+      return true;
+  } else {
+    followed_status = path_status;
+  }
   if (os::file_type_letter(followed_status.mode) != 'd') return true;
 
   if (followed_status.has_file_identity) {
@@ -91,7 +98,8 @@ static fn change_path_ownership_recursive(
     if (followed_status.has_file_identity) active_directories.pop_back();
   };
 
-  let children = Path::read_directory(path, cxt.scratch_allocator());
+  let children =
+      os::list_directory_status(path.text().view(), cxt.scratch_allocator());
   if (!children.has_value()) {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
@@ -101,14 +109,16 @@ static fn change_path_ownership_recursive(
   }
 
   bool did_succeed = true;
-  for (const String &name : *children) {
+  for (let const &child_entry : *children) {
     let child = PathBuilder{path.text().view(), cxt.scratch_allocator()}
-                    .append(name.view())
+                    .append(child_entry.child.name.view())
                     .build();
+    let const child_status =
+        child_entry.has_status ? &child_entry.status : nullptr;
     if (!change_path_ownership_recursive(
             ec, cxt, utility_name, child, owner_id, group_id, true,
             should_follow_nested_symlinks, should_follow_nested_symlinks,
-            active_directories))
+            active_directories, child_status))
       did_succeed = false;
   }
 
