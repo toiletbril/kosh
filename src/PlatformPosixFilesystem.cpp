@@ -296,11 +296,17 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>
 {
-  const String dir_string{dir};
+  return list_directory_typed(dir, heap_allocator());
+}
+
+cold fn list_directory_typed(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  const String dir_string{allocator, dir};
   let const handle = ::opendir(dir_string.c_str());
   if (handle == nullptr) return None;
 
-  let entries = ArrayList<Path::directory_child>{heap_allocator()};
+  let entries = ArrayList<Path::directory_child>{allocator};
   loop
   {
     errno = 0;
@@ -327,7 +333,7 @@ cold fn list_directory_typed(StringView dir) throws
     default: kind = Path::entry_kind::Other; break;
     }
 
-    entries.push(Path::directory_child{String{name}, kind});
+    entries.push(Path::directory_child{String{allocator, name}, kind});
   }
 
   ::closedir(handle);

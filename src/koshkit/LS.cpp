@@ -375,7 +375,9 @@ static fn collect_directory(const Path &directory,
       }
 
       let const child_path =
-          PathBuilder{directory_text}.append(child.child.name.view()).build();
+          PathBuilder{directory_text, allocator}
+              .append(child.child.name.view())
+              .build();
       entries.push(make_entry(child_path, child.child.name.view(), options,
                               child.child.kind, allocator, &child));
     }
@@ -384,7 +386,7 @@ static fn collect_directory(const Path &directory,
     return true;
   }
 
-  let const children = Path::read_directory_typed(directory);
+  let const children = Path::read_directory_typed(directory, allocator);
   if (!children.has_value()) return false;
 
   entries.reserve(children->count() + 2);
@@ -393,7 +395,9 @@ static fn collect_directory(const Path &directory,
     entries.push(make_entry(directory, StringView{"."}, options,
                             Path::entry_kind::Directory, allocator));
     entries.push(make_entry(
-        PathBuilder{directory_text}.append(StringView{".."}).build(),
+        PathBuilder{directory_text, allocator}
+            .append(StringView{".."})
+            .build(),
         StringView{".."}, options, Path::entry_kind::Directory, allocator));
   }
 
@@ -401,7 +405,9 @@ static fn collect_directory(const Path &directory,
     if (!options.is_showing_dot_names && child.name.starts_with(".")) continue;
 
     let const child_path =
-        PathBuilder{directory_text}.append(child.name.view()).build();
+        PathBuilder{directory_text, allocator}
+            .append(child.name.view())
+            .build();
     entries.push(make_entry(child_path, child.name.view(), options, child.kind,
                             allocator));
   }

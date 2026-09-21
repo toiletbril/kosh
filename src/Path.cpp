@@ -390,6 +390,12 @@ cold fn Path::read_directory_typed(const Path &dir) throws
   return os::list_directory_typed(dir.text().view());
 }
 
+cold fn Path::read_directory_typed(const Path &dir, Allocator allocator) throws
+    -> Maybe<ArrayList<directory_child>>
+{
+  return os::list_directory_typed(dir.text().view(), allocator);
+}
+
 fn Path::temp_directory() throws -> Path
 {
   return Path{os::temp_directory_path().view()};

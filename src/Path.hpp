@@ -128,6 +128,9 @@ public:
   };
   cold mustuse static fn read_directory_typed(const Path &dir) throws
       -> Maybe<ArrayList<directory_child>>;
+  cold mustuse static fn read_directory_typed(const Path &dir,
+                                              Allocator allocator) throws
+      -> Maybe<ArrayList<directory_child>>;
 
   mustuse fn read_entire_file() const throws -> Maybe<String>;
 

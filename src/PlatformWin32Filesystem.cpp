@@ -607,12 +607,18 @@ cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>
 {
-  const String dir_string{dir};
+  return list_directory_typed(dir, heap_allocator());
+}
+
+cold fn list_directory_typed(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  const String dir_string{allocator, dir};
   let pattern = dir_string.clone();
   pattern.push(DIRECTORY_SEPARATOR);
   pattern.push('*');
 
-  let const wide_pattern = utf8_to_wide(pattern.view(), heap_allocator());
+  let const wide_pattern = utf8_to_wide(pattern.view(), allocator);
   if (!wide_pattern.has_value()) return None;
   WIN32_FIND_DATAW data{};
   let const handle = FindFirstFileW(wide_pattern->begin(), &data);
@@ -624,11 +630,11 @@ cold fn list_directory_typed(StringView dir) throws
     SetLastError(error);
   };
 
-  let entries = ArrayList<Path::directory_child>{heap_allocator()};
+  let entries = ArrayList<Path::directory_child>{allocator};
   do {
     let name = wide_to_utf8(data.cFileName,
                             static_cast<usize>(lstrlenW(data.cFileName)),
-                            heap_allocator());
+                            allocator);
     if (!name.has_value()) return None;
     if (name->view() == StringView{"."} || name->view() == StringView{".."})
       continue;
@@ -646,7 +652,7 @@ cold fn list_directory_typed(StringView dir) throws
 cold fn list_directory_status(StringView dir, Allocator allocator) throws
     -> Maybe<ArrayList<directory_status_entry>>
 {
-  let children = list_directory_typed(dir);
+  let children = list_directory_typed(dir, allocator);
   if (!children.has_value()) return None;
 
   let entries = ArrayList<directory_status_entry>{allocator};
