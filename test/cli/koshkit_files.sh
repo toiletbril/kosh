@@ -104,6 +104,8 @@ printf bb > du-default/b
 printf 1234567890 > du-default/long-name
 printf ccc > du-default/sub/c
 ln -s sub du-default/sub-link
+printf x > du-default/tie-a
+printf y > du-default/tie-b
 echo "--- du with no operand lists every entry and the total ---"
 du_report=$d/du-default.out
 (cd du-default && "$BIN" -c 'koshkit du') > "$du_report"
@@ -132,6 +134,10 @@ if [ "$du_path_mask" -eq 127 ]; then
 else
   echo "du-recursion=incomplete"
 fi
+echo "--- du multiple roots ---"
+"$BIN" -c 'koshkit du -s du-default/a du-default/b'
+echo "--- du equal-size roots ---"
+"$BIN" -c 'koshkit du -s du-default/tie-a du-default/tie-b'
 mkdir du-links
 printf x > du-links/a
 ln du-links/a du-links/b
