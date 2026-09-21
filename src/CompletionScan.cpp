@@ -324,7 +324,7 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
   let const absolute_source_file = source_file.to_absolute();
   let const mtime = absolute_source_file.modification_time();
   if (!mtime.has_value()) return nullptr;
-  let const key = absolute_source_file.text().view();
+  let const key = absolute_source_file.view();
   if (const cached_target_list *cached = BUILD_TARGET_CACHE.find(key);
       cached != nullptr && cached->mtime == *mtime)
     return &cached->targets;
@@ -409,7 +409,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
         ProgramResolver::CachePolicy::Bypass);
     if (resolved.is_empty()) return String{heap_allocator()};
     let argv = ArrayList<String>{heap_allocator()};
-    argv.push(String{resolved[0].text().view()});
+    argv.push(String{resolved[0].view()});
     for (usize i = 1; i < probe_argv.count(); i++)
       argv.push(String{probe_argv[i].view()});
     return os::capture_program_output(argv, probe_timeout_nanos)

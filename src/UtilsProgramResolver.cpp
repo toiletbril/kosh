@@ -244,7 +244,7 @@ static fn read_directory_cached_after_status(const Path &directory,
                                              bool has_status) throws
     -> const ArrayList<Path::directory_child> *
 {
-  let const key = directory.text().view();
+  let const key = directory.view();
   let physical_position = Maybe<usize>{};
   if (has_status && status.has_file_identity) {
     let const identity_key =
@@ -350,7 +350,7 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
                          directory_listing_order order) throws
     -> const ArrayList<Path::directory_child> *
 {
-  let const key = directory.text().view();
+  let const key = directory.view();
   let *alias = DIR_LISTING_ALIASES.find(key);
   if (validation == directory_validation::Cached && alias != nullptr &&
       alias->validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
@@ -392,7 +392,7 @@ fn warm_directory_index(const Path &directory) throws -> void
 
 pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
 {
-  let const *alias = DIR_LISTING_ALIASES.find(directory.text().view());
+  let const *alias = DIR_LISTING_ALIASES.find(directory.view());
   if (alias == nullptr) return 0;
   return DIR_LISTINGS[alias->listing_position].generation;
 }

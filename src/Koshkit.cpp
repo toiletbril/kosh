@@ -329,7 +329,7 @@ fn copy_file_contents(StringView source, StringView destination,
 
 fn make_directories(const Path &directory, u32 mode) wontthrow -> bool
 {
-  let const text = directory.text().view();
+  let const text = directory.view();
   let const root_length = os::path_root_length(text);
   for (usize position = root_length; position <= text.length; position++) {
     if (position < text.length && !os::is_directory_separator(text[position]))

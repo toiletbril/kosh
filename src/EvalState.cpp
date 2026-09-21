@@ -1226,11 +1226,11 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
       source += " >/dev/null\n";
     }
     source += "pushd ";
-    append_shell_quoted_arg(source, working_directory.text().view());
+    append_shell_quoted_arg(source, working_directory.view());
     source += " >/dev/null\n";
   } else {
     source += "builtin cd -- ";
-    append_shell_quoted_arg(source, working_directory.text().view());
+    append_shell_quoted_arg(source, working_directory.view());
     source.push('\n');
   }
 

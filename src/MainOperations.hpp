@@ -1725,8 +1725,8 @@ static fn source_file(
      set --init-moods inside a sourced rc reaches here while that rc's tree is
      live and a reset would free the node mid-walk. */
   unused(ast_arena);
-  context.run_source(*contents, path.text().view(), return_handling::Consume,
-                     /*call_site=*/None, path.text().view());
+  context.run_source(*contents, path.view(), return_handling::Consume,
+                     /*call_site=*/None, path.view());
   return true;
 }
 
@@ -2022,7 +2022,7 @@ static fn replace_file_contents(const apply_file_snapshot &snapshot,
       resolved_operand->text() != snapshot.target_path.text() ||
       !current_contents.has_value() ||
       current_contents->view() != snapshot.contents.view() ||
-      !os::stat_path_following(snapshot.target_path.text().view(),
+      !os::stat_path_following(snapshot.target_path.view(),
                                current_status) ||
       !os::file_status_matches(snapshot.status, current_status))
   {
@@ -2031,7 +2031,7 @@ static fn replace_file_contents(const apply_file_snapshot &snapshot,
     return false;
   }
   if (!os::rename_path(replacement_path->text().view(),
-                       snapshot.target_path.text().view()))
+                       snapshot.target_path.view()))
   {
     show_message("Unable to replace '" + snapshot.operand_path.text() +
                  "': " + os::last_system_error_message());

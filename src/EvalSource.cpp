@@ -241,7 +241,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   LOG(Debug, "seeded the strict options for the %s mimicked run",
       is_mimic_strict ? "kosh" : "lax");
 
-  let const script_filename = ec.program_path().text().view();
+  let const script_filename = ec.program_path().view();
   m_source_frames.push(source_frame{String{ec.program().view()},
                                     ec.source_location(), current_source(),
                                     source_generation_for(current_source()),
@@ -352,7 +352,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_shell_name =
       String{heap_allocator(), ec.should_use_fallback_argv0
                                    ? ec.args()[0].view()
-                                   : ec.program_path().text().view()};
+                                   : ec.program_path().view()};
   set_current_source(&*contents, String{ec.program().view()});
   m_current_location = SourceLocation{};
   m_mimicry_depth++;
