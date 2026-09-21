@@ -10,6 +10,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../Path.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -172,6 +173,36 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
 
+  let const allocator = cxt.scratch_allocator();
+  let paths = ArrayList<Path>{allocator};
+  let statuses = ArrayList<os::file_status>{allocator};
+  let metadata_errors = ArrayList<i32>{allocator};
+  let metadata_source_indices = ArrayList<usize>{allocator};
+  let metadata_results = ArrayList<os::batch_result>{allocator};
+  let metadata_batch = os::Batch{allocator};
+  paths.reserve(sources.count());
+  statuses.reserve(sources.count());
+  metadata_errors.reserve(sources.count());
+  metadata_batch.reserve(sources.count());
+  for (let const &source : sources) {
+    paths.push(Path{source, allocator});
+    statuses.push({});
+    metadata_errors.push(0);
+  }
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    if (sources[source_index] == "-") continue;
+    metadata_source_indices.push(source_index);
+    metadata_batch.add(
+        os::batch_operation::stat(paths[source_index], statuses[source_index]));
+  }
+  if (metadata_batch.count() != 0) {
+    metadata_results = metadata_batch.execute();
+    for (usize result_index = 0; result_index < metadata_results.count();
+         result_index++)
+      metadata_errors[metadata_source_indices[result_index]] =
+          metadata_results[result_index].error_number;
+  }
+
   let const should_print_headers = sources.count() > 1;
   let output = String{cxt.scratch_allocator()};
   i32 status = 0;
@@ -179,10 +210,8 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     Maybe<String> content;
     bool did_use_positioned_read = false;
     if (origin == count_origin::FromEnd && sources[source_index] != "-") {
-      os::file_status source_status{};
-      if (os::stat_path(sources[source_index], source_status) &&
-          os::file_type_letter(source_status.mode) == '-')
-      {
+      if (metadata_errors[source_index] == 0 &&
+          os::file_type_letter(statuses[source_index].mode) == '-') {
         let const descriptor = os::open_file_descriptor(
             sources[source_index], os::file_open_mode::Read);
         if (descriptor.has_value()) {
