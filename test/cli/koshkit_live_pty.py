@@ -14,7 +14,7 @@ import termios
 import time
 
 
-def run_pty(binary, command):
+def run_pty(binary, command, key=None):
     pid, fd = pty.fork()
     if pid == 0:
         os.execv(binary, [binary, "-Q", "-c", command])
@@ -26,6 +26,7 @@ def run_pty(binary, command):
     resize(100, 30)
     output = bytearray()
     resized = False
+    sent_key = False
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
         ready, _, _ = select.select([fd], [], [], 0.05)
@@ -41,7 +42,13 @@ def run_pty(binary, command):
         if not resized and len(output) > 1000:
             resize(45, 10)
             resized = True
+            if key is not None and not sent_key:
+                os.write(fd, key)
+                sent_key = True
             time.sleep(0.15)
+        if key is not None and not sent_key and len(output) > 1500:
+            os.write(fd, key)
+            sent_key = True
 
     if resized:
         os.kill(pid, signal.SIGINT)
@@ -77,6 +84,7 @@ def run_pty(binary, command):
         "blank_separator": bool(frame_parts) and all(
             count == 1 for count in blank_counts
         ),
+        "sort_cycle": b"SORT tree" in output and b"SORT name" in output,
     }
 
 
@@ -117,20 +125,23 @@ def main():
         return 2
 
     ok = True
-    for name, command, marker in (
+    for name, command, key in (
         ("evilio-pty", "koshkit --color never evilio --ps --live=0.05 "
-         "--cumulative=0.1", "controls"),
+         "--cumulative=0.1", None),
         ("evilps-pty", "koshkit --color never evilps --cpu --live=0.05 "
-         "--cumulative=0.1 -1", "controls"),
+         "--cumulative=0.1 -1", b"s\n"),
     ):
-        result = run_pty(binary, command)
-        ok &= check(name, result, {"status": 130, "resized": True,
-                                   "controls": True, "ansi": True,
-                                   "alternate_enter": True,
-                                   "alternate_leave": True,
-                                   "cursor_hide": True,
-                                   "cursor_show": True,
-                                   "blank_separator": True})
+        result = run_pty(binary, command, key if name == "evilps-pty" else None)
+        requirements = {"status": 130, "resized": True,
+                        "controls": True, "ansi": True,
+                        "alternate_enter": True,
+                        "alternate_leave": True,
+                        "cursor_hide": True,
+                        "cursor_show": True,
+                        "blank_separator": True}
+        if key is not None:
+            requirements["sort_cycle"] = True
+        ok &= check(name, result, requirements)
         if result["frames"] < 2:
             print("%s FAIL fewer than two live frames" % name)
             ok = False
