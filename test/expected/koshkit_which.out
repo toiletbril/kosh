@@ -1,5 +1,9 @@
 == a builtin name:
 echo
+== an alias name:
+alias which_alias='echo'
+== a function name:
+which_function
 == an absent name exits 1 with no output:
 rc=1
 == a program resolved in a temp PATH:

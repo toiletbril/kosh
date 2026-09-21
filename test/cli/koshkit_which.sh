@@ -5,6 +5,8 @@ unset KOSH_FLAGS
 # which on PATH. The PATH lookups run against a temp directory the test makes, so
 # the printed path is stable once the temp prefix is masked.
 echo "== a builtin name:"; "$BIN" -c 'koshkit which echo'
+echo "== an alias name:"; "$BIN" -c "alias which_alias='echo'; koshkit which which_alias"
+echo "== a function name:"; "$BIN" -c 'which_function() { echo function; }; koshkit which which_function'
 echo "== an absent name exits 1 with no output:"
 "$BIN" -c 'koshkit which definitely_absent_xyz'; echo "rc=$?"
 d=$(mktemp -d); printf '#!/bin/sh\n' > "$d/mytool"; chmod +x "$d/mytool"
