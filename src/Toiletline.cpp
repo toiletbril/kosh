@@ -63,7 +63,7 @@ fn tl_arena_malloc(usize length) -> opaque *
   let const allocation_length = length + TL_ALLOC_HEADER;
   let const base =
       koshka::heap_allocator().alloc_array<char>(allocation_length);
-  if (base != NULL) {
+  if (base != nullptr) {
     *reinterpret_cast<usize *>(base) = length;
     return base + TL_ALLOC_HEADER;
   }
