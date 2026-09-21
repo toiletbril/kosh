@@ -2074,6 +2074,12 @@ option collects traffic for an optional window, defaulting to one second;
 with
 .B \-\-live
 it controls the collection window without changing the refresh interval.
+The
+.B \-\-sort
+option orders traffic rows by name, receive or transmit bytes, packet counts,
+errors, or drops, using the shortest unambiguous prefix. Numeric counters sort
+from largest to smallest, unavailable values sort last, and ties use the
+interface name.
 .TP
 .B goodnode
 Inode identity, allocation, known filesystem capabilities, verification state,

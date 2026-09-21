@@ -145,6 +145,48 @@ printf 'evilio-completion-controls=%s\n' "$evilio_completion_controls"
 printf 'evilnet-completion-controls=%s\n' "$evilnet_completion_controls"
 printf 'evilps-completion-controls=%s\n' "$evilps_completion_controls"
 
+evilnet_sort_keys=matched
+for evilnet_sort_key in name rx tx rx-packets tx-packets rx-errors \
+  tx-errors rx-drops tx-drops
+do
+  if ! "$BIN" -c \
+    "koshkit --color never evilnet --traffic --sort $evilnet_sort_key" \
+    > "$TEST_NULL_DEVICE" 2>&1
+  then
+    evilnet_sort_keys=wrong
+  fi
+done
+printf 'evilnet-sort-keys=%s\n' "$evilnet_sort_keys"
+
+evilnet_ambiguous_sort=$(
+  "$BIN" -c 'koshkit evilnet --traffic --sort r' 2>&1
+)
+case $evilnet_ambiguous_sort in
+  *'ambiguous sort key'*) evilnet_ambiguous_sort_status=matched ;;
+  *) evilnet_ambiguous_sort_status=wrong ;;
+esac
+printf 'evilnet-ambiguous-sort=%s\n' "$evilnet_ambiguous_sort_status"
+
+evilnet_live_sort_path=$TEST_TEMP_DIRECTORY/evilnet-live-sort-report
+set -m
+"$BIN" -c \
+  'koshkit --color never evilnet --traffic --sort tx --live=0.05 --cumulative=0.1' \
+  > "$evilnet_live_sort_path" &
+evilnet_live_sort_pid=$!
+set +m
+sleep 0.30
+if kill -0 "$evilnet_live_sort_pid" 2> "$TEST_NULL_DEVICE"; then
+  kill -INT "$evilnet_live_sort_pid"
+fi
+wait "$evilnet_live_sort_pid"
+printf 'evilnet-live-sort-status=%s\n' "$?"
+evilnet_live_sort_report=$(< "$evilnet_live_sort_path")
+case $evilnet_live_sort_report in
+  *'TX/0.1s'*'ctrl+c to exit'*) evilnet_live_sort_update=matched ;;
+  *) evilnet_live_sort_update=wrong ;;
+esac
+printf 'evilnet-live-sort=%s\n' "$evilnet_live_sort_update"
+
 evilps_help=$($BIN -c 'koshkit evilps --help')
 case $evilps_help in
   *'--live[=<seconds>]'*'--cumulative[=<seconds>]'*)

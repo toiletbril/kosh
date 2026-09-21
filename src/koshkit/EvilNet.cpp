@@ -17,13 +17,16 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aCtlf]");
+HELP_SYNOPSIS_DECL("[-aCtlf] [--sort key]");
 
 HELP_DESCRIPTION_DECL(
     "The evilnet utility reports the addresses assigned to each interface.");
 
 FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
 FLAG(EVILNET_TRAFFIC, Bool, 't', "traffic", "Show interface traffic only.");
+FLAG(EVILNET_SORT, String, '\0', "sort",
+     "Sort traffic by a unique prefix of name, rx, tx, packet, error, or drop "
+     "counters.");
 static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
     -> bool
 {
@@ -49,6 +52,110 @@ REGISTER_KOSHKIT_UTIL_FLAGS(EvilNet);
 namespace koshka::koshkit {
 
 namespace {
+
+enum class evilnet_sort_key : u8
+{
+  Name,
+  ReceiveBytes,
+  TransmitBytes,
+  ReceivePackets,
+  TransmitPackets,
+  ReceiveErrors,
+  TransmitErrors,
+  ReceiveDrops,
+  TransmitDrops,
+};
+
+struct evilnet_sort_spec
+{
+  evilnet_sort_key key;
+  StringView name;
+  os::network_statistics_field field;
+  u64 os::network_interface_statistics_entry::*member;
+};
+
+static constexpr evilnet_sort_spec EVILNET_SORT_SPECS[] = {
+    {evilnet_sort_key::Name, "name", os::network_statistics_field::ReceiveBytes,
+     &os::network_interface_statistics_entry::receive_bytes},
+    {evilnet_sort_key::ReceiveBytes, "rx",
+     os::network_statistics_field::ReceiveBytes,
+     &os::network_interface_statistics_entry::receive_bytes},
+    {evilnet_sort_key::TransmitBytes, "tx",
+     os::network_statistics_field::TransmitBytes,
+     &os::network_interface_statistics_entry::transmit_bytes},
+    {evilnet_sort_key::ReceivePackets, "rx-packets",
+     os::network_statistics_field::ReceivePackets,
+     &os::network_interface_statistics_entry::receive_packet_count},
+    {evilnet_sort_key::TransmitPackets, "tx-packets",
+     os::network_statistics_field::TransmitPackets,
+     &os::network_interface_statistics_entry::transmit_packet_count},
+    {evilnet_sort_key::ReceiveErrors, "rx-errors",
+     os::network_statistics_field::ReceiveErrors,
+     &os::network_interface_statistics_entry::receive_error_count},
+    {evilnet_sort_key::TransmitErrors, "tx-errors",
+     os::network_statistics_field::TransmitErrors,
+     &os::network_interface_statistics_entry::transmit_error_count},
+    {evilnet_sort_key::ReceiveDrops, "rx-drops",
+     os::network_statistics_field::ReceiveDrops,
+     &os::network_interface_statistics_entry::receive_drop_count},
+    {evilnet_sort_key::TransmitDrops, "tx-drops",
+     os::network_statistics_field::TransmitDrops,
+     &os::network_interface_statistics_entry::transmit_drop_count},
+};
+
+struct evilnet_sort_resolution
+{
+  Maybe<evilnet_sort_key> key{};
+  usize match_count{0};
+  String matches{heap_allocator()};
+};
+
+fn resolve_evilnet_sort_key(StringView value, Allocator allocator) throws
+    -> evilnet_sort_resolution
+{
+  evilnet_sort_resolution result{};
+  result.matches = String{allocator};
+  for (let const &spec : EVILNET_SORT_SPECS) {
+    if (spec.name == value) {
+      result.key = spec.key;
+      result.match_count = 1;
+      result.matches += spec.name;
+      return result;
+    }
+    if (!spec.name.starts_with(value)) continue;
+    if (!result.matches.is_empty()) result.matches += ", ";
+    result.matches += spec.name;
+    result.key = spec.key;
+    result.match_count++;
+  }
+  return result;
+}
+
+fn sort_network_statistics(
+    ArrayList<os::network_interface_statistics_entry> &statistics,
+    Maybe<evilnet_sort_key> sort_key) throws -> void
+{
+  let const selected = sort_key.value_or(evilnet_sort_key::Name);
+  const evilnet_sort_spec *spec = nullptr;
+  for (let const &candidate : EVILNET_SORT_SPECS) {
+    if (candidate.key == selected) {
+      spec = &candidate;
+      break;
+    }
+  }
+  statistics.sort([selected, spec](
+                      const os::network_interface_statistics_entry &left,
+                      const os::network_interface_statistics_entry &right) {
+    if (selected == evilnet_sort_key::Name || spec == nullptr)
+      return left.interface_name.view() < right.interface_name.view();
+    let const left_available = left.has_field(spec->field);
+    let const right_available = right.has_field(spec->field);
+    if (left_available != right_available) return left_available;
+    if (left_available && left.*(spec->member) != right.*(spec->member))
+      return left.*(spec->member) > right.*(spec->member);
+    return left.interface_name.view() < right.interface_name.view();
+  });
+}
 
 static fn default_network_interface(Allocator allocator) throws -> Maybe<String>
 {
@@ -297,14 +404,12 @@ fn append_network_traffic_statistics_report(
 }
 
 fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
-                                 Allocator allocator, bool should_color) throws
+                                 Allocator allocator, bool should_color,
+                                 Maybe<evilnet_sort_key> sort_key) throws
     -> usize
 {
   let statistics = os::read_network_interface_statistics();
-  statistics.sort([](const os::network_interface_statistics_entry &left,
-                     const os::network_interface_statistics_entry &right) {
-    return left.interface_name < right.interface_name;
-  });
+  sort_network_statistics(statistics, sort_key);
   let const default_interface = default_network_interface(allocator);
   return append_network_traffic_statistics_report(output, warnings, allocator,
                                                   statistics, should_color, {},
@@ -613,7 +718,8 @@ fn get_network_window_status(const live_network_row &row,
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
                             f64 window_seconds, f64 sample_interval_seconds,
                             f64 refresh_interval_seconds,
-                            bool should_color) throws -> i32
+                            bool should_color,
+                            Maybe<evilnet_sort_key> sort_key) throws -> i32
 {
   let retained = ArrayList<live_network_row>{allocator};
   let const falloff_nanoseconds =
@@ -724,10 +830,6 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
       continue;
     }
     last_refresh_nanoseconds = now;
-    retained.sort([](const live_network_row &left,
-                     const live_network_row &right) {
-      return left.interface_name.view() < right.interface_name.view();
-    });
     let statistics =
         ArrayList<os::network_interface_statistics_entry>{allocator};
     statistics.reserve(retained.count());
@@ -739,6 +841,7 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
       statistics.push(
           get_network_window_status(row, window_start, allocator));
     }
+    sort_network_statistics(statistics, sort_key);
     let output = String{allocator};
     let warnings = ArrayList<String>{allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
@@ -787,6 +890,27 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let const should_color = koshkit_should_color();
+  Maybe<evilnet_sort_key> sort_key{};
+  if (FLAG_EVILNET_SORT.is_set()) {
+    let const resolved = resolve_evilnet_sort_key(FLAG_EVILNET_SORT.value(),
+                                                  allocator);
+    if (resolved.match_count == 0) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_SORT.value_location(),
+                              "invalid sort key",
+                              "use name, rx, tx, rx-packets, tx-packets, "
+                              "rx-errors, tx-errors, rx-drops, or tx-drops");
+      return 1;
+    }
+    if (resolved.match_count > 1) {
+      let note = String{allocator, "Matches "};
+      note += resolved.matches.view();
+      note += "; use a longer prefix";
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_SORT.value_location(),
+                              "ambiguous sort key", note.view());
+      return 1;
+    }
+    sort_key = resolved.key;
+  }
   if (FLAG_EVILNET_FAILURES.is_enabled() && FLAG_EVILNET_LIVE.is_enabled()) {
     KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_FAILURES.value_location(),
                             "conflicting flags",
@@ -822,11 +946,12 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     return run_live_network_traffic(ec, heap_allocator(), window_seconds,
                                     live_interval_seconds, live_interval_seconds,
-                                    should_color);
+                                    should_color, sort_key);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
   let const should_show_traffic =
-      should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled();
+      should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled() ||
+      sort_key.has_value();
   let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
   let const should_show_interfaces =
       !FLAG_EVILNET_TRAFFIC.is_enabled() && !should_show_failures;
@@ -845,7 +970,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
         return 130;
       }
       let const after = os::read_network_interface_statistics();
-      let const sampled = sample_network_statistics(before, after, allocator);
+      let sampled = sample_network_statistics(before, after, allocator);
+      sort_network_statistics(sampled, sort_key);
       let const default_interface = default_network_interface(allocator);
       let duration_suffix = String{allocator, "/"};
       duration_suffix += format_live_duration(window_seconds, allocator).view();
@@ -854,7 +980,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
           duration_suffix.view(), default_interface);
     } else {
       traffic_count = append_network_traffic_report(output, warnings, allocator,
-                                                    should_color);
+                                                    should_color, sort_key);
     }
   }
   if (should_show_all || should_show_failures)
