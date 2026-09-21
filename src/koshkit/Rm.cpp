@@ -34,18 +34,29 @@ namespace koshka {
 
 namespace koshkit {
 
-fn remove_path(StringView path, removal_mode mode, Allocator allocator) throws
+fn remove_path(StringView path, removal_mode mode, Allocator allocator,
+               Path::entry_kind known_kind = Path::entry_kind::Unknown) throws
     -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
-  if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
-    let names = Path::read_directory(target, allocator);
+  let is_directory = false;
+  let is_symbolic_link = false;
+  if (known_kind == Path::entry_kind::Unknown) {
+    is_directory = target.is_directory();
+    is_symbolic_link = target.is_symbolic_link();
+  } else {
+    is_directory = known_kind == Path::entry_kind::Directory;
+    is_symbolic_link = known_kind == Path::entry_kind::Symlink;
+  }
+  if (is_recursive && is_directory && !is_symbolic_link) {
+    let names = os::list_directory_status(path, allocator);
     if (names.has_value())
-      for (const String &name : *names) {
+      for (let const &entry : *names) {
         let const child =
-            PathBuilder{path, allocator}.append(name.view()).build();
-        if (!remove_path(child.text().view(), mode, allocator)) return false;
+            PathBuilder{path, allocator}.append(entry.child.name.view()).build();
+        if (!remove_path(child.text().view(), mode, allocator, entry.child.kind))
+          return false;
       }
     return os::remove_directory(path);
   }
