@@ -65,21 +65,33 @@ fn remove_path(StringView path, removal_mode mode, Allocator allocator,
 
 static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
                                   removal_mode mode, bool should_prompt,
-                                  Allocator allocator) throws
+                                  Allocator allocator,
+                                  Path::entry_kind known_kind =
+                                      Path::entry_kind::Unknown) throws
     -> bool
 {
-  if (!should_prompt) return remove_path(path, mode, allocator);
+  if (!should_prompt) return remove_path(path, mode, allocator, known_kind);
 
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
-  if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
-    let names = Path::read_directory(target, allocator);
+  let is_directory = false;
+  let is_symbolic_link = false;
+  if (known_kind == Path::entry_kind::Unknown) {
+    is_directory = target.is_directory();
+    is_symbolic_link = target.is_symbolic_link();
+  } else {
+    is_directory = known_kind == Path::entry_kind::Directory;
+    is_symbolic_link = known_kind == Path::entry_kind::Symlink;
+  }
+  if (is_recursive && is_directory && !is_symbolic_link) {
+    let names = os::list_directory_status(path, allocator);
     if (names.has_value())
-      for (const String &name : *names) {
+      for (let const &entry : *names) {
         let const child =
-            PathBuilder{path, allocator}.append(name.view()).build();
+            PathBuilder{path, allocator}.append(entry.child.name.view()).build();
         if (!remove_path_with_prompt(ec, child.text().view(), mode,
-                                     should_prompt, allocator))
+                                     should_prompt, allocator,
+                                     entry.child.kind))
           return false;
       }
     if (!confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
@@ -93,20 +105,31 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
 
 static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
                                  StringView path, removal_mode mode,
-                                 bool should_prompt, Allocator allocator) throws
+                                 bool should_prompt, Allocator allocator,
+                                 Path::entry_kind known_kind =
+                                     Path::entry_kind::Unknown) throws
     -> void
 {
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};
-  if (is_recursive && target.is_directory() && !target.is_symbolic_link()) {
-    if (let names = Path::read_directory(target, allocator);
+  let is_directory = false;
+  let is_symbolic_link = false;
+  if (known_kind == Path::entry_kind::Unknown) {
+    is_directory = target.is_directory();
+    is_symbolic_link = target.is_symbolic_link();
+  } else {
+    is_directory = known_kind == Path::entry_kind::Directory;
+    is_symbolic_link = known_kind == Path::entry_kind::Symlink;
+  }
+  if (is_recursive && is_directory && !is_symbolic_link) {
+    if (let names = os::list_directory_status(path, allocator);
         names.has_value())
     {
-      for (const String &name : *names) {
+      for (let const &entry : *names) {
         let const child =
-            PathBuilder{path, allocator}.append(name.view()).build();
+            PathBuilder{path, allocator}.append(entry.child.name.view()).build();
         report_dry_run_removal(ec, cxt, child.text().view(), mode,
-                               should_prompt, allocator);
+                               should_prompt, allocator, entry.child.kind);
       }
     }
   }
