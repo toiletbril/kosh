@@ -150,6 +150,12 @@ cli_koshkit_eviliso_loopback: $(EVILISO_LOOPBACK_DEPENDENCY)
 cli_tests: $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh cli
 
+ifeq ($(IS_NONDEBUG_BUILD),0)
+cli_koshkit_goodfsw_rss:
+	@printf "\t%-64s skipped, requires a non-debug allocator\n" \
+		"cli/koshkit_goodfsw_rss.sh"
+endif
+
 ifneq ($(TARGET), Linux)
 NON_LINUX_SKIPPED_CLI_NAMES := \
 	cli_koshkit_eviliso_loopback \
