@@ -553,7 +553,9 @@ static fn open_filesystem_listing(const utils::decoded_shell_word &decoded_word,
 
 static fn check_filesystem_entry(const filesystem_listing &listing,
                                  const Path::directory_child &entry,
-                                 filesystem_entry_filter filter) throws
+                                 filesystem_entry_filter filter,
+                                 Maybe<Path::entry_kind> resolved_kind = None)
+    throws
     -> Maybe<eligible_filesystem_entry>
 {
   let const name = entry.name.view();
@@ -564,9 +566,13 @@ static fn check_filesystem_entry(const filesystem_listing &listing,
     return None;
   }
 
-  let const is_directory =
-      utils::directory_entry_kind(listing.directory, entry) ==
-      Path::entry_kind::Directory;
+  let entry_kind = entry.kind;
+  if (resolved_kind.has_value())
+    entry_kind = *resolved_kind;
+  else if (entry_kind == Path::entry_kind::Symlink ||
+           entry_kind == Path::entry_kind::Unknown)
+    entry_kind = utils::directory_entry_kind(listing.directory, entry);
+  let const is_directory = entry_kind == Path::entry_kind::Directory;
   if (filter == filesystem_entry_filter::DirectoriesOnly && !is_directory) {
     return None;
   }
@@ -663,23 +669,74 @@ static fn collect_filesystem_matches(
       static_cast<int>(parts.directory_part.length), parts.directory_part.data,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
-  let const do_add_entry = [&](const Path::directory_child &entry) throws {
-    let const name = entry.name.view();
-    collector.note_source_candidate();
-    let const tier =
-        candidate_match(parts.basename_part, name, is_case_sensitive);
-    if (!tier.has_value()) return;
-
-    let const eligible_entry = check_filesystem_entry(*listing, entry, filter);
-    if (!eligible_entry.has_value()) return;
-
-    let candidate =
-        build_filesystem_candidate(parts.directory_part, raw_directory_part,
-                                   name, eligible_entry->is_directory,
-                                   suffix_mode, text_mode, token, decoded_word);
-    collector.add(candidate.view(), *tier);
+  struct matched_entry
+  {
+    usize position;
+    match_tier tier;
   };
 
+  let const do_add_matches = [&](const ArrayList<matched_entry> &matches)
+                                 throws {
+    let paths = ArrayList<Path>{completion_allocator()};
+    let statuses = ArrayList<os::file_status>{completion_allocator()};
+    let result_positions = ArrayList<usize>{completion_allocator()};
+    let batch = os::Batch{completion_allocator()};
+    paths.reserve(matches.count());
+    statuses.reserve(matches.count());
+    result_positions.reserve(matches.count());
+    batch.reserve(matches.count());
+
+    for (let const &match : matches) {
+      let const &entry = (*listing->entries)[match.position];
+      result_positions.push(SIZE_MAX);
+      if (entry.kind != Path::entry_kind::Symlink) continue;
+
+      let path = listing->directory.clone();
+      path.push_component(entry.name.view());
+      result_positions.back() = paths.count();
+      paths.push(steal(path));
+      statuses.push({});
+    }
+    for (usize position = 0; position < paths.count(); position++)
+      batch.add(os::batch_operation::stat(paths[position], statuses[position]));
+
+    let results = ArrayList<os::batch_result>{completion_allocator()};
+    if (!paths.is_empty()) batch.execute(results);
+
+    for (usize match_position = 0; match_position < matches.count();
+         match_position++)
+    {
+      let const &match = matches[match_position];
+      let const &entry = (*listing->entries)[match.position];
+      let resolved_kind = Maybe<Path::entry_kind>{};
+      let const result_position = result_positions[match_position];
+      if (result_position != SIZE_MAX) {
+        if (result_position >= results.count() ||
+            results[result_position].error_number != 0) {
+          resolved_kind = Path::entry_kind::Other;
+        } else {
+          switch (os::file_type_letter(statuses[result_position].mode)) {
+          case 'd': resolved_kind = Path::entry_kind::Directory; break;
+          case '-': resolved_kind = Path::entry_kind::Regular; break;
+          default: resolved_kind = Path::entry_kind::Other; break;
+          }
+        }
+      }
+
+      let const eligible_entry =
+          check_filesystem_entry(*listing, entry, filter, resolved_kind);
+      if (!eligible_entry.has_value()) continue;
+
+      let const name = entry.name.view();
+      let candidate = build_filesystem_candidate(
+          parts.directory_part, raw_directory_part, name,
+          eligible_entry->is_directory, suffix_mode, text_mode, token,
+          decoded_word);
+      collector.add(candidate.view(), match.tier);
+    }
+  };
+
+  let matches = ArrayList<matched_entry>{completion_allocator()};
   let entry_position = utils::directory_entry_name_lower_bound(
       *listing->entries, parts.basename_part);
   while (
@@ -687,15 +744,28 @@ static fn collect_filesystem_matches(
       utils::directory_entry_name_has_casefold_prefix(
           (*listing->entries)[entry_position].name.view(), parts.basename_part))
   {
-    do_add_entry((*listing->entries)[entry_position]);
+    let const &entry = (*listing->entries)[entry_position];
+    collector.note_source_candidate();
+    let const tier = candidate_match(parts.basename_part, entry.name.view(),
+                                     is_case_sensitive);
+    if (tier.has_value()) matches.push({entry_position, *tier});
     entry_position++;
   }
+  do_add_matches(matches);
   if (collector.has_prefix() || !collector.allows_fuzzy_fallback()) return;
 
-  for (let const &entry : *listing->entries)
+  matches.clear();
+  for (usize position = 0; position < listing->entries->count(); position++) {
+    let const &entry = (*listing->entries)[position];
     if (!utils::directory_entry_name_has_casefold_prefix(entry.name.view(),
-                                                         parts.basename_part))
-      do_add_entry(entry);
+                                                         parts.basename_part)) {
+      collector.note_source_candidate();
+      let const tier = candidate_match(parts.basename_part, entry.name.view(),
+                                       is_case_sensitive);
+      if (tier.has_value()) matches.push({position, *tier});
+    }
+  }
+  do_add_matches(matches);
 }
 
 template <typename Collector>
