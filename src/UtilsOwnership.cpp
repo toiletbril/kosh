@@ -91,7 +91,7 @@ static fn change_path_ownership_recursive(
     if (followed_status.has_file_identity) active_directories.pop_back();
   };
 
-  let children = Path::read_directory(path);
+  let children = Path::read_directory(path, cxt.scratch_allocator());
   if (!children.has_value()) {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
