@@ -1364,7 +1364,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   f64 cumulative_duration_seconds = 1.0;
-  String cumulative_duration_label{allocator, "1"};
   if (sample_duration_operand.has_value()) {
     cumulative_duration_seconds = parse_koshkit_duration_seconds(
         *sample_duration_operand, *sample_duration_location, allocator);
@@ -1373,7 +1372,6 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                               "the duration must be greater than zero");
       return 1;
     }
-    cumulative_duration_label = String{allocator, *sample_duration_operand};
   }
 
   usize row_limit = FLAG_EVILIO_PS.is_enabled() ? SIZE_MAX : 10;
@@ -1435,17 +1433,16 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
     live_interval_seconds = parsed.value();
   }
-  String sample_duration_label{allocator, "/S"};
-  if (FLAG_EVILIO_CUMULATIVE.is_enabled())
-    sample_duration_label =
-        String{allocator, "/"} + cumulative_duration_label.view() + "s";
-  else if (FLAG_EVILIO_LIVE.is_enabled())
-    sample_duration_label = String{allocator, "/1s"};
   let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
                                           ? cumulative_duration_seconds
                                           : (FLAG_EVILIO_LIVE.is_enabled()
                                                  ? 1.0
                                                  : live_interval_seconds);
+  String sample_duration_label{allocator, "/S"};
+  if (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled())
+    sample_duration_label =
+        String{allocator, "/"} +
+        format_live_duration(sample_duration_seconds, allocator).view();
   let const refresh_interval_seconds = live_interval_seconds;
   let const should_show_processes =
       FLAG_EVILIO_PS.is_enabled() || FLAG_EVILIO_COUNT.is_set() ||
