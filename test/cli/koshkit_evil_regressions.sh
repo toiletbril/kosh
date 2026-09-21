@@ -102,6 +102,49 @@ case $evilio_live_sort_report in
 esac
 printf 'evilio-live-sort=%s\n' "$evilio_live_sort_update"
 
+evilio_help=$($BIN -c 'koshkit evilio --help')
+if printf '%s\n' "$evilio_help" | grep -Fq 'LIVE OPTIONS' &&
+  printf '%s\n' "$evilio_help" | grep -Fq -- '--live[=<seconds>]' &&
+  printf '%s\n' "$evilio_help" | grep -Fq -- '--cumulative[=<seconds>]' &&
+  printf '%s\n' "$evilio_help" | grep -Fq -- '--sort=<...>'
+then
+  evilio_help_controls=matched
+else
+  evilio_help_controls=wrong
+fi
+printf 'evilio-help-controls=%s\n' "$evilio_help_controls"
+
+evilnet_help=$($BIN -c 'koshkit evilnet --help')
+if printf '%s\n' "$evilnet_help" | grep -Fq 'LIVE OPTIONS' &&
+  printf '%s\n' "$evilnet_help" | grep -Fq -- '--live[=<seconds>]' &&
+  printf '%s\n' "$evilnet_help" | grep -Fq -- '--cumulative[=<seconds>]'
+then
+  evilnet_help_controls=matched
+else
+  evilnet_help_controls=wrong
+fi
+printf 'evilnet-help-controls=%s\n' "$evilnet_help_controls"
+
+evil_completion=$(< ../completions/kosh.bash)
+case $evil_completion in
+  *'evilio)'*'-C --cumulative -l --live'*'--sort'*)
+    evilio_completion_controls=matched ;;
+  *) evilio_completion_controls=wrong ;;
+esac
+case $evil_completion in
+  *'evilnet)'*'-l --live -C --cumulative'*)
+    evilnet_completion_controls=matched ;;
+  *) evilnet_completion_controls=wrong ;;
+esac
+case $evil_completion in
+  *'evilps)'*'-w --wide --sort -l --live -C --cumulative'*)
+    evilps_completion_controls=matched ;;
+  *) evilps_completion_controls=wrong ;;
+esac
+printf 'evilio-completion-controls=%s\n' "$evilio_completion_controls"
+printf 'evilnet-completion-controls=%s\n' "$evilnet_completion_controls"
+printf 'evilps-completion-controls=%s\n' "$evilps_completion_controls"
+
 evilps_help=$($BIN -c 'koshkit evilps --help')
 case $evilps_help in
   *'--live[=<seconds>]'*'--cumulative[=<seconds>]'*)
