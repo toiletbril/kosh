@@ -30,6 +30,20 @@ printf 'path=%s\n' "$event_path"
 printf 'event=%s\n' "$event_name"
 printf 'kind=%s\n' "$event_kind"
 
+goodfsw_help=$($BIN -c 'koshkit goodfsw --help' 2>&1)
+case $goodfsw_help in
+  *'-x, --one-file-system'*) goodfsw_onefs_help=present ;;
+  *) goodfsw_onefs_help=missing ;;
+esac
+printf 'goodfsw-one-file-system-help=%s\n' "$goodfsw_onefs_help"
+
+interrupt_root=$TEST_TEMP_DIRECTORY/goodfsw-interrupt
+mkdir -p "$interrupt_root"
+: > "$interrupt_root/file"
+goodfsw_interrupt_status=$(BIN="$BIN" INTERRUPT_ROOT="$interrupt_root" \
+  python3 "$(dirname "$0")/goodfsw_interrupt.py")
+printf 'goodfsw-interrupt-status=%s\n' "$goodfsw_interrupt_status"
+
 node_root=$TEST_TEMP_DIRECTORY/goodnode-batch
 node_path=$node_root
 node_depth=24
