@@ -127,7 +127,11 @@ static fn copy_path(const ExecContext &ec, StringView source,
 
   /* A symlink is excluded so a link back into the tree does not drive an
      unbounded walk. */
-  if (source_path.is_directory() && !source_path.is_symbolic_link()) {
+  let const is_source_directory =
+      source_status.has_value()
+          ? os::file_type_letter(source_status->mode) == 'd'
+          : source_path.is_directory();
+  if (is_source_directory && !source_path.is_symbolic_link()) {
     if (!is_recursive)
       throw Error{
           "'" + String{allocator, source}
