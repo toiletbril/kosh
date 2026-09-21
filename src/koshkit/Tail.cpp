@@ -333,7 +333,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     if (!content.has_value()) {
       report_soft_koshkit_util_error(
           ec, cxt, args[0].view(),
-          "cannot open '" +
+          String{did_use_positioned_read ? "cannot read '" : "cannot open '"} +
               String{cxt.scratch_allocator(), sources[source_index]} +
               "': " + os::last_system_error_message());
       status = 1;
