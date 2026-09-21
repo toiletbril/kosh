@@ -47,6 +47,18 @@ def run_pty(binary, command):
         os.kill(pid, signal.SIGINT)
     else:
         os.kill(pid, signal.SIGKILL)
+    drain_deadline = time.monotonic() + 1.0
+    while time.monotonic() < drain_deadline:
+        ready, _, _ = select.select([fd], [], [], 0.05)
+        if not ready:
+            continue
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        output.extend(chunk)
     _, status = os.waitpid(pid, 0)
     return {
         "status": os.waitstatus_to_exitcode(status),
@@ -54,6 +66,10 @@ def run_pty(binary, command):
         "frames": bytes(output).count(b"ctrl+c to exit"),
         "controls": b"ctrl+c to exit" in output,
         "ansi": b"\x1b[" in output,
+        "alternate_enter": b"\x1b[?1049h" in output,
+        "alternate_leave": b"\x1b[?1049l" in output,
+        "cursor_hide": b"\x1b[?25l" in output,
+        "cursor_show": b"\x1b[?25h" in output,
     }
 
 
@@ -102,7 +118,11 @@ def main():
     ):
         result = run_pty(binary, command)
         ok &= check(name, result, {"status": 130, "resized": True,
-                                   "controls": True, "ansi": True})
+                                   "controls": True, "ansi": True,
+                                   "alternate_enter": True,
+                                   "alternate_leave": True,
+                                   "cursor_hide": True,
+                                   "cursor_show": True})
         if result["frames"] < 2:
             print("%s FAIL fewer than two live frames" % name)
             ok = False
