@@ -161,6 +161,8 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
     if (child_entry.kind == Path::entry_kind::Unknown) {
       if (os::stat_path(child_display.view(), child_status_value))
         child_status = &child_status_value;
+      else
+        child_type_letter = '?';
     } else {
       switch (child_entry.kind) {
       case Path::entry_kind::Directory: child_type_letter = 'd'; break;
