@@ -207,6 +207,18 @@ pure fn counter_delta(u64 before, u64 after) wontthrow -> Maybe<u64>
   return after - before;
 }
 
+pure fn process_io_counter_reset(const os::process_io_status &before,
+                                 const os::process_io_status &after) wontthrow
+    -> bool
+{
+  if (after.read_bytes < before.read_bytes ||
+      after.written_bytes < before.written_bytes)
+    return true;
+  return before.has_operation_counts && after.has_operation_counts &&
+         (after.read_operation_count < before.read_operation_count ||
+          after.write_operation_count < before.write_operation_count);
+}
+
 pure fn counter_rate(u64 before, u64 after, u64 elapsed_nanoseconds) wontthrow
     -> Maybe<u64>
 {
@@ -692,6 +704,25 @@ pure fn disk_sort_value(const disk_io_row &row, evilio_sort_key key) wontthrow
   }
 }
 
+pure fn disk_io_counter_reset(const os::disk_io_status &before,
+                              const os::disk_io_status &after) wontthrow -> bool
+{
+  return after.read_bytes < before.read_bytes ||
+         after.written_bytes < before.written_bytes ||
+         after.read_operation_count < before.read_operation_count ||
+         after.write_operation_count < before.write_operation_count ||
+         after.read_time_nanoseconds < before.read_time_nanoseconds ||
+         after.write_time_nanoseconds < before.write_time_nanoseconds ||
+         after.busy_time_nanoseconds < before.busy_time_nanoseconds ||
+         after.idle_time_nanoseconds < before.idle_time_nanoseconds ||
+         after.weighted_busy_time_nanoseconds <
+             before.weighted_busy_time_nanoseconds ||
+         after.read_error_count < before.read_error_count ||
+         after.write_error_count < before.write_error_count ||
+         after.read_retry_count < before.read_retry_count ||
+         after.write_retry_count < before.write_retry_count;
+}
+
 fn sort_disk_rows(ArrayList<disk_io_row> &rows,
                   Maybe<evilio_sort_key> sort_key) throws -> void
 {
@@ -921,6 +952,11 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
           if (retained[index].pid != row.pid ||
               retained[index].start_token != row.start_token)
             continue;
+          if (process_io_counter_reset(retained[index].history.back(),
+                                       row.status)) {
+            retained[index].history.clear();
+            retained[index].history_nanoseconds.clear();
+          }
           retained[index].history.push(row.status);
           retained[index].history_nanoseconds.push(now);
           retained[index].last_seen_nanoseconds = now;
@@ -1116,6 +1152,10 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
         bool is_known = false;
         for (usize index = 0; index < retained.count(); index++) {
           if (retained[index].name != disk.name) continue;
+          if (disk_io_counter_reset(retained[index].history.back(), disk)) {
+            retained[index].history.clear();
+            retained[index].history_nanoseconds.clear();
+          }
           retained[index].history.push(disk);
           retained[index].history_nanoseconds.push(now);
           retained[index].last_seen_nanoseconds = now;
