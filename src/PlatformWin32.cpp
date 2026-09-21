@@ -330,6 +330,16 @@ fn descriptor_is_seekable(os::descriptor fd) wontthrow -> bool
   return SetFilePointerEx(fd, distance, nullptr, FILE_CURRENT) != FALSE;
 }
 
+fn regular_descriptor_file_size(os::descriptor fd) wontthrow -> Maybe<u64>
+{
+  if (GetFileType(fd) != FILE_TYPE_DISK) return None;
+
+  LARGE_INTEGER size{};
+  if (GetFileSizeEx(fd, &size) == FALSE || size.QuadPart < 0) return None;
+
+  return static_cast<u64>(size.QuadPart);
+}
+
 fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool
 {
   LARGE_INTEGER distance{};

@@ -1083,6 +1083,7 @@ fn write_to_numbered_fd(i64 fd_number, const opaque *buf, usize size) wontthrow
 fn read_fd(os::descriptor fd, opaque *buf, usize size) wontthrow
     -> Maybe<usize>;
 fn descriptor_is_seekable(os::descriptor fd) wontthrow -> bool;
+fn regular_descriptor_file_size(os::descriptor fd) wontthrow -> Maybe<u64>;
 fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool;
 fn seek_descriptor_from_start(os::descriptor fd, u64 byte_offset) wontthrow
     -> bool;

@@ -638,6 +638,15 @@ fn descriptor_is_seekable(os::descriptor fd) wontthrow -> bool
   return lseek(fd, 0, SEEK_CUR) != static_cast<off_t>(-1);
 }
 
+fn regular_descriptor_file_size(os::descriptor fd) wontthrow -> Maybe<u64>
+{
+  struct stat info{};
+  if (fstat(fd, &info) != 0 || !S_ISREG(info.st_mode) || info.st_size < 0)
+    return None;
+
+  return static_cast<u64>(info.st_size);
+}
+
 fn rewind_descriptor(os::descriptor fd, usize byte_count) wontthrow -> bool
 {
   return lseek(fd, -static_cast<off_t>(byte_count), SEEK_CUR) !=
