@@ -5,6 +5,11 @@ BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 d=$(mktemp -d) || exit 1
 cd "$d" || exit 1
 printf 'banana\napple\ncherry\napple\n' > fruit.txt
+mkdir -p grep-tree/sub
+printf 'hello\nnope\n' > grep-tree/a.txt
+printf 'hello-again\n' > grep-tree/sub/b.txt
+yes x | tr -d '\n' | head -c 65534 > grep-regex-boundary.txt
+printf 'aXa\n' >> grep-regex-boundary.txt
 
 echo "--- cat -n ---"
 "$BIN" -c 'koshkit cat -n fruit.txt'
@@ -156,6 +161,18 @@ echo "--- grep no match status ---"
 "$BIN" -c 'koshkit grep absent fruit.txt; printf "status=%s\n" "$?"'
 echo "--- grep invalid pattern status ---"
 "$BIN" -c 'koshkit grep "[" fruit.txt; printf "status=%s\n" "$?"' 2>&1
+echo "--- grep regex wildcard ---"
+"$BIN" -c 'koshkit grep "a.a" fruit.txt'
+echo "--- grep regex no match status ---"
+"$BIN" -c 'koshkit grep "z.z" fruit.txt; printf "status=%s\n" "$?"'
+echo "--- grep regex chunk boundary ---"
+"$BIN" -c 'koshkit grep "a.a" grep-regex-boundary.txt > "$TEST_NULL_DEVICE"; printf "status=%s\n" "$?"'
+echo "--- grep -rnh ---"
+"$BIN" -c 'koshkit grep -rnh hello grep-tree'
+echo "--- grep -rn ---"
+"$BIN" -c 'koshkit grep -rn hello grep-tree'
+echo "--- grep long recursive flags ---"
+"$BIN" -c 'koshkit grep --recursive --line-number --no-filename hello grep-tree'
 echo "--- grep stdin ---"
 printf 'pear\nplum\n' | "$BIN" -c 'koshkit grep plum'
 echo "--- grep repeated stdin ---"

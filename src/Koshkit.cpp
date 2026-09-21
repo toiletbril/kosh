@@ -379,7 +379,8 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 SourceBatchReader::SourceBatchReader(const ExecContext &ec,
                                      const ArrayList<StringView> &sources,
                                      Allocator allocator, usize read_byte_count,
-                                     bool should_treat_dash_as_stdin) throws
+                                     bool should_treat_dash_as_stdin,
+                                     bool sources_are_known_regular) throws
     : m_ec(ec),
       m_sources(sources),
       m_readers(allocator),
@@ -389,7 +390,8 @@ SourceBatchReader::SourceBatchReader(const ExecContext &ec,
       m_metadata_paths(allocator),
       m_metadata_statuses(allocator),
       m_read_byte_count(read_byte_count),
-      m_should_treat_dash_as_stdin(should_treat_dash_as_stdin)
+      m_should_treat_dash_as_stdin(should_treat_dash_as_stdin),
+      m_sources_are_known_regular(sources_are_known_regular)
 {
   constexpr usize READER_COUNT = 16;
   m_readers.reserve(READER_COUNT);
@@ -498,7 +500,8 @@ fn SourceBatchReader::fill_readers() throws -> void
       break;
     }
 
-    let const should_probe_nonblocking = !m_readers.is_empty();
+    let const should_probe_nonblocking =
+        !m_readers.is_empty() && !m_sources_are_known_regular;
     if (should_probe_nonblocking) {
       if (should_defer_source) break;
 
@@ -558,7 +561,8 @@ fn SourceBatchReader::fill_readers() throws -> void
       break;
     }
 
-    let const is_seekable = os::descriptor_is_seekable(*descriptor);
+    let const is_seekable =
+        m_sources_are_known_regular || os::descriptor_is_seekable(*descriptor);
     if (should_probe_nonblocking && !is_seekable) {
       os::close_fd(*descriptor);
       should_defer_source = true;
@@ -626,6 +630,10 @@ fn SourceBatchReader::read_seekable() throws -> ReadResult
     reader.pending_byte_count = result.transferred_byte_count;
     reader.has_pending_chunk = true;
     reader.byte_offset += result.transferred_byte_count;
+    /* A short positioned read from a regular file is the EOF boundary. Avoid
+       submitting a second zero-byte read for the common small-file case. */
+    if (result.transferred_byte_count < reader.read_byte_count)
+      close_reader(reader);
   }
 
   return ReadResult::Chunks;

@@ -15,13 +15,16 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-iv] pattern [file ...]");
+HELP_SYNOPSIS_DECL("[-ivrnh] pattern [file ...]");
 
 HELP_DESCRIPTION_DECL(
     "The grep utility prints the lines of each file that match a pattern.");
 
 FLAG(GREP_IGNORE_CASE, Bool, 'i', "", "Match without regard to letter case.");
 FLAG(GREP_INVERT, Bool, 'v', "", "Print the lines that do not match.");
+FLAG(GREP_RECURSIVE, Bool, 'r', "recursive", "Search directories recursively.");
+FLAG(GREP_LINE_NUMBER, Bool, 'n', "line-number", "Prefix matching lines with numbers.");
+FLAG(GREP_NO_FILENAME, Bool, 'h', "no-filename", "Suppress file-name prefixes.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Grep);
@@ -55,6 +58,13 @@ static pure fn is_literal_search_pattern(StringView pattern) wontthrow -> bool
   return true;
 }
 
+static pure fn is_ascii_pattern(StringView pattern) wontthrow -> bool
+{
+  for (usize index = 0; index < pattern.length; index++)
+    if (static_cast<unsigned char>(pattern[index]) > 0x7f) return false;
+  return true;
+}
+
 static pure fn contains_case_insensitive_ascii(
     StringView value, StringView folded_pattern) wontthrow
     -> bool
@@ -78,6 +88,63 @@ static pure fn contains_case_insensitive_ascii(
   return false;
 }
 
+static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
+                                    StringView path, Allocator allocator,
+                                    ArrayList<String> &storage,
+                                    i32 &status) throws -> void
+{
+  os::file_status file_status{};
+  if (!os::stat_path(path, file_status)) {
+    report_soft_koshkit_util_error(
+        ec, cxt, "grep",
+        String{allocator, path} + ": " + os::last_system_error_message());
+    status = 2;
+    return;
+  }
+
+  if (os::file_type_letter(file_status.mode) != 'd') {
+    if (os::file_type_letter(file_status.mode) == '-')
+      storage.push(String{allocator, path});
+    return;
+  }
+
+  let children = Path::read_directory_typed(Path{path, allocator}, allocator);
+  if (!children.has_value()) {
+    report_soft_koshkit_util_error(
+        ec, cxt, "grep",
+        String{allocator, path} + ": " + os::last_system_error_message());
+    status = 2;
+    return;
+  }
+  children->sort([](const Path::directory_child &left,
+                    const Path::directory_child &right) {
+    return left.name.view() < right.name.view();
+  });
+
+  for (let const &child : *children) {
+    if (os::INTERRUPT_REQUESTED) return;
+    String child_path{allocator, path};
+    if (!child_path.is_empty() && child_path.back() != '/') child_path += '/';
+    child_path += child.name.view();
+    if (child.kind == Path::entry_kind::Directory)
+      collect_recursive_sources(ec, cxt, child_path.view(), allocator,
+                                storage, status);
+    else if (child.kind == Path::entry_kind::Regular)
+      storage.push(steal(child_path));
+    else if (child.kind == Path::entry_kind::Unknown) {
+      os::file_status child_status{};
+      if (os::stat_path(child_path.view(), child_status)) {
+        let const type = os::file_type_letter(child_status.mode);
+        if (type == 'd')
+          collect_recursive_sources(ec, cxt, child_path.view(), allocator,
+                                    storage, status);
+        else if (type == '-')
+          storage.push(steal(child_path));
+      }
+    }
+  }
+}
+
 Grep::Grep() = default;
 
 pure fn Grep::kind() const wontthrow -> Utility::Kind { return Kind::Grep; }
@@ -98,7 +165,12 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const pattern = operands[0].view();
   let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
-  let const should_use_literal_search = is_literal_search_pattern(pattern);
+  let const should_recurse = FLAG_GREP_RECURSIVE.is_enabled();
+  let const should_print_line_numbers = FLAG_GREP_LINE_NUMBER.is_enabled();
+  let const should_suppress_names = FLAG_GREP_NO_FILENAME.is_enabled();
+  let const should_use_literal_search =
+      is_literal_search_pattern(pattern) &&
+      (!should_ignore_case || is_ascii_pattern(pattern));
 
   let folded_pattern = String{cxt.scratch_allocator()};
   if (should_use_literal_search && should_ignore_case) {
@@ -118,21 +190,48 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
           "the pattern '" + operands[0] + "' is not a valid regex");
       return 2;
     }
-    defer { os::free_regex(compiled); };
   }
 
-  let const sources =
-      source_list_from_operands(operands, cxt.scratch_allocator(), 1);
+  defer {
+    if (!should_use_literal_search) os::free_regex(compiled);
+  };
 
-  let const should_print_names = sources.count() > 1;
-  let output = String{cxt.scratch_allocator()};
-  let line = String{cxt.scratch_allocator()};
-  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
-  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
-  bool has_any_match = false;
+  let const allocator = cxt.scratch_allocator();
+  let const operand_sources = source_list_from_operands(operands, allocator, 1);
+  ArrayList<String> recursive_storage{allocator};
+  ArrayList<StringView> sources{allocator};
   i32 status = 0;
-  let const do_process_line = [&](StringView source, StringView value) throws
-      -> void {
+  if (should_recurse) {
+    for (let const source : operand_sources) {
+      if (source == "-") {
+        sources.push(source);
+        continue;
+      }
+      collect_recursive_sources(ec, cxt, source, allocator, recursive_storage,
+                                status);
+    }
+    sources.reserve(recursive_storage.count() + 1);
+    for (let const &source : recursive_storage) sources.push(source.view());
+    if (sources.is_empty() && operand_sources.count() == 1 &&
+        operand_sources[0] == "-")
+      sources.push("-");
+  } else {
+    sources = steal(operand_sources);
+  }
+
+  let const should_print_names = !should_suppress_names && sources.count() > 1;
+  let output = String{allocator};
+  let line = String{allocator};
+  let reader = SourceBatchReader{ec, sources, allocator, 64 * 1024, true,
+                                 should_recurse};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
+  ArrayList<usize> source_line_numbers{allocator};
+  source_line_numbers.reserve(sources.count());
+  for (usize index = 0; index < sources.count(); index++)
+    source_line_numbers.push(1);
+  bool has_any_match = false;
+  let const do_process_line = [&](usize source_index, StringView source,
+                                  StringView value) throws -> void {
     let const is_match = should_use_literal_search
                              ? (should_ignore_case
                                     ? contains_case_insensitive_ascii(
@@ -143,6 +242,10 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       has_any_match = true;
       if (should_print_names) {
         output += source == "-" ? StringView{"(standard input)"} : source;
+        output += ':';
+      }
+      if (should_print_line_numbers) {
+        output += String::from(source_line_numbers[source_index], allocator);
         output += ':';
       }
       output += value;
@@ -179,11 +282,13 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
           break;
         }
 
-        if (should_use_literal_search && line.is_empty())
-          do_process_line(source, segment);
-        else {
+        if (should_use_literal_search && line.is_empty()) {
+          do_process_line(chunk.source_index, source, segment);
+          source_line_numbers[chunk.source_index]++;
+        } else {
           line.append(segment);
-          do_process_line(source, line.view());
+          do_process_line(chunk.source_index, source, line.view());
+          source_line_numbers[chunk.source_index]++;
         }
         position = delimiter_position;
         position++;
@@ -205,7 +310,10 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         continue;
       }
 
-      if (!line.is_empty()) do_process_line(source, line.view());
+      if (!line.is_empty()) {
+        do_process_line(chunk.source_index, source, line.view());
+        source_line_numbers[chunk.source_index]++;
+      }
     }
   }
 

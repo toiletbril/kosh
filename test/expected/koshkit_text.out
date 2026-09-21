@@ -204,6 +204,21 @@ status=1
      1 |  koshkit grep "[" fruit.txt; printf "status=%s\n" "$?"
        |               ^~~
 status=2
+--- grep regex wildcard ---
+banana
+--- grep regex no match status ---
+status=1
+--- grep regex chunk boundary ---
+status=0
+--- grep -rnh ---
+1:hello
+1:hello-again
+--- grep -rn ---
+grep-tree/a.txt:1:hello
+grep-tree/sub/b.txt:1:hello-again
+--- grep long recursive flags ---
+1:hello
+1:hello-again
 --- grep stdin ---
 plum
 --- grep repeated stdin ---
