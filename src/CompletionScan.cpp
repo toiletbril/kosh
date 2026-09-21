@@ -706,6 +706,16 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
     }
 
     if (util_for_flags.has_value()) {
+      if (*util_for_flags == koshkit::Utility::Kind::Which && wants_operand &&
+          !os::has_directory_separator(token)) {
+        if (token.is_empty() && mode != completion_mode::Listing) return None;
+
+        let names =
+            complete_command_names(token, command_match_mode::Prefix, context);
+        if (!names.is_empty()) return names;
+        return None;
+      }
+
       let const takes_signal_name =
           *util_for_flags == koshkit::Utility::Kind::Timeout ||
           *util_for_flags == koshkit::Utility::Kind::Pkill ||
@@ -875,6 +885,47 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
     let names =
         complete_command_names(token, command_match_mode::Prefix, context);
     if (!names.is_empty()) return names;
+    return None;
+  }
+
+  if (builtin_kind.has_value() &&
+      *builtin_kind == Builtin::Kind::Command && wants_operand &&
+      !os::has_directory_separator(token))
+  {
+    usize settled_word_count = 0;
+    let const settled_words =
+        split_completion_words(line, token_start, settled_word_count);
+    bool has_command_operand = false;
+    bool should_complete_later_operands = false;
+
+    for (usize index = 1; index < settled_words.count(); index++) {
+      let const word = settled_words[index].view();
+      if (!has_command_operand && word.starts_with("-")) {
+        for (usize byte_index = 1; byte_index < word.length; byte_index++) {
+          if (word[byte_index] == 'v' || word[byte_index] == 'V') {
+            should_complete_later_operands = true;
+            break;
+          }
+        }
+        if (word == "--") continue;
+        continue;
+      }
+
+      if (!has_command_operand) {
+        has_command_operand = true;
+        continue;
+      }
+
+      if (!should_complete_later_operands) return None;
+    }
+
+    if (!has_command_operand || should_complete_later_operands) {
+      if (token.is_empty() && mode != completion_mode::Listing) return None;
+
+      let names =
+          complete_command_names(token, command_match_mode::Prefix, context);
+      if (!names.is_empty()) return names;
+    }
     return None;
   }
 
