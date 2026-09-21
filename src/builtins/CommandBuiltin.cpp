@@ -110,8 +110,16 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
         continue;
       }
       if (cxt.has_functions() && cxt.find_function(name.view()) != nullptr) {
-        ec.print_to_stdout(is_verbose ? name + " is a function\n"
-                                      : name + "\n");
+        if (!is_verbose) {
+          ec.print_to_stdout(name + "\n");
+        } else {
+          ec.print_to_stdout(name + " is a function\n");
+          let const *function_source = cxt.find_function_source(name.view());
+          if (function_source != nullptr && !function_source->is_empty()) {
+            ec.print_to_stdout(function_source->view());
+            if (function_source->back() != '\n') ec.print_to_stdout("\n");
+          }
+        }
         did_find_any = true;
         continue;
       }

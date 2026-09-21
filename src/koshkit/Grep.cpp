@@ -55,19 +55,19 @@ static pure fn is_literal_search_pattern(StringView pattern) wontthrow -> bool
   return true;
 }
 
-static pure fn contains_ascii_insensitive(StringView value,
-                                           StringView pattern) wontthrow
+static pure fn contains_case_insensitive_ascii(
+    StringView value, StringView folded_pattern) wontthrow
     -> bool
 {
-  if (pattern.is_empty()) return true;
-  if (pattern.length > value.length) return false;
+  if (folded_pattern.is_empty()) return true;
+  if (folded_pattern.length > value.length) return false;
 
-  let const last_start = value.length - pattern.length;
+  let const last_start = value.length - folded_pattern.length;
   for (usize start = 0; start <= last_start; start++) {
     bool is_match = true;
-    for (usize index = 0; index < pattern.length; index++) {
+    for (usize index = 0; index < folded_pattern.length; index++) {
       if (utils::ascii_to_lower(value[start + index]) !=
-          utils::ascii_to_lower(pattern[index])) {
+          folded_pattern[index]) {
         is_match = false;
         break;
       }
@@ -100,19 +100,26 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
   let const should_use_literal_search = is_literal_search_pattern(pattern);
 
-  os::compiled_regex compiled;
-  if (os::compile_search_regex(pattern,
-                               should_ignore_case
-                                   ? os::case_sensitivity::Insensitive
-                                   : os::case_sensitivity::Sensitive,
-                               compiled) != os::regex_compile_result::Ok)
-  {
-    report_soft_koshkit_util_error(
-        ec, cxt, operand_locations[0], args[0].view(),
-        "the pattern '" + operands[0] + "' is not a valid regex");
-    return 2;
+  let folded_pattern = String{cxt.scratch_allocator()};
+  if (should_use_literal_search && should_ignore_case) {
+    for (usize index = 0; index < pattern.length; index++)
+      folded_pattern.push(utils::ascii_to_lower(pattern[index]));
   }
-  defer { os::free_regex(compiled); };
+
+  os::compiled_regex compiled;
+  if (!should_use_literal_search) {
+    if (os::compile_search_regex(
+            pattern,
+            should_ignore_case ? os::case_sensitivity::Insensitive
+                               : os::case_sensitivity::Sensitive,
+            compiled) != os::regex_compile_result::Ok) {
+      report_soft_koshkit_util_error(
+          ec, cxt, operand_locations[0], args[0].view(),
+          "the pattern '" + operands[0] + "' is not a valid regex");
+      return 2;
+    }
+    defer { os::free_regex(compiled); };
+  }
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator(), 1);
@@ -128,7 +135,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       -> void {
     let const is_match = should_use_literal_search
                              ? (should_ignore_case
-                                    ? contains_ascii_insensitive(value, pattern)
+                                    ? contains_case_insensitive_ascii(
+                                          value, folded_pattern.view())
                                     : value.find_substring(pattern).has_value())
                              : os::regex_matches_null_terminated(compiled, value);
     if (is_match != should_invert) {
