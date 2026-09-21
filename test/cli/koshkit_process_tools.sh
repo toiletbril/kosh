@@ -14,7 +14,7 @@ mkdir -p "$root/sub"
 ) &
 writer_pid=$!
 
-"$BIN" -c 'koshkit goodfsw -trx1 -l 0.02 "$1"' goodfsw "$root" \
+"$BIN" -c 'koshkit goodfsw -tr1 --event-flags -l 0.02 "$1"' goodfsw "$root" \
   > "$event_output" 2>&1
 watcher_status=$?
 wait "$writer_pid"

@@ -34,8 +34,9 @@ namespace koshka {
 
 namespace koshkit {
 
-fn remove_path(StringView path, removal_mode mode, Allocator allocator,
-               Path::entry_kind known_kind = Path::entry_kind::Unknown) throws
+static fn remove_path_impl(StringView path, removal_mode mode,
+                           Allocator allocator,
+                           Path::entry_kind known_kind) throws
     -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
@@ -56,12 +57,18 @@ fn remove_path(StringView path, removal_mode mode, Allocator allocator,
         if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
-        if (!remove_path(child.view(), mode, allocator, entry.child.kind))
+        if (!remove_path_impl(child.view(), mode, allocator, entry.child.kind))
           return false;
       }
     return os::remove_directory(path);
   }
   return os::remove_file(path);
+}
+
+fn remove_path(StringView path, removal_mode mode, Allocator allocator) throws
+    -> bool
+{
+  return remove_path_impl(path, mode, allocator, Path::entry_kind::Unknown);
 }
 
 static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
@@ -71,7 +78,8 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
                                       Path::entry_kind::Unknown) throws
     -> bool
 {
-  if (!should_prompt) return remove_path(path, mode, allocator, known_kind);
+  if (!should_prompt)
+    return remove_path_impl(path, mode, allocator, known_kind);
 
   let const is_recursive = mode == removal_mode::Recursive;
   let const target = Path{path};

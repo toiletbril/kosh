@@ -31,10 +31,12 @@ FLAG(GOODFSW_MACHINE, Bool, 'm', "machine-readable",
      "Use Unix timestamps and numeric event masks.");
 FLAG(GOODFSW_TIMESTAMP, Bool, 't', "timestamp",
      "Prefix every record with the Unix scan timestamp.");
-FLAG(GOODFSW_EVENT_FLAGS, Bool, 'x', "event-flags",
+FLAG(GOODFSW_EVENT_FLAGS, Bool, '\0', "event-flags",
      "Append the event names to every record.");
 FLAG(GOODFSW_ONE_EVENT, Bool, '1', "one-event",
      "Report the first batch of changes and stop.");
+FLAG(GOODFSW_ONE_FILE_SYSTEM, Bool, 'x', "one-file-system",
+     "Do not descend across filesystem devices.");
 FLAG(GOODFSW_LATENCY, String, 'l', "latency",
      "Wait this many seconds between scans. The default is one.");
 FLAG(GOODFSW_EXCLUDE, String, 'e', "exclude",
@@ -71,6 +73,7 @@ enum class watch_event : u8
 struct watched_entry
 {
   String path;
+  u64 device_id{0};
   u64 size{0};
   u64 file_id{0};
   i64 modification_time{0};
@@ -214,6 +217,7 @@ fn is_excluded(StringView path) wontthrow -> bool
 
 fn scan_path(StringView path, ArrayList<watched_entry> &entries,
              bool is_recursive, usize depth, Allocator allocator,
+             u64 root_device_id,
              const os::file_status *known_status = nullptr) throws -> void
 {
   if (depth > MAXIMUM_SCAN_DEPTH) return;
@@ -230,6 +234,7 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
   watched_entry entry{
       String{allocator, path}
   };
+  entry.device_id = known_status->device_id;
   entry.size = known_status->size;
   entry.file_id = known_status->file_id;
   entry.modification_time = known_status->modification_time;
@@ -247,15 +252,19 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
   if (!children.has_value()) return;
 
   for (let const &child_entry : *children) {
+    if (os::INTERRUPT_REQUESTED) return;
     let const &child = child_entry.child;
     if (child.name.view() == "." || child.name.view() == "..") continue;
 
-    let child_path = path.clone();
+    let child_path = Path{path, allocator};
     child_path.append(child.name.view());
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
+    if (FLAG_GOODFSW_ONE_FILE_SYSTEM.is_enabled() && child_status != nullptr &&
+        child_status->device_id != root_device_id)
+      continue;
     scan_path(child_path.view(), entries, is_recursive, depth + 1,
-              allocator, child_status);
+              allocator, root_device_id, child_status);
   }
 }
 
@@ -291,6 +300,7 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const allocator = cxt.scratch_allocator();
+  let const watch_allocator = heap_allocator();
   f64 latency_seconds = DEFAULT_LATENCY_SECONDS;
   if (FLAG_GOODFSW_LATENCY.is_set()) {
     latency_seconds = parse_koshkit_duration_seconds(
@@ -352,38 +362,56 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  ArrayList<watched_entry> previous{allocator};
+  ArrayList<watched_entry> previous{watch_allocator};
   for (usize index = 0; index < operands.count(); index++)
-    scan_path(operands[index].view(), previous, is_recursive, 0, allocator,
-              &operand_statuses[index]);
+    scan_path(operands[index].view(), previous, is_recursive, 0,
+              watch_allocator,
+              operand_statuses[index].device_id, &operand_statuses[index]);
   sort_entries(previous);
 
   let const should_color = koshkit_should_color();
 
+  bool was_interrupted = false;
   loop
   {
     os::sleep_for_seconds(latency_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
+      was_interrupted = true;
       os::INTERRUPT_REQUESTED = 0;
       break;
     }
 
-    ArrayList<watched_entry> current{allocator};
-    for (let const &operand : operands)
-      scan_path(operand.view(), current, is_recursive, 0, allocator);
+    ArrayList<watched_entry> current{watch_allocator};
+    for (usize index = 0; index < operands.count(); index++) {
+      if (os::INTERRUPT_REQUESTED) {
+        was_interrupted = true;
+        break;
+      }
+      scan_path(operands[index].view(), current, is_recursive, 0,
+                watch_allocator,
+                operand_statuses[index].device_id);
+    }
+    if (was_interrupted) {
+      os::INTERRUPT_REQUESTED = 0;
+      break;
+    }
     sort_entries(current);
 
     let const scan_microseconds = os::realtime_microseconds();
     let const scan_time = static_cast<i64>(scan_microseconds / 1000000u);
     let const scan_nanoseconds =
         static_cast<u32>((scan_microseconds % 1000000u) * 1000u);
-    let output = String{allocator};
+    let output = String{watch_allocator};
 
     usize previous_position = 0;
     usize current_position = 0;
     while (previous_position < previous.count() ||
            current_position < current.count())
     {
+      if (os::INTERRUPT_REQUESTED) {
+        was_interrupted = true;
+        break;
+      }
       if (current_position >= current.count() ||
           (previous_position < previous.count() &&
            previous[previous_position].path.view() <
@@ -440,7 +468,7 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
     if (FLAG_GOODFSW_ONE_EVENT.is_enabled()) break;
   }
 
-  return 0;
+  return was_interrupted ? 130 : 0;
 }
 
 } // namespace koshka::koshkit
