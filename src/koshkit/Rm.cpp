@@ -200,7 +200,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   i32 status = 0;
-  for (const String &operand : operands) {
+  for (let const &operand : operands) {
     if (os::INTERRUPT_REQUESTED) return 130;
     if (names_dot_or_dotdot(operand.view())) {
       report_soft_koshkit_util_error(
