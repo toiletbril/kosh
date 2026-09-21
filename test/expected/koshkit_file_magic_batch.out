@@ -1,0 +1,21 @@
+--- ordered errors ---
+ordered-first: match
+1:37: error: file: cannot open 'missing-magic': No such file or directory.
+     1 |  koshkit file -M magic ordered-first missing-magic ordered-last
+       |                                      ^~~~~~~~~~~~~
+ordered-last: match
+status=1
+--- exact boundaries ---
+edge-65535: edge-65535
+edge-65536: edge-65536
+edge-65537: edge-65537
+--- far continuation ---
+continuation: parent child
+--- symlink precedence ---
+link: edge-65536
+link: symbolic link to edge-65536
+--- nonregular and literal dash ---
+fifo: fifo
+-: match
+--- sparse logical size ---
+sparse: sparse-end
