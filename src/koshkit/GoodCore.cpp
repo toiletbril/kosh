@@ -111,7 +111,7 @@ fn copy_into_root(const Path &stage, StringView source) throws -> bool
   destination.append(relative);
   if (!make_directories(destination.parent(), 0700)) return false;
 
-  return copy_file_contents(source, destination.text().view(), false) ==
+  return copy_file_contents(source, destination.view(), false) ==
          copy_file_result::Success;
 }
 
@@ -222,7 +222,7 @@ fn collect_core_libraries(EvalContext &cxt, StringView core, StringView binary,
 
 fn remove_stage(const Path &stage, Allocator allocator) throws -> void
 {
-  unused(remove_path(stage.text().view(), removal_mode::Recursive, allocator));
+  unused(remove_path(stage.view(), removal_mode::Recursive, allocator));
 }
 
 } // namespace
@@ -340,7 +340,7 @@ fn GoodCore::execute(
 
   let dump_directory = stage.clone();
   dump_directory.append("dump");
-  if (!os::make_directory(dump_directory.text().view(), 0700)) {
+  if (!os::make_directory(dump_directory.view(), 0700)) {
     report_soft_koshkit_error(ec, cxt, "cannot create dump directory",
                               os::last_system_error_message());
     return 1;
@@ -381,7 +381,7 @@ fn GoodCore::execute(
 #if defined __linux__
     let const captured_core =
         Path{core.text() + "." + String::from(process_id, allocator)};
-    if (!os::rename_path(captured_core.text().view(), core.text().view())) {
+    if (!os::rename_path(captured_core.view(), core.view())) {
       report_soft_koshkit_error(ec, cxt, "capture failed",
                                 "the debugger produced no usable core file");
       return 1;
@@ -396,7 +396,7 @@ fn GoodCore::execute(
       return 1;
     }
 
-    if (copy_file_contents(source.text().view(), core.text().view(), false) !=
+    if (copy_file_contents(source.view(), core.view(), false) !=
         copy_file_result::Success)
     {
       report_soft_koshkit_error(ec, cxt, "cannot copy core file",
@@ -406,7 +406,7 @@ fn GoodCore::execute(
   }
 
   os::file_status core_status{};
-  if (!os::stat_path_following(core.text().view(), core_status) ||
+  if (!os::stat_path_following(core.view(), core_status) ||
       core_status.size == 0)
   {
     report_soft_koshkit_error(ec, cxt, "capture failed",
@@ -416,7 +416,7 @@ fn GoodCore::execute(
 
   print_progress(ec, should_show_progress,
                  "collecting executable and libraries");
-  collect_core_libraries(cxt, core.text().view(), binary->view(), paths,
+  collect_core_libraries(cxt, core.view(), binary->view(), paths,
                          allocator);
   print_progress(ec, should_show_progress,
                  String{"collected "} + String::from(paths.count(), allocator) +
@@ -457,7 +457,7 @@ fn GoodCore::execute(
   }
   let metadata_path = stage.clone();
   metadata_path.append("INFO.txt");
-  if (!write_text_file(metadata_path.text().view(), metadata.view())) {
+  if (!write_text_file(metadata_path.view(), metadata.view())) {
     report_soft_koshkit_error(ec, cxt, "cannot write metadata",
                               os::last_system_error_message());
     return 1;
@@ -550,7 +550,7 @@ fn GoodCore::execute(
     return 1;
   }
 
-  if (!os::rename_path(temporary_output->text().view(), output.text().view())) {
+  if (!os::rename_path(temporary_output->view(), output.view())) {
     report_soft_koshkit_error(ec, cxt, "cannot publish archive",
                               os::last_system_error_message());
     return 1;
@@ -559,7 +559,7 @@ fn GoodCore::execute(
   if (!FLAG_GOODCORE_QUIET.is_enabled()) {
     let const should_color = koshkit_should_color();
     let table = ReportTable{allocator};
-    table.add("Archive", output.text().view(), colors::ansi::GREEN);
+    table.add("Archive", output.view(), colors::ansi::GREEN);
     table.add("Executable", binary->view(), colors::ansi::GREEN);
     table.add("Files", String::from(copied_path_count, allocator).view(),
               colors::ansi::GREEN);

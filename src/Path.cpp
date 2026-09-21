@@ -216,7 +216,7 @@ cold fn Path::first_unavailable_component() const throws
     let is_directory = false;
     if (has_dot_component) {
       let status = os::file_status{};
-      is_available = os::stat_path_following(prefix.text().view(), status);
+      is_available = os::stat_path_following(prefix.view(), status);
       is_directory = is_available && os::file_type_letter(status.mode) == 'd';
     } else {
       is_available = prefix.exists();
@@ -390,30 +390,30 @@ cold fn Path::current_directory() throws -> Path
 
 fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
-  return os::change_current_directory(path.text().view());
+  return os::change_current_directory(path.view());
 }
 
 cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
-  return os::list_directory(dir.text().view());
+  return os::list_directory(dir.view());
 }
 
 cold fn Path::read_directory(const Path &dir, Allocator allocator) throws
     -> Maybe<ArrayList<String>>
 {
-  return os::list_directory(dir.text().view(), allocator);
+  return os::list_directory(dir.view(), allocator);
 }
 
 cold fn Path::read_directory_typed(const Path &dir) throws
     -> Maybe<ArrayList<directory_child>>
 {
-  return os::list_directory_typed(dir.text().view());
+  return os::list_directory_typed(dir.view());
 }
 
 cold fn Path::read_directory_typed(const Path &dir, Allocator allocator) throws
     -> Maybe<ArrayList<directory_child>>
 {
-  return os::list_directory_typed(dir.text().view(), allocator);
+  return os::list_directory_typed(dir.view(), allocator);
 }
 
 fn Path::temp_directory() throws -> Path
@@ -448,13 +448,13 @@ fn Path::canonicalize(StringView path) throws -> Maybe<Path>
   let const ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
   let status = os::file_status{};
-  let was_resolved = os::stat_path_following(candidate.text().view(), status);
+  let was_resolved = os::stat_path_following(candidate.view(), status);
   if (candidate.extension().is_empty() && !ends_with_dot) {
     usize suffix_index = 0;
     while (!was_resolved && suffix_index < os::PROGRAM_SUFFIXES.count()) {
       let const &suffix = os::PROGRAM_SUFFIXES[suffix_index++];
       candidate = candidate.with_extension(suffix.text);
-      was_resolved = os::stat_path_following(candidate.text().view(), status);
+      was_resolved = os::stat_path_following(candidate.view(), status);
     }
   }
 
