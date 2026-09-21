@@ -157,7 +157,7 @@ hot fn CompoundList::evaluate_root_status_impl(
         let const first_command = n->command();
         let const start_position = first_command->source_location().position;
         let const end_position =
-            m_nodes[history_end_index]->source_location().position;
+            m_nodes[history_end_index]->source_end_position();
         if (start_position < end_position &&
             end_position <= history_source->length)
         {
