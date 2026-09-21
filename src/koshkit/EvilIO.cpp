@@ -290,6 +290,7 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
                           Maybe<evilio_sort_key> sort_key) throws
     -> ArrayList<io_row>
 {
+  unused(elapsed_nanoseconds);
   let sampled_rows = ArrayList<io_row>{allocator};
   usize before_position = 0;
   for (let const &after : after_rows) {
@@ -306,25 +307,24 @@ fn sample_process_io_rows(const ArrayList<io_row> &before_rows,
     }
 
     let const &before = before_rows[before_position];
-    let const read_rate = counter_rate(
-        before.status.read_bytes, after.status.read_bytes, elapsed_nanoseconds);
-    let const write_rate =
-        counter_rate(before.status.written_bytes, after.status.written_bytes,
-                     elapsed_nanoseconds);
-    if (!read_rate.has_value() || !write_rate.has_value()) continue;
+    let const read_delta =
+        counter_delta(before.status.read_bytes, after.status.read_bytes);
+    let const write_delta =
+        counter_delta(before.status.written_bytes, after.status.written_bytes);
+    if (!read_delta.has_value() || !write_delta.has_value()) continue;
 
-    os::process_io_status status{*read_rate, *write_rate, 0, 0, false};
+    os::process_io_status status{*read_delta, *write_delta, 0, 0, false};
     if (before.status.has_operation_counts && after.status.has_operation_counts)
     {
-      let const read_operation_rate =
-          counter_rate(before.status.read_operation_count,
-                       after.status.read_operation_count, elapsed_nanoseconds);
-      let const write_operation_rate =
-          counter_rate(before.status.write_operation_count,
-                       after.status.write_operation_count, elapsed_nanoseconds);
-      if (read_operation_rate.has_value() && write_operation_rate.has_value()) {
-        status.read_operation_count = *read_operation_rate;
-        status.write_operation_count = *write_operation_rate;
+      let const read_operation_delta =
+          counter_delta(before.status.read_operation_count,
+                        after.status.read_operation_count);
+      let const write_operation_delta =
+          counter_delta(before.status.write_operation_count,
+                        after.status.write_operation_count);
+      if (read_operation_delta.has_value() && write_operation_delta.has_value()) {
+        status.read_operation_count = *read_operation_delta;
+        status.write_operation_count = *write_operation_delta;
         status.has_operation_counts = true;
       }
     }
@@ -567,28 +567,26 @@ fn make_disk_io_rows(const os::disk_io_snapshot &before_snapshot,
         if (before->has_field(os::disk_io_field::ReadBytes) &&
             after.has_field(os::disk_io_field::ReadBytes))
         {
-          row.read = counter_rate(before->read_bytes, after.read_bytes,
-                                  elapsed_nanoseconds);
+          row.read = counter_delta(before->read_bytes, after.read_bytes);
         }
         if (before->has_field(os::disk_io_field::WrittenBytes) &&
             after.has_field(os::disk_io_field::WrittenBytes))
         {
-          row.write = counter_rate(before->written_bytes, after.written_bytes,
-                                   elapsed_nanoseconds);
+          row.write = counter_delta(before->written_bytes, after.written_bytes);
         }
         if (before->has_field(os::disk_io_field::ReadOperations) &&
             after.has_field(os::disk_io_field::ReadOperations))
         {
           row.read_operations =
-              counter_rate(before->read_operation_count,
-                           after.read_operation_count, elapsed_nanoseconds);
+              counter_delta(before->read_operation_count,
+                            after.read_operation_count);
         }
         if (before->has_field(os::disk_io_field::WriteOperations) &&
             after.has_field(os::disk_io_field::WriteOperations))
         {
           row.write_operations =
-              counter_rate(before->write_operation_count,
-                           after.write_operation_count, elapsed_nanoseconds);
+              counter_delta(before->write_operation_count,
+                            after.write_operation_count);
         }
       }
     } else {
