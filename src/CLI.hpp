@@ -381,18 +381,47 @@ struct report_table_row
   String value;
   StringView style;
 };
+enum class report_table_alignment : u8
+{
+  Left,
+  Right,
+};
+struct report_table_column
+{
+  String heading;
+  report_table_alignment alignment;
+  StringView style;
+};
+struct report_table_cell_view
+{
+  StringView text;
+  StringView style;
+};
+struct report_table_cell
+{
+  String text;
+  StringView style;
+};
 class ReportTable
 {
 public:
-  explicit ReportTable(Allocator allocator) : m_rows(allocator) {}
+  explicit ReportTable(Allocator allocator)
+      : m_rows(allocator), m_columns(allocator), m_grid_rows(allocator)
+  {}
 
   fn add(StringView name, StringView value, StringView style = {}) throws
       -> void;
+  fn add_column(StringView heading,
+                report_table_alignment alignment = report_table_alignment::Left,
+                StringView style = {}) throws -> void;
+  fn add_row(const ArrayList<report_table_cell_view> &cells) throws -> void;
   fn to_string(bool should_color, StringView indentation = "  ") const throws
       -> String;
 
 private:
   ArrayList<report_table_row> m_rows;
+  ArrayList<report_table_column> m_columns;
+  ArrayList<ArrayList<report_table_cell>> m_grid_rows;
 };
 fn append_report_table(String &output, const ArrayList<report_table_row> &rows,
                        bool should_color, StringView indentation = "  ") throws

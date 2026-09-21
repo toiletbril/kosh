@@ -15,6 +15,7 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
+#include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -1157,10 +1158,75 @@ fn ReportTable::add(StringView name, StringView value, StringView style) throws
   });
 }
 
+fn ReportTable::add_column(StringView heading, report_table_alignment alignment,
+                           StringView style) throws -> void
+{
+  m_columns.push({String{m_columns.allocator(), heading}, alignment, style});
+}
+
+fn ReportTable::add_row(const ArrayList<report_table_cell_view> &cells) throws
+    -> void
+{
+  let row = ArrayList<report_table_cell>{m_grid_rows.allocator()};
+  row.reserve(cells.count());
+  for (let const &cell : cells)
+    row.push({String{row.allocator(), cell.text}, cell.style});
+  m_grid_rows.push(steal(row));
+}
+
+static fn append_report_grid(String &output,
+                             const ArrayList<report_table_column> &columns,
+                             const ArrayList<ArrayList<report_table_cell>> &rows,
+                             bool should_color, StringView indentation) throws
+    -> void
+{
+  let widths = ArrayList<usize>{columns.allocator()};
+  widths.reserve(columns.count());
+  for (let const &column : columns) widths.push(toiletline::display_width(
+      column.heading.view()));
+
+  for (let const &row : rows) {
+    for (usize index = 0; index < columns.count(); index++) {
+      if (index >= row.count()) continue;
+      let const width = toiletline::display_width(row[index].text.view());
+      if (widths[index] < width) widths[index] = width;
+    }
+  }
+
+  let const append_row = [&](const ArrayList<report_table_cell> &row) throws {
+    output += indentation;
+    for (usize index = 0; index < columns.count(); index++) {
+      let const text = index < row.count() ? row[index].text.view()
+                                           : StringView{};
+      let const style = index < row.count() && !row[index].style.is_empty()
+                            ? row[index].style
+                            : columns[index].style;
+      append_report_column(
+          output, text, widths[index],
+          columns[index].alignment == report_table_alignment::Right, style,
+          should_color);
+      if (index + 1 < columns.count()) output += "  ";
+    }
+    output += '\n';
+  };
+
+  let header = ArrayList<report_table_cell>{columns.allocator()};
+  header.reserve(columns.count());
+  for (let const &column : columns)
+    header.push({String{header.allocator(), column.heading.view()}, {}});
+  append_row(header);
+  for (let const &row : rows) append_row(row);
+}
+
 fn ReportTable::to_string(bool should_color,
                           StringView indentation) const throws -> String
 {
   let output = String{m_rows.allocator()};
+  if (!m_columns.is_empty()) {
+    append_report_grid(output, m_columns, m_grid_rows, should_color,
+                       indentation);
+    return output;
+  }
   append_report_table(output, m_rows, should_color, indentation);
   return output;
 }
