@@ -639,13 +639,21 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
     if (entries == nullptr) continue;
 
     for (let const &entry : *entries) {
-      let full_path = directory.clone();
-      full_path.push_component(entry.name.view());
-      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists()) {
-        continue;
+      Maybe<Path> full_path;
+      if (entry.kind == Path::entry_kind::Symlink) {
+        full_path = directory.clone();
+        full_path->push_component(entry.name.view());
+        if (!full_path->exists()) continue;
       }
-      if (directory_entry_kind(directory, entry) != Path::entry_kind::Regular)
+
+      if (directory_entry_kind(directory, entry) !=
+          Path::entry_kind::Regular)
         continue;
+
+      if (!full_path.has_value()) {
+        full_path = directory.clone();
+        full_path->push_component(entry.name.view());
+      }
 
       let normalized_name = entry.name.clone();
       let const name_info = os::normalize_program_name(normalized_name);
@@ -658,7 +666,7 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
 #if !defined NDEBUG
       DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
-      if (!full_path.is_executable()) continue;
+      if (!full_path->is_executable()) continue;
       if (stem.length != entry.name.length())
         m_command_names.push(String{stem});
       m_command_names.push(steal(normalized_name));
@@ -779,13 +787,21 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
                                smart_case_prefix_matches(stem, prefix);
       if (!full_name_matches && !stem_matches) continue;
 
-      let full_path = directory.clone();
-      full_path.push_component(entry.name.view());
-      if (entry.kind == Path::entry_kind::Symlink && !full_path.exists()) {
-        continue;
+      Maybe<Path> full_path;
+      if (entry.kind == Path::entry_kind::Symlink) {
+        full_path = directory.clone();
+        full_path->push_component(entry.name.view());
+        if (!full_path->exists()) continue;
       }
-      if (directory_entry_kind(directory, entry) != Path::entry_kind::Regular)
+
+      if (directory_entry_kind(directory, entry) !=
+          Path::entry_kind::Regular)
         continue;
+
+      if (!full_path.has_value()) {
+        full_path = directory.clone();
+        full_path->push_component(entry.name.view());
+      }
 
       if (stem_matches) m_regular_names.push(String{stem});
       if (full_name_matches)
@@ -794,7 +810,7 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
 #if !defined NDEBUG
       DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
-      if (!full_path.is_executable()) continue;
+      if (!full_path->is_executable()) continue;
       if (stem_matches) m_command_names.push(String{stem});
       if (full_name_matches) m_command_names.push(steal(normalized_name));
     }
