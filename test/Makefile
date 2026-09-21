@@ -142,6 +142,9 @@ sanitizer_live_probes: $(BIN)
 	@BIN='$(BIN)' TARGET='$(TARGET)' TEST_NULL_DEVICE='$(TEST_NULL_DEVICE)' \
 		$(SHELL) cli/koshkit_live_sanitizers.sh
 
+pty_live_probes: $(BIN)
+	@BIN='$(BIN)' TARGET='$(TARGET)' python3 cli/koshkit_live_pty.py
+
 cli_koshkit_eviliso_loopback: $(EVILISO_LOOPBACK_DEPENDENCY)
 
 cli_tests: $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)

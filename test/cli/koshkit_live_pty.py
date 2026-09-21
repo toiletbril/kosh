@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Bounded PTY and redirected probes for EvilIO and EvilPS live output."""
+
+import fcntl
+import os
+import pty
+import select
+import signal
+import struct
+import subprocess
+import sys
+import tempfile
+import termios
+import time
+
+
+def run_pty(binary, command):
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execv(binary, [binary, "-Q", "-c", command])
+
+    def resize(columns, rows):
+        fcntl.ioctl(fd, termios.TIOCSWINSZ,
+                    struct.pack("HHHH", rows, columns, 0, 0))
+
+    resize(100, 30)
+    output = bytearray()
+    resized = False
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        ready, _, _ = select.select([fd], [], [], 0.05)
+        if not ready:
+            continue
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        output.extend(chunk)
+        if not resized and len(output) > 1000:
+            resize(45, 10)
+            resized = True
+            time.sleep(0.15)
+
+    if resized:
+        os.kill(pid, signal.SIGINT)
+    else:
+        os.kill(pid, signal.SIGKILL)
+    _, status = os.waitpid(pid, 0)
+    return {
+        "status": os.waitstatus_to_exitcode(status),
+        "resized": resized,
+        "frames": bytes(output).count(b"ctrl+c to exit"),
+        "controls": b"ctrl+c to exit" in output,
+        "ansi": b"\x1b[" in output,
+    }
+
+
+def run_redirected(binary, command):
+    with tempfile.TemporaryFile() as output:
+        process = subprocess.Popen([binary, "-Q", "-c", command],
+                                   stdout=output, stderr=subprocess.STDOUT)
+        time.sleep(0.35)
+        process.send_signal(signal.SIGINT)
+        status = process.wait(timeout=3.0)
+        output.seek(0)
+        data = output.read()
+    return {
+        "status": status,
+        "lines": data.count(b"\n"),
+        "ansi": b"\x1b[" in data,
+        "controls": b"ctrl+c to exit" in data,
+    }
+
+
+def check(name, result, requirements):
+    failed = [key for key, expected in requirements.items()
+              if result.get(key) != expected]
+    if failed:
+        print("%s FAIL %s result=%r" % (name, ",".join(failed), result))
+        return False
+    print("%s PASS %r" % (name, result))
+    return True
+
+
+def main():
+    if sys.platform != "linux":
+        print("live PTY probes: skipped (requires Linux)")
+        return 0
+    binary = os.environ.get("BIN")
+    if not binary:
+        print("BIN is required", file=sys.stderr)
+        return 2
+
+    ok = True
+    for name, command, marker in (
+        ("evilio-pty", "koshkit --color never evilio --ps --live=0.05 "
+         "--cumulative=0.1", "controls"),
+        ("evilps-pty", "koshkit --color never evilps --cpu --live=0.05 "
+         "--cumulative=0.1 -1", "controls"),
+    ):
+        result = run_pty(binary, command)
+        ok &= check(name, result, {"status": 130, "resized": True,
+                                   "controls": True, "ansi": True})
+        if result["frames"] < 2:
+            print("%s FAIL fewer than two live frames" % name)
+            ok = False
+
+    for name, command in (
+        ("evilio-redirected", "koshkit --color never evilio --ps --live=0.05 "
+         "--cumulative=0.1"),
+        ("evilps-redirected", "koshkit --color never evilps --cpu --live=0.05 "
+         "--cumulative=0.1 -1"),
+    ):
+        result = run_redirected(binary, command)
+        ok &= check(name, result, {"status": 130, "ansi": False,
+                                   "controls": True})
+        if result["lines"] < 2:
+            print("%s FAIL fewer than two redirected frames" % name)
+            ok = False
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
