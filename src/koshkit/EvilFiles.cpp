@@ -382,7 +382,7 @@ fn EvilFiles::execute(
 
   if (rows.is_empty()) {
     if (!warnings.is_empty())
-      show_message(Warning{warnings.view()}.to_string());
+      show_warning(warnings.view());
     return 1;
   }
 
@@ -499,7 +499,7 @@ fn EvilFiles::execute(
 
   ec.print_to_stdout(output);
   if (!warnings.is_empty())
-    show_message(Warning{warnings.view()}.to_string());
+    show_warning(warnings.view());
   return 0;
 }
 

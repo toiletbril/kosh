@@ -447,6 +447,7 @@ fn append_live_controls_bar(String &output, StringView sample_label,
 fn format_live_duration(f64 seconds, Allocator allocator) throws -> String;
 
 fn show_message(StringView err) throws -> void;
+fn show_warning(StringView warning) throws -> void;
 
 /* Arm a one-shot leading newline on the next show_message, so a diagnostic
    raised while the editor sits mid-line starts on its own line instead of

@@ -1610,4 +1610,9 @@ cold fn show_message(StringView err) throws -> void
   print_error("\n");
 }
 
+fn show_warning(StringView warning) throws -> void
+{
+  show_message(Warning{warning}.to_string());
+}
+
 } /* namespace koshka */

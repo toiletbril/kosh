@@ -990,7 +990,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   if (!warnings.is_empty()) output += "\n";
   ec.print_to_stdout(output);
   for (let const &warning : warnings) {
-    show_message(Warning{warning.view()}.to_string());
+    show_warning(warning.view());
   }
 
   return address_count == 0 && traffic_count == 0 && !has_tcp_statistics ? 1
