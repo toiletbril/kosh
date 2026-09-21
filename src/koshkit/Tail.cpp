@@ -136,6 +136,7 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
     if (!has_pending) break;
 
     batch.execute(results);
+    if (os::INTERRUPT_REQUESTED) return;
     for (usize result_index = 0; result_index < results.count();
          result_index++) {
       let &state = states[operation_states[result_index]];
@@ -313,6 +314,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       regular_states.push(steal(state));
     }
     read_regular_tails(regular_states, positioned_contents, allocator);
+    if (os::INTERRUPT_REQUESTED) return 130;
   }
 
   let const should_print_headers = sources.count() > 1;
