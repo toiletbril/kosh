@@ -141,9 +141,12 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
         child.append(entry.child.name.view());
         report_dry_run_removal(ec, cxt, child.view(), mode,
                                should_prompt, allocator, entry.child.kind);
+        if (os::INTERRUPT_REQUESTED) return;
       }
     }
   }
+
+  if (os::INTERRUPT_REQUESTED) return;
 
   if (should_prompt &&
       !confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
@@ -242,6 +245,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
                              is_recursive ? removal_mode::Recursive
                                           : removal_mode::SinglePath,
                              should_prompt, allocator);
+      if (os::INTERRUPT_REQUESTED) return 130;
       continue;
     }
 
@@ -250,6 +254,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
                                               : removal_mode::SinglePath,
                                  should_prompt, allocator))
     {
+      if (os::INTERRUPT_REQUESTED) return 130;
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),
                                      "cannot remove '" + operand + "': " +
                                          os::last_system_error_message());

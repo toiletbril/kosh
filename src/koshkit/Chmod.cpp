@@ -71,7 +71,11 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
   for (let const &child_entry : *children) {
     if (os::INTERRUPT_REQUESTED) return did_succeed;
-    if (child_entry.child.kind == Path::entry_kind::Symlink) continue;
+    let const is_child_symlink =
+        child_entry.child.kind == Path::entry_kind::Symlink ||
+        (child_entry.has_status &&
+         os::file_type_letter(child_entry.status.mode) == 'l');
+    if (is_child_symlink) continue;
 
     let child = Path{path.view(), cxt.scratch_allocator()};
     child.append(child_entry.child.name.view());
