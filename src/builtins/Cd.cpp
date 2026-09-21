@@ -135,9 +135,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let is_logical_target_available = true;
   let const do_resolve_logical_target = [](const Path &raw_target,
                                            bool &did_fail_before_dotdot) {
-    let logical_candidate = Path{raw_target.text().view().substring_of_length(
-        0, os::path_root_length(raw_target.text().view()))};
-    usize component_position = os::path_root_length(raw_target.text().view());
+    let logical_candidate = Path{raw_target.view().substring_of_length(
+        0, os::path_root_length(raw_target.view()))};
+    usize component_position = os::path_root_length(raw_target.view());
     while (component_position < raw_target.count()) {
       while (component_position < raw_target.count() &&
              os::is_directory_separator(raw_target.text()[component_position]))
@@ -147,7 +147,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       while (component_position < raw_target.count() &&
              !os::is_directory_separator(raw_target.text()[component_position]))
         component_position++;
-      let const component = raw_target.text().view().substring_of_length(
+      let const component = raw_target.view().substring_of_length(
           component_start, component_position - component_start);
       if (component == StringView{"."}) continue;
       if (component == StringView{".."}) {
@@ -185,7 +185,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           if (resolved.is_relative()) {
             let current_directory = Path::current_directory();
             if (current_directory.is_empty()) break;
-            resolved = current_directory.push_component(resolved.text().view());
+            resolved = current_directory.push_component(resolved.view());
           }
           if (let canonical = os::canonical_path(resolved)) {
             resolved = canonical.take();
@@ -244,14 +244,14 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   } else {
     let raw_logical_target = Path{};
-    let logical_operand = target.text().view();
+    let logical_operand = target.view();
     if (target.is_absolute() ||
-        os::path_is_drive_relative(target.text().view()))
+        os::path_is_drive_relative(target.view()))
     {
       raw_logical_target = target.to_absolute_without_normalizing();
     } else {
       old_directory = logical_working_directory(cxt);
-      raw_logical_target = Path{old_directory.text().view()};
+      raw_logical_target = Path{old_directory.view()};
       raw_logical_target.push_component(logical_operand);
     }
 
@@ -297,7 +297,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
-    record_directory_access(target.text().view(), cxt.scratch_allocator());
+    record_directory_access(target.view(), cxt.scratch_allocator());
     if (should_print_target) {
       ec.print_to_stdout(target.text() + "\n");
     }

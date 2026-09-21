@@ -72,7 +72,7 @@ static fn history_target_needs_separator(const Path &target) throws
     -> ErrorOr<bool>
 {
   os::file_status status{};
-  if (!os::stat_path_following(target.text().view(), status)) {
+  if (!os::stat_path_following(target.view(), status)) {
     if (os::last_system_error_is_missing_file()) return false;
 
     return Error{os::last_system_error_message()};
@@ -80,7 +80,7 @@ static fn history_target_needs_separator(const Path &target) throws
   if (status.size == 0) return false;
 
   let const opened =
-      os::open_file_descriptor(target.text().view(), os::file_open_mode::Read);
+      os::open_file_descriptor(target.view(), os::file_open_mode::Read);
   if (!opened.has_value()) return Error{os::last_system_error_message()};
 
   let const fd = opened.value();
@@ -166,7 +166,7 @@ static fn get_history_file_identity(const Path &path) throws
 
   let status = os::file_status{};
   identity.has_file_identity =
-      os::stat_path_following(path.text().view(), status) &&
+      os::stat_path_following(path.view(), status) &&
       status.has_file_identity;
   if (identity.has_file_identity) {
     identity.device_id = status.device_id;
@@ -209,7 +209,7 @@ static fn append_contents_into_history(EvalContext &cxt,
   if (!backing.has_value()) return Error{"the path is unavailable"};
 
   let const parent = backing->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return Error{os::last_system_error_message()};
 
   defer { os::release_process_lock(lock.take()); };
@@ -268,7 +268,7 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
   let const target_identity = get_history_file_identity(target);
   let const lock_target = Path{target_identity.resolved_path.view()};
   let const lock_parent = lock_target.parent_or_current();
-  let lock = os::acquire_process_lock(lock_parent.text().view());
+  let lock = os::acquire_process_lock(lock_parent.view());
   if (!lock.has_value()) return Error{os::last_system_error_message()};
 
   defer { os::release_process_lock(lock.take()); };
@@ -306,7 +306,7 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
     toiletline::encode_history_record(payload, event.command.view());
 
   if (!should_append) {
-    let const opened = os::open_file_descriptor(target.text().view(),
+    let const opened = os::open_file_descriptor(target.view(),
                                                 os::file_open_mode::Truncate);
     if (!opened.has_value()) return Error{os::last_system_error_message()};
 
@@ -338,7 +338,7 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
     }
   }
 
-  let const opened = os::open_file_descriptor(target.text().view(),
+    let const opened = os::open_file_descriptor(target.view(),
                                               os::file_open_mode::Append);
   if (!opened.has_value()) return Error{os::last_system_error_message()};
 

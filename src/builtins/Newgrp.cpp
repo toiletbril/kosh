@@ -65,7 +65,7 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       ec.source_location(), ResolvedCommand::from_program(found[0]),
       steal(command_args), steal(command_arg_locations));
 
-  LOG(Info, "newgrp handing the shell off to '%s'", found[0].text().c_str());
+  LOG(Info, "newgrp handing the shell off to '%s'", found[0].c_str());
 
   try {
     unused(cxt.materialize_kosh_identity());

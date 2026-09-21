@@ -141,8 +141,8 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (let const &name : sorted_names) {
       let link = Path{FLAG_KOSHKIT_ASSIMILATE.value()};
       link.push_component(name.view());
-      if (link.is_symbolic_link()) os::remove_file(link.text().view());
-      if (!os::create_symlink(target->view(), link.text().view())) {
+      if (link.is_symbolic_link()) os::remove_file(link.view());
+      if (!os::create_symlink(target->view(), link.view())) {
         report_soft_builtin_error(ec, cxt,
                                   "Cannot link '" + link.text() +
                                       "': " + os::last_system_error_message());

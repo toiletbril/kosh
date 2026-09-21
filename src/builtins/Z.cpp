@@ -261,7 +261,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const target = Path{best->path.view()}.to_absolute().normalized();
 
-  LOG(Info, "z changing directory to '%s'", target.text().c_str());
+  LOG(Info, "z changing directory to '%s'", target.c_str());
 
   let const status = run_cd_to_directory(cxt, ec, target.text());
   if (status != 0) return status;
