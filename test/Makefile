@@ -231,6 +231,7 @@ WINDOWS_SKIPPED_COMPLETION_NAMES := \
 	completion_complete_go_subcommands \
 	completion_complete_help_subcommands \
 	completion_editor_append_hot_path \
+	completion_executable_filtering_batch \
 	completion_help_options_trusted_dir_only \
 	completion_help_subcommand_second_level \
 	completion_help_subcommand_third_level \
