@@ -16,6 +16,16 @@ esac
 printf 'if test -f "\044x"; then echo yes; else echo no; fi\n' |
   "$BIN" --format
 
+long_string_warning=$(printf '%s\n' \
+  'echo "this is a deliberately very long quoted string that should trigger the formatter warning because it cannot be split safely"' |
+  "$BIN" --format 2>&1 > "$TEST_NULL_DEVICE")
+case $long_string_warning in
+*'warning:'*'consider making the string shorter'*)
+  printf 'long-string-warning=yes\n'
+  ;;
+*) printf 'long-string-warning=no\n' ;;
+esac
+
 printf '%s\n' 'ln a b && test ! -f c || result=fallback' \
   > "$root/diagnostic-stability.sh"
 diagnostics_before=$("$BIN" --lint --no-traces \

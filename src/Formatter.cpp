@@ -757,6 +757,45 @@ fn collect_option_wrap_positions(const ArrayList<format_piece> &pieces) throws
   return positions;
 }
 
+pure fn word_contains_unbreakable_string(StringView word) wontthrow -> bool
+{
+  if (word.length < 2) return false;
+  if (word[0] == '\'' || word[0] == '"') return true;
+  return word.find_character('\'').has_value() ||
+         word.find_character('"').has_value();
+}
+
+fn append_long_string_warnings(StringView source,
+                               const ArrayList<format_piece> &pieces,
+                               Maybe<StringView> filename,
+                               ArrayList<String> &warnings) throws -> void
+{
+  for (let const &piece : pieces) {
+    if (piece.kind != format_piece_kind::Word ||
+        !word_contains_unbreakable_string(piece.text) ||
+        toiletline::display_width(piece.text) <= FormatWriter::MAX_LINE_WIDTH)
+      continue;
+
+    usize line = 1;
+    usize column = 1;
+    for (usize index = 0; index < piece.source_position; index++) {
+      if (source[index] == '\n') {
+        line++;
+        column = 1;
+      } else {
+        column++;
+      }
+    }
+
+    let warning_name = filename.has_value() ? *filename : StringView{"<stdin>"};
+    warnings.push(String{
+        heap_allocator(), warning_name + ":" + String::from(line, heap_allocator()) +
+        ":" + String::from(column, heap_allocator()) +
+        ": warning: unbreakable string exceeds 78 columns; consider making "
+        "the string shorter"});
+  }
+}
+
 pure fn has_prior_test_shadow(Maybe<usize> first_shadow_position,
                               usize source_position) wontthrow -> bool
 {
@@ -1681,6 +1720,7 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
   if (!validate_formatted_source(source_view, mood, arena, errors, ast_output))
     return None;
   let const pieces = scan_format_pieces(source_view);
+  append_long_string_warnings(source_view, pieces, None, errors);
   let formatted = render_format_pieces(pieces);
   let formatted_errors = ArrayList<String>{heap_allocator()};
   if (!validate_formatted_source(formatted.view(), mood, arena,

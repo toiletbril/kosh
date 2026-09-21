@@ -2245,6 +2245,7 @@ static fn run_format_operation(const ArrayList<String> &file_names,
       did_fail = true;
       continue;
     }
+    for (let const &warning : errors) show_message(warning.view());
     if (context.show_ast() && !ast_output.is_empty()) {
       print(ast_output.view());
       print("\n");

@@ -6,6 +6,7 @@ then
 else
   echo no
 fi
+long-string-warning=yes
 format-diagnostics=0,0,same
 openmpi-format-diagnostics=0,0 warnings=0,0 errors=0,0
 #!/bin/sh
