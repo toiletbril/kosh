@@ -2,10 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file defines Path and PathBuilder, component iteration, filesystem
- * queries, source-type detection, and path construction interfaces. Path.cpp
- * owns normalization and out-of-line filesystem operations through the
- * platform boundary.
+ * This file defines Path, component iteration, filesystem queries, source-type
+ * detection, and allocator-aware path construction interfaces. Path.cpp owns
+ * normalization and out-of-line filesystem operations through the platform
+ * boundary.
  */
 
 #pragma once
@@ -72,6 +72,8 @@ public:
   mustuse fn to_absolute_without_normalizing() const throws -> Path;
   mustuse fn to_absolute() const throws -> Path;
 
+  fn append(StringView component) throws -> Path &;
+  fn append_raw(StringView bytes) throws -> Path &;
   fn push_component(StringView component) throws -> Path &;
 
   mustuse fn with_extension(StringView new_extension) const throws -> Path;

@@ -104,6 +104,18 @@ fn Path::push_component(StringView component) throws -> Path &
   return *this;
 }
 
+fn Path::append(StringView component) throws -> Path &
+{
+  append_path_component(m_text, component);
+  return *this;
+}
+
+fn Path::append_raw(StringView bytes) throws -> Path &
+{
+  m_text.append(bytes);
+  return *this;
+}
+
 fn Path::next_component(usize &position) const wontthrow -> component
 {
   return next_component(m_text.view(), position);
