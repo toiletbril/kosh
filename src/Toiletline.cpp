@@ -251,7 +251,7 @@ fn build_selector_args(koshka::EvalContext &context,
     -> koshka::ArrayList<koshka::String>
 {
   let args = koshka::ArrayList<koshka::String>{koshka::heap_allocator()};
-  args.push(koshka::String{program.text().view()});
+  args.push(koshka::String{program.view()});
 
   /* The records travel NUL separated in both directions. The framing belongs
      to the shell and stays out of the variable. */
@@ -417,7 +417,7 @@ fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
     let const note = selector_variable_note(context);
     report_selector_failure(
         koshka::StringView{"The tab selector '"} +
-            selector_program.text().view() + "' exited with status " +
+            selector_program.view() + "' exited with status " +
             koshka::String::from(status, koshka::heap_allocator()),
         note.view(), false);
 
@@ -824,7 +824,7 @@ static fn provide_history_search_snapshot(const char **out_contents,
     let const path = get_history_file_path();
     if (!path.has_value()) return 0;
     let const parent = path->parent_or_current();
-    let lock = os::acquire_process_lock(parent.text().view());
+    let lock = os::acquire_process_lock(parent.view());
     if (!lock.has_value()) return 0;
     defer { os::release_process_lock(lock.take()); };
 
@@ -1015,7 +1015,7 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return koshka::Error{os::last_system_error_message()};
   defer { os::release_process_lock(lock.take()); };
   TRY(ensure_history_loaded(*path, true));
@@ -1084,7 +1084,7 @@ static fn load_history(const Path &path, bool should_allow_missing)
   {
     let status_before = os::file_status{};
     let const had_status_before =
-        os::stat_path_following(path.text().view(), status_before);
+        os::stat_path_following(path.view(), status_before);
 
     if (::tl_history_load(path.c_str()) != TL_SUCCESS) {
       let const history_errno = errno;
@@ -1096,7 +1096,7 @@ static fn load_history(const Path &path, bool should_allow_missing)
       }
 
       let status_after = os::file_status{};
-      if (!os::stat_path_following(path.text().view(), status_after)) {
+      if (!os::stat_path_following(path.view(), status_after)) {
         if (os::last_system_error_is_missing_file()) {
           ::itl_history_offsets_reset();
           ::itl_g_last_history_event_number = 0;
@@ -1117,7 +1117,7 @@ static fn load_history(const Path &path, bool should_allow_missing)
     }
 
     let status_after = os::file_status{};
-    if (!os::stat_path_following(path.text().view(), status_after)) continue;
+    if (!os::stat_path_following(path.view(), status_after)) continue;
     if (!had_status_before ||
         !os::file_status_matches(status_before, status_after))
     {
@@ -1138,9 +1138,9 @@ static fn sync_history(const Path &path, bool should_allow_missing)
 {
   let status = os::file_status{};
   if (::itl_g_history_path != nullptr &&
-      StringView{::itl_g_history_path} == path.text().view() &&
+      StringView{::itl_g_history_path} == path.view() &&
       !::itl_g_history_file_is_bad && HAS_HISTORY_FILE_STATUS &&
-      os::stat_path_following(path.text().view(), status) &&
+      os::stat_path_following(path.view(), status) &&
       os::file_status_matches(HISTORY_FILE_STATUS, status))
   {
     return koshka::Success;
@@ -1153,7 +1153,7 @@ static fn ensure_history_loaded(const Path &path, bool should_allow_missing)
     -> koshka::ErrorOr<koshka::Ok>
 {
   if (::itl_g_history_path != nullptr &&
-      StringView{::itl_g_history_path} == path.text().view())
+      StringView{::itl_g_history_path} == path.view())
   {
     return koshka::Success;
   }
@@ -1170,9 +1170,9 @@ static fn commit_history_replacement(const Path &path, const Path &parent,
   let const replacement_path =
       os::write_to_named_temp_file(parent, name_prefix, contents);
   if (!replacement_path.has_value()) return false;
-  defer { unused(os::remove_file(replacement_path->text().view())); };
+  defer { unused(os::remove_file(replacement_path->view())); };
 
-  return os::rename_path(replacement_path->text().view(), path.text().view());
+  return os::rename_path(replacement_path->view(), path.view());
 }
 
 /* A caller that cannot describe the new file itself reloads it here. */
@@ -1195,7 +1195,7 @@ static fn replace_history_file(const Path &path, const Path &parent,
 static fn record_history_file_status(const Path &path) -> void
 {
   HAS_HISTORY_FILE_STATUS =
-      os::stat_path_following(path.text().view(), HISTORY_FILE_STATUS);
+      os::stat_path_following(path.view(), HISTORY_FILE_STATUS);
   if (HAS_HISTORY_FILE_STATUS &&
       HISTORY_FILE_STATUS.size != ::itl_g_history_file_size)
   {
@@ -1232,7 +1232,7 @@ fn sync_history() -> koshka::ErrorOr<koshka::Ok>
   let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return koshka::Error{os::last_system_error_message()};
   defer { os::release_process_lock(lock.take()); };
 
@@ -1244,11 +1244,11 @@ fn history_clear() -> koshka::ErrorOr<koshka::Ok>
   let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return koshka::Error{os::last_system_error_message()};
   defer { os::release_process_lock(lock.take()); };
   let opened = koshka::os::open_file_descriptor(
-      path->text().view(), koshka::os::file_open_mode::Truncate);
+      path->view(), koshka::os::file_open_mode::Truncate);
   if (!opened.has_value())
     return koshka::Error{os::last_system_error_message()};
   if (!koshka::os::close_fd(opened.take()))
@@ -1411,7 +1411,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   let const path = get_active_history_file_path();
   if (!path.has_value()) return koshka::None;
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return koshka::None;
   defer { os::release_process_lock(lock.take()); };
   if (ensure_history_loaded(*path, true).is_error()) return koshka::None;
@@ -1457,7 +1457,7 @@ fn history_rewrite_event(usize number, StringView expected,
   let const path = get_history_file_path();
   if (!path.has_value()) return false;
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
   if (ensure_history_loaded(*path, false).is_error()) return false;
@@ -1884,7 +1884,7 @@ static fn compact_history_file(usize entry_limit) -> bool
   let const path = get_history_file_path();
   if (!path.has_value()) return true;
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
 
