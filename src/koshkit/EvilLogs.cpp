@@ -243,7 +243,7 @@ fn append_core_dump_report(String &output, Allocator allocator,
   if (home.has_value()) {
     let directory = Path{home->view(), allocator};
     directory.append("Library/Logs/DiagnosticReports");
-    directories.push(String{allocator, directory.text().view()});
+    directories.push(String{allocator, directory.view()});
   }
 
   usize total_dump_count = 0;

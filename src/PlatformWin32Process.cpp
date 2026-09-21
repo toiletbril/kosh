@@ -866,11 +866,11 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
   String working_directory_storage{heap_allocator()};
   const char *working_directory = nullptr;
   String command_line = make_os_args(ec.args());
-  if (is_batch_program(ec.program_path().text().view())) {
+  if (is_batch_program(ec.program_path().view())) {
     let batch_command = String{heap_allocator()};
     append_windows_quoted_arg(batch_command,
                               resolved_program_path_storage.is_empty()
-                                  ? ec.program_path().text().view()
+                                  ? ec.program_path().view()
                                   : resolved_program_path_storage.view());
     for (usize argument_index = 1; argument_index < ec.args().count();
          argument_index++)
@@ -894,7 +894,7 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
     command_line = steal(processor_command_line);
 
     let const current_directory = read_current_directory();
-    let current_directory_text = current_directory.text().view();
+    let current_directory_text = current_directory.view();
     if (current_directory_text.length >= 7 &&
         current_directory_text.starts_with(StringView{"\\\\?\\"}) &&
         current_directory_text[5] == ':' &&

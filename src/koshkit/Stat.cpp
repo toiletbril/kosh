@@ -176,7 +176,7 @@ fn find_mount_point(StringView path, Allocator allocator) throws -> String
 
   let absolute = String{allocator};
   if (path.length == 0 || path[0] != '/') {
-    absolute += os::read_current_directory().text().view();
+    absolute += os::read_current_directory().view();
     absolute += "/";
   }
 

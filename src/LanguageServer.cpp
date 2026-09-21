@@ -1550,7 +1550,7 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
     information.push('\n');
   }
   information.append("Path: ");
-  information.append(paths[0].text().view());
+  information.append(paths[0].view());
 
   return information;
 }

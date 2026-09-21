@@ -62,7 +62,7 @@ fn Rmdir::execute(const ExecContext &ec, EvalContext &cxt,
       {
         let parent = current.parent();
         if (parent.is_empty() || parent == current) break;
-        if (!os::remove_directory(parent.text().view())) {
+        if (!os::remove_directory(parent.view())) {
           KOSHKIT_REPORT_ERROR_AT(operand_locations[operand_index],
                                   "failed to remove '" + parent.text() +
                                       "': " + os::last_system_error_message());

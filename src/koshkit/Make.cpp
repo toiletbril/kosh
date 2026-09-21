@@ -1563,7 +1563,7 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     for (StringView word : split_word_views(source.view(), allocator)) {
       if (spec.kind == make_function_kind::Abspath) {
         let const path = Path{word}.to_absolute();
-        append_make_word(result, path.text().view(), has_word);
+        append_make_word(result, path.view(), has_word);
       } else if (let path = Path::canonicalize(word); path.has_value()) {
         append_make_word(result, path->text().view(), has_word);
       }
@@ -3767,7 +3767,7 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
   let const command_assignments = ArrayList<String>{cxt.scratch_allocator()};
   let sources = ArrayList<make_source_document>{cxt.scratch_allocator()};
   sources.push(make_source_document{
-      steal(*source), intern_source_name(makefile.text().view())});
+      steal(*source), intern_source_name(makefile.view())});
   let const mk = parse_makefile(cxt, sources, command_assignments, false, true);
   for (const make_rule &rule : mk.rules) {
     let const name = rule.target.view();

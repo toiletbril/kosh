@@ -155,9 +155,9 @@ static fn manpath_command_output(EvalContext &context) throws -> StringView
   if (manpath_present || man_present) {
     let argv = ArrayList<String>{heap_allocator()};
     if (manpath_present) {
-      argv.push(String{man_paths[0].text().view()});
+      argv.push(String{man_paths[0].view()});
     } else {
-      argv.push(String{manbin_paths[0].text().view()});
+      argv.push(String{manbin_paths[0].view()});
       argv.push(String{"--path"});
     }
 
@@ -285,11 +285,11 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
 {
   MAN_SUBCOMMAND_INDEX.clear();
   for (let const &directory : manpage_section1_directories(context)) {
-    LOG(Info, "scanning man1 directory '%s'", directory.text().c_str());
+      LOG(Info, "scanning man1 directory '%s'", directory.c_str());
     let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
       LOG(Debug, "directory '%s' is unreadable, skipping",
-          directory.text().c_str());
+          directory.c_str());
       continue;
     }
     MAN_PAGE_FILE_PATHS.reserve(MAN_PAGE_FILE_PATHS.count() + entries->count());
@@ -299,7 +299,7 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
       if (MAN_PAGE_FILE_PATHS.find(*stripped) != nullptr) continue;
       let file_path = directory.clone();
       file_path.push_component(entry.view());
-      MAN_PAGE_FILE_PATHS.set(*stripped, String{file_path.text().view()});
+      MAN_PAGE_FILE_PATHS.set(*stripped, String{file_path.view()});
     }
   }
   MAN_PAGE_FILE_PATHS.for_each([&](StringView name, const String &) {
@@ -650,7 +650,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
       ProgramResolver::Requirement::Runnable,
       ProgramResolver::CachePolicy::Bypass);
   if (man_paths.is_empty() ||
-      !command_directory_is_trusted(man_paths[0].text().view()))
+      !command_directory_is_trusted(man_paths[0].view()))
   {
     LOG(Debug,
         "skipping the man fork for '%.*s' because man is absent or untrusted",
@@ -658,7 +658,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     return *MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
   }
   let argv = ArrayList<String>{heap_allocator()};
-  argv.push(String{man_paths[0].text().view()});
+  argv.push(String{man_paths[0].view()});
   argv.push(String{page_name});
   Maybe<String> page = capture_completion_program_output(context, argv);
   if (!page.has_value()) {
@@ -693,7 +693,7 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
       ProgramResolver::Requirement::Runnable,
       ProgramResolver::CachePolicy::Bypass);
   if (man_paths.is_empty() ||
-      !command_directory_is_trusted(man_paths[0].text().view()))
+      !command_directory_is_trusted(man_paths[0].view()))
   {
     LOG(Debug,
         "skipping the man fork for '%.*s' because man is absent or untrusted",
@@ -703,7 +703,7 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
   }
 
   let locate_argv = ArrayList<String>{heap_allocator()};
-  locate_argv.push(String{man_paths[0].text().view()});
+  locate_argv.push(String{man_paths[0].view()});
   locate_argv.push(String{"-w"});
   locate_argv.push(String{page_name});
   let const location = capture_completion_program_output(context, locate_argv);
@@ -722,7 +722,7 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
     return MANPAGE_TEXT_CACHE.set(page_name, steal(text))->view();
 
   let argv = ArrayList<String>{heap_allocator()};
-  argv.push(String{man_paths[0].text().view()});
+  argv.push(String{man_paths[0].view()});
   argv.push(String{page_name});
   Maybe<String> page = capture_completion_program_output(context, argv);
   if (!page.has_value()) {
@@ -820,7 +820,7 @@ static fn help_text_for(EvalContext &context, StringView command,
       ProgramResolver::Requirement::Runnable,
       ProgramResolver::CachePolicy::Bypass);
   if (help_argument.has_value() && !paths.is_empty() &&
-      command_directory_is_trusted(paths[0].text().view()))
+      command_directory_is_trusted(paths[0].view()))
   {
     LOG(Debug,
         "the help allowlist lists '%.*s' and the directory is trusted, "
@@ -830,7 +830,7 @@ static fn help_text_for(EvalContext &context, StringView command,
        then the help argument split on spaces, so git remote add runs as path,
        remote, add, --help. */
     let argv = ArrayList<String>{heap_allocator()};
-    argv.push(String{paths[0].text().view()});
+    argv.push(String{paths[0].view()});
     subcommand.for_each_ascii_whitespace_word(
         [&](StringView word) throws { argv.push(String{word}); });
     StringView{*help_argument}.for_each_ascii_whitespace_word(
@@ -863,8 +863,7 @@ static fn help_text_for(EvalContext &context, StringView command,
         "the help allowlist lists '%.*s' but the directory '%.*s' is "
         "not trusted, skipping the --help fork",
         static_cast<int>(command.length), command.data,
-        static_cast<int>(paths[0].text().view().length),
-        paths[0].text().view().data);
+        static_cast<int>(paths[0].view().length), paths[0].view().data);
   }
 
   return String{heap_allocator()};

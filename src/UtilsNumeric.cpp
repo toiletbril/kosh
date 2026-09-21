@@ -645,7 +645,7 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>
 
   let expanded = home.take();
   if (slash.has_value()) expanded.push_component(name.substring(*slash + 1));
-  return String{expanded.text().view()};
+  return String{expanded.view()};
 }
 
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void

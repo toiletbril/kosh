@@ -79,7 +79,7 @@ static fn update_history_file_status(no_editor_history_state &state,
                                      const Path &path) -> bool
 {
   state.has_file_status =
-      os::stat_path_following(path.text().view(), state.file_status);
+      os::stat_path_following(path.view(), state.file_status);
   return state.has_file_status;
 }
 
@@ -226,8 +226,8 @@ static fn scan_no_editor_history(const Path &path, StringView contents,
     -> history_scan_outcome
 {
   let &state = get_no_editor_history_state();
-  if (state.loaded_path.view() != path.text().view())
-    state.loaded_path = String{heap_allocator(), path.text().view()};
+  if (state.loaded_path.view() != path.view())
+    state.loaded_path = String{heap_allocator(), path.view()};
   state.branch_contents = String{heap_allocator(), contents};
   state.record_byte_offsets.clear();
   state.durable_record_byte_offsets.clear();
@@ -305,7 +305,7 @@ static fn ensure_no_editor_history_loaded(const Path &path,
     -> ErrorOr<Ok>
 {
   let &state = get_no_editor_history_state();
-  if (!state.is_loaded || state.loaded_path.view() != path.text().view())
+  if (!state.is_loaded || state.loaded_path.view() != path.view())
     return load_no_editor_history(path, should_allow_missing);
 
   return Success;
@@ -349,7 +349,7 @@ static fn rewrite_no_editor_history_event(usize wanted_number,
   let const path = resolve_no_editor_history_path();
   if (!path.has_value()) return false;
   let const parent = path->parent_or_current();
-  let lock = os::acquire_process_lock(parent.text().view());
+  let lock = os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return false;
   defer { os::release_process_lock(lock.take()); };
   let &state = get_no_editor_history_state();
@@ -541,7 +541,7 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
-  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  let lock = koshka::os::acquire_process_lock(parent.view());
   if (!lock.has_value())
     return koshka::Error{koshka::os::last_system_error_message()};
   defer { koshka::os::release_process_lock(lock.take()); };
@@ -597,7 +597,7 @@ fn sync_history() -> koshka::ErrorOr<koshka::Ok>
   let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
   let const parent = path->parent_or_current();
-  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  let lock = koshka::os::acquire_process_lock(parent.view());
   if (!lock.has_value())
     return koshka::Error{koshka::os::last_system_error_message()};
   defer { koshka::os::release_process_lock(lock.take()); };
@@ -611,7 +611,7 @@ fn history_clear() -> koshka::ErrorOr<koshka::Ok>
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
 
   let const parent = path->parent_or_current();
-  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  let lock = koshka::os::acquire_process_lock(parent.view());
   if (!lock.has_value())
     return koshka::Error{koshka::os::last_system_error_message()};
   defer { koshka::os::release_process_lock(lock.take()); };
@@ -761,7 +761,7 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   let const path = get_history_path();
   if (!path.has_value()) return koshka::None;
   let const parent = path->parent_or_current();
-  let lock = koshka::os::acquire_process_lock(parent.text().view());
+  let lock = koshka::os::acquire_process_lock(parent.view());
   if (!lock.has_value()) return koshka::None;
   defer { koshka::os::release_process_lock(lock.take()); };
   if (koshka::internal::ensure_no_editor_history_loaded(*path, true).is_error())

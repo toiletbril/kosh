@@ -133,7 +133,7 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
   let const prefix_path = Path{prefix};
   let const prefix_parent = prefix_path.parent_or_current();
   let const name_limit =
-      os::path_configuration(prefix_parent.text().view(),
+      os::path_configuration(prefix_parent.view(),
                              os::path_configuration_key::NameMax)
           .value_or(255);
   let const prefix_name_length =

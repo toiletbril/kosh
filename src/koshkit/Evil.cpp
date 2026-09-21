@@ -356,7 +356,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   append_report_field(output, "Directory",
-                      os::read_current_directory().text().view(),
+                      os::read_current_directory().view(),
                       colors::ansi::BOLD_CYAN, should_color);
   if (FLAG_EVIL_ALL.is_enabled()) {
     append_report_field(

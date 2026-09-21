@@ -476,7 +476,7 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
                            ProgramResolver::Requirement::Regular,
                            ProgramResolver::CachePolicy::Bypass);
   if (git_results.is_empty()) return;
-  let const git_path = String{heap_allocator(), git_results[0].text().view()};
+  let const git_path = String{heap_allocator(), git_results[0].view()};
 
   let count_argv = ArrayList<String>{heap_allocator()};
   count_argv.push(String{heap_allocator(), git_path.view()});

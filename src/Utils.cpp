@@ -509,7 +509,7 @@ fn locate_first_unavailable_path_component(const Path &target,
     typed_prefix.append(expanded_operand);
 
   let const prefix = Path{
-      target.text().view().substring_of_length(0, unavailable->component_end)};
+      target.view().substring_of_length(0, unavailable->component_end)};
   let const is_final_component =
       expanded_component_index + 1 >= expanded_components.count();
 
@@ -527,7 +527,7 @@ fn file_content_identity(const Path &path, Allocator allocator) throws
     -> Maybe<String>
 {
   let const file =
-      os::open_file_descriptor(path.text().view(), os::file_open_mode::Read);
+      os::open_file_descriptor(path.view(), os::file_open_mode::Read);
   if (!file.has_value()) return None;
   defer { os::close_fd(*file); };
 

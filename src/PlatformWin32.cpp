@@ -468,7 +468,7 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
   for (usize i = mark; i < m_paths.count(); i++) {
     try {
       let const wide_path =
-          utf8_to_wide(m_paths[i].text().view(), heap_allocator());
+          utf8_to_wide(m_paths[i].view(), heap_allocator());
       if (wide_path.has_value() && DeleteFileW(wide_path->begin()) != FALSE)
         continue;
     } catch (...) {}
