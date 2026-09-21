@@ -1,0 +1,81 @@
+--- line and byte boundaries ---
+tail -n 2 without final newline:
+b
+c
+tail -n 0 empty file:
+
+tail -c 4:
+6789
+--- positive offsets and standard input ---
+tail -n +2:
+b
+c
+
+tail -c +4:
+3456789
+tail from standard input:
+b
+c
+
+--- bounded source order ---
+==> TMPDIR/batch-01.txt <==
+last-01
+
+==> TMPDIR/batch-02.txt <==
+last-02
+
+==> TMPDIR/batch-03.txt <==
+last-03
+
+==> TMPDIR/batch-04.txt <==
+last-04
+
+==> TMPDIR/batch-05.txt <==
+last-05
+
+==> TMPDIR/batch-06.txt <==
+last-06
+
+==> TMPDIR/batch-07.txt <==
+last-07
+
+==> TMPDIR/batch-08.txt <==
+last-08
+
+==> TMPDIR/batch-09.txt <==
+last-09
+
+==> TMPDIR/batch-10.txt <==
+last-10
+
+==> TMPDIR/batch-11.txt <==
+last-11
+
+==> TMPDIR/batch-12.txt <==
+last-12
+
+==> TMPDIR/batch-13.txt <==
+last-13
+
+==> TMPDIR/batch-14.txt <==
+last-14
+
+==> TMPDIR/batch-15.txt <==
+last-15
+
+==> TMPDIR/batch-16.txt <==
+last-16
+
+==> TMPDIR/batch-17.txt <==
+last-17
+
+==> TMPDIR/batch-18.txt <==
+last-18
+--- missing source preserves later output and status ---
+1:1: error: tail: cannot open 'missing.txt': No such file or directory.
+     1 |  koshkit tail -n 1 missing.txt with-final.txt
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+==> with-final.txt <==
+c
+status=1
