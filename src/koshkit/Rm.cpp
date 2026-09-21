@@ -53,6 +53,7 @@ fn remove_path(StringView path, removal_mode mode, Allocator allocator,
     let names = os::list_directory_status(path, allocator);
     if (names.has_value())
       for (let const &entry : *names) {
+        if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         if (!remove_path(child.text().view(), mode, allocator, entry.child.kind))
@@ -87,6 +88,7 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
     let names = os::list_directory_status(path, allocator);
     if (names.has_value())
       for (let const &entry : *names) {
+        if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         if (!remove_path_with_prompt(ec, child.text().view(), mode,
@@ -126,6 +128,7 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
         names.has_value())
     {
       for (let const &entry : *names) {
+        if (os::INTERRUPT_REQUESTED) return;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         report_dry_run_removal(ec, cxt, child.text().view(), mode,
@@ -198,6 +201,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   for (const String &operand : operands) {
+    if (os::INTERRUPT_REQUESTED) return 130;
     if (names_dot_or_dotdot(operand.view())) {
       report_soft_koshkit_util_error(
           ec, cxt, args[0].view(),
@@ -243,6 +247,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
                                          os::last_system_error_message());
       status = 1;
     }
+    if (os::INTERRUPT_REQUESTED) return 130;
   }
   return status;
 }

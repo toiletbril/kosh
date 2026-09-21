@@ -171,6 +171,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       };
 
     for (let const &entry : *names) {
+      if (os::INTERRUPT_REQUESTED) return;
       let child_source = Path{source, allocator};
       child_source.append(entry.child.name.view());
       let child_destination = Path{destination, allocator};
@@ -295,6 +296,7 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
     copy_path(ec, source, target.view(), is_recursive, should_force,
               should_preserve, is_verbose, cxt.scratch_allocator());
+    if (os::INTERRUPT_REQUESTED) return 130;
   }
 
   return 0;

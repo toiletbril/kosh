@@ -56,6 +56,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
     did_succeed = false;
   }
 
+  if (os::INTERRUPT_REQUESTED) return did_succeed;
   if (!should_recurse || os::file_type_letter(status.mode) != 'd')
     return did_succeed;
 
@@ -69,6 +70,7 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   }
 
   for (let const &child_entry : *children) {
+    if (os::INTERRUPT_REQUESTED) return did_succeed;
     if (child_entry.child.kind == Path::entry_kind::Symlink) continue;
 
     let child = Path{path.text().view(), cxt.scratch_allocator()};
@@ -111,10 +113,13 @@ fn Chmod::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
 
-  for (usize index = 1; index < operands.count(); index++)
+  for (usize index = 1; index < operands.count(); index++) {
+    if (os::INTERRUPT_REQUESTED) return 130;
     if (!change_mode(ec, cxt, Path{operands[index].view()}, expression,
                      FLAG_CHMOD_RECURSIVE.is_enabled()))
       status = 1;
+    if (os::INTERRUPT_REQUESTED) return 130;
+  }
 
   return status;
 }
