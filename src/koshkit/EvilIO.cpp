@@ -1511,7 +1511,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (FLAG_EVILIO_LIVE.is_enabled()) {
-    let const is_terminal = colors::stdout_is_a_terminal();
+    let const is_terminal =
+        os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
     bool is_alternate_screen_active = false;
     if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
     let const is_cursor_hidden = is_terminal && hide_cursor(ec);

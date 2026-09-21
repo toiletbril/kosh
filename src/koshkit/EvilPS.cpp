@@ -815,7 +815,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       u32 terminal_rows = 0;
       if (is_terminal) {
         u32 terminal_columns = 0;
-        if (!os::terminal_size(terminal_columns, terminal_rows))
+        if (!os::terminal_size(terminal_columns, terminal_rows,
+                               ec.out_fd.value_or(KOSH_STDOUT)))
           terminal_rows = 24;
       }
       usize visible_line_count = 0;
