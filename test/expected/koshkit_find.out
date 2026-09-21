@@ -7,6 +7,11 @@
 ./a/b/two.log
 ./a/one.txt
 ./broken
+./file-link
+./long
+./long/abcdefghijklmnopqrstuvwxyz
+./long/abcdefghijklmnopqrstuvwxyz/segment
+./long/abcdefghijklmnopqrstuvwxyz/segment/leaf
 --- find -name *.txt ---
 ./a/b/c/three.txt
 ./a/one.txt
@@ -15,13 +20,19 @@
 ./a
 ./a/b
 ./a/b/c
+./long
+./long/abcdefghijklmnopqrstuvwxyz
+./long/abcdefghijklmnopqrstuvwxyz/segment
 --- find -maxdepth 1 ---
 .
 ./a
 ./broken
+./file-link
+./long
 --- find -mindepth 3 -type f ---
 ./a/b/c/three.txt
 ./a/b/two.log
+./long/abcdefghijklmnopqrstuvwxyz/segment/leaf
 --- find a named root ---
 a/b
 a/b/c
@@ -32,6 +43,10 @@ a/one.txt
 a/b
 --- find a dangling symlink root ---
 broken
+--- find an explicit file symlink root ---
+file-link
+--- find a long path ---
+long/abcdefghijklmnopqrstuvwxyz/segment/leaf
 --- find unknown predicate ---
 1:16: error: find: unknown predicate '-bogus'.
      1 |  koshkit find . -bogus

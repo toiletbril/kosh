@@ -11,6 +11,9 @@ cd "$d" || exit 1
 "$BIN" -c 'koshkit touch a/b/two.log'
 "$BIN" -c 'koshkit touch a/b/c/three.txt'
 "$BIN" -c 'koshkit ln -sf missing broken'
+"$BIN" -c 'koshkit mkdir -p long/abcdefghijklmnopqrstuvwxyz/segment'
+"$BIN" -c 'koshkit touch long/abcdefghijklmnopqrstuvwxyz/segment/leaf'
+"$BIN" -c 'koshkit ln -s a/b/c/three.txt file-link'
 
 echo "--- find all ---"
 "$BIN" -c 'koshkit find .'
@@ -28,6 +31,10 @@ echo "--- find multiple roots ---"
 "$BIN" -c 'koshkit find a/one.txt a/b -maxdepth 0'
 echo "--- find a dangling symlink root ---"
 "$BIN" -c 'koshkit find broken -type l -maxdepth 0'
+echo "--- find an explicit file symlink root ---"
+"$BIN" -c 'koshkit find file-link -type l -maxdepth 0'
+echo "--- find a long path ---"
+"$BIN" -c 'koshkit find long -name leaf'
 echo "--- find unknown predicate ---"
 "$BIN" -c 'koshkit find . -bogus' 2>&1
 echo "--- find missing -name argument ---"
