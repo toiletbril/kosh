@@ -310,7 +310,7 @@ history_metrics=$(metric_line "$d/history-typescript" 2) || exit 1
 history_entry_scan_count=$(metric_field "$history_metrics" history-scans)
 test "$history_entry_scan_count" -ge 32 || exit 1
 test "$history_entry_scan_count" -le 33 || exit 1
-case $history_short_metrics in *' history-loads=1 '*) ;; *) exit 1 ;; esac
+case $history_short_metrics in *' history-loads=0 '*) ;; *) exit 1 ;; esac
 case $history_metrics in *' history-loads=0 '*) ;; *) exit 1 ;; esac
 history_short_scan_count=$(metric_field "$history_short_metrics" scans)
 history_scan_count=$(metric_field "$history_metrics" scans)
