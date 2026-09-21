@@ -11,6 +11,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
@@ -48,6 +49,52 @@ REGISTER_KOSHKIT_UTIL_FLAGS(EvilNet);
 namespace koshka::koshkit {
 
 namespace {
+
+static fn default_network_interface(Allocator allocator) throws -> Maybe<String>
+{
+#if defined __linux__
+  let contents = Path{"/proc/net/route"}.read_entire_file();
+  if (!contents.has_value()) return None;
+
+  usize position = 0;
+  while (position < contents->length()) {
+    let const line_start = position;
+    while (position < contents->length() && contents->view()[position] != '\n')
+      position++;
+    let const line = contents->view().substring_of_length(
+        line_start, position - line_start);
+    if (position < contents->length()) position++;
+    if (line.starts_with("Iface")) continue;
+
+    StringView words[4]{};
+    usize word_count = 0;
+    usize word_position = 0;
+    while (word_position < line.length && word_count < countof(words)) {
+      while (word_position < line.length &&
+             (line[word_position] == ' ' || line[word_position] == '\t'))
+        word_position++;
+      let const word_start = word_position;
+      while (word_position < line.length && line[word_position] != ' ' &&
+             line[word_position] != '\t')
+        word_position++;
+      if (word_position > word_start)
+        words[word_count++] = line.substring_of_length(
+            word_start, word_position - word_start);
+    }
+    let const has_up_flag =
+        word_count >= 4 && words[3].length >= 4 &&
+        (words[3][3] == '1' || words[3][3] == '3' || words[3][3] == '5' ||
+         words[3][3] == '7' || words[3][3] == '9' || words[3][3] == 'b' ||
+         words[3][3] == 'B' || words[3][3] == 'd' || words[3][3] == 'D' ||
+         words[3][3] == 'f' || words[3][3] == 'F');
+    if (word_count >= 4 && words[1] == "00000000" && has_up_flag)
+      return String{allocator, words[0]};
+  }
+#else
+  unused(allocator);
+#endif
+  return None;
+}
 
 pure fn family_name(os::network_address_family family) wontthrow -> StringView
 {
@@ -109,7 +156,8 @@ fn append_network_interface_report(String &output, bool should_color,
 fn append_network_traffic_statistics_report(
     String &output, ArrayList<String> &warnings, Allocator allocator,
     const ArrayList<os::network_interface_statistics_entry> &statistics,
-    bool should_color, StringView duration_suffix = {}) throws -> usize
+    bool should_color, StringView duration_suffix,
+    const Maybe<String> &default_interface) throws -> usize
 {
   usize name_width = 4;
   for (let const &entry : statistics) {
@@ -152,8 +200,13 @@ fn append_network_traffic_statistics_report(
   }
   output += "\n";
   for (let const &entry : statistics) {
+    let const is_default = default_interface.has_value() &&
+                           entry.interface_name.view() ==
+                               default_interface->view();
     append_report_column(output, entry.interface_name.view(), name_width, false,
-                         colors::ansi::BOLD_GREEN, should_color);
+                         is_default ? colors::ansi::BOLD_GREEN
+                                    : colors::ansi::GREEN,
+                         should_color);
     output += "   ";
     append_report_column(
         output,
@@ -252,8 +305,10 @@ fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
                      const os::network_interface_statistics_entry &right) {
     return left.interface_name < right.interface_name;
   });
+  let const default_interface = default_network_interface(allocator);
   return append_network_traffic_statistics_report(output, warnings, allocator,
-                                                  statistics, should_color);
+                                                  statistics, should_color, {},
+                                                  default_interface);
 }
 
 fn append_tcp_report(String &output, ArrayList<String> &warnings,
@@ -542,6 +597,7 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
   let const sample_label = format_live_duration(window_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
+  let const default_interface = default_network_interface(allocator);
   let duration_suffix = String{allocator, "/"};
   duration_suffix += sample_label.view();
   let baseline = os::read_network_interface_statistics();
@@ -652,7 +708,8 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
                              should_color);
     append_network_traffic_statistics_report(output, warnings, allocator,
                                              statistics, should_color,
-                                             duration_suffix.view());
+                                             duration_suffix.view(),
+                                             default_interface);
     if (!warnings.is_empty()) output += "\n";
     for (let const &warning : warnings) {
       output += Warning{warning.view()}.to_string().view();
@@ -751,11 +808,12 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       }
       let const after = os::read_network_interface_statistics();
       let const sampled = sample_network_statistics(before, after, allocator);
+      let const default_interface = default_network_interface(allocator);
       let duration_suffix = String{allocator, "/"};
       duration_suffix += format_live_duration(window_seconds, allocator).view();
       traffic_count = append_network_traffic_statistics_report(
           output, warnings, allocator, sampled, should_color,
-          duration_suffix.view());
+          duration_suffix.view(), default_interface);
     } else {
       traffic_count = append_network_traffic_report(output, warnings, allocator,
                                                     should_color);
