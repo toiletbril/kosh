@@ -1157,7 +1157,8 @@ fn append_remote_report(String &output, bool should_color,
 }
 
 fn append_runtime_report(String &output, bool should_color,
-                         bool show_kubernetes, bool show_container) throws
+                         bool show_kubernetes, bool show_container,
+                         bool should_show_detail) throws
     -> void
 {
   let table = ReportTable{heap_allocator()};
@@ -1193,9 +1194,64 @@ fn append_runtime_report(String &output, bool should_color,
               kubernetes.has_value() ||
                       cgroup_text.find_substring("kubepods").has_value()
                   ? "present"
-                  : "not detected",
+              : "not detected",
               colors::ansi::BOLD_CYAN);
   output += table.to_string(should_color, "");
+
+  if (!should_show_detail) return;
+
+  struct runtime_process_row
+  {
+    String runtime{heap_allocator()};
+    String source{heap_allocator()};
+    String process_id{heap_allocator()};
+    String name{heap_allocator()};
+    String container{heap_allocator()};
+    String orchestrator{heap_allocator()};
+  };
+  let rows = ArrayList<runtime_process_row>{heap_allocator()};
+  for (let const &process : os::enumerate_processes()) {
+    let cgroups = remote_process_cgroups(process.pid, heap_allocator());
+    let const runtime_name = remote_runtime_name(cgroups.view());
+    let const orchestrator_name = remote_orchestrator_name(cgroups.view());
+    if (runtime_name == "-" && orchestrator_name == "-") continue;
+    rows.push({
+        String{heap_allocator(), runtime_name},
+        String{heap_allocator(), "cgroup"},
+        String::from(process.pid, heap_allocator()),
+        process.name.is_empty() ? String{heap_allocator(), "-"}
+                                : String{heap_allocator(), process.name.view()},
+        remote_container_id(cgroups.view(), heap_allocator()),
+        String{heap_allocator(), orchestrator_name},
+    });
+  }
+  if (rows.is_empty()) return;
+
+  output += "\n";
+  let detail_table = ReportTable{heap_allocator()};
+  detail_table.add_column("RUNTIME", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+  detail_table.add_column("SOURCE", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+  detail_table.add_column("PID", report_table_alignment::Right,
+                          colors::ansi::BOLD_CYAN);
+  detail_table.add_column("NAME", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+  detail_table.add_column("CONTAINER", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+  detail_table.add_column("ORCHESTRATOR", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+  for (let const &row : rows) {
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
+    cells.push({row.source.view(), {}});
+    cells.push({row.process_id.view(), colors::ansi::YELLOW});
+    cells.push({row.name.view(), {}});
+    cells.push({row.container.view(), {}});
+    cells.push({row.orchestrator.view(), {}});
+    detail_table.add_row(cells);
+  }
+  output += detail_table.to_string(should_color, "").view();
 }
 
 } // namespace
@@ -1259,7 +1315,7 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
         FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled());
   if (show_runtime)
     append_runtime_report(output, should_color, show_kubernetes,
-                          show_container);
+                          show_container, FLAG_EVILISO_ALL.is_enabled());
   ec.print_to_stdout(output);
   return 0;
 }
