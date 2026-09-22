@@ -611,14 +611,15 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
 
 #if defined __linux__
 
-static fn read_native_filesystem_error_counters(
-    StringView path, filesystem_error_counters &counters) throws -> bool
+static fn find_mounted_filesystem(
+    StringView path, const ArrayList<mounted_filesystem> &filesystems,
+    StringView required_type = {}) throws -> Maybe<usize>
 {
   let const absolute_path = Path{path}.to_absolute();
-  let const filesystems = mounted_filesystems();
-  const mounted_filesystem *selected = nullptr;
-  for (let const &filesystem : filesystems) {
-    if (filesystem.type != "btrfs") continue;
+  Maybe<usize> selected_index;
+  for (usize index = 0; index < filesystems.count(); index++) {
+    let const &filesystem = filesystems[index];
+    if (!required_type.is_empty() && filesystem.type != required_type) continue;
 
     let const target = filesystem.target.view();
     let const subject = absolute_path.view();
@@ -628,11 +629,24 @@ static fn read_native_filesystem_error_counters(
                               subject.length > target.length &&
                               (is_root || subject[target.length] == '/');
     if (!is_same && !is_descendant) continue;
-    if (selected == nullptr || target.length > selected->target.view().length) {
-      selected = &filesystem;
+    if (!selected_index.has_value() ||
+        target.length > filesystems[*selected_index].target.view().length)
+    {
+      selected_index = index;
     }
   }
-  if (selected == nullptr) return false;
+
+  return selected_index;
+}
+
+static fn read_native_filesystem_error_counters(
+    StringView path, filesystem_error_counters &counters) throws -> bool
+{
+  let const filesystems = mounted_filesystems();
+  let const selected_index =
+      find_mounted_filesystem(path, filesystems, "btrfs");
+  if (!selected_index.has_value()) return false;
+  let const &selected = filesystems[*selected_index];
 
   let const sysfs_root = Path{"/sys/fs/btrfs"};
   let const filesystem_names = Path::read_directory(sysfs_root);
@@ -640,15 +654,15 @@ static fn read_native_filesystem_error_counters(
 
   let filesystem_root = Path{};
   for (let const &filesystem_name : *filesystem_names) {
-    if (!selected->volume_uuid.is_empty() &&
-        filesystem_name == selected->volume_uuid)
+    if (!selected.volume_uuid.is_empty() &&
+        filesystem_name == selected.volume_uuid)
     {
       filesystem_root = sysfs_root.clone();
       filesystem_root.append(filesystem_name.view());
       break;
     }
 
-    let const device_name = Path{selected->source.view()}.filename();
+    let const device_name = Path{selected.source.view()}.filename();
     if (device_name.is_empty()) continue;
     let device_path = sysfs_root.clone();
     device_path.append(filesystem_name.view());
@@ -721,6 +735,68 @@ static fn read_native_filesystem_error_counters(
   return true;
 }
 
+static fn read_ext4_recorded_error_count(const mounted_filesystem &filesystem)
+    throws -> Maybe<u64>
+{
+  let const do_read_count = [](StringView device_name) throws -> Maybe<u64> {
+    if (device_name.is_empty()) return None;
+
+    let count_path = Path{"/sys/fs/ext4"};
+    count_path.append(device_name);
+    count_path.append("errors_count");
+    let const contents = count_path.read_entire_file();
+    if (!contents.has_value()) return None;
+
+    let const text = contents->view().without_trailing_newline();
+    if (!text.is_all_decimal_digits()) return None;
+    let const parsed =
+        utils::parse_integer_in_base_u64(text, int_base::decimal);
+    if (parsed.is_error()) return None;
+
+    return parsed.value();
+  };
+
+  let const source_path = Path{filesystem.source.view()};
+  if (let const count = do_read_count(source_path.filename());
+      count.has_value())
+  {
+    return count;
+  }
+
+  let const canonical_source = canonical_path(source_path);
+  if (!canonical_source.has_value()) return None;
+  return do_read_count(canonical_source->filename());
+}
+
+fn read_filesystem_integrity_evidence(StringView path) throws
+    -> Maybe<filesystem_integrity_evidence>
+{
+  let const filesystems = mounted_filesystems();
+  let const selected_index = find_mounted_filesystem(path, filesystems);
+  if (!selected_index.has_value()) return None;
+  let const &filesystem = filesystems[*selected_index];
+
+  if (filesystem.type == "btrfs") {
+    filesystem_error_counters counters{};
+    if (!read_native_filesystem_error_counters(path, counters)) return None;
+
+    return filesystem_integrity_evidence{
+        filesystem_integrity_kind::BtrfsDeviceErrorCounters, counters};
+  }
+
+  if (filesystem.type == "ext4") {
+    let const count = read_ext4_recorded_error_count(filesystem);
+    if (!count.has_value()) return None;
+
+    filesystem_integrity_evidence evidence{
+        filesystem_integrity_kind::Ext4RecordedErrors};
+    evidence.recorded_error_count = *count;
+    return evidence;
+  }
+
+  return None;
+}
+
 #else
 
 static fn read_native_filesystem_error_counters(
@@ -729,6 +805,13 @@ static fn read_native_filesystem_error_counters(
   unused(path);
   unused(counters);
   return false;
+}
+
+fn read_filesystem_integrity_evidence(StringView path) throws
+    -> Maybe<filesystem_integrity_evidence>
+{
+  unused(path);
+  return None;
 }
 
 #endif

@@ -1370,6 +1370,13 @@ fn read_filesystem_error_counters(StringView path,
   return false;
 }
 
+fn read_filesystem_integrity_evidence(StringView path) throws
+    -> Maybe<filesystem_integrity_evidence>
+{
+  unused(path);
+  return None;
+}
+
 fn sync_filesystems() wontthrow -> bool
 {
   wchar_t drives[512];

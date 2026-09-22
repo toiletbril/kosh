@@ -644,6 +644,24 @@ fn read_filesystem_error_counters(StringView path,
                                   filesystem_error_counters &counters) throws
     -> bool;
 
+enum class filesystem_integrity_kind : u8
+{
+  BtrfsDeviceErrorCounters,
+  Ext4RecordedErrors,
+  NtfsDirtyFlag,
+};
+
+struct filesystem_integrity_evidence
+{
+  filesystem_integrity_kind kind;
+  filesystem_error_counters counters{};
+  u64 recorded_error_count{0};
+  bool is_dirty{false};
+};
+
+fn read_filesystem_integrity_evidence(StringView path) throws
+    -> Maybe<filesystem_integrity_evidence>;
+
 fn sync_filesystems() wontthrow -> bool;
 
 fn sync_path(StringView path, bool is_data_only) wontthrow -> bool;

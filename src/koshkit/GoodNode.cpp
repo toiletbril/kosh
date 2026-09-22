@@ -122,15 +122,21 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     if (features.has_value()) do_append_field("Features", *features);
   }
 
-  os::filesystem_error_counters errors{};
-  if (os::read_filesystem_error_counters(path, errors)) {
-    let const has_errors = errors.read_count != 0 || errors.write_count != 0 ||
-                           errors.flush_count != 0 ||
-                           errors.corruption_count != 0 ||
-                           errors.generation_count != 0;
-    do_append_field("Health", has_errors ? StringView{"errors recorded"}
-                                         : StringView{"no errors recorded"});
-    if (has_errors) {
+  if (let const evidence = os::read_filesystem_integrity_evidence(path);
+      evidence.has_value())
+  {
+    switch (evidence->kind) {
+    case os::filesystem_integrity_kind::BtrfsDeviceErrorCounters: {
+      let const &errors = evidence->counters;
+      let const has_errors =
+          errors.read_count != 0 || errors.write_count != 0 ||
+          errors.flush_count != 0 || errors.corruption_count != 0 ||
+          errors.generation_count != 0;
+      do_append_field("Integrity", has_errors
+                                       ? StringView{"device errors recorded"}
+                                       : StringView{"no device errors recorded"});
+      if (!has_errors) break;
+
       let error_text = String{allocator, "read "};
       error_text += String::from(errors.read_count, allocator).view();
       error_text += ", write ";
@@ -142,9 +148,23 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
       error_text += ", generation ";
       error_text += String::from(errors.generation_count, allocator).view();
       do_append_field("Errors", error_text.view());
+      break;
+    }
+    case os::filesystem_integrity_kind::Ext4RecordedErrors:
+      do_append_field(
+          "Integrity",
+          String::from(evidence->recorded_error_count, allocator).view() +
+              (evidence->recorded_error_count == 1 ? " recorded error"
+                                                   : " recorded errors"));
+      break;
+    case os::filesystem_integrity_kind::NtfsDirtyFlag:
+      do_append_field("Integrity", evidence->is_dirty
+                                       ? StringView{"dirty bit set"}
+                                       : StringView{"dirty bit clear"});
+      break;
     }
   } else {
-    do_append_field("Health", "not verified");
+    do_append_field("Integrity", "not verified");
   }
   if (status.link_count == 0) do_append_field("Link state", "unlinked");
 
