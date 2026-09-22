@@ -717,10 +717,18 @@ fn poll_live_input(os::descriptor input_fd, String &input, String &search,
     if (byte == '/') {
       input.clear();
       input += '/';
+      search.clear();
+      scroll_offset = 0;
       continue;
     }
     if (byte == 127 || byte == 8) {
-      if (!input.is_empty()) input.truncate(input.length() - 1);
+      if (!input.is_empty()) {
+        input.truncate(input.length() - 1);
+        if (input.is_empty()) {
+          search.clear();
+          scroll_offset = 0;
+        }
+      }
       continue;
     }
     if (byte == '\n' || byte == '\r') {
