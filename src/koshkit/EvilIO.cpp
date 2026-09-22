@@ -8,6 +8,7 @@
 
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
+#include "../Arena.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -891,6 +892,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        StringView sample_duration_label) throws -> i32
 {
   let const allocator = heap_allocator();
+  let frame_arena = BumpArena{};
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(window_seconds * 1000000000.0);
@@ -918,6 +920,10 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
 
   loop
   {
+    let const frame_mark = frame_arena.mark();
+    defer { frame_arena.release(frame_mark); };
+    let const frame_allocator = bump_allocator(frame_arena);
+
     let const before_wait_nanoseconds = os::monotonic_nanos();
     let const until_sample =
         sample_interval_nanoseconds -
@@ -941,7 +947,8 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
 
     let const now = os::monotonic_nanos();
     if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
-      let after_rows = read_process_io_rows(allocator, selected_pid, true);
+      let after_rows =
+          read_process_io_rows(frame_allocator, selected_pid, true);
       if (selected_pid.has_value() && after_rows.is_empty()) return 1;
 
       for (let const &row : after_rows) {
@@ -998,24 +1005,24 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) continue;
 
     last_refresh_nanoseconds = now;
-    let rows = ArrayList<io_row>{allocator};
+    let rows = ArrayList<io_row>{frame_allocator};
     rows.reserve(retained.count());
     let const window_start = last_sample_nanoseconds > falloff_nanoseconds
                                  ? last_sample_nanoseconds - falloff_nanoseconds
                                  : 0;
     for (let const &row : retained) {
       rows.push(io_row{
-          String{allocator, row.name.view()},
+          String{frame_allocator, row.name.view()},
           row.pid, row.start_token,
           get_process_window_status(row, window_start)
       });
     }
     sort_process_rows(rows, sort_key);
-    let output = String{allocator};
+    let output = String{frame_allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_process_io_rate_report(output, rows, row_limit, allocator,
+    append_process_io_rate_report(output, rows, row_limit, frame_allocator,
                                   should_color, sample_duration_label, nullptr);
     ec.print_to_stdout(output);
   }
@@ -1099,6 +1106,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
                     Maybe<evilio_sort_key> sort_key) throws -> i32
 {
   let const allocator = heap_allocator();
+  let frame_arena = BumpArena{};
   let retained = ArrayList<live_disk_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(window_seconds * 1000000000.0);
@@ -1123,6 +1131,10 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
 
   loop
   {
+    let const frame_mark = frame_arena.mark();
+    defer { frame_arena.release(frame_mark); };
+    let const frame_allocator = bump_allocator(frame_arena);
+
     let const now_before_wait = os::monotonic_nanos();
     let const sample_elapsed = now_before_wait - last_sample_nanoseconds;
     let const refresh_elapsed = now_before_wait - last_refresh_nanoseconds;
@@ -1209,21 +1221,22 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
     for (let const &row : retained) {
       let sampled = get_disk_window_status(row, window_start);
       let baseline = os::disk_io_status{};
-      baseline.name = String{allocator, row.name.view()};
+      baseline.name = String{frame_allocator, row.name.view()};
       baseline.available_fields = sampled.available_fields;
       before_snapshot.disks.push(steal(baseline));
       after_snapshot.disks.push(steal(sampled));
     }
     let const elapsed_nanoseconds = 1000000000ULL;
     let rows = make_disk_io_rows(before_snapshot, after_snapshot,
-                                 elapsed_nanoseconds, true, allocator);
+                                 elapsed_nanoseconds, true, frame_allocator);
     sort_disk_rows(rows, sort_key);
 
-    let output = String{allocator};
+    let output = String{frame_allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_disk_io_report(output, rows, true, false, allocator, should_color,
+    append_disk_io_report(output, rows, true, false, frame_allocator,
+                          should_color,
                           sample_duration_label);
     ec.print_to_stdout(output);
   }
