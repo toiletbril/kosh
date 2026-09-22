@@ -85,6 +85,8 @@ echo "compat-level-two-recursion=$(printf '%s\n' "$compat_level_two" |
   grep -c 'SC2264')"
 echo "compat-level-three-recursion=$(printf '%s\n' "$compat_level_three" |
   grep -c 'SC2264')"
+echo "compat-recursion-warning=$(printf '%s\n' "$compat_level_two" |
+  grep -c 'This is a fork bomb. Note: rewrite your program or ignore this warning')"
 
 cat > "$temporary_directory/file-directive.sh" <<'EOF'
 # shellcheck disable=SC2164
