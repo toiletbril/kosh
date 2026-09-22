@@ -66,30 +66,40 @@ static pure fn is_ascii_pattern(StringView pattern) wontthrow -> bool
 }
 
 static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
-                                    StringView path, Allocator allocator,
+                                    const Path &path,
+                                    Path::entry_kind path_kind,
+                                    Allocator allocator,
                                     ArrayList<String> &storage,
                                     i32 &status) throws -> void
 {
-  os::file_status file_status{};
-  if (!os::stat_path(path, file_status)) {
-    report_soft_koshkit_util_error(
-        ec, cxt, "grep",
-        String{allocator, path} + ": " + os::last_system_error_message());
-    status = 2;
+  if (path_kind == Path::entry_kind::Unknown) {
+    os::file_status file_status{};
+    if (!os::stat_path(path.view(), file_status)) {
+      report_soft_koshkit_util_error(
+          ec, cxt, "grep",
+          path.text() + ": " + os::last_system_error_message());
+      status = 2;
+      return;
+    }
+
+    switch (os::file_type_letter(file_status.mode)) {
+    case 'd': path_kind = Path::entry_kind::Directory; break;
+    case '-': path_kind = Path::entry_kind::Regular; break;
+    default: path_kind = Path::entry_kind::Other; break;
+    }
+  }
+
+  if (path_kind != Path::entry_kind::Directory) {
+    if (path_kind == Path::entry_kind::Regular)
+      storage.push(path.text().clone());
     return;
   }
 
-  if (os::file_type_letter(file_status.mode) != 'd') {
-    if (os::file_type_letter(file_status.mode) == '-')
-      storage.push(String{allocator, path});
-    return;
-  }
-
-  let children = Path::read_directory_typed(Path{path, allocator}, allocator);
+  let children = Path::read_directory_typed(path, allocator);
   if (!children.has_value()) {
     report_soft_koshkit_util_error(
         ec, cxt, "grep",
-        String{allocator, path} + ": " + os::last_system_error_message());
+        path.text() + ": " + os::last_system_error_message());
     status = 2;
     return;
   }
@@ -98,27 +108,60 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
     return left.name.view() < right.name.view();
   });
 
+  if (os::INTERRUPT_REQUESTED) return;
+
+  let child_paths = ArrayList<Path>{allocator};
+  child_paths.reserve(children->count());
+  usize unknown_count = 0;
   for (let const &child : *children) {
-    if (os::INTERRUPT_REQUESTED) return;
-    String child_path{allocator, path};
-    if (!child_path.is_empty() && child_path.back() != '/') child_path += '/';
-    child_path += child.name.view();
-    if (child.kind == Path::entry_kind::Directory)
-      collect_recursive_sources(ec, cxt, child_path.view(), allocator,
-                                storage, status);
-    else if (child.kind == Path::entry_kind::Regular)
-      storage.push(steal(child_path));
-    else if (child.kind == Path::entry_kind::Unknown) {
-      os::file_status child_status{};
-      if (os::stat_path(child_path.view(), child_status)) {
-        let const type = os::file_type_letter(child_status.mode);
-        if (type == 'd')
-          collect_recursive_sources(ec, cxt, child_path.view(), allocator,
-                                    storage, status);
-        else if (type == '-')
-          storage.push(steal(child_path));
+    let child_path = path.clone();
+    child_path.push_component(child.name.view());
+    child_paths.push(steal(child_path));
+    if (child.kind == Path::entry_kind::Unknown) unknown_count++;
+  }
+
+  if (unknown_count != 0) {
+    let unknown_statuses = ArrayList<os::file_status>{allocator};
+    let unknown_indices = ArrayList<usize>{allocator};
+    let batch = os::Batch{allocator};
+    unknown_statuses.reserve(unknown_count);
+    unknown_indices.reserve(unknown_count);
+    batch.reserve(unknown_count);
+
+    for (usize index = 0; index < children->count(); index++) {
+      if ((*children)[index].kind != Path::entry_kind::Unknown) continue;
+      unknown_statuses.push({});
+      unknown_indices.push(index);
+    }
+
+    for (usize index = 0; index < unknown_count; index++)
+      batch.add(os::batch_operation::stat(
+          child_paths[unknown_indices[index]], unknown_statuses[index]));
+
+    let const results = batch.execute();
+    for (usize index = 0; index < unknown_count; index++) {
+      let &kind = (*children)[unknown_indices[index]].kind;
+      if (results[index].error_number != 0) {
+        kind = Path::entry_kind::Other;
+        continue;
+      }
+
+      switch (os::file_type_letter(unknown_statuses[index].mode)) {
+      case 'd': kind = Path::entry_kind::Directory; break;
+      case '-': kind = Path::entry_kind::Regular; break;
+      default: kind = Path::entry_kind::Other; break;
       }
     }
+  }
+
+  for (usize index = 0; index < children->count(); index++) {
+    if (os::INTERRUPT_REQUESTED) return;
+    let const kind = (*children)[index].kind;
+    if (kind == Path::entry_kind::Directory)
+      collect_recursive_sources(ec, cxt, child_paths[index], kind, allocator,
+                                storage, status);
+    else if (kind == Path::entry_kind::Regular)
+      storage.push(child_paths[index].text().clone());
   }
 }
 
@@ -184,8 +227,10 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         sources.push(source);
         continue;
       }
-      collect_recursive_sources(ec, cxt, source, allocator, recursive_storage,
-                                status);
+      let const source_path = Path{source, allocator};
+      collect_recursive_sources(ec, cxt, source_path,
+                                Path::entry_kind::Unknown, allocator,
+                                recursive_storage, status);
     }
     sources.reserve(recursive_storage.count() + 1);
     for (let const &source : recursive_storage) sources.push(source.view());
