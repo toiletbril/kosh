@@ -122,10 +122,16 @@ fn append_subject(String &output, StringView operand,
   append_report_text(output, operand, colors::ansi::BOLD_BLUE, should_color);
   output += "\n";
   let table = ReportTable{allocator};
+  table.add_column("FIELD", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("VALUE");
   let const do_append_field = [&](StringView name, StringView value,
                                   StringView style, bool unused_color) throws {
     unused(unused_color);
-    table.add(name, value, style);
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({name, style});
+    cells.push({value, {}});
+    table.add_row(cells);
   };
   let const described_type = describe_file_type(operand, status, allocator);
   do_append_field("Type",

@@ -91,8 +91,14 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
   append_report_text(output, path, colors::ansi::BOLD_BLUE, should_color);
   output += '\n';
   let table = ReportTable{allocator};
+  table.add_column("FIELD", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("VALUE");
   let const do_append_field = [&](StringView name, StringView value) throws {
-    table.add(name, value, colors::ansi::BOLD_CYAN);
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({name, colors::ansi::BOLD_CYAN});
+    cells.push({value, {}});
+    table.add_row(cells);
   };
   do_append_field("Type", file_type_name(status));
   do_append_field("Inode", String::from(status.file_id, allocator));

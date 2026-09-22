@@ -13,7 +13,7 @@ printf 'default-scope=%s\n' "$default_scope"
 filesystem_report=$($BIN -c 'koshkit --color never goodstat --filesystem "$1"' \
   goodstat "$fixture")
 case $filesystem_report in
-  *Filesystem:*'Filesystem block size:'*'Filesystem capacity:'*)
+  *FIELD*VALUE*Filesystem*'Filesystem block size'*'Filesystem capacity'*)
     filesystem_shape=matched
     ;;
   *) filesystem_shape=wrong ;;
@@ -22,9 +22,9 @@ printf 'filesystem-shape=%s\n' "$filesystem_shape"
 
 checksum_report=$($BIN -c 'koshkit --color never goodstat --checksum "$1"' \
   goodstat "$fixture")
-checksum_line=$(printf '%s\n' "$checksum_report" | sed -n '/CRC32C:/p')
+checksum_line=$(printf '%s\n' "$checksum_report" | sed -n '/CRC32C[[:space:]]/p')
 case $checksum_line in
-  '  CRC32C: '????????) checksum_shape=matched ;;
+  *CRC32C*????????) checksum_shape=matched ;;
   *) checksum_shape=wrong ;;
 esac
 printf 'checksum-shape=%s\n' "$checksum_shape"
