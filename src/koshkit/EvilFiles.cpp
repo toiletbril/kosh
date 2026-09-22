@@ -369,7 +369,7 @@ fn EvilFiles::execute(
 
   let warnings = String{allocator};
   if (inaccessible_process_count != 0) {
-    warnings += "\nSkipped ";
+    warnings += "Skipped ";
     warnings += String::from(inaccessible_process_count, allocator).view();
     warnings += inaccessible_process_count == 1 ? " inaccessible process."
                                                 : " inaccessible processes.";
