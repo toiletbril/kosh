@@ -392,6 +392,78 @@ fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
   return memberships;
 }
 
+struct process_cgroup_snapshot
+{
+  i64 process_id{0};
+  u64 start_token{0};
+  String name{heap_allocator()};
+  ArrayList<cgroup_membership> memberships{heap_allocator()};
+};
+
+fn collect_process_cgroup_snapshot(Allocator allocator) throws
+    -> ArrayList<process_cgroup_snapshot>
+{
+  let candidates =
+      os::enumerate_processes(os::process_detail::ResourceStats);
+  let pending = ArrayList<process_cgroup_snapshot>{allocator};
+  for (let const &process : candidates) {
+    let suffix = String::from(process.pid, allocator);
+    suffix += "/cgroup";
+    let const contents =
+        Path{cgroup_proc_path(suffix.view(), allocator)}.read_entire_file();
+    if (!contents.has_value()) continue;
+    let memberships =
+        parse_cgroup_memberships(contents->view(), allocator);
+    if (memberships.is_empty()) continue;
+    pending.push({
+        process.pid,
+        process.start_token,
+        process.name.is_empty() ? String{allocator, "-"}
+                                : String{allocator, process.name.view()},
+        steal(memberships),
+    });
+  }
+
+  let current = os::enumerate_processes(os::process_detail::ResourceStats);
+  let snapshot = ArrayList<process_cgroup_snapshot>{allocator};
+  for (let &candidate : pending) {
+    for (let const &process : current) {
+      if (process.pid != candidate.process_id || process.start_token == 0 ||
+          candidate.start_token == 0 ||
+          process.start_token != candidate.start_token)
+      {
+        continue;
+      }
+      candidate.name = process.name.is_empty()
+                           ? String{allocator, "-"}
+                           : String{allocator, process.name.view()};
+      snapshot.push(steal(candidate));
+      break;
+    }
+  }
+  return snapshot;
+}
+
+fn join_cgroup_paths(const process_cgroup_snapshot &process,
+                     Allocator allocator) throws -> String
+{
+  let result = String{allocator};
+  for (usize index = 0; index < process.memberships.count(); index++) {
+    let const &membership = process.memberships[index];
+    bool is_known = false;
+    for (usize known_index = 0; known_index < index; known_index++) {
+      if (process.memberships[known_index].path == membership.path) {
+        is_known = true;
+        break;
+      }
+    }
+    if (is_known) continue;
+    if (!result.is_empty()) result += ',';
+    result += membership.path.view();
+  }
+  return result;
+}
+
 struct cgroup_report_row
 {
   String hierarchy{heap_allocator()};
@@ -406,41 +478,28 @@ struct cgroup_report_row
 };
 
 fn append_cgroup_report(String &output, bool should_color,
-                        bool should_show_detail) throws -> void
+                        bool should_show_detail,
+                        const ArrayList<process_cgroup_snapshot> &snapshot)
+    throws -> void
 {
-  let const contents =
-      Path{cgroup_proc_path("self/cgroup", heap_allocator())}
-          .read_entire_file();
   let table = ReportTable{heap_allocator()};
-  if (!contents.has_value()) {
-    table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
-    output += table.to_string(should_color, "");
-    return;
-  }
-
-  let const self_memberships =
-      parse_cgroup_memberships(contents->view(), heap_allocator());
-  if (self_memberships.is_empty()) {
-    table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
-    output += table.to_string(should_color, "");
-    return;
-  }
-
+  let self_index = Maybe<usize>{};
   let const self_process_id = os::get_current_process_id();
-  let self_name = String{heap_allocator(), "-"};
-  if (let const name =
-          Path{cgroup_proc_path("self/comm", heap_allocator())}
-              .read_entire_file();
-      name.has_value())
-  {
-    for (let const line : utils::split_lines(name->view())) {
-      if (!line.is_empty()) self_name = String{heap_allocator(), line};
+  for (usize index = 0; index < snapshot.count(); index++) {
+    if (snapshot[index].process_id == self_process_id) {
+      self_index = index;
       break;
     }
   }
+  if (!self_index.has_value()) {
+    table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
+    output += table.to_string(should_color, "");
+    return;
+  }
 
+  let const &self = snapshot[*self_index];
   let rows = ArrayList<cgroup_report_row>{heap_allocator()};
-  for (let const &membership : self_memberships) {
+  for (let const &membership : self.memberships) {
     rows.push({
         String{heap_allocator(), membership.hierarchy.view()},
         membership.hierarchy_value,
@@ -448,67 +507,36 @@ fn append_cgroup_report(String &output, bool should_color,
         String{heap_allocator(), membership.path.view()},
         String::from(self_process_id, heap_allocator()),
         self_process_id,
-        0,
-        String{heap_allocator(), self_name.view()},
+        self.start_token,
+        String{heap_allocator(), self.name.view()},
         "self",
     });
   }
 
   if (should_show_detail) {
-    let const processes =
-        os::enumerate_processes(os::process_detail::ResourceStats);
-    let candidate_rows = ArrayList<cgroup_report_row>{heap_allocator()};
-    for (let const &process : processes) {
-      if (process.pid == self_process_id) continue;
-      let const process_contents =
-          Path{cgroup_proc_path(
-                   String::from(process.pid, heap_allocator()) + "/cgroup",
-                   heap_allocator())}
-              .read_entire_file();
-      if (!process_contents.has_value()) continue;
-      let const memberships =
-          parse_cgroup_memberships(process_contents->view(), heap_allocator());
-      for (let const &membership : memberships) {
-        for (let const &self_membership : self_memberships) {
+    for (let const &process : snapshot) {
+      if (process.process_id == self_process_id) continue;
+      for (let const &membership : process.memberships) {
+        for (let const &self_membership : self.memberships) {
           if (membership.hierarchy != self_membership.hierarchy ||
               membership.controller != self_membership.controller ||
               membership.path != self_membership.path)
           {
             continue;
           }
-          candidate_rows.push({
+          rows.push({
               String{heap_allocator(), membership.hierarchy.view()},
               membership.hierarchy_value,
               String{heap_allocator(), membership.controller.view()},
               String{heap_allocator(), membership.path.view()},
-              String::from(process.pid, heap_allocator()),
-              process.pid,
+              String::from(process.process_id, heap_allocator()),
+              process.process_id,
               process.start_token,
-              process.name.is_empty()
-                  ? String{heap_allocator(), "-"}
-                  : String{heap_allocator(), process.name.view()},
+              String{heap_allocator(), process.name.view()},
               "other",
           });
           break;
         }
-      }
-    }
-    let const current_processes =
-        os::enumerate_processes(os::process_detail::ResourceStats);
-    for (let &row : candidate_rows) {
-      if (row.process_start_token == 0) continue;
-      for (let const &process : current_processes) {
-        if (process.pid != row.process_id_value ||
-            process.start_token == 0 ||
-            process.start_token != row.process_start_token)
-        {
-          continue;
-        }
-        row.name = process.name.is_empty()
-                       ? String{heap_allocator(), "-"}
-                       : String{heap_allocator(), process.name.view()};
-        rows.push(steal(row));
-        break;
       }
     }
   }
@@ -1178,42 +1206,28 @@ fn append_remote_report(String &output, bool should_color,
 
 fn append_runtime_report(String &output, bool should_color,
                          bool show_kubernetes, bool show_container,
-                         bool should_show_detail) throws
+                         bool should_show_detail,
+                         const ArrayList<process_cgroup_snapshot> &snapshot)
+    throws
     -> void
 {
   let table = ReportTable{heap_allocator()};
-  let const cgroup =
-      Path{cgroup_proc_path("1/cgroup", heap_allocator())}.read_entire_file();
-  let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
   let const kubernetes =
       os::get_environment_variable("KUBERNETES_SERVICE_HOST");
-  bool has_kubepods = cgroup_text.find_substring("kubepods").has_value();
-  bool has_docker = cgroup_text.find_substring("docker").has_value();
-  bool has_containerd = cgroup_text.find_substring("containerd").has_value();
-  bool has_crio = cgroup_text.find_substring("crio").has_value();
-  bool has_libpod = cgroup_text.find_substring("libpod").has_value();
-  if (!has_kubepods || !has_docker || !has_containerd || !has_crio ||
-      !has_libpod)
-  {
-    for (let const &process : os::enumerate_processes()) {
-      let const process_cgroups =
-          remote_process_cgroups(process.pid, heap_allocator());
-      has_kubepods = has_kubepods ||
-                     remote_orchestrator_name(process_cgroups.view()) ==
-                         "kubernetes";
-      has_docker = has_docker ||
-                   remote_runtime_name(process_cgroups.view()) == "docker";
-      has_containerd =
-          has_containerd ||
-          remote_runtime_name(process_cgroups.view()) == "containerd";
-      has_crio = has_crio ||
-                 remote_runtime_name(process_cgroups.view()) == "cri-o";
-      has_libpod = has_libpod ||
-                   remote_runtime_name(process_cgroups.view()) == "podman";
-      if (has_kubepods && has_docker && has_containerd && has_crio &&
-          has_libpod)
-        break;
-    }
+  bool has_kubepods = false;
+  bool has_docker = false;
+  bool has_containerd = false;
+  bool has_crio = false;
+  bool has_libpod = false;
+  for (let const &process : snapshot) {
+    let const cgroups = join_cgroup_paths(process, heap_allocator());
+    let const runtime_name = remote_runtime_name(cgroups.view());
+    has_kubepods = has_kubepods ||
+                   remote_orchestrator_name(cgroups.view()) == "kubernetes";
+    has_docker = has_docker || runtime_name == "docker";
+    has_containerd = has_containerd || runtime_name == "containerd";
+    has_crio = has_crio || runtime_name == "cri-o";
+    has_libpod = has_libpod || runtime_name == "podman";
   }
   let runtime = String{heap_allocator()};
   if (kubernetes.has_value() || has_kubepods)
@@ -1264,17 +1278,16 @@ fn append_runtime_report(String &output, bool should_color,
     String orchestrator{heap_allocator()};
   };
   let rows = ArrayList<runtime_process_row>{heap_allocator()};
-  for (let const &process : os::enumerate_processes()) {
-    let cgroups = remote_process_cgroups(process.pid, heap_allocator());
+  for (let const &process : snapshot) {
+    let cgroups = join_cgroup_paths(process, heap_allocator());
     let const runtime_name = remote_runtime_name(cgroups.view());
     let const orchestrator_name = remote_orchestrator_name(cgroups.view());
     if (runtime_name == "-" && orchestrator_name == "-") continue;
     rows.push({
         String{heap_allocator(), runtime_name},
         String{heap_allocator(), "cgroup"},
-        String::from(process.pid, heap_allocator()),
-        process.name.is_empty() ? String{heap_allocator(), "-"}
-                                : String{heap_allocator(), process.name.view()},
+        String::from(process.process_id, heap_allocator()),
+        String{heap_allocator(), process.name.view()},
         remote_container_id(cgroups.view(), heap_allocator()),
         String{heap_allocator(), orchestrator_name},
     });
@@ -1405,11 +1418,18 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_EVILISO_CONTAINER.is_enabled() || FLAG_EVILISO_CONTAINERS.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
+  let process_cgroups =
+      ArrayList<process_cgroup_snapshot>{cxt.scratch_allocator()};
+  if (show_cgroups || show_runtime) {
+    process_cgroups =
+        collect_process_cgroup_snapshot(cxt.scratch_allocator());
+  }
   if (show_namespaces)
     append_namespace_report(output, should_color,
                             FLAG_EVILISO_ALL.is_enabled());
   if (show_cgroups)
-    append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
+    append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled(),
+                         process_cgroups);
   if (show_sessions)
     append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_remote)
@@ -1419,7 +1439,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
         FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled());
   if (show_runtime)
     append_runtime_report(output, should_color, show_kubernetes,
-                          show_container, FLAG_EVILISO_ALL.is_enabled());
+                          show_container, FLAG_EVILISO_ALL.is_enabled(),
+                          process_cgroups);
   ec.print_to_stdout(output);
   return 0;
 }
