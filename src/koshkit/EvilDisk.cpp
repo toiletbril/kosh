@@ -540,36 +540,39 @@ fn EvilDisk::execute(
       unavailable_sections.push("Filesystem failure counters");
     } else {
       output += "\n";
-      constexpr StringView HEADERS[] = {"READ", "WRITE", "FLUSH", "CORRUPTION",
-                                        "GENERATION"};
-      constexpr usize WIDTHS[] = {6, 6, 6, 10, 10};
-      usize mount_width = 5;
+      let table = ReportTable{allocator};
+      table.add_column("MOUNT", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("READ", report_table_alignment::Right,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("WRITE", report_table_alignment::Right,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("FLUSH", report_table_alignment::Right,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("CORRUPTION", report_table_alignment::Right,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("GENERATION", report_table_alignment::Right,
+                       colors::ansi::BOLD_CYAN);
       for (let const &row : failure_rows) {
-        if (row.mount.length > mount_width) mount_width = row.mount.length;
+        let const read_count = String::from(row.counters.read_count, allocator);
+        let const write_count =
+            String::from(row.counters.write_count, allocator);
+        let const flush_count =
+            String::from(row.counters.flush_count, allocator);
+        let const corruption_count =
+            String::from(row.counters.corruption_count, allocator);
+        let const generation_count =
+            String::from(row.counters.generation_count, allocator);
+        let cells = ArrayList<report_table_cell_view>{allocator};
+        cells.push({row.mount, colors::ansi::BOLD_GREEN});
+        cells.push({read_count.view(), colors::ansi::RESET});
+        cells.push({write_count.view(), colors::ansi::RESET});
+        cells.push({flush_count.view(), colors::ansi::RESET});
+        cells.push({corruption_count.view(), colors::ansi::RESET});
+        cells.push({generation_count.view(), colors::ansi::RESET});
+        table.add_row(cells);
       }
-      append_report_column(output, "MOUNT", mount_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      for (usize index = 0; index < countof(HEADERS); index++) {
-        output += "  ";
-        append_report_column(output, HEADERS[index], WIDTHS[index], true,
-                             colors::ansi::BOLD_CYAN, should_color);
-      }
-      output += "\n";
-      for (let const &row : failure_rows) {
-        const u64 values[] = {row.counters.read_count,
-                              row.counters.write_count,
-                              row.counters.flush_count,
-                              row.counters.corruption_count,
-                              row.counters.generation_count};
-        append_report_column(output, row.mount, mount_width, false,
-                             colors::ansi::BOLD_GREEN, should_color);
-        for (usize index = 0; index < countof(values); index++) {
-          output += "  ";
-          append_report_column(output, String::from(values[index], allocator),
-                               WIDTHS[index], true, {}, should_color);
-        }
-        output += "\n";
-      }
+      output += table.to_string(should_color, "").view();
     }
   }
 
