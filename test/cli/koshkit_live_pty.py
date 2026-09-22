@@ -87,6 +87,7 @@ def run_pty(binary, command, key=None):
         "sort_cycle": all(marker in output for marker in (
             b"SORT tree", b"SORT name", b"SORT pid", b"SORT cpu",
             b"SORT memory")),
+        "search_query": b"SEARCH /1" in output,
     }
 
 
@@ -131,7 +132,7 @@ def main():
         ("evilio-pty", "koshkit --color never evilio --ps --live=0.05 "
          "--cumulative=0.1", None),
         ("evilps-pty", "koshkit --color never evilps --cpu --live=0.05 "
-         "--cumulative=0.1 -1", b"s\n" * 5),
+         "--cumulative=0.1 -1", b"s\n" * 5 + b"/1\n"),
     ):
         result = run_pty(binary, command, key if name == "evilps-pty" else None)
         requirements = {"status": 130, "resized": True,
@@ -143,6 +144,7 @@ def main():
                         "blank_separator": True}
         if key is not None:
             requirements["sort_cycle"] = True
+            requirements["search_query"] = True
         ok &= check(name, result, requirements)
         if result["frames"] < 2:
             print("%s FAIL fewer than two live frames" % name)
