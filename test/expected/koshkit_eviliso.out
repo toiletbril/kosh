@@ -11,6 +11,7 @@ remote-selector=matched
 remote-scope=matched
 runtime-selector=matched
 runtime-scope=matched
+containers-alias=matched
 combined-scope=matched
 all-scope=matched
 all-default-scope=matched

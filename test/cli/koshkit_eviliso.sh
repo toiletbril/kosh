@@ -170,6 +170,18 @@ for selector_section in \
   printf '%s-scope=%s\n' "$1" "$selector_scope"
 done
 
+containers_report=$(run_report '--containers')
+containers_alias=missing
+case $containers_report in
+  *"Runtime:"*) containers_alias=matched ;;
+esac
+case $containers_report in
+  *"HIERARCHY"*|*"Remote sockets:"*|*"USER   TERMINAL"*)
+    containers_alias=wrong
+    ;;
+esac
+printf 'containers-alias=%s\n' "$containers_alias"
+
 combined_report=$(run_report '-n -k')
 case $combined_report in
 *"Runtime:"*) combined_scope=matched ;;
