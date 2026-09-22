@@ -1,0 +1,3 @@
+== export completes variable names without an equals suffix:
+KOSH_EXPORT_COMPLETION_UNIQUE
+export-candidate=plain

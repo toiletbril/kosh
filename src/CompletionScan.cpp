@@ -836,6 +836,20 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Export &&
+      wants_operand)
+  {
+    let const is_value_after_equals = token_start > 0 &&
+                                      line[token_start - 1] == '=';
+    if (!is_value_after_equals) {
+      let names = ArrayList<String>{heap_allocator()};
+      push_variable_name_candidates(token, context, names);
+      if (!names.is_empty()) return names;
+    }
+
+    return None;
+  }
+
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Kill) {
     /* kill -s and kill -n both resolve a signal name or a number. */
     if (previous_word == "-s" || previous_word == "-n") {
