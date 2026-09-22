@@ -12,6 +12,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Lexer.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -445,6 +446,12 @@ enum class bc_flow : u8
   Return,
   Quit,
 };
+
+static constexpr static_string_entry<bc_flow> BC_CONTROL_FLOW_ENTRIES[] = {
+    {SSK("break"), bc_flow::Break},
+    {SSK("quit"), bc_flow::Quit},
+};
+static constexpr StaticStringMap BC_CONTROL_FLOW{BC_CONTROL_FLOW_ENTRIES};
 
 static fn bc_run_program(StringView program, const ExecContext &ec,
                          EvalContext &cxt, bc_runtime &runtime) throws
@@ -1000,8 +1007,8 @@ static fn bc_execute_statement(StringView statement, const ExecContext &ec,
 {
   statement = statement.trim_blanks();
   if (statement.is_empty()) return bc_flow::Normal;
-  if (statement == "break") return bc_flow::Break;
-  if (statement == "quit") return bc_flow::Quit;
+  if (let const flow = BC_CONTROL_FLOW.find(statement); flow.has_value())
+    return *flow;
   if (bc_define_function(statement, runtime, cxt.scratch_allocator()))
     return bc_flow::Normal;
   if (bc_declare_auto(statement, cxt, cxt.scratch_allocator()))
