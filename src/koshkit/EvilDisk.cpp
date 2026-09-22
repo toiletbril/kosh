@@ -506,31 +506,21 @@ fn EvilDisk::execute(
       unavailable_sections.push("Identity data");
     } else {
       output += "\n";
-      usize mount_width = 5;
-      usize label_width = 5;
+      let table = ReportTable{allocator};
+      table.add_column("MOUNT", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("LABEL", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("UUID", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
       for (let const &row : identity_rows) {
-        if (row.mount.length > mount_width) mount_width = row.mount.length;
-        if (row.label.length > label_width) label_width = row.label.length;
+        let cells = ArrayList<report_table_cell_view>{allocator};
+        cells.push({row.mount, colors::ansi::BOLD_GREEN});
+        cells.push({row.label, colors::ansi::RESET});
+        cells.push({row.uuid, colors::ansi::DIM});
+        table.add_row(cells);
       }
-      append_report_column(output, "MOUNT", mount_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_column(output, "LABEL", label_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_text(output, "UUID", colors::ansi::BOLD_CYAN,
-                         should_color);
-      output += "\n";
-      for (let const &row : identity_rows) {
-        append_report_column(output, row.mount, mount_width, false,
-                             colors::ansi::BOLD_GREEN, should_color);
-        output += "  ";
-        append_report_column(output, row.label, label_width, false, {},
-                             should_color);
-        output += "  ";
-        append_report_text(output, row.uuid, colors::ansi::DIM, should_color);
-        output += "\n";
-      }
+      output += table.to_string(should_color, "").view();
     }
 
     struct failure_row
