@@ -307,10 +307,53 @@ fn append_cpu_value(String &output, const tree_node &node, Allocator allocator,
   output += "s";
 }
 
+fn append_bounded_command(String &output, StringView command,
+                          usize line_width_limit, bool should_color) throws
+    -> void
+{
+  if (command.is_empty()) return;
+  if (line_width_limit == 0 || line_width_limit == SIZE_MAX) {
+    output += " ";
+    append_report_text(output, command, colors::ansi::DIM, should_color);
+    return;
+  }
+
+  let const line_start = output.view().find_last_character('\n');
+  let const current_line = line_start.has_value()
+                               ? output.view().substring(*line_start + 1)
+                               : output.view();
+  let const current_width = toiletline::display_width(current_line);
+  if (current_width >= line_width_limit) return;
+  let const available = line_width_limit - current_width - 1;
+  if (available == 0) return;
+
+  output += " ";
+  if (toiletline::display_width(command) <= available) {
+    append_report_text(output, command, colors::ansi::DIM, should_color);
+    return;
+  }
+
+  if (available <= 3) {
+    let usize actual_cells = 0;
+    let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+        command, available, actual_cells);
+    append_report_text(output, command.substring_of_length(0, kept_bytes),
+                       colors::ansi::DIM, should_color);
+    return;
+  }
+
+  let usize actual_cells = 0;
+  let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+      command, available - 3, actual_cells);
+  append_report_text(output, command.substring_of_length(0, kept_bytes),
+                     colors::ansi::DIM, should_color);
+  append_report_text(output, "...", colors::ansi::DIM, should_color);
+}
+
 fn append_label(String &output, const tree_node &node, Allocator allocator,
                 bool should_color, bool should_human,
                 Maybe<evilps_sort_key> sort_key,
-                bool is_sampled) throws -> void
+                bool is_sampled, usize line_width_limit) throws -> void
 {
   if (should_human) {
     append_report_text(output,
@@ -330,9 +373,8 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
     if ((FLAG_EVILPS_ALL.is_enabled() ||
          FLAG_EVILPS_ARGUMENTS.is_enabled()) &&
         !node.command_line.is_empty()) {
-      output += " ";
-      append_report_text(output, node.command_line.view(), colors::ansi::DIM,
-                         should_color);
+      append_bounded_command(output, node.command_line.view(),
+                             line_width_limit, should_color);
     }
     output += "\n";
     return;
@@ -383,9 +425,8 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
 
   if ((FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_ARGUMENTS.is_enabled()) &&
       !node.command_line.is_empty()) {
-    output += " ";
-    append_report_text(output, node.command_line.view(), colors::ansi::DIM,
-                       should_color);
+    append_bounded_command(output, node.command_line.view(), line_width_limit,
+                           should_color);
   }
 
   output += "\n";
@@ -396,7 +437,7 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
                    bool should_color, usize output_limit,
                    usize &rendered_count, bool should_human,
                    Maybe<evilps_sort_key> sort_key,
-                   bool is_sampled) throws -> void
+                   bool is_sampled, usize line_width_limit) throws -> void
 {
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
 
@@ -424,14 +465,14 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
     append_report_text(output, is_last ? "└── " : "├── ", colors::ansi::CYAN,
                        should_color);
     append_label(output, nodes[position], allocator, should_color, should_human,
-                 sort_key, is_sampled);
+                 sort_key, is_sampled, line_width_limit);
     rendered_count++;
 
     let child_prefix = String{allocator, prefix.view()};
     child_prefix += is_last ? "    " : "│   ";
     render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
                     allocator, should_color, output_limit, rendered_count,
-                    should_human, sort_key, is_sampled);
+                    should_human, sort_key, is_sampled, line_width_limit);
   }
 }
 
@@ -512,6 +553,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            usize scroll_offset, StringView search,
                            bool should_human,
                            Maybe<evilps_sort_key> sort_key, bool is_sampled,
+                           usize line_width_limit,
                            usize &visible_line_count) throws -> i32
 {
   if (nodes.is_empty()) {
@@ -556,11 +598,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (nodes[root_position].search_visible) {
       nodes[root_position].was_rendered = true;
       append_label(output, nodes[root_position], allocator, should_color,
-                   should_human, sort_key, is_sampled);
+                   should_human, sort_key, is_sampled, line_width_limit);
       rendered_count++;
       render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
                       should_color, output_limit, rendered_count, should_human,
-                      sort_key, is_sampled);
+                      sort_key, is_sampled, line_width_limit);
     }
     visible_line_count = 1;
     if (viewport_rows != 0) {
@@ -608,11 +650,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (sort_key.has_value()) {
       nodes[position].was_rendered = true;
       append_label(output, nodes[position], allocator, should_color,
-                   should_human, sort_key, is_sampled);
+                   should_human, sort_key, is_sampled, line_width_limit);
       rendered_count++;
       render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
                       allocator, should_color, output_limit, rendered_count,
-                      should_human, sort_key, is_sampled);
+                      should_human, sort_key, is_sampled, line_width_limit);
       continue;
     }
 
@@ -631,11 +673,11 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     nodes[position].was_rendered = true;
     append_label(output, nodes[position], allocator, should_color,
-                 should_human, sort_key, is_sampled);
+                 should_human, sort_key, is_sampled, line_width_limit);
     rendered_count++;
     render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
                     allocator, should_color, output_limit, rendered_count,
-                    should_human, sort_key, is_sampled);
+                    should_human, sort_key, is_sampled, line_width_limit);
   }
 
   visible_line_count = rendered_count;
@@ -866,6 +908,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let live_input = String{live_allocator};
     let live_search = String{live_allocator};
     usize scroll_offset = 0;
+    usize live_line_width_limit = line_width_limit;
     if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
     let const is_cursor_hidden = is_terminal && hide_cursor(ec);
     defer
@@ -904,7 +947,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
       let const now = os::monotonic_nanos();
       if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
-        let live_line_width_limit = line_width_limit;
+        live_line_width_limit = line_width_limit;
         if (!FLAG_EVILPS_WIDE.is_enabled() && is_terminal) {
           u32 terminal_columns = 0;
           u32 terminal_rows = 0;
@@ -967,7 +1010,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
           output_limit, should_color,
           is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
           scroll_offset, live_search.view(), false, sort_key, true,
-          visible_line_count);
+          live_line_width_limit, visible_line_count);
       if (status != 0) return status;
       ec.print_to_stdout(frame);
       if (visible_line_count > terminal_rows && terminal_rows > 1) {
@@ -1015,7 +1058,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   let const status = render_process_snapshot(
       ec, cxt, allocator, output, nodes, operands, operand_locations,
       output_limit, should_color, 0, 0, StringView{}, false, sort_key,
-      is_sampled, output_limit);
+      is_sampled, line_width_limit, output_limit);
   if (status == 0) ec.print_to_stdout(output);
   return status;
 }
