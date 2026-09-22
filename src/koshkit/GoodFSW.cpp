@@ -181,7 +181,8 @@ fn report_event(String &output, StringView path, const os::file_status &status,
                                      timestamp_precision, timezone,
                                      output.allocator());
     output += " ";
-  } else {
+  } else if (FLAG_GOODFSW_MACHINE.is_enabled() ||
+             FLAG_GOODFSW_TIMESTAMP.is_enabled()) {
     output +=
         String::from(static_cast<u64>(scan_time), output.allocator()).view();
     output += " ";
@@ -191,18 +192,14 @@ fn report_event(String &output, StringView path, const os::file_status &status,
     append_report_text(output, path, colors::ansi::BOLD, should_color);
     output += " ";
     append_event_names(output, status, event, should_color);
-  } else if (FLAG_GOODFSW_TIMESTAMP.is_enabled() ||
-             FLAG_GOODFSW_EVENT_FLAGS.is_enabled())
-  {
+  } else {
+    output += String::from(event_mask(event), output.allocator()).view();
+    output += " ";
     append_report_text(output, path, colors::ansi::BOLD, should_color);
     if (FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
       output += " ";
       append_event_names(output, status, event, should_color);
     }
-  } else {
-    output += String::from(event_mask(event), output.allocator()).view();
-    output += " ";
-    append_report_text(output, path, colors::ansi::BOLD, should_color);
   }
 
   output += "\n";
