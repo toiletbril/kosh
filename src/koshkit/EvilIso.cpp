@@ -1182,6 +1182,10 @@ fn append_runtime_report(String &output, bool should_color,
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "cri-o";
   }
+  if (cgroup_text.find_substring("libpod").has_value()) {
+    if (!runtime.is_empty()) runtime += ", ";
+    runtime += "podman";
+  }
   if (runtime.is_empty() && Path{"/.dockerenv"}.is_regular_file())
     runtime = "docker";
   if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file())
