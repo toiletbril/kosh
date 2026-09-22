@@ -352,70 +352,36 @@ fn EvilDisk::execute(
     rows.push(steal(row));
   }
 
-  usize source_width = 10;
-  usize type_width = 4;
-  usize size_width = 4;
-  usize used_width = 4;
-  usize available_width = 9;
-  usize use_width = 3;
-  for (let const &row : rows) {
-    if (row.source.length() > source_width) source_width = row.source.length();
-    if (row.type.length() > type_width) type_width = row.type.length();
-    if (row.size.length() > size_width) size_width = row.size.length();
-    if (row.used.length() > used_width) used_width = row.used.length();
-    if (row.available.length() > available_width) {
-      available_width = row.available.length();
-    }
-    if (row.use.length() > use_width) use_width = row.use.length();
-  }
-
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let unavailable_sections = ArrayList<StringView>{allocator};
-  append_report_column(output, "FILESYSTEM", source_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "TYPE", type_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "SIZE", size_width, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "USED", used_width, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "AVAILABLE", available_width, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "USE", use_width, true, colors::ansi::BOLD_CYAN,
-                       should_color);
-  output += "  ";
-  append_report_text(output, "MOUNT", colors::ansi::BOLD_CYAN, should_color);
-  output += "\n";
-
+  let capacity_table = ReportTable{allocator};
+  capacity_table.add_column("FILESYSTEM", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+  capacity_table.add_column("TYPE", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+  capacity_table.add_column("SIZE", report_table_alignment::Right,
+                            colors::ansi::BOLD_CYAN);
+  capacity_table.add_column("USED", report_table_alignment::Right,
+                            colors::ansi::BOLD_CYAN);
+  capacity_table.add_column("AVAILABLE", report_table_alignment::Right,
+                            colors::ansi::BOLD_CYAN);
+  capacity_table.add_column("USE", report_table_alignment::Right,
+                            colors::ansi::BOLD_CYAN);
+  capacity_table.add_column("MOUNT", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
   for (let const &row : rows) {
-    append_report_column(output, row.source.view(), source_width, false,
-                         colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(output, row.type.view(), type_width, false,
-                         colors::ansi::BOLD_MAGENTA, should_color);
-    output += "  ";
-    append_report_column(output, row.size.view(), size_width, true,
-                         colors::ansi::CYAN, should_color);
-    output += "  ";
-    append_report_column(output, row.used.view(), used_width, true,
-                         colors::ansi::CYAN, should_color);
-    output += "  ";
-    append_report_column(output, row.available.view(), available_width, true,
-                         colors::ansi::CYAN, should_color);
-    output += "  ";
-    append_report_column(output, row.use.view(), use_width, true,
-                         usage_style(row.use_percent), should_color);
-    output += "  ";
-    append_report_text(output, row.target.view(), colors::ansi::BOLD_GREEN,
-                       should_color);
-    output += "\n";
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({row.source.view(), colors::ansi::GREEN});
+    cells.push({row.type.view(), colors::ansi::BOLD_MAGENTA});
+    cells.push({row.size.view(), colors::ansi::CYAN});
+    cells.push({row.used.view(), colors::ansi::CYAN});
+    cells.push({row.available.view(), colors::ansi::CYAN});
+    cells.push({row.use.view(), usage_style(row.use_percent)});
+    cells.push({row.target.view(), colors::ansi::BOLD_GREEN});
+    capacity_table.add_row(cells);
   }
+  output += capacity_table.to_string(should_color, "").view();
 
   let disk_snapshot = os::read_disk_io_snapshot(allocator);
   disk_snapshot.disks.sort(
