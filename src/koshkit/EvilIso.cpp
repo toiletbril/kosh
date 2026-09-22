@@ -398,7 +398,160 @@ struct process_cgroup_snapshot
   u64 start_token{0};
   String name{heap_allocator()};
   ArrayList<cgroup_membership> memberships{heap_allocator()};
+  struct identity_evidence
+  {
+    String runtime{heap_allocator()};
+    String container_id{heap_allocator()};
+    String pod_uid{heap_allocator()};
+    String qos{heap_allocator()};
+    bool is_kubernetes{false};
+    String path{heap_allocator()};
+  };
+  ArrayList<identity_evidence> evidence{heap_allocator()};
 };
+
+pure fn is_hexadecimal_id(StringView text) wontthrow -> bool
+{
+  if (text.length != 64) return false;
+  for (usize index = 0; index < text.length; index++) {
+    let const byte = text[index];
+    if (!((byte >= '0' && byte <= '9') || (byte >= 'a' && byte <= 'f') ||
+          (byte >= 'A' && byte <= 'F')))
+      return false;
+  }
+  return true;
+}
+
+pure fn has_suffix(StringView text, StringView suffix) wontthrow -> bool
+{
+  return text.length >= suffix.length &&
+         text.substring(text.length - suffix.length) == suffix;
+}
+
+pure fn scoped_container_id(StringView component, StringView prefix) wontthrow
+    -> Maybe<StringView>
+{
+  constexpr StringView SUFFIX = ".scope";
+  if (!component.starts_with(prefix) || !has_suffix(component, SUFFIX) ||
+      component.length != prefix.length + 64 + SUFFIX.length)
+    return None;
+  let const identifier =
+      component.substring_of_length(prefix.length, 64);
+  return is_hexadecimal_id(identifier) ? Maybe<StringView>{identifier} : None;
+}
+
+pure fn normalized_pod_uid(StringView component, Allocator allocator) throws
+    -> String
+{
+  usize start = 0;
+  if (component.starts_with("pod")) {
+    start = 3;
+  } else if (let const marker = component.find_substring("-pod");
+             marker.has_value())
+  {
+    start = *marker + 4;
+  } else {
+    return String{allocator, "-"};
+  }
+  let end = component.length;
+  if (has_suffix(component, ".slice")) end -= 6;
+  if (end - start != 36) return String{allocator, "-"};
+  let result = String{allocator};
+  result.reserve(36);
+  for (usize index = start; index < end; index++) {
+    let byte = component[index];
+    if (byte == '_') byte = '-';
+    let const uid_index = index - start;
+    let const should_be_separator = uid_index == 8 || uid_index == 13 ||
+                                     uid_index == 18 || uid_index == 23;
+    let const is_valid = should_be_separator
+                             ? byte == '-'
+                             : (byte >= '0' && byte <= '9') ||
+                                   (byte >= 'a' && byte <= 'f') ||
+                                   (byte >= 'A' && byte <= 'F');
+    if (!is_valid) return String{allocator, "-"};
+    result.push(byte >= 'A' && byte <= 'F' ? byte - 'A' + 'a' : byte);
+  }
+  return result;
+}
+
+fn parse_cgroup_identity(StringView path, Allocator allocator) throws
+    -> process_cgroup_snapshot::identity_evidence
+{
+  let result = process_cgroup_snapshot::identity_evidence{
+      String{allocator, "-"}, String{allocator, "-"},
+      String{allocator, "-"}, String{allocator, "-"},
+      false, String{allocator, path}};
+  let previous = StringView{};
+  let remaining = path;
+  bool has_kubernetes_component = false;
+  while (!remaining.is_empty()) {
+    if (remaining[0] == '/') {
+      remaining = remaining.substring(1);
+      continue;
+    }
+    let const separator = remaining.find_character('/');
+    let const component = separator.has_value()
+                               ? remaining.substring_of_length(0, *separator)
+                               : remaining;
+    remaining = separator.has_value()
+                    ? remaining.substring(*separator + 1)
+                    : StringView{};
+
+    if (component == "docker" || component == "containerd" ||
+        component == "crio" || component == "libpod")
+    {
+      result.runtime =
+          component == "crio"
+              ? String{allocator, "cri-o"}
+              : component == "libpod" ? String{allocator, "podman"}
+                                        : String{allocator, component};
+    }
+
+    struct scoped_runtime
+    {
+      StringView prefix;
+      StringView runtime;
+    };
+    static constexpr scoped_runtime SCOPED_RUNTIMES[] = {
+        {"docker-",         "docker"    },
+        {"cri-containerd-", "containerd"},
+        {"crio-",           "cri-o"     },
+        {"libpod-",         "podman"    },
+    };
+    for (let const &candidate : SCOPED_RUNTIMES) {
+      let const identifier =
+          scoped_container_id(component, candidate.prefix);
+      if (!identifier.has_value()) continue;
+      result.runtime = String{allocator, candidate.runtime};
+      result.container_id = String{allocator, *identifier};
+      break;
+    }
+    if (result.container_id == "-" && is_hexadecimal_id(component) &&
+        (previous == "docker" || previous == "containerd" ||
+         previous == "crio" || previous == "libpod" ||
+         has_kubernetes_component))
+      result.container_id = String{allocator, component};
+
+    let pod_uid = normalized_pod_uid(component, allocator);
+    if (pod_uid != "-") result.pod_uid = steal(pod_uid);
+    if (component == "burstable" ||
+        component.find_substring("-burstable-").has_value() ||
+        component == "kubepods-burstable.slice")
+      result.qos = "burstable";
+    if (component == "besteffort" ||
+        component.find_substring("-besteffort-").has_value() ||
+        component == "kubepods-besteffort.slice")
+      result.qos = "besteffort";
+    if (component == "kubepods" || component.starts_with("kubepods-")) {
+      result.is_kubernetes = true;
+      has_kubernetes_component = true;
+    }
+    previous = component;
+  }
+  if (result.pod_uid != "-" && result.qos == "-") result.qos = "guaranteed";
+  return result;
+}
 
 fn collect_process_cgroup_snapshot(Allocator allocator) throws
     -> ArrayList<process_cgroup_snapshot>
@@ -415,12 +568,19 @@ fn collect_process_cgroup_snapshot(Allocator allocator) throws
     let memberships =
         parse_cgroup_memberships(contents->view(), allocator);
     if (memberships.is_empty()) continue;
+    let evidence =
+        ArrayList<process_cgroup_snapshot::identity_evidence>{allocator};
+    evidence.reserve(memberships.count());
+    for (let const &membership : memberships) {
+      evidence.push(parse_cgroup_identity(membership.path.view(), allocator));
+    }
     pending.push({
         process.pid,
         process.start_token,
         process.name.is_empty() ? String{allocator, "-"}
                                 : String{allocator, process.name.view()},
         steal(memberships),
+        steal(evidence),
     });
   }
 
@@ -442,26 +602,6 @@ fn collect_process_cgroup_snapshot(Allocator allocator) throws
     }
   }
   return snapshot;
-}
-
-fn join_cgroup_paths(const process_cgroup_snapshot &process,
-                     Allocator allocator) throws -> String
-{
-  let result = String{allocator};
-  for (usize index = 0; index < process.memberships.count(); index++) {
-    let const &membership = process.memberships[index];
-    bool is_known = false;
-    for (usize known_index = 0; known_index < index; known_index++) {
-      if (process.memberships[known_index].path == membership.path) {
-        is_known = true;
-        break;
-      }
-    }
-    if (is_known) continue;
-    if (!result.is_empty()) result += ',';
-    result += membership.path.view();
-  }
-  return result;
 }
 
 struct cgroup_report_row
@@ -1220,14 +1360,13 @@ fn append_runtime_report(String &output, bool should_color,
   bool has_crio = false;
   bool has_libpod = false;
   for (let const &process : snapshot) {
-    let const cgroups = join_cgroup_paths(process, heap_allocator());
-    let const runtime_name = remote_runtime_name(cgroups.view());
-    has_kubepods = has_kubepods ||
-                   remote_orchestrator_name(cgroups.view()) == "kubernetes";
-    has_docker = has_docker || runtime_name == "docker";
-    has_containerd = has_containerd || runtime_name == "containerd";
-    has_crio = has_crio || runtime_name == "cri-o";
-    has_libpod = has_libpod || runtime_name == "podman";
+    for (let const &evidence : process.evidence) {
+      has_kubepods = has_kubepods || evidence.is_kubernetes;
+      has_docker = has_docker || evidence.runtime == "docker";
+      has_containerd = has_containerd || evidence.runtime == "containerd";
+      has_crio = has_crio || evidence.runtime == "cri-o";
+      has_libpod = has_libpod || evidence.runtime == "podman";
+    }
   }
   let runtime = String{heap_allocator()};
   if (kubernetes.has_value() || has_kubepods)
@@ -1279,17 +1418,24 @@ fn append_runtime_report(String &output, bool should_color,
   };
   let rows = ArrayList<runtime_process_row>{heap_allocator()};
   for (let const &process : snapshot) {
-    let cgroups = join_cgroup_paths(process, heap_allocator());
-    let const runtime_name = remote_runtime_name(cgroups.view());
-    let const orchestrator_name = remote_orchestrator_name(cgroups.view());
-    if (runtime_name == "-" && orchestrator_name == "-") continue;
+    let runtime_name = String{heap_allocator(), "-"};
+    let container_id = String{heap_allocator(), "-"};
+    bool is_kubernetes = false;
+    for (let const &evidence : process.evidence) {
+      if (runtime_name == "-" && evidence.runtime != "-")
+        runtime_name = evidence.runtime.clone();
+      if (container_id == "-" && evidence.container_id != "-")
+        container_id = evidence.container_id.clone();
+      is_kubernetes = is_kubernetes || evidence.is_kubernetes;
+    }
+    if (runtime_name == "-" && !is_kubernetes) continue;
     rows.push({
-        String{heap_allocator(), runtime_name},
+        steal(runtime_name),
         String{heap_allocator(), "cgroup"},
         String::from(process.process_id, heap_allocator()),
         String{heap_allocator(), process.name.view()},
-        remote_container_id(cgroups.view(), heap_allocator()),
-        String{heap_allocator(), orchestrator_name},
+        steal(container_id),
+        String{heap_allocator(), is_kubernetes ? "kubernetes" : "-"},
     });
   }
   if (!rows.is_empty()) {
