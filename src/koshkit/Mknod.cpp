@@ -12,6 +12,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 #include "Mode.hpp"
 
@@ -43,6 +44,14 @@ static constexpr u32 FIFO_TYPE = 0010000;
 static constexpr u32 CHARACTER_TYPE = 0020000;
 static constexpr u32 BLOCK_TYPE = 0060000;
 
+static constexpr static_string_entry<u32> NODE_TYPE_ENTRIES[] = {
+    {SSK("b"), BLOCK_TYPE},       {SSK("block"), BLOCK_TYPE},
+    {SSK("c"), CHARACTER_TYPE},   {SSK("char"), CHARACTER_TYPE},
+    {SSK("character"), CHARACTER_TYPE},
+    {SSK("fifo"), FIFO_TYPE},     {SSK("p"), FIFO_TYPE},
+};
+static constexpr StaticStringMap NODE_TYPES{NODE_TYPE_ENTRIES};
+
 fn parse_device_number(StringView text) throws -> Maybe<u64>
 {
   let const parsed = utils::parse_decimal_u64(text);
@@ -52,11 +61,7 @@ fn parse_device_number(StringView text) throws -> Maybe<u64>
 
 pure fn node_type(StringView text) wontthrow -> Maybe<u32>
 {
-  if (text == "p" || text == "fifo") return FIFO_TYPE;
-  if (text == "c" || text == "char" || text == "character")
-    return CHARACTER_TYPE;
-  if (text == "b" || text == "block") return BLOCK_TYPE;
-  return None;
+  return NODE_TYPES.find(text);
 }
 
 } /* namespace */
