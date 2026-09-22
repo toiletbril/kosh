@@ -853,8 +853,18 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
       let const now = os::monotonic_nanos();
       if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
+        let live_line_width_limit = line_width_limit;
+        if (!FLAG_EVILPS_WIDE.is_enabled() && is_terminal) {
+          u32 terminal_columns = 0;
+          u32 terminal_rows = 0;
+          if (os::terminal_size(terminal_columns, terminal_rows,
+                                ec.out_fd.value_or(KOSH_STDOUT)) &&
+              terminal_columns > 8)
+            live_line_width_limit = terminal_columns;
+          unused(terminal_rows);
+        }
         nodes = read_process_nodes(live_allocator, should_read_resources,
-                                   line_width_limit);
+                                   live_line_width_limit);
         if (should_sample_cpu)
           update_cpu_history(nodes, history, now, window_nanoseconds);
         last_sample_nanoseconds = now;
