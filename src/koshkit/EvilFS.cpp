@@ -136,17 +136,6 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
     return left.source.view() < right.source.view();
   });
 
-  usize source_width = 6;
-  usize target_width = 6;
-  usize type_width = 4;
-  for (let const &mount : mounts) {
-    if (mount.source.length() > source_width)
-      source_width = mount.source.length();
-    if (mount.target.length() > target_width)
-      target_width = mount.target.length();
-    if (mount.type.length() > type_width) type_width = mount.type.length();
-  }
-
   let output = String{cxt.scratch_allocator()};
   let const should_color = koshkit_should_color();
   if (FLAG_EVILFS_ALL.is_enabled()) {
@@ -198,32 +187,24 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
     return mounts.is_empty() ? 1 : 0;
   }
 
-  append_report_column(output, "SOURCE", source_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "TARGET", target_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "TYPE", type_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_text(output, "OPTIONS", colors::ansi::BOLD_CYAN, should_color);
-  output += "\n";
-
+  let table = ReportTable{cxt.scratch_allocator()};
+  table.add_column("SOURCE", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("TARGET", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("TYPE", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("OPTIONS", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
   for (let const &mount : mounts) {
-    append_report_column(output, mount.source.view(), source_width, false,
-                         colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(output, mount.target.view(), target_width, false,
-                         colors::ansi::BOLD_GREEN, should_color);
-    output += "  ";
-    append_report_column(output, mount.type.view(), type_width, false,
-                         colors::ansi::BOLD_MAGENTA, should_color);
-    output += "  ";
-    append_report_text(output, mount.options.view(), colors::ansi::DIM,
-                       should_color);
-    output += "\n";
+    let cells = ArrayList<report_table_cell_view>{cxt.scratch_allocator()};
+    cells.push({mount.source.view(), colors::ansi::GREEN});
+    cells.push({mount.target.view(), colors::ansi::BOLD_GREEN});
+    cells.push({mount.type.view(), colors::ansi::BOLD_MAGENTA});
+    cells.push({mount.options.view(), colors::ansi::DIM});
+    table.add_row(cells);
   }
+  output += table.to_string(should_color, "").view();
 
   ec.print_to_stdout(output);
   return mounts.is_empty() ? 1 : 0;
