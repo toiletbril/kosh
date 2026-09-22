@@ -10,6 +10,7 @@
 
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
+#include "../Arena.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -790,6 +791,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (FLAG_EVILPS_LIVE.is_enabled()) {
     let const live_allocator = heap_allocator();
+    let frame_arena = BumpArena{};
     let const is_terminal =
         os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
     let const sample_interval_nanoseconds =
@@ -812,6 +814,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
     loop
     {
+      let const frame_mark = frame_arena.mark();
+      defer { frame_arena.release(frame_mark); };
+      let const frame_allocator = bump_allocator(frame_arena);
+
       if (last_sample_nanoseconds != 0) {
         let const before_wait_nanoseconds = os::monotonic_nanos();
         let const elapsed_nanoseconds =
@@ -829,7 +835,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       }
 
       let const now = os::monotonic_nanos();
-      let nodes = read_process_nodes(live_allocator, should_read_resources,
+      let nodes = read_process_nodes(frame_allocator, should_read_resources,
                                      line_width_limit);
       if (should_sample_cpu)
         update_cpu_history(nodes, history, now, window_nanoseconds);
@@ -842,13 +848,13 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
           terminal_rows = 24;
       }
       usize visible_line_count = 0;
-      let frame = String{live_allocator};
+      let frame = String{frame_allocator};
       if (is_terminal) frame += "\x1b[H\x1b[2J";
       append_live_controls_bar(
           frame,
-          format_live_duration(cumulative_interval_seconds, live_allocator)
+          format_live_duration(cumulative_interval_seconds, frame_allocator)
               .view(),
-          format_live_duration(live_interval_seconds, live_allocator).view(),
+          format_live_duration(live_interval_seconds, frame_allocator).view(),
           should_color);
       frame += "SORT ";
       if (!sort_key.has_value()) frame += "tree";
@@ -858,7 +864,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       else frame += "memory";
       frame += " | s sort | / search | q quit\n";
       let const status = render_process_snapshot(
-          ec, cxt, live_allocator, frame, nodes, operands, operand_locations,
+          ec, cxt, frame_allocator, frame, nodes, operands, operand_locations,
           output_limit, should_color,
           is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
           scroll_offset, live_search.view(), false, sort_key, true,
