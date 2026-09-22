@@ -127,9 +127,13 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   let frames = ArrayList<du_directory_frame>{allocator};
   let directory_queue = ArrayList<usize>{allocator};
   let stat_work = ArrayList<du_stat_work>{allocator};
+  let stat_batch = os::Batch{allocator};
+  let batch_results = ArrayList<os::batch_result>{allocator};
   frames.reserve(32);
   directory_queue.reserve(32);
   stat_work.reserve(512);
+  stat_batch.reserve(512);
+  batch_results.reserve(512);
   frames.push(du_directory_frame{Path{path.view(), allocator}, SIZE_MAX,
                                  allocated_size_bytes, 0, 0, false, false,
                                  false});
@@ -189,11 +193,10 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   let const do_flush_stat_work = [&]() throws -> void {
     if (stat_work.is_empty()) return;
 
-    let batch = os::Batch{allocator};
-    batch.reserve(stat_work.count());
+    stat_batch.clear();
     for (let &work : stat_work)
-      batch.add(os::batch_operation::lstat(work.path, work.status));
-    let const batch_results = batch.execute();
+      stat_batch.add(os::batch_operation::lstat(work.path, work.status));
+    stat_batch.execute(batch_results);
     for (usize index = 0; index < stat_work.count(); index++) {
       let &work = stat_work[index];
       let const parent_index = work.parent_index;
