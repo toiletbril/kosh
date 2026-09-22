@@ -103,6 +103,12 @@ static fn append_detailed_filesystem(String &output,
   return true;
 }
 
+struct filesystem_failure_row
+{
+  String target;
+  String error;
+};
+
 fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
                    const ArrayList<String> &args,
                    const ArrayList<SourceLocation> &arg_locations) const throws
@@ -146,7 +152,8 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILFS_ALL.is_enabled()) {
     usize skipped_permission_count = 0;
     let skipped_warning = String{cxt.scratch_allocator()};
-    let failed_targets = ArrayList<StringView>{cxt.scratch_allocator()};
+    let failure_rows =
+        ArrayList<filesystem_failure_row>{cxt.scratch_allocator()};
     for (let const &mount : mounts) {
       if (!output.is_empty()) output += "\n";
       let const metadata_available = append_detailed_filesystem(
@@ -155,7 +162,10 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
         if (os::last_system_error_is_permission_denied())
         skipped_permission_count++;
         else
-          failed_targets.push(mount.target.view());
+          failure_rows.push({
+              String{cxt.scratch_allocator(), mount.target.view()},
+              String{cxt.scratch_allocator(), os::last_system_error_message()},
+          });
       }
     }
     if (skipped_permission_count != 0) {
@@ -167,21 +177,21 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
           skipped_permission_count == 1 ? " filesystem" : " filesystems";
       skipped_warning += " due to permission denied.";
     }
-    if (!failed_targets.is_empty()) {
+    if (!failure_rows.is_empty()) {
       output += "\n";
-      append_report_column(output, "TARGET", 24, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_text(output, "ERROR", colors::ansi::BOLD_RED, should_color);
-      output += "\n";
-      for (let const &target : failed_targets) {
-        append_report_column(output, target, 24, false,
-                             colors::ansi::BOLD_GREEN, should_color);
-        output += "  ";
-        append_report_text(output, os::last_system_error_message(),
-                           colors::ansi::BOLD_RED, should_color);
-        output += "\n";
+      let table = ReportTable{cxt.scratch_allocator()};
+      table.add_column("TARGET", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("ERROR", report_table_alignment::Left,
+                       colors::ansi::BOLD_RED);
+      for (let const &failure : failure_rows) {
+        let cells =
+            ArrayList<report_table_cell_view>{cxt.scratch_allocator()};
+        cells.push({failure.target.view(), colors::ansi::BOLD_GREEN});
+        cells.push({failure.error.view(), colors::ansi::BOLD_RED});
+        table.add_row(cells);
       }
+      output += table.to_string(should_color, "").view();
     }
     ec.print_to_stdout(output);
     if (!skipped_warning.is_empty()) show_warning(skipped_warning.view());
