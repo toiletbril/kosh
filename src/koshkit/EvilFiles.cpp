@@ -49,6 +49,7 @@ struct open_file_row
   String descriptor;
   String type;
   String mode;
+  String state;
   String device;
   String size;
   String offset;
@@ -65,6 +66,7 @@ struct column_widths
   usize descriptor{2};
   usize type{4};
   usize mode{4};
+  usize state{5};
   usize device{6};
   usize size{8};
   usize offset{6};
@@ -341,6 +343,7 @@ fn EvilFiles::execute(
                                      : bracketed_type_label(file.path.view())},
           did_stat ? os::format_mode_string(status.mode)
                    : String{allocator, "-"},
+          String{allocator, file.is_deleted ? "deleted" : "-"},
           did_stat ? device_label(status, allocator) : String{allocator, "-"                                                                         },
           String::from(file.size != 0 || !did_stat ? file.size : status.size,
                        allocator),
@@ -358,6 +361,7 @@ fn EvilFiles::execute(
       widen(widths.descriptor, row.descriptor);
       widen(widths.type, row.type);
       widen(widths.mode, row.mode);
+      widen(widths.state, row.state);
       widen(widths.device, row.device);
       widen(widths.size, row.size);
       widen(widths.offset, row.offset);
@@ -400,8 +404,9 @@ fn EvilFiles::execute(
   if (line_width_limit != SIZE_MAX) {
     let const fixed_width = widths.pid + 2 + widths.user + 2 +
                             widths.descriptor + 2 + widths.type + 2 +
-                            widths.mode + 2 + widths.device + 2 + widths.size +
-                            2 + widths.offset + 2 + widths.node + 2 +
+                            widths.mode + 2 + widths.state + 2 +
+                            widths.device + 2 + widths.size + 2 +
+                            widths.offset + 2 + widths.node + 2 +
                             widths.endpoint + 2 + 3;
     if (line_width_limit > fixed_width + 4) {
       let const command_limit = line_width_limit - fixed_width;
@@ -424,6 +429,9 @@ fn EvilFiles::execute(
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
   append_report_column(output, "MODE", widths.mode, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "STATE", widths.state, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
   append_report_column(output, "DEVICE", widths.device, true,
@@ -474,6 +482,11 @@ fn EvilFiles::execute(
     append_report_column(output, row.mode.view(), widths.mode, false,
                          colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
+    append_report_column(output, row.state.view(), widths.state, false,
+                         row.state == "deleted" ? colors::ansi::BOLD_RED
+                                                : colors::ansi::GREEN,
+                         should_color);
+    output += "  ";
     append_report_column(output, row.device.view(), widths.device, true,
                          colors::ansi::GREEN, should_color);
     output += "  ";
@@ -493,8 +506,8 @@ fn EvilFiles::execute(
       usize const used_width =
           widths.command + 2 + widths.pid + 2 + widths.user + 2 +
           widths.descriptor + 2 + widths.type + 2 + widths.mode + 2 +
-          widths.device + 2 + widths.size + 2 + widths.offset + 2 +
-          widths.node + 2 + widths.endpoint + 2;
+          widths.state + 2 + widths.device + 2 + widths.size + 2 +
+          widths.offset + 2 + widths.node + 2 + widths.endpoint + 2;
       if (used_width + toiletline::display_width(row.name.view()) >
           line_width_limit)
       {
