@@ -589,53 +589,29 @@ fn EvilDisk::execute(
       unavailable_sections.push("SMART data");
     } else {
       output += "\n";
-      usize device_width = 6;
-      usize status_width = 6;
-      usize model_width = 5;
-      usize protocol_width = 8;
+      let table = ReportTable{allocator};
+      table.add_column("DEVICE", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("STATUS", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("MODEL", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("PROTOCOL", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
+      table.add_column("STATISTICS", report_table_alignment::Left,
+                       colors::ansi::BOLD_CYAN);
       for (let const &row : smart_rows) {
-        if (row.device.length() > device_width)
-          device_width = row.device.length();
-        if (row.status.length() > status_width)
-          status_width = row.status.length();
-        if (row.model.length() > model_width) model_width = row.model.length();
-        if (row.protocol.length() > protocol_width)
-          protocol_width = row.protocol.length();
-      }
+        let const is_healthy = smart_status_is_healthy(row.status.view());
+        let cells = ArrayList<report_table_cell_view>{allocator};
+        cells.push({row.device.view(), colors::ansi::BOLD_GREEN});
+        cells.push({row.status.view(), is_healthy ? colors::ansi::BOLD_GREEN
+                                                  : colors::ansi::BOLD_YELLOW});
+        cells.push({row.model.view(), colors::ansi::RESET});
+        cells.push({row.protocol.view(), colors::ansi::BOLD_MAGENTA});
+        cells.push({row.statistics.view(), colors::ansi::CYAN});
+        table.add_row(cells);
 
-      append_report_column(output, "DEVICE", device_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_column(output, "STATUS", status_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_column(output, "MODEL", model_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_column(output, "PROTOCOL", protocol_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      for (let const &row : smart_rows) {
-        append_report_column(output, row.device.view(), device_width, false,
-                             colors::ansi::BOLD_GREEN, should_color);
-        output += "  ";
-        let const status_style = smart_status_is_healthy(row.status.view())
-                                     ? colors::ansi::BOLD_GREEN
-                                     : colors::ansi::BOLD_YELLOW;
-        append_report_column(output, row.status.view(), status_width, false,
-                             status_style, should_color);
-        output += "  ";
-        append_report_column(output, row.model.view(), model_width, false, {},
-                             should_color);
-        output += "  ";
-        append_report_column(output, row.protocol.view(), protocol_width, false,
-                             colors::ansi::BOLD_MAGENTA, should_color);
-        output += "  ";
-        append_report_text(output, row.statistics.view(), colors::ansi::CYAN,
-                           should_color);
-        output += "\n";
-
-        if (!smart_status_is_healthy(row.status.view())) {
+        if (!is_healthy) {
           warnings.push(row.device + " reports SMART status " + row.status);
         }
         if (!row.warning_statistics.is_empty()) {
@@ -643,6 +619,7 @@ fn EvilDisk::execute(
                         row.warning_statistics);
         }
       }
+      output += table.to_string(should_color, "").view();
     }
   }
 
