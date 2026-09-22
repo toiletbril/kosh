@@ -770,12 +770,16 @@ fn collect_option_wrap_positions(const ArrayList<format_piece> &pieces) throws
   return positions;
 }
 
-pure fn word_contains_unbreakable_string(StringView word) wontthrow -> bool
+pure fn word_is_unbreakable(StringView word) wontthrow -> bool
 {
   if (word.length < 2) return false;
   if (word[0] == '\'' || word[0] == '"') return true;
-  return word.find_character('\'').has_value() ||
-         word.find_character('"').has_value();
+  if (word.find_character('\'').has_value() ||
+      word.find_character('"').has_value())
+    return true;
+  for (usize position = 0; position < word.length; position++)
+    if (is_format_blank(word[position])) return false;
+  return true;
 }
 
 fn append_long_string_warnings(StringView source,
@@ -785,7 +789,7 @@ fn append_long_string_warnings(StringView source,
 {
   for (let const &piece : pieces) {
     if (piece.kind != format_piece_kind::Word ||
-        !word_contains_unbreakable_string(piece.text) ||
+        !word_is_unbreakable(piece.text) ||
         toiletline::display_width(piece.text) <= FormatWriter::MAX_LINE_WIDTH)
       continue;
 
@@ -804,8 +808,8 @@ fn append_long_string_warnings(StringView source,
     warnings.push(String{
         heap_allocator(), warning_name + ":" + String::from(line, heap_allocator()) +
         ":" + String::from(column, heap_allocator()) +
-        ": warning: unbreakable string exceeds 78 columns; consider making "
-        "the string shorter"});
+        ": warning: unbreakable word exceeds 78 columns; consider making it "
+        "shorter or splitting it"});
   }
 }
 
