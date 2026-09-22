@@ -201,18 +201,13 @@ fn collect_core_libraries(EvalContext &cxt, StringView core, StringView binary,
       collect_paths_from_output(output->view(), paths, allocator);
   }
 
-  if (let const dependency_tool = resolve_util_program(
-#if defined __APPLE__
-          cxt, "otool"
-#else
-          cxt, "ldd"
-#endif
-          ))
+  let const platform_tools = os::goodcore_tools();
+  if (let const dependency_tool =
+          resolve_util_program(cxt, platform_tools.dependency_program))
   {
     let arguments = ArrayList<String>{heap_allocator()};
-#if defined __APPLE__
-    arguments.push(String{"-L"});
-#endif
+    if (platform_tools.dependency_uses_library_flag)
+      arguments.push(String{"-L"});
     arguments.push(String{binary});
     if (let const output = capture_util_program_output(
             *dependency_tool, steal(arguments), 30'000'000'000))
@@ -350,26 +345,28 @@ fn GoodCore::execute(
   core.append("core");
   if (has_pid) {
     print_progress(ec, should_show_progress, "capturing process core");
-#if defined __APPLE__
-    let const debugger = resolve_util_program(cxt, "lldb");
+    let const platform_tools = os::goodcore_tools();
+    let debugger = Maybe<Path>{};
+    if (!platform_tools.debugger_program.is_empty())
+      debugger = resolve_util_program(cxt, platform_tools.debugger_program);
     let capture_arguments = ArrayList<String>{heap_allocator()};
-    capture_arguments.push(String{"--batch"});
-    capture_arguments.push(String{"-p"});
-    capture_arguments.push(String::from(process_id, heap_allocator()));
-    capture_arguments.push(String{"-o"});
-    capture_arguments.push(String{"process save-core "} + core.text());
-    capture_arguments.push(String{"-o"});
-    capture_arguments.push(String{"process detach"});
-#elif defined __linux__
-    let const debugger = resolve_util_program(cxt, "gcore");
-    let capture_arguments = ArrayList<String>{heap_allocator()};
-    capture_arguments.push(String{"-o"});
-    capture_arguments.push(core.text().clone());
-    capture_arguments.push(String::from(process_id, heap_allocator()));
-#else
-    let const debugger = Maybe<Path>{};
-    let capture_arguments = ArrayList<String>{heap_allocator()};
-#endif
+    switch (platform_tools.capture_mode) {
+    case os::goodcore_capture_mode::Lldb:
+      capture_arguments.push(String{"--batch"});
+      capture_arguments.push(String{"-p"});
+      capture_arguments.push(String::from(process_id, heap_allocator()));
+      capture_arguments.push(String{"-o"});
+      capture_arguments.push(String{"process save-core "} + core.text());
+      capture_arguments.push(String{"-o"});
+      capture_arguments.push(String{"process detach"});
+      break;
+    case os::goodcore_capture_mode::Gcore:
+      capture_arguments.push(String{"-o"});
+      capture_arguments.push(core.text().clone());
+      capture_arguments.push(String::from(process_id, heap_allocator()));
+      break;
+    case os::goodcore_capture_mode::Unsupported: break;
+    }
     if (!debugger.has_value() || !run_tool(*debugger, steal(capture_arguments),
                                            os::measured_output::Inherit))
     {
@@ -378,15 +375,16 @@ fn GoodCore::execute(
           "install the platform debugger and check process permissions");
       return 1;
     }
-#if defined __linux__
-    let const captured_core =
-        Path{core.text() + "." + String::from(process_id, allocator)};
-    if (!os::rename_path(captured_core.view(), core.view())) {
-      report_soft_koshkit_error(ec, cxt, "capture failed",
-                                "the debugger produced no usable core file");
-      return 1;
+    if (platform_tools.capture_mode == os::goodcore_capture_mode::Gcore) {
+      let const captured_core =
+          Path{core.text() + "." + String::from(process_id, allocator)};
+      if (!os::rename_path(captured_core.view(), core.view())) {
+        report_soft_koshkit_error(
+            ec, cxt, "capture failed",
+            "the debugger produced no usable core file");
+        return 1;
+      }
     }
-#endif
   } else {
     print_progress(ec, should_show_progress, "copying existing core");
     let const source = Path{operands[0].view()}.to_absolute();

@@ -167,6 +167,23 @@ enum class mimic_mood : u8;
 
 namespace os {
 
+enum class goodcore_capture_mode : u8
+{
+  Unsupported,
+  Lldb,
+  Gcore,
+};
+
+struct goodcore_platform_tools
+{
+  StringView dependency_program;
+  StringView debugger_program;
+  goodcore_capture_mode capture_mode;
+  bool dependency_uses_library_flag;
+};
+
+pure fn goodcore_tools() wontthrow -> goodcore_platform_tools;
+
 enum class process_detail : u8
 {
   Basic,

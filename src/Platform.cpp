@@ -14,6 +14,17 @@
 namespace koshka {
 namespace os {
 
+pure fn goodcore_tools() wontthrow -> goodcore_platform_tools
+{
+#if defined __APPLE__
+  return {"otool", "lldb", goodcore_capture_mode::Lldb, true};
+#elif defined __linux__
+  return {"ldd", "gcore", goodcore_capture_mode::Gcore, false};
+#else
+  return {{}, {}, goodcore_capture_mode::Unsupported, false};
+#endif
+}
+
 static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
 
 } /* namespace os */
