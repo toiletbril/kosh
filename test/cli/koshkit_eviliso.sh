@@ -512,7 +512,8 @@ fi
 
 help=$($BIN -c 'koshkit eviliso --help')
 case $help in
-  *"--all"*"--namespaces"*"--cgroups"*"--sessions"*"--remote"*"--runtime"*)
+  *"--all"*"--namespaces"*"--cgroups"*"--sessions"*"--remote"*"--runtime"*\
+*"--kubernetes"*"--containers"*)
     help_shape=matched
     ;;
   *) help_shape=wrong ;;
