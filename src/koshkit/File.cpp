@@ -995,9 +995,9 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       sample_byte_count = FILE_CONTENT_SAMPLE_BYTE_COUNT;
     }
 
+    metadata_batch.clear();
     for (usize operand_position = 0; operand_position < operands.count();
-         operand_position++)
-    {
+         operand_position++) {
       if (metadata_results[operand_position].error_number != 0 ||
           os::file_type_letter(file_statuses[operand_position].mode) != 'l' ||
           !should_follow)
@@ -1005,8 +1005,12 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
         continue;
       }
 
-      unused(os::stat_path_following(operands[operand_position].view(),
-                                     file_statuses[operand_position]));
+      metadata_batch.add(os::batch_operation::stat(
+          operand_paths[operand_position], file_statuses[operand_position]));
+    }
+    if (metadata_batch.count() != 0) {
+      let follow_results = ArrayList<os::batch_result>{allocator};
+      metadata_batch.execute(follow_results);
     }
 
     let sample_sources = ArrayList<StringView>{allocator};
