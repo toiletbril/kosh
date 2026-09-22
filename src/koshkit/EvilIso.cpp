@@ -861,100 +861,6 @@ fn remote_endpoint(StringView address, u16 port,
   return result;
 }
 
-fn remote_process_cgroups(i64 process_id, Allocator allocator) throws -> String
-{
-  let suffix = String::from(process_id, allocator);
-  suffix += "/cgroup";
-  let const contents =
-      Path{cgroup_proc_path(suffix.view(), allocator)}.read_entire_file();
-  if (!contents.has_value()) return String{allocator, "-"};
-
-  let paths = ArrayList<String>{allocator};
-  for (let const line : utils::split_lines(contents->view())) {
-    let const first_separator = line.find_character(':');
-    if (!first_separator.has_value()) continue;
-    let const remainder = line.substring(*first_separator + 1);
-    let const second_separator = remainder.find_character(':');
-    if (!second_separator.has_value()) continue;
-    let const path = remainder.substring(*second_separator + 1);
-    if (path.is_empty()) continue;
-    bool is_known = false;
-    for (let const &known : paths) {
-      if (known.view() == path) {
-        is_known = true;
-        break;
-      }
-    }
-    if (!is_known) paths.push(String{allocator, path});
-  }
-
-  if (paths.is_empty()) return String{allocator, "-"};
-  let result = String{allocator};
-  for (let const &path : paths) {
-    if (!result.is_empty()) result += ",";
-    result += path.view();
-  }
-  return result;
-}
-
-pure fn remote_runtime_name(StringView cgroup) wontthrow -> StringView
-{
-  if (cgroup.find_substring("containerd").has_value()) return "containerd";
-  if (cgroup.find_substring("crio").has_value()) return "cri-o";
-  if (cgroup.find_substring("docker").has_value()) return "docker";
-  if (cgroup.find_substring("libpod").has_value()) return "podman";
-  return "-";
-}
-
-pure fn remote_orchestrator_name(StringView cgroup) wontthrow -> StringView
-{
-  return cgroup.find_substring("kubepods").has_value() ? "kubernetes" : "-";
-}
-
-fn remote_container_id(StringView cgroups, Allocator allocator) throws -> String
-{
-  usize best_start = 0;
-  usize best_length = 0;
-  usize position = 0;
-  while (position < cgroups.length) {
-    let const byte = cgroups[position];
-    let const is_hexadecimal = (byte >= '0' && byte <= '9') ||
-                               (byte >= 'a' && byte <= 'f') ||
-                               (byte >= 'A' && byte <= 'F');
-    if (!is_hexadecimal) {
-      position++;
-      continue;
-    }
-    let const start = position;
-    while (position < cgroups.length) {
-      let const candidate = cgroups[position];
-      if (!((candidate >= '0' && candidate <= '9') ||
-            (candidate >= 'a' && candidate <= 'f') ||
-            (candidate >= 'A' && candidate <= 'F')))
-      {
-        break;
-      }
-      position++;
-    }
-    let const length = position - start;
-    let const prefix_start = start > 32 ? start - 32 : 0;
-    let const prefix =
-        cgroups.substring_of_length(prefix_start, start - prefix_start);
-    let const has_runtime_marker =
-        prefix.find_substring("docker").has_value() ||
-        prefix.find_substring("containerd").has_value() ||
-        prefix.find_substring("crio").has_value() ||
-        prefix.find_substring("libpod").has_value();
-    if (length == 64 && has_runtime_marker && length > best_length) {
-      best_start = start;
-      best_length = length;
-    }
-  }
-  if (best_length == 0) return String{allocator, "-"};
-  return String{allocator,
-                cgroups.substring_of_length(best_start, best_length)};
-}
-
 fn remote_table_text(StringView text, usize maximum_cells,
                      Allocator allocator) throws -> String
 {
@@ -976,8 +882,9 @@ fn remote_table_text(StringView text, usize maximum_cells,
 }
 
 fn append_remote_report(String &output, bool should_color,
-                        bool should_show_rows, bool should_show_detail) throws
-    -> void
+                        bool should_show_rows, bool should_show_detail,
+                        const ArrayList<process_cgroup_snapshot> &snapshot)
+    throws -> void
 {
   let table = ReportTable{heap_allocator()};
   if (!os::has_network_socket_listing()) {
@@ -1202,13 +1109,41 @@ fn append_remote_report(String &output, bool should_color,
           {
             context.net_namespace = steal(*net_namespace);
           }
-          context.cgroups =
-              remote_process_cgroups(socket.process_id, heap_allocator());
-          context.orchestrator =
-              remote_orchestrator_name(context.cgroups.view());
-          context.runtime = remote_runtime_name(context.cgroups.view());
-          context.container =
-              remote_container_id(context.cgroups.view(), heap_allocator());
+          for (let const &process_cgroups : snapshot) {
+            if (process_cgroups.process_id != socket.process_id ||
+                process_cgroups.start_token != socket.owner_start_token)
+              continue;
+            for (usize index = 0;
+                 index < process_cgroups.memberships.count(); index++)
+            {
+              let const &membership = process_cgroups.memberships[index];
+              bool is_known = false;
+              for (usize known_index = 0; known_index < index; known_index++) {
+                if (process_cgroups.memberships[known_index].path ==
+                    membership.path)
+                {
+                  is_known = true;
+                  break;
+                }
+              }
+              if (is_known) continue;
+              if (!context.cgroups.is_empty()) context.cgroups += ',';
+              context.cgroups += membership.path.view();
+            }
+            for (let const &evidence : process_cgroups.evidence) {
+              if (context.runtime.is_empty() && evidence.runtime != "-")
+                context.runtime = evidence.runtime.clone();
+              if (context.container.is_empty() && evidence.container_id != "-")
+                context.container = evidence.container_id.clone();
+              if (context.orchestrator.is_empty() && evidence.is_kubernetes)
+                context.orchestrator = "kubernetes";
+            }
+            break;
+          }
+          if (context.cgroups.is_empty()) context.cgroups = "-";
+          if (context.orchestrator.is_empty()) context.orchestrator = "-";
+          if (context.runtime.is_empty()) context.runtime = "-";
+          if (context.container.is_empty()) context.container = "-";
           context.cgroups =
               remote_table_text(context.cgroups.view(), 120, heap_allocator());
           context.is_available = true;
@@ -1237,111 +1172,72 @@ fn append_remote_report(String &output, bool should_color,
     remote_rows.push(steal(row));
   }
 
-  usize local_width = 5;
-  usize peer_width = 4;
-  usize receive_width = 6;
-  usize send_width = 6;
-  usize process_width = 3;
-  usize socket_width = 6;
-  usize owner_width = 3;
-  usize user_width = 4;
-  usize name_width = 4;
-  usize command_width = 7;
-  usize namespace_width = 5;
-  usize orchestrator_width = 12;
-  usize runtime_width = 7;
-  usize container_width = 9;
-  usize cgroup_width = 6;
-  for (let const &row : remote_rows) {
-    if (row.local.length() > local_width) local_width = row.local.length();
-    if (row.peer.length() > peer_width) peer_width = row.peer.length();
-    let const receive = String::from(row.receive_queue_bytes, heap_allocator());
-    let const send = String::from(row.send_queue_bytes, heap_allocator());
-    if (receive.length() > receive_width) receive_width = receive.length();
-    if (send.length() > send_width) send_width = send.length();
-    if (!should_show_detail) continue;
-    if (row.socket_id.length() > socket_width)
-      socket_width = row.socket_id.length();
-    if (row.process_id.length() > process_width)
-      process_width = row.process_id.length();
-    if (row.owner_id.length() > owner_width)
-      owner_width = row.owner_id.length();
-    if (row.user.length() > user_width) user_width = row.user.length();
-    if (row.name.length() > name_width) name_width = row.name.length();
-    if (row.command.length() > command_width)
-      command_width = row.command.length();
-    if (row.net_namespace.length() > namespace_width) {
-      namespace_width = row.net_namespace.length();
-    }
-    if (row.orchestrator.length() > orchestrator_width)
-      orchestrator_width = row.orchestrator.length();
-    if (row.runtime.length() > runtime_width)
-      runtime_width = row.runtime.length();
-    if (row.container.length() > container_width)
-      container_width = row.container.length();
-    if (row.cgroup.length() > cgroup_width) cgroup_width = row.cgroup.length();
-  }
-
-  let const do_append_column = [&](StringView text, usize width,
-                                   bool is_numeric,
-                                   StringView style = {}) throws {
-    output += "  ";
-    append_report_column(output, text, width, is_numeric, style, should_color);
-  };
-  append_report_column(output, "FAMILY", 6, false, colors::ansi::BOLD_CYAN,
-                       should_color);
-  do_append_column("PROTO", 5, false, colors::ansi::BOLD_CYAN);
-  do_append_column("STATE", 10, false, colors::ansi::BOLD_CYAN);
-  do_append_column("RECV-Q", receive_width, true, colors::ansi::BOLD_CYAN);
-  do_append_column("SEND-Q", send_width, true, colors::ansi::BOLD_CYAN);
-  do_append_column("LOCAL", local_width, false, colors::ansi::BOLD_CYAN);
-  do_append_column("PEER", peer_width, false, colors::ansi::BOLD_CYAN);
+  let peer_table = ReportTable{heap_allocator()};
+  peer_table.add_column("FAMILY", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  peer_table.add_column("PROTO", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  peer_table.add_column("STATE", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  peer_table.add_column("RECV-Q", report_table_alignment::Right,
+                        colors::ansi::BOLD_CYAN);
+  peer_table.add_column("SEND-Q", report_table_alignment::Right,
+                        colors::ansi::BOLD_CYAN);
+  peer_table.add_column("LOCAL", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  peer_table.add_column("PEER", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
   if (should_show_detail) {
-    do_append_column("SOCKET", socket_width, true, colors::ansi::BOLD_CYAN);
-    do_append_column("PID", process_width, true, colors::ansi::BOLD_CYAN);
-    do_append_column("UID", owner_width, true, colors::ansi::BOLD_CYAN);
-    do_append_column("USER", user_width, false, colors::ansi::BOLD_CYAN);
-    do_append_column("NAME", name_width, false, colors::ansi::BOLD_CYAN);
-    do_append_column("COMMAND", command_width, false, colors::ansi::BOLD_CYAN);
-    do_append_column("NETNS", namespace_width, false, colors::ansi::BOLD_CYAN);
-    do_append_column("ORCHESTRATOR", orchestrator_width, false,
-                     colors::ansi::BOLD_CYAN);
-    do_append_column("RUNTIME", runtime_width, false, colors::ansi::BOLD_CYAN);
-    do_append_column("CONTAINER", container_width, false,
-                     colors::ansi::BOLD_CYAN);
-    do_append_column("CGROUP", cgroup_width, false, colors::ansi::BOLD_CYAN);
+    peer_table.add_column("SOCKET", report_table_alignment::Right,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("PID", report_table_alignment::Right,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("UID", report_table_alignment::Right,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("USER", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("NAME", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("COMMAND", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("NETNS", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("ORCHESTRATOR", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("RUNTIME", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("CONTAINER", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
+    peer_table.add_column("CGROUP", report_table_alignment::Left,
+                          colors::ansi::BOLD_CYAN);
   }
-  output += "\n";
-
   for (let const &row : remote_rows) {
-    append_report_column(output, row.family, 6, false,
-                         colors::ansi::BOLD_MAGENTA, should_color);
-    do_append_column(row.protocol, 5, false, colors::ansi::BOLD_MAGENTA);
-    do_append_column(row.state, 10, false, colors::ansi::BOLD_GREEN);
-    do_append_column(String::from(row.receive_queue_bytes, heap_allocator()),
-                     receive_width, true, colors::ansi::GREEN);
-    do_append_column(String::from(row.send_queue_bytes, heap_allocator()),
-                     send_width, true, colors::ansi::GREEN);
-    do_append_column(row.local.view(), local_width, false,
-                     colors::ansi::BOLD_CYAN);
-    do_append_column(row.peer.view(), peer_width, false, colors::ansi::CYAN);
+    let receive = String::from(row.receive_queue_bytes, heap_allocator());
+    let send = String::from(row.send_queue_bytes, heap_allocator());
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({row.family, colors::ansi::BOLD_MAGENTA});
+    cells.push({row.protocol, colors::ansi::BOLD_MAGENTA});
+    cells.push({row.state, colors::ansi::BOLD_GREEN});
+    cells.push({receive.view(), colors::ansi::GREEN});
+    cells.push({send.view(), colors::ansi::GREEN});
+    cells.push({row.local.view(), colors::ansi::BOLD_CYAN});
+    cells.push({row.peer.view(), colors::ansi::CYAN});
     if (should_show_detail) {
-      do_append_column(row.socket_id.view(), socket_width, true,
-                       colors::ansi::YELLOW);
-      do_append_column(row.process_id.view(), process_width, true,
-                       colors::ansi::YELLOW);
-      do_append_column(row.owner_id.view(), owner_width, true, {});
-      do_append_column(row.user.view(), user_width, false, {});
-      do_append_column(row.name.view(), name_width, false, {});
-      do_append_column(row.command.view(), command_width, false, {});
-      do_append_column(row.net_namespace.view(), namespace_width, false, {});
-      do_append_column(row.orchestrator.view(), orchestrator_width, false, {});
-      do_append_column(row.runtime.view(), runtime_width, false, {});
-      do_append_column(row.container.view(), container_width, false, {});
-      do_append_column(row.cgroup.view(), cgroup_width, false, {});
+      cells.push({row.socket_id.view(), colors::ansi::YELLOW});
+      cells.push({row.process_id.view(), colors::ansi::YELLOW});
+      cells.push({row.owner_id.view(), colors::ansi::RESET});
+      cells.push({row.user.view(), colors::ansi::RESET});
+      cells.push({row.name.view(), colors::ansi::RESET});
+      cells.push({row.command.view(), colors::ansi::RESET});
+      cells.push({row.net_namespace.view(), colors::ansi::RESET});
+      cells.push({row.orchestrator.view(), colors::ansi::RESET});
+      cells.push({row.runtime.view(), colors::ansi::RESET});
+      cells.push({row.container.view(), colors::ansi::RESET});
+      cells.push({row.cgroup.view(), colors::ansi::RESET});
     }
-    output += "\n";
+    peer_table.add_row(cells);
   }
+  output += peer_table.to_string(should_color, "").view();
 }
 
 fn append_runtime_report(String &output, bool should_color, bool show_runtime,
@@ -1800,7 +1696,9 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   let process_cgroups =
       ArrayList<process_cgroup_snapshot>{cxt.scratch_allocator()};
-  if (show_cgroups || show_runtime || show_kubernetes || show_container) {
+  if (show_cgroups || show_remote || show_runtime || show_kubernetes ||
+      show_container)
+  {
     process_cgroups =
         collect_process_cgroup_snapshot(cxt.scratch_allocator());
   }
@@ -1816,7 +1714,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
     append_remote_report(
         output, should_color,
         FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled(),
-        FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled());
+        FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled(),
+        process_cgroups);
   if (show_runtime || show_kubernetes || show_container)
     append_runtime_report(output, should_color, show_runtime, show_kubernetes,
                           show_container, FLAG_EVILISO_ALL.is_enabled(),
