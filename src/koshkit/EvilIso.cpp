@@ -485,49 +485,30 @@ fn append_cgroup_report(String &output, bool should_color,
     return left.process_id_value < right.process_id_value;
   });
 
-  usize hierarchy_width = 9;
-  usize controller_width = 10;
-  usize path_width = 4;
-  usize process_width = 3;
-  usize name_width = 4;
+  let report = ReportTable{heap_allocator()};
+  report.add_column("HIERARCHY", report_table_alignment::Right,
+                    colors::ansi::BOLD_CYAN);
+  report.add_column("CONTROLLER", report_table_alignment::Left,
+                    colors::ansi::BOLD_CYAN);
+  report.add_column("PATH", report_table_alignment::Left,
+                    colors::ansi::BOLD_CYAN);
+  report.add_column("PID", report_table_alignment::Right,
+                    colors::ansi::BOLD_CYAN);
+  report.add_column("NAME", report_table_alignment::Left,
+                    colors::ansi::BOLD_CYAN);
+  report.add_column("ROLE", report_table_alignment::Left,
+                    colors::ansi::BOLD_CYAN);
   for (let const &row : rows) {
-    if (row.hierarchy.length() > hierarchy_width)
-      hierarchy_width = row.hierarchy.length();
-    if (row.controller.length() > controller_width)
-      controller_width = row.controller.length();
-    if (row.path.length() > path_width) path_width = row.path.length();
-    if (row.process_id.length() > process_width)
-      process_width = row.process_id.length();
-    if (row.name.length() > name_width) name_width = row.name.length();
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({row.hierarchy.view(), colors::ansi::BOLD_GREEN});
+    cells.push({row.controller.view(), colors::ansi::RESET});
+    cells.push({row.path.view(), colors::ansi::RESET});
+    cells.push({row.process_id.view(), colors::ansi::BOLD_GREEN});
+    cells.push({row.name.view(), colors::ansi::RESET});
+    cells.push({row.role, colors::ansi::BOLD_MAGENTA});
+    report.add_row(cells);
   }
-
-  let const do_append_column = [&](StringView text, usize width,
-                                   bool is_numeric,
-                                   StringView style = {}) throws {
-    append_report_column(output, text, width, is_numeric, style, should_color);
-    output += "  ";
-  };
-  do_append_column("HIERARCHY", hierarchy_width, true,
-                   colors::ansi::BOLD_CYAN);
-  do_append_column("CONTROLLER", controller_width, false,
-                   colors::ansi::BOLD_CYAN);
-  do_append_column("PATH", path_width, false, colors::ansi::BOLD_CYAN);
-  do_append_column("PID", process_width, true, colors::ansi::BOLD_CYAN);
-  do_append_column("NAME", name_width, false, colors::ansi::BOLD_CYAN);
-  append_report_text(output, "ROLE", colors::ansi::BOLD_CYAN, should_color);
-  output += '\n';
-  for (let const &row : rows) {
-    do_append_column(row.hierarchy.view(), hierarchy_width, true,
-                     colors::ansi::BOLD_GREEN);
-    do_append_column(row.controller.view(), controller_width, false, {});
-    do_append_column(row.path.view(), path_width, false, {});
-    do_append_column(row.process_id.view(), process_width, true,
-                     colors::ansi::BOLD_GREEN);
-    do_append_column(row.name.view(), name_width, false, {});
-    append_report_text(output, row.role, colors::ansi::BOLD_MAGENTA,
-                       should_color);
-    output += '\n';
-  }
+  output += report.to_string(should_color, "");
 }
 
 fn eviliso_sessions() throws -> ArrayList<os::user_session>
