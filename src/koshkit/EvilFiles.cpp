@@ -397,6 +397,17 @@ fn EvilFiles::execute(
         terminal_columns > 8)
       line_width_limit = terminal_columns;
   }
+  if (line_width_limit != SIZE_MAX) {
+    let const fixed_width = widths.pid + 2 + widths.user + 2 +
+                            widths.descriptor + 2 + widths.type + 2 +
+                            widths.mode + 2 + widths.device + 2 + widths.size +
+                            2 + widths.offset + 2 + widths.node + 2 +
+                            widths.endpoint + 2 + 3;
+    if (line_width_limit > fixed_width + 4) {
+      let const command_limit = line_width_limit - fixed_width;
+      if (widths.command > command_limit) widths.command = command_limit;
+    }
+  }
   append_report_column(output, "COMMAND", widths.command, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
@@ -434,7 +445,18 @@ fn EvilFiles::execute(
   output += "\n";
 
   for (let const &row : rows) {
-    append_report_column(output, row.command.view(), widths.command, false,
+    let command = String{allocator, row.command.view()};
+    if (toiletline::display_width(command.view()) > widths.command &&
+        widths.command > 3)
+    {
+      usize actual_cells = 0;
+      let const kept_bytes =
+          toiletline::byte_offset_at_or_before_display_cell(
+              command.view(), widths.command - 3, actual_cells);
+      command.truncate(kept_bytes);
+      command += "...";
+    }
+    append_report_column(output, command.view(), widths.command, false,
                          colors::ansi::BOLD_GREEN, should_color);
     output += "  ";
     append_report_column(output, row.pid.view(), widths.pid, true,
