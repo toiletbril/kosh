@@ -756,9 +756,6 @@ fn append_session_report(String &output, bool should_color,
   });
 
   let rows = ArrayList<session_report_row>{heap_allocator()};
-  usize user_width = 4;
-  usize terminal_width = 8;
-  usize login_time_width = 10;
   for (let const &session : sessions) {
     let login_time = String{heap_allocator()};
     if (should_show_detail) {
@@ -772,38 +769,27 @@ fn append_session_report(String &output, bool should_color,
         String{heap_allocator(), session.terminal.view()},
         steal(login_time),
     });
-    let const &row = rows[rows.count() - 1];
-    if (row.user.length() > user_width) user_width = row.user.length();
-    if (row.terminal.length() > terminal_width)
-      terminal_width = row.terminal.length();
-    if (row.login_time.length() > login_time_width)
-      login_time_width = row.login_time.length();
   }
 
-  append_report_column(output, "USER", user_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "TERMINAL", terminal_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
+  let table = ReportTable{heap_allocator()};
+  table.add_column("USER", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("TERMINAL", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
   if (should_show_detail) {
-    output += "  ";
-    append_report_column(output, "LOGIN TIME", login_time_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
+    table.add_column("LOGIN TIME", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
   }
-  output += '\n';
   for (let const &row : rows) {
-    append_report_column(output, row.user.view(), user_width, false,
-                         colors::ansi::BOLD_GREEN, should_color);
-    output += "  ";
-    append_report_column(output, row.terminal.view(), terminal_width, false, {},
-                         should_color);
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({row.user.view(), colors::ansi::BOLD_GREEN});
+    cells.push({row.terminal.view(), colors::ansi::RESET});
     if (should_show_detail) {
-      output += "  ";
-      append_report_column(output, row.login_time.view(), login_time_width,
-                           false, {}, should_color);
+      cells.push({row.login_time.view(), colors::ansi::RESET});
     }
-    output += '\n';
+    table.add_row(cells);
   }
+  output += table.to_string(should_color, "").view();
 }
 
 pure fn remote_state_name(os::network_socket_state state) wontthrow
