@@ -501,6 +501,7 @@ fn kosh_history_select_callback(const char *const *entries, size_t count,
                                              false, selected);
     if (outcome == selector_outcome::NotRun) return 0;
     if (outcome == selector_outcome::Dismissed) return -1;
+    if (selected.is_empty()) return 0;
 
     /* A multiple selection has no meaning for one line. The first pick wins. */
     SELECTED_HISTORY_ENTRY =
