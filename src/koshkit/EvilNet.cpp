@@ -37,7 +37,8 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
 FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
               Live,
               "Refresh live traffic every N seconds; the default is 0.5 "
-              "seconds. N controls cadence, not the rolling window.",
+              "seconds. N changes refresh only; sampling remains every 0.5 "
+              "seconds.",
               is_evilnet_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative",
               Live,

@@ -51,7 +51,8 @@ static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
 FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
               Live,
               "Refresh the process tree every N seconds until interrupted; the "
-              "default is 0.5 seconds. N controls cadence, not the window.",
+              "default is 0.5 seconds. N changes refresh only; sampling remains "
+              "every 0.5 seconds.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative",
               Live,
