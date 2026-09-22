@@ -20,7 +20,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r] [-k]");
+HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r] [-k] [--kubernetes] [--container]");
 
 HELP_DESCRIPTION_DECL(
     "The eviliso utility reports namespaces, cgroups, sessions, and remote "
@@ -35,6 +35,10 @@ FLAG(EVILISO_REMOTE, Bool, 'r', "remote",
      "List remote peers and their owning processes.");
 FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
      "Report container and Kubernetes runtime evidence.");
+FLAG(EVILISO_KUBERNETES, Bool, '\0', "kubernetes",
+     "Report Kubernetes runtime evidence.");
+FLAG(EVILISO_CONTAINER, Bool, '\0', "container",
+     "Report container runtime evidence.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilIso);
@@ -1150,7 +1154,9 @@ fn append_remote_report(String &output, bool should_color,
   }
 }
 
-fn append_runtime_report(String &output, bool should_color) throws -> void
+fn append_runtime_report(String &output, bool should_color,
+                         bool show_kubernetes, bool show_container) throws
+    -> void
 {
   let table = ReportTable{heap_allocator()};
   let const cgroup = Path{"/proc/1/cgroup"}.read_entire_file();
@@ -1177,14 +1183,16 @@ fn append_runtime_report(String &output, bool should_color) throws -> void
     runtime = "docker";
   if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file())
     runtime = "podman";
-  table.add("Runtime", runtime.is_empty() ? "none detected" : runtime.view(),
-            colors::ansi::BOLD_CYAN);
-  table.add("Kubernetes",
-            kubernetes.has_value() ||
-                    cgroup_text.find_substring("kubepods").has_value()
-                ? "present"
-                : "not detected",
-            colors::ansi::BOLD_CYAN);
+  if (show_container)
+    table.add("Runtime", runtime.is_empty() ? "none detected" : runtime.view(),
+              colors::ansi::BOLD_CYAN);
+  if (show_kubernetes)
+    table.add("Kubernetes",
+              kubernetes.has_value() ||
+                      cgroup_text.find_substring("kubepods").has_value()
+                  ? "present"
+                  : "not detected",
+              colors::ansi::BOLD_CYAN);
   output += table.to_string(should_color, "");
 }
 
@@ -1215,13 +1223,22 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const any_selector =
       FLAG_EVILISO_NAMESPACES.is_enabled() ||
       FLAG_EVILISO_CGROUPS.is_enabled() || FLAG_EVILISO_SESSIONS.is_enabled() ||
-      FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled();
+      FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled() ||
+      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled();
   let const show_namespaces =
       !any_selector || FLAG_EVILISO_NAMESPACES.is_enabled();
   let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
   let const show_sessions = !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
   let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
-  let const show_runtime = !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
+  let const show_runtime =
+      !any_selector || FLAG_EVILISO_RUNTIME.is_enabled() ||
+      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled();
+  let const show_kubernetes =
+      !any_selector || FLAG_EVILISO_RUNTIME.is_enabled() ||
+      FLAG_EVILISO_KUBERNETES.is_enabled();
+  let const show_container =
+      !any_selector || FLAG_EVILISO_RUNTIME.is_enabled() ||
+      FLAG_EVILISO_CONTAINER.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
   if (show_namespaces)
@@ -1236,7 +1253,9 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
         output, should_color,
         FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled(),
         FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled());
-  if (show_runtime) append_runtime_report(output, should_color);
+  if (show_runtime)
+    append_runtime_report(output, should_color, show_kubernetes,
+                          show_container);
   ec.print_to_stdout(output);
   return 0;
 }

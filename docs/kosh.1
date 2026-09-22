@@ -1961,7 +1961,11 @@ and
 .B -r
 select namespaces, cgroups, sessions, and remote sockets; the
 .B \-k
-option selects container and Kubernetes runtime evidence.
+option selects container and Kubernetes runtime evidence. The long-only
+.B \-\-container
+and
+.B \-\-kubernetes
+selectors select only their corresponding runtime rows.
 .TP
 .B evildisk
 The utility prints capacity and filesystem identity for each named path or
