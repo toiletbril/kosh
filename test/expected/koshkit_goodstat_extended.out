@@ -3,5 +3,6 @@ filesystem-shape=matched
 filesystem-color=absent
 checksum-shape=matched
 checksum-grid=matched
+unicode-grid=matched
 combined-status=0
 help-shape=matched

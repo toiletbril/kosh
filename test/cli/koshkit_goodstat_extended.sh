@@ -41,6 +41,17 @@ case $checksum_report in
 esac
 printf 'checksum-grid=%s\n' "$checksum_grid"
 
+unicode_name=$(printf '\303\251')
+unicode_fixture=$TEST_TEMP_DIRECTORY/goodstat-$unicode_name
+printf 'unicode fixture\n' > "$unicode_fixture"
+unicode_report=$($BIN -c 'koshkit --color never goodstat "$1"' \
+  goodstat "$unicode_fixture")
+case $unicode_report in
+  *"$unicode_name"*FIELD*VALUE*) unicode_grid=matched ;;
+  *) unicode_grid=missing ;;
+esac
+printf 'unicode-grid=%s\n' "$unicode_grid"
+
 combined_status=0
 $BIN -c 'koshkit --color never goodstat -f -c "$1"' goodstat "$fixture" \
   >/dev/null 2>&1 || combined_status=$?
