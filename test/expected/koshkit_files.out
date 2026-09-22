@@ -54,6 +54,7 @@ mv-interactive-no=old source=present
 mv-interactive-yes=new source=missing
 --- du -s nums.txt ---
 du-file-allocation=matched
+du-sparse-allocation=matched
 --- du with no operand lists every entry and the total ---
 du-order=descending
 du-recursion=incomplete

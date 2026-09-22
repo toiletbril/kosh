@@ -98,6 +98,19 @@ if [ "$1" -eq "$((du_file_blocks * 512))" ]; then
 else
   echo "du-file-allocation=wrong"
 fi
+if [ "${TARGET-}" = Linux ]; then
+  dd if=/dev/zero of=du-sparse bs=1 count=0 seek=1048576 2>/dev/null
+  du_sparse_output=$("$BIN" -c 'koshkit du -s du-sparse')
+  set -- $du_sparse_output
+  du_sparse_blocks=$("$BIN" -c 'koshkit stat -c %b du-sparse')
+  if [ "$1" -eq "$((du_sparse_blocks * 512))" ]; then
+    echo "du-sparse-allocation=matched"
+  else
+    echo "du-sparse-allocation=wrong"
+  fi
+else
+  echo "du-sparse-allocation=skipped"
+fi
 mkdir -p du-default/sub
 printf a > du-default/a
 printf bb > du-default/b
