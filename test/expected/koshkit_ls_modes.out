@@ -143,3 +143,5 @@ empty:
 rc=2
 --- invalid color ---
 rc=2
+--- unreadable root ---
+ls-unreadable=matched

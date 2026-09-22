@@ -82,6 +82,28 @@ echo "rc=$?"
 echo "--- invalid color ---"
 "$BIN" -c 'koshkit --color pink ls sub' 2>/dev/null
 echo "rc=$?"
+echo "--- unreadable root ---"
+mkdir unreadable
+: > unreadable/entry
+chmod 000 unreadable
+if ls unreadable >/dev/null 2>&1; then
+  chmod 700 unreadable
+  echo "ls-unreadable=skipped"
+else
+  unreadable_output=$("$BIN" -c 'koshkit ls unreadable' 2>&1)
+  unreadable_status=$?
+  chmod 700 unreadable
+  case $unreadable_output in
+    *entry*) echo "ls-unreadable=failed" ;;
+    *)
+      if [ "$unreadable_status" -ne 0 ]; then
+        echo "ls-unreadable=matched"
+      else
+        echo "ls-unreadable=failed"
+      fi
+      ;;
+  esac
+fi
 
 cd / || exit 1
 rm -rf "$d"
