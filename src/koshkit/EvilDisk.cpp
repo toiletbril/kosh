@@ -604,7 +604,6 @@ fn EvilDisk::execute(
           protocol_width = row.protocol.length();
       }
 
-      output += "  ";
       append_report_column(output, "DEVICE", device_width, false,
                            colors::ansi::BOLD_CYAN, should_color);
       output += "  ";
@@ -618,7 +617,6 @@ fn EvilDisk::execute(
                            colors::ansi::BOLD_CYAN, should_color);
       output += "  ";
       for (let const &row : smart_rows) {
-        output += "  ";
         append_report_column(output, row.device.view(), device_width, false,
                              colors::ansi::BOLD_GREEN, should_color);
         output += "  ";
