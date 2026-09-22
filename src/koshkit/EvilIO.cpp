@@ -1298,7 +1298,6 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
   append_report_body(output, summary.view(), "");
 
   output += "\n";
-  output += "\n";
   append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
                        should_color);
   output += "  ";
