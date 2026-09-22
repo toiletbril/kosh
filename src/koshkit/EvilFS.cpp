@@ -145,6 +145,7 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_color = koshkit_should_color();
   if (FLAG_EVILFS_ALL.is_enabled()) {
     usize skipped_permission_count = 0;
+    let skipped_warning = String{cxt.scratch_allocator()};
     let failed_targets = ArrayList<StringView>{cxt.scratch_allocator()};
     for (let const &mount : mounts) {
       if (!output.is_empty()) output += "\n";
@@ -159,11 +160,12 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
     }
     if (skipped_permission_count != 0) {
       output += "\n";
-      output += "Warning: Skipped ";
-      output += String::from(skipped_permission_count,
-                             cxt.scratch_allocator()).view();
-      output += skipped_permission_count == 1 ? " filesystem" : " filesystems";
-      output += " due to permission denied.\n";
+      skipped_warning = "Skipped ";
+      skipped_warning += String::from(skipped_permission_count,
+                                      cxt.scratch_allocator()).view();
+      skipped_warning +=
+          skipped_permission_count == 1 ? " filesystem" : " filesystems";
+      skipped_warning += " due to permission denied.";
     }
     if (!failed_targets.is_empty()) {
       output += "\n";
@@ -182,6 +184,7 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
       }
     }
     ec.print_to_stdout(output);
+    if (!skipped_warning.is_empty()) show_warning(skipped_warning.view());
     return mounts.is_empty() ? 1 : 0;
   }
 
