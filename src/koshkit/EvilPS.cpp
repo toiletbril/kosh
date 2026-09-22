@@ -707,6 +707,7 @@ fn poll_live_input(os::descriptor input_fd, String &input, String &search,
           case evilps_sort_key::Memory: sort_key = None; break;
         }
       }
+      scroll_offset = 0;
       if (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu)
         should_sample_cpu = true;
       if (sort_key.has_value() && *sort_key == evilps_sort_key::Memory)
