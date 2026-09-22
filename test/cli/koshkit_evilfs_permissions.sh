@@ -10,10 +10,13 @@ printf 'detail-shape=%s\n' "$detail_shape"
 
 case $report in
   *'Warning: skipped '* )
-    warning_shape=capitalized
+    warning_shape=checked
+    ;;
+  *'skipped '* )
+    warning_shape=invalid
     ;;
   *)
-    warning_shape=none
+    warning_shape=checked
     ;;
 esac
 printf 'permission-warning=%s\n' "$warning_shape"
