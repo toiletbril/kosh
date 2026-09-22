@@ -1658,6 +1658,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
   let const show_sessions = !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
   let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
+  let const should_show_remote_detail =
+      FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled();
   let const show_runtime =
       !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const show_kubernetes =
@@ -1669,8 +1671,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   let process_cgroups =
       ArrayList<process_cgroup_snapshot>{cxt.scratch_allocator()};
-  if (show_cgroups || show_remote || show_runtime || show_kubernetes ||
-      show_container)
+  if (show_cgroups || should_show_remote_detail || show_runtime ||
+      show_kubernetes || show_container)
   {
     process_cgroups =
         collect_process_cgroup_snapshot(cxt.scratch_allocator());
@@ -1684,11 +1686,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   if (show_sessions)
     append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_remote)
-    append_remote_report(
-        output, should_color,
-        FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled(),
-        FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled(),
-        process_cgroups);
+    append_remote_report(output, should_color, should_show_remote_detail,
+                         should_show_remote_detail, process_cgroups);
   if (show_runtime || show_kubernetes || show_container)
     append_runtime_report(output, should_color, show_runtime, show_kubernetes,
                           show_container, FLAG_EVILISO_ALL.is_enabled(),
