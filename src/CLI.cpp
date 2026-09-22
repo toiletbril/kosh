@@ -1241,6 +1241,11 @@ fn ReportTable::to_string(bool should_color,
   return output;
 }
 
+fn ReportTable::to_string() const throws -> String
+{
+  return to_string(false);
+}
+
 static pure fn report_indentation_width(StringView indentation) wontthrow
     -> usize
 {
