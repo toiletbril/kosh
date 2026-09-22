@@ -1229,33 +1229,80 @@ fn append_runtime_report(String &output, bool should_color,
         String{heap_allocator(), orchestrator_name},
     });
   }
-  if (rows.is_empty()) return;
+  if (!rows.is_empty()) {
+    output += "\n";
+    let detail_table = ReportTable{heap_allocator()};
+    detail_table.add_column("RUNTIME", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+    detail_table.add_column("SOURCE", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+    detail_table.add_column("PID", report_table_alignment::Right,
+                            colors::ansi::BOLD_CYAN);
+    detail_table.add_column("NAME", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+    detail_table.add_column("CONTAINER", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+    detail_table.add_column("ORCHESTRATOR", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+    for (let const &row : rows) {
+      let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+      cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
+      cells.push({row.source.view(), {}});
+      cells.push({row.process_id.view(), colors::ansi::YELLOW});
+      cells.push({row.name.view(), {}});
+      cells.push({row.container.view(), {}});
+      cells.push({row.orchestrator.view(), {}});
+      detail_table.add_row(cells);
+    }
+    output += detail_table.to_string(should_color, "").view();
+  }
+
+  if (!show_kubernetes) return;
+  let const namespace_file = Path{
+      "/var/run/secrets/kubernetes.io/serviceaccount/namespace"}
+                              .read_entire_file();
+  let namespace = String{heap_allocator()};
+  if (namespace_file.has_value()) {
+    namespace = String{heap_allocator(), namespace_file->view().trim_blanks()};
+  }
+  let const has_kubepods = cgroup_text.find_substring("kubepods").has_value();
+  if (!kubernetes.has_value() && !has_kubepods && namespace.is_empty()) return;
 
   output += "\n";
-  let detail_table = ReportTable{heap_allocator()};
-  detail_table.add_column("RUNTIME", report_table_alignment::Left,
-                          colors::ansi::BOLD_CYAN);
-  detail_table.add_column("SOURCE", report_table_alignment::Left,
-                          colors::ansi::BOLD_CYAN);
-  detail_table.add_column("PID", report_table_alignment::Right,
-                          colors::ansi::BOLD_CYAN);
-  detail_table.add_column("NAME", report_table_alignment::Left,
-                          colors::ansi::BOLD_CYAN);
-  detail_table.add_column("CONTAINER", report_table_alignment::Left,
-                          colors::ansi::BOLD_CYAN);
-  detail_table.add_column("ORCHESTRATOR", report_table_alignment::Left,
-                          colors::ansi::BOLD_CYAN);
-  for (let const &row : rows) {
+  let kube_table = ReportTable{heap_allocator()};
+  kube_table.add_column("SOURCE", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  kube_table.add_column("HOST", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  kube_table.add_column("NAMESPACE", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  kube_table.add_column("EVIDENCE", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  if (kubernetes.has_value()) {
     let cells = ArrayList<report_table_cell_view>{heap_allocator()};
-    cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
-    cells.push({row.source.view(), {}});
-    cells.push({row.process_id.view(), colors::ansi::YELLOW});
-    cells.push({row.name.view(), {}});
-    cells.push({row.container.view(), {}});
-    cells.push({row.orchestrator.view(), {}});
-    detail_table.add_row(cells);
+    cells.push({"environment", {}});
+    cells.push({kubernetes->view(), colors::ansi::BOLD_GREEN});
+    cells.push({namespace.is_empty() ? StringView{"-"} : namespace.view(), {}});
+    cells.push({"KUBERNETES_SERVICE_HOST", {}});
+    kube_table.add_row(cells);
   }
-  output += detail_table.to_string(should_color, "").view();
+  if (has_kubepods) {
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({"cgroup", {}});
+    cells.push({"-", {}});
+    cells.push({namespace.is_empty() ? StringView{"-"} : namespace.view(), {}});
+    cells.push({"kubepods", {}});
+    kube_table.add_row(cells);
+  }
+  if (!namespace.is_empty() && !kubernetes.has_value() && !has_kubepods) {
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({"service-account", {}});
+    cells.push({"-", {}});
+    cells.push({namespace.view(), {}});
+    cells.push({"namespace file", {}});
+    kube_table.add_row(cells);
+  }
+  output += kube_table.to_string(should_color, "").view();
 }
 
 } // namespace
