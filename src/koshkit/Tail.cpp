@@ -202,6 +202,109 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
   }
 }
 
+struct forward_tail_state
+{
+  usize source_index{0};
+  os::descriptor descriptor{KOSH_INVALID_FD};
+  u64 file_size{0};
+  u64 next_offset{0};
+  u64 skipped_newlines{0};
+  bool is_byte_mode{false};
+  bool is_done{false};
+  bool has_error{false};
+  ArrayList<char> buffer{heap_allocator()};
+};
+
+static fn read_regular_forward_tails(
+    ArrayList<forward_tail_state> &states,
+    ArrayList<Maybe<String>> &outputs, Allocator allocator) throws -> void
+{
+  let batch = os::Batch{allocator};
+  let results = ArrayList<os::batch_result>{allocator};
+  let operation_states = ArrayList<usize>{allocator};
+  defer
+  {
+    for (let &state : states)
+      if (state.descriptor != KOSH_INVALID_FD)
+        unused(os::close_fd(state.descriptor));
+  };
+
+  for (let &state : states) {
+    if (state.next_offset >= state.file_size) {
+      state.is_done = true;
+      outputs[state.source_index] = String{allocator};
+    }
+  }
+
+  loop
+  {
+    batch.clear();
+    results.clear();
+    operation_states.clear();
+    bool has_pending = false;
+    for (usize state_index = 0; state_index < states.count(); state_index++) {
+      let &state = states[state_index];
+      if (state.is_done || state.has_error) continue;
+
+      let const remaining = state.file_size - state.next_offset;
+      let const block_size = remaining > TAIL_BLOCK_BYTE_COUNT
+                                 ? TAIL_BLOCK_BYTE_COUNT
+                                 : static_cast<usize>(remaining);
+      state.buffer.clear();
+      state.buffer.reserve(block_size);
+      for (usize byte_index = 0; byte_index < block_size; byte_index++)
+        state.buffer.push(0);
+      batch.add(os::batch_operation::read(
+          state.descriptor, state.buffer.begin(), block_size,
+          state.next_offset));
+      operation_states.push(state_index);
+      has_pending = true;
+    }
+    if (!has_pending) break;
+
+    batch.execute(results);
+    if (os::INTERRUPT_REQUESTED) return;
+    for (usize result_index = 0; result_index < results.count();
+         result_index++) {
+      let &state = states[operation_states[result_index]];
+      let const &result = results[result_index];
+      if (result.error_number != 0) {
+        state.has_error = true;
+        state.is_done = true;
+        continue;
+      }
+
+      let const transferred = result.transferred_byte_count;
+      if (transferred == 0) {
+        state.is_done = true;
+        continue;
+      }
+
+      usize append_start = 0;
+      if (!state.is_byte_mode && state.skipped_newlines != 0) {
+        for (usize position = 0; position < transferred; position++) {
+          if (state.buffer[position] != '\n') continue;
+          state.skipped_newlines--;
+          append_start = position + 1;
+          if (state.skipped_newlines == 0) break;
+        }
+        if (state.skipped_newlines != 0) append_start = transferred;
+      }
+
+      if (!outputs[state.source_index].has_value())
+        outputs[state.source_index] = String{allocator};
+      if (append_start < transferred)
+        outputs[state.source_index]->append(StringView{
+            state.buffer.begin() + append_start, transferred - append_start});
+
+      state.next_offset += transferred;
+      if (transferred < state.buffer.count() ||
+          state.next_offset >= state.file_size)
+        state.is_done = true;
+    }
+  }
+}
+
 Tail::Tail() = default;
 
 pure fn Tail::kind() const wontthrow -> Utility::Kind { return Kind::Tail; }
@@ -277,6 +380,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   let positioned_contents = ArrayList<Maybe<String>>{allocator};
   let positioned_attempted = ArrayList<bool>{allocator};
   let regular_states = ArrayList<regular_tail_state>{allocator};
+  let forward_states = ArrayList<forward_tail_state>{allocator};
   positioned_contents.reserve(sources.count());
   positioned_attempted.reserve(sources.count());
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
@@ -322,6 +426,52 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     }
     if (regular_states.count() != 0)
       read_regular_tails(regular_states, positioned_contents, allocator);
+    if (os::INTERRUPT_REQUESTED) return 130;
+  } else {
+    for (usize source_index = 0; source_index < sources.count();
+         source_index++) {
+      if (sources[source_index] == "" || sources[source_index] == "-" ||
+          metadata_errors[source_index] != 0 ||
+          os::file_type_letter(statuses[source_index].mode) != '-')
+        continue;
+
+      let const descriptor = os::open_file_descriptor(
+          sources[source_index], os::file_open_mode::Read);
+      if (!descriptor.has_value()) continue;
+      let const file_size = os::regular_descriptor_file_size(*descriptor);
+      if (!file_size.has_value()) {
+        unused(os::close_fd(*descriptor));
+        continue;
+      }
+
+      positioned_attempted[source_index] = true;
+      forward_tail_state state{};
+      state.source_index = source_index;
+      state.descriptor = *descriptor;
+      state.file_size = *file_size;
+      state.is_byte_mode = is_byte_mode;
+      state.next_offset = is_byte_mode
+                              ? (count == 0
+                                     ? *file_size
+                                     : (static_cast<u64>(count - 1) < *file_size
+                                            ? static_cast<u64>(count - 1)
+                                            : *file_size))
+                              : 0;
+      state.skipped_newlines =
+          !is_byte_mode && count > 0 ? static_cast<u64>(count - 1) : 0;
+      state.buffer = ArrayList<char>{allocator};
+      state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
+      forward_states.push(steal(state));
+
+      if (forward_states.count() == TAIL_ACTIVE_SOURCE_COUNT) {
+        read_regular_forward_tails(forward_states, positioned_contents,
+                                   allocator);
+        forward_states.clear();
+        if (os::INTERRUPT_REQUESTED) return 130;
+      }
+    }
+    if (forward_states.count() != 0)
+      read_regular_forward_tails(forward_states, positioned_contents, allocator);
     if (os::INTERRUPT_REQUESTED) return 130;
   }
 
