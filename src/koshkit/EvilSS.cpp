@@ -25,7 +25,8 @@ FLAG(EVILSS_ALL, Bool, 'a', "all", "Show listening and connected sockets.");
 FLAG(EVILSS_TCP, Bool, 't', "tcp", "Show TCP sockets.");
 FLAG(EVILSS_UDP, Bool, 'u', "udp", "Show UDP sockets.");
 FLAG(EVILSS_UNIX, Bool, 'x', "unix", "Show Unix-domain sockets.");
-FLAG(EVILSS_PROCESSES, Bool, 'p', "processes", "Show the owning process id.");
+FLAG(EVILSS_PROCESSES, Bool, 'p', "processes",
+     "Show the owning process id, name, and owner.");
 FLAG(EVILSS_NUMERIC, Bool, 'n', "numeric", "Keep addresses and ports numeric.");
 FLAG(EVILSS_IPV4, Bool, '4', "ipv4", "Show IPv4 sockets.");
 FLAG(EVILSS_IPV6, Bool, '6', "ipv6", "Show IPv6 sockets.");
@@ -59,7 +60,9 @@ struct socket_row
   String send_queue{heap_allocator()};
   String local{heap_allocator()};
   String peer{heap_allocator()};
-  String process{heap_allocator()};
+  String process_id{heap_allocator()};
+  String process_name{heap_allocator()};
+  String owner{heap_allocator()};
 };
 
 pure fn unix_protocol_name(os::network_unix_socket_type type) wontthrow
@@ -153,6 +156,10 @@ fn append_network_socket_report(String &output,
     return left.process_id < right.process_id;
   });
 
+  let const processes =
+      options.should_show_processes
+          ? os::enumerate_processes(os::process_detail::ResourceStats)
+          : ArrayList<os::process_entry>{allocator};
   let rows = ArrayList<socket_row>{allocator};
   u64 previous_identity = 0;
   u32 previous_process_id = 0;
@@ -211,9 +218,35 @@ fn append_network_socket_report(String &output,
     row.peer = is_unix ? unix_endpoint({}, socket.peer_identity, allocator)
                        : endpoint(socket.peer_address.view(), socket.peer_port,
                                   socket.family, allocator);
-    row.process = socket.process_id == 0
-                      ? String{allocator, "-"}
-                      : String::from(socket.process_id, allocator);
+    row.process_id = socket.process_id == 0
+                         ? String{allocator, "-"}
+                         : String::from(socket.process_id, allocator);
+    row.process_name = "-";
+    row.owner = "-";
+    if (options.should_show_processes) {
+      if (socket.has_owner_id) {
+        let const owner_name = os::uid_to_username(socket.owner_id);
+        row.owner = owner_name.has_value()
+                        ? owner_name->clone()
+                        : String::from(socket.owner_id, allocator);
+      }
+      if (socket.process_id != 0 && socket.has_owner_start_token) {
+        for (let const &process : processes) {
+          if (process.pid != socket.process_id || process.start_token == 0 ||
+              process.start_token != socket.owner_start_token)
+            continue;
+          if (!process.name.is_empty())
+            row.process_name = process.name.clone();
+          if (!socket.has_owner_id) {
+            let const owner_name = os::uid_to_username(process.owner_id);
+            row.owner = owner_name.has_value()
+                            ? owner_name->clone()
+                            : String::from(process.owner_id, allocator);
+          }
+          break;
+        }
+      }
+    }
     rows.push(steal(row));
   }
 
@@ -222,6 +255,9 @@ fn append_network_socket_report(String &output,
   usize send_width = 6;
   usize local_width = 18;
   usize peer_width = 18;
+  usize process_id_width = 3;
+  usize process_name_width = 7;
+  usize owner_width = 5;
   for (let const &row : rows) {
     if (row.state.length() > state_width) state_width = row.state.length();
     if (row.receive_queue.length() > receive_width) {
@@ -232,6 +268,11 @@ fn append_network_socket_report(String &output,
     }
     if (row.local.length() > local_width) local_width = row.local.length();
     if (row.peer.length() > peer_width) peer_width = row.peer.length();
+    if (row.process_id.length() > process_id_width)
+      process_id_width = row.process_id.length();
+    if (row.process_name.length() > process_name_width)
+      process_name_width = row.process_name.length();
+    if (row.owner.length() > owner_width) owner_width = row.owner.length();
   }
 
   if (options.should_show_header) {
@@ -253,7 +294,17 @@ fn append_network_socket_report(String &output,
     output += "  ";
     append_report_column(output, "Peer Address:Port", peer_width, false,
                          colors::ansi::BOLD_CYAN, should_color);
-    if (options.should_show_processes) output += "  Process";
+    if (options.should_show_processes) {
+      output += "  ";
+      append_report_column(output, "PID", process_id_width, true,
+                           colors::ansi::BOLD_CYAN, should_color);
+      output += "  ";
+      append_report_column(output, "Process", process_name_width, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+      output += "  ";
+      append_report_column(output, "Owner", owner_width, false,
+                           colors::ansi::BOLD_CYAN, should_color);
+    }
     output += "\n";
   }
 
@@ -278,8 +329,14 @@ fn append_network_socket_report(String &output,
                          colors::ansi::CYAN, should_color);
     if (options.should_show_processes) {
       output += "  ";
-      append_report_text(output, row.process.view(), colors::ansi::YELLOW,
-                         should_color);
+      append_report_column(output, row.process_id.view(), process_id_width,
+                           true, colors::ansi::YELLOW, should_color);
+      output += "  ";
+      append_report_column(output, row.process_name.view(), process_name_width,
+                           false, colors::ansi::BOLD_GREEN, should_color);
+      output += "  ";
+      append_report_column(output, row.owner.view(), owner_width, false,
+                           colors::ansi::YELLOW, should_color);
     }
     output += "\n";
   }

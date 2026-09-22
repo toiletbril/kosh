@@ -349,7 +349,8 @@ _koshkit_util_flags ()
       echo "-n --attempts -d --delay -b --backoff -m --max-delay -q --quiet"
     ;;
     evilss)
-      echo "-4 -a -H -l -n -p -t -u -6"
+      echo \
+        "-4 --ipv4 -6 --ipv6 -a --all -H --no-header -l --listening -n --numeric -p --processes -t --tcp -u --udp -x --unix"
     ;;
     stat)
       echo "-L --dereference -f --file-system -t --terse -c --format --printf"
