@@ -617,7 +617,7 @@ static fn build_filesystem_candidate(
 
   if (preserve_directory_spelling) {
     if (!inside_quote && path_candidate_needs_quoting(entry_name.view())) {
-      entry_name = escape_path_candidate(entry_name.view());
+      entry_name = quote_path_candidate(entry_name.view());
     }
 
     return String{completion_allocator(), raw_directory_part} + entry_name;
@@ -628,17 +628,17 @@ static fn build_filesystem_candidate(
       !directory_part.is_empty() && directory_part[0] == '$';
   if (is_variable_prefixed && !inside_quote) {
     if (path_candidate_needs_quoting(entry_name.view()))
-      entry_name = escape_path_candidate(entry_name.view());
+      entry_name = quote_path_candidate(entry_name.view());
     candidate += entry_name;
   } else if (decoded_word.is_leading_tilde_active && !inside_quote) {
     candidate = String{completion_allocator(), raw_directory_part};
     if (path_candidate_needs_quoting(entry_name.view()))
-      entry_name = escape_path_candidate(entry_name.view());
+      entry_name = quote_path_candidate(entry_name.view());
     candidate += entry_name;
   } else {
     candidate += entry_name;
     if (!inside_quote && path_candidate_needs_quoting(candidate.view())) {
-      candidate = escape_path_candidate(candidate.view());
+      candidate = quote_path_candidate(candidate.view());
     }
   }
 

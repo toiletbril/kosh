@@ -92,51 +92,16 @@ static pure fn byte_needs_double_quote_escape(char byte) wontthrow -> bool
 fn internal::quote_path_candidate(StringView candidate) throws -> String
 {
   let quoted = String{completion_allocator()};
-
-  let const has_single_quote = candidate.find_character('\'').has_value();
-  let const has_bang = candidate.find_character('!').has_value();
-
-  if (!has_single_quote) {
-    quoted.push('\'');
-    quoted += candidate;
-    quoted.push('\'');
-    return quoted;
-  }
-
-  if (!has_bang) {
-    quoted.push('"');
-    for (usize i = 0; i < candidate.length; i++) {
-      let const byte = candidate[i];
-      if (byte_needs_double_quote_escape(byte)) quoted.push('\\');
-      quoted.push(byte);
-    }
-    quoted.push('"');
-    return quoted;
-  }
-
-  for (usize i = 0; i < candidate.length; i++) {
-    let const byte = candidate[i];
-    if (byte_needs_quoting(byte)) quoted.push('\\');
-    quoted.push(byte);
-  }
-
-  return quoted;
-}
-
-fn internal::escape_path_candidate(StringView candidate) throws -> String
-{
-  if (candidate.find_character('\n').has_value())
-    return quote_path_candidate(candidate);
-
-  let escaped = String{completion_allocator()};
-
+  quoted.push('\'');
   for (usize position = 0; position < candidate.length; position++) {
-    let const byte = candidate[position];
-    if (byte_needs_quoting(byte)) escaped.push('\\');
-    escaped.push(byte);
+    if (candidate[position] == '\'') {
+      quoted += "'\"'\"'";
+      continue;
+    }
+    quoted.push(candidate[position]);
   }
-
-  return escaped;
+  quoted.push('\'');
+  return quoted;
 }
 
 static fn append_open_quote_candidate(String &candidate, StringView text,
@@ -145,14 +110,16 @@ static fn append_open_quote_candidate(String &candidate, StringView text,
   for (usize position = 0; position < text.length; position++) {
     let const byte = text[position];
     if (quote_character == '\'' && byte == '\'') {
-      candidate.push('\'');
-      candidate.push('\\');
-      candidate.push('\'');
-      candidate.push('\'');
+      candidate += "'\"'\"'";
       continue;
     }
     if (quote_character == '"' && byte_needs_double_quote_escape(byte)) {
-      candidate.push('\\');
+      candidate.push('"');
+      candidate.push('\'');
+      candidate.push(byte);
+      candidate.push('\'');
+      candidate.push('"');
+      continue;
     }
     candidate.push(byte);
   }
@@ -185,7 +152,7 @@ static fn append_candidate_suffix(String &candidate, StringView suffix) throws
   if (suffix.is_empty()) return;
 
   if (path_candidate_needs_quoting(suffix))
-    candidate += escape_path_candidate(suffix);
+    candidate += quote_path_candidate(suffix);
   else
     candidate += suffix;
 }
@@ -231,7 +198,7 @@ fn internal::rebuild_shell_syntax_candidate(
     {
       candidate.append(raw_token.substring_of_length(
           0, decoded_word.leading_variable_expansion_end));
-      candidate += escape_path_candidate(decoded_candidate.substring(
+      candidate += quote_path_candidate(decoded_candidate.substring(
           decoded_word.leading_variable_expansion_end));
       return candidate;
     }
