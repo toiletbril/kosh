@@ -231,6 +231,8 @@ tail
 pear.txt:pear
 --- grep match across chunk boundary ---
 65541
+--- grep interruption ---
+grep-interrupt=matched
 --- grep multiple files with a missing operand ---
 1:27: error: grep: missing.txt: No such file or directory.
      1 |  koshkit grep a sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"

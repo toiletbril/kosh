@@ -189,6 +189,33 @@ echo "--- grep multiple files ---"
 printf 'needle\n' >> grep-boundary.txt
 echo "--- grep match across chunk boundary ---"
 "$BIN" -c 'koshkit grep needle grep-boundary.txt | koshkit wc -c'
+echo "--- grep interruption ---"
+if [ "${TARGET-}" != Linux ] || ! command -v timeout >/dev/null 2>&1; then
+  echo "grep-interrupt=skipped"
+else
+  grep_interrupt_root=$TEST_TEMP_DIRECTORY/grep-interrupt
+  mkdir -p "$grep_interrupt_root"
+  grep_interrupt_directory=0
+  while [ "$grep_interrupt_directory" -lt 200 ]; do
+    grep_interrupt_path=$grep_interrupt_root/d$grep_interrupt_directory
+    mkdir "$grep_interrupt_path"
+    grep_interrupt_file=0
+    while [ "$grep_interrupt_file" -lt 200 ]; do
+      printf 'needle\n' > "$grep_interrupt_path/f$grep_interrupt_file"
+      grep_interrupt_file=$((grep_interrupt_file + 1))
+    done
+    grep_interrupt_directory=$((grep_interrupt_directory + 1))
+  done
+  timeout --preserve-status -s INT 0.005s "$BIN" -c \
+    "koshkit grep -r needle '$grep_interrupt_root'" \
+    > "$grep_interrupt_root/output" 2>&1
+  grep_interrupt_status=$?
+  if [ "$grep_interrupt_status" -eq 130 ]; then
+    echo "grep-interrupt=matched"
+  else
+    echo "grep-interrupt=failed"
+  fi
+fi
 echo "--- grep multiple files with a missing operand ---"
 "$BIN" -c \
   'koshkit grep a sort-a.txt missing.txt sort-b.txt; printf "status=%s\n" "$?"' \
