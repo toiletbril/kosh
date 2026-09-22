@@ -70,6 +70,16 @@ case $node_report in
 esac
 printf 'goodnode-status=%s\n' "$node_status"
 printf 'goodnode-path=%s\n' "$node_path_status"
+case $node_report in
+  *FIELD*VALUE*) node_grid=matched ;;
+  *) node_grid=missing ;;
+esac
+case $node_report in
+  *$(printf '\033')*) node_color=present ;;
+  *) node_color=absent ;;
+esac
+printf 'goodnode-grid=%s\n' "$node_grid"
+printf 'goodnode-color=%s\n' "$node_color"
 
 default_report=$("$BIN" -c 'koshkit --color never evilio')
 case $default_report in
