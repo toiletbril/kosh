@@ -1100,7 +1100,6 @@ fn append_remote_report(String &output, bool should_color,
     output += "  ";
     append_report_column(output, text, width, is_numeric, style, should_color);
   };
-  output += "\n";
   append_report_column(output, "FAMILY", 6, false, colors::ansi::BOLD_CYAN,
                        should_color);
   do_append_column("PROTO", 5, false, colors::ansi::BOLD_CYAN);
