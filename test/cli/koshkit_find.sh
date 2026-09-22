@@ -61,3 +61,25 @@ echo "--- find missing -maxdepth argument ---"
 "$BIN" -c 'koshkit find . -maxdepth' 2>&1
 echo "--- find valid -maxdepth argument ---"
 "$BIN" -c 'koshkit find . -maxdepth 0'
+echo "--- find unreadable nested path ---"
+mkdir -p a/private
+: > a/private/entry
+chmod 000 a/private
+if ls a/private >/dev/null 2>&1; then
+  chmod 700 a/private
+  echo "find-unreadable=skipped"
+else
+  unreadable_output=$("$BIN" -c 'koshkit find a/private' 2>&1)
+  unreadable_status=$?
+  chmod 700 a/private
+  case $unreadable_output in
+    *entry*) echo "find-unreadable=failed" ;;
+    *)
+      if [ "$unreadable_status" -ne 0 ]; then
+        echo "find-unreadable=matched"
+      else
+        echo "find-unreadable=failed"
+      fi
+      ;;
+  esac
+fi

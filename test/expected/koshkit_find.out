@@ -95,3 +95,5 @@ note: Depth must be a whole number greater than or equal to zero.
 note: Pass a whole number greater than or equal to zero.
 --- find valid -maxdepth argument ---
 .
+--- find unreadable nested path ---
+find-unreadable=matched
