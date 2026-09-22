@@ -66,6 +66,8 @@ du-recursion=incomplete
 4096  du-default/tie-b
 du-hardlinks=deduplicated
 du-unreadable=ok
+--- du interruption ---
+du-interrupt=matched
 --- basename ---
 libfoo
 --- dirname ---
