@@ -71,3 +71,5 @@ note: Remove the trailing slash.
 note: Add a shebang such as `#!/bin/sh` on the first line.
 == stdin carries no shebang ==
 rc=0
+== eval source carries no shebang ==
+rc=0

@@ -60,3 +60,7 @@ echo hi
 echo "== stdin carries no shebang =="
 printf 'echo hi\n' | "$BIN" -n -WWW - 2>&1
 echo "rc=$?"
+
+echo "== eval source carries no shebang =="
+"$BIN" -n -WWW -c 'eval "echo hi"' 2>&1
+echo "rc=$?"
