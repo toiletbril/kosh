@@ -174,33 +174,72 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
     return left.name.view() < right.name.view();
   });
 
-  for (let const &child_entry : *children) {
+  usize unknown_count = 0;
+  for (let const &child : *children)
+    if (child.kind == Path::entry_kind::Unknown) unknown_count++;
+
+  if (unknown_count != 0) {
+    let unknown_paths = ArrayList<Path>{allocator};
+    let unknown_statuses = ArrayList<os::file_status>{allocator};
+    let unknown_indices = ArrayList<usize>{allocator};
+    let unknown_batch = os::Batch{allocator};
+    unknown_paths.reserve(unknown_count);
+    unknown_statuses.reserve(unknown_count);
+    unknown_indices.reserve(unknown_count);
+    unknown_batch.reserve(unknown_count);
+
+    for (usize index = 0; index < children->count(); index++) {
+      if ((*children)[index].kind != Path::entry_kind::Unknown) continue;
+
+      let child_path = Path{path_text, allocator};
+      child_path.append((*children)[index].name.view());
+      unknown_paths.push(steal(child_path));
+      unknown_statuses.push({});
+      unknown_indices.push(index);
+    }
+
+    for (usize index = 0; index < unknown_count; index++)
+      unknown_batch.add(os::batch_operation::lstat(unknown_paths[index],
+                                                   unknown_statuses[index]));
+
+    let const unknown_results = unknown_batch.execute();
+    for (usize index = 0; index < unknown_count; index++) {
+      let &kind = (*children)[unknown_indices[index]].kind;
+      if (unknown_results[index].error_number != 0) {
+        kind = Path::entry_kind::Other;
+        continue;
+      }
+
+      switch (os::file_type_letter(unknown_statuses[index].mode)) {
+      case 'd': kind = Path::entry_kind::Directory; break;
+      case '-': kind = Path::entry_kind::Regular; break;
+      case 'l': kind = Path::entry_kind::Symlink; break;
+      default: kind = Path::entry_kind::Other; break;
+      }
+    }
+  }
+
+  for (usize index = 0; index < children->count(); index++) {
     if (os::INTERRUPT_REQUESTED) return;
 
+    let const &child_entry = (*children)[index];
     String child_display{allocator, display};
     if (!child_display.is_empty() && child_display.back() != '/') {
       child_display += '/';
     }
     child_display += child_entry.name.view();
-    os::file_status child_status_value{};
-    const os::file_status *child_status = nullptr;
-    char child_type_letter = 0;
-    if (child_entry.kind == Path::entry_kind::Unknown) {
-      if (os::stat_path(child_display.view(), child_status_value))
-        child_status = &child_status_value;
-      else
-        child_type_letter = '?';
-    } else {
-      switch (child_entry.kind) {
-      case Path::entry_kind::Directory: child_type_letter = 'd'; break;
-      case Path::entry_kind::Regular: child_type_letter = '-'; break;
-      case Path::entry_kind::Symlink: child_type_letter = 'l'; break;
-      case Path::entry_kind::Other: child_type_letter = '?'; break;
-      case Path::entry_kind::Unknown: break;
-      }
+    let child_path = Path{path_text, allocator};
+    child_path.append(child_entry.name.view());
+    char child_type_letter = '?';
+    switch (child_entry.kind) {
+    case Path::entry_kind::Directory: child_type_letter = 'd'; break;
+    case Path::entry_kind::Regular: child_type_letter = '-'; break;
+    case Path::entry_kind::Symlink: child_type_letter = 'l'; break;
+    case Path::entry_kind::Other:
+    case Path::entry_kind::Unknown: break;
     }
-    find_walk(ec, cxt, child_display.view(), child_display.view(), depth + 1,
-              options, output, exit_status, allocator, child_status,
+    find_walk(ec, cxt, child_path.view(), child_display.view(), depth + 1,
+              options, output, exit_status, allocator, nullptr,
               child_type_letter);
   }
 }
