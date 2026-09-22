@@ -46,6 +46,25 @@ struct du_size_result
   bool should_emit;
 };
 
+struct du_directory_frame
+{
+  Path path;
+  usize parent_index{SIZE_MAX};
+  u64 total_bytes{0};
+  usize pending_stat_count{0};
+  usize pending_directory_count{0};
+  bool is_enumerated{false};
+  bool has_failure{false};
+  bool is_complete{false};
+};
+
+struct du_stat_work
+{
+  Path path;
+  usize parent_index{SIZE_MAX};
+  os::file_status status{};
+};
+
 fn append_output_row(ArrayList<du_output_row> &rows, u64 size, StringView path,
                      usize &size_width, Allocator allocator) throws -> void
 {
@@ -97,58 +116,195 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   }
 
   let const allocated_size_bytes = known_status->blocks * 512;
-  if (type_letter == 'd') {
-    u64 total_bytes = allocated_size_bytes;
-    let children = os::list_directory_status(path.view(), allocator);
-    if (!children.has_value()) {
-      report_soft_koshkit_util_error(ec, cxt, "du",
-                                     "cannot read '" + path.text() + "': " +
-                                         os::last_system_error_message());
-      has_failure = true;
-      return None;
-    }
-
-    children->sort([](const os::directory_status_entry &left,
-                      const os::directory_status_entry &right) {
-      return left.child.name.view() < right.child.name.view();
-    });
-
-    for (let const &child_entry : *children) {
-      if (os::INTERRUPT_REQUESTED) return None;
-
-      let child = Path{path.view(), allocator};
-      child.append(child_entry.child.name.view());
-      let const child_status =
-          child_entry.has_status ? &child_entry.status : nullptr;
-      let const child_size =
-          total_size(ec, cxt, child, has_failure, output_rows, size_width,
-                     seen_links, allocator, child_status);
-      if (!child_size.has_value()) {
-        if (os::INTERRUPT_REQUESTED) return None;
-        continue;
-      }
-      if (child_size->size_bytes > UINT64_MAX - total_bytes) {
-        report_soft_koshkit_util_error(ec, cxt, "du",
-                                       "cannot read '" + child.text() +
-                                           "': the total size is too large");
-        has_failure = true;
-        return None;
-      }
-      total_bytes += child_size->size_bytes;
-    }
-
+  if (type_letter != 'd') {
     if (output_rows != nullptr)
-      append_output_row(*output_rows, total_bytes, path.view(),
+      append_output_row(*output_rows, allocated_size_bytes, path.view(),
                         size_width, allocator);
 
-    return du_size_result{total_bytes, true};
+    return du_size_result{allocated_size_bytes, true};
   }
 
-  if (output_rows != nullptr)
-    append_output_row(*output_rows, allocated_size_bytes, path.view(),
-                      size_width, allocator);
+  let frames = ArrayList<du_directory_frame>{allocator};
+  let directory_queue = ArrayList<usize>{allocator};
+  let stat_work = ArrayList<du_stat_work>{allocator};
+  frames.reserve(32);
+  directory_queue.reserve(32);
+  stat_work.reserve(512);
+  frames.push(du_directory_frame{Path{path.view(), allocator}, SIZE_MAX,
+                                 allocated_size_bytes, 0, 0, false, false,
+                                 false});
+  directory_queue.push(0);
+  bool is_root_complete = false;
+  du_size_result root_result{0, false};
 
-  return du_size_result{allocated_size_bytes, true};
+  let const do_try_complete = [&](usize frame_index) throws -> void {
+    while (frame_index != SIZE_MAX) {
+      let &frame = frames[frame_index];
+      if (frame.is_complete || !frame.is_enumerated ||
+          frame.pending_stat_count != 0 || frame.pending_directory_count != 0)
+        return;
+
+      frame.is_complete = true;
+      if (frame.has_failure) {
+        has_failure = true;
+        if (frame.parent_index != SIZE_MAX)
+          frames[frame.parent_index].has_failure = true;
+      } else {
+        if (output_rows != nullptr)
+          append_output_row(*output_rows, frame.total_bytes, frame.path.view(),
+                            size_width, allocator);
+        if (frame.parent_index == SIZE_MAX) {
+          is_root_complete = true;
+          root_result = du_size_result{frame.total_bytes, true};
+          return;
+        }
+
+        let &parent = frames[frame.parent_index];
+        if (frame.total_bytes > UINT64_MAX - parent.total_bytes) {
+          report_soft_koshkit_util_error(
+              ec, cxt, "du",
+              "cannot read '" + frame.path.text() +
+                  "': the total size is too large");
+          parent.has_failure = true;
+          has_failure = true;
+        } else {
+          parent.total_bytes += frame.total_bytes;
+        }
+      }
+
+      if (frame.parent_index == SIZE_MAX) {
+        is_root_complete = true;
+        root_result = du_size_result{frame.total_bytes, !frame.has_failure};
+        return;
+      }
+
+      let const parent_index = frame.parent_index;
+      let &parent = frames[parent_index];
+      if (parent.pending_directory_count != 0)
+        parent.pending_directory_count--;
+      frame_index = parent_index;
+    }
+  };
+
+  let const do_flush_stat_work = [&]() throws -> void {
+    if (stat_work.is_empty()) return;
+
+    let batch = os::Batch{allocator};
+    batch.reserve(stat_work.count());
+    for (let &work : stat_work)
+      batch.add(os::batch_operation::lstat(work.path, work.status));
+    let const batch_results = batch.execute();
+    for (usize index = 0; index < stat_work.count(); index++) {
+      let &work = stat_work[index];
+      let const parent_index = work.parent_index;
+      if (batch_results[index].error_number != 0) {
+        os::set_last_system_error(batch_results[index].error_number);
+        report_soft_koshkit_util_error(
+            ec, cxt, "du",
+            "cannot read '" + work.path.text() + "': " +
+                os::last_system_error_message());
+        frames[parent_index].has_failure = true;
+        has_failure = true;
+        frames[parent_index].pending_stat_count--;
+        do_try_complete(parent_index);
+        continue;
+      }
+
+      let const &status = work.status;
+      let const type = os::file_type_letter(status.mode);
+      if (type != 'd' && status.has_file_identity && status.link_count > 1) {
+        const u64 identity[] = {status.device_id, status.file_id};
+        let const key = StringView{reinterpret_cast<const char *>(identity),
+                                   sizeof(identity)};
+        if (!seen_links.add(key)) {
+          frames[parent_index].pending_stat_count--;
+          do_try_complete(parent_index);
+          continue;
+        }
+      }
+      if (status.blocks > UINT64_MAX / 512) {
+        report_soft_koshkit_util_error(
+            ec, cxt, "du",
+            "cannot read '" + work.path.text() + "': the total size is too large");
+        frames[parent_index].has_failure = true;
+        has_failure = true;
+        frames[parent_index].pending_stat_count--;
+        do_try_complete(parent_index);
+        continue;
+      }
+
+      let const allocated_size_bytes = status.blocks * 512;
+      if (type == 'd') {
+        frames[parent_index].pending_directory_count++;
+        frames.push(du_directory_frame{steal(work.path), work.parent_index,
+                                       allocated_size_bytes, 0, 0, false, false,
+                                       false});
+        directory_queue.push(frames.count() - 1);
+      } else {
+        if (allocated_size_bytes >
+            UINT64_MAX - frames[parent_index].total_bytes) {
+          report_soft_koshkit_util_error(
+              ec, cxt, "du",
+              "cannot read '" + work.path.text() +
+                  "': the total size is too large");
+          frames[parent_index].has_failure = true;
+          has_failure = true;
+        } else {
+          frames[parent_index].total_bytes += allocated_size_bytes;
+          if (output_rows != nullptr)
+            append_output_row(*output_rows, allocated_size_bytes,
+                              work.path.view(), size_width, allocator);
+        }
+      }
+      frames[parent_index].pending_stat_count--;
+      do_try_complete(parent_index);
+    }
+    stat_work.clear();
+  };
+
+  usize directory_index = 0;
+  while (directory_index < directory_queue.count() && !is_root_complete) {
+    let const frontier_end =
+        directory_index + 32 < directory_queue.count()
+            ? directory_index + 32
+            : directory_queue.count();
+    for (; directory_index < frontier_end; directory_index++) {
+      if (os::INTERRUPT_REQUESTED) return None;
+      let const frame_index = directory_queue[directory_index];
+      let children =
+          Path::read_directory_typed(frames[frame_index].path, allocator);
+      if (!children.has_value()) {
+        report_soft_koshkit_util_error(
+            ec, cxt, "du",
+            "cannot read '" + frames[frame_index].path.text() + "': " +
+                os::last_system_error_message());
+        frames[frame_index].has_failure = true;
+        frames[frame_index].is_enumerated = true;
+        has_failure = true;
+        do_try_complete(frame_index);
+        continue;
+      }
+      children->sort([](const Path::directory_child &left,
+                        const Path::directory_child &right) {
+        return left.name.view() < right.name.view();
+      });
+      frames[frame_index].pending_stat_count += children->count();
+      frames[frame_index].is_enumerated = true;
+      for (let const &child : *children) {
+        let child_path = Path{frames[frame_index].path.view(), allocator};
+        child_path.append(child.name.view());
+        stat_work.push(du_stat_work{steal(child_path), frame_index});
+        if (stat_work.count() == 512) do_flush_stat_work();
+      }
+      do_try_complete(frame_index);
+    }
+    do_flush_stat_work();
+  }
+
+  if (!stat_work.is_empty()) do_flush_stat_work();
+  if (os::INTERRUPT_REQUESTED) return None;
+  if (!is_root_complete || has_failure) return None;
+  return root_result;
 }
 
 fn append_size_line(String &output, const du_output_row &row, usize size_width,
