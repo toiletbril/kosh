@@ -951,7 +951,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   }
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     return run_live_network_traffic(ec, heap_allocator(), window_seconds,
-                                    live_interval_seconds, live_interval_seconds,
+                                    0.5, live_interval_seconds,
                                     should_color, sort_key);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();

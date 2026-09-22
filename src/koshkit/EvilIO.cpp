@@ -1576,12 +1576,12 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (should_show_processes) {
       return run_live_process_io(ec, selected_pid, row_limit, sort_key,
-                                 sample_duration_seconds, live_interval_seconds,
+                                 sample_duration_seconds, 0.5,
                                  refresh_interval_seconds, is_terminal,
                                  should_color, sample_duration_label.view());
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds, live_interval_seconds,
+    return run_live_disk_io(ec, sample_duration_seconds, 0.5,
                             refresh_interval_seconds, is_terminal, should_color,
                             sample_duration_label.view(), sort_key);
   }
