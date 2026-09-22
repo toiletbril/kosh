@@ -314,6 +314,44 @@ fn cgroup_proc_path(StringView suffix, Allocator allocator) throws -> String
   return path;
 }
 
+fn container_marker_path(StringView suffix, Allocator allocator) throws
+    -> String
+{
+#ifndef NDEBUG
+  if (let const *root = std::getenv("KOSH_TEST_EVILISO_MARKER_ROOT");
+      root != nullptr && root[0] != '\0')
+  {
+    let path = String{allocator, root};
+    path += '/';
+    path += suffix;
+    return path;
+  }
+#endif
+  let path = String{allocator, "/"};
+  path += suffix;
+  return path;
+}
+
+fn kubernetes_service_account_path(StringView name, Allocator allocator) throws
+    -> String
+{
+#ifndef NDEBUG
+  if (let const *root =
+          std::getenv("KOSH_TEST_EVILISO_SERVICE_ACCOUNT_ROOT");
+      root != nullptr && root[0] != '\0')
+  {
+    let path = String{allocator, root};
+    path += '/';
+    path += name;
+    return path;
+  }
+#endif
+  let path = String{allocator,
+                    "/var/run/secrets/kubernetes.io/serviceaccount/"};
+  path += name;
+  return path;
+}
+
 fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
     -> ArrayList<cgroup_membership>
 {
@@ -657,9 +695,10 @@ fn remote_endpoint(StringView address, u16 port,
 
 fn remote_process_cgroups(i64 process_id, Allocator allocator) throws -> String
 {
+  let suffix = String::from(process_id, allocator);
+  suffix += "/cgroup";
   let const contents =
-      Path{String{"/proc/"} + String::from(process_id, allocator) + "/cgroup"}
-          .read_entire_file();
+      Path{cgroup_proc_path(suffix.view(), allocator)}.read_entire_file();
   if (!contents.has_value()) return String{allocator, "-"};
 
   let paths = ArrayList<String>{allocator};
@@ -1143,7 +1182,8 @@ fn append_runtime_report(String &output, bool should_color,
     -> void
 {
   let table = ReportTable{heap_allocator()};
-  let const cgroup = Path{"/proc/1/cgroup"}.read_entire_file();
+  let const cgroup =
+      Path{cgroup_proc_path("1/cgroup", heap_allocator())}.read_entire_file();
   let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
   let const kubernetes =
       os::get_environment_variable("KUBERNETES_SERVICE_HOST");
@@ -1194,9 +1234,13 @@ fn append_runtime_report(String &output, bool should_color,
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "podman";
   }
-  if (runtime.is_empty() && Path{"/.dockerenv"}.is_regular_file())
+  if (runtime.is_empty() &&
+      Path{container_marker_path(".dockerenv", heap_allocator())}
+          .is_regular_file())
     runtime = "docker";
-  if (runtime.is_empty() && Path{"/run/.containerenv"}.is_regular_file())
+  if (runtime.is_empty() &&
+      Path{container_marker_path("run/.containerenv", heap_allocator())}
+          .is_regular_file())
     runtime = "podman";
   if (show_container)
     table.add("Runtime", runtime.is_empty() ? "none detected" : runtime.view(),
@@ -1264,9 +1308,9 @@ fn append_runtime_report(String &output, bool should_color,
   }
 
   if (!show_kubernetes) return;
-  let const namespace_file = Path{
-      "/var/run/secrets/kubernetes.io/serviceaccount/namespace"}
-                              .read_entire_file();
+  let const namespace_file =
+      Path{kubernetes_service_account_path("namespace", heap_allocator())}
+          .read_entire_file();
   let namespace_name = String{heap_allocator()};
   if (namespace_file.has_value()) {
     namespace_name =
