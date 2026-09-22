@@ -1166,23 +1166,50 @@ fn append_runtime_report(String &output, bool should_color,
   let const cgroup_text = cgroup.has_value() ? cgroup->view() : StringView{};
   let const kubernetes =
       os::get_environment_variable("KUBERNETES_SERVICE_HOST");
+  bool has_kubepods = cgroup_text.find_substring("kubepods").has_value();
+  bool has_docker = cgroup_text.find_substring("docker").has_value();
+  bool has_containerd = cgroup_text.find_substring("containerd").has_value();
+  bool has_crio = cgroup_text.find_substring("crio").has_value();
+  bool has_libpod = cgroup_text.find_substring("libpod").has_value();
+  if (!has_kubepods || !has_docker || !has_containerd || !has_crio ||
+      !has_libpod)
+  {
+    for (let const &process : os::enumerate_processes()) {
+      let const process_cgroups =
+          remote_process_cgroups(process.pid, heap_allocator());
+      has_kubepods = has_kubepods ||
+                     remote_orchestrator_name(process_cgroups.view()) ==
+                         "kubernetes";
+      has_docker = has_docker ||
+                   remote_runtime_name(process_cgroups.view()) == "docker";
+      has_containerd =
+          has_containerd ||
+          remote_runtime_name(process_cgroups.view()) == "containerd";
+      has_crio = has_crio ||
+                 remote_runtime_name(process_cgroups.view()) == "cri-o";
+      has_libpod = has_libpod ||
+                   remote_runtime_name(process_cgroups.view()) == "podman";
+      if (has_kubepods && has_docker && has_containerd && has_crio &&
+          has_libpod)
+        break;
+    }
+  }
   let runtime = String{heap_allocator()};
-  if (kubernetes.has_value() ||
-      cgroup_text.find_substring("kubepods").has_value())
+  if (kubernetes.has_value() || has_kubepods)
     runtime += "kubernetes";
-  if (cgroup_text.find_substring("docker").has_value()) {
+  if (has_docker) {
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "docker";
   }
-  if (cgroup_text.find_substring("containerd").has_value()) {
+  if (has_containerd) {
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "containerd";
   }
-  if (cgroup_text.find_substring("crio").has_value()) {
+  if (has_crio) {
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "cri-o";
   }
-  if (cgroup_text.find_substring("libpod").has_value()) {
+  if (has_libpod) {
     if (!runtime.is_empty()) runtime += ", ";
     runtime += "podman";
   }
@@ -1195,9 +1222,7 @@ fn append_runtime_report(String &output, bool should_color,
               colors::ansi::BOLD_CYAN);
   if (show_kubernetes)
     table.add("Kubernetes",
-              kubernetes.has_value() ||
-                      cgroup_text.find_substring("kubepods").has_value()
-                  ? "present"
+              kubernetes.has_value() || has_kubepods ? "present"
               : "not detected",
               colors::ansi::BOLD_CYAN);
   output += table.to_string(should_color, "");
@@ -1266,7 +1291,6 @@ fn append_runtime_report(String &output, bool should_color,
     namespace_name =
         String{heap_allocator(), namespace_file->view().trim_blanks()};
   }
-  let const has_kubepods = cgroup_text.find_substring("kubepods").has_value();
   if (!kubernetes.has_value() && !has_kubepods && namespace_name.is_empty())
     return;
 
