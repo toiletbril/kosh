@@ -1986,10 +1986,19 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  let swap_body = String{allocator};
+  let swap_table = ReportTable{allocator};
+  swap_table.add_column("SECTION", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  swap_table.add_column("STATUS", report_table_alignment::Left,
+                        colors::ansi::BOLD_CYAN);
+  let add_swap_row = [&](StringView section, StringView status) throws -> void {
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({section, colors::ansi::BOLD_CYAN});
+    cells.push({status, {}});
+    swap_table.add_row(cells);
+  };
   if (!has_swap_after) {
-    append_report_field(swap_body, "Status", "unavailable",
-                        colors::ansi::BOLD_CYAN, should_color);
+    add_swap_row("Swap", "unavailable");
   } else {
     let utilization = String::from(
         swap_after.total_bytes == 0
@@ -2006,9 +2015,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     status += "), ";
     status += format_human_size(swap_after.free_bytes, allocator).view();
     status += " free";
-    append_report_inline_field(swap_body, "Status", status.view(),
-                               colors::ansi::BOLD_CYAN, should_color);
-    swap_body += "\n";
+    add_swap_row("Swap", status.view());
     if (FLAG_EVILIO_ALL.is_enabled() && swap_after.has_activity) {
       let activity = String{allocator};
       if (FLAG_EVILIO_ALL.is_enabled() && has_swap_before &&
@@ -2034,17 +2041,14 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
             format_human_size(swap_after.output_bytes, allocator).view();
         activity += " out";
       }
-      append_report_inline_field(swap_body, "Activity", activity.view(),
-                                 colors::ansi::BOLD_CYAN, should_color);
-      swap_body += "\n";
+      add_swap_row("Activity", activity.view());
     }
     if (swap_after.has_encryption_state) {
-      append_report_field(swap_body, "Encryption",
-                          swap_after.is_encrypted ? "enabled" : "disabled",
-                          colors::ansi::BOLD_CYAN, should_color);
+      add_swap_row("Encryption",
+                   swap_after.is_encrypted ? "enabled" : "disabled");
     }
   }
-  append_report_body(output, swap_body.view(), "");
+  output += swap_table.to_string(should_color, "").view();
 
   ec.print_to_stdout(output);
   return 0;
