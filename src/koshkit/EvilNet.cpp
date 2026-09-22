@@ -8,6 +8,7 @@
 
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
+#include "../Arena.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -738,6 +739,7 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
   let const default_interface = default_network_interface(allocator);
+  let frame_arena = BumpArena{};
   let duration_suffix = String{allocator, "/"};
   duration_suffix += sample_label.view();
   let baseline = os::read_network_interface_statistics();
@@ -757,6 +759,10 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
 
   loop
   {
+    let const frame_mark = frame_arena.mark();
+    defer { frame_arena.release(frame_mark); };
+    let const frame_allocator = bump_allocator(frame_arena);
+
     let const before_wait_nanoseconds = os::monotonic_nanos();
     let const sample_elapsed = before_wait_nanoseconds - last_sample_nanoseconds;
     let const refresh_elapsed = before_wait_nanoseconds - last_refresh_nanoseconds;
@@ -831,7 +837,7 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     }
     last_refresh_nanoseconds = now;
     let statistics =
-        ArrayList<os::network_interface_statistics_entry>{allocator};
+        ArrayList<os::network_interface_statistics_entry>{frame_allocator};
     statistics.reserve(retained.count());
     let const window_start =
         last_sample_nanoseconds > falloff_nanoseconds
@@ -839,15 +845,15 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
             : 0;
     for (let const &row : retained) {
       statistics.push(
-          get_network_window_status(row, window_start, allocator));
+          get_network_window_status(row, window_start, frame_allocator));
     }
     sort_network_statistics(statistics, sort_key);
-    let output = String{allocator};
-    let warnings = ArrayList<String>{allocator};
+    let output = String{frame_allocator};
+    let warnings = ArrayList<String>{frame_allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_network_traffic_statistics_report(output, warnings, allocator,
+    append_network_traffic_statistics_report(output, warnings, frame_allocator,
                                              statistics, should_color,
                                              duration_suffix.view(),
                                              default_interface);
