@@ -651,7 +651,7 @@ fn EvilDisk::execute(
 
   ec.print_to_stdout(output);
   if (skipped_permission_count != 0) {
-    let warning = String{allocator, "skipped "};
+    let warning = String{allocator, "Skipped "};
     warning += String::from(skipped_permission_count, allocator).view();
     warning += " filesystem";
     if (skipped_permission_count != 1) warning += "s";
