@@ -234,7 +234,7 @@ _koshkit_util_flags ()
     ;;
     goodfsw)
       echo \
-        "-h --human-readable -m --machine-readable -r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude --timezone --precision"
+        "-h --human-readable -m --machine-readable -r --recursive -t --timestamp -x --one-file-system --event-flags -1 --one-event -l --latency -e --exclude --timezone --precision"
     ;;
     ls)
       echo \

@@ -217,6 +217,8 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
              u64 root_device_id,
              const os::file_status *known_status = nullptr) throws -> void
 {
+  if (os::INTERRUPT_REQUESTED != 0) return;
+
   if (depth > MAXIMUM_SCAN_DEPTH) return;
 
   if (is_excluded(path)) return;
@@ -227,6 +229,10 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
 
     known_status = &queried_status;
   }
+
+  if (depth != 0 && FLAG_GOODFSW_ONE_FILE_SYSTEM.is_enabled() &&
+      known_status->device_id != root_device_id)
+    return;
 
   watched_entry entry{
       String{allocator, path}
@@ -257,9 +263,6 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
     child_path.append(child.name.view());
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
-    if (FLAG_GOODFSW_ONE_FILE_SYSTEM.is_enabled() && child_status != nullptr &&
-        child_status->device_id != root_device_id)
-      continue;
     scan_path(child_path.view(), entries, is_recursive, depth + 1,
               allocator, root_device_id, child_status);
   }
@@ -364,6 +367,10 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
     scan_path(operands[index].view(), previous, is_recursive, 0,
               watch_allocator,
               operand_statuses[index].device_id, &operand_statuses[index]);
+  if (os::INTERRUPT_REQUESTED != 0) {
+    os::INTERRUPT_REQUESTED = 0;
+    return 130;
+  }
   sort_entries(previous);
 
   let const should_color = koshkit_should_color();
