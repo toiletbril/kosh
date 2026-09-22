@@ -662,6 +662,20 @@ struct filesystem_integrity_evidence
 fn read_filesystem_integrity_evidence(StringView path) throws
     -> Maybe<filesystem_integrity_evidence>;
 
+enum class filesystem_verification_result : u8
+{
+  Passed,
+  Failed,
+  Interrupted,
+  TimedOut,
+  Unsupported,
+  Unavailable,
+};
+
+fn verify_filesystem_integrity(StringView path,
+                               u64 timeout_nanoseconds) throws
+    -> filesystem_verification_result;
+
 fn sync_filesystems() wontthrow -> bool;
 
 fn sync_path(StringView path, bool is_data_only) wontthrow -> bool;

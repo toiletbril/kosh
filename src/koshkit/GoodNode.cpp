@@ -19,13 +19,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-i inode] [-r root] [path ...]");
+HELP_SYNOPSIS_DECL("[-i inode] [-r root] [--verify] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The goodnode utility reports inode metadata and a CRC32C checksum.");
 
 FLAG(GOODNODE_INODE, String, 'i', "inode", "Locate this inode.");
 FLAG(GOODNODE_ROOT, String, 'r', "root", "Search beneath this path.");
+FLAG(GOODNODE_VERIFY, Bool, '\0', "verify",
+     "Verify filesystem integrity when the platform supports it.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(GoodNode);
@@ -86,7 +88,7 @@ fn filesystem_features(StringView filesystem_type) throws -> Maybe<StringView>
 
 fn append_node_report(String &output, const ExecContext &ec, StringView path,
                       const os::file_status &status, bool should_color,
-                      Allocator allocator) throws -> void
+                      bool should_verify, Allocator allocator) throws -> void
 {
   append_report_text(output, path, colors::ansi::BOLD_BLUE, should_color);
   output += '\n';
@@ -165,6 +167,32 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     }
   } else {
     do_append_field("Integrity", "not verified");
+  }
+
+  if (should_verify) {
+    constexpr u64 VERIFICATION_TIMEOUT_NANOSECONDS = 300'000'000'000;
+    let verification = StringView{"unavailable"};
+    switch (os::verify_filesystem_integrity(
+        path, VERIFICATION_TIMEOUT_NANOSECONDS))
+    {
+    case os::filesystem_verification_result::Passed:
+      verification = "passed";
+      break;
+    case os::filesystem_verification_result::Failed:
+      verification = "failed";
+      break;
+    case os::filesystem_verification_result::Interrupted:
+      verification = "interrupted";
+      break;
+    case os::filesystem_verification_result::TimedOut:
+      verification = "timed out";
+      break;
+    case os::filesystem_verification_result::Unsupported:
+      verification = "not supported";
+      break;
+    case os::filesystem_verification_result::Unavailable: break;
+    }
+    do_append_field("Verification", verification);
   }
   if (status.link_count == 0) do_append_field("Link state", "unlinked");
 
@@ -301,6 +329,7 @@ fn GoodNode::execute(
   }
 
   let const should_color = koshkit_should_color();
+  let const should_verify = FLAG_GOODNODE_VERIFY.is_enabled();
 
   let output = String{allocator};
   i32 exit_status = 0;
@@ -332,7 +361,8 @@ fn GoodNode::execute(
 
     if (!output.is_empty()) output += '\n';
     append_node_report(output, ec, path.view(), report_statuses[index],
-                       should_color, allocator);
+                       should_color, should_verify, allocator);
+    if (os::INTERRUPT_REQUESTED) return 130;
   }
 
   ec.print_to_stdout(output);

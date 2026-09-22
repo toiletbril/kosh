@@ -223,7 +223,7 @@ _koshkit_util_flags ()
         "-a --all -t --traffic -l --live -C --cumulative -f --failures --sort"
     ;;
     goodnode)
-      echo "-i --inode -r --root"
+      echo "-i --inode -r --root --verify"
     ;;
     evilps)
       echo \

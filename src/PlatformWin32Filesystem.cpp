@@ -1422,6 +1422,15 @@ fn read_filesystem_integrity_evidence(StringView path) throws
   return evidence;
 }
 
+fn verify_filesystem_integrity(StringView path,
+                               u64 timeout_nanoseconds) throws
+    -> filesystem_verification_result
+{
+  unused(path);
+  unused(timeout_nanoseconds);
+  return filesystem_verification_result::Unsupported;
+}
+
 fn sync_filesystems() wontthrow -> bool
 {
   wchar_t drives[512];

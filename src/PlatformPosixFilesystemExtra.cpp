@@ -609,8 +609,6 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
   return result;
 }
 
-#if defined __linux__
-
 static fn find_mounted_filesystem(
     StringView path, const ArrayList<mounted_filesystem> &filesystems,
     StringView required_type = {}) throws -> Maybe<usize>
@@ -638,6 +636,8 @@ static fn find_mounted_filesystem(
 
   return selected_index;
 }
+
+#if defined __linux__
 
 static fn read_native_filesystem_error_counters(
     StringView path, filesystem_error_counters &counters) throws -> bool
@@ -821,6 +821,98 @@ fn read_filesystem_error_counters(StringView path,
     -> bool
 {
   return read_native_filesystem_error_counters(path, counters);
+}
+
+fn verify_filesystem_integrity(StringView path,
+                               u64 timeout_nanoseconds) throws
+    -> filesystem_verification_result
+{
+#if defined __APPLE__
+  let const filesystems = mounted_filesystems();
+  let const selected_index = find_mounted_filesystem(path, filesystems);
+  if (!selected_index.has_value() ||
+      filesystems[*selected_index].type != "apfs")
+  {
+    return filesystem_verification_result::Unsupported;
+  }
+
+  constexpr char DISKUTIL_PATH[] = "/usr/sbin/diskutil";
+  if (::access(DISKUTIL_PATH, X_OK) != 0)
+    return filesystem_verification_result::Unavailable;
+
+  let const null_descriptor = ::open("/dev/null", O_RDWR);
+  if (null_descriptor < 0)
+    return filesystem_verification_result::Unavailable;
+
+  posix_spawn_file_actions_t actions;
+  if (posix_spawn_file_actions_init(&actions) != 0) {
+    ::close(null_descriptor);
+    return filesystem_verification_result::Unavailable;
+  }
+  defer { posix_spawn_file_actions_destroy(&actions); };
+  let const did_prepare_actions =
+      posix_spawn_file_actions_adddup2(&actions, null_descriptor,
+                                       STDIN_FILENO) == 0 &&
+      posix_spawn_file_actions_adddup2(&actions, null_descriptor,
+                                       STDOUT_FILENO) == 0 &&
+      posix_spawn_file_actions_adddup2(&actions, null_descriptor,
+                                       STDERR_FILENO) == 0 &&
+      posix_spawn_file_actions_addclose(&actions, null_descriptor) == 0;
+  if (!did_prepare_actions) {
+    ::close(null_descriptor);
+    return filesystem_verification_result::Unavailable;
+  }
+
+  let const mount_path = filesystems[*selected_index].target.clone();
+  char *arguments[] = {const_cast<char *>(DISKUTIL_PATH),
+                       const_cast<char *>("verifyVolume"),
+                       const_cast<char *>(mount_path.c_str()),
+                       nullptr};
+  pid_t child = 0;
+  let const spawn_result = posix_spawn(
+      &child, DISKUTIL_PATH, &actions, nullptr, arguments, environ);
+  ::close(null_descriptor);
+  if (spawn_result != 0)
+    return filesystem_verification_result::Unavailable;
+
+  let const do_stop_child = [&]() wontthrow {
+    unused(::kill(child, SIGKILL));
+    while (::waitpid(child, nullptr, 0) == -1 && errno == EINTR) {}
+  };
+  let const started_at = monotonic_nanos();
+  loop
+  {
+    int status = 0;
+    let const waited = ::waitpid(child, &status, WNOHANG);
+    if (waited == child) {
+      return WIFEXITED(status) && WEXITSTATUS(status) == 0
+                 ? filesystem_verification_result::Passed
+                 : filesystem_verification_result::Failed;
+    }
+    if (waited == -1 && errno != EINTR) {
+      do_stop_child();
+      return filesystem_verification_result::Unavailable;
+    }
+    if (INTERRUPT_REQUESTED) {
+      do_stop_child();
+      return filesystem_verification_result::Interrupted;
+    }
+    let const now = monotonic_nanos();
+    if (now - started_at >= timeout_nanoseconds) {
+      do_stop_child();
+      return filesystem_verification_result::TimedOut;
+    }
+
+    timespec pause{0, 50'000'000};
+    while (::nanosleep(&pause, &pause) == -1 && errno == EINTR) {
+      if (INTERRUPT_REQUESTED) break;
+    }
+  }
+#else
+  unused(path);
+  unused(timeout_nanoseconds);
+  return filesystem_verification_result::Unsupported;
+#endif
 }
 
 #if defined __APPLE__

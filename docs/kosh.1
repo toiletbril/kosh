@@ -2095,6 +2095,12 @@ and a CRC32C checksum are printed for each path. The
 .B \-i
 option locates an inode beneath the path selected by
 .BR \-r .
+The
+.B \-\-verify
+option runs bounded native filesystem verification when the platform supports
+it. On APFS it runs
+.B diskutil verifyVolume
+and reports the command status without parsing localized output.
 .TP
 .B evilps
 Visible processes are printed as a parent and child tree. The
