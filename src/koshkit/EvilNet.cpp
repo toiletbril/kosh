@@ -937,8 +937,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
     }
     live_interval_seconds = parsed;
   }
-  f64 window_seconds = FLAG_EVILNET_LIVE.is_enabled() ? 1.0
-                                                       : live_interval_seconds;
+  f64 window_seconds = 1.0;
   if (FLAG_EVILNET_CUMULATIVE.has_value()) {
     window_seconds = parse_koshkit_duration_seconds(
         FLAG_EVILNET_CUMULATIVE.value(),
