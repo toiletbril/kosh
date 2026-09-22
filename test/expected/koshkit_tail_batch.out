@@ -17,6 +17,12 @@ tail from standard input:
 b
 c
 
+--- forward batch boundary ---
+tail -n +65538 line count:
+4463
+tail -c +65537 byte count:
+74464
+
 --- bounded source order ---
 ==> TMPDIR/batch-01.txt <==
 last-01

@@ -7,6 +7,8 @@ printf 'a\nb\nc\n' > "$d/with-final.txt"
 printf 'a\nb\nc' > "$d/no-final.txt"
 : > "$d/empty.txt"
 printf '0123456789' > "$d/bytes.txt"
+awk 'BEGIN { for (i = 1; i <= 70000; i++) print "x" }' \
+  > "$d/large-forward.txt"
 for batch_source_index in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18; do
   printf 'source-%s\nfirst-%s\nlast-%s\n' \
     "$batch_source_index" "$batch_source_index" "$batch_source_index" \
@@ -32,6 +34,12 @@ echo "tail -c +4:"
 printf '\n'
 echo "tail from standard input:"
 printf 'a\nb\nc\n' | "$BIN" -c 'koshkit tail -n 2'
+printf '\n'
+echo "--- forward batch boundary ---"
+echo "tail -n +65538 line count:"
+"$BIN" -c "koshkit tail -n +65538 '$d/large-forward.txt' | koshkit wc -l"
+echo "tail -c +65537 byte count:"
+"$BIN" -c "koshkit tail -c +65537 '$d/large-forward.txt' | koshkit wc -c"
 printf '\n'
 echo "--- bounded source order ---"
 "$BIN" -c "koshkit tail -n 1 '$d/batch-01.txt' '$d/batch-02.txt' '$d/batch-03.txt' '$d/batch-04.txt' '$d/batch-05.txt' '$d/batch-06.txt' '$d/batch-07.txt' '$d/batch-08.txt' '$d/batch-09.txt' '$d/batch-10.txt' '$d/batch-11.txt' '$d/batch-12.txt' '$d/batch-13.txt' '$d/batch-14.txt' '$d/batch-15.txt' '$d/batch-16.txt' '$d/batch-17.txt' '$d/batch-18.txt'" \
