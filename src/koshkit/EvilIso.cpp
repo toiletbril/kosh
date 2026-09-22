@@ -20,7 +20,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r] [-k] [--kubernetes] [--container]");
+HELP_SYNOPSIS_DECL(
+    "[-a] [-n] [-c] [-s] [-r] [-k] [--kubernetes] [--container] [--containers]");
 
 HELP_DESCRIPTION_DECL(
     "The eviliso utility reports namespaces, cgroups, sessions, and remote "
@@ -38,6 +39,8 @@ FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
 FLAG(EVILISO_KUBERNETES, Bool, '\0', "kubernetes",
      "Report Kubernetes runtime evidence.");
 FLAG(EVILISO_CONTAINER, Bool, '\0', "container",
+     "Report container runtime evidence.");
+FLAG(EVILISO_CONTAINERS, Bool, '\0', "containers",
      "Report container runtime evidence.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -1224,7 +1227,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_EVILISO_NAMESPACES.is_enabled() ||
       FLAG_EVILISO_CGROUPS.is_enabled() || FLAG_EVILISO_SESSIONS.is_enabled() ||
       FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled() ||
-      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled();
+      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled() ||
+      FLAG_EVILISO_CONTAINERS.is_enabled();
   let const show_namespaces =
       !any_selector || FLAG_EVILISO_NAMESPACES.is_enabled();
   let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
@@ -1232,13 +1236,14 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
   let const show_runtime =
       !any_selector || FLAG_EVILISO_RUNTIME.is_enabled() ||
-      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled();
+      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled() ||
+      FLAG_EVILISO_CONTAINERS.is_enabled();
   let const show_kubernetes =
       !any_selector || FLAG_EVILISO_RUNTIME.is_enabled() ||
       FLAG_EVILISO_KUBERNETES.is_enabled();
   let const show_container =
       !any_selector || FLAG_EVILISO_RUNTIME.is_enabled() ||
-      FLAG_EVILISO_CONTAINER.is_enabled();
+      FLAG_EVILISO_CONTAINER.is_enabled() || FLAG_EVILISO_CONTAINERS.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
   if (show_namespaces)

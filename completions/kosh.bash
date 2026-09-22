@@ -200,7 +200,7 @@ _koshkit_util_flags ()
     ;;
     eviliso)
       echo \
-        "-a --all -n --namespaces -c --cgroups -s --sessions -r --remote -k --runtime --kubernetes --container"
+        "-a --all -n --namespaces -c --cgroups -s --sessions -r --remote -k --runtime --kubernetes --container --containers"
     ;;
     evildisk)
       echo "-a --all"
