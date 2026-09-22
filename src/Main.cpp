@@ -1285,6 +1285,9 @@ fn kosh_main(int argc, char **argv) -> int
                                       ? toiletline::edit_mode::Vi
                                       : toiletline::edit_mode::Emacs);
         toiletline::set_tab_selector(context.tab_selector());
+        toiletline::set_space_after_completion(
+            context.shell_option_state(
+                koshka::shell_option_id::SpaceAfterCompletion));
         toiletline::set_history_limit(
             context.get_history_limit("KOSH_HISTORY_SIZE", 4096));
 

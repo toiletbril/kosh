@@ -524,6 +524,8 @@ fn disable_completion() -> void {}
 
 fn completion_is_enabled() -> bool { return false; }
 
+fn set_space_after_completion(bool enabled) -> void { unused(enabled); }
+
 fn enter_calc_history() -> void {}
 
 fn leave_calc_history() -> void {}

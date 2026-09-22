@@ -91,6 +91,8 @@ void enable_job_notifications(koshka::EvalContext &context);
 
 void set_ghost_enabled(bool enabled);
 
+void set_space_after_completion(bool enabled);
+
 void set_highlight_enabled(bool enabled);
 
 void set_colors_enabled(bool enabled);

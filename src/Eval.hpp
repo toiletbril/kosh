@@ -109,6 +109,7 @@ enum class shell_option_id : u8
   ShowStats,
   ShowMemory,
   Onecmd,
+  SpaceAfterCompletion,
   Count,
 };
 
