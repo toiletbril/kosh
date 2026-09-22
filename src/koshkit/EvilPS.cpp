@@ -318,7 +318,7 @@ fn append_bounded_command(String &output, StringView command,
     return;
   }
 
-  let const line_start = output.view().find_last_character('\n');
+  let const line_start = output.find_last_character('\n');
   let const current_line = line_start.has_value()
                                ? output.view().substring(*line_start + 1)
                                : output.view();
@@ -334,7 +334,7 @@ fn append_bounded_command(String &output, StringView command,
   }
 
   if (available <= 3) {
-    let usize actual_cells = 0;
+    usize actual_cells = 0;
     let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
         command, available, actual_cells);
     append_report_text(output, command.substring_of_length(0, kept_bytes),
@@ -342,7 +342,7 @@ fn append_bounded_command(String &output, StringView command,
     return;
   }
 
-  let usize actual_cells = 0;
+  usize actual_cells = 0;
   let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
       command, available - 3, actual_cells);
   append_report_text(output, command.substring_of_length(0, kept_bytes),
@@ -521,7 +521,8 @@ fn mark_search_visibility(ArrayList<tree_node> &nodes, StringView search) throws
   for (let &node : nodes) {
     node.search_visible =
         is_exact_pid
-            ? static_cast<u64>(node.pid) == parsed_pid.value()
+            ? static_cast<u64>(node.pid) ==
+                  static_cast<u64>(parsed_pid.value())
             : node.name.view().find_substring(search).has_value() ||
                   node.command_line.view().find_substring(search).has_value();
   }

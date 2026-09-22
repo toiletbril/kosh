@@ -1261,12 +1261,14 @@ fn append_runtime_report(String &output, bool should_color,
   let const namespace_file = Path{
       "/var/run/secrets/kubernetes.io/serviceaccount/namespace"}
                               .read_entire_file();
-  let namespace = String{heap_allocator()};
+  let namespace_name = String{heap_allocator()};
   if (namespace_file.has_value()) {
-    namespace = String{heap_allocator(), namespace_file->view().trim_blanks()};
+    namespace_name =
+        String{heap_allocator(), namespace_file->view().trim_blanks()};
   }
   let const has_kubepods = cgroup_text.find_substring("kubepods").has_value();
-  if (!kubernetes.has_value() && !has_kubepods && namespace.is_empty()) return;
+  if (!kubernetes.has_value() && !has_kubepods && namespace_name.is_empty())
+    return;
 
   output += "\n";
   let kube_table = ReportTable{heap_allocator()};
@@ -1282,7 +1284,8 @@ fn append_runtime_report(String &output, bool should_color,
     let cells = ArrayList<report_table_cell_view>{heap_allocator()};
     cells.push({"environment", {}});
     cells.push({kubernetes->view(), colors::ansi::BOLD_GREEN});
-    cells.push({namespace.is_empty() ? StringView{"-"} : namespace.view(), {}});
+    cells.push({namespace_name.is_empty() ? StringView{"-"}
+                                       : namespace_name.view(), {}});
     cells.push({"KUBERNETES_SERVICE_HOST", {}});
     kube_table.add_row(cells);
   }
@@ -1290,15 +1293,16 @@ fn append_runtime_report(String &output, bool should_color,
     let cells = ArrayList<report_table_cell_view>{heap_allocator()};
     cells.push({"cgroup", {}});
     cells.push({"-", {}});
-    cells.push({namespace.is_empty() ? StringView{"-"} : namespace.view(), {}});
+    cells.push({namespace_name.is_empty() ? StringView{"-"}
+                                       : namespace_name.view(), {}});
     cells.push({"kubepods", {}});
     kube_table.add_row(cells);
   }
-  if (!namespace.is_empty() && !kubernetes.has_value() && !has_kubepods) {
+  if (!namespace_name.is_empty() && !kubernetes.has_value() && !has_kubepods) {
     let cells = ArrayList<report_table_cell_view>{heap_allocator()};
     cells.push({"service-account", {}});
     cells.push({"-", {}});
-    cells.push({namespace.view(), {}});
+    cells.push({namespace_name.view(), {}});
     cells.push({"namespace file", {}});
     kube_table.add_row(cells);
   }
