@@ -404,21 +404,17 @@ fn EvilDisk::execute(
     unavailable_sections.push("Disk failure counters");
   } else {
     output += "\n";
-    append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
-                         should_color);
-    constexpr StringView HEADERS[] = {
-        "READ ERRORS",
-        "WRITE ERRORS",
-        "READ RETRIES",
-        "WRITE RETRIES",
-    };
-    constexpr usize WIDTHS[] = {11, 12, 12, 13};
-    for (usize index = 0; index < countof(HEADERS); index++) {
-      output += "  ";
-      append_report_column(output, HEADERS[index], WIDTHS[index], true,
-                           colors::ansi::BOLD_CYAN, should_color);
-    }
-    output += "\n";
+    let table = ReportTable{allocator};
+    table.add_column("DEVICE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("READ ERRORS", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("WRITE ERRORS", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("READ RETRIES", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("WRITE RETRIES", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
     for (let const &disk : disk_snapshot.disks) {
       const u64 counters[] = {
           disk.read_error_count,
@@ -432,21 +428,23 @@ fn EvilDisk::execute(
           os::disk_io_field::ReadRetries,
           os::disk_io_field::WriteRetries,
       };
-      append_report_column(output, disk.name.view(), 16, false,
-                           colors::ansi::BOLD_GREEN, should_color);
+      let counter_text = ArrayList<String>{allocator};
+      counter_text.reserve(countof(counters));
       for (usize index = 0; index < countof(counters); index++) {
-        output += "  ";
-        append_report_column(
-            output,
-            disk.has_field(FIELDS[index])
-                ? String::from(counters[index], allocator).view()
-                : StringView{"-"},
-            WIDTHS[index], true,
-            counters[index] == 0 ? colors::ansi::GREEN : colors::ansi::BOLD_RED,
-            should_color);
+        counter_text.push(disk.has_field(FIELDS[index])
+                              ? String::from(counters[index], allocator)
+                              : String{allocator, "-"});
       }
-      output += "\n";
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({disk.name.view(), colors::ansi::BOLD_GREEN});
+      for (usize index = 0; index < counter_text.count(); index++) {
+        cells.push({counter_text[index].view(),
+                    counters[index] == 0 ? colors::ansi::GREEN
+                                         : colors::ansi::BOLD_RED});
+      }
+      table.add_row(cells);
     }
+    output += table.to_string(should_color, "").view();
   }
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
