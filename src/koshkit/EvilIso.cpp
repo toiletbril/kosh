@@ -218,50 +218,36 @@ fn append_namespace_report(String &output, bool should_color,
     return left.process_id < right.process_id;
   });
 
-  usize type_width = 4;
-  usize identifier_width = 2;
-  usize process_width = 3;
-  usize name_width = 4;
-  for (let const &relation : relations) {
-    if (relation.type.length > type_width) type_width = relation.type.length;
-    if (relation.identifier.length() > identifier_width)
-      identifier_width = relation.identifier.length();
-    let const process_id =
-        String::from(relation.process_id, heap_allocator());
-    if (process_id.length() > process_width) process_width = process_id.length();
-    if (relation.name.length() > name_width) name_width = relation.name.length();
-  }
-
-  let const do_append_column = [&](StringView text, usize width,
-                                   bool is_numeric,
-                                   StringView style = {}) throws {
-    append_report_column(output, text, width, is_numeric, style, should_color);
-    output += "  ";
-  };
-  do_append_column("TYPE", type_width, false, colors::ansi::BOLD_CYAN);
-  do_append_column("ID", identifier_width, true, colors::ansi::BOLD_CYAN);
+  let table = ReportTable{heap_allocator()};
+  table.add_column("TYPE", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("ID", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
   if (should_show_detail) {
-    do_append_column("PID", process_width, true, colors::ansi::BOLD_CYAN);
-    do_append_column("NAME", name_width, false, colors::ansi::BOLD_CYAN);
-    append_report_text(output, "ROLE", colors::ansi::BOLD_CYAN, should_color);
+    table.add_column("PID", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("NAME", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("ROLE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
   } else {
-    append_report_text(output, "PROCESSES", colors::ansi::BOLD_CYAN,
-                       should_color);
+    table.add_column("PROCESSES", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
   }
-  output += '\n';
 
   if (should_show_detail) {
     for (let const &relation : relations) {
-      do_append_column(relation.type, type_width, false,
-                       colors::ansi::BOLD_MAGENTA);
-      do_append_column(relation.identifier.view(), identifier_width, true, {});
-      do_append_column(String::from(relation.process_id, heap_allocator()),
-                       process_width, true, colors::ansi::BOLD_GREEN);
-      do_append_column(relation.name.view(), name_width, false, {});
-      append_report_text(output, relation.role, colors::ansi::BOLD_MAGENTA,
-                         should_color);
-      output += '\n';
+      let process_id =
+          String::from(relation.process_id, heap_allocator());
+      let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+      cells.push({relation.type, colors::ansi::BOLD_MAGENTA});
+      cells.push({relation.identifier.view(), colors::ansi::RESET});
+      cells.push({process_id.view(), colors::ansi::BOLD_GREEN});
+      cells.push({relation.name.view(), colors::ansi::RESET});
+      cells.push({relation.role, colors::ansi::BOLD_MAGENTA});
+      table.add_row(cells);
     }
+    output += table.to_string(should_color, "").view();
     return;
   }
 
@@ -278,15 +264,16 @@ fn append_namespace_report(String &output, bool should_color,
       }
       group_end++;
     }
-    do_append_column(first.type, type_width, false,
-                     colors::ansi::BOLD_MAGENTA);
-    do_append_column(first.identifier.view(), identifier_width, true, {});
-    append_report_text(
-        output, String::from(group_end - relation_index, heap_allocator()),
-        colors::ansi::BOLD_GREEN, should_color);
-    output += '\n';
+    let count =
+        String::from(group_end - relation_index, heap_allocator());
+    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.push({first.type, colors::ansi::BOLD_MAGENTA});
+    cells.push({first.identifier.view(), colors::ansi::RESET});
+    cells.push({count.view(), colors::ansi::BOLD_GREEN});
+    table.add_row(cells);
     relation_index = group_end;
   }
+  output += table.to_string(should_color, "").view();
 }
 
 struct cgroup_membership
