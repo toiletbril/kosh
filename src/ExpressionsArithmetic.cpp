@@ -1411,26 +1411,6 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   unused(is_unconditional);
   actx.add_defined_function(m_name);
 
-  let body_source = analysis_source_span(actx, *m_body).trim_blanks();
-  if (!body_source.is_empty() &&
-      (body_source[0] == '{' || body_source[0] == '('))
-  {
-    body_source = body_source.substring(1).trim_blanks();
-  }
-  if (body_source.starts_with(m_name.view()) &&
-      body_source.length > m_name.count() &&
-      (body_source[m_name.count()] == ' ' ||
-       body_source[m_name.count()] == '\t' ||
-       body_source[m_name.count()] == '\n' ||
-       body_source[m_name.count()] == ';'))
-  {
-    let const call_location = SourceLocation{
-        static_cast<usize>(body_source.data - actx.source.data), m_name.count(),
-        m_body->source_location().source_name_index};
-    actx.report_diagnostic(diagnostic_id::sc2264, call_location,
-                           {m_name.view()}, source_location());
-  }
-
   /* The body runs later when the function is called, so it is analyzed from an
      empty constant table with the outer constants restored after. A called
      function edits the caller's own shell, and its search path, working
@@ -1483,6 +1463,16 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   m_body->analyze(actx, false);
   let &function_definition =
       actx.function_definitions[function_definition_index];
+  if (function_definition.recursive_call_count > 0) {
+    let const diagnostic =
+        function_definition.recursive_call_count >= 2 &&
+                function_definition.has_async_recursive_call
+            ? diagnostic_id::fork_bomb
+            : diagnostic_id::sc2264;
+    actx.report_diagnostic(diagnostic,
+                           function_definition.first_recursive_call_location,
+                           {m_name.view()}, source_location());
+  }
   function_definition.occurrence_end =
       actx.symbol_records != nullptr
           ? actx.symbol_records->variable_occurrences.count()

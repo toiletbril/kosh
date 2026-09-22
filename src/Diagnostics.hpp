@@ -285,6 +285,7 @@ enum class diagnostic_id : u16
   sc2260,
   sc2261,
   sc2264,
+  fork_bomb,
   sc2267,
   sc2268,
   sc2269,

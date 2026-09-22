@@ -268,6 +268,9 @@ struct function_definition_record
   SourceLocation first_positional_read_location;
   bool has_been_called{false};
   bool is_analysis_complete{false};
+  SourceLocation first_recursive_call_location{};
+  usize recursive_call_count{0};
+  bool has_async_recursive_call{false};
 };
 
 /* One function definition a reader may ask about. The body span is recovered

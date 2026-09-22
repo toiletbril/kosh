@@ -86,7 +86,7 @@ echo "compat-level-two-recursion=$(printf '%s\n' "$compat_level_two" |
 echo "compat-level-three-recursion=$(printf '%s\n' "$compat_level_three" |
   grep -c 'SC2264')"
 echo "compat-recursion-warning=$(printf '%s\n' "$compat_level_two" |
-  grep -c 'This is a fork bomb. Note: rewrite your program or ignore this warning')"
+  grep -c "The 'wrapper' function calls itself")"
 
 cat > "$temporary_directory/file-directive.sh" <<'EOF'
 # shellcheck disable=SC2164

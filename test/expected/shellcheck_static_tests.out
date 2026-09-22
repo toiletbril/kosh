@@ -1607,13 +1607,13 @@
 [Word
   Unquoted "}"
 ]
-4:23: warning: This is a fork bomb. Note: rewrite your program or ignore this warning. (SC2264)
+4:23: warning: The 'recursive_wrapper' function calls itself. (SC2264)
      4 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |                        ^~~~~~~~~~~~~~~~~
 4:1: details:
      4 |  recursive_wrapper() { recursive_wrapper "$@"; }
        |  ^~~~~~~~~~~~~~~~~ 'recursive_wrapper' is defined here.
-note: The 'recursive_wrapper' function calls itself.
+note: Use `command` before the wrapped command name.
 7:7: warning: Arithmetic reads the `-lt` operator as a subtraction. (SC1106)
      7 |    let "counter -lt limit"
        |        ^~~~~~~~~~~~~~~~~~~

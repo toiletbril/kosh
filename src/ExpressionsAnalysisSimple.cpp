@@ -666,6 +666,18 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         call_location,
         m_args.count() > 1, actx.function_scope_depth != 0
     });
+    if (actx.active_function_definition_index !=
+            AnalysisContext::NO_ACTIVE_FUNCTION_DEFINITION &&
+        actx.function_definitions[actx.active_function_definition_index]
+                .name.view() == command_literal)
+    {
+      let &definition =
+          actx.function_definitions[actx.active_function_definition_index];
+      if (definition.recursive_call_count == 0)
+        definition.first_recursive_call_location = call_location;
+      definition.recursive_call_count++;
+      definition.has_async_recursive_call |= is_async();
+    }
     actx.apply_called_function(command_literal, call_location);
   }
 
