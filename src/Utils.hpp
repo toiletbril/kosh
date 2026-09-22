@@ -166,6 +166,10 @@ pure alwaysinline fn ascii_to_lower(char ch) wontthrow -> char
   return ch;
 }
 
+pure fn contains_case_insensitive_ascii(StringView value,
+                                        StringView folded_pattern) wontthrow
+    -> bool;
+
 pure alwaysinline fn environment_name_is_path(StringView name) wontthrow -> bool
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) return name == "PATH";

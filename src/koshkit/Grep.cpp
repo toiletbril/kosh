@@ -65,29 +65,6 @@ static pure fn is_ascii_pattern(StringView pattern) wontthrow -> bool
   return true;
 }
 
-static pure fn contains_case_insensitive_ascii(
-    StringView value, StringView folded_pattern) wontthrow
-    -> bool
-{
-  if (folded_pattern.is_empty()) return true;
-  if (folded_pattern.length > value.length) return false;
-
-  let const last_start = value.length - folded_pattern.length;
-  for (usize start = 0; start <= last_start; start++) {
-    bool is_match = true;
-    for (usize index = 0; index < folded_pattern.length; index++) {
-      if (utils::ascii_to_lower(value[start + index]) !=
-          folded_pattern[index]) {
-        is_match = false;
-        break;
-      }
-    }
-    if (is_match) return true;
-  }
-
-  return false;
-}
-
 static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
                                     StringView path, Allocator allocator,
                                     ArrayList<String> &storage,
@@ -234,7 +211,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
                                   StringView value) throws -> void {
     let const is_match = should_use_literal_search
                              ? (should_ignore_case
-                                    ? contains_case_insensitive_ascii(
+                                    ? utils::contains_case_insensitive_ascii(
                                           value, folded_pattern.view())
                                     : value.find_substring(pattern).has_value())
                              : os::regex_matches_null_terminated(compiled, value);

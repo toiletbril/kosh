@@ -27,6 +27,28 @@ namespace koshka {
 
 namespace utils {
 
+pure fn contains_case_insensitive_ascii(StringView value,
+                                        StringView folded_pattern) wontthrow
+    -> bool
+{
+  if (folded_pattern.is_empty()) return true;
+  if (folded_pattern.length > value.length) return false;
+
+  let const last_start = value.length - folded_pattern.length;
+  for (usize start = 0; start <= last_start; start++) {
+    bool is_match = true;
+    for (usize index = 0; index < folded_pattern.length; index++) {
+      if (ascii_to_lower(value[start + index]) != folded_pattern[index]) {
+        is_match = false;
+        break;
+      }
+    }
+    if (is_match) return true;
+  }
+
+  return false;
+}
+
 static fn shell_word_expansion_end(StringView word,
                                    usize expansion_start) wontthrow -> usize
 {
