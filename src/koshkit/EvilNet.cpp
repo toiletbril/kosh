@@ -230,34 +230,21 @@ fn append_network_interface_report(String &output, bool should_color,
     return left.address.view() < right.address.view();
   });
 
-  usize interface_width = 9;
+  let table = ReportTable{addresses.allocator()};
+  table.add_column("NAME", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("FAMILY", report_table_alignment::Left,
+                   colors::ansi::BOLD_MAGENTA);
+  table.add_column("ADDRESS", report_table_alignment::Left,
+                   colors::ansi::RESET);
   for (let const &address : addresses) {
-    if (address.interface_name.length() > interface_width) {
-      interface_width = address.interface_name.length();
-    }
+    let cells = ArrayList<report_table_cell_view>{addresses.allocator()};
+    cells.push({address.interface_name.view(), colors::ansi::BOLD_GREEN});
+    cells.push({family_name(address.family), colors::ansi::BOLD_MAGENTA});
+    cells.push({address.address.view(), colors::ansi::RESET});
+    table.add_row(cells);
   }
-
-  output += indentation;
-  append_report_column(output, "NAME", interface_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, "FAMILY", 6, false, colors::ansi::BOLD_MAGENTA,
-                       should_color);
-  output += "  ";
-  append_report_text(output, "ADDRESS", {}, should_color);
-  output += "\n";
-
-  for (let const &address : addresses) {
-    output += indentation;
-    append_report_column(output, address.interface_name.view(), interface_width,
-                         false, colors::ansi::BOLD_GREEN, should_color);
-    output += "  ";
-    append_report_column(output, family_name(address.family), 6, false,
-                         colors::ansi::BOLD_MAGENTA, should_color);
-    output += "  ";
-    append_report_text(output, address.address.view(), {}, should_color);
-    output += "\n";
-  }
+  output += table.to_string(should_color, indentation).view();
 
   return addresses.count();
 }
