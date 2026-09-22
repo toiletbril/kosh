@@ -97,3 +97,5 @@ note: Pass a whole number greater than or equal to zero.
 .
 --- find unreadable nested path ---
 find-unreadable=matched
+--- find interruption ---
+find-interrupt=matched

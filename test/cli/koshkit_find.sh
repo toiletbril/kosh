@@ -83,3 +83,31 @@ else
       ;;
   esac
 fi
+echo "--- find interruption ---"
+if [ "${TARGET-}" != Linux ] || ! command -v timeout >/dev/null 2>&1; then
+  echo "find-interrupt=skipped"
+else
+  interrupt_fast_root=$TEST_TEMP_DIRECTORY/find-interrupt-fast
+  interrupt_root=$TEST_TEMP_DIRECTORY/find-interrupt-slow
+  mkdir -p "$interrupt_fast_root" "$interrupt_root"
+  : > "$interrupt_fast_root/complete"
+  interrupt_directory=0
+  while [ "$interrupt_directory" -lt 200 ]; do
+    interrupt_path=$interrupt_root/d$interrupt_directory
+    mkdir "$interrupt_path"
+    interrupt_file=0
+    while [ "$interrupt_file" -lt 200 ]; do
+      printf x > "$interrupt_path/f$interrupt_file"
+      interrupt_file=$((interrupt_file + 1))
+    done
+    interrupt_directory=$((interrupt_directory + 1))
+  done
+  interrupt_output=$(timeout --preserve-status -s INT 0.005s "$BIN" -c \
+    "koshkit find '$interrupt_fast_root' '$interrupt_root'" 2>&1)
+  interrupt_status=$?
+  if [ "$interrupt_status" -eq 130 ]; then
+    echo "find-interrupt=matched"
+  else
+    echo "find-interrupt=failed"
+  fi
+fi
