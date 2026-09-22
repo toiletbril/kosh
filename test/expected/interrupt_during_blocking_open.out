@@ -33,6 +33,7 @@ rc=130
 == grep reads an earlier regular file before opening a later pipe:
 grep-status=143
 grep-first=printed
+grep-interrupt=preserved
 == diff stops after a first error before opening a later pipe:
 3:1: error: diff: cannot read 'missing': No such file or directory.
      3 |  koshkit diff missing diff

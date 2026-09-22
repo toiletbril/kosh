@@ -81,6 +81,8 @@ if [ "$grep_output_is_ready" = yes ]; then
 else
   echo "grep-first=missing"
 fi
+python3 "$(dirname "$0")/grep_interrupted_output.py" \
+  "$BIN" "$directory" "$directory/grep"
 
 echo "== diff stops after a first error before opening a later pipe:"
 "$BIN" --no-traces -c 'directory=$1
