@@ -1373,8 +1373,53 @@ fn read_filesystem_error_counters(StringView path,
 fn read_filesystem_integrity_evidence(StringView path) throws
     -> Maybe<filesystem_integrity_evidence>
 {
-  unused(path);
-  return None;
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return None;
+
+  wchar_t volume_root[MAX_PATH + 1]{};
+  if (GetVolumePathNameW(wide_path->begin(), volume_root,
+                         countof(volume_root)) == 0)
+  {
+    return None;
+  }
+
+  wchar_t filesystem_name[MAX_PATH + 1]{};
+  if (GetVolumeInformationW(volume_root, nullptr, 0, nullptr, nullptr, nullptr,
+                            filesystem_name, countof(filesystem_name)) == 0 ||
+      _wcsicmp(filesystem_name, L"NTFS") != 0)
+  {
+    return None;
+  }
+
+  wchar_t volume_path[MAX_PATH + 1]{};
+  if (GetVolumeNameForVolumeMountPointW(volume_root, volume_path,
+                                        countof(volume_path)) == 0)
+  {
+    return None;
+  }
+  let volume_path_length = static_cast<usize>(lstrlenW(volume_path));
+  if (volume_path_length > 0 && volume_path[volume_path_length - 1] == L'\\')
+    volume_path[volume_path_length - 1] = L'\0';
+
+  let const volume = CreateFileW(
+      volume_path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      nullptr, OPEN_EXISTING, 0, nullptr);
+  if (volume == INVALID_HANDLE_VALUE) return None;
+  defer { CloseHandle(volume); };
+
+  ULONG flags = 0;
+  DWORD returned_byte_count = 0;
+  if (DeviceIoControl(volume, FSCTL_IS_VOLUME_DIRTY, nullptr, 0, &flags,
+                      sizeof(flags), &returned_byte_count, nullptr) == 0 ||
+      returned_byte_count < sizeof(flags))
+  {
+    return None;
+  }
+
+  filesystem_integrity_evidence evidence{
+      filesystem_integrity_kind::NtfsDirtyFlag};
+  evidence.is_dirty = (flags & VOLUME_IS_DIRTY) != 0;
+  return evidence;
 }
 
 fn sync_filesystems() wontthrow -> bool
