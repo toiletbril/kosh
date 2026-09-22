@@ -594,14 +594,14 @@ static fn build_filesystem_candidate(
   let const inside_quote = text_mode == path_text_mode::Literal;
   let const preserve_directory_spelling = raw_directory_part != directory_part;
   let entry_name = String{completion_allocator(), name};
+  char directory_separator = 0;
   if (is_directory && suffix_mode == directory_suffix_mode::Marked) {
-    let separator = '/';
+    directory_separator = '/';
     if (!directory_part.is_empty() &&
         os::is_directory_separator(directory_part[directory_part.length - 1]))
     {
-      separator = directory_part[directory_part.length - 1];
+      directory_separator = directory_part[directory_part.length - 1];
     }
-    entry_name.push(separator);
   }
 
   let const token_ends_with_closed_quote =
@@ -611,8 +611,10 @@ static fn build_filesystem_candidate(
   if (decoded_word.quote_character != 0 || token_ends_with_closed_quote) {
     let decoded_candidate =
         String{completion_allocator(), directory_part} + entry_name;
-    return rebuild_shell_syntax_candidate(raw_token, decoded_word,
-                                          decoded_candidate.view());
+    let candidate = rebuild_shell_syntax_candidate(raw_token, decoded_word,
+                                                    decoded_candidate.view());
+    if (directory_separator != 0) candidate.push(directory_separator);
+    return candidate;
   }
 
   if (preserve_directory_spelling) {
@@ -620,7 +622,10 @@ static fn build_filesystem_candidate(
       entry_name = quote_path_candidate(entry_name.view());
     }
 
-    return String{completion_allocator(), raw_directory_part} + entry_name;
+    let candidate =
+        String{completion_allocator(), raw_directory_part} + entry_name;
+    if (directory_separator != 0) candidate.push(directory_separator);
+    return candidate;
   }
 
   let candidate = String{completion_allocator(), directory_part};
@@ -642,6 +647,7 @@ static fn build_filesystem_candidate(
     }
   }
 
+  if (directory_separator != 0) candidate.push(directory_separator);
   return candidate;
 }
 
@@ -1285,6 +1291,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
           stage_token,
           token_is_glob ? command_match_mode::Glob : command_match_mode::Prefix,
           context, extra_command_names);
+      should_rebuild_shell_syntax_candidates = true;
     }
   } else if (is_command && !token_has_path_separator) {
     /* An empty command token would enumerate every PATH command on each
@@ -1311,7 +1318,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
         materialized_candidate_count = collector.materialized();
         ghost_prefix = collector.take_prefix();
       }
-      should_rebuild_shell_syntax_candidates = decoded_token.has_shell_syntax;
+      should_rebuild_shell_syntax_candidates = true;
     }
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory, filesystem_filter,
@@ -1353,7 +1360,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
     }
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);
-      should_rebuild_shell_syntax_candidates = decoded_token.has_shell_syntax;
+      should_rebuild_shell_syntax_candidates = true;
     } else if (for_listing) {
       let const basename =
           split_path_token(decoded_token.text.view()).basename_part;
