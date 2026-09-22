@@ -145,3 +145,5 @@ rc=2
 rc=2
 --- unreadable root ---
 ls-unreadable=matched
+--- recursive ls interruption ---
+ls-interrupt=matched
