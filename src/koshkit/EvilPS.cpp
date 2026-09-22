@@ -120,6 +120,7 @@ struct tree_node
   String command_line{heap_allocator()};
   bool has_cpu_percentage{false};
   bool was_rendered{false};
+  bool search_visible{true};
 };
 
 struct live_process_cpu_row
@@ -403,6 +404,8 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
   for (usize position = 0; position < nodes.count(); position++) {
     if (nodes[position].parent_pid != parent_pid) continue;
 
+    if (!nodes[position].search_visible) continue;
+
     if (nodes[position].pid == parent_pid) continue;
 
     if (nodes[position].was_rendered) continue;
@@ -466,6 +469,39 @@ fn read_process_nodes(Allocator allocator, bool should_read_resources,
   return nodes;
 }
 
+fn mark_search_visibility(ArrayList<tree_node> &nodes, StringView search) throws
+    -> void
+{
+  if (search.is_empty()) return;
+
+  let const parsed_pid = utils::parse_integer_in_base(search, int_base::decimal);
+  let const is_exact_pid =
+      !parsed_pid.is_error() && parsed_pid.value() > 0;
+  for (let &node : nodes) {
+    node.search_visible =
+        is_exact_pid
+            ? static_cast<u64>(node.pid) == parsed_pid.value()
+            : node.name.view().find_substring(search).has_value() ||
+                  node.command_line.view().find_substring(search).has_value();
+  }
+
+  for (usize index = 0; index < nodes.count(); index++) {
+    if (!nodes[index].search_visible) continue;
+    let parent_pid = nodes[index].parent_pid;
+    while (parent_pid > 0) {
+      bool found_parent = false;
+      for (let &candidate : nodes) {
+        if (candidate.pid != parent_pid) continue;
+        candidate.search_visible = true;
+        parent_pid = candidate.parent_pid;
+        found_parent = true;
+        break;
+      }
+      if (!found_parent) break;
+    }
+  }
+}
+
 fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            Allocator allocator, String &output,
                            ArrayList<tree_node> &nodes,
@@ -486,6 +522,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
   }
 
   sort_nodes(nodes, sort_key, is_sampled);
+  mark_search_visibility(nodes, search);
 
   i64 root_pid = 1;
   if (!operands.is_empty()) {
@@ -514,14 +551,17 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
   if (should_human) output += "PID  PPID  CPU  MEM  COMMAND\n";
 
-  if (root_position < nodes.count() && !sort_key.has_value()) {
-    nodes[root_position].was_rendered = true;
-    append_label(output, nodes[root_position], allocator, should_color,
-                 should_human, sort_key, is_sampled);
-    rendered_count++;
-    render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
-                    should_color, output_limit, rendered_count, should_human,
-                    sort_key, is_sampled);
+  if (root_position < nodes.count() && !sort_key.has_value() &&
+      (search.is_empty() || nodes[root_position].search_visible)) {
+    if (nodes[root_position].search_visible) {
+      nodes[root_position].was_rendered = true;
+      append_label(output, nodes[root_position], allocator, should_color,
+                   should_human, sort_key, is_sampled);
+      rendered_count++;
+      render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
+                      should_color, output_limit, rendered_count, should_human,
+                      sort_key, is_sampled);
+    }
     visible_line_count = 1;
     if (viewport_rows != 0) {
       let const full_output = String{allocator, output.view()};
@@ -536,7 +576,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                                  : full_output.length();
         let const line = full_output.view().substring_of_length(
             position, line_end - position);
-        if (search.is_empty() || line.find_substring(search).has_value()) {
+        {
           if (line_number >= scroll_offset &&
               line_number - scroll_offset < viewport_rows - 1) {
             output += line;
@@ -563,6 +603,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (rendered_count >= output_limit) break;
 
     if (nodes[position].was_rendered) continue;
+    if (!nodes[position].search_visible) continue;
 
     if (sort_key.has_value()) {
       nodes[position].was_rendered = true;
@@ -579,7 +620,8 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     for (let const &candidate : nodes) {
       if (candidate.pid != nodes[position].parent_pid) continue;
 
-      if (candidate.pid == nodes[position].pid) continue;
+      if (candidate.pid == nodes[position].pid || !candidate.search_visible)
+        continue;
 
       has_visible_parent = true;
       break;
@@ -610,7 +652,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                                : full_output.length();
       let const line = full_output.view().substring_of_length(
           position, line_end - position);
-      if (search.is_empty() || line.find_substring(search).has_value()) {
+      {
         if (line_number >= scroll_offset &&
             line_number - scroll_offset < viewport_rows - 1) {
           output += line;
