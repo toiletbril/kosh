@@ -951,7 +951,17 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       else if (*sort_key == evilps_sort_key::Pid) frame += "pid";
       else if (*sort_key == evilps_sort_key::Cpu) frame += "cpu";
       else frame += "memory";
-      frame += " | s sort | / search | q quit\n";
+      frame += " | s sort | / search | q quit";
+      if (!live_search.is_empty() || !live_input.is_empty()) {
+        frame += " | SEARCH ";
+        if (!live_input.is_empty())
+          frame += live_input.view();
+        else {
+          frame += "/";
+          frame += live_search.view();
+        }
+      }
+      frame += "\n";
       let const status = render_process_snapshot(
           ec, cxt, frame_allocator, frame, nodes, operands, operand_locations,
           output_limit, should_color,
