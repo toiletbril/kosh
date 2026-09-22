@@ -794,12 +794,22 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let frame_arena = BumpArena{};
     let const is_terminal =
         os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
-    let const sample_interval_nanoseconds =
+    let const sample_interval_nanoseconds = 500000000ULL;
+    let const refresh_interval_nanoseconds =
         static_cast<u64>(live_interval_seconds * 1000000000.0);
     let const window_nanoseconds =
         static_cast<u64>(cumulative_interval_seconds * 1000000000.0);
     let history = ArrayList<live_process_cpu_row>{live_allocator};
-    u64 last_sample_nanoseconds = 0;
+    let nodes = read_process_nodes(live_allocator, should_read_resources,
+                                   line_width_limit);
+    u64 last_sample_nanoseconds = os::monotonic_nanos();
+    u64 last_refresh_nanoseconds =
+        last_sample_nanoseconds > refresh_interval_nanoseconds
+            ? last_sample_nanoseconds - refresh_interval_nanoseconds
+            : 0;
+    if (should_sample_cpu)
+      update_cpu_history(nodes, history, last_sample_nanoseconds,
+                         window_nanoseconds);
     bool is_alternate_screen_active = false;
     let live_input = String{live_allocator};
     let live_search = String{live_allocator};
@@ -818,28 +828,45 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       defer { frame_arena.release(frame_mark); };
       let const frame_allocator = bump_allocator(frame_arena);
 
-      if (last_sample_nanoseconds != 0) {
-        let const before_wait_nanoseconds = os::monotonic_nanos();
-        let const elapsed_nanoseconds =
-            before_wait_nanoseconds - last_sample_nanoseconds;
-        let const wait_nanoseconds =
-            sample_interval_nanoseconds > elapsed_nanoseconds
-                ? sample_interval_nanoseconds - elapsed_nanoseconds
-                : 0;
+      let const before_wait_nanoseconds = os::monotonic_nanos();
+      let const sample_elapsed =
+          before_wait_nanoseconds - last_sample_nanoseconds;
+      let const refresh_elapsed =
+          before_wait_nanoseconds - last_refresh_nanoseconds;
+      let const until_sample = sample_interval_nanoseconds > sample_elapsed
+                                   ? sample_interval_nanoseconds - sample_elapsed
+                                   : 0;
+      let const until_refresh =
+          refresh_interval_nanoseconds > refresh_elapsed
+              ? refresh_interval_nanoseconds - refresh_elapsed
+              : 0;
+      let const wait_nanoseconds =
+          until_sample < until_refresh ? until_sample : until_refresh;
+      if (wait_nanoseconds != 0)
         os::sleep_for_seconds(static_cast<f64>(wait_nanoseconds) /
                               1000000000.0);
-        if (os::INTERRUPT_REQUESTED != 0) {
-          os::INTERRUPT_REQUESTED = 0;
-          return 130;
-        }
+      if (os::INTERRUPT_REQUESTED != 0) {
+        os::INTERRUPT_REQUESTED = 0;
+        return 130;
       }
 
       let const now = os::monotonic_nanos();
-      let nodes = read_process_nodes(frame_allocator, should_read_resources,
-                                     line_width_limit);
-      if (should_sample_cpu)
-        update_cpu_history(nodes, history, now, window_nanoseconds);
-      last_sample_nanoseconds = now;
+      if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
+        nodes = read_process_nodes(live_allocator, should_read_resources,
+                                   line_width_limit);
+        if (should_sample_cpu)
+          update_cpu_history(nodes, history, now, window_nanoseconds);
+        last_sample_nanoseconds = now;
+      }
+      if (now - last_refresh_nanoseconds < refresh_interval_nanoseconds) {
+        if (is_terminal && !poll_live_input(
+                                ec.in_fd.value_or(KOSH_STDIN), live_input,
+                                live_search, scroll_offset, sort_key,
+                                should_sample_cpu, should_read_resources))
+          return 0;
+        continue;
+      }
+      last_refresh_nanoseconds = now;
       u32 terminal_rows = 0;
       if (is_terminal) {
         u32 terminal_columns = 0;
