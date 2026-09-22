@@ -371,7 +371,7 @@ fn EvilDisk::execute(
 
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
-  output += "\n";
+  let unavailable_sections = ArrayList<StringView>{allocator};
   append_report_column(output, "FILESYSTEM", source_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
@@ -394,7 +394,6 @@ fn EvilDisk::execute(
   output += "\n";
 
   for (let const &row : rows) {
-    output += "  ";
     append_report_column(output, row.source.view(), source_width, false,
                          colors::ansi::GREEN, should_color);
     output += "  ";
@@ -435,10 +434,10 @@ fn EvilDisk::execute(
     }
   }
 
-  output += "\n";
   if (!has_failure_counters) {
-    output += "Disk failure counters are unavailable on this platform.\n";
+    unavailable_sections.push("Disk failure counters");
   } else {
+    output += "\n";
     append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                          should_color);
     constexpr StringView HEADERS[] = {
@@ -485,7 +484,6 @@ fn EvilDisk::execute(
   }
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
-    output += "\n";
     struct identity_row
     {
       StringView mount;
@@ -505,8 +503,9 @@ fn EvilDisk::execute(
                                             : filesystem.volume_uuid.view()});
     }
     if (identity_rows.is_empty()) {
-      output += "Identity data is unavailable on this platform.\n";
+      unavailable_sections.push("Identity data");
     } else {
+      output += "\n";
       usize mount_width = 5;
       usize label_width = 5;
       for (let const &row : identity_rows) {
@@ -534,7 +533,6 @@ fn EvilDisk::execute(
       }
     }
 
-    output += "\n";
     struct failure_row
     {
       StringView mount;
@@ -549,8 +547,9 @@ fn EvilDisk::execute(
       failure_rows.push(failure_row{filesystem.target.view(), counters});
     }
     if (failure_rows.is_empty()) {
-      output += "Filesystem failure counters are unavailable.\n";
+      unavailable_sections.push("Filesystem failure counters");
     } else {
+      output += "\n";
       constexpr StringView HEADERS[] = {"READ", "WRITE", "FLUSH", "CORRUPTION",
                                         "GENERATION"};
       constexpr usize WIDTHS[] = {6, 6, 6, 10, 10};
@@ -586,10 +585,10 @@ fn EvilDisk::execute(
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
     let const smart_rows = read_smart_rows(cxt, filesystems, allocator);
-    output += "\n";
     if (smart_rows.is_empty()) {
-      output += "SMART data is unavailable on this platform.\n";
+      unavailable_sections.push("SMART data");
     } else {
+      output += "\n";
       usize device_width = 6;
       usize status_width = 6;
       usize model_width = 5;
@@ -645,6 +644,22 @@ fn EvilDisk::execute(
         }
       }
     }
+  }
+
+  if (!unavailable_sections.is_empty()) {
+    if (!output.is_empty() && output.back() != '\n') output += '\n';
+    let table = ReportTable{allocator};
+    table.add_column("SECTION", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("STATUS", report_table_alignment::Left,
+                     colors::ansi::BOLD_YELLOW);
+    for (let const section : unavailable_sections) {
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({section, colors::ansi::BOLD_CYAN});
+      cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
+      table.add_row(cells);
+    }
+    output += table.to_string(should_color, "").view();
   }
 
   ec.print_to_stdout(output);
