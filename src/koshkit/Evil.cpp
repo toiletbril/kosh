@@ -295,6 +295,12 @@ fn append_procfs_report(String &output, bool should_color,
          &os::system_activity_status::writeback_page_count},
         {os::system_activity_field::OomKills, "OOM kills",
          &os::system_activity_status::oom_kill_count},
+        {os::system_activity_field::NamespaceCount,
+         "Current-process namespaces",
+         &os::system_activity_status::namespace_count},
+        {os::system_activity_field::CgroupMembershipCount,
+         "Current-process cgroup memberships",
+         &os::system_activity_status::cgroup_membership_count},
     };
     for (let const &metric : METRICS) {
       if (!activity.has_field(metric.field)) continue;
@@ -306,6 +312,17 @@ fn append_procfs_report(String &output, bool should_color,
   } else {
     append_report_field(output, "Activity", "unavailable",
                         colors::ansi::BOLD_CYAN, should_color);
+  }
+  if (activity.has_isolation_probes) {
+    if (!activity.has_field(os::system_activity_field::NamespaceCount)) {
+      append_report_field(output, "Current-process namespaces", "unavailable",
+                          colors::ansi::BOLD_CYAN, should_color);
+    }
+    if (!activity.has_field(os::system_activity_field::CgroupMembershipCount)) {
+      append_report_field(output, "Current-process cgroup memberships",
+                          "unavailable", colors::ansi::BOLD_CYAN,
+                          should_color);
+    }
   }
 
   os::memory_status memory{};

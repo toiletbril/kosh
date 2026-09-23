@@ -1922,7 +1922,9 @@ filesystem, and network information is printed. The
 .B \-a
 option adds system details that are omitted from the default report. The
 additional activity counters are shown only when the platform provides them;
-pressure-stall totals are measured in microseconds. The
+pressure-stall totals are measured in microseconds. On Linux, this includes
+counts of the current process's namespace entries and cgroup memberships;
+each reports unavailable if its procfs source cannot be read. The
 .B \-s
 option selects identity fields. The
 .B \-u

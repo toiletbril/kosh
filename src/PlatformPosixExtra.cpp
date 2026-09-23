@@ -1276,6 +1276,7 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
 
   return status.available_fields != 0;
 #elif defined __linux__
+  status.has_isolation_probes = true;
   char stat_buffer[16384];
   let const stat_length =
       read_small_file("/proc/stat", stat_buffer, sizeof(stat_buffer));
@@ -1471,6 +1472,78 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
   if (has_full) {
     status.available_fields |=
         static_cast<u32>(system_activity_field::IoFullStall);
+  }
+
+  if (DIR *namespace_directory = ::opendir("/proc/self/ns");
+      namespace_directory != nullptr)
+  {
+    defer { ::closedir(namespace_directory); };
+    errno = 0;
+    u64 namespace_count = 0;
+    bool is_bounded = true;
+    for (struct dirent *entry = ::readdir(namespace_directory);
+         entry != nullptr; entry = ::readdir(namespace_directory))
+    {
+      if (entry->d_name[0] == '.') continue;
+      if (namespace_count == 64) {
+        is_bounded = false;
+        break;
+      }
+      namespace_count++;
+    }
+    if (is_bounded && errno == 0) {
+      status.namespace_count = namespace_count;
+      status.available_fields |=
+          static_cast<u32>(system_activity_field::NamespaceCount);
+    }
+  }
+
+  if (let const cgroup_fd = ::open("/proc/self/cgroup", O_RDONLY | O_CLOEXEC);
+      cgroup_fd >= 0)
+  {
+    defer { ::close(cgroup_fd); };
+    char cgroup_buffer[8192];
+    usize cgroup_length = 0;
+    bool has_complete_read = false;
+    while (cgroup_length < sizeof(cgroup_buffer)) {
+      let const read_length =
+          ::read(cgroup_fd, cgroup_buffer + cgroup_length,
+                 sizeof(cgroup_buffer) - cgroup_length);
+      if (read_length > 0) {
+        cgroup_length += static_cast<usize>(read_length);
+        continue;
+      }
+      if (read_length == 0) {
+        has_complete_read = true;
+        break;
+      }
+      if (errno != EINTR) break;
+    }
+    if (has_complete_read && cgroup_length > 0 &&
+        cgroup_buffer[cgroup_length - 1] == '\n')
+    {
+      let const text = StringView{cgroup_buffer, cgroup_length};
+      usize position = 0;
+      u64 membership_count = 0;
+      bool is_valid = true;
+      while (position < text.length) {
+        let const line = each_line(text, position);
+        let const first_colon = line.find_character(':');
+        if (!first_colon.has_value() ||
+            !line.substring(*first_colon + 1).find_character(':').has_value() ||
+            membership_count == 64)
+        {
+          is_valid = false;
+          break;
+        }
+        membership_count++;
+      }
+      if (is_valid) {
+        status.cgroup_membership_count = membership_count;
+        status.available_fields |=
+            static_cast<u32>(system_activity_field::CgroupMembershipCount);
+      }
+    }
   }
 
   return status.available_fields != 0;

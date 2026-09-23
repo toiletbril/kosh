@@ -793,6 +793,8 @@ enum class system_activity_field : u32
   ContextSwitches = 1u << 23,
   ProcessCreations = 1u << 24,
   SoftInterrupts = 1u << 25,
+  NamespaceCount = 1u << 26,
+  CgroupMembershipCount = 1u << 27,
 };
 
 struct system_activity_status
@@ -825,7 +827,10 @@ struct system_activity_status
   u64 context_switch_count{0};
   u64 process_creation_count{0};
   u64 soft_interrupt_count{0};
+  u64 namespace_count{0};
+  u64 cgroup_membership_count{0};
   u32 available_fields{0};
+  bool has_isolation_probes{false};
 
   pure fn has_field(system_activity_field field) const wontthrow -> bool
   {
