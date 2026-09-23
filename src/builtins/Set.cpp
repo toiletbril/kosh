@@ -451,16 +451,16 @@ consteval fn make_set_option_letter_table() wontthrow -> set_option_letter_table
 
 constexpr auto SET_OPTION_BY_LETTER = make_set_option_letter_table();
 
-fn find_option_by_letter(char letter) throws -> const set_option_descriptor *
+fn find_option_by_letter(char letter) wontthrow -> Maybe<usize>
 {
   let const position = SET_OPTION_BY_LETTER.positions[static_cast<u8>(letter)];
-  return position == 0xff ? nullptr : &SET_OPTIONS[position];
+  return position == 0xff ? None : Maybe<usize>{position};
 }
 
-fn find_option_by_name(StringView name) throws -> const set_option_descriptor *
+fn find_option_by_name(StringView name) throws -> Maybe<usize>
 {
   let const position = SET_OPTION_BY_NAME.find(name);
-  return position.has_value() ? &SET_OPTIONS[*position] : nullptr;
+  return position.has_value() ? Maybe<usize>{*position} : None;
 }
 
 fn option_is_available(const EvalContext &cxt,
@@ -620,17 +620,18 @@ fn apply_long_option_by_name(const ExecContext &ec, EvalContext &cxt,
     return;
   }
   let const &name = args[++i];
-  let const option = find_option_by_name(name);
-  if (option == nullptr)
+  let const option_position = find_option_by_name(name);
+  if (!option_position.has_value())
     throw make_error_for_arg(ec, i,
                              StringView{"Unknown -o option '"} + name + "'");
-  if (!option_is_available(cxt, *option)) {
+  let const &option = SET_OPTIONS[*option_position];
+  if (!option_is_available(cxt, option)) {
     let error = make_error_for_arg(
         ec, i, StringView{"Unknown -o option '"} + name + "'");
     error.set_command_status(2);
     throw error;
   }
-  apply_or_reject_option(cxt, *option, enable);
+  apply_or_reject_option(cxt, option, enable);
 }
 
 fn format_option_table(const EvalContext *cxt,
@@ -694,9 +695,9 @@ fn format_option_switches_help() throws -> String
 fn query_shell_option(const EvalContext &cxt, StringView name) throws
     -> Maybe<bool>
 {
-  const set_option_descriptor *option = find_option_by_name(name);
-  if (option == nullptr) return None;
-  return option_is_on(cxt, *option);
+  let const option_position = find_option_by_name(name);
+  if (!option_position.has_value()) return None;
+  return option_is_on(cxt, SET_OPTIONS[*option_position]);
 }
 
 fn shell_option_names(bool include_alias_spellings) throws
@@ -774,11 +775,13 @@ fn enabled_shell_option_letters(const EvalContext &cxt) throws -> String
 fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool
 {
-  const set_option_descriptor *option = find_option_by_name(name);
-  if (option == nullptr || !option_is_available(cxt, *option)) {
+  let const option_position = find_option_by_name(name);
+  if (!option_position.has_value() ||
+      !option_is_available(cxt, SET_OPTIONS[*option_position]))
+  {
     return false;
   }
-  apply_or_reject_option(cxt, *option, enable);
+  apply_or_reject_option(cxt, SET_OPTIONS[*option_position], enable);
   return true;
 }
 
@@ -935,8 +938,11 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (arg == "-" || arg == "+") {
       if (arg[0] == '-') {
-        apply_or_reject_option(cxt, *find_option_by_letter('x'), false);
-        apply_or_reject_option(cxt, *find_option_by_letter('v'), false);
+        let const x_position = find_option_by_letter('x');
+        let const v_position = find_option_by_letter('v');
+        ASSERT(x_position.has_value() && v_position.has_value());
+        apply_or_reject_option(cxt, SET_OPTIONS[*x_position], false);
+        apply_or_reject_option(cxt, SET_OPTIONS[*v_position], false);
       }
 
       is_collecting_operands = true;
@@ -964,12 +970,14 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           continue;
         }
 
-        let const option = find_option_by_letter(letter);
-        if (option == nullptr || !option_is_available(cxt, *option)) {
+        let const option_position = find_option_by_letter(letter);
+        if (!option_position.has_value() ||
+            !option_is_available(cxt, SET_OPTIONS[*option_position]))
+        {
           let invalid_option = String{heap_allocator()};
           invalid_option += arg[0];
           invalid_option += letter;
-          if (option == nullptr)
+          if (!option_position.has_value())
             throw make_error_for_arg(
                 ec, i, StringView{"Unknown option '"} + invalid_option + "'");
           let unavailable_error = make_error_for_arg(
@@ -977,7 +985,7 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           unavailable_error.set_command_status(2);
           throw unavailable_error;
         }
-        apply_or_reject_option(cxt, *option, enable, true);
+        apply_or_reject_option(cxt, SET_OPTIONS[*option_position], enable, true);
       }
       continue;
     }
