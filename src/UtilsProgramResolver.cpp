@@ -1090,8 +1090,8 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
         continue;
       }
 
-      let const is_runnable = candidate_paths[index].is_executable();
-      if (requirement == Requirement::Regular || is_runnable)
+      if (requirement == Requirement::Regular ||
+          candidate_paths[index].is_executable())
         result.push(steal(candidate_paths[index]));
     }
 
@@ -1137,7 +1137,11 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
           os::file_type_letter(candidate_statuses[index].mode) != '-')
         continue;
 
-      let const is_runnable = candidate_paths[index].is_executable();
+      let const should_check_executable =
+          requirement != Requirement::Regular ||
+          cache_policy != CachePolicy::Bypass;
+      let const is_runnable =
+          should_check_executable && candidate_paths[index].is_executable();
       let const is_match = requirement == Requirement::Regular || is_runnable;
       if (is_match) {
         let const extension =
