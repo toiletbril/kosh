@@ -33,6 +33,8 @@ namespace koshka {
 
 namespace koshkit {
 
+constexpr usize GREP_UNKNOWN_BATCH_COUNT = 512;
+
 static pure fn is_literal_search_pattern(StringView pattern) wontthrow -> bool
 {
   for (usize index = 0; index < pattern.length; index++) {
@@ -123,35 +125,51 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
   if (unknown_count != 0) {
     let unknown_statuses = ArrayList<os::file_status>{allocator};
     let unknown_indices = ArrayList<usize>{allocator};
+    let results = ArrayList<os::batch_result>{allocator};
     let batch = os::Batch{allocator};
-    unknown_statuses.reserve(unknown_count);
-    unknown_indices.reserve(unknown_count);
-    batch.reserve(unknown_count);
+    let const wave_count = unknown_count < GREP_UNKNOWN_BATCH_COUNT
+                               ? unknown_count
+                               : GREP_UNKNOWN_BATCH_COUNT;
+    unknown_statuses.reserve(wave_count);
+    unknown_indices.reserve(wave_count);
+    results.reserve(wave_count);
+    batch.reserve(wave_count);
+
+    let const do_flush_unknown = [&]() throws -> void {
+      if (unknown_indices.is_empty()) return;
+
+      batch.clear();
+      for (usize index = 0; index < unknown_indices.count(); index++)
+        batch.add(os::batch_operation::stat(
+            child_paths[unknown_indices[index]], unknown_statuses[index]));
+
+      batch.execute(results);
+      for (usize index = 0; index < unknown_indices.count(); index++) {
+        let &kind = (*children)[unknown_indices[index]].kind;
+        if (results[index].error_number != 0) {
+          kind = Path::entry_kind::Other;
+          continue;
+        }
+
+        switch (os::file_type_letter(unknown_statuses[index].mode)) {
+        case 'd': kind = Path::entry_kind::Directory; break;
+        case '-': kind = Path::entry_kind::Regular; break;
+        default: kind = Path::entry_kind::Other; break;
+        }
+      }
+      unknown_statuses.clear();
+      unknown_indices.clear();
+    };
 
     for (usize index = 0; index < children->count(); index++) {
       if ((*children)[index].kind != Path::entry_kind::Unknown) continue;
+
       unknown_statuses.push({});
       unknown_indices.push(index);
+      if (unknown_indices.count() == GREP_UNKNOWN_BATCH_COUNT)
+        do_flush_unknown();
     }
-
-    for (usize index = 0; index < unknown_count; index++)
-      batch.add(os::batch_operation::stat(
-          child_paths[unknown_indices[index]], unknown_statuses[index]));
-
-    let const results = batch.execute();
-    for (usize index = 0; index < unknown_count; index++) {
-      let &kind = (*children)[unknown_indices[index]].kind;
-      if (results[index].error_number != 0) {
-        kind = Path::entry_kind::Other;
-        continue;
-      }
-
-      switch (os::file_type_letter(unknown_statuses[index].mode)) {
-      case 'd': kind = Path::entry_kind::Directory; break;
-      case '-': kind = Path::entry_kind::Regular; break;
-      default: kind = Path::entry_kind::Other; break;
-      }
-    }
+    do_flush_unknown();
   }
 
   for (usize index = 0; index < children->count(); index++) {
