@@ -143,8 +143,7 @@ fn EvalContext::record_history_event(StringView command) throws -> bool
   }
 
   toiletline::set_history_limit(get_history_limit("KOSH_HISTORY_SIZE", 4096));
-  unused(toiletline::history_append_event(command));
-  return true;
+  return toiletline::history_append_event(command).has_value();
 }
 
 fn EvalContext::begin_history_transaction(ArrayList<String> &commands) throws
