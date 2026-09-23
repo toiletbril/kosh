@@ -643,9 +643,10 @@ static fn render_tree_level(StringView directory,
     if (os::INTERRUPT_REQUESTED) return;
     const listing_entry &entry = entries[index];
     let const is_last = index + 1 == entries.count();
+    let const connector = get_tree_connector(is_last);
 
     output += prefix.view();
-    output += is_last ? StringView{"└── "} : StringView{"├── "};
+    output += connector.branch;
     append_decorated_name(output, entry, options);
     output += '\n';
 
@@ -655,7 +656,7 @@ static fn render_tree_level(StringView directory,
     if (!is_descending) continue;
 
     let const kept_length = prefix.count();
-    prefix += is_last ? StringView{"    "} : StringView{"│   "};
+    prefix += connector.continuation;
     let child = Path{directory, allocator};
     child.append(entry.name.view());
     render_tree_level(child.view(), options, depth + 1, prefix, output,

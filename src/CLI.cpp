@@ -1090,6 +1090,12 @@ fn stdout_wants_color(cli_color_mode mode) throws -> bool
   unreachable("invalid CLI color mode %d", ENUM(mode));
 }
 
+pure fn get_tree_connector(bool is_last) wontthrow -> tree_connector
+{
+  return is_last ? tree_connector{"└── ", "    "}
+                 : tree_connector{"├── ", "│   "};
+}
+
 fn append_report_text(String &output, StringView text, StringView style,
                       bool should_color) throws -> void
 {

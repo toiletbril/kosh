@@ -366,6 +366,14 @@ enum class cli_color_mode : u8
 fn parse_cli_color_mode(StringView text) wontthrow -> Maybe<cli_color_mode>;
 fn stdout_wants_color(cli_color_mode mode) throws -> bool;
 
+struct tree_connector
+{
+  StringView branch;
+  StringView continuation;
+};
+
+pure fn get_tree_connector(bool is_last) wontthrow -> tree_connector;
+
 fn append_report_text(String &output, StringView text, StringView style,
                       bool should_color) throws -> void;
 fn append_report_column(String &output, StringView text, usize width,

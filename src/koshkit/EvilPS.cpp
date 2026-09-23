@@ -437,17 +437,18 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
 
     let const position = child_positions[index];
     let const is_last = index + 1 == child_positions.count();
+    let const connector = get_tree_connector(is_last);
     nodes[position].was_rendered = true;
 
     append_report_text(output, prefix.view(), colors::ansi::CYAN, should_color);
-    append_report_text(output, is_last ? "└── " : "├── ", colors::ansi::CYAN,
+    append_report_text(output, connector.branch, colors::ansi::CYAN,
                        should_color);
     append_label(output, nodes[position], allocator, should_color, should_human,
                  sort_key, is_sampled, line_width_limit);
     rendered_count++;
 
     let child_prefix = String{allocator, prefix.view()};
-    child_prefix += is_last ? "    " : "│   ";
+    child_prefix += connector.continuation;
     render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
                     allocator, should_color, output_limit, rendered_count,
                     should_human, sort_key, is_sampled, line_width_limit);
