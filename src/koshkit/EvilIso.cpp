@@ -943,13 +943,28 @@ fn remote_table_text(StringView text, usize maximum_cells,
                      Allocator allocator) throws -> String
 {
   let result = String{allocator};
-  result.reserve(text.length);
-  for (usize position = 0; position < text.length; position++) {
+  let const byte_limit = maximum_cells * 8;
+  let const copied_bytes = text.length < byte_limit ? text.length : byte_limit;
+  result.reserve(copied_bytes);
+  for (usize position = 0; position < copied_bytes; position++) {
     let const byte = text[position];
     result.push((static_cast<unsigned char>(byte) < 32 || byte == 127) ? ' '
                                                                        : byte);
   }
-  if (toiletline::get_display_width(result.view()) > maximum_cells) {
+  if (copied_bytes < text.length &&
+      (static_cast<unsigned char>(text[copied_bytes]) & 0xc0) == 0x80)
+  {
+    usize complete_bytes = copied_bytes;
+    while (complete_bytes > 0 &&
+           (static_cast<unsigned char>(text[complete_bytes - 1]) & 0xc0) ==
+               0x80)
+      complete_bytes--;
+    if (complete_bytes > 0) complete_bytes--;
+    result.truncate(complete_bytes);
+  }
+  if (copied_bytes < text.length ||
+      toiletline::get_display_width(result.view()) > maximum_cells)
+  {
     usize actual_cells = 0;
     let const kept_bytes =
         toiletline::get_byte_offset_at_or_before_display_cell(
@@ -962,10 +977,11 @@ fn remote_table_text(StringView text, usize maximum_cells,
 
 fn append_remote_report(String &output, bool should_color,
                         bool should_show_rows, bool should_show_detail,
-                        const ArrayList<process_cgroup_snapshot> &snapshot)
+                        const ArrayList<process_cgroup_snapshot> &snapshot,
+                        Allocator allocator)
     throws -> void
 {
-  let table = ReportTable{heap_allocator()};
+  let table = ReportTable{allocator};
   if (!os::has_network_socket_listing()) {
     table.add("Sockets", "unavailable", colors::ansi::BOLD_CYAN);
     append_titled_report_table(output, "Socket summary", table, should_color);
@@ -993,8 +1009,8 @@ fn append_remote_report(String &output, bool should_color,
     return left.process_id < right.process_id;
   });
 
-  let socket_identities = ArrayList<u64>{heap_allocator()};
-  let remote_identities = ArrayList<u64>{heap_allocator()};
+  let socket_identities = ArrayList<u64>{allocator};
+  let remote_identities = ArrayList<u64>{allocator};
   usize zero_identity_count = 0;
   usize remote_zero_identity_count = 0;
   for (let const &socket : sockets) {
@@ -1023,80 +1039,98 @@ fn append_remote_report(String &output, bool should_color,
   let const remote_count =
       remote_zero_identity_count + do_count_unique(remote_identities);
   table.add("Remote sockets",
-            String::from(remote_count, heap_allocator()).view(),
+            String::from(remote_count, allocator).view(),
             colors::ansi::BOLD_CYAN);
   table.add("Total sockets",
-            String::from(socket_count, heap_allocator()).view(),
+            String::from(socket_count, allocator).view(),
             colors::ansi::BOLD_CYAN);
   append_titled_report_table(output, "Socket summary", table, should_color);
   if (!should_show_rows) return;
 
   struct remote_peer_row
   {
-    StringView family;
-    StringView protocol;
-    StringView state;
-    String local{heap_allocator()};
-    String peer{heap_allocator()};
-    String socket_id{heap_allocator()};
-    String process_id{heap_allocator()};
-    String owner_id{heap_allocator()};
-    String user{heap_allocator()};
-    String name{heap_allocator()};
-    String command{heap_allocator()};
-    String net_namespace{heap_allocator()};
-    String orchestrator{heap_allocator()};
-    String runtime{heap_allocator()};
-    String container{heap_allocator()};
-    String cgroup{heap_allocator()};
+    explicit remote_peer_row(Allocator allocator)
+        : local(allocator), peer(allocator), socket_id(allocator),
+          process_id(allocator), owner_id(allocator), user(allocator),
+          name(allocator), command(allocator), net_namespace(allocator),
+          orchestrator(allocator), runtime(allocator), container(allocator),
+          cgroup(allocator)
+    {}
+
+    StringView family{};
+    StringView protocol{};
+    StringView state{};
+    String local;
+    String peer;
+    String socket_id;
+    String process_id;
+    String owner_id;
+    String user;
+    String name;
+    String command;
+    String net_namespace;
+    String orchestrator;
+    String runtime;
+    String container;
+    String cgroup;
     u64 receive_queue_bytes{0};
     u64 send_queue_bytes{0};
   };
 
   struct remote_process_context
   {
+    explicit remote_process_context(Allocator allocator)
+        : name(allocator), command(allocator), net_namespace(allocator),
+          orchestrator(allocator), runtime(allocator), container(allocator),
+          cgroups(allocator)
+    {}
+
     i64 process_id{0};
     u64 start_token{0};
     u32 owner_id{0};
-    String name{heap_allocator()};
-    String command{heap_allocator()};
-    String net_namespace{heap_allocator()};
-    String orchestrator{heap_allocator()};
-    String runtime{heap_allocator()};
-    String container{heap_allocator()};
-    String cgroups{heap_allocator()};
+    String name;
+    String command;
+    String net_namespace;
+    String orchestrator;
+    String runtime;
+    String container;
+    String cgroups;
     bool is_available{false};
   };
 
   struct remote_user_context
   {
+    explicit remote_user_context(Allocator allocator) : name(allocator) {}
+
     u32 owner_id{0};
-    String name{heap_allocator()};
+    String name;
   };
 
-  let process_contexts = ArrayList<remote_process_context>{heap_allocator()};
-  let user_contexts = ArrayList<remote_user_context>{heap_allocator()};
+  let process_contexts = ArrayList<remote_process_context>{allocator};
+  let user_contexts = ArrayList<remote_user_context>{allocator};
   let const self_net_namespace = os::read_symlink(
-      eviliso_namespace_proc_path("self/ns/net", heap_allocator()),
-      heap_allocator());
+      eviliso_namespace_proc_path("self/ns/net", allocator), allocator);
   let const do_get_user = [&](u32 process_id, u32 owner_id) throws -> String {
     for (let const &context : user_contexts) {
       if (context.owner_id == owner_id) {
-        return String{heap_allocator(), context.name.view()};
+        return String{allocator, context.name.view()};
       }
     }
-    let name = String::from(owner_id, heap_allocator());
+    let name = String::from(owner_id, allocator);
     if (let const resolved =
-            os::process_owner_name(process_id, owner_id, heap_allocator());
+            os::process_owner_name(process_id, owner_id, allocator);
         resolved.has_value())
     {
       name = steal(*resolved);
     }
-    user_contexts.push(remote_user_context{owner_id, steal(name)});
-    return String{heap_allocator(),
+    let context = remote_user_context{allocator};
+    context.owner_id = owner_id;
+    context.name = steal(name);
+    user_contexts.push(steal(context));
+    return String{allocator,
                   user_contexts[user_contexts.count() - 1].name.view()};
   };
-  let remote_rows = ArrayList<remote_peer_row>{heap_allocator()};
+  let remote_rows = ArrayList<remote_peer_row>{allocator};
   u64 previous_identity = 0;
   u32 previous_process_id = 0;
   bool has_previous_owner = false;
@@ -1112,35 +1146,35 @@ fn append_remote_report(String &output, bool should_color,
     previous_process_id = socket.process_id;
     has_previous_owner = socket.identity != 0;
 
-    remote_peer_row row{};
+    remote_peer_row row{allocator};
     row.family =
         socket.family == os::network_address_family::IPv6 ? "IPv6" : "IPv4";
     row.protocol =
         socket.protocol == os::network_socket_protocol::Udp ? "UDP" : "TCP";
     row.state = remote_state_name(socket.state);
     row.local = remote_endpoint(socket.local_address.view(), socket.local_port,
-                                socket.family, heap_allocator());
+                                socket.family, allocator);
     row.peer = remote_endpoint(socket.peer_address.view(), socket.peer_port,
-                               socket.family, heap_allocator());
+                               socket.family, allocator);
     row.socket_id = socket.identity == 0
-                        ? String{heap_allocator(), "-"}
-                        : String::from(socket.identity, heap_allocator());
+                        ? String{allocator, "-"}
+                        : String::from(socket.identity, allocator);
     row.receive_queue_bytes = socket.receive_queue_bytes;
     row.send_queue_bytes = socket.send_queue_bytes;
     if (should_show_detail) {
       row.process_id = socket.process_id == 0
-                           ? String{heap_allocator(), "-"}
-                           : String::from(socket.process_id, heap_allocator());
+                           ? String{allocator, "-"}
+                           : String::from(socket.process_id, allocator);
       row.owner_id = socket.has_owner_id
-                         ? String::from(socket.owner_id, heap_allocator())
-                         : String{heap_allocator(), "-"};
+                         ? String::from(socket.owner_id, allocator)
+                         : String{allocator, "-"};
       row.user = "-";
       row.name = "-";
       row.command = "-";
       row.net_namespace =
           self_net_namespace.has_value()
-              ? String{heap_allocator(), self_net_namespace->view()}
-              : String{heap_allocator(), "-"};
+              ? String{allocator, self_net_namespace->view()}
+              : String{allocator, "-"};
       row.orchestrator = "-";
       row.runtime = "-";
       row.container = "-";
@@ -1161,7 +1195,7 @@ fn append_remote_report(String &output, bool should_color,
       if (process_context == nullptr && socket.process_id != 0 &&
           socket.has_owner_start_token)
       {
-        remote_process_context context{};
+        remote_process_context context{allocator};
         context.process_id = socket.process_id;
         context.start_token = socket.owner_start_token;
         for (let const &process : snapshot) {
@@ -1171,16 +1205,16 @@ fn append_remote_report(String &output, bool should_color,
             break;
           context.owner_id = process.owner_id;
           context.name = remote_table_text(process.name.view(), 48,
-                                           heap_allocator());
+                                           allocator);
           context.command = remote_table_text(process.command.view(), 96,
-                                              heap_allocator());
+                                              allocator);
           let net_namespace_suffix =
-              String::from(socket.process_id, heap_allocator());
+              String::from(socket.process_id, allocator);
           net_namespace_suffix += "/ns/net";
           if (let net_namespace = os::read_symlink(
                   eviliso_namespace_proc_path(net_namespace_suffix.view(),
-                                              heap_allocator()),
-                  heap_allocator());
+                                              allocator),
+                  allocator);
               net_namespace.has_value())
           {
             context.net_namespace = steal(*net_namespace);
@@ -1195,8 +1229,15 @@ fn append_remote_report(String &output, bool should_color,
               }
             }
             if (is_known) continue;
+            constexpr usize cgroup_copy_limit = 120 * 8 + 1;
+            if (context.cgroups.length() >= cgroup_copy_limit) break;
             if (!context.cgroups.is_empty()) context.cgroups += ',';
-            context.cgroups += membership.path.view();
+            let const remaining_bytes =
+                cgroup_copy_limit - context.cgroups.length();
+            let const path = membership.path.view();
+            context.cgroups += path.substring_of_length(
+                0, path.length < remaining_bytes ? path.length
+                                                 : remaining_bytes);
           }
           for (let const &evidence : process.evidence) {
             if (context.runtime.is_empty() && evidence.runtime != "-")
@@ -1211,7 +1252,7 @@ fn append_remote_report(String &output, bool should_color,
           if (context.runtime.is_empty()) context.runtime = "-";
           if (context.container.is_empty()) context.container = "-";
           context.cgroups =
-              remote_table_text(context.cgroups.view(), 120, heap_allocator());
+              remote_table_text(context.cgroups.view(), 120, allocator);
           context.is_available = true;
           break;
         }
@@ -1221,7 +1262,7 @@ fn append_remote_report(String &output, bool should_color,
       if (process_context != nullptr && process_context->is_available) {
         if (!socket.has_owner_id) {
           row.owner_id =
-              String::from(process_context->owner_id, heap_allocator());
+              String::from(process_context->owner_id, allocator);
           row.user = do_get_user(socket.process_id, process_context->owner_id);
         }
         row.name = process_context->name;
@@ -1238,7 +1279,7 @@ fn append_remote_report(String &output, bool should_color,
     remote_rows.push(steal(row));
   }
 
-  let peer_table = ReportTable{heap_allocator()};
+  let peer_table = ReportTable{allocator};
   peer_table.add_column("FAMILY", report_table_alignment::Left,
                         colors::ansi::BOLD_CYAN);
   peer_table.add_column("PROTO", report_table_alignment::Left,
@@ -1278,9 +1319,9 @@ fn append_remote_report(String &output, bool should_color,
                           colors::ansi::BOLD_CYAN);
   }
   for (let const &row : remote_rows) {
-    let receive = String::from(row.receive_queue_bytes, heap_allocator());
-    let send = String::from(row.send_queue_bytes, heap_allocator());
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    let receive = String::from(row.receive_queue_bytes, allocator);
+    let send = String::from(row.send_queue_bytes, allocator);
+    let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({row.family, colors::ansi::BOLD_MAGENTA});
     cells.push({row.protocol, colors::ansi::BOLD_MAGENTA});
     cells.push({row.state, colors::ansi::BOLD_GREEN});
@@ -1875,7 +1916,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
     append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_remote)
     append_remote_report(output, should_color, should_show_remote_detail,
-                         should_show_remote_detail, process_cgroups);
+                         should_show_remote_detail, process_cgroups,
+                         cxt.scratch_allocator());
   if (show_runtime)
     append_runtime_evidence_report(output, should_color,
                                    FLAG_EVILISO_ALL.is_enabled(),
