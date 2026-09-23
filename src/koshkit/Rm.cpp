@@ -34,6 +34,20 @@ namespace koshka {
 
 namespace koshkit {
 
+static pure fn effective_entry_kind(
+    const os::directory_status_entry &entry) wontthrow -> Path::entry_kind
+{
+  if (entry.child.kind != Path::entry_kind::Unknown || !entry.has_status)
+    return entry.child.kind;
+
+  switch (os::file_type_letter(entry.status.mode)) {
+  case 'd': return Path::entry_kind::Directory;
+  case '-': return Path::entry_kind::Regular;
+  case 'l': return Path::entry_kind::Symlink;
+  default: return Path::entry_kind::Other;
+  }
+}
+
 static fn remove_path_impl(StringView path, removal_mode mode,
                            Allocator allocator,
                            Path::entry_kind known_kind) throws
@@ -57,7 +71,8 @@ static fn remove_path_impl(StringView path, removal_mode mode,
         if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
-        if (!remove_path_impl(child.view(), mode, allocator, entry.child.kind))
+        if (!remove_path_impl(child.view(), mode, allocator,
+                              effective_entry_kind(entry)))
           return false;
       }
     return os::remove_directory(path);
@@ -101,7 +116,7 @@ static fn remove_path_with_prompt(const ExecContext &ec, StringView path,
         child.append(entry.child.name.view());
         if (!remove_path_with_prompt(ec, child.view(), mode,
                                      should_prompt, allocator,
-                                     entry.child.kind))
+                                     effective_entry_kind(entry)))
           return false;
       }
     if (!confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
@@ -140,7 +155,8 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         report_dry_run_removal(ec, cxt, child.view(), mode,
-                               should_prompt, allocator, entry.child.kind);
+                               should_prompt, allocator,
+                               effective_entry_kind(entry));
         if (os::INTERRUPT_REQUESTED) return;
       }
     }
