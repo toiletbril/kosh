@@ -83,15 +83,6 @@ fn format_uptime(u64 seconds, Allocator allocator) throws -> String
   return text;
 }
 
-fn resolve_color(const ExecContext &ec, EvalContext &cxt,
-                 bool &out_should_color) throws -> bool
-{
-  unused(ec);
-  unused(cxt);
-  out_should_color = koshkit_should_color();
-  return true;
-}
-
 fn format_limit_value(u64 value, Allocator allocator) throws -> String
 {
   if (value == os::RESOURCE_UNLIMITED) return String{allocator, "unlimited"};
@@ -388,8 +379,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  bool should_color = false;
-  if (!resolve_color(ec, cxt, should_color)) return 1;
+  let const should_color = koshkit_should_color();
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
