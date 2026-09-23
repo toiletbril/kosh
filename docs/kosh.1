@@ -1962,8 +1962,9 @@ identifier. The
 section prints hierarchy, controller, path, process ID, process name, and
 self/other role columns. With
 .BR --all ,
-it adds other processes only when their complete cgroup membership matches a
-self membership. Sessions are printed as user and terminal rows. With
+it adds each membership of another process that has the same hierarchy,
+controller, and path as one of the current process's memberships. Sessions are
+printed as user and terminal rows. With
 .BR --all ,
 each row also includes its login time; an unavailable timestamp is shown
 explicitly. The
