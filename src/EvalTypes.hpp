@@ -257,6 +257,22 @@ public:
   {
   }
 
+  fn set_last_background_pid(i64 pid) wontthrow -> void;
+  fn register_job(os::process pid, StringView command, i64 process_group_id)
+      throws -> i32;
+  fn register_pipeline_job(const ArrayList<os::process> &processes,
+                           os::process primary_process, StringView command,
+                           i64 process_group_id) throws -> i32;
+  fn register_stopped_job(os::process pid, StringView command, i32 status,
+                          i64 process_group_id) throws -> i32;
+  fn update_jobs() throws -> void;
+  fn find_job(i32 id) wontthrow -> job *;
+  fn find_job_index_by_spec(StringView spec) throws -> Maybe<usize>;
+  fn find_job_by_spec(StringView spec) throws -> job *;
+  fn most_recent_job() wontthrow -> job *;
+  fn forget_done_jobs() throws -> void;
+  fn remove_job(i32 id) throws -> bool;
+
 private:
   Maybe<i64> m_last_background_pid{};
   ArrayList<job> m_jobs;
