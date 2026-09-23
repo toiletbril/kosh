@@ -264,99 +264,47 @@ fn append_network_socket_report(String &output,
     rows.push(steal(row));
   }
 
-  usize state_width = 5;
-  usize receive_width = 6;
-  usize send_width = 6;
-  usize local_width = 18;
-  usize peer_width = 18;
-  usize process_id_width = 3;
-  usize process_name_width = 7;
-  usize owner_width = 5;
-  for (let const &row : rows) {
-    if (row.state.length() > state_width) state_width = row.state.length();
-    if (row.receive_queue.length() > receive_width) {
-      receive_width = row.receive_queue.length();
-    }
-    if (row.send_queue.length() > send_width) {
-      send_width = row.send_queue.length();
-    }
-    if (row.local.length() > local_width) local_width = row.local.length();
-    if (row.peer.length() > peer_width) peer_width = row.peer.length();
-    if (row.process_id.length() > process_id_width)
-      process_id_width = row.process_id.length();
-    if (row.process_name.length() > process_name_width)
-      process_name_width = row.process_name.length();
-    if (row.owner.length() > owner_width) owner_width = row.owner.length();
+  let table = ReportTable{allocator};
+  table.set_header_visible(options.should_show_header);
+  table.add_column("Netid", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("State", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("Recv-Q", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("Send-Q", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("Local Address:Port", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("Peer Address:Port", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  if (options.should_show_processes) {
+    table.add_column("PID", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("Process", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("Owner", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
   }
 
-  append_report_text(output, "Sockets", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += '\n';
-  if (options.should_show_header) {
-    output += "  ";
-    append_report_column(output, "Netid", 5, false, colors::ansi::BOLD_CYAN,
-                         should_color);
-    output += "  ";
-    append_report_column(output, "State", state_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "  ";
-    append_report_column(output, "Recv-Q", receive_width, true,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "  ";
-    append_report_column(output, "Send-Q", send_width, true,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "  ";
-    append_report_column(output, "Local Address:Port", local_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "  ";
-    append_report_column(output, "Peer Address:Port", peer_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
-    if (options.should_show_processes) {
-      output += "  ";
-      append_report_column(output, "PID", process_id_width, true,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_column(output, "Process", process_name_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-      output += "  ";
-      append_report_column(output, "Owner", owner_width, false,
-                           colors::ansi::BOLD_CYAN, should_color);
-    }
-    output += "\n";
-  }
-
+  let cells = ArrayList<report_table_cell_view>{allocator};
+  cells.reserve(options.should_show_processes ? 9 : 6);
   for (let const &row : rows) {
-    output += "  ";
-    append_report_column(output, row.protocol.view(), 5, false,
-                         colors::ansi::BOLD_MAGENTA, should_color);
-    output += "  ";
-    append_report_column(output, row.state.view(), state_width, false,
-                         colors::ansi::BOLD_GREEN, should_color);
-    output += "  ";
-    append_report_column(output, row.receive_queue.view(), receive_width, true,
-                         colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(output, row.send_queue.view(), send_width, true,
-                         colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(output, row.local.view(), local_width, false,
-                         colors::ansi::BOLD_CYAN, should_color);
-    output += "  ";
-    append_report_column(output, row.peer.view(), peer_width, false,
-                         colors::ansi::CYAN, should_color);
+    cells.clear();
+    cells.push({row.protocol.view(), colors::ansi::BOLD_MAGENTA});
+    cells.push({row.state.view(), colors::ansi::BOLD_GREEN});
+    cells.push({row.receive_queue.view(), colors::ansi::GREEN});
+    cells.push({row.send_queue.view(), colors::ansi::GREEN});
+    cells.push({row.local.view(), colors::ansi::BOLD_CYAN});
+    cells.push({row.peer.view(), colors::ansi::CYAN});
     if (options.should_show_processes) {
-      output += "  ";
-      append_report_column(output, row.process_id.view(), process_id_width,
-                           true, colors::ansi::YELLOW, should_color);
-      output += "  ";
-      append_report_column(output, row.process_name.view(), process_name_width,
-                           false, colors::ansi::BOLD_GREEN, should_color);
-      output += "  ";
-      append_report_column(output, row.owner.view(), owner_width, false,
-                           colors::ansi::YELLOW, should_color);
+      cells.push({row.process_id.view(), colors::ansi::YELLOW});
+      cells.push({row.process_name.view(), colors::ansi::BOLD_GREEN});
+      cells.push({row.owner.view(), colors::ansi::YELLOW});
     }
-    output += "\n";
+    table.add_row(cells);
   }
+  append_titled_report_table(output, "Sockets", table, should_color);
 
   return !rows.is_empty();
 }

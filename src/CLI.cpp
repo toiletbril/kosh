@@ -1184,7 +1184,8 @@ fn ReportTable::add_row(const ArrayList<report_table_cell_view> &cells) throws
 static fn append_report_grid(String &output,
                              const ArrayList<report_table_column> &columns,
                              const ArrayList<ArrayList<report_table_cell>> &rows,
-                             bool should_color, StringView indentation) throws
+                             bool should_color, StringView indentation,
+                             bool should_show_header) throws
     -> void
 {
   let widths = ArrayList<usize>{columns.allocator()};
@@ -1226,11 +1227,13 @@ static fn append_report_grid(String &output,
     output += '\n';
   };
 
-  let header = ArrayList<report_table_cell>{columns.allocator()};
-  header.reserve(columns.count());
-  for (let const &column : columns)
-    header.push({String{header.allocator(), column.heading.view()}, {}});
-  append_row(header);
+  if (should_show_header) {
+    let header = ArrayList<report_table_cell>{columns.allocator()};
+    header.reserve(columns.count());
+    for (let const &column : columns)
+      header.push({String{header.allocator(), column.heading.view()}, {}});
+    append_row(header);
+  }
   for (let const &row : rows) append_row(row);
 }
 
@@ -1240,7 +1243,7 @@ fn ReportTable::to_string(bool should_color,
   let output = String{m_rows.allocator()};
   if (!m_columns.is_empty()) {
     append_report_grid(output, m_columns, m_grid_rows, should_color,
-                       indentation);
+                       indentation, m_should_show_header);
     return output;
   }
   append_report_table(output, m_rows, should_color, indentation);
