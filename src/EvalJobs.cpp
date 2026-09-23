@@ -66,12 +66,12 @@ fn EvalContext::register_job(os::process pid, StringView command,
 fn JobTable::register_job(os::process pid, StringView command,
                           i64 process_group_id) throws -> i32
 {
-  let new_job = job{};
+  let new_job = job{m_jobs.allocator()};
   new_job.id = m_next_job_id++;
   new_job.pid = pid;
   new_job.process_id = os::process_id_of(pid);
   new_job.process_group_id = process_group_id;
-  new_job.command = command;
+  new_job.command = String{m_jobs.allocator(), command};
   new_job.state = job::State::Running;
   m_jobs.push(steal(new_job));
   ASSERT(!m_jobs.is_empty());
@@ -93,12 +93,12 @@ fn JobTable::register_pipeline_job(const ArrayList<os::process> &processes,
                                    StringView command,
                                    i64 process_group_id) throws -> i32
 {
-  let new_job = job{};
+  let new_job = job{m_jobs.allocator()};
   new_job.id = m_next_job_id++;
   new_job.pid = primary_process;
   new_job.process_id = os::process_id_of(primary_process);
   new_job.process_group_id = process_group_id;
-  new_job.command = command;
+  new_job.command = String{m_jobs.allocator(), command};
   bool did_skip_primary = false;
 
   for (let const process : processes) {

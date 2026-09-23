@@ -227,6 +227,12 @@ static_assert(sizeof(usize) != 8 || sizeof(local_binding) == 272);
 
 struct job
 {
+  job() = default;
+  explicit job(Allocator allocator)
+      : earlier_pipeline_processes(allocator), command(allocator)
+  {
+  }
+
   enum class State : u8
   {
     Running,

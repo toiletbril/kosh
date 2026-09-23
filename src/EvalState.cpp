@@ -1516,10 +1516,10 @@ fn EvalContext::apply_subshell_bootstrap(
   i32 previous_job_id = 0;
 
   for (usize job_index = 0; job_index < job_count; job_index++) {
-    let child_job = job{};
+    let child_job = job{jobs.allocator()};
     child_job.id = reader.read_i32();
     let const command = reader.read_text();
-    child_job.command = String{heap_allocator(), command};
+    child_job.command = String{jobs.allocator(), command};
     child_job.process_id = reader.read_i64();
     child_job.process_group_id = reader.read_i64();
     child_job.last_status = reader.read_i32();
