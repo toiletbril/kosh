@@ -1066,10 +1066,9 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
       }
 
       for (let const &suffix : os::PROGRAM_SUFFIXES) {
-        if (suffix.text.is_empty())
-          candidate_paths.push(full_path.clone());
-        else
-          candidate_paths.push(Path{(full_path.text() + suffix.text).view()});
+        let candidate_path = full_path.clone();
+        candidate_path.append_raw(suffix.text);
+        candidate_paths.push(steal(candidate_path));
         candidate_statuses.push({});
       }
     }
@@ -1110,12 +1109,9 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
 
     if (name_info.extension == os::program_extension::None) {
       for (let const &suffix : os::PROGRAM_SUFFIXES) {
-        if (!suffix.text.is_empty())
-          candidate_paths.push(
-              Path{(full_path.text() + suffix.text).view()});
-        else
-          candidate_paths.push(full_path.clone());
-
+        let candidate_path = full_path.clone();
+        candidate_path.append_raw(suffix.text);
+        candidate_paths.push(steal(candidate_path));
         candidate_statuses.push({});
       }
     } else {
