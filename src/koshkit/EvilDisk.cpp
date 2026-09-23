@@ -439,9 +439,11 @@ fn EvilDisk::execute(
       let cells = ArrayList<report_table_cell_view>{allocator};
       cells.push({disk.name.view(), colors::ansi::BOLD_GREEN});
       for (usize index = 0; index < counter_text.count(); index++) {
-        cells.push({counter_text[index].view(),
-                    counters[index] == 0 ? colors::ansi::GREEN
-                                         : colors::ansi::BOLD_RED});
+        let color = colors::ansi::DIM;
+        if (disk.has_field(FIELDS[index]))
+          color = counters[index] == 0 ? colors::ansi::GREEN
+                                       : colors::ansi::BOLD_RED;
+        cells.push({counter_text[index].view(), color});
       }
       table.add_row(cells);
     }
