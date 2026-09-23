@@ -641,10 +641,9 @@ static fn build_filesystem_candidate(
       entry_name = quote_path_candidate(entry_name.view());
     candidate += entry_name;
   } else {
+    if (!inside_quote && path_candidate_needs_quoting(entry_name.view()))
+      entry_name = quote_path_candidate(entry_name.view());
     candidate += entry_name;
-    if (!inside_quote && path_candidate_needs_quoting(candidate.view())) {
-      candidate = quote_path_candidate(candidate.view());
-    }
   }
 
   if (directory_separator != 0) candidate.push(directory_separator);

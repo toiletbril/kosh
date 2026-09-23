@@ -149,12 +149,23 @@ static fn open_quote_candidate_boundary(StringView typed, usize typed_boundary,
 static fn append_candidate_suffix(String &candidate, StringView suffix) throws
     -> void
 {
-  if (suffix.is_empty()) return;
+  usize component_start = 0;
+  for (usize position = 0; position <= suffix.length; position++) {
+    let const is_separator =
+        position < suffix.length &&
+        os::is_directory_separator(suffix[position]);
+    if (position < suffix.length && !is_separator) continue;
 
-  if (path_candidate_needs_quoting(suffix))
-    candidate += quote_path_candidate(suffix);
-  else
-    candidate += suffix;
+    let const component = suffix.substring_of_length(
+        component_start, position - component_start);
+    if (path_candidate_needs_quoting(component))
+      candidate += quote_path_candidate(component);
+    else
+      candidate += component;
+
+    if (is_separator) candidate.push(suffix[position]);
+    component_start = position + 1;
+  }
 }
 
 fn internal::rebuild_shell_syntax_candidate(
@@ -198,8 +209,9 @@ fn internal::rebuild_shell_syntax_candidate(
     {
       candidate.append(raw_token.substring_of_length(
           0, decoded_word.leading_variable_expansion_end));
-      candidate += quote_path_candidate(decoded_candidate.substring(
-          decoded_word.leading_variable_expansion_end));
+      append_candidate_suffix(
+          candidate, decoded_candidate.substring(
+                         decoded_word.leading_variable_expansion_end));
       return candidate;
     }
 
@@ -218,12 +230,7 @@ fn internal::rebuild_shell_syntax_candidate(
     candidate.append(raw_token.substring_of_length(
         0, decoded_word.last_quote_content_start));
   } else {
-    if (!candidate_prefix.is_empty()) {
-      if (path_candidate_needs_quoting(candidate_prefix))
-        candidate.append(quote_path_candidate(candidate_prefix).view());
-      else
-        candidate.append(candidate_prefix);
-    }
+    append_candidate_suffix(candidate, candidate_prefix);
     candidate.push(decoded_word.last_quote_character);
   }
   append_open_quote_candidate(candidate,
