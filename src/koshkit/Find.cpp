@@ -64,6 +64,7 @@ static constexpr static_string_entry<find_predicate_kind>
 };
 static constexpr StaticStringMap FIND_PREDICATES{FIND_PREDICATE_ENTRIES};
 constexpr usize FIND_OUTPUT_BUFFER_BYTE_COUNT = 64 * 1024;
+constexpr usize FIND_UNKNOWN_BATCH_COUNT = 512;
 
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
                              const find_options &options,
@@ -187,44 +188,62 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
     if (child.kind == Path::entry_kind::Unknown) unknown_count++;
 
   if (unknown_count != 0) {
-    let unknown_paths = ArrayList<Path>{allocator};
-    let unknown_statuses = ArrayList<os::file_status>{allocator};
-    let unknown_indices = ArrayList<usize>{allocator};
-    let unknown_batch = os::Batch{allocator};
-    unknown_paths.reserve(unknown_count);
-    unknown_statuses.reserve(unknown_count);
-    unknown_indices.reserve(unknown_count);
-    unknown_batch.reserve(unknown_count);
+    let const wave_allocator = heap_allocator();
+    let unknown_paths = ArrayList<Path>{wave_allocator};
+    let unknown_statuses = ArrayList<os::file_status>{wave_allocator};
+    let unknown_indices = ArrayList<usize>{wave_allocator};
+    let unknown_results = ArrayList<os::batch_result>{wave_allocator};
+    let unknown_batch = os::Batch{wave_allocator};
+    let const wave_count = unknown_count < FIND_UNKNOWN_BATCH_COUNT
+                               ? unknown_count
+                               : FIND_UNKNOWN_BATCH_COUNT;
+    unknown_paths.reserve(wave_count);
+    unknown_statuses.reserve(wave_count);
+    unknown_indices.reserve(wave_count);
+    unknown_results.reserve(wave_count);
+    unknown_batch.reserve(wave_count);
+
+    let const do_flush_unknown = [&]() throws -> void {
+      if (unknown_indices.is_empty()) return;
+
+      unknown_batch.clear();
+      for (usize index = 0; index < unknown_indices.count(); index++)
+        unknown_batch.add(os::batch_operation::lstat(
+            unknown_paths[index], unknown_statuses[index]));
+
+      unknown_batch.execute(unknown_results);
+      for (usize index = 0; index < unknown_indices.count(); index++) {
+        let &kind = (*children)[unknown_indices[index]].kind;
+        if (unknown_results[index].error_number != 0) {
+          kind = Path::entry_kind::Other;
+          continue;
+        }
+
+        switch (os::file_type_letter(unknown_statuses[index].mode)) {
+        case 'd': kind = Path::entry_kind::Directory; break;
+        case '-': kind = Path::entry_kind::Regular; break;
+        case 'l': kind = Path::entry_kind::Symlink; break;
+        default: kind = Path::entry_kind::Other; break;
+        }
+      }
+      unknown_batch.clear();
+      unknown_paths.clear();
+      unknown_statuses.clear();
+      unknown_indices.clear();
+    };
 
     for (usize index = 0; index < children->count(); index++) {
       if ((*children)[index].kind != Path::entry_kind::Unknown) continue;
 
-      let child_path = Path{path_text, allocator};
+      let child_path = Path{path_text, wave_allocator};
       child_path.append((*children)[index].name.view());
       unknown_paths.push(steal(child_path));
       unknown_statuses.push({});
       unknown_indices.push(index);
+      if (unknown_indices.count() == FIND_UNKNOWN_BATCH_COUNT)
+        do_flush_unknown();
     }
-
-    for (usize index = 0; index < unknown_count; index++)
-      unknown_batch.add(os::batch_operation::lstat(unknown_paths[index],
-                                                   unknown_statuses[index]));
-
-    let const unknown_results = unknown_batch.execute();
-    for (usize index = 0; index < unknown_count; index++) {
-      let &kind = (*children)[unknown_indices[index]].kind;
-      if (unknown_results[index].error_number != 0) {
-        kind = Path::entry_kind::Other;
-        continue;
-      }
-
-      switch (os::file_type_letter(unknown_statuses[index].mode)) {
-      case 'd': kind = Path::entry_kind::Directory; break;
-      case '-': kind = Path::entry_kind::Regular; break;
-      case 'l': kind = Path::entry_kind::Symlink; break;
-      default: kind = Path::entry_kind::Other; break;
-      }
-    }
+    do_flush_unknown();
   }
 
   for (usize index = 0; index < children->count(); index++) {
