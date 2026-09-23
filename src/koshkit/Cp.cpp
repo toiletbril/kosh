@@ -32,6 +32,21 @@ namespace koshka {
 
 namespace koshkit {
 
+static fn report_copy_error(const ExecContext &ec, EvalContext &cxt,
+                            StringView utility_name,
+                            const Error &error) throws -> void
+{
+  if (error.detail_message().is_empty()) {
+    report_soft_koshkit_util_error(ec, cxt, utility_name,
+                                   error.message().view());
+    return;
+  }
+
+  report_soft_koshkit_util_error(ec, cxt, utility_name,
+                                 error.message().view(),
+                                 error.detail_message());
+}
+
 static fn copy_file(const ExecContext &ec, StringView source,
                     StringView destination, bool should_force, bool is_verbose,
                     Allocator allocator) throws -> void
@@ -77,12 +92,13 @@ static fn source_file_status(StringView source) throws -> Maybe<os::file_status>
   return status;
 }
 
-static fn copy_path(const ExecContext &ec, StringView source,
+static fn copy_path(const ExecContext &ec, EvalContext &cxt,
+                    StringView utility_name, StringView source,
                     StringView destination, bool is_recursive,
                     bool should_force, bool should_preserve, bool is_verbose,
                     Allocator allocator,
                     const os::file_status *known_lstat = nullptr) throws
-    -> void
+    -> bool
 {
   let const source_path = Path{source};
   let const destination_path = Path{destination};
@@ -126,7 +142,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
         ec.print_to_stdout("'" + String{allocator, source} + "' -> '" +
                            String{allocator, destination} + "'\n");
 
-      return;
+      return true;
     }
   }
 
@@ -175,17 +191,26 @@ static fn copy_path(const ExecContext &ec, StringView source,
           "': " + os::last_system_error_message()
       };
 
+    bool did_succeed = true;
     for (let const &entry : *names) {
-      if (os::INTERRUPT_REQUESTED) return;
+      if (os::INTERRUPT_REQUESTED) return false;
       let child_source = Path{source, allocator};
       child_source.append(entry.child.name.view());
       let child_destination = Path{destination, allocator};
       child_destination.append(entry.child.name.view());
-      copy_path(ec, child_source.view(), child_destination.view(),
-                is_recursive, should_force, should_preserve, is_verbose,
-                allocator,
-                entry.has_status ? &entry.status : nullptr);
-      if (os::INTERRUPT_REQUESTED) return;
+      try {
+        if (!copy_path(ec, cxt, utility_name, child_source.view(),
+                       child_destination.view(), is_recursive, should_force,
+                       should_preserve, is_verbose, allocator,
+                       entry.has_status ? &entry.status : nullptr))
+          did_succeed = false;
+      } catch (const BrokenPipeExit &) {
+        throw;
+      } catch (const Error &error) {
+        report_copy_error(ec, cxt, utility_name, error);
+        did_succeed = false;
+      }
+      if (os::INTERRUPT_REQUESTED) return false;
     }
 
     if (source_status.has_value() &&
@@ -210,7 +235,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
       };
     }
 
-    return;
+    return did_succeed;
   }
 
   /* A destination symlink is removed so the copy does not follow the link and
@@ -245,6 +270,8 @@ static fn copy_path(const ExecContext &ec, StringView source,
         "': " + os::last_system_error_message()
     };
   }
+
+  return true;
 }
 
 Cp::Cp() = default;
@@ -283,6 +310,7 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
     };
   }
 
+  i32 status = 0;
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
     let target = String{cxt.scratch_allocator(), destination};
@@ -300,12 +328,21 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
         !confirm_koshkit_action(ec, "overwrite '" + target + "'? "))
       continue;
 
-    copy_path(ec, source, target.view(), is_recursive, should_force,
-              should_preserve, is_verbose, cxt.scratch_allocator());
+    try {
+      if (!copy_path(ec, cxt, args[0].view(), source, target.view(),
+                     is_recursive, should_force, should_preserve, is_verbose,
+                     cxt.scratch_allocator()))
+        status = 1;
+    } catch (const BrokenPipeExit &) {
+      throw;
+    } catch (const Error &error) {
+      report_copy_error(ec, cxt, args[0].view(), error);
+      status = 1;
+    }
     if (os::INTERRUPT_REQUESTED) return 130;
   }
 
-  return 0;
+  return status;
 }
 
 } /* namespace koshkit */
