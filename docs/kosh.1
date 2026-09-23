@@ -2133,16 +2133,15 @@ option is shorthand for
 .B \-l
 and
 .B \-\-live
-options refresh the process tree until interrupted. An optional duration sets
-the refresh cadence, which defaults to 0.5 seconds. The
+options sample and refresh the process tree until interrupted. An optional
+duration sets both intervals, which default to 0.5 seconds. The
 .B \-\-cumulative
 option accepts an optional sliding window. With
 .BR \-\-live ,
-the window defaults to one second unless an explicit cumulative value is given.
-Each refresh keeps the counter
-changes collected during the preceding window, including a proportional
-boundary sample. A new process shows unavailable processor utilization until
-two samples have been collected. Without
+the window defaults to the live interval unless an explicit cumulative value
+is given. Each refresh keeps complete sampled counter changes whose intervals
+are in the preceding window. A new process shows unavailable processor
+utilization until two samples have been collected. Without
 .B \-\-live,
 two snapshots are taken across the cumulative interval and the report shows
 their average processor utilization.

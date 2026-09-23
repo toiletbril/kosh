@@ -50,9 +50,8 @@ static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
 }
 FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live",
               Live,
-              "Refresh the process tree every N seconds until interrupted; the "
-              "default is 0.5 seconds. N changes refresh only; sampling remains "
-              "every 0.5 seconds.",
+              "Sample and refresh the process tree every N seconds until "
+              "interrupted; the default is 0.5 seconds.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative",
               Live,
@@ -132,16 +131,6 @@ struct live_process_cpu_row
   u64 last_seen_nanoseconds{0};
 };
 
-pure fn interpolate_cpu_milliseconds(u64 before, u64 after,
-                                     u64 elapsed_nanoseconds,
-                                     u64 passed_nanoseconds) wontthrow -> u64
-{
-  if (after < before || elapsed_nanoseconds == 0) return after;
-  return before + static_cast<u64>(
-                      static_cast<u128>(after - before) * passed_nanoseconds /
-                      elapsed_nanoseconds);
-}
-
 fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
                       u64 window_start_nanoseconds,
                       u64 now_nanoseconds) wontthrow -> void
@@ -155,18 +144,8 @@ fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
     oldest++;
   }
 
-  u64 baseline_milliseconds = history.history_milliseconds[oldest];
-  u64 baseline_nanoseconds = history.history_nanoseconds[oldest];
-  if (baseline_nanoseconds < window_start_nanoseconds &&
-      oldest + 1 < history.history_nanoseconds.count())
-  {
-    let const next_nanoseconds = history.history_nanoseconds[oldest + 1];
-    baseline_milliseconds = interpolate_cpu_milliseconds(
-        baseline_milliseconds, history.history_milliseconds[oldest + 1],
-        next_nanoseconds - baseline_nanoseconds,
-        window_start_nanoseconds - baseline_nanoseconds);
-    baseline_nanoseconds = window_start_nanoseconds;
-  }
+  let const baseline_milliseconds = history.history_milliseconds[oldest];
+  let const baseline_nanoseconds = history.history_nanoseconds[oldest];
 
   let const current_milliseconds = history.history_milliseconds.back();
   if (current_milliseconds < baseline_milliseconds ||
@@ -873,6 +852,9 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       return 1;
     }
   }
+  if (FLAG_EVILPS_LIVE.is_enabled() &&
+      !FLAG_EVILPS_CUMULATIVE.is_enabled())
+    cumulative_interval_seconds = live_interval_seconds;
 
   let line_width_limit = SIZE_MAX;
   if (!FLAG_EVILPS_WIDE.is_enabled()) {
@@ -889,7 +871,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let frame_arena = BumpArena{};
     let const is_terminal =
         os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
-    let const sample_interval_nanoseconds = 500000000ULL;
+    let const sample_interval_nanoseconds =
+        static_cast<u64>(live_interval_seconds * 1000000000.0);
     let const refresh_interval_nanoseconds =
         static_cast<u64>(live_interval_seconds * 1000000000.0);
     let const window_nanoseconds =
