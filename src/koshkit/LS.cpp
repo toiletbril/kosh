@@ -518,6 +518,19 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
   let const count = entries.count();
   if (count == 0) return;
 
+  u32 terminal_columns = 0;
+  u32 terminal_rows = 0;
+  let const is_terminal =
+      !options.is_one_per_line &&
+      os::terminal_size(terminal_columns, terminal_rows);
+  if (!is_terminal) {
+    for (let const &entry : entries) {
+      append_decorated_name(output, entry, options);
+      output += '\n';
+    }
+    return;
+  }
+
   ArrayList<String> cells{allocator};
   ArrayList<usize> widths{allocator};
   cells.reserve(count);
@@ -529,16 +542,6 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
     widths.push(decorated_width(entry, options));
   }
 
-  u32 terminal_columns = 0;
-  u32 terminal_rows = 0;
-  let const is_terminal = os::terminal_size(terminal_columns, terminal_rows);
-  if (options.is_one_per_line || !is_terminal) {
-    for (let const &cell : cells) {
-      output += cell.view();
-      output += '\n';
-    }
-    return;
-  }
   const usize terminal_width = terminal_columns;
 
   /* A column-major grid puts the entry at column*rows+row. */
