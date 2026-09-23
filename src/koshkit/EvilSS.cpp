@@ -54,15 +54,22 @@ struct network_socket_report_options
 
 struct socket_row
 {
-  String protocol{heap_allocator()};
-  String state{heap_allocator()};
-  String receive_queue{heap_allocator()};
-  String send_queue{heap_allocator()};
-  String local{heap_allocator()};
-  String peer{heap_allocator()};
-  String process_id{heap_allocator()};
-  String process_name{heap_allocator()};
-  String owner{heap_allocator()};
+  explicit socket_row(Allocator allocator)
+      : protocol(allocator), state(allocator), receive_queue(allocator),
+        send_queue(allocator), local(allocator), peer(allocator),
+        process_id(allocator), process_name(allocator), owner(allocator)
+  {
+  }
+
+  String protocol;
+  String state;
+  String receive_queue;
+  String send_queue;
+  String local;
+  String peer;
+  String process_id;
+  String process_name;
+  String owner;
 };
 
 pure fn unix_protocol_name(os::network_unix_socket_type type) wontthrow
@@ -211,7 +218,7 @@ fn append_network_socket_report(String &output,
     previous_identity = socket.identity;
     previous_process_id = socket.process_id;
 
-    let row = socket_row{};
+    let row = socket_row{allocator};
     row.protocol =
         String{allocator, is_unix ? unix_protocol_name(socket.unix_type)
                                   : (is_tcp ? "tcp" : "udp")};
@@ -234,7 +241,7 @@ fn append_network_socket_report(String &output,
       if (socket.has_owner_id) {
         let const owner_name = os::uid_to_username(socket.owner_id);
         row.owner = owner_name.has_value()
-                        ? owner_name->clone()
+                        ? String{allocator, owner_name->view()}
                         : String::from(socket.owner_id, allocator);
       }
       if (socket.process_id != 0 && socket.has_owner_start_token) {
@@ -243,11 +250,11 @@ fn append_network_socket_report(String &output,
               process.start_token != socket.owner_start_token)
             continue;
           if (!process.name.is_empty())
-            row.process_name = process.name.clone();
+            row.process_name = String{allocator, process.name.view()};
           if (!socket.has_owner_id) {
             let const owner_name = os::uid_to_username(process.owner_id);
             row.owner = owner_name.has_value()
-                            ? owner_name->clone()
+                            ? String{allocator, owner_name->view()}
                             : String::from(process.owner_id, allocator);
           }
           break;
