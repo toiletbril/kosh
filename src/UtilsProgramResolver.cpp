@@ -638,17 +638,42 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
         read_directory_cached(directory, directory_validation::Cached);
     if (entries == nullptr) continue;
 
+    usize symlink_count = 0;
+    for (let const &entry : *entries)
+      if (entry.kind == Path::entry_kind::Symlink) symlink_count++;
+
+    let symlink_paths = ArrayList<Path>{heap_allocator()};
+    let symlink_statuses = ArrayList<os::file_status>{heap_allocator()};
+    let symlink_batch = os::Batch{heap_allocator()};
+    symlink_paths.reserve(symlink_count);
+    symlink_statuses.reserve(symlink_count);
+    symlink_batch.reserve(symlink_count);
+    for (let const &entry : *entries) {
+      if (entry.kind != Path::entry_kind::Symlink) continue;
+
+      let full_path = directory.clone();
+      full_path.push_component(entry.name.view());
+      symlink_paths.push(steal(full_path));
+      symlink_statuses.push({});
+    }
+    for (usize position = 0; position < symlink_count; position++)
+      symlink_batch.add(os::batch_operation::stat(
+          symlink_paths[position], symlink_statuses[position]));
+    let symlink_results = ArrayList<os::batch_result>{heap_allocator()};
+    if (symlink_count != 0) symlink_batch.execute(symlink_results);
+
+    usize symlink_position = 0;
     for (let const &entry : *entries) {
       Maybe<Path> full_path;
       if (entry.kind == Path::entry_kind::Symlink) {
-        full_path = directory.clone();
-        full_path->push_component(entry.name.view());
-        if (!full_path->exists()) continue;
-      }
-
-      if (directory_entry_kind(directory, entry) !=
-          Path::entry_kind::Regular)
+        let const position = symlink_position++;
+        if (symlink_results[position].error_number != 0 ||
+            os::file_type_letter(symlink_statuses[position].mode) != '-')
+          continue;
+        full_path = steal(symlink_paths[position]);
+      } else if (entry.kind != Path::entry_kind::Regular) {
         continue;
+      }
 
       if (!full_path.has_value()) {
         full_path = directory.clone();
@@ -776,6 +801,35 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
         read_directory_cached(directory, directory_validation::Cached);
     if (entries == nullptr) continue;
 
+    let symlink_paths = ArrayList<Path>{heap_allocator()};
+    let symlink_statuses = ArrayList<os::file_status>{heap_allocator()};
+    let symlink_batch = os::Batch{heap_allocator()};
+    for (let const &entry : *entries) {
+      if (entry.kind != Path::entry_kind::Symlink) continue;
+
+      let normalized_name = entry.name.clone();
+      let const name_info = os::normalize_program_name(normalized_name);
+      let const stem =
+          normalized_name.substring_of_length(0, name_info.stem_length);
+      let const full_name_matches =
+          smart_case_prefix_matches(normalized_name.view(), prefix);
+      let const stem_matches = stem.length != normalized_name.length() &&
+                               smart_case_prefix_matches(stem, prefix);
+      if (!full_name_matches && !stem_matches) continue;
+
+      let full_path = directory.clone();
+      full_path.push_component(entry.name.view());
+      symlink_paths.push(steal(full_path));
+      symlink_statuses.push({});
+    }
+    symlink_batch.reserve(symlink_paths.count());
+    for (usize position = 0; position < symlink_paths.count(); position++)
+      symlink_batch.add(os::batch_operation::stat(
+          symlink_paths[position], symlink_statuses[position]));
+    let symlink_results = ArrayList<os::batch_result>{heap_allocator()};
+    if (!symlink_paths.is_empty()) symlink_batch.execute(symlink_results);
+
+    usize symlink_position = 0;
     for (let const &entry : *entries) {
       let normalized_name = entry.name.clone();
       let const name_info = os::normalize_program_name(normalized_name);
@@ -789,14 +843,14 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
 
       Maybe<Path> full_path;
       if (entry.kind == Path::entry_kind::Symlink) {
-        full_path = directory.clone();
-        full_path->push_component(entry.name.view());
-        if (!full_path->exists()) continue;
-      }
-
-      if (directory_entry_kind(directory, entry) !=
-          Path::entry_kind::Regular)
+        let const position = symlink_position++;
+        if (symlink_results[position].error_number != 0 ||
+            os::file_type_letter(symlink_statuses[position].mode) != '-')
+          continue;
+        full_path = steal(symlink_paths[position]);
+      } else if (entry.kind != Path::entry_kind::Regular) {
         continue;
+      }
 
       if (!full_path.has_value()) {
         full_path = directory.clone();
