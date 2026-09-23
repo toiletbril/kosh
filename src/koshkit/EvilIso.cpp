@@ -84,14 +84,15 @@ struct namespace_relation
   bool is_available{false};
 };
 
-fn eviliso_namespace_processes() throws -> ArrayList<namespace_process>
+fn eviliso_namespace_process_override(Allocator allocator) throws
+    -> Maybe<ArrayList<namespace_process>>
 {
 #ifndef NDEBUG
   if (let const *path = std::getenv("KOSH_TEST_EVILISO_NAMESPACE_PROCESSES");
       path != nullptr && path[0] != '\0')
   {
-    let processes = ArrayList<namespace_process>{heap_allocator()};
-    let const contents = Path{path}.read_entire_file();
+    let processes = ArrayList<namespace_process>{allocator};
+    let const contents = Path{path, allocator}.read_entire_file();
     if (!contents.has_value()) return processes;
     for (let const line : utils::split_lines(contents->view())) {
       let const process_end = line.find_character('|');
@@ -107,24 +108,15 @@ fn eviliso_namespace_processes() throws -> ArrayList<namespace_process>
       if (role != "self" && role != "other") continue;
       processes.push({
           process_id.value(),
-          String{heap_allocator(), name},
+          String{allocator, name},
           role == "self",
       });
     }
     return processes;
   }
 #endif
-  let processes = ArrayList<namespace_process>{heap_allocator()};
-  let const self_process_id = os::get_current_process_id();
-  for (let const &process : os::enumerate_processes()) {
-    processes.push({
-        process.pid,
-        process.name.is_empty() ? String{heap_allocator(), "-"}
-                                : String{heap_allocator(), process.name.view()},
-        process.pid == self_process_id,
-    });
-  }
-  return processes;
+  unused(allocator);
+  return None;
 }
 
 fn eviliso_namespace_proc_path(StringView suffix,
@@ -157,12 +149,13 @@ fn namespace_identifier(StringView target, Allocator allocator) throws
 }
 
 fn append_namespace_report(String &output, bool should_color,
-                           bool should_show_detail) throws -> void
+                           bool should_show_detail,
+                           ArrayList<namespace_process> processes) throws
+    -> void
 {
   constexpr StringView names[] = {"cgroup", "ipc",  "mnt",  "net",
                                   "pid",    "time", "user", "uts"};
   constexpr usize NAME_COUNT = sizeof(names) / sizeof(*names);
-  let processes = eviliso_namespace_processes();
   if (!Path{eviliso_namespace_proc_path("self/ns", heap_allocator())}
            .is_directory())
   {
@@ -404,6 +397,14 @@ enum class process_snapshot_status : u8
   Unverifiable,
 };
 
+pure fn process_snapshot_identity_is_valid(process_snapshot_status status)
+    wontthrow -> bool
+{
+  return status != process_snapshot_status::Exited &&
+         status != process_snapshot_status::Reused &&
+         status != process_snapshot_status::Unverifiable;
+}
+
 struct process_cgroup_snapshot
 {
   i64 process_id{0};
@@ -577,7 +578,8 @@ fn parse_cgroup_identity(StringView path, Allocator allocator) throws
   return result;
 }
 
-fn collect_process_cgroup_snapshot(Allocator allocator) throws
+fn collect_process_cgroup_snapshot(Allocator allocator,
+                                   bool should_collect_cgroups) throws
     -> ArrayList<process_cgroup_snapshot>
 {
   let candidates =
@@ -599,25 +601,27 @@ fn collect_process_cgroup_snapshot(Allocator allocator) throws
     record.evidence =
         ArrayList<process_cgroup_snapshot::identity_evidence>{allocator};
 
-    let suffix = String::from(process.pid, allocator);
-    suffix += "/cgroup";
-    let const contents =
-        Path{cgroup_proc_path(suffix.view(), allocator), allocator}
-            .read_entire_file();
-    if (!contents.has_value()) {
-      record.status = os::last_system_error_is_permission_denied()
-                          ? process_snapshot_status::PermissionDenied
-                          : process_snapshot_status::Unavailable;
-    } else {
-      record.memberships =
-          parse_cgroup_memberships(contents->view(), allocator);
-      record.status = record.memberships.is_empty()
-                          ? process_snapshot_status::Empty
-                          : process_snapshot_status::Available;
-      record.evidence.reserve(record.memberships.count());
-      for (let const &membership : record.memberships) {
-        record.evidence.push(
-            parse_cgroup_identity(membership.path.view(), allocator));
+    if (should_collect_cgroups) {
+      let suffix = String::from(process.pid, allocator);
+      suffix += "/cgroup";
+      let const contents =
+          Path{cgroup_proc_path(suffix.view(), allocator), allocator}
+              .read_entire_file();
+      if (!contents.has_value()) {
+        record.status = os::last_system_error_is_permission_denied()
+                            ? process_snapshot_status::PermissionDenied
+                            : process_snapshot_status::Unavailable;
+      } else {
+        record.memberships =
+            parse_cgroup_memberships(contents->view(), allocator);
+        record.status = record.memberships.is_empty()
+                            ? process_snapshot_status::Empty
+                            : process_snapshot_status::Available;
+        record.evidence.reserve(record.memberships.count());
+        for (let const &membership : record.memberships) {
+          record.evidence.push(
+              parse_cgroup_identity(membership.path.view(), allocator));
+        }
       }
     }
     snapshot.push(steal(record));
@@ -1073,10 +1077,6 @@ fn append_remote_report(String &output, bool should_color,
     String name{heap_allocator()};
   };
 
-  let const processes =
-      should_show_detail
-          ? os::enumerate_processes(os::process_detail::ResourceStats)
-          : ArrayList<os::process_entry>{heap_allocator()};
   let process_contexts = ArrayList<remote_process_context>{heap_allocator()};
   let user_contexts = ArrayList<remote_user_context>{heap_allocator()};
   let const self_net_namespace = os::read_symlink(
@@ -1167,18 +1167,16 @@ fn append_remote_report(String &output, bool should_color,
         remote_process_context context{};
         context.process_id = socket.process_id;
         context.start_token = socket.owner_start_token;
-        for (let const &process : processes) {
-          if (process.pid != socket.process_id) continue;
-          if (process.start_token != socket.owner_start_token) break;
+        for (let const &process : snapshot) {
+          if (process.process_id != socket.process_id) continue;
+          if (process.start_token != socket.owner_start_token ||
+              !process_snapshot_identity_is_valid(process.status))
+            break;
           context.owner_id = process.owner_id;
-          context.name = process.name.is_empty()
-                             ? String{heap_allocator(), "-"}
-                             : remote_table_text(process.name.view(), 48,
-                                                 heap_allocator());
-          context.command = process.command_line.is_empty()
-                                ? String{heap_allocator(), "-"}
-                                : remote_table_text(process.command_line.view(),
-                                                    96, heap_allocator());
+          context.name = remote_table_text(process.name.view(), 48,
+                                           heap_allocator());
+          context.command = remote_table_text(process.command.view(), 96,
+                                              heap_allocator());
           let net_namespace_suffix =
               String::from(socket.process_id, heap_allocator());
           net_namespace_suffix += "/ns/net";
@@ -1190,36 +1188,26 @@ fn append_remote_report(String &output, bool should_color,
           {
             context.net_namespace = steal(*net_namespace);
           }
-          for (let const &process_cgroups : snapshot) {
-            if (process_cgroups.process_id != socket.process_id ||
-                process_cgroups.start_token != socket.owner_start_token)
-              continue;
-            for (usize index = 0;
-                 index < process_cgroups.memberships.count(); index++)
-            {
-              let const &membership = process_cgroups.memberships[index];
-              bool is_known = false;
-              for (usize known_index = 0; known_index < index; known_index++) {
-                if (process_cgroups.memberships[known_index].path ==
-                    membership.path)
-                {
-                  is_known = true;
-                  break;
-                }
+          for (usize index = 0; index < process.memberships.count(); index++) {
+            let const &membership = process.memberships[index];
+            bool is_known = false;
+            for (usize known_index = 0; known_index < index; known_index++) {
+              if (process.memberships[known_index].path == membership.path) {
+                is_known = true;
+                break;
               }
-              if (is_known) continue;
-              if (!context.cgroups.is_empty()) context.cgroups += ',';
-              context.cgroups += membership.path.view();
             }
-            for (let const &evidence : process_cgroups.evidence) {
-              if (context.runtime.is_empty() && evidence.runtime != "-")
-                context.runtime = evidence.runtime.clone();
-              if (context.container.is_empty() && evidence.container_id != "-")
-                context.container = evidence.container_id.clone();
-              if (context.orchestrator.is_empty() && evidence.is_kubernetes)
-                context.orchestrator = "kubernetes";
-            }
-            break;
+            if (is_known) continue;
+            if (!context.cgroups.is_empty()) context.cgroups += ',';
+            context.cgroups += membership.path.view();
+          }
+          for (let const &evidence : process.evidence) {
+            if (context.runtime.is_empty() && evidence.runtime != "-")
+              context.runtime = evidence.runtime.clone();
+            if (context.container.is_empty() && evidence.container_id != "-")
+              context.container = evidence.container_id.clone();
+            if (context.orchestrator.is_empty() && evidence.is_kubernetes)
+              context.orchestrator = "kubernetes";
           }
           if (context.cgroups.is_empty()) context.cgroups = "-";
           if (context.orchestrator.is_empty()) context.orchestrator = "-";
@@ -1849,15 +1837,38 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   let process_cgroups =
       ArrayList<process_cgroup_snapshot>{cxt.scratch_allocator()};
-  if (show_cgroups || should_show_remote_detail || show_runtime ||
-      show_kubernetes || show_container)
+  let const should_collect_cgroups =
+      show_cgroups || should_show_remote_detail || show_runtime ||
+      show_kubernetes || show_container;
+  if (show_namespaces || should_collect_cgroups)
   {
-    process_cgroups =
-        collect_process_cgroup_snapshot(cxt.scratch_allocator());
+    process_cgroups = collect_process_cgroup_snapshot(cxt.scratch_allocator(),
+                                                      should_collect_cgroups);
   }
-  if (show_namespaces)
+  if (show_namespaces) {
+    let namespace_processes = ArrayList<namespace_process>{
+        cxt.scratch_allocator()};
+    if (let override =
+            eviliso_namespace_process_override(cxt.scratch_allocator());
+        override.has_value())
+    {
+      namespace_processes = override.take();
+    } else {
+      let const self_process_id = os::get_current_process_id();
+      namespace_processes.reserve(process_cgroups.count());
+      for (let const &process : process_cgroups) {
+        if (!process_snapshot_identity_is_valid(process.status)) continue;
+        namespace_processes.push({
+            process.process_id,
+            String{cxt.scratch_allocator(), process.name.view()},
+            process.process_id == self_process_id,
+        });
+      }
+    }
     append_namespace_report(output, should_color,
-                            FLAG_EVILISO_ALL.is_enabled());
+                            FLAG_EVILISO_ALL.is_enabled(),
+                            steal(namespace_processes));
+  }
   if (show_cgroups)
     append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled(),
                          process_cgroups);
