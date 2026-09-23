@@ -129,7 +129,8 @@ fn append_system_configuration(String &output, StringView name,
 struct mapped_library_family
 {
   String family;
-  String path;
+  u64 abi_version{0};
+  bool has_version_mix{false};
 };
 
 fn append_anomaly_report(String &output, EvalContext &cxt,
@@ -145,13 +146,52 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
   let const files =
       os::list_process_open_files(os::get_current_process_id(), allocator,
                                   true);
+  let executable_path = StringView{};
+  bool is_mapping_evidence_available = true;
+  for (let const &file : files) {
+    if (file.use == os::process_file_use::Executable && !file.is_inaccessible)
+      executable_path = file.path.view();
+    if (file.use == os::process_file_use::Mapped && file.is_inaccessible)
+      is_mapping_evidence_available = false;
+  }
+  if (!is_mapping_evidence_available) {
+    append_report_field(output, "Mixed library ABIs", "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "Deleted code mappings", "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "Cost", "process mappings",
+                        colors::ansi::BOLD_CYAN, should_color);
+    return;
+  }
+
   let families = ArrayList<mapped_library_family>{allocator};
-  usize findings = 0;
+  usize mixed_family_count = 0;
+  usize deleted_mapping_count = 0;
   for (let const &file : files) {
     if (file.use != os::process_file_use::Mapped) continue;
-    let const filename = Path{file.path.view()}.filename();
-    let const marker = filename.find_substring(".so");
+
+    let const filename = Path{file.path.view(), allocator}.filename();
+    let const shared_object_marker = filename.find_substring(".so");
+    let const marker = filename.find_substring(".so.");
+    if (file.is_deleted &&
+        (shared_object_marker.has_value() ||
+         file.path.view() == executable_path))
+      deleted_mapping_count++;
     if (!marker.has_value()) continue;
+
+    let version_end = *marker + 4;
+    while (version_end < filename.length && filename[version_end] >= '0' &&
+           filename[version_end] <= '9')
+      version_end++;
+    if (version_end == *marker + 4) continue;
+    if (version_end < filename.length && filename[version_end] != '.')
+      continue;
+    let const abi_version =
+        filename.substring_of_length(*marker + 4,
+                                     version_end - (*marker + 4))
+            .to<u64>();
+    if (abi_version.is_error()) continue;
+
     let const family = filename.substring_of_length(0, *marker);
     usize family_index = 0;
     while (family_index < families.count() &&
@@ -159,19 +199,24 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
       family_index++;
     if (family_index == families.count()) {
       families.push(mapped_library_family{
-          String{allocator, family          },
-          String{allocator, file.path.view()}
+          String{allocator, family}, abi_version.value(), false
       });
-    } else if (families[family_index].path.view() != file.path.view()) {
-      findings++;
+    } else if (families[family_index].abi_version != abi_version.value() &&
+               !families[family_index].has_version_mix)
+    {
+      families[family_index].has_version_mix = true;
+      mixed_family_count++;
     }
   }
 
-  append_report_field(output, "Mixed libraries",
-                      String::from(findings, allocator).view(),
+  append_report_field(output, "Mixed library ABIs",
+                      String::from(mixed_family_count, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(output, "Confidence", "high", colors::ansi::BOLD_CYAN,
-                      should_color);
+  append_report_field(output, "Deleted code mappings",
+                      String::from(deleted_mapping_count, allocator).view(),
+                      colors::ansi::BOLD_CYAN, should_color);
+  append_report_field(output, "Finding confidence", "high",
+                      colors::ansi::BOLD_CYAN, should_color);
   append_report_field(output, "Cost", "process mappings",
                       colors::ansi::BOLD_CYAN, should_color);
 }

@@ -2326,7 +2326,12 @@ fn list_process_open_files(i64 pid, Allocator allocator,
   };
 
 #if defined __APPLE__
-  unused(should_include_mappings);
+  if (should_include_mappings) {
+    files.push(process_open_file{
+        String{allocator, "[inaccessible]"}, -1, 0, 0, 0, 0,
+        process_file_use::Mapped, 'u', false, true, String{allocator}
+    });
+  }
   let const process_id = static_cast<pid_t>(pid);
   struct proc_vnodepathinfo vnode_paths{};
   if (::proc_pidinfo(process_id, PROC_PIDVNODEPATHINFO, 0, &vnode_paths,
@@ -2428,10 +2433,19 @@ fn list_process_open_files(i64 pid, Allocator allocator,
     let const target = read_symlink(reference_path.view(), allocator);
     if (!target.has_value()) continue;
 
-    do_push(target->view(), -1, 0, 0, 0, 0, reference.use, 'r', false, {});
+    constexpr StringView DELETED_SUFFIX = " (deleted)";
+    let path = target->view();
+    let const is_deleted = path.length >= DELETED_SUFFIX.length &&
+                            path.substring(path.length -
+                                           DELETED_SUFFIX.length) ==
+                                DELETED_SUFFIX;
+    if (is_deleted)
+      path = path.substring_of_length(0, path.length - DELETED_SUFFIX.length);
+    do_push(path, -1, 0, 0, 0, 0, reference.use, 'r', is_deleted, {});
   }
 
   if (should_include_mappings) {
+    bool did_read_mappings = false;
     let maps_path = String{allocator, process_path};
     maps_path += "/maps";
     if (let maps_descriptor =
@@ -2442,6 +2456,7 @@ fn list_process_open_files(i64 pid, Allocator allocator,
       if (let maps = read_fd_to_string(*maps_descriptor, allocator);
           maps.has_value())
       {
+        did_read_mappings = true;
         usize line_position = 0;
         while (line_position < maps->length()) {
           let const line = each_line(maps->view(), line_position);
@@ -2506,6 +2521,12 @@ fn list_process_open_files(i64 pid, Allocator allocator,
                   is_deleted, {});
         }
       }
+    }
+    if (!did_read_mappings) {
+      files.push(process_open_file{
+          String{allocator, "[inaccessible]"}, -1, 0, 0, 0, 0,
+          process_file_use::Mapped, 'u', false, true, String{allocator}
+      });
     }
   }
 
