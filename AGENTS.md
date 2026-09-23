@@ -399,6 +399,9 @@ changes update this file.
 
 ## Make
 
+- Select a cross-platform build with the documented `TARGET` value, such as
+  `TARGET=Windows_NT`; do not invent a `PLATFORM` override. Confirm the target
+  from the object path in the build log.
 - A make target is owned by the makefile of the directory the command runs in.
   Confirm the working directory before a nonzero status is attributed to the
   files under change, and give a root build the repository root as its make
