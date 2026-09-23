@@ -309,7 +309,7 @@ fn EvilFiles::execute(
         continue;
 
       matching_positions.push(file_position);
-      matching_paths.push(Path{files[file_position].path.view()});
+      matching_paths.push(Path{files[file_position].path.view(), allocator});
     }
     if (matching_positions.is_empty()) continue;
 
