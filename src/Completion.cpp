@@ -1037,11 +1037,12 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
   return candidates;
 }
 
-static pure fn file_extension_hint(StringView command) wontthrow -> const char *
+static pure fn file_extension_hint(StringView command) wontthrow
+    -> Maybe<StringView>
 {
   if (let const hint = FILE_EXTENSION_HINTS.find(command); hint.has_value())
-    return *hint;
-  return nullptr;
+    return StringView{*hint};
+  return None;
 }
 
 static pure fn candidate_extension_is_hinted(
@@ -1243,8 +1244,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       is_command             ? filesystem_entry_filter::RunnableOrDirectories
       : command_word == "cd" ? filesystem_entry_filter::DirectoriesOnly
                              : filesystem_entry_filter::All;
-  const char *const extension_hint =
-      is_command ? nullptr : file_extension_hint(command_word);
+  let const extension_hint =
+      is_command ? Maybe<StringView>{} : file_extension_hint(command_word);
 
   let candidates = ArrayList<String>{arena};
   let descriptions = StringMap<String>{arena};
@@ -1408,9 +1409,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       }
       candidates.truncate(kept_count);
 
-      if (extension_hint != nullptr && stage_token.is_empty()) {
-        candidates = keep_hinted_extension(steal(candidates),
-                                           StringView{extension_hint});
+      if (extension_hint.has_value() && stage_token.is_empty()) {
+        candidates = keep_hinted_extension(steal(candidates), *extension_hint);
       }
     }
 
@@ -1440,9 +1440,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       descriptions = steal(rebuilt_descriptions);
     }
 
-    if (for_listing && extension_hint != nullptr && !stage_token.is_empty()) {
-      candidates =
-          partition_by_extension(steal(candidates), StringView{extension_hint});
+    if (for_listing && extension_hint.has_value() && !stage_token.is_empty()) {
+      candidates = partition_by_extension(steal(candidates), *extension_hint);
     }
   }
 
