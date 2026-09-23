@@ -2075,13 +2075,17 @@ prints TCP failure and packet-loss telemetry without interface or socket rows.
 Nonzero error, drop, and failure counters are also reported as warnings.
 The
 .B \-\-live
-option refreshes traffic at an optional interval, defaulting to 0.5 seconds.
+option samples and refreshes traffic at an optional interval, defaulting to
+0.5 seconds.
 The
 .B \-\-cumulative
 option collects traffic for an optional window, defaulting to one second;
 with
 .B \-\-live
-it controls the collection window without changing the refresh interval.
+it controls the rolling window without changing the sampling and refresh
+interval. Without
+.BR \-\-live ,
+it enables the traffic table and waits for the requested measurement window.
 The
 .B \-\-sort
 option orders traffic rows by name, receive or transmit bytes, packet counts,

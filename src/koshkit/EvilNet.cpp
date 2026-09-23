@@ -36,9 +36,8 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
 }
 FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
               Live,
-              "Refresh live traffic every N seconds; the default is 0.5 "
-              "seconds. N changes refresh only; sampling remains every 0.5 "
-              "seconds.",
+              "Sample and refresh live traffic every N seconds; the default "
+              "is 0.5 seconds.",
               is_evilnet_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative",
               Live,
@@ -633,16 +632,6 @@ struct live_network_row
   u64 last_seen_nanoseconds{0};
 };
 
-pure fn interpolate_network_counter(u64 before, u64 after,
-                                    u64 elapsed_nanoseconds,
-                                    u64 passed_nanoseconds) wontthrow -> u64
-{
-  if (after < before || elapsed_nanoseconds == 0) return after;
-  return before + static_cast<u64>(
-                      static_cast<u128>(after - before) * passed_nanoseconds /
-                      elapsed_nanoseconds);
-}
-
 fn get_network_window_status(const live_network_row &row,
                              u64 window_start_nanoseconds,
                              Allocator allocator) throws
@@ -653,38 +642,7 @@ fn get_network_window_status(const live_network_row &row,
          row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
     oldest++;
 
-  let before = row.history[oldest];
-  u64 before_nanoseconds = row.history_nanoseconds[oldest];
-  if (before_nanoseconds < window_start_nanoseconds &&
-      oldest + 1 < row.history.count())
-  {
-    let const &next = row.history[oldest + 1];
-    let const elapsed_nanoseconds =
-        row.history_nanoseconds[oldest + 1] - before_nanoseconds;
-    let const passed_nanoseconds =
-        window_start_nanoseconds - before_nanoseconds;
-    let const do_interpolate =
-        [&](u64 os::network_interface_statistics_entry::*member) {
-          before.*member = interpolate_network_counter(
-              before.*member, next.*member, elapsed_nanoseconds,
-              passed_nanoseconds);
-        };
-    do_interpolate(&os::network_interface_statistics_entry::receive_bytes);
-    do_interpolate(&os::network_interface_statistics_entry::transmit_bytes);
-    do_interpolate(
-        &os::network_interface_statistics_entry::receive_packet_count);
-    do_interpolate(
-        &os::network_interface_statistics_entry::transmit_packet_count);
-    do_interpolate(
-        &os::network_interface_statistics_entry::receive_error_count);
-    do_interpolate(
-        &os::network_interface_statistics_entry::transmit_error_count);
-    do_interpolate(
-        &os::network_interface_statistics_entry::receive_drop_count);
-    do_interpolate(
-        &os::network_interface_statistics_entry::transmit_drop_count);
-    before_nanoseconds = window_start_nanoseconds;
-  }
+  let const &before = row.history[oldest];
 
   let sampled = row.history.back();
   sampled.interface_name = String{allocator, row.interface_name.view()};
@@ -936,15 +894,19 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       return 1;
     }
   }
+  if (FLAG_EVILNET_LIVE.is_enabled() &&
+      !FLAG_EVILNET_CUMULATIVE.is_enabled())
+    window_seconds = live_interval_seconds;
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     return run_live_network_traffic(ec, heap_allocator(), window_seconds,
-                                    0.5, live_interval_seconds,
+                                    live_interval_seconds,
+                                    live_interval_seconds,
                                     should_color, sort_key);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
   let const should_show_traffic =
       should_show_all || FLAG_EVILNET_TRAFFIC.is_enabled() ||
-      sort_key.has_value();
+      FLAG_EVILNET_CUMULATIVE.is_enabled() || sort_key.has_value();
   let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
   let const should_show_interfaces =
       !FLAG_EVILNET_TRAFFIC.is_enabled() && !should_show_failures;
