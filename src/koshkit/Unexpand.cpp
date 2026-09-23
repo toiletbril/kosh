@@ -10,7 +10,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../TextProcessing.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -34,7 +34,7 @@ static fn append_unexpanded_blanks(String &output, usize start_column,
   usize column = start_column;
 
   while (column < end_column) {
-    let const target = next_tab_column(column, tab_stops);
+    let const target = utils::get_next_tab_column(column, tab_stops);
     if (target > column + 1 && target <= end_column) {
       output += '\t';
       column = target;
@@ -62,8 +62,8 @@ fn Unexpand::execute(
 
   let tab_stops = ArrayList<usize>{cxt.scratch_allocator()};
   if (FLAG_UNEXPAND_TABS.is_set()) {
-    let const parsed = parse_tab_stop_list(FLAG_UNEXPAND_TABS.value(),
-                                           cxt.scratch_allocator());
+    let const parsed = utils::parse_tab_stop_list(
+        FLAG_UNEXPAND_TABS.value(), cxt.scratch_allocator());
     if (!parsed.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           FLAG_UNEXPAND_TABS.value_location(), "invalid tab list",
@@ -103,7 +103,7 @@ fn Unexpand::execute(
         if (byte == ' ')
           column++;
         else {
-          let const target = next_tab_column(column, tab_stops);
+          let const target = utils::get_next_tab_column(column, tab_stops);
           column = target == column ? column + 1 : target;
         }
         continue;

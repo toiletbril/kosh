@@ -170,6 +170,29 @@ pure fn contains_case_insensitive_ascii(StringView value,
                                         StringView folded_pattern) wontthrow
     -> bool;
 
+struct text_position_range
+{
+  usize first;
+  usize last;
+
+  pure fn operator<(const text_position_range &other) const wontthrow -> bool
+  {
+    if (first != other.first) return first < other.first;
+    return last < other.last;
+  }
+};
+
+fn parse_text_position_ranges(StringView text, Allocator allocator) throws
+    -> Maybe<ArrayList<text_position_range>>;
+pure fn text_position_is_selected(
+    usize one_based_position,
+    const ArrayList<text_position_range> &ranges) wontthrow -> bool;
+
+fn parse_tab_stop_list(StringView text, Allocator allocator) throws
+    -> Maybe<ArrayList<usize>>;
+pure fn get_next_tab_column(
+    usize column, const ArrayList<usize> &tab_stops) wontthrow -> usize;
+
 pure alwaysinline fn environment_name_is_path(StringView name) wontthrow -> bool
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) return name == "PATH";

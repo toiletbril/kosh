@@ -11,7 +11,6 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../TextProcessing.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -62,7 +61,8 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_CUT_BYTES.is_set()        ? FLAG_CUT_BYTES.value_location()
       : FLAG_CUT_CHARACTERS.is_set() ? FLAG_CUT_CHARACTERS.value_location()
                                      : FLAG_CUT_FIELDS.value_location();
-  let const ranges = parse_text_position_ranges(list, cxt.scratch_allocator());
+  let const ranges =
+      utils::parse_text_position_ranges(list, cxt.scratch_allocator());
   if (!ranges.has_value()) {
     KOSHKIT_REPORT_ERROR_AT(
         list_location,
@@ -100,8 +100,8 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
           usize byte_position = 0;
           while (byte_position < line_view.length) {
             let const decoded = utils::decode_utf8(line_view, byte_position, 0);
-            if (text_position_is_selected(byte_position + decoded.length,
-                                          *ranges))
+            if (utils::text_position_is_selected(
+                    byte_position + decoded.length, *ranges))
             {
               output +=
                   line_view.substring_of_length(byte_position, decoded.length);
@@ -110,7 +110,7 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
           }
         } else {
           for (usize position = 0; position < line_view.length; position++)
-            if (text_position_is_selected(position + 1, *ranges))
+            if (utils::text_position_is_selected(position + 1, *ranges))
               output += line_view[position];
         }
       } else {
@@ -120,7 +120,7 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
         while (byte_position < line_view.length) {
           let const decoded = utils::decode_utf8(line_view, byte_position, 0);
 
-          if (text_position_is_selected(character_position, *ranges))
+          if (utils::text_position_is_selected(character_position, *ranges))
             output +=
                 line_view.substring_of_length(byte_position, decoded.length);
           byte_position += decoded.length;
@@ -148,7 +148,7 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
             continue;
           }
 
-          if (text_position_is_selected(field_number, *ranges)) {
+          if (utils::text_position_is_selected(field_number, *ranges)) {
             if (has_output_field) output += delimiter;
 
             output += line_view.substring_of_length(field_start,

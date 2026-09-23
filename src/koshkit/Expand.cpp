@@ -10,7 +10,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../TextProcessing.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -45,8 +45,8 @@ fn Expand::execute(const ExecContext &ec, EvalContext &cxt,
 
   let tab_stops = ArrayList<usize>{cxt.scratch_allocator()};
   if (FLAG_EXPAND_TABS.is_set()) {
-    let const parsed =
-        parse_tab_stop_list(FLAG_EXPAND_TABS.value(), cxt.scratch_allocator());
+    let const parsed = utils::parse_tab_stop_list(FLAG_EXPAND_TABS.value(),
+                                                  cxt.scratch_allocator());
     if (!parsed.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           FLAG_EXPAND_TABS.value_location(), "invalid tab list",
@@ -69,7 +69,7 @@ fn Expand::execute(const ExecContext &ec, EvalContext &cxt,
       let const byte = text[position];
       switch (byte) {
       case '\t': {
-        let const target = next_tab_column(column, tab_stops);
+        let const target = utils::get_next_tab_column(column, tab_stops);
         if (target == column) {
           output += '\t';
         } else {
