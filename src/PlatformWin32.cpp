@@ -917,6 +917,12 @@ fn network_interface_addresses() throws -> ArrayList<network_interface_address>
   return result;
 }
 
+fn default_network_interface(Allocator allocator) throws -> Maybe<String>
+{
+  unused(allocator);
+  return None;
+}
+
 fn read_network_interface_statistics() throws
     -> ArrayList<network_interface_statistics_entry>
 {

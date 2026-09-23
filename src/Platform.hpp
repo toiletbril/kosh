@@ -1526,6 +1526,7 @@ struct network_interface_address
 };
 
 fn network_interface_addresses() throws -> ArrayList<network_interface_address>;
+fn default_network_interface(Allocator allocator) throws -> Maybe<String>;
 
 enum class network_statistics_field : u32
 {

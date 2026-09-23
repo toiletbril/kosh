@@ -1031,6 +1031,52 @@ fn network_interface_addresses() throws -> ArrayList<network_interface_address>
   return result;
 }
 
+fn default_network_interface(Allocator allocator) throws -> Maybe<String>
+{
+#if defined __linux__
+  let contents = Path{"/proc/net/route"}.read_entire_file();
+  if (!contents.has_value()) return None;
+
+  usize position = 0;
+  while (position < contents->length()) {
+    let const line_start = position;
+    while (position < contents->length() && contents->view()[position] != '\n')
+      position++;
+    let const line = contents->view().substring_of_length(
+        line_start, position - line_start);
+    if (position < contents->length()) position++;
+    if (line.starts_with("Iface")) continue;
+
+    StringView words[4]{};
+    usize word_count = 0;
+    usize word_position = 0;
+    while (word_position < line.length && word_count < countof(words)) {
+      while (word_position < line.length &&
+             (line[word_position] == ' ' || line[word_position] == '\t'))
+        word_position++;
+      let const word_start = word_position;
+      while (word_position < line.length && line[word_position] != ' ' &&
+             line[word_position] != '\t')
+        word_position++;
+      if (word_position > word_start)
+        words[word_count++] = line.substring_of_length(
+            word_start, word_position - word_start);
+    }
+    let const has_up_flag =
+        word_count >= 4 && words[3].length >= 4 &&
+        (words[3][3] == '1' || words[3][3] == '3' || words[3][3] == '5' ||
+         words[3][3] == '7' || words[3][3] == '9' || words[3][3] == 'b' ||
+         words[3][3] == 'B' || words[3][3] == 'd' || words[3][3] == 'D' ||
+         words[3][3] == 'f' || words[3][3] == 'F');
+    if (word_count >= 4 && words[1] == "00000000" && has_up_flag)
+      return String{allocator, words[0]};
+  }
+#else
+  unused(allocator);
+#endif
+  return None;
+}
+
 #if defined __APPLE__
 
 static pure fn socket_state_of(int state) wontthrow -> network_socket_state
