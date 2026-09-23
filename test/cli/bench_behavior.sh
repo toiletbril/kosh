@@ -70,7 +70,7 @@ if [ "$(uname -s)" = Linux ] && command -v perf >/dev/null 2>&1 &&
     test "$counter_row_count" -eq 5
 fi
 case "$counter_output" in
-    *"Benchmark: $BENCH_ECHO counter-run (1 runs)"*) ;;
+    *"Benchmark: \`$BENCH_ECHO counter-run\` (1 runs)"*) ;;
     *) exit 1 ;;
 esac
 echo "counter capability passed"
@@ -84,7 +84,7 @@ if [ "$(uname -s)" = Linux ]; then
     test "$(printf '%s\n' "$fallback_output" | grep -c '^fallback-run$')" -eq 1
     test "$(printf '%s\n' "$fallback_output" | grep -Ec '^  (cpu cycles|instructions|cache refs|cache misses|branch misses)')" -eq 0
     case "$fallback_output" in
-        *"Benchmark: $BENCH_ECHO fallback-run (1 runs)"*) ;;
+        *"Benchmark: \`$BENCH_ECHO fallback-run\` (1 runs)"*) ;;
         *) exit 1 ;;
     esac
 fi

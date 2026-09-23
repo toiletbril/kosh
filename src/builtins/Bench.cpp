@@ -9,6 +9,7 @@
 #include "../Builtin.hpp"
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
+#include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
 #include "../Trace.hpp"
@@ -453,13 +454,24 @@ fn sample_command(StringView shell_binary, StringView command,
   return result;
 }
 
-fn append_summary(String &out, const CommandResult &result, bool should_color,
-                  Allocator allocator) throws -> void
+fn append_command_label(String &out, StringView label, bool should_color,
+                        EvalContext &context) throws -> void
 {
-  out.append(colored(colors::ansi::BOLD, should_color));
+  out += '`';
+  if (should_color) {
+    completion::append_highlighted_source(
+        out, label, context, colors::PRINTED_SOURCE_HIGHLIGHT_THEME);
+  } else {
+    out += label;
+  }
+  out += '`';
+}
+
+fn append_summary(String &out, const CommandResult &result, bool should_color,
+                  EvalContext &context, Allocator allocator) throws -> void
+{
   out += "Benchmark: ";
-  out += result.label;
-  out.append(colored(colors::ansi::RESET, should_color));
+  append_command_label(out, result.label.view(), should_color, context);
   out += " (" + String::from(result.sample_count, allocator) + " runs)\n";
 
   let rows = ArrayList<MetricRow>{allocator};
@@ -508,17 +520,13 @@ fn append_summary(String &out, const CommandResult &result, bool should_color,
 }
 
 fn append_comparison(String &out, const CommandResult &first,
-                     const CommandResult &other, bool should_color) throws
-    -> void
+                     const CommandResult &other, bool should_color,
+                     EvalContext &context) throws -> void
 {
-  out.append(colored(colors::ansi::BOLD, should_color));
   out += "Relative to: ";
-  out += first.label;
-  out.append(colored(colors::ansi::RESET, should_color));
+  append_command_label(out, first.label.view(), should_color, context);
   out += "\n  ";
-  out.append(colored(colors::ansi::BOLD, should_color));
-  out += other.label;
-  out.append(colored(colors::ansi::RESET, should_color));
+  append_command_label(out, other.label.view(), should_color, context);
   out += "\n";
 
   append_relative_line(out, "wall time", first.wall_time, other.wall_time,
@@ -632,13 +640,14 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let out = String{cxt.scratch_allocator()};
   for (usize i = 0; i < results.count(); i++) {
     if (i > 0) out += "\n";
-    append_summary(out, results[i], should_color, cxt.scratch_allocator());
+    append_summary(out, results[i], should_color, cxt,
+                   cxt.scratch_allocator());
   }
 
   if (results.count() > 1) {
     out += "\n";
     for (usize i = 1; i < results.count(); i++)
-      append_comparison(out, results[0], results[i], should_color);
+      append_comparison(out, results[0], results[i], should_color, cxt);
   }
 
   ec.print_to_stdout(out);

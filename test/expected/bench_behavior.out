@@ -4,13 +4,13 @@ note: Pass `--ignore-exit-code` to benchmark it regardless.
 == the failure sets the exit status:
 rc=1
 == --ignore-exit-code keeps sampling a failing command:
-Benchmark: false (3 runs)
+Benchmark: `false` (3 runs)
 == --no-shell --show-output forks the command directly:
 direct
 direct
-Benchmark: /bin/echo direct (2 runs)
+Benchmark: `/bin/echo direct` (2 runs)
 == --runs executes exactly one sample:
-Benchmark: true (1 runs)
+Benchmark: `true` (1 runs)
 == invalid sample counts are rejected:
 rc=1
 rc=1
