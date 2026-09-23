@@ -187,6 +187,11 @@ fn JobTable::update_jobs() throws -> void
 fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
     -> i32
 {
+  return m_job_table.wait_for_job_processes(job, was_stopped);
+}
+
+fn JobTable::wait_for_job_processes(job &job, bool *was_stopped) throws -> i32
+{
   if (job.state == job::State::Done) {
     if (was_stopped != nullptr) *was_stopped = false;
     return job.last_status;
@@ -404,17 +409,23 @@ fn JobTable::remove_job(i32 id) throws -> bool
 fn EvalContext::format_done_job_notifications(StringView line_ending) throws
     -> String
 {
+  return m_job_table.format_done_job_notifications(line_ending);
+}
+
+fn JobTable::format_done_job_notifications(StringView line_ending) throws
+    -> String
+{
   update_jobs();
 
   let out = String{heap_allocator()};
-  for (usize i = 0; i < m_job_table.m_jobs.count(); i++) {
-    let const &job = m_job_table.m_jobs[i];
+  for (usize i = 0; i < m_jobs.count(); i++) {
+    let const &job = m_jobs[i];
     if (job.state != job::State::Done) continue;
 
     char marker = ' ';
-    if (i == m_job_table.m_jobs.count() - 1) {
+    if (i == m_jobs.count() - 1) {
       marker = '+';
-    } else if (i == m_job_table.m_jobs.count() - 2) {
+    } else if (i == m_jobs.count() - 2) {
       marker = '-';
     }
 
