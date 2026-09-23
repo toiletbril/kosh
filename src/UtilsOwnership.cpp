@@ -41,7 +41,9 @@ static fn change_path_ownership_recursive(
     const Path &path, i64 owner_id, i64 group_id, bool should_recurse,
     bool should_follow_symlink, bool should_follow_nested_symlinks,
     ArrayList<ownership_directory_identity> &active_directories,
-    const os::file_status *known_path_status = nullptr) throws -> bool
+    const os::file_status *known_path_status = nullptr,
+    const os::file_status *known_followed_status = nullptr,
+    bool was_followed_status_queried = false) throws -> bool
 {
   os::file_status path_status{};
   if (known_path_status != nullptr) {
@@ -70,8 +72,12 @@ static fn change_path_ownership_recursive(
 
   os::file_status followed_status{};
   if (is_symlink) {
-    if (!os::stat_path_following(path.view(), followed_status))
+    if (was_followed_status_queried) {
+      if (known_followed_status == nullptr) return true;
+      followed_status = *known_followed_status;
+    } else if (!os::stat_path_following(path.view(), followed_status)) {
       return true;
+    }
   } else {
     followed_status = path_status;
   }
@@ -108,17 +114,69 @@ static fn change_path_ownership_recursive(
     return false;
   }
 
-  bool did_succeed = true;
-  for (let const &child_entry : *children) {
-    if (os::INTERRUPT_REQUESTED) return did_succeed;
+  let child_paths = ArrayList<Path>{cxt.scratch_allocator()};
+  let followed_child_positions = ArrayList<usize>{cxt.scratch_allocator()};
+  let followed_child_statuses =
+      ArrayList<os::file_status>{cxt.scratch_allocator()};
+  let followed_batch = os::Batch{cxt.scratch_allocator()};
+  child_paths.reserve(children->count());
+  if (should_follow_nested_symlinks) {
+    followed_child_positions.reserve(children->count());
+    followed_child_statuses.reserve(children->count());
+    followed_batch.reserve(children->count());
+  }
+
+  for (usize child_position = 0; child_position < children->count();
+       child_position++)
+  {
+    let const &child_entry = (*children)[child_position];
     let child = Path{path.view(), cxt.scratch_allocator()};
     child.append(child_entry.child.name.view());
+    child_paths.push(steal(child));
+
+    let const is_child_symlink =
+        child_entry.child.kind == Path::entry_kind::Symlink ||
+        (child_entry.has_status &&
+         os::file_type_letter(child_entry.status.mode) == 'l');
+    if (!should_follow_nested_symlinks || !is_child_symlink) continue;
+
+    followed_child_positions.push(child_position);
+    followed_child_statuses.push({});
+    followed_batch.add(os::batch_operation::stat(
+        child_paths.back(), followed_child_statuses.back()));
+  }
+
+  let followed_results = ArrayList<os::batch_result>{cxt.scratch_allocator()};
+  if (followed_batch.count() != 0) followed_batch.execute(followed_results);
+
+  bool did_succeed = true;
+  usize followed_position = 0;
+  for (usize child_position = 0; child_position < children->count();
+       child_position++)
+  {
+    if (os::INTERRUPT_REQUESTED) return did_succeed;
+    let const &child_entry = (*children)[child_position];
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
+    let known_child_followed_status =
+        static_cast<const os::file_status *>(nullptr);
+    let was_child_followed_status_queried = false;
+    if (followed_position < followed_child_positions.count() &&
+        followed_child_positions[followed_position] == child_position)
+    {
+      was_child_followed_status_queried = true;
+      if (followed_results[followed_position].error_number == 0)
+        known_child_followed_status =
+            &followed_child_statuses[followed_position];
+      followed_position++;
+    }
+
     if (!change_path_ownership_recursive(
-            ec, cxt, utility_name, child, owner_id, group_id, true,
+            ec, cxt, utility_name, child_paths[child_position], owner_id,
+            group_id, true,
             should_follow_nested_symlinks, should_follow_nested_symlinks,
-            active_directories, child_status))
+            active_directories, child_status, known_child_followed_status,
+            was_child_followed_status_queried))
       did_succeed = false;
   }
 
