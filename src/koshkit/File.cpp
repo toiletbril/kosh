@@ -81,16 +81,16 @@ static pure fn magic_digit(char byte) wontthrow -> u8
   return 0xff;
 }
 
-static fn parse_magic_number(StringView text, u64 &value) wontthrow -> bool
+static fn parse_magic_number(StringView text) wontthrow -> Maybe<u64>
 {
-  if (text.is_empty()) return false;
+  if (text.is_empty()) return None;
   usize position = 0;
   bool is_negative = false;
   if (text[position] == '-') {
     is_negative = true;
     position++;
   }
-  if (position == text.length) return false;
+  if (position == text.length) return None;
 
   u8 base = 10;
   if (text.length - position > 2 && text[position] == '0' &&
@@ -101,19 +101,18 @@ static fn parse_magic_number(StringView text, u64 &value) wontthrow -> bool
   } else if (text.length - position > 1 && text[position] == '0') {
     base = 8;
   }
-  if (position == text.length) return false;
+  if (position == text.length) return None;
 
   u64 parsed = 0;
   for (; position < text.length; position++) {
     let const digit = magic_digit(text[position]);
     if (digit >= base || parsed > (UINT64_MAX - digit) / base) {
-      return false;
+      return None;
     }
     parsed = parsed * base + digit;
   }
 
-  value = is_negative ? 0 - parsed : parsed;
-  return true;
+  return is_negative ? 0 - parsed : parsed;
 }
 
 static fn decode_magic_text(StringView encoded, String &decoded) throws -> void
@@ -262,14 +261,13 @@ static fn parse_magic_type(StringView text, file_magic_rule &rule) throws
         while (position < text.length && text[position] >= '0' &&
                text[position] <= '9')
           position++;
-        u64 byte_count = 0;
-        if (size_start == position ||
-            !parse_magic_number(
-                text.substring_of_length(size_start, position - size_start),
-                byte_count) ||
-            byte_count == 0 || byte_count > 8)
+        if (size_start == position) return false;
+        let const byte_count = parse_magic_number(
+            text.substring_of_length(size_start, position - size_start));
+        if (!byte_count.has_value() || *byte_count == 0 || *byte_count > 8) {
           return false;
-        rule.byte_count = static_cast<usize>(byte_count);
+        }
+        rule.byte_count = static_cast<usize>(*byte_count);
         break;
       }
       }
@@ -282,7 +280,9 @@ static fn parse_magic_type(StringView text, file_magic_rule &rule) throws
   if (rule.kind == file_magic_kind::String) return position == text.length;
   if (position < text.length && text[position] == '&') {
     position++;
-    if (!parse_magic_number(text.substring(position), rule.mask)) return false;
+    let const mask = parse_magic_number(text.substring(position));
+    if (!mask.has_value()) return false;
+    rule.mask = *mask;
     return true;
   }
   return position == text.length;
@@ -310,9 +310,14 @@ static fn parse_magic_rule(StringView line, Allocator allocator,
     rule.is_continuation = true;
     offset = offset.substring(1);
   }
-  if (offset.is_empty() || offset[0] == '-' ||
-      !parse_magic_number(offset, rule.offset) || !parse_magic_type(type, rule))
+  if (offset.is_empty() || offset[0] == '-') {
     return false;
+  }
+  let const parsed_offset = parse_magic_number(offset);
+  if (!parsed_offset.has_value() || !parse_magic_type(type, rule)) {
+    return false;
+  }
+  rule.offset = *parsed_offset;
 
   if (rule.kind == file_magic_kind::String) {
     decode_magic_text(value, rule.expected_text);
@@ -326,9 +331,11 @@ static fn parse_magic_rule(StringView line, Allocator allocator,
       rule.comparison = 'x';
       value = {};
     }
-    if (rule.comparison != 'x' &&
-        !parse_magic_number(value, rule.expected_number))
-      return false;
+    if (rule.comparison != 'x') {
+      let const expected_number = parse_magic_number(value);
+      if (!expected_number.has_value()) return false;
+      rule.expected_number = *expected_number;
+    }
   }
 
   rule.message = String{allocator, message};
