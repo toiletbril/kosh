@@ -192,9 +192,11 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     let const *previous = lookup_shell_variable(name);
     let saved = Maybe<String>{};
     if (previous != nullptr) saved = String{previous->view()};
+    let const saved_definition = special_variable_definition_location(name);
 
-    m_confined_write_log.push(
-        environment_undo_entry{String{name}, steal(saved)});
+    m_confined_write_log.push(environment_undo_entry{
+        String{name}, steal(saved), saved_definition
+    });
   }
 
   if (is_field_separator_name) set_field_separators(value);
@@ -211,18 +213,26 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   if (is_exported(name)) {
     if (m_subshell_depth > 0)
       m_environment_undo_log.push(environment_undo_entry{
-          String{name}, os::get_environment_variable(name)});
+          String{name}, os::get_environment_variable(name), None});
     os::set_environment_variable(name, value);
   }
 }
 
 fn EvalContext::restore_temporary_shell_variable(
-    StringView name, const Maybe<String> &previous_value) throws -> void
+    StringView name, const Maybe<String> &previous_value,
+    Maybe<SourceLocation> previous_definition_location) throws -> void
 {
   if (previous_value.has_value())
     m_shell_variables.set(name, previous_value->view());
   else
     m_shell_variables.erase(name);
+  if (is_prompt_special_variable(name)) {
+    if (previous_definition_location.has_value())
+      m_special_variable_definition_locations.set(
+          name, *previous_definition_location);
+    else
+      m_special_variable_definition_locations.erase(name);
+  }
 }
 
 fn EvalContext::begin_confined_variable_writes() wontthrow -> usize
@@ -252,7 +262,9 @@ fn EvalContext::rollback_confined_variable_writes(usize mark) wontthrow -> void
     try {
       let const &entry = m_confined_write_log.back();
       let const name = entry.name.view();
-      restore_temporary_shell_variable(name, entry.previous_value);
+      restore_temporary_shell_variable(
+          name, entry.previous_value,
+          entry.previous_special_definition_location);
       let const restored = entry.previous_value.has_value()
                                ? entry.previous_value->view()
                                : StringView{};
@@ -475,6 +487,13 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     assign_variable(binding.name, *binding.previous_value);
   else
     force_unset_shell_variable(binding.name);
+  if (is_prompt_special_variable(binding.name.view())) {
+    if (binding.previous_special_definition_location.has_value())
+      m_special_variable_definition_locations.set(
+          binding.name.view(), *binding.previous_special_definition_location);
+    else
+      m_special_variable_definition_locations.erase(binding.name.view());
+  }
   if (binding.previous_indexed_array.has_value())
     m_indexed_arrays.set(binding.name.view(),
                          steal(*binding.previous_indexed_array));
@@ -846,7 +865,9 @@ fn EvalContext::record_environment_change(StringView name) throws -> void
 {
   if (m_subshell_depth == 0) return;
   m_environment_undo_log.push(
-      environment_undo_entry{String{name}, os::get_environment_variable(name)});
+      environment_undo_entry{
+          String{name}, os::get_environment_variable(name), None
+      });
 }
 
 static constexpr usize EXPORTED_NAME_FOLD_BYTES = 64;

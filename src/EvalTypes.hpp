@@ -211,6 +211,7 @@ struct local_binding
 {
   String name;
   Maybe<String> previous_value;
+  Maybe<SourceLocation> previous_special_definition_location;
   Maybe<ArrayList<String>> previous_indexed_array;
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
@@ -221,7 +222,7 @@ struct local_binding
   bool previous_was_exported{false};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(local_binding) == 256);
+static_assert(sizeof(usize) != 8 || sizeof(local_binding) == 272);
 
 struct job
 {
@@ -249,6 +250,7 @@ struct environment_undo_entry
 {
   String name;
   Maybe<String> previous_value;
+  Maybe<SourceLocation> previous_special_definition_location;
 };
 
 struct process_substitution

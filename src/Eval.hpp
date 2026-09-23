@@ -420,7 +420,8 @@ public:
       -> Maybe<SourceLocation>;
   fn disable_ignoreeof() throws -> void;
   fn restore_temporary_shell_variable(
-      StringView name, const Maybe<String> &previous_value) throws -> void;
+      StringView name, const Maybe<String> &previous_value,
+      Maybe<SourceLocation> previous_definition_location) throws -> void;
   fn begin_confined_variable_writes() wontthrow -> usize;
   fn rollback_confined_variable_writes(usize mark) wontthrow -> void;
   fn get_program_resolver() wontthrow -> ProgramResolver &

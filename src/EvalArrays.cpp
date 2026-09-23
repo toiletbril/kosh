@@ -636,6 +636,8 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   }
 
   let const previous_attributes = variable_attributes(name);
+  let const previous_special_definition_location =
+      special_variable_definition_location(name);
   if (!should_inherit_value) m_variable_attributes.erase(name);
   unmark_readonly(name);
 
@@ -659,8 +661,8 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   }
 
   m_local_scopes[m_local_scope_depth - 1].push(local_binding{
-      String{name}, steal(previous_value), steal(previous_array),
-      steal(previous_keys), steal(previous_values),
+      String{name}, steal(previous_value), previous_special_definition_location,
+      steal(previous_array), steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
       previous_attributes, previous_was_associative, previous_was_exported});
 

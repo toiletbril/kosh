@@ -605,6 +605,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     String name;
     Maybe<String> previous_value;
     Maybe<String> previous_shell_value;
+    Maybe<SourceLocation> previous_special_definition_location;
     bool did_overlay_shell_value;
   };
   ArrayList<saved_env_var> saved_env{cxt.scratch_allocator()};
@@ -621,8 +622,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     for (usize i = saved_env.count(); i > 0; i--) {
       const saved_env_var &restore = saved_env[i - 1];
       if (restore.did_overlay_shell_value)
-        cxt.restore_temporary_shell_variable(restore.name.view(),
-                                             restore.previous_shell_value);
+        cxt.restore_temporary_shell_variable(
+            restore.name.view(), restore.previous_shell_value,
+            restore.previous_special_definition_location);
       if (restore.previous_value)
         os::set_environment_variable(restore.name.view(),
                                      restore.previous_value->view());
@@ -686,6 +688,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
 
         if (!is_read_field_separator) {
           Maybe<String> previous_shell_value;
+          Maybe<SourceLocation> previous_special_definition_location;
           let const did_overlay_shell_value = command_word_function != nullptr;
           if (did_overlay_shell_value) {
             if (let const *stored = cxt.lookup_shell_variable(name);
@@ -694,6 +697,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
               previous_shell_value =
                   String{cxt.scratch_allocator(), stored->view()};
             }
+            previous_special_definition_location =
+                cxt.special_variable_definition_location(name);
             if (name == "IGNOREEOF" && !previous_ignoreeof_state.has_value()) {
               previous_ignoreeof_state =
                   cxt.shell_option_state(shell_option_id::Ignoreeof);
@@ -703,7 +708,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
           saved_env.push(saved_env_var{
               String{cxt.scratch_allocator(), name},
               steal(previous),
-              steal(previous_shell_value), did_overlay_shell_value
+              steal(previous_shell_value), previous_special_definition_location,
+              did_overlay_shell_value
           });
           os::set_environment_variable(name, expanded_value.view());
           cxt.mark_exported(name);

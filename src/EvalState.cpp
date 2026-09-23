@@ -732,6 +732,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
 
   let snapshot = eval_state_snapshot{
       m_shell_variables,
+      m_special_variable_definition_locations,
       m_indexed_arrays,
       m_completion_specs,
       m_default_completion_spec,
@@ -799,6 +800,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
   LOG(Debug, "restoring the evaluator state after a subshell or substitution");
   m_shell_variables = steal(snapshot.shell_variables);
+  m_special_variable_definition_locations =
+      steal(snapshot.special_variable_definition_locations);
   m_indexed_arrays = steal(snapshot.indexed_arrays);
   m_completion_specs = steal(snapshot.completion_specs);
   m_default_completion_spec = steal(snapshot.default_completion_spec);

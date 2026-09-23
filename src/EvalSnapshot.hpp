@@ -47,6 +47,7 @@ struct completion_spec
 struct eval_state_snapshot
 {
   StringMap<String> shell_variables;
+  StringMap<SourceLocation> special_variable_definition_locations;
   StringMap<ArrayList<String>> indexed_arrays;
   StringMap<completion_spec> completion_specs;
   Maybe<completion_spec> default_completion_spec;
