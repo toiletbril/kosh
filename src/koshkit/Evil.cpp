@@ -137,9 +137,18 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
                          bool should_color) throws -> void
 {
   let const allocator = cxt.scratch_allocator();
-  if (!os::has_process_open_file_listing()) {
-    append_report_field(output, "Mixed libraries", "unavailable",
+  let const do_append_unavailable = [&](StringView cost) throws -> void {
+    append_report_field(output, "Mixed library ABIs", "unavailable",
                         colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "Deleted code mappings", "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "Finding confidence", "unavailable",
+                        colors::ansi::BOLD_CYAN, should_color);
+    append_report_field(output, "Cost", cost, colors::ansi::BOLD_CYAN,
+                        should_color);
+  };
+  if (!os::has_process_open_file_listing()) {
+    do_append_unavailable("not probed");
     return;
   }
 
@@ -155,12 +164,7 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
       is_mapping_evidence_available = false;
   }
   if (!is_mapping_evidence_available) {
-    append_report_field(output, "Mixed library ABIs", "unavailable",
-                        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(output, "Deleted code mappings", "unavailable",
-                        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(output, "Cost", "process mappings",
-                        colors::ansi::BOLD_CYAN, should_color);
+    do_append_unavailable("process mappings");
     return;
   }
 
