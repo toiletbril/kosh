@@ -292,9 +292,10 @@ make_entry(const Path &path, StringView name, const listing_options &options,
 
 static fn prepare_entries(ArrayList<listing_entry> &entries,
                           const listing_options &options, StringView directory,
-                          bool is_name_path, Allocator allocator) throws -> void
+                          bool is_name_path, Allocator allocator,
+                          bool are_symlink_targets_known = false) throws -> void
 {
-  if (options.should_color) {
+  if (options.should_color && !are_symlink_targets_known) {
     let symlink_paths = ArrayList<Path>{allocator};
     let symlink_statuses = ArrayList<os::file_status>{allocator};
     for (let const &entry : entries) {
@@ -799,22 +800,26 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
 
   let target_paths = ArrayList<Path>{allocator};
   let target_statuses = ArrayList<os::file_status>{allocator};
+  let target_is_broken_symlink = ArrayList<bool>{allocator};
   let target_batch = os::Batch{allocator};
   target_paths.reserve(targets.count());
   target_statuses.reserve(targets.count());
+  target_is_broken_symlink.reserve(targets.count());
   target_batch.reserve(targets.count());
   for (let const target : targets) {
     target_paths.push(Path{target});
     target_statuses.push({});
+    target_is_broken_symlink.push(false);
   }
   for (usize index = 0; index < targets.count(); index++) {
     target_batch.add(
-        os::batch_operation::stat(target_paths[index], target_statuses[index]));
+        os::batch_operation::lstat(target_paths[index], target_statuses[index]));
   }
   let const target_results = target_batch.execute();
 
   ArrayList<listing_entry> file_entries{allocator};
   ArrayList<usize> file_target_indices{allocator};
+  ArrayList<usize> symlink_target_indices{allocator};
   ArrayList<StringView> dir_targets{allocator};
   ArrayList<id_name_entry> uid_cache{allocator};
   ArrayList<id_name_entry> gid_cache{allocator};
@@ -837,36 +842,49 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
+    if (os::file_type_letter(target_statuses[index].mode) == 'l') {
+      symlink_target_indices.push(index);
+      continue;
+    }
+
     file_target_indices.push(index);
   }
 
-  if (options.needs_full_status || options.needs_type) {
-    let file_statuses = ArrayList<os::file_status>{allocator};
-    let file_batch = os::Batch{allocator};
-    file_statuses.reserve(file_target_indices.count());
-    file_batch.reserve(file_target_indices.count());
-    for (usize index = 0; index < file_target_indices.count(); index++) {
-      file_statuses.push({});
-      file_batch.add(os::batch_operation::lstat(
-          target_paths[file_target_indices[index]], file_statuses[index]));
+  if (!symlink_target_indices.is_empty()) {
+    let followed_statuses = ArrayList<os::file_status>{allocator};
+    let follow_batch = os::Batch{allocator};
+    followed_statuses.reserve(symlink_target_indices.count());
+    follow_batch.reserve(symlink_target_indices.count());
+    for (let const target_index : symlink_target_indices) {
+      followed_statuses.push({});
+      follow_batch.add(os::batch_operation::stat(
+          target_paths[target_index], followed_statuses.back()));
     }
-    let const file_results = file_batch.execute();
 
-    for (usize index = 0; index < file_target_indices.count(); index++) {
-      let const target_index = file_target_indices[index];
-      let entry = listing_entry{allocator};
-      entry.name = String{allocator, targets[target_index]};
-      if (file_results[index].error_number == 0) {
-        set_entry_status(entry, file_statuses[index]);
+    let const follow_results = follow_batch.execute();
+    for (usize index = 0; index < symlink_target_indices.count(); index++) {
+      let const target_index = symlink_target_indices[index];
+      if (follow_results[index].error_number == 0 &&
+          os::file_type_letter(followed_statuses[index].mode) == 'd')
+      {
+        dir_targets.push(targets[target_index]);
+      } else {
+        target_is_broken_symlink[target_index] =
+            follow_results[index].error_number != 0;
+        file_target_indices.push(target_index);
       }
-      file_entries.push(steal(entry));
     }
-  } else {
-    for (let const target_index : file_target_indices) {
-      file_entries.push(make_entry(target_paths[target_index],
-                                   targets[target_index], options,
-                                   Path::entry_kind::Unknown, allocator));
-    }
+  }
+
+  file_target_indices.sort();
+  dir_targets.sort();
+  for (let const target_index : file_target_indices) {
+    let entry = listing_entry{allocator};
+    entry.name = String{allocator, targets[target_index]};
+    set_entry_status(entry, target_statuses[target_index]);
+    if (target_is_broken_symlink[target_index])
+      entry.type = entry_type::BrokenSymlink;
+    file_entries.push(steal(entry));
   }
 
   let const should_print_headers =
@@ -874,7 +892,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
       file_entries.count() + dir_targets.count() > 1;
 
   if (!file_entries.is_empty()) {
-    prepare_entries(file_entries, options, StringView{}, true, allocator);
+    prepare_entries(file_entries, options, StringView{}, true, allocator, true);
     render_entries(file_entries, options, false, uid_cache, gid_cache, output,
                    allocator);
   }
