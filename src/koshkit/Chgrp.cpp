@@ -51,7 +51,8 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
-  let const group_id = utils::resolve_group_id(operands[0].view());
+  let const group_id =
+      utilsownership::resolve_group_id(operands[0].view());
   if (!group_id.has_value()) {
     KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
                             "invalid group '" + operands[0] + "'",
@@ -63,7 +64,7 @@ fn Chgrp::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize index = 1; index < operands.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return 130;
-    if (!utils::change_path_ownership(
+    if (!utilsownership::change_path_ownership(
             ec, cxt, "chgrp", Path{operands[index].view()}, -1, *group_id,
             FLAG_CHGRP_RECURSIVE.is_enabled(),
             FLAG_CHGRP_NO_DEREFERENCE.is_enabled(),

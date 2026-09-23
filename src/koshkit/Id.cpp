@@ -77,7 +77,8 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
                                       ? os::get_real_group_id()
                                       : os::get_effective_group_id());
   if (!operands.is_empty()) {
-    let const resolved = utils::resolve_user_id(operands[0].view());
+    let const resolved =
+        utilsownership::resolve_user_id(operands[0].view());
     if (!resolved.has_value()) {
       report_soft_koshkit_util_error(ec, cxt, operand_locations[0],
                                      args[0].view(),

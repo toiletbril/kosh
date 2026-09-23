@@ -74,7 +74,7 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
   i64 owner_id = -1;
   i64 group_id = -1;
   if (!owner_text.is_empty()) {
-    let const resolved = utils::resolve_user_id(owner_text);
+    let const resolved = utilsownership::resolve_user_id(owner_text);
     if (!resolved.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           operand_locations[0],
@@ -85,7 +85,7 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
     owner_id = *resolved;
   }
   if (!group_text.is_empty()) {
-    let const resolved = utils::resolve_group_id(group_text);
+    let const resolved = utilsownership::resolve_group_id(group_text);
     if (!resolved.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           operand_locations[0],
@@ -100,7 +100,7 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize index = 1; index < operands.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return 130;
-    if (!utils::change_path_ownership(
+    if (!utilsownership::change_path_ownership(
             ec, cxt, "chown", Path{operands[index].view()}, owner_id, group_id,
             FLAG_CHOWN_RECURSIVE.is_enabled(),
             FLAG_CHOWN_NO_DEREFERENCE.is_enabled(),
