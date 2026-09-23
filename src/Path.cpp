@@ -27,6 +27,11 @@ hot fn Path::view() const wontthrow -> StringView { return m_text.view(); }
 
 hot fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
 
+hot fn Path::allocator() const wontthrow -> Allocator
+{
+  return m_text.allocator();
+}
+
 hot fn Path::count() const wontthrow -> usize { return m_text.count(); }
 
 hot fn Path::is_empty() const wontthrow -> bool { return m_text.is_empty(); }
@@ -73,9 +78,10 @@ fn Path::extension() const wontthrow -> StringView
 fn Path::parent() const throws -> Path
 {
   let const end = filename_offset(m_text);
-  if (end == 0) return Path{};
-  if (end == 1) return Path{m_text.substring_of_length(0, 1)};
-  return Path{m_text.substring_of_length(0, end - 1)};
+  if (end == 0) return Path{{}, allocator()};
+  if (end == 1)
+    return Path{m_text.substring_of_length(0, 1), allocator()};
+  return Path{m_text.substring_of_length(0, end - 1), allocator()};
 }
 
 /* A bare filename has no parent text, and every caller that locks or writes
@@ -83,7 +89,7 @@ fn Path::parent() const throws -> Path
 fn Path::parent_or_current() const throws -> Path
 {
   let directory = parent();
-  if (directory.text().is_empty()) return Path{"."};
+  if (directory.text().is_empty()) return Path{".", allocator()};
 
   return directory;
 }
@@ -143,7 +149,8 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
          "extension is a suffix of the path text");
   let const prefix_length = m_text.count() - current_extension.length;
 
-  let result = Path{m_text.substring_of_length(0, prefix_length)};
+  let result =
+      Path{m_text.substring_of_length(0, prefix_length), allocator()};
   if (new_extension.length > 0 && new_extension.data[0] != '.') {
     result.m_text.push('.');
   }
@@ -159,7 +166,7 @@ cold fn Path::normalized() const throws -> Path
   let const root_length = os::path_root_length(m_text.view());
   let const is_absolute_path = root_length > 0;
 
-  let components = ArrayList<StringView>{heap_allocator()};
+  let components = ArrayList<StringView>{allocator()};
   usize i = root_length;
   while (i < m_text.count()) {
     let const component = next_component(i).text;
@@ -178,7 +185,7 @@ cold fn Path::normalized() const throws -> Path
     components.push(component);
   }
 
-  let normalized_text = String{heap_allocator()};
+  let normalized_text = String{allocator()};
   normalized_text.append(m_text.substring_of_length(0, root_length));
   if (!normalized_text.is_empty() && !components.is_empty() &&
       !os::is_directory_separator(normalized_text.back()))
@@ -193,7 +200,7 @@ cold fn Path::normalized() const throws -> Path
     normalized_text.append(is_absolute_path
                                ? StringView{&os::DIRECTORY_SEPARATOR, 1}
                                : StringView{"."});
-  return Path{normalized_text};
+  return Path{normalized_text.view(), allocator()};
 }
 
 cold fn Path::first_unavailable_component() const throws
@@ -211,7 +218,8 @@ cold fn Path::first_unavailable_component() const throws
       has_dot_component = true;
     }
 
-    let const prefix = Path{m_text.substring_of_length(0, component.end)};
+    let const prefix =
+        Path{m_text.substring_of_length(0, component.end), allocator()};
     let is_available = false;
     let is_directory = false;
     if (has_dot_component) {
@@ -247,7 +255,7 @@ cold fn Path::first_unavailable_component() const throws
 
 fn Path::to_absolute_without_normalizing() const throws -> Path
 {
-  let result = Path{};
+  let result = Path{{}, allocator()};
   if (is_absolute()) {
     result = clone();
   } else if (let native = os::resolve_drive_relative_path(m_text.view())) {
@@ -260,6 +268,7 @@ fn Path::to_absolute_without_normalizing() const throws -> Path
       relative = relative.substring(2);
     if (!relative.is_empty()) result.push_component(relative);
   }
+  result.m_text.move_to_allocator(allocator());
 
   let const root_length = os::path_root_length(result.m_text.view());
   while (result.m_text.count() > root_length &&
