@@ -306,7 +306,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
   if (!stat_work.is_empty()) do_flush_stat_work();
   if (os::INTERRUPT_REQUESTED) return None;
-  if (!is_root_complete || has_failure) return None;
+  if (!is_root_complete || !root_result.should_emit) return None;
   return root_result;
 }
 
