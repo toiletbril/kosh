@@ -43,8 +43,8 @@ FLAG_OPTIONAL(EVILIO_CUMULATIVE, 'C', "cumulative",
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG_OPTIONAL(EVILIO_LIVE, 'l', "live",
               Live,
-              "Refresh live output every N seconds; the default is 0.5 seconds. "
-              "N changes refresh only; sampling remains every 0.5 seconds.",
+              "Sample and refresh live output every N seconds; the default is "
+              "0.5 seconds.",
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
@@ -352,14 +352,6 @@ struct live_process_row
   u64 last_seen_nanoseconds{0};
 };
 
-pure fn interpolate_counter(u64 before, u64 after, u64 elapsed_nanoseconds,
-                            u64 passed_nanoseconds) wontthrow -> u64
-{
-  if (after < before || elapsed_nanoseconds == 0) return after;
-  return before + static_cast<u64>(static_cast<u128>(after - before) *
-                                   passed_nanoseconds / elapsed_nanoseconds);
-}
-
 fn get_process_window_status(const live_process_row &row,
                              u64 window_start_nanoseconds) wontthrow
     -> os::process_io_status
@@ -369,32 +361,7 @@ fn get_process_window_status(const live_process_row &row,
          row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
     oldest++;
 
-  let before = row.history[oldest];
-  u64 before_nanoseconds = row.history_nanoseconds[oldest];
-  if (before_nanoseconds < window_start_nanoseconds &&
-      oldest + 1 < row.history.count())
-  {
-    let const &next = row.history[oldest + 1];
-    let const next_nanoseconds = row.history_nanoseconds[oldest + 1];
-    let const elapsed_nanoseconds = next_nanoseconds - before_nanoseconds;
-    let const passed_nanoseconds =
-        window_start_nanoseconds - before_nanoseconds;
-    before.read_bytes =
-        interpolate_counter(before.read_bytes, next.read_bytes,
-                            elapsed_nanoseconds, passed_nanoseconds);
-    before.written_bytes =
-        interpolate_counter(before.written_bytes, next.written_bytes,
-                            elapsed_nanoseconds, passed_nanoseconds);
-    if (before.has_operation_counts && next.has_operation_counts) {
-      before.read_operation_count = interpolate_counter(
-          before.read_operation_count, next.read_operation_count,
-          elapsed_nanoseconds, passed_nanoseconds);
-      before.write_operation_count = interpolate_counter(
-          before.write_operation_count, next.write_operation_count,
-          elapsed_nanoseconds, passed_nanoseconds);
-    }
-    before_nanoseconds = window_start_nanoseconds;
-  }
+  let const &before = row.history[oldest];
 
   let const &newest = row.history.back();
   os::process_io_status status{0, 0, 0, 0, false};
@@ -1045,36 +1012,7 @@ fn get_disk_window_status(const live_disk_row &row,
          row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
     oldest++;
 
-  let before = row.history[oldest];
-  u64 before_nanoseconds = row.history_nanoseconds[oldest];
-  if (before_nanoseconds < window_start_nanoseconds &&
-      oldest + 1 < row.history.count())
-  {
-    let const &next = row.history[oldest + 1];
-    let const elapsed_nanoseconds =
-        row.history_nanoseconds[oldest + 1] - before_nanoseconds;
-    let const passed_nanoseconds =
-        window_start_nanoseconds - before_nanoseconds;
-    let const do_interpolate = [&](u64 os::disk_io_status::*member) {
-      before.*member =
-          interpolate_counter(before.*member, next.*member, elapsed_nanoseconds,
-                              passed_nanoseconds);
-    };
-    do_interpolate(&os::disk_io_status::read_bytes);
-    do_interpolate(&os::disk_io_status::written_bytes);
-    do_interpolate(&os::disk_io_status::read_operation_count);
-    do_interpolate(&os::disk_io_status::write_operation_count);
-    do_interpolate(&os::disk_io_status::read_time_nanoseconds);
-    do_interpolate(&os::disk_io_status::write_time_nanoseconds);
-    do_interpolate(&os::disk_io_status::busy_time_nanoseconds);
-    do_interpolate(&os::disk_io_status::idle_time_nanoseconds);
-    do_interpolate(&os::disk_io_status::weighted_busy_time_nanoseconds);
-    do_interpolate(&os::disk_io_status::read_error_count);
-    do_interpolate(&os::disk_io_status::write_error_count);
-    do_interpolate(&os::disk_io_status::read_retry_count);
-    do_interpolate(&os::disk_io_status::write_retry_count);
-    before_nanoseconds = window_start_nanoseconds;
-  }
+  let const &before = row.history[oldest];
 
   let const &newest = row.history.back();
   let sampled = newest;
@@ -1483,9 +1421,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
                                           ? cumulative_duration_seconds
-                                          : (FLAG_EVILIO_LIVE.is_enabled()
-                                                 ? 1.0
-                                                 : live_interval_seconds);
+                                          : live_interval_seconds;
   String sample_duration_label{allocator, "/S"};
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled())
     sample_duration_label =
@@ -1575,12 +1511,13 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (should_show_processes) {
       return run_live_process_io(ec, selected_pid, row_limit, sort_key,
-                                 sample_duration_seconds, 0.5,
+                                 sample_duration_seconds, live_interval_seconds,
                                  refresh_interval_seconds, is_terminal,
                                  should_color, sample_duration_label.view());
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds, 0.5,
+    return run_live_disk_io(ec, sample_duration_seconds,
+                            live_interval_seconds,
                             refresh_interval_seconds, is_terminal, should_color,
                             sample_duration_label.view(), sort_key);
   }
