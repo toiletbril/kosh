@@ -124,10 +124,14 @@ struct tree_node
 
 struct live_process_cpu_row
 {
+  explicit live_process_cpu_row(Allocator allocator)
+      : history_milliseconds(allocator), history_nanoseconds(allocator)
+  {}
+
   i64 pid{0};
   u64 start_token{0};
-  ArrayList<u64> history_milliseconds{heap_allocator()};
-  ArrayList<u64> history_nanoseconds{heap_allocator()};
+  ArrayList<u64> history_milliseconds;
+  ArrayList<u64> history_nanoseconds;
   u64 last_seen_nanoseconds{0};
 };
 
@@ -174,7 +178,7 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
     }
 
     if (row == nullptr) {
-      live_process_cpu_row fresh{};
+      live_process_cpu_row fresh{history.allocator()};
       fresh.pid = node.pid;
       fresh.start_token = node.start_token;
       fresh.history_milliseconds.push(node.cpu_milliseconds);
