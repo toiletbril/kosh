@@ -1494,37 +1494,26 @@ fn append_container_report(
   append_titled_table(output, "Containers", table, should_color);
 }
 
-fn append_runtime_report(String &output, bool should_color, bool show_runtime,
-                         bool show_kubernetes, bool show_container,
-                         bool should_show_detail,
-                         const ArrayList<process_cgroup_snapshot> &snapshot)
-    throws -> void
+fn append_kubernetes_report(
+    String &output, bool should_color, bool should_show_detail,
+    const ArrayList<process_cgroup_snapshot> &snapshot,
+    Allocator allocator) throws -> void
 {
   let const self_process_id = os::get_current_process_id();
-  if (show_runtime)
-    append_runtime_evidence_report(output, should_color, should_show_detail,
-                                   snapshot, output.allocator());
-
-  if (show_container)
-    append_container_report(output, should_color, should_show_detail, snapshot,
-                            output.allocator());
-
-  if (!show_kubernetes) return;
   let const kubernetes =
       os::get_environment_variable("KUBERNETES_SERVICE_HOST");
   let const namespace_file =
-      Path{kubernetes_service_account_path("namespace", heap_allocator())}
+      Path{kubernetes_service_account_path("namespace", allocator), allocator}
           .read_entire_file();
-  let namespace_name = String{heap_allocator()};
+  let namespace_name = String{allocator};
   if (namespace_file.has_value())
-    namespace_name =
-        String{heap_allocator(), namespace_file->view().trim_blanks()};
+    namespace_name = String{allocator, namespace_file->view().trim_blanks()};
   bool has_kubepods = false;
   for (let const &process : snapshot) {
     for (let const &evidence : process.evidence)
       has_kubepods = has_kubepods || evidence.is_kubernetes;
   }
-  let evidence_table = ReportTable{heap_allocator()};
+  let evidence_table = ReportTable{allocator};
   evidence_table.add_column("SOURCE", report_table_alignment::Left,
                             colors::ansi::BOLD_CYAN);
   evidence_table.add_column("HOST", report_table_alignment::Left,
@@ -1534,7 +1523,7 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
   evidence_table.add_column("EVIDENCE", report_table_alignment::Left,
                             colors::ansi::BOLD_CYAN);
   if (kubernetes.has_value()) {
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({"environment", colors::ansi::RESET});
     cells.push({kubernetes->view(), colors::ansi::BOLD_GREEN});
     cells.push({namespace_name.is_empty() ? StringView{"-"}
@@ -1544,7 +1533,7 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
     evidence_table.add_row(cells);
   }
   if (has_kubepods) {
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({"cgroup", colors::ansi::RESET});
     cells.push({"-", colors::ansi::RESET});
     cells.push({namespace_name.is_empty() ? StringView{"-"}
@@ -1554,32 +1543,30 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
     evidence_table.add_row(cells);
   }
   if (!namespace_name.is_empty()) {
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({"service-account", colors::ansi::RESET});
     cells.push({"-", colors::ansi::RESET});
     cells.push({namespace_name.view(), colors::ansi::BOLD_GREEN});
     cells.push({"namespace file", colors::ansi::RESET});
     evidence_table.add_row(cells);
   }
-  if (!kubernetes.has_value() && !has_kubepods && namespace_name.is_empty()) {
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
-    cells.push({"detection", colors::ansi::RESET});
-    cells.push({"-", colors::ansi::RESET});
-    cells.push({"-", colors::ansi::RESET});
-    cells.push({"Not detected", colors::ansi::BOLD_YELLOW});
-    evidence_table.add_row(cells);
-  }
   append_titled_table(output, "Kubernetes", evidence_table, should_color);
 
   struct kubernetes_row
   {
-    String pod_uid{heap_allocator()};
-    String qos{heap_allocator()};
-    String runtime{heap_allocator()};
-    String container_id{heap_allocator()};
+    String pod_uid;
+    String qos;
+    String runtime;
+    String container_id;
     usize process_count{0};
+
+    explicit kubernetes_row(Allocator allocator)
+        : pod_uid(allocator), qos(allocator), runtime(allocator),
+          container_id(allocator)
+    {
+    }
   };
-  let rows = ArrayList<kubernetes_row>{heap_allocator()};
+  let rows = ArrayList<kubernetes_row>{allocator};
   for (let const &process : snapshot) {
     for (usize index = 0; index < process.evidence.count(); index++) {
       let const &evidence = process.evidence[index];
@@ -1607,19 +1594,23 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
         break;
       }
       if (!is_known) {
-        rows.push({evidence.pod_uid.clone(), evidence.qos.clone(),
-                   evidence.runtime.clone(), evidence.container_id.clone(), 1});
+        let row = kubernetes_row{allocator};
+        row.pod_uid = evidence.pod_uid.clone();
+        row.qos = evidence.qos.clone();
+        row.runtime = evidence.runtime.clone();
+        row.container_id = evidence.container_id.clone();
+        row.process_count = 1;
+        rows.push(steal(row));
       }
     }
   }
-  if (rows.is_empty()) return;
   rows.sort([](const kubernetes_row &left, const kubernetes_row &right) {
     if (left.pod_uid != right.pod_uid) return left.pod_uid < right.pod_uid;
     if (left.qos != right.qos) return left.qos < right.qos;
     if (left.runtime != right.runtime) return left.runtime < right.runtime;
     return left.container_id < right.container_id;
   });
-  let workload_table = ReportTable{heap_allocator()};
+  let workload_table = ReportTable{allocator};
   workload_table.add_column("SOURCE", report_table_alignment::Left,
                             colors::ansi::BOLD_CYAN);
   workload_table.add_column("POD UID", report_table_alignment::Left,
@@ -1634,8 +1625,8 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
     workload_table.add_column("PROCESSES", report_table_alignment::Right,
                               colors::ansi::BOLD_CYAN);
     for (let const &row : rows) {
-      let count = String::from(row.process_count, heap_allocator());
-      let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+      let count = String::from(row.process_count, allocator);
+      let cells = ArrayList<report_table_cell_view>{allocator};
       cells.push({"cgroup", colors::ansi::RESET});
       cells.push({row.pod_uid.view(), colors::ansi::BOLD_GREEN});
       cells.push({row.qos.view(), colors::ansi::BOLD_MAGENTA});
@@ -1670,8 +1661,8 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
           }
         }
         if (is_duplicate) continue;
-        let process_id = String::from(process.process_id, heap_allocator());
-        let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+        let process_id = String::from(process.process_id, allocator);
+        let cells = ArrayList<report_table_cell_view>{allocator};
         cells.push({"cgroup", colors::ansi::RESET});
         cells.push({evidence.pod_uid.view(), colors::ansi::BOLD_GREEN});
         cells.push({evidence.qos.view(), colors::ansi::BOLD_MAGENTA});
@@ -1756,10 +1747,18 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   if (show_remote)
     append_remote_report(output, should_color, should_show_remote_detail,
                          should_show_remote_detail, process_cgroups);
-  if (show_runtime || show_kubernetes || show_container)
-    append_runtime_report(output, should_color, show_runtime, show_kubernetes,
-                          show_container, FLAG_EVILISO_ALL.is_enabled(),
-                          process_cgroups);
+  if (show_runtime)
+    append_runtime_evidence_report(output, should_color,
+                                   FLAG_EVILISO_ALL.is_enabled(),
+                                   process_cgroups, output.allocator());
+  if (show_container)
+    append_container_report(output, should_color,
+                            FLAG_EVILISO_ALL.is_enabled(), process_cgroups,
+                            output.allocator());
+  if (show_kubernetes)
+    append_kubernetes_report(output, should_color,
+                             FLAG_EVILISO_ALL.is_enabled(), process_cgroups,
+                             output.allocator());
   ec.print_to_stdout(output);
   return 0;
 }
