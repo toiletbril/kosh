@@ -70,6 +70,98 @@ static fn byte_prefix_length_dropping_last(StringView text,
   return text.length - static_cast<usize>(drop_count);
 }
 
+static fn read_all_but_last(os::descriptor fd, u64 drop_count,
+                            bool is_byte_mode, Allocator allocator) throws
+    -> Maybe<String>
+{
+  let text = read_all(fd, allocator);
+  if (!text.has_value()) return None;
+
+  let const keep_length =
+      is_byte_mode ? byte_prefix_length_dropping_last(text->view(), drop_count)
+                   : line_prefix_length_dropping_last(text->view(), drop_count);
+  text->truncate(keep_length);
+  return text;
+}
+
+static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
+                                    u64 drop_count, bool is_byte_mode,
+                                    Allocator allocator) throws -> Maybe<String>
+{
+  constexpr usize block_byte_count = 64 * 1024;
+  char block[block_byte_count];
+  let batch = os::Batch{allocator};
+  let results = ArrayList<os::batch_result>{allocator};
+  batch.reserve(1);
+  results.reserve(1);
+
+  let const do_read_block = [&](u64 offset, usize byte_count) -> os::batch_result {
+    batch.clear();
+    batch.add(os::batch_operation::read(fd, block, byte_count, offset));
+    batch.execute(results);
+    return results[0];
+  };
+
+  u64 prefix_end = file_size;
+  if (is_byte_mode) {
+    prefix_end = drop_count >= file_size ? 0 : file_size - drop_count;
+  } else if (drop_count != 0) {
+    u64 remaining_lines = drop_count;
+    u64 next_end = file_size;
+    prefix_end = 0;
+    while (next_end != 0) {
+      if (os::INTERRUPT_REQUESTED) return String{allocator};
+
+      let const byte_count = next_end > block_byte_count
+                                  ? block_byte_count
+                                  : static_cast<usize>(next_end);
+      let const offset = next_end - byte_count;
+      let const read_result = do_read_block(offset, byte_count);
+      if (read_result.error_number != 0) {
+        os::set_last_system_error(read_result.error_number);
+        return None;
+      }
+      if (read_result.transferred_byte_count != byte_count)
+        return read_all_but_last(fd, drop_count, is_byte_mode, allocator);
+
+      for (usize position = byte_count; position > 0; position--) {
+        if (block[position - 1] != '\n') continue;
+        let const absolute = offset + position - 1;
+        if (absolute + 1 == file_size) continue;
+        if (--remaining_lines == 0) {
+          prefix_end = absolute + 1;
+          break;
+        }
+      }
+      if (remaining_lines == 0) break;
+      next_end = offset;
+    }
+  }
+
+  let result = String{allocator};
+  u64 next_offset = 0;
+  while (next_offset < prefix_end) {
+    if (os::INTERRUPT_REQUESTED) return String{allocator};
+
+    let const remaining = prefix_end - next_offset;
+    let const byte_count = remaining > block_byte_count
+                                ? block_byte_count
+                                : static_cast<usize>(remaining);
+    let const read_result = do_read_block(next_offset, byte_count);
+    if (read_result.error_number != 0) {
+      os::set_last_system_error(read_result.error_number);
+      return None;
+    }
+    if (read_result.transferred_byte_count != byte_count)
+      return read_all_but_last(fd, drop_count, is_byte_mode, allocator);
+
+    result.append(StringView{block, byte_count});
+    next_offset += byte_count;
+  }
+
+  return result;
+}
+
 Head::Head() = default;
 
 pure fn Head::kind() const wontthrow -> Utility::Kind { return Kind::Head; }
@@ -162,10 +254,20 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
         was_opened = true;
       }
 
-      let const text = read_all(fd, cxt.scratch_allocator());
+      let const file_size = was_opened
+                                ? os::regular_descriptor_file_size(fd)
+                                : Maybe<u64>{};
+      let const text = file_size.has_value()
+                           ? read_regular_all_but_last(
+                                 fd, *file_size, count, is_byte_mode,
+                                 cxt.scratch_allocator())
+                           : read_all_but_last(fd, count, is_byte_mode,
+                                               cxt.scratch_allocator());
+      let const read_error = os::get_last_system_error_number();
       if (was_opened) os::close_fd(fd);
       if (os::INTERRUPT_REQUESTED) return 130;
       if (!text.has_value()) {
+        os::set_last_system_error(read_error);
         report_soft_koshkit_util_error(
             ec, cxt, args[0].view(),
             "cannot read '" +
@@ -175,11 +277,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
         continue;
       }
 
-      let const keep_length =
-          is_byte_mode ? byte_prefix_length_dropping_last(text->view(), count)
-                       : line_prefix_length_dropping_last(text->view(), count);
-      do_print_source(source_index,
-                      text->view().substring_of_length(0, keep_length));
+      do_print_source(source_index, text->view());
     }
 
     return status;
