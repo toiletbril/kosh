@@ -744,6 +744,10 @@ enum class system_activity_field : u32
   DirtyPages = 1u << 19,
   WritebackPages = 1u << 20,
   OomKills = 1u << 21,
+  Interrupts = 1u << 22,
+  ContextSwitches = 1u << 23,
+  ProcessCreations = 1u << 24,
+  SoftInterrupts = 1u << 25,
 };
 
 struct system_activity_status
@@ -772,6 +776,10 @@ struct system_activity_status
   u64 dirty_page_count{0};
   u64 writeback_page_count{0};
   u64 oom_kill_count{0};
+  u64 interrupt_count{0};
+  u64 context_switch_count{0};
+  u64 process_creation_count{0};
+  u64 soft_interrupt_count{0};
   u32 available_fields{0};
 
   pure fn has_field(system_activity_field field) const wontthrow -> bool

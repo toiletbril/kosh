@@ -265,6 +265,34 @@ fn append_procfs_report(String &output, bool should_color,
           colors::ansi::BOLD_CYAN, should_color);
     }
 
+    if (activity.has_field(os::system_activity_field::Interrupts)) {
+      append_report_field(
+          output, "Interrupts",
+          String::from(activity.interrupt_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::ContextSwitches)) {
+      append_report_field(
+          output, "Context switches",
+          String::from(activity.context_switch_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::ProcessCreations)) {
+      append_report_field(
+          output, "Processes created",
+          String::from(activity.process_creation_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::SoftInterrupts)) {
+      append_report_field(
+          output, "Soft interrupts",
+          String::from(activity.soft_interrupt_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
     if (activity.has_field(os::system_activity_field::CpuSomeStall)) {
       append_report_field(
           output, "CPU stall microseconds",

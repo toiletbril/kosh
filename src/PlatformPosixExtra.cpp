@@ -1322,6 +1322,33 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
           status.available_fields |=
               static_cast<u32>(system_activity_field::Blocked);
         }
+      } else {
+        struct stat_scalar_field
+        {
+          StringView name;
+          u64 system_activity_status::*value;
+          system_activity_field availability;
+        };
+        static constexpr stat_scalar_field STAT_SCALAR_FIELDS[] = {
+            {"intr ",      &system_activity_status::interrupt_count,
+             system_activity_field::Interrupts                              },
+            {"ctxt ",      &system_activity_status::context_switch_count,
+             system_activity_field::ContextSwitches                         },
+            {"processes ", &system_activity_status::process_creation_count,
+             system_activity_field::ProcessCreations                        },
+            {"softirq ",   &system_activity_status::soft_interrupt_count,
+             system_activity_field::SoftInterrupts                          },
+        };
+        for (let const &field : STAT_SCALAR_FIELDS) {
+          if (!line.starts_with(field.name)) continue;
+          let const value = leading_digits(line, field.name.length).to<u64>();
+          if (!value.is_error()) {
+            status.*(field.value) = value.value();
+            status.available_fields |=
+                static_cast<u32>(field.availability);
+          }
+          break;
+        }
       }
     }
   }
