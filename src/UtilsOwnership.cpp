@@ -104,6 +104,8 @@ static fn change_path_ownership_recursive(
     if (followed_status.has_file_identity) active_directories.pop_back();
   };
 
+  let const directory_scratch = cxt.scratch_mark();
+  defer { cxt.scratch_release(directory_scratch); };
   let children =
       os::list_directory_status(path.view(), cxt.scratch_allocator());
   if (!children.has_value()) {
@@ -223,7 +225,7 @@ fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
       !should_not_dereference &&
       (!should_recurse || should_follow_command_line);
   let active_directories =
-      ArrayList<ownership_directory_identity>{cxt.scratch_allocator()};
+      ArrayList<ownership_directory_identity>{heap_allocator()};
 
   return change_path_ownership_recursive(
       ec, cxt, utility_name, path, owner_id, group_id, should_recurse,
