@@ -226,99 +226,81 @@ fn append_procfs_report(String &output, bool should_color,
 {
   os::system_activity_status activity{};
   if (os::read_system_activity_status(activity)) {
-    if (activity.has_field(os::system_activity_field::Cpu)) {
+    struct activity_metric
+    {
+      os::system_activity_field field;
+      StringView label;
+      u64 os::system_activity_status::*value;
+    };
+    static constexpr activity_metric METRICS[] = {
+        {os::system_activity_field::Cpu, "CPU user units",
+         &os::system_activity_status::cpu_user_units},
+        {os::system_activity_field::Cpu, "CPU system units",
+         &os::system_activity_status::cpu_system_units},
+        {os::system_activity_field::Cpu, "CPU idle units",
+         &os::system_activity_status::cpu_idle_units},
+        {os::system_activity_field::CpuWait, "CPU wait units",
+         &os::system_activity_status::cpu_wait_units},
+        {os::system_activity_field::CpuStolen, "CPU stolen units",
+         &os::system_activity_status::cpu_stolen_units},
+        {os::system_activity_field::Faults, "Page faults",
+         &os::system_activity_status::page_fault_count},
+        {os::system_activity_field::MajorFaults, "Major page faults",
+         &os::system_activity_status::major_page_fault_count},
+        {os::system_activity_field::PageInput, "Page input bytes",
+         &os::system_activity_status::page_input_bytes},
+        {os::system_activity_field::PageOutput, "Page output bytes",
+         &os::system_activity_status::page_output_bytes},
+        {os::system_activity_field::Runnable, "Runnable processes",
+         &os::system_activity_status::runnable_process_count},
+        {os::system_activity_field::Blocked, "Blocked processes",
+         &os::system_activity_status::blocked_process_count},
+        {os::system_activity_field::Interrupts, "Interrupts",
+         &os::system_activity_status::interrupt_count},
+        {os::system_activity_field::ContextSwitches, "Context switches",
+         &os::system_activity_status::context_switch_count},
+        {os::system_activity_field::ProcessCreations, "Processes created",
+         &os::system_activity_status::process_creation_count},
+        {os::system_activity_field::SoftInterrupts, "Soft interrupts",
+         &os::system_activity_status::soft_interrupt_count},
+        {os::system_activity_field::CpuSomeStall,
+         "CPU partial stall microseconds",
+         &os::system_activity_status::cpu_some_stall_microseconds},
+        {os::system_activity_field::CpuFullStall,
+         "CPU full stall microseconds",
+         &os::system_activity_status::cpu_full_stall_microseconds},
+        {os::system_activity_field::MemorySomeStall,
+         "Memory partial stall microseconds",
+         &os::system_activity_status::memory_some_stall_microseconds},
+        {os::system_activity_field::MemoryFullStall,
+         "Memory full stall microseconds",
+         &os::system_activity_status::memory_full_stall_microseconds},
+        {os::system_activity_field::IoSomeStall,
+         "IO partial stall microseconds",
+         &os::system_activity_status::io_some_stall_microseconds},
+        {os::system_activity_field::IoFullStall,
+         "IO full stall microseconds",
+         &os::system_activity_status::io_full_stall_microseconds},
+        {os::system_activity_field::PageScan, "Pages scanned",
+         &os::system_activity_status::page_scan_count},
+        {os::system_activity_field::PageSteal, "Pages reclaimed",
+         &os::system_activity_status::page_steal_count},
+        {os::system_activity_field::DirectReclaim, "Direct reclaim stalls",
+         &os::system_activity_status::direct_reclaim_count},
+        {os::system_activity_field::CompactionStall, "Compaction stalls",
+         &os::system_activity_status::compaction_stall_count},
+        {os::system_activity_field::DirtyPages, "Dirty pages",
+         &os::system_activity_status::dirty_page_count},
+        {os::system_activity_field::WritebackPages, "Writeback pages",
+         &os::system_activity_status::writeback_page_count},
+        {os::system_activity_field::OomKills, "OOM kills",
+         &os::system_activity_status::oom_kill_count},
+    };
+    for (let const &metric : METRICS) {
+      if (!activity.has_field(metric.field)) continue;
       append_report_field(
-          output, "CPU user units",
-          String::from(activity.cpu_user_units, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          output, "CPU system units",
-          String::from(activity.cpu_system_units, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::Faults)) {
-      append_report_field(
-          output, "Page faults",
-          String::from(activity.page_fault_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::MajorFaults)) {
-      append_report_field(
-          output, "Major page faults",
-          String::from(activity.major_page_fault_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::Runnable)) {
-      append_report_field(
-          output, "Runnable processes",
-          String::from(activity.runnable_process_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::Blocked)) {
-      append_report_field(
-          output, "Blocked processes",
-          String::from(activity.blocked_process_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::Interrupts)) {
-      append_report_field(
-          output, "Interrupts",
-          String::from(activity.interrupt_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::ContextSwitches)) {
-      append_report_field(
-          output, "Context switches",
-          String::from(activity.context_switch_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::ProcessCreations)) {
-      append_report_field(
-          output, "Processes created",
-          String::from(activity.process_creation_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::SoftInterrupts)) {
-      append_report_field(
-          output, "Soft interrupts",
-          String::from(activity.soft_interrupt_count, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::CpuSomeStall)) {
-      append_report_field(
-          output, "CPU stall microseconds",
-          String::from(activity.cpu_some_stall_microseconds, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::MemorySomeStall)) {
-      append_report_field(
-          output, "Memory stall microseconds",
-          String::from(activity.memory_some_stall_microseconds, allocator)
-              .view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::IoSomeStall)) {
-      append_report_field(
-          output, "IO stall microseconds",
-          String::from(activity.io_some_stall_microseconds, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-    }
-
-    if (activity.has_field(os::system_activity_field::OomKills)) {
-      append_report_field(
-          output, "OOM kills",
-          String::from(activity.oom_kill_count, allocator).view(),
+          output, metric.label,
+          String::from(activity.*metric.value, allocator).view(),
           colors::ansi::BOLD_CYAN, should_color);
     }
   } else {
