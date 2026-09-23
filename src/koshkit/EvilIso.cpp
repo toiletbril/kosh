@@ -614,21 +614,29 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
   }
 
   let current = os::enumerate_processes(os::process_detail::ResourceStats);
+  current.sort([](const os::process_entry &left,
+                  const os::process_entry &right) {
+    return left.pid < right.pid;
+  });
   for (let &candidate : snapshot) {
-    let current_process = Maybe<usize>{};
-    for (usize index = 0; index < current.count(); index++) {
-      if (current[index].pid == candidate.process_id) {
-        current_process = index;
-        break;
-      }
+    usize lower = 0;
+    usize upper = current.count();
+    while (lower < upper) {
+      let const middle = lower + (upper - lower) / 2;
+      if (current[middle].pid < candidate.process_id)
+        lower = middle + 1;
+      else
+        upper = middle;
     }
-    if (!current_process.has_value()) {
+    if (lower == current.count() ||
+        current[lower].pid != candidate.process_id)
+    {
       candidate.status = process_snapshot_status::Exited;
       candidate.memberships.clear();
       candidate.evidence.clear();
       continue;
     }
-    let const &process = current[*current_process];
+    let const &process = current[lower];
     if (process.start_token == 0 || candidate.start_token == 0) {
       candidate.status = process_snapshot_status::Unverifiable;
       candidate.memberships.clear();
