@@ -54,6 +54,18 @@ namespace koshka::koshkit {
 
 namespace {
 
+fn append_table_title(String &output, StringView title,
+                      bool should_color) throws -> void
+{
+  if (!output.is_empty()) {
+    while (!output.is_empty() && output.back() == '\n')
+      output.truncate(output.length() - 1);
+    output += "\n\n";
+  }
+  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+}
+
 enum class evilnet_sort_key : u8
 {
   Name,
@@ -214,8 +226,8 @@ pure fn family_name(os::network_address_family family) wontthrow -> StringView
   unreachable("unknown network address family");
 }
 
-fn append_network_interface_report(String &output, bool should_color,
-                                   StringView indentation) throws -> usize
+fn append_network_interface_report(String &output, bool should_color) throws
+    -> usize
 {
   let addresses = os::network_interface_addresses();
   addresses.sort([](const os::network_interface_address &left,
@@ -243,7 +255,8 @@ fn append_network_interface_report(String &output, bool should_color,
     cells.push({address.address.view(), colors::ansi::RESET});
     table.add_row(cells);
   }
-  output += table.to_string(should_color, indentation).view();
+  append_table_title(output, "Network interfaces", should_color);
+  output += table.to_string(should_color, "  ").view();
 
   return addresses.count();
 }
@@ -254,6 +267,7 @@ fn append_network_traffic_statistics_report(
     bool should_color, StringView duration_suffix,
     const Maybe<String> &default_interface) throws -> usize
 {
+  append_table_title(output, "Network traffic", should_color);
   usize name_width = 4;
   for (let const &entry : statistics) {
     if (entry.interface_name.length() > name_width) {
@@ -261,6 +275,7 @@ fn append_network_traffic_statistics_report(
     }
   }
 
+  output += "  ";
   append_report_column(output, "NAME", name_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
   let receive_header = String{allocator, "RX"};
@@ -295,6 +310,7 @@ fn append_network_traffic_statistics_report(
   }
   output += "\n";
   for (let const &entry : statistics) {
+    output += "  ";
     let const is_default = default_interface.has_value() &&
                            entry.interface_name.view() ==
                                default_interface->view();
@@ -907,10 +923,10 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_show_failures = FLAG_EVILNET_FAILURES.is_enabled();
   let const should_show_interfaces =
       !FLAG_EVILNET_TRAFFIC.is_enabled() && !should_show_failures;
-  let const address_count = should_show_interfaces
-                                ? append_network_interface_report(
-                                      output, should_color, "")
-                                : 0;
+  let const address_count =
+      should_show_interfaces
+          ? append_network_interface_report(output, should_color)
+          : 0;
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
   if (should_show_traffic && !should_show_failures) {
