@@ -180,44 +180,73 @@ fn append_procfs_report(String &output, bool should_color,
 {
   os::system_activity_status activity{};
   if (os::read_system_activity_status(activity)) {
-    append_report_field(output, "CPU user units",
-                        String::from(activity.cpu_user_units, allocator).view(),
-                        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "CPU system units",
-        String::from(activity.cpu_system_units, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "Page faults",
-        String::from(activity.page_fault_count, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "Major page faults",
-        String::from(activity.major_page_fault_count, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "Runnable processes",
-        String::from(activity.runnable_process_count, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "Blocked processes",
-        String::from(activity.blocked_process_count, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "CPU stall microseconds",
-        String::from(activity.cpu_some_stall_microseconds, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "Memory stall microseconds",
-        String::from(activity.memory_some_stall_microseconds, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        output, "IO stall microseconds",
-        String::from(activity.io_some_stall_microseconds, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(output, "OOM kills",
-                        String::from(activity.oom_kill_count, allocator).view(),
-                        colors::ansi::BOLD_CYAN, should_color);
+    if (activity.has_field(os::system_activity_field::Cpu)) {
+      append_report_field(
+          output, "CPU user units",
+          String::from(activity.cpu_user_units, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+      append_report_field(
+          output, "CPU system units",
+          String::from(activity.cpu_system_units, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::Faults)) {
+      append_report_field(
+          output, "Page faults",
+          String::from(activity.page_fault_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::MajorFaults)) {
+      append_report_field(
+          output, "Major page faults",
+          String::from(activity.major_page_fault_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::Runnable)) {
+      append_report_field(
+          output, "Runnable processes",
+          String::from(activity.runnable_process_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::Blocked)) {
+      append_report_field(
+          output, "Blocked processes",
+          String::from(activity.blocked_process_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::CpuSomeStall)) {
+      append_report_field(
+          output, "CPU stall microseconds",
+          String::from(activity.cpu_some_stall_microseconds, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::MemorySomeStall)) {
+      append_report_field(
+          output, "Memory stall microseconds",
+          String::from(activity.memory_some_stall_microseconds, allocator)
+              .view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::IoSomeStall)) {
+      append_report_field(
+          output, "IO stall microseconds",
+          String::from(activity.io_some_stall_microseconds, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
+
+    if (activity.has_field(os::system_activity_field::OomKills)) {
+      append_report_field(
+          output, "OOM kills",
+          String::from(activity.oom_kill_count, allocator).view(),
+          colors::ansi::BOLD_CYAN, should_color);
+    }
   } else {
     append_report_field(output, "Activity", "unavailable",
                         colors::ansi::BOLD_CYAN, should_color);
