@@ -402,7 +402,7 @@ fn EvilFiles::execute(
       line_width_limit = terminal_columns;
   }
   if (line_width_limit != SIZE_MAX) {
-    let const fixed_width = widths.pid + 2 + widths.user + 2 +
+    let const fixed_width = 2 + widths.pid + 2 + widths.user + 2 +
                             widths.descriptor + 2 + widths.type + 2 +
                             widths.mode + 2 + widths.state + 2 +
                             widths.device + 2 + widths.size + 2 +
@@ -413,6 +413,10 @@ fn EvilFiles::execute(
       if (widths.command > command_limit) widths.command = command_limit;
     }
   }
+  append_report_text(output, "Open files", colors::ansi::BOLD_BLUE,
+                     should_color);
+  output += '\n';
+  output += "  ";
   append_report_column(output, "COMMAND", widths.command, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
@@ -453,6 +457,7 @@ fn EvilFiles::execute(
   output += "\n";
 
   for (let const &row : rows) {
+    output += "  ";
     let command = String{allocator, row.command.view()};
     if (toiletline::display_width(command.view()) > widths.command &&
         widths.command > 3)
@@ -504,7 +509,7 @@ fn EvilFiles::execute(
     output += "  ";
     if (line_width_limit != SIZE_MAX) {
       usize const used_width =
-          widths.command + 2 + widths.pid + 2 + widths.user + 2 +
+          2 + widths.command + 2 + widths.pid + 2 + widths.user + 2 +
           widths.descriptor + 2 + widths.type + 2 + widths.mode + 2 +
           widths.state + 2 + widths.device + 2 + widths.size + 2 +
           widths.offset + 2 + widths.node + 2 + widths.endpoint + 2;
