@@ -1523,20 +1523,15 @@ fn Parser::finish_function_body(const SourceLocation &location,
   let const scope_mark = open_analysis_scope();
 
   let body_storage = FunctionBodyHandle::create();
-  BumpArena &per_command_arena = m_lexer.arena();
-  BumpArena *previous_function_arena = FUNCTION_ARENA;
-  m_lexer.set_arena(*body_storage.get_arena());
-  FUNCTION_ARENA = body_storage.get_arena();
+  let &previous_arena = m_lexer.arena();
+  let const previous_arena_kind = m_lexer.arena_kind();
   Command *body = nullptr;
-  try {
+  {
+    m_lexer.set_arena(*body_storage.get_arena(),
+                      ParseSession::AllocationKind::FunctionBody);
+    defer { m_lexer.set_arena(previous_arena, previous_arena_kind); };
     body = parse_simple_command();
-  } catch (...) {
-    FUNCTION_ARENA = previous_function_arena;
-    m_lexer.set_arena(per_command_arena);
-    throw;
   }
-  FUNCTION_ARENA = previous_function_arena;
-  m_lexer.set_arena(per_command_arena);
 
   if (body == nullptr) {
     throw ErrorWithLocation{location,

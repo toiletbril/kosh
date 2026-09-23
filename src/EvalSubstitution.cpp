@@ -376,9 +376,12 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
       !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
     LOG(Debug, "command substitution ast cache miss, reparsing");
-    let parser = Parser{
-        Lexer{segment.text.view(), *cache_arena, false, None, mood()}
-    };
+    let const allocation_kind =
+        segment.is_substitution_cache_in_function_arena
+            ? ParseSession::AllocationKind::FunctionBody
+            : ParseSession::AllocationKind::Syntax;
+    let parser = Parser{Lexer{segment.text.view(), *cache_arena, false, None,
+                              mood(), allocation_kind}};
     try {
       cache.substitution_ast = parser.construct_ast();
     } catch (ErrorWithLocation &error) {
@@ -748,9 +751,12 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
       !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
     LOG(Debug, "function substitution ast cache miss, reparsing");
-    let parser = Parser{
-        Lexer{segment.text.view(), *cache_arena, false, None, mood()}
-    };
+    let const allocation_kind =
+        segment.is_substitution_cache_in_function_arena
+            ? ParseSession::AllocationKind::FunctionBody
+            : ParseSession::AllocationKind::Syntax;
+    let parser = Parser{Lexer{segment.text.view(), *cache_arena, false, None,
+                              mood(), allocation_kind}};
     try {
       cache.substitution_ast = parser.construct_ast();
     } catch (...) {

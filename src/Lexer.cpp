@@ -201,12 +201,13 @@ hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 
 Lexer::Lexer(StringView source, BumpArena &arena,
              bool should_collect_debug_words, Maybe<StringView> filename,
-             mimic_mood mood)
-    : m_source(source), m_arena(&arena),
+             mimic_mood mood, ParseSession::AllocationKind allocation_kind)
+    : m_source(source), m_parse_session(arena),
       m_source_name_index(filename.has_value() ? intern_source_name(*filename)
                                                : 0),
       m_mood(mood), m_should_collect_debug_words(should_collect_debug_words)
 {
+  m_parse_session.set_arena(arena, allocation_kind);
   LOG(Debug, "starting a lexer over %zu bytes of source", m_source.length);
 }
 
@@ -220,7 +221,7 @@ fn Lexer::peek_shell_token() throws -> Token *
   Token *const token = lex_shell_token();
   m_peek_cache = token;
 #if !defined NDEBUG
-  m_peek_cache_generation = m_arena->reset_generation();
+  m_peek_cache_generation = m_parse_session.get_arena().reset_generation();
 #endif
 
   return token;
@@ -289,12 +290,17 @@ pure fn Lexer::debug_words() const wontthrow -> const ArrayList<Word> &
   return m_debug_words;
 }
 
-pure fn Lexer::arena() const wontthrow -> BumpArena & { return *m_arena; }
+pure fn Lexer::arena() const wontthrow -> BumpArena &
+{
+  return m_parse_session.get_arena();
+}
 
-fn Lexer::set_arena(BumpArena &arena) wontthrow -> void
+fn Lexer::set_arena(BumpArena &arena,
+                    ParseSession::AllocationKind allocation_kind) wontthrow
+    -> void
 {
   LOG(Debug, "switching the lexer arena and dropping the cached peek");
-  m_arena = &arena;
+  m_parse_session.set_arena(arena, allocation_kind);
   drop_peek_cache();
 }
 
@@ -307,7 +313,8 @@ fn Lexer::peek_cache_is_live() const wontthrow -> bool
   if (m_peek_cache == nullptr) return false;
 
 #if !defined NDEBUG
-  ASSERT(m_peek_cache_generation == m_arena->reset_generation(),
+  ASSERT(m_peek_cache_generation ==
+             m_parse_session.get_arena().reset_generation(),
          "the arena was rewound without dropping the cached peek");
 #endif
 
@@ -336,8 +343,9 @@ cold fn Lexer::register_heredoc(StringView delimiter,
                                 bool should_strip_tabs) throws
     -> const heredoc_contents *
 {
-  let contents = m_arena->create<heredoc_contents>(bump_allocator(*m_arena),
-                                                   !should_strip_tabs);
+  let &arena = m_parse_session.get_arena();
+  let contents =
+      arena.create<heredoc_contents>(bump_allocator(arena), !should_strip_tabs);
   ASSERT(contents != nullptr);
 
   LOG(Debug, "registering a pending heredoc with delimiter '%.*s'",
@@ -475,7 +483,8 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
   let const ch = chop_character();
   switch (ch) {
   case lexer::CEOF:
-    token = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
+    token = m_parse_session.get_arena().create<tokens::EndOfFile>(
+        here(m_cursor_position, 1));
     break;
   case '<':
   case '>':
@@ -1264,8 +1273,9 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
   let const actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length);
+  let &arena = m_parse_session.get_arena();
 
-  if (m_arena == FUNCTION_ARENA) {
+  if (m_parse_session.is_allocating_function_body()) {
     for (let &segment : word.segments)
       segment.is_substitution_cache_in_function_arena = true;
   }
@@ -1282,10 +1292,10 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
   if (let assignment_split = word.get_assignment_split();
       assignment_split.has_value())
   {
-    let const arena_allocator = bump_allocator(*m_arena);
+    let const arena_allocator = bump_allocator(arena);
     assignment_split->name.move_to_allocator(arena_allocator);
-    assignment_split->value.move_resources_to_arena(*m_arena);
-    token = m_arena->create<tokens::Assignment>(
+    assignment_split->value.move_resources_to_arena(arena);
+    token = arena.create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), steal(assignment_split->name),
         steal(assignment_split->value), assignment_split->is_append);
   } else if (word.segments.count() == 1 &&
@@ -1306,7 +1316,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
 
   if (token == nullptr) {
     token = tokens::create_word_token(
-        *m_arena, here(actual_cursor_position, byte_count), steal(word));
+        arena, here(actual_cursor_position, byte_count), steal(word));
   }
 
   m_cached_offset = byte_count;
@@ -1318,6 +1328,7 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
 {
   let const ch = chop_character();
   ASSERT(ch != lexer::CEOF);
+  let &arena = m_parse_session.get_arena();
 
   usize extra_length = 0;
 
@@ -1325,29 +1336,29 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
 
 #define TOKEN_CASE_ONE(byte, t)                                                \
   case byte:                                                                   \
-    token = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
+    token = arena.create<tokens::t>(here(m_cursor_position, 1));               \
     break;
 
 #define TOKEN_CASE_TWO(byte, t, ch, t2)                                        \
   case byte: {                                                                 \
     if (chop_character(1) == ch) {                                             \
-      token = m_arena->create<tokens::t2>(here(m_cursor_position, 2));         \
+      token = arena.create<tokens::t2>(here(m_cursor_position, 2));            \
       extra_length++;                                                          \
     } else {                                                                   \
-      token = m_arena->create<tokens::t>(here(m_cursor_position, 1));          \
+      token = arena.create<tokens::t>(here(m_cursor_position, 1));             \
     }                                                                          \
   } break;
 
 #define TOKEN_CASE_THREE(byte, t, ch2, t2, ch3, t3)                            \
   case byte: {                                                                 \
     if (chop_character(1) == ch2) {                                            \
-      token = m_arena->create<tokens::t2>(here(m_cursor_position, 2));         \
+      token = arena.create<tokens::t2>(here(m_cursor_position, 2));            \
       extra_length++;                                                          \
     } else if (chop_character(1) == ch3) {                                     \
-      token = m_arena->create<tokens::t3>(here(m_cursor_position, 2));         \
+      token = arena.create<tokens::t3>(here(m_cursor_position, 2));            \
       extra_length++;                                                          \
     } else {                                                                   \
-      token = m_arena->create<tokens::t>(here(m_cursor_position, 1));          \
+      token = arena.create<tokens::t>(here(m_cursor_position, 1));             \
     }                                                                          \
   } break;
 
@@ -1357,20 +1368,20 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   case ';': {
     if (chop_character(1) == ';') {
       if (chop_character(2) == '&') {
-        token = m_arena->create<tokens::DoubleSemicolonAmpersand>(
+        token = arena.create<tokens::DoubleSemicolonAmpersand>(
             here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        token = m_arena->create<tokens::DoubleSemicolon>(
+        token = arena.create<tokens::DoubleSemicolon>(
             here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '&') {
-      token = m_arena->create<tokens::SemicolonAmpersand>(
+      token = arena.create<tokens::SemicolonAmpersand>(
           here(m_cursor_position, 2));
       extra_length++;
     } else {
-      token = m_arena->create<tokens::Semicolon>(here(m_cursor_position, 1));
+      token = arena.create<tokens::Semicolon>(here(m_cursor_position, 1));
     }
   } break;
     TOKEN_CASE_ONE('.', Dot);
@@ -1389,34 +1400,33 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   case '&': {
     if (bash_additions_enabled() && chop_character(1) == '>') {
       if (chop_character(2) == '>') {
-        token = m_arena->create<tokens::AmpersandDoubleGreater>(
+        token = arena.create<tokens::AmpersandDoubleGreater>(
             here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        token = m_arena->create<tokens::AmpersandGreater>(
+        token = arena.create<tokens::AmpersandGreater>(
             here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '&') {
-      token =
-          m_arena->create<tokens::DoubleAmpersand>(here(m_cursor_position, 2));
+      token = arena.create<tokens::DoubleAmpersand>(
+          here(m_cursor_position, 2));
       extra_length++;
     } else {
-      token = m_arena->create<tokens::Ampersand>(here(m_cursor_position, 1));
+      token = arena.create<tokens::Ampersand>(here(m_cursor_position, 1));
     }
   } break;
 
   /* |& is the shorthand for 2>&1 |, riding every mood but POSIX. */
   case '|': {
     if (chop_character(1) == '|') {
-      token = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
+      token = arena.create<tokens::DoublePipe>(here(m_cursor_position, 2));
       extra_length++;
     } else if (bash_additions_enabled() && chop_character(1) == '&') {
-      token =
-          m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
+      token = arena.create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
       extra_length++;
     } else {
-      token = m_arena->create<tokens::Pipe>(here(m_cursor_position, 1));
+      token = arena.create<tokens::Pipe>(here(m_cursor_position, 1));
     }
   } break;
     TOKEN_CASE_TWO('=', Equals, '=', DoubleEquals);
@@ -1428,17 +1438,17 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   case '<': {
     if (chop_character(1) == '<') {
       if (chop_character(2) == '<' && bash_additions_enabled()) {
-        token = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
+        token = arena.create<tokens::TripleLess>(here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        token = m_arena->create<tokens::DoubleLess>(here(m_cursor_position, 2));
+        token = arena.create<tokens::DoubleLess>(here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '=') {
-      token = m_arena->create<tokens::LessEquals>(here(m_cursor_position, 2));
+      token = arena.create<tokens::LessEquals>(here(m_cursor_position, 2));
       extra_length++;
     } else {
-      token = m_arena->create<tokens::Less>(here(m_cursor_position, 1));
+      token = arena.create<tokens::Less>(here(m_cursor_position, 1));
     }
   } break;
 
@@ -1476,17 +1486,18 @@ hot alwaysinline fn Lexer::lex_process_substitution(char direction) throws
       inner_start, *substitution_end - inner_start - 1);
 
   LOG(Debug, "capturing a process substitution of %zu bytes", byte_count);
+  let &arena = m_parse_session.get_arena();
 
   /* The direction byte leads the segment text so the evaluator reads the pipe
      direction without a second field. */
   let word = Word{};
   word.segments.push(WordSegment{
       WordSegment::Kind::ProcessSubstitution,
-      SegmentText{bump_allocator(*m_arena), direction, body},
+      SegmentText{bump_allocator(arena), direction, body},
       false
   });
   word.segments.back().set_source_span(open_position, byte_count);
-  let t = tokens::create_word_token(*m_arena, here(open_position, byte_count),
+  let t = tokens::create_word_token(arena, here(open_position, byte_count),
                                     steal(word));
   m_cached_offset = byte_count;
   return t;

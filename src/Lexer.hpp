@@ -2,9 +2,10 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file declares the stateful shell lexer, heredoc storage, and shared
- * lexical predicates. Parsing, formatting, completion, and diagnostics share
- * the interface. Token construction remains in the lexer sources.
+ * This file declares the per-parser arena session, stateful shell lexer,
+ * heredoc storage, and shared lexical predicates. Parsing, formatting,
+ * completion, and diagnostics share the interface. Token construction remains
+ * in the lexer sources.
  */
 
 #pragma once
@@ -20,6 +21,52 @@
 namespace koshka {
 
 class BumpArena;
+
+class ParseSession
+{
+public:
+  enum class AllocationKind : u8
+  {
+    Syntax,
+    FunctionBody,
+  };
+
+  explicit ParseSession(BumpArena &syntax_arena)
+      : m_syntax_arena(&syntax_arena), m_active_arena(&syntax_arena)
+  {}
+
+  pure fn get_arena() const wontthrow -> BumpArena &
+  {
+    return *m_active_arena;
+  }
+
+  pure fn get_syntax_arena() const wontthrow -> BumpArena &
+  {
+    return *m_syntax_arena;
+  }
+
+  pure fn is_allocating_function_body() const wontthrow -> bool
+  {
+    return m_allocation_kind == AllocationKind::FunctionBody;
+  }
+
+  pure fn get_allocation_kind() const wontthrow -> AllocationKind
+  {
+    return m_allocation_kind;
+  }
+
+  fn set_arena(BumpArena &arena, AllocationKind allocation_kind) wontthrow
+      -> void
+  {
+    m_active_arena = &arena;
+    m_allocation_kind = allocation_kind;
+  }
+
+private:
+  BumpArena *m_syntax_arena;
+  BumpArena *m_active_arena;
+  AllocationKind m_allocation_kind{AllocationKind::Syntax};
+};
 
 struct heredoc_contents
 {
@@ -80,7 +127,9 @@ public:
   Lexer(StringView source, BumpArena &arena,
         bool should_collect_debug_words = false,
         Maybe<StringView> filename = None,
-        mimic_mood mood = mimic_mood::Default);
+        mimic_mood mood = mimic_mood::Default,
+        ParseSession::AllocationKind allocation_kind =
+            ParseSession::AllocationKind::Syntax);
   ~Lexer();
 
   pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
@@ -119,7 +168,13 @@ public:
   pure fn is_at_source_end() const wontthrow -> bool;
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
   pure fn arena() const wontthrow -> BumpArena &;
-  fn set_arena(BumpArena &arena) wontthrow -> void;
+  pure fn arena_kind() const wontthrow -> ParseSession::AllocationKind
+  {
+    return m_parse_session.get_allocation_kind();
+  }
+  fn set_arena(BumpArena &arena,
+               ParseSession::AllocationKind allocation_kind) wontthrow
+      -> void;
   fn drop_peek_cache() wontthrow -> void;
   fn advance_past_last_peek() throws -> usize;
 
@@ -149,7 +204,7 @@ protected:
   fn peek_cache_is_live() const wontthrow -> bool;
 
   StringView m_source;
-  BumpArena *m_arena;
+  ParseSession m_parse_session;
   /* The interned name of the file this source came from, or zero for an unnamed
      source such as an interactive line. It travels into every SourceLocation
      the lexer stamps. */

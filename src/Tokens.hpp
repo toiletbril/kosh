@@ -746,8 +746,7 @@ const ArrayList<String> &keyword_names() throws;
 /* clang-format off */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
-    token =                                                                    \
-        m_arena->create<tokens::k>(here(actual_cursor_position, byte_count));  \
+    token = arena.create<tokens::k>(here(actual_cursor_position, byte_count)); \
     break
 /* clang-format on */
 

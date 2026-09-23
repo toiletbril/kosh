@@ -327,7 +327,7 @@ fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
 
   let parser = Parser{
       Lexer{stored_action->view(), *body_storage.get_arena(), false, None,
-            mood()}
+            mood(), ParseSession::AllocationKind::FunctionBody}
   };
   let const parsed_action = parser.construct_ast();
   if (parsed_action == nullptr) return FunctionBodyHandle{};
