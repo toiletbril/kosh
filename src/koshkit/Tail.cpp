@@ -84,6 +84,7 @@ struct regular_tail_state
 
 static fn read_regular_tails(ArrayList<regular_tail_state> &states,
                              ArrayList<Maybe<String>> &outputs,
+                             ArrayList<i32> &errors,
                              Allocator allocator) throws -> void
 {
   let batch = os::Batch{allocator};
@@ -143,6 +144,7 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
       if (result.error_number != 0) {
         state.has_error = true;
         state.is_done = true;
+        errors[state.source_index] = result.error_number;
         continue;
       }
 
@@ -216,7 +218,8 @@ struct forward_tail_state
 
 static fn read_regular_forward_tails(
     ArrayList<forward_tail_state> &states,
-    ArrayList<Maybe<String>> &outputs, Allocator allocator) throws -> void
+    ArrayList<Maybe<String>> &outputs, ArrayList<i32> &errors,
+    Allocator allocator) throws -> void
 {
   let batch = os::Batch{allocator};
   let results = ArrayList<os::batch_result>{allocator};
@@ -267,6 +270,7 @@ static fn read_regular_forward_tails(
       if (result.error_number != 0) {
         state.has_error = true;
         state.is_done = true;
+        errors[state.source_index] = result.error_number;
         continue;
       }
 
@@ -375,13 +379,16 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
   let positioned_contents = ArrayList<Maybe<String>>{allocator};
   let positioned_attempted = ArrayList<bool>{allocator};
+  let positioned_errors = ArrayList<i32>{allocator};
   let regular_states = ArrayList<regular_tail_state>{allocator};
   let forward_states = ArrayList<forward_tail_state>{allocator};
   positioned_contents.reserve(sources.count());
   positioned_attempted.reserve(sources.count());
+  positioned_errors.reserve(sources.count());
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
     positioned_contents.push(None);
     positioned_attempted.push(false);
+    positioned_errors.push(0);
   }
   if (origin == count_origin::FromEnd) {
     for (usize source_index = 0; source_index < sources.count();
@@ -415,13 +422,15 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       regular_states.push(steal(state));
 
       if (regular_states.count() == TAIL_ACTIVE_SOURCE_COUNT) {
-        read_regular_tails(regular_states, positioned_contents, allocator);
+        read_regular_tails(regular_states, positioned_contents,
+                           positioned_errors, allocator);
         regular_states.clear();
         if (os::INTERRUPT_REQUESTED) return 130;
       }
     }
     if (regular_states.count() != 0)
-      read_regular_tails(regular_states, positioned_contents, allocator);
+      read_regular_tails(regular_states, positioned_contents,
+                         positioned_errors, allocator);
     if (os::INTERRUPT_REQUESTED) return 130;
   } else {
     for (usize source_index = 0; source_index < sources.count();
@@ -448,7 +457,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.is_byte_mode = is_byte_mode;
       state.next_offset = is_byte_mode
                               ? (count == 0
-                                     ? *file_size
+                                     ? 0
                                      : (static_cast<u64>(count - 1) < *file_size
                                             ? static_cast<u64>(count - 1)
                                             : *file_size))
@@ -461,13 +470,14 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
       if (forward_states.count() == TAIL_ACTIVE_SOURCE_COUNT) {
         read_regular_forward_tails(forward_states, positioned_contents,
-                                   allocator);
+                                   positioned_errors, allocator);
         forward_states.clear();
         if (os::INTERRUPT_REQUESTED) return 130;
       }
     }
     if (forward_states.count() != 0)
-      read_regular_forward_tails(forward_states, positioned_contents, allocator);
+      read_regular_forward_tails(forward_states, positioned_contents,
+                                 positioned_errors, allocator);
     if (os::INTERRUPT_REQUESTED) return 130;
   }
 
@@ -485,6 +495,8 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       content = read_named_or_stdin(ec, sources[source_index]);
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
+      if (positioned_errors[source_index] != 0)
+        os::set_last_system_error(positioned_errors[source_index]);
       report_soft_koshkit_util_error(
           ec, cxt, args[0].view(),
           String{did_use_positioned_read ? "cannot read '" : "cannot open '"} +
@@ -506,7 +518,9 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       let const wanted_count = static_cast<usize>(count);
       let const text = content->view();
       let start = origin == count_origin::FromStart
-                      ? (count > 0 ? static_cast<usize>(count - 1) : 0)
+                      ? (did_use_positioned_read || count == 0
+                             ? 0
+                             : static_cast<usize>(count - 1))
                       : sub_sat(text.length, wanted_count);
       if (start > text.length) start = text.length;
 
@@ -517,7 +531,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     let const text = content->view();
     let const wanted_count = static_cast<usize>(count);
     usize start = 0;
-    if (origin == count_origin::FromStart) {
+    if (origin == count_origin::FromStart && !did_use_positioned_read) {
       usize remaining_newline_count = count > 0 ? wanted_count - 1 : 0;
       while (start < text.length && remaining_newline_count > 0) {
         if (text[start] == '\n') remaining_newline_count--;
