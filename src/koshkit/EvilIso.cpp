@@ -997,8 +997,9 @@ fn append_remote_report(String &output, bool should_color,
           : ArrayList<os::process_entry>{heap_allocator()};
   let process_contexts = ArrayList<remote_process_context>{heap_allocator()};
   let user_contexts = ArrayList<remote_user_context>{heap_allocator()};
-  let const self_net_namespace =
-      os::read_symlink("/proc/self/ns/net", heap_allocator());
+  let const self_net_namespace = os::read_symlink(
+      eviliso_namespace_proc_path("self/ns/net", heap_allocator()),
+      heap_allocator());
   let const do_get_user = [&](u32 process_id, u32 owner_id) throws -> String {
     for (let const &context : user_contexts) {
       if (context.owner_id == owner_id) {
@@ -1096,10 +1097,12 @@ fn append_remote_report(String &output, bool should_color,
                                 ? String{heap_allocator(), "-"}
                                 : remote_table_text(process.command_line.view(),
                                                     96, heap_allocator());
+          let net_namespace_suffix =
+              String::from(socket.process_id, heap_allocator());
+          net_namespace_suffix += "/ns/net";
           if (let net_namespace = os::read_symlink(
-                  String{"/proc/"} +
-                      String::from(socket.process_id, heap_allocator()) +
-                      "/ns/net",
+                  eviliso_namespace_proc_path(net_namespace_suffix.view(),
+                                              heap_allocator()),
                   heap_allocator());
               net_namespace.has_value())
           {
