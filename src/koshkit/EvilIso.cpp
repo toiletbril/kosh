@@ -666,7 +666,23 @@ struct cgroup_report_row
   u64 process_start_token{0};
   String name{heap_allocator()};
   StringView role;
+  StringView status;
 };
+
+pure fn process_snapshot_status_name(process_snapshot_status status)
+    wontthrow -> StringView
+{
+  switch (status) {
+  case process_snapshot_status::Available: return "available";
+  case process_snapshot_status::PermissionDenied: return "permission denied";
+  case process_snapshot_status::Unavailable: return "unavailable";
+  case process_snapshot_status::Empty: return "empty";
+  case process_snapshot_status::Exited: return "exited";
+  case process_snapshot_status::Reused: return "PID reused";
+  case process_snapshot_status::Unverifiable: return "identity unavailable";
+  }
+  unreachable("unknown process snapshot status");
+}
 
 fn append_cgroup_report(String &output, bool should_color,
                         bool should_show_detail,
@@ -701,6 +717,7 @@ fn append_cgroup_report(String &output, bool should_color,
         self.start_token,
         String{heap_allocator(), self.name.view()},
         "self",
+        "available",
     });
   }
 
@@ -725,10 +742,27 @@ fn append_cgroup_report(String &output, bool should_color,
               process.start_token,
               String{heap_allocator(), process.name.view()},
               "other",
+              "available",
           });
           break;
         }
       }
+    }
+    for (let const &process : snapshot) {
+      if (process.status == process_snapshot_status::Available) continue;
+      rows.push({
+          String{heap_allocator(), "-"},
+          static_cast<u64>(-1),
+          String{heap_allocator(), "-"},
+          String{heap_allocator(), "-"},
+          String::from(process.process_id, heap_allocator()),
+          process.process_id,
+          process.start_token,
+          String{heap_allocator(), process.name.view()},
+          process.process_id == self_process_id ? StringView{"self"}
+                                                : StringView{"other"},
+          process_snapshot_status_name(process.status),
+      });
     }
   }
 
@@ -755,6 +789,9 @@ fn append_cgroup_report(String &output, bool should_color,
                     colors::ansi::BOLD_CYAN);
   report.add_column("ROLE", report_table_alignment::Left,
                     colors::ansi::BOLD_CYAN);
+  if (should_show_detail)
+    report.add_column("STATUS", report_table_alignment::Left,
+                      colors::ansi::BOLD_CYAN);
   for (let const &row : rows) {
     let cells = ArrayList<report_table_cell_view>{heap_allocator()};
     cells.push({row.hierarchy.view(), colors::ansi::BOLD_GREEN});
@@ -763,6 +800,10 @@ fn append_cgroup_report(String &output, bool should_color,
     cells.push({row.process_id.view(), colors::ansi::BOLD_GREEN});
     cells.push({row.name.view(), colors::ansi::RESET});
     cells.push({row.role, colors::ansi::BOLD_MAGENTA});
+    if (should_show_detail)
+      cells.push({row.status, row.status == "available"
+                                  ? colors::ansi::BOLD_GREEN
+                                  : colors::ansi::BOLD_YELLOW});
     report.add_row(cells);
   }
   append_titled_table(output, "Cgroup membership", report, should_color);
