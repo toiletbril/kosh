@@ -411,9 +411,6 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.buffer = ArrayList<char>{allocator};
       state.blocks = ArrayList<tail_block>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
-      for (usize byte_index = 0; byte_index < TAIL_BLOCK_BYTE_COUNT;
-           byte_index++)
-        state.buffer.push(0);
       state.blocks.reserve(2);
       regular_states.push(steal(state));
 
@@ -460,9 +457,6 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
           !is_byte_mode && count > 0 ? static_cast<u64>(count - 1) : 0;
       state.buffer = ArrayList<char>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
-      for (usize byte_index = 0; byte_index < TAIL_BLOCK_BYTE_COUNT;
-           byte_index++)
-        state.buffer.push(0);
       forward_states.push(steal(state));
 
       if (forward_states.count() == TAIL_ACTIVE_SOURCE_COUNT) {
