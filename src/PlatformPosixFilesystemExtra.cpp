@@ -1447,12 +1447,9 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
         let const chunk_index = byte_offset / sizeof(aiocb);
         if (!is_queued[chunk_index] || is_completed[chunk_index]) continue;
         let &result = results[operation_start + chunk_index];
-        let const error_number = static_cast<i32>(events[event_index].ext[0]);
-        if (error_number == 0)
-          result.transferred_byte_count =
-              static_cast<usize>(events[event_index].ext[1]);
-        else
-          result.error_number = error_number;
+        const aiocb *pending[] = {&controls[chunk_index]};
+        while (!finish_suspended_aio(controls[chunk_index], result))
+          unused(::aio_suspend(pending, 1, nullptr));
         is_completed[chunk_index] = true;
         completed_count++;
       }
