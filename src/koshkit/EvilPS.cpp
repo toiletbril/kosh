@@ -41,7 +41,8 @@ FLAG(EVILPS_MEMORY, Bool, 'M', "memory", "Show resident memory usage.");
 FLAG(EVILPS_WIDE, Bool, 'w', "wide",
      "Do not truncate command lines to the terminal width.");
 FLAG(EVILPS_SORT, String, '\0', "sort",
-     "Sort children by a unique prefix of name, pid, cpu, or memory.");
+     "Sort process trees by name, pid, cpu, or memory; show relatives "
+     "beneath the highest-ranked process.");
 static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
     -> bool
 {
@@ -412,16 +413,35 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
   output += "\n";
 }
 
-fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
-                   const String &prefix, usize depth, Allocator allocator,
-                   bool should_color, usize output_limit,
-                   usize &rendered_count, bool should_human,
-                   Maybe<evilps_sort_key> sort_key,
-                   bool is_sampled, usize line_width_limit) throws -> void
+fn render_process_relatives(String &output, ArrayList<tree_node> &nodes,
+                            usize parent_position, const String &prefix,
+                            usize depth, Allocator allocator,
+                            bool should_color, usize output_limit,
+                            usize &rendered_count, bool should_human,
+                            Maybe<evilps_sort_key> sort_key, bool is_sampled,
+                            usize line_width_limit,
+                            bool should_follow_parents) throws -> void
 {
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
 
-  ArrayList<usize> child_positions{allocator};
+  ArrayList<usize> relative_positions{allocator};
+  let const parent_pid = nodes[parent_position].pid;
+  let const ancestor_pid = nodes[parent_position].parent_pid;
+  let ancestor_position = Maybe<usize>{None};
+  if (should_follow_parents && ancestor_pid != parent_pid) {
+    for (usize position = 0; position < nodes.count(); position++) {
+      if (nodes[position].pid != ancestor_pid ||
+          !nodes[position].search_visible || nodes[position].was_rendered)
+      {
+        continue;
+      }
+
+      relative_positions.push(position);
+      ancestor_position = position;
+      break;
+    }
+  }
+
   for (usize position = 0; position < nodes.count(); position++) {
     if (nodes[position].parent_pid != parent_pid) continue;
 
@@ -429,16 +449,22 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
 
     if (nodes[position].pid == parent_pid) continue;
 
+    if (ancestor_position.has_value() && position == *ancestor_position) {
+      continue;
+    }
+
     if (nodes[position].was_rendered) continue;
 
-    child_positions.push(position);
+    relative_positions.push(position);
   }
 
-  for (usize index = 0; index < child_positions.count(); index++) {
+  for (usize index = 0; index < relative_positions.count(); index++) {
     if (rendered_count >= output_limit) break;
 
-    let const position = child_positions[index];
-    let const is_last = index + 1 == child_positions.count();
+    let const position = relative_positions[index];
+    if (nodes[position].was_rendered) continue;
+
+    let const is_last = index + 1 == relative_positions.count();
     let const connector = get_tree_connector(is_last);
     nodes[position].was_rendered = true;
 
@@ -449,11 +475,13 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
                  sort_key, is_sampled, line_width_limit);
     rendered_count++;
 
-    let child_prefix = String{allocator, prefix.view()};
-    child_prefix += connector.continuation;
-    render_children(output, nodes, nodes[position].pid, child_prefix, depth + 1,
-                    allocator, should_color, output_limit, rendered_count,
-                    should_human, sort_key, is_sampled, line_width_limit);
+    let relative_prefix = String{allocator, prefix.view()};
+    relative_prefix += connector.continuation;
+    render_process_relatives(output, nodes, position, relative_prefix, depth + 1,
+                             allocator, should_color, output_limit,
+                             rendered_count, should_human, sort_key,
+                             is_sampled, line_width_limit,
+                             should_follow_parents);
   }
 }
 
@@ -574,7 +602,8 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     output += "\n  PID  PPID  CPU  MEM  COMMAND\n";
   }
 
-  if (root_position < nodes.count() && !sort_key.has_value() &&
+  if (root_position < nodes.count() &&
+      (!sort_key.has_value() || !operands.is_empty()) &&
       (search.is_empty() || nodes[root_position].search_visible)) {
     if (nodes[root_position].search_visible) {
       nodes[root_position].was_rendered = true;
@@ -582,10 +611,10 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
       append_label(output, nodes[root_position], allocator, should_color,
                    should_human, sort_key, is_sampled, line_width_limit);
       rendered_count++;
-      render_children(output, nodes, root_pid,
-                      String{allocator, root_indentation}, 0, allocator,
-                      should_color, output_limit, rendered_count,
-                      should_human, sort_key, is_sampled, line_width_limit);
+      render_process_relatives(
+          output, nodes, root_position, String{allocator, root_indentation},
+          0, allocator, should_color, output_limit, rendered_count,
+          should_human, sort_key, is_sampled, line_width_limit, false);
     }
     visible_line_count = 1;
     if (viewport_rows != 0) {
@@ -636,10 +665,10 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
       append_label(output, nodes[position], allocator, should_color,
                    should_human, sort_key, is_sampled, line_width_limit);
       rendered_count++;
-      render_children(output, nodes, nodes[position].pid,
-                      String{allocator, root_indentation}, 0, allocator,
-                      should_color, output_limit, rendered_count,
-                      should_human, sort_key, is_sampled, line_width_limit);
+      render_process_relatives(
+          output, nodes, position, String{allocator, root_indentation}, 0,
+          allocator, should_color, output_limit, rendered_count,
+          should_human, sort_key, is_sampled, line_width_limit, true);
       continue;
     }
 
@@ -661,10 +690,10 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     append_label(output, nodes[position], allocator, should_color,
                  should_human, sort_key, is_sampled, line_width_limit);
     rendered_count++;
-    render_children(output, nodes, nodes[position].pid,
-                    String{allocator, root_indentation}, 0, allocator,
-                    should_color, output_limit, rendered_count, should_human,
-                    sort_key, is_sampled, line_width_limit);
+    render_process_relatives(
+        output, nodes, position, String{allocator, root_indentation}, 0,
+        allocator, should_color, output_limit, rendered_count,
+        should_human, sort_key, is_sampled, line_width_limit, false);
   }
 
   visible_line_count = rendered_count;
