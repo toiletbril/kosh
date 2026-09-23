@@ -1636,6 +1636,7 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
 
   let const text = StringView{buffer, length};
   StringView header;
+  bool has_statistics = false;
   usize position = 0;
   while (position < text.length) {
     let const line = each_line(text, position);
@@ -1645,7 +1646,6 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
       continue;
     }
 
-    bool has_statistics = false;
     usize name_position = 0;
     usize value_position = 4;
     while (name_position < header.length && value_position < line.length) {
@@ -1689,9 +1689,76 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
         break;
       }
     }
-    return has_statistics;
+    break;
   }
-  return false;
+
+  char netstat_buffer[65536];
+  let const netstat_length =
+      read_small_file("/proc/net/netstat", netstat_buffer,
+                      sizeof(netstat_buffer));
+  if (netstat_length == 0) return has_statistics;
+
+  let const netstat_text = StringView{netstat_buffer, netstat_length};
+  let tcp_extended_header = StringView{};
+  usize netstat_position = 0;
+  while (netstat_position < netstat_text.length) {
+    let const line = each_line(netstat_text, netstat_position);
+    if (!line.starts_with("TcpExt:")) continue;
+    if (tcp_extended_header.is_empty()) {
+      tcp_extended_header = line.substring(7);
+      continue;
+    }
+
+    usize name_position = 0;
+    usize value_position = 7;
+    while (name_position < tcp_extended_header.length &&
+           value_position < line.length)
+    {
+      let const name =
+          tcp_extended_header.next_ascii_whitespace_word(name_position);
+      let const value_word = line.next_ascii_whitespace_word(value_position);
+      u64 value = 0;
+      if (!parse_decimal_word(value_word, value)) continue;
+      struct tcp_extended_field
+      {
+        StringView name;
+        u64 tcp_statistics::*field;
+        tcp_statistics_field capability;
+      };
+      static constexpr tcp_extended_field FIELDS[] = {
+          {"ListenOverflows", &tcp_statistics::listen_overflow_count,
+           tcp_statistics_field::ListenOverflows                },
+          {"ListenDrops",     &tcp_statistics::listen_drop_count,
+           tcp_statistics_field::ListenDrops                    },
+          {"TCPTimeouts",     &tcp_statistics::retransmit_timeout_count,
+           tcp_statistics_field::RetransmitTimeouts             },
+          {"TCPSynRetrans",   &tcp_statistics::syn_retransmit_count,
+           tcp_statistics_field::SynRetransmits                 },
+          {"TCPFastRetrans",  &tcp_statistics::fast_retransmit_count,
+           tcp_statistics_field::FastRetransmits                },
+          {"TCPSpuriousRTOs",
+           &tcp_statistics::spurious_retransmit_timeout_count,
+           tcp_statistics_field::SpuriousRetransmitTimeouts     },
+          {"TCPRcvQDrop",     &tcp_statistics::receive_queue_drop_count,
+           tcp_statistics_field::ReceiveQueueDrops              },
+          {"TCPBacklogDrop",  &tcp_statistics::backlog_drop_count,
+           tcp_statistics_field::BacklogDrops                   },
+          {"TCPReqQFullDrop", &tcp_statistics::request_queue_full_drop_count,
+           tcp_statistics_field::RequestQueueFullDrops          },
+          {"TCPRetransFail",  &tcp_statistics::retransmit_failure_count,
+           tcp_statistics_field::RetransmitFailures             },
+      };
+      for (let const &known : FIELDS) {
+        if (name != known.name) continue;
+        statistics.*known.field = value;
+        statistics.available_fields |= static_cast<u32>(known.capability);
+        has_statistics = true;
+        break;
+      }
+    }
+    break;
+  }
+  return has_statistics;
 #else
   unused(statistics);
   return false;

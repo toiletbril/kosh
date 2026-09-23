@@ -1548,6 +1548,14 @@ enum class tcp_statistics_field : u32
   ReceiveMemoryDrops = 1u << 11,
   ListenDrops = 1u << 12,
   RetransmitTimeouts = 1u << 13,
+  ListenOverflows = 1u << 14,
+  SynRetransmits = 1u << 15,
+  FastRetransmits = 1u << 16,
+  SpuriousRetransmitTimeouts = 1u << 17,
+  ReceiveQueueDrops = 1u << 18,
+  BacklogDrops = 1u << 19,
+  RequestQueueFullDrops = 1u << 20,
+  RetransmitFailures = 1u << 21,
 };
 
 struct tcp_statistics
@@ -1566,6 +1574,14 @@ struct tcp_statistics
   u64 receive_memory_drop_count{0};
   u64 listen_drop_count{0};
   u64 retransmit_timeout_count{0};
+  u64 listen_overflow_count{0};
+  u64 syn_retransmit_count{0};
+  u64 fast_retransmit_count{0};
+  u64 spurious_retransmit_timeout_count{0};
+  u64 receive_queue_drop_count{0};
+  u64 backlog_drop_count{0};
+  u64 request_queue_full_drop_count{0};
+  u64 retransmit_failure_count{0};
   u32 available_fields{0};
 
   pure fn has_field(tcp_statistics_field field) const wontthrow -> bool
