@@ -659,14 +659,26 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
 
 struct cgroup_report_row
 {
-  String hierarchy{heap_allocator()};
+  cgroup_report_row(StringView hierarchy, u64 hierarchy_value,
+                    StringView controller, StringView path,
+                    const process_cgroup_snapshot &process, StringView role,
+                    StringView status, Allocator allocator)
+      : hierarchy(allocator, hierarchy), hierarchy_value(hierarchy_value),
+        controller(allocator, controller), path(allocator, path),
+        process_id(String::from(process.process_id, allocator)),
+        process_id_value(process.process_id),
+        process_start_token(process.start_token),
+        name(allocator, process.name.view()), role(role), status(status)
+  {}
+
+  String hierarchy;
   u64 hierarchy_value{0};
-  String controller{heap_allocator()};
-  String path{heap_allocator()};
-  String process_id{heap_allocator()};
+  String controller;
+  String path;
+  String process_id;
   i64 process_id_value{0};
   u64 process_start_token{0};
-  String name{heap_allocator()};
+  String name;
   StringView role;
   StringView status;
 };
@@ -691,7 +703,8 @@ fn append_cgroup_report(String &output, bool should_color,
                         const ArrayList<process_cgroup_snapshot> &snapshot)
     throws -> void
 {
-  let table = ReportTable{heap_allocator()};
+  let const allocator = snapshot.allocator();
+  let table = ReportTable{allocator};
   let self_index = Maybe<usize>{};
   let const self_process_id = os::get_current_process_id();
   for (usize index = 0; index < snapshot.count(); index++) {
@@ -708,20 +721,12 @@ fn append_cgroup_report(String &output, bool should_color,
   }
 
   let const &self = snapshot[*self_index];
-  let rows = ArrayList<cgroup_report_row>{heap_allocator()};
+  let rows = ArrayList<cgroup_report_row>{allocator};
   for (let const &membership : self.memberships) {
-    rows.push({
-        String{heap_allocator(), membership.hierarchy.view()},
-        membership.hierarchy_value,
-        String{heap_allocator(), membership.controller.view()},
-        String{heap_allocator(), membership.path.view()},
-        String::from(self_process_id, heap_allocator()),
-        self_process_id,
-        self.start_token,
-        String{heap_allocator(), self.name.view()},
-        "self",
-        "available",
-    });
+    rows.push(cgroup_report_row{
+        membership.hierarchy.view(), membership.hierarchy_value,
+        membership.controller.view(), membership.path.view(), self, "self",
+        "available", allocator});
   }
 
   if (should_show_detail) {
@@ -735,37 +740,21 @@ fn append_cgroup_report(String &output, bool should_color,
           {
             continue;
           }
-          rows.push({
-              String{heap_allocator(), membership.hierarchy.view()},
-              membership.hierarchy_value,
-              String{heap_allocator(), membership.controller.view()},
-              String{heap_allocator(), membership.path.view()},
-              String::from(process.process_id, heap_allocator()),
-              process.process_id,
-              process.start_token,
-              String{heap_allocator(), process.name.view()},
-              "other",
-              "available",
-          });
+          rows.push(cgroup_report_row{
+              membership.hierarchy.view(), membership.hierarchy_value,
+              membership.controller.view(), membership.path.view(), process,
+              "other", "available", allocator});
           break;
         }
       }
     }
     for (let const &process : snapshot) {
       if (process.status == process_snapshot_status::Available) continue;
-      rows.push({
-          String{heap_allocator(), "-"},
-          static_cast<u64>(-1),
-          String{heap_allocator(), "-"},
-          String{heap_allocator(), "-"},
-          String::from(process.process_id, heap_allocator()),
-          process.process_id,
-          process.start_token,
-          String{heap_allocator(), process.name.view()},
+      rows.push(cgroup_report_row{
+          "-", static_cast<u64>(-1), "-", "-", process,
           process.process_id == self_process_id ? StringView{"self"}
                                                 : StringView{"other"},
-          process_snapshot_status_name(process.status),
-      });
+          process_snapshot_status_name(process.status), allocator});
     }
   }
 
@@ -779,7 +768,7 @@ fn append_cgroup_report(String &output, bool should_color,
     return left.process_id_value < right.process_id_value;
   });
 
-  let report = ReportTable{heap_allocator()};
+  let report = ReportTable{allocator};
   report.add_column("HIERARCHY", report_table_alignment::Right,
                     colors::ansi::BOLD_CYAN);
   report.add_column("CONTROLLER", report_table_alignment::Left,
@@ -795,8 +784,10 @@ fn append_cgroup_report(String &output, bool should_color,
   if (should_show_detail)
     report.add_column("STATUS", report_table_alignment::Left,
                       colors::ansi::BOLD_CYAN);
+  let cells = ArrayList<report_table_cell_view>{allocator};
+  cells.reserve(7);
   for (let const &row : rows) {
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    cells.clear();
     cells.push({row.hierarchy.view(), colors::ansi::BOLD_GREEN});
     cells.push({row.controller.view(), colors::ansi::RESET});
     cells.push({row.path.view(), colors::ansi::RESET});
