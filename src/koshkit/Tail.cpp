@@ -35,25 +35,27 @@ enum class count_origin : u8
   FromStart
 };
 
-static fn parse_tail_count(StringView spec, count_origin &origin_out,
-                           i64 &count_out) throws -> bool
+struct parsed_tail_count
 {
-  origin_out = count_origin::FromEnd;
+  count_origin origin;
+  i64 count;
+};
+
+static fn parse_tail_count(StringView spec) throws -> Maybe<parsed_tail_count>
+{
+  let origin = count_origin::FromEnd;
   let digits = spec;
   if (digits.length > 0 && digits[0] == '+') {
-    origin_out = count_origin::FromStart;
+    origin = count_origin::FromStart;
     digits = digits.substring(1);
   } else if (digits.length > 0 && digits[0] == '-') {
     digits = digits.substring(1);
   }
 
   let const parsed = digits.to<i64>();
-  if (parsed.is_error() || parsed.value() < 0) {
-    return false;
-  }
+  if (parsed.is_error() || parsed.value() < 0) return None;
 
-  count_out = parsed.value();
-  return true;
+  return parsed_tail_count{origin, parsed.value()};
 }
 
 constexpr usize TAIL_BLOCK_BYTE_COUNT = 64 * 1024;
@@ -322,10 +324,11 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
 
   /* -c takes precedence over -n when both are given, matching GNU tail. */
   let const is_byte_mode = FLAG_TAIL_BYTES.is_set();
-  let origin = count_origin::FromEnd;
-  i64 count = 10;
+  let parsed_count = Maybe<parsed_tail_count>{
+      parsed_tail_count{count_origin::FromEnd, 10}};
   if (is_byte_mode) {
-    if (!parse_tail_count(FLAG_TAIL_BYTES.value(), origin, count)) {
+    parsed_count = parse_tail_count(FLAG_TAIL_BYTES.value());
+    if (!parsed_count.has_value()) {
       throw ErrorWithDetails{
           "invalid byte count '" +
               String{cxt.scratch_allocator(), FLAG_TAIL_BYTES.value()}
@@ -334,7 +337,8 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       };
     }
   } else if (FLAG_TAIL_LINES.is_set()) {
-    if (!parse_tail_count(FLAG_TAIL_LINES.value(), origin, count)) {
+    parsed_count = parse_tail_count(FLAG_TAIL_LINES.value());
+    if (!parsed_count.has_value()) {
       throw ErrorWithDetails{
           "invalid line count '" +
               String{cxt.scratch_allocator(), FLAG_TAIL_LINES.value()}
@@ -343,6 +347,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       };
     }
   }
+  let const [origin, count] = *parsed_count;
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
