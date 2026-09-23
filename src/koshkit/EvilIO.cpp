@@ -356,11 +356,8 @@ fn get_process_window_status(const live_process_row &row,
                              u64 window_start_nanoseconds) wontthrow
     -> os::process_io_status
 {
-  usize oldest = 0;
-  while (oldest + 1 < row.history_nanoseconds.count() &&
-         row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
-    oldest++;
-
+  let const oldest = rolling_window_baseline_index(
+      row.history_nanoseconds, window_start_nanoseconds);
   let const &before = row.history[oldest];
 
   let const &newest = row.history.back();
@@ -1007,11 +1004,8 @@ fn get_disk_window_status(const live_disk_row &row,
                           u64 window_start_nanoseconds) throws
     -> os::disk_io_status
 {
-  usize oldest = 0;
-  while (oldest + 1 < row.history_nanoseconds.count() &&
-         row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
-    oldest++;
-
+  let const oldest = rolling_window_baseline_index(
+      row.history_nanoseconds, window_start_nanoseconds);
   let const &before = row.history[oldest];
 
   let const &newest = row.history.back();

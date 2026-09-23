@@ -137,13 +137,8 @@ fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
 {
   if (history.history_nanoseconds.count() < 2) return;
 
-  usize oldest = 0;
-  while (oldest + 1 < history.history_nanoseconds.count() &&
-         history.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
-  {
-    oldest++;
-  }
-
+  let const oldest = rolling_window_baseline_index(
+      history.history_nanoseconds, window_start_nanoseconds);
   let const baseline_milliseconds = history.history_milliseconds[oldest];
   let const baseline_nanoseconds = history.history_nanoseconds[oldest];
 

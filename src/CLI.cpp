@@ -1456,6 +1456,17 @@ fn format_live_duration(f64 seconds, Allocator allocator) throws -> String
   return result;
 }
 
+pure fn rolling_window_baseline_index(const ArrayList<u64> &timestamps,
+                                      u64 window_start) wontthrow -> usize
+{
+  usize baseline = 0;
+  while (baseline + 1 < timestamps.count() &&
+         timestamps[baseline + 1] <= window_start)
+    baseline++;
+
+  return baseline;
+}
+
 cold fn make_flag_help(const FlagList &flags, bool should_color) throws
     -> String
 {

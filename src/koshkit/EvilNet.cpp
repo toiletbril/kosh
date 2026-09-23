@@ -637,11 +637,8 @@ fn get_network_window_status(const live_network_row &row,
                              Allocator allocator) throws
     -> os::network_interface_statistics_entry
 {
-  usize oldest = 0;
-  while (oldest + 1 < row.history_nanoseconds.count() &&
-         row.history_nanoseconds[oldest + 1] <= window_start_nanoseconds)
-    oldest++;
-
+  let const oldest = rolling_window_baseline_index(
+      row.history_nanoseconds, window_start_nanoseconds);
   let const &before = row.history[oldest];
 
   let sampled = row.history.back();

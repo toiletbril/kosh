@@ -446,6 +446,8 @@ fn append_live_controls_bar(String &output, StringView sample_label,
                             StringView refresh_label, bool should_color)
     throws -> void;
 fn format_live_duration(f64 seconds, Allocator allocator) throws -> String;
+pure fn rolling_window_baseline_index(const ArrayList<u64> &timestamps,
+                                      u64 window_start) wontthrow -> usize;
 
 fn show_message(StringView err) throws -> void;
 fn show_warning(StringView warning) throws -> void;
