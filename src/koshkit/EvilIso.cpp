@@ -393,11 +393,24 @@ fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
   return memberships;
 }
 
+enum class process_snapshot_status : u8
+{
+  Available,
+  PermissionDenied,
+  Unavailable,
+  Empty,
+  Exited,
+  Reused,
+  Unverifiable,
+};
+
 struct process_cgroup_snapshot
 {
   i64 process_id{0};
   u64 start_token{0};
+  u32 owner_id{0};
   String name{heap_allocator()};
+  String command{heap_allocator()};
   ArrayList<cgroup_membership> memberships{heap_allocator()};
   struct identity_evidence
   {
@@ -409,6 +422,7 @@ struct process_cgroup_snapshot
     String path{heap_allocator()};
   };
   ArrayList<identity_evidence> evidence{heap_allocator()};
+  process_snapshot_status status{process_snapshot_status::Unavailable};
 };
 
 pure fn is_hexadecimal_id(StringView text) wontthrow -> bool
@@ -568,47 +582,74 @@ fn collect_process_cgroup_snapshot(Allocator allocator) throws
 {
   let candidates =
       os::enumerate_processes(os::process_detail::ResourceStats);
-  let pending = ArrayList<process_cgroup_snapshot>{allocator};
+  let snapshot = ArrayList<process_cgroup_snapshot>{allocator};
+  snapshot.reserve(candidates.count());
   for (let const &process : candidates) {
+    let record = process_cgroup_snapshot{};
+    record.process_id = process.pid;
+    record.start_token = process.start_token;
+    record.owner_id = process.owner_id;
+    record.name = process.name.is_empty()
+                      ? String{allocator, "-"}
+                      : String{allocator, process.name.view()};
+    record.command = process.command_line.is_empty()
+                         ? String{allocator, "-"}
+                         : String{allocator, process.command_line.view()};
+    record.memberships = ArrayList<cgroup_membership>{allocator};
+    record.evidence =
+        ArrayList<process_cgroup_snapshot::identity_evidence>{allocator};
+
     let suffix = String::from(process.pid, allocator);
     suffix += "/cgroup";
     let const contents =
-        Path{cgroup_proc_path(suffix.view(), allocator)}.read_entire_file();
-    if (!contents.has_value()) continue;
-    let memberships =
-        parse_cgroup_memberships(contents->view(), allocator);
-    if (memberships.is_empty()) continue;
-    let evidence =
-        ArrayList<process_cgroup_snapshot::identity_evidence>{allocator};
-    evidence.reserve(memberships.count());
-    for (let const &membership : memberships) {
-      evidence.push(parse_cgroup_identity(membership.path.view(), allocator));
+        Path{cgroup_proc_path(suffix.view(), allocator), allocator}
+            .read_entire_file();
+    if (!contents.has_value()) {
+      record.status = os::last_system_error_is_permission_denied()
+                          ? process_snapshot_status::PermissionDenied
+                          : process_snapshot_status::Unavailable;
+    } else {
+      record.memberships =
+          parse_cgroup_memberships(contents->view(), allocator);
+      record.status = record.memberships.is_empty()
+                          ? process_snapshot_status::Empty
+                          : process_snapshot_status::Available;
+      record.evidence.reserve(record.memberships.count());
+      for (let const &membership : record.memberships) {
+        record.evidence.push(
+            parse_cgroup_identity(membership.path.view(), allocator));
+      }
     }
-    pending.push({
-        process.pid,
-        process.start_token,
-        process.name.is_empty() ? String{allocator, "-"}
-                                : String{allocator, process.name.view()},
-        steal(memberships),
-        steal(evidence),
-    });
+    snapshot.push(steal(record));
   }
 
   let current = os::enumerate_processes(os::process_detail::ResourceStats);
-  let snapshot = ArrayList<process_cgroup_snapshot>{allocator};
-  for (let &candidate : pending) {
-    for (let const &process : current) {
-      if (process.pid != candidate.process_id || process.start_token == 0 ||
-          candidate.start_token == 0 ||
-          process.start_token != candidate.start_token)
-      {
-        continue;
+  for (let &candidate : snapshot) {
+    let current_process = Maybe<usize>{};
+    for (usize index = 0; index < current.count(); index++) {
+      if (current[index].pid == candidate.process_id) {
+        current_process = index;
+        break;
       }
-      candidate.name = process.name.is_empty()
-                           ? String{allocator, "-"}
-                           : String{allocator, process.name.view()};
-      snapshot.push(steal(candidate));
-      break;
+    }
+    if (!current_process.has_value()) {
+      candidate.status = process_snapshot_status::Exited;
+      candidate.memberships.clear();
+      candidate.evidence.clear();
+      continue;
+    }
+    let const &process = current[*current_process];
+    if (process.start_token == 0 || candidate.start_token == 0) {
+      candidate.status = process_snapshot_status::Unverifiable;
+      candidate.memberships.clear();
+      candidate.evidence.clear();
+      continue;
+    }
+    if (process.start_token != candidate.start_token) {
+      candidate.status = process_snapshot_status::Reused;
+      candidate.memberships.clear();
+      candidate.evidence.clear();
+      continue;
     }
   }
   return snapshot;
