@@ -168,23 +168,30 @@ fn append_network_socket_report(String &output,
     let const is_tcp = socket.protocol == os::network_socket_protocol::Tcp;
     let const is_udp = socket.protocol == os::network_socket_protocol::Udp;
     let const is_unix = socket.protocol == os::network_socket_protocol::Unix;
-    if (options.should_show_tcp && !options.should_show_udp && !is_tcp) {
-      continue;
-    }
-    if (options.should_show_udp && !options.should_show_tcp && !is_udp) {
-      continue;
-    }
-    if (options.should_show_unix && !is_unix) continue;
-    if (!options.should_show_unix && is_unix) continue;
-    if (options.should_show_ipv4 && !options.should_show_ipv6 &&
-        socket.family != os::network_address_family::IPv4)
-    {
-      continue;
-    }
-    if (options.should_show_ipv6 && !options.should_show_ipv4 &&
-        socket.family != os::network_address_family::IPv6)
-    {
-      continue;
+    let const has_protocol_filter = options.should_show_tcp ||
+                                    options.should_show_udp ||
+                                    options.should_show_unix;
+    let const is_selected_protocol =
+        (is_tcp && options.should_show_tcp) ||
+        (is_udp && options.should_show_udp) ||
+        (is_unix && options.should_show_unix);
+    if (has_protocol_filter && !is_selected_protocol) continue;
+
+    let const has_address_family_filter =
+        options.should_show_ipv4 || options.should_show_ipv6;
+    if (is_unix) {
+      if (has_address_family_filter && !options.should_show_unix) continue;
+    } else {
+      if (options.should_show_ipv4 && !options.should_show_ipv6 &&
+          socket.family != os::network_address_family::IPv4)
+      {
+        continue;
+      }
+      if (options.should_show_ipv6 && !options.should_show_ipv4 &&
+          socket.family != os::network_address_family::IPv6)
+      {
+        continue;
+      }
     }
 
     let const is_socket_listening = is_listening(socket);
