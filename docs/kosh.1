@@ -1942,7 +1942,8 @@ when available, with gzip as the fallback.
 .TP
 .B eviliso
 Isolation evidence is grouped into namespace, cgroup, login-session, remote
-socket, and runtime sections. With no selector, all sections are shown. The
+socket, container-runtime, container, and Kubernetes sections. With no
+selector, all sections are shown. The
 .B -a
 or
 .B --all
@@ -1978,11 +1979,11 @@ and
 .B -r
 select namespaces, cgroups, sessions, and remote sockets; the
 .B \-k
-option selects container and Kubernetes runtime evidence. The long-only
+option selects container-runtime evidence. The long-only
 .B \-\-container
 and
 .B \-\-kubernetes
-selectors select only their corresponding runtime rows.
+selectors select only their corresponding sections.
 The plural
 .B \-\-containers
 spelling is an equivalent alias for

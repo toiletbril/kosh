@@ -24,8 +24,8 @@ HELP_SYNOPSIS_DECL(
     "[-a] [-n] [-c] [-s] [-r] [-k] [--kubernetes] [--container] [--containers]");
 
 HELP_DESCRIPTION_DECL(
-    "The eviliso utility reports namespaces, cgroups, sessions, and remote "
-    "connections.");
+    "The eviliso utility reports namespaces, cgroups, sessions, remote "
+    "connections, container runtimes, containers, and Kubernetes.");
 
 FLAG(EVILISO_ALL, Bool, 'a', "all",
      "Include detailed rows for every selected section.");
@@ -35,7 +35,7 @@ FLAG(EVILISO_SESSIONS, Bool, 's', "sessions", "Report login sessions.");
 FLAG(EVILISO_REMOTE, Bool, 'r', "remote",
      "List remote peers and their owning processes.");
 FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
-     "Report container and Kubernetes runtime evidence.");
+     "Report container runtime evidence.");
 FLAG(EVILISO_KUBERNETES, Bool, '\0', "kubernetes",
      "Report Kubernetes runtime evidence.");
 FLAG(EVILISO_CONTAINER, Bool, '\0', "container",
