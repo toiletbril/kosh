@@ -192,13 +192,16 @@ public:
   fn reserve(usize operation_count) throws -> void;
   fn add(batch_operation operation) throws -> void;
   fn clear() wontthrow -> void;
-  fn execute(ArrayList<batch_result> &results) const throws -> void;
-  fn execute() const throws -> ArrayList<batch_result>;
+  fn execute(ArrayList<batch_result> &results) throws -> void;
+  fn execute() throws -> ArrayList<batch_result>;
 
   pure fn count() const wontthrow -> usize;
 
 private:
   ArrayList<batch_operation> m_operations;
+  ArrayList<usize> m_canonical_positions;
+  ArrayList<usize> m_buckets;
+  ArrayList<batch_operation> m_optimized_operations;
 };
 
 } /* namespace koshka::os */

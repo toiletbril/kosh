@@ -74,7 +74,11 @@ fn batch_operation::exists(const Path &path) wontthrow -> batch_operation
   return operation;
 }
 
-Batch::Batch(Allocator allocator) : m_operations(allocator) {}
+Batch::Batch(Allocator allocator)
+    : m_operations(allocator), m_canonical_positions(allocator),
+      m_buckets(allocator), m_optimized_operations(allocator)
+{
+}
 
 fn Batch::reserve(usize operation_count) throws -> void
 {
@@ -134,7 +138,8 @@ static pure fn is_metadata_request(
 
 static fn find_canonical_operation_positions(
     const ArrayList<batch_internal::batched_syscall> &operations,
-    ArrayList<usize> &canonical_positions) throws -> usize
+    ArrayList<usize> &canonical_positions, ArrayList<usize> &buckets) throws
+    -> usize
 {
   constexpr usize LINEAR_METADATA_LIMIT = 8;
   usize metadata_count = 0;
@@ -177,7 +182,7 @@ static fn find_canonical_operation_positions(
   while (bucket_count < metadata_count * 2)
     bucket_count *= 2;
 
-  let buckets = ArrayList<usize>{operations.allocator()};
+  buckets.clear();
   buckets.reserve(bucket_count);
   for (usize index = 0; index < bucket_count; index++)
     buckets.push(SIZE_MAX);
@@ -218,11 +223,14 @@ static fn find_canonical_operation_positions(
   return has_repeated_request ? unique_operation_count : 0;
 }
 
-fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
+fn Batch::execute(ArrayList<batch_result> &results) throws -> void
 {
-  let canonical_positions = ArrayList<usize>{m_operations.allocator()};
-  let const unique_operation_count =
-      find_canonical_operation_positions(m_operations, canonical_positions);
+  m_canonical_positions.clear();
+  m_buckets.clear();
+  m_optimized_operations.clear();
+  defer { m_optimized_operations.clear(); };
+  let const unique_operation_count = find_canonical_operation_positions(
+      m_operations, m_canonical_positions, m_buckets);
   if (unique_operation_count == 0) {
     results.clear();
     results.reserve(m_operations.count());
@@ -234,27 +242,26 @@ fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
     return;
   }
 
-  let optimized_operations =
-      ArrayList<batch_internal::batched_syscall>{m_operations.allocator()};
-  optimized_operations.reserve(unique_operation_count);
+  m_optimized_operations.reserve(unique_operation_count);
   for (usize index = 0; index < m_operations.count(); index++) {
-    let const canonical_position = canonical_positions[index];
+    let const canonical_position = m_canonical_positions[index];
     if (canonical_position != index) {
-      canonical_positions[index] = canonical_positions[canonical_position];
+      m_canonical_positions[index] =
+          m_canonical_positions[canonical_position];
       continue;
     }
 
-    canonical_positions[index] = optimized_operations.count();
-    optimized_operations.push(m_operations[index]);
+    m_canonical_positions[index] = m_optimized_operations.count();
+    m_optimized_operations.push(m_operations[index]);
   }
 
   results.clear();
   results.reserve(m_operations.count());
-  for (usize index = 0; index < optimized_operations.count(); index++)
+  for (usize index = 0; index < m_optimized_operations.count(); index++)
     results.push({});
 
-  batch_internal::execute_batch_operations(optimized_operations.begin(),
-                                           optimized_operations.count(),
+  batch_internal::execute_batch_operations(m_optimized_operations.begin(),
+                                           m_optimized_operations.count(),
                                            results.begin());
 
   while (results.count() < m_operations.count())
@@ -263,13 +270,14 @@ fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
        remaining_count--)
   {
     let const index = remaining_count - 1;
-    let const optimized_position = canonical_positions[index];
+    let const optimized_position = m_canonical_positions[index];
     let result = results[optimized_position];
     result.request_id = index;
     results[index] = result;
 
     let const &operation = m_operations[index];
-    let const &optimized_operation = optimized_operations[optimized_position];
+    let const &optimized_operation =
+        m_optimized_operations[optimized_position];
     let *status = batch_internal::batch_operation_access::get_status(operation);
     let *optimized_status =
         batch_internal::batch_operation_access::get_status(optimized_operation);
@@ -281,7 +289,7 @@ fn Batch::execute(ArrayList<batch_result> &results) const throws -> void
   }
 }
 
-fn Batch::execute() const throws -> ArrayList<batch_result>
+fn Batch::execute() throws -> ArrayList<batch_result>
 {
   let results = ArrayList<batch_result>{m_operations.allocator()};
   execute(results);
