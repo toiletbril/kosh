@@ -255,8 +255,8 @@ fn append_network_interface_report(String &output, bool should_color) throws
     cells.push({address.address.view(), colors::ansi::RESET});
     table.add_row(cells);
   }
-  append_table_title(output, "Network interfaces", should_color);
-  output += table.to_string(should_color, "  ").view();
+  append_titled_report_table(output, "Network interfaces", table,
+                             should_color);
 
   return addresses.count();
 }

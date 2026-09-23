@@ -171,10 +171,7 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
                                               : colors::ansi::BOLD_RED});
       table.add_row(cells);
     }
-    append_report_text(output, "Filesystems", colors::ansi::BOLD_BLUE,
-                       should_color);
-    output += '\n';
-    output += table.to_string(should_color, "  ").view();
+    append_titled_report_table(output, "Filesystems", table, should_color);
     if (skipped_permission_count != 0) {
       skipped_warning = "Skipped ";
       skipped_warning +=
@@ -205,10 +202,7 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
     cells.push({mount.options.view(), colors::ansi::DIM});
     table.add_row(cells);
   }
-  append_report_text(output, "Filesystems", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += '\n';
-  output += table.to_string(should_color, "  ").view();
+  append_titled_report_table(output, "Filesystems", table, should_color);
 
   ec.print_to_stdout(output);
   return mounts.is_empty() ? 1 : 0;

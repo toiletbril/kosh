@@ -425,6 +425,9 @@ private:
   ArrayList<report_table_column> m_columns;
   ArrayList<ArrayList<report_table_cell>> m_grid_rows;
 };
+fn append_titled_report_table(String &output, StringView title,
+                              const ReportTable &table,
+                              bool should_color) throws -> void;
 fn append_report_table(String &output, const ArrayList<report_table_row> &rows,
                        bool should_color, StringView indentation = "  ") throws
     -> void;

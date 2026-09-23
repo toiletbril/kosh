@@ -382,10 +382,6 @@ fn get_process_window_status(const live_process_row &row,
   return status;
 }
 
-fn append_titled_table(String &output, StringView title,
-                       const ReportTable &table, bool should_color) throws
-    -> void;
-
 fn append_process_io_rate_report(
     String &output, const ArrayList<io_row> &rows, usize row_limit,
     Allocator allocator, bool should_color, StringView duration_suffix,
@@ -429,7 +425,7 @@ fn append_process_io_rate_report(
     cells.push({row.name.view(), colors::ansi::BOLD_CYAN});
     table.add_row(cells);
   }
-  append_titled_table(output, "Process I/O", table, should_color);
+  append_titled_report_table(output, "Process I/O", table, should_color);
 }
 
 pure fn find_disk_io_status(const os::disk_io_snapshot &snapshot,
@@ -724,20 +720,6 @@ fn tenths_text(u64 tenths, Allocator allocator,
   return result;
 }
 
-fn append_titled_table(String &output, StringView title,
-                       const ReportTable &table, bool should_color) throws
-    -> void
-{
-  if (!output.is_empty()) {
-    while (!output.is_empty() && output.back() == '\n')
-      output.truncate(output.length() - 1);
-    output += "\n\n";
-  }
-  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
-  output += table.to_string(should_color, "  ").view();
-}
-
 fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
                          bool is_sampled, Allocator allocator, bool should_color,
                          StringView duration_suffix = "/S") throws -> void
@@ -841,7 +823,7 @@ fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
                                     : colors::ansi::GREEN});
     table.add_row(cells);
   }
-  append_titled_table(output, "Disk I/O", table, should_color);
+  append_titled_report_table(output, "Disk I/O", table, should_color);
 }
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        usize row_limit, Maybe<evilio_sort_key> sort_key,
@@ -1203,8 +1185,8 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
                    String::from(total_write_operation_count, allocator),
                    allocator);
   }
-  append_titled_table(output, "Process I/O summary", summary_table,
-                      should_color);
+  append_titled_report_table(output, "Process I/O summary", summary_table,
+                             should_color);
 
   let process_table = ReportTable{allocator};
   process_table.add_column("PID", report_table_alignment::Right,
@@ -1250,7 +1232,8 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
     cells.push({row.name.view(), colors::ansi::BOLD_CYAN});
     process_table.add_row(cells);
   }
-  append_titled_table(output, "Processes", process_table, should_color);
+  append_titled_report_table(output, "Processes", process_table,
+                             should_color);
 }
 
 } /* namespace */
@@ -1624,7 +1607,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
         add_metric_row(table, "Stolen CPU time",
                        percent_text(*stolen, total, allocator), allocator);
       }
-      append_titled_table(output, "Processor activity", table, should_color);
+      append_titled_report_table(output, "Processor activity", table,
+                                 should_color);
     }
   }
 
@@ -1712,7 +1696,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (has_memory_status || (has_activity_before && has_activity_after))
-    append_titled_table(output, "Memory", memory_table, should_color);
+    append_titled_report_table(output, "Memory", memory_table, should_color);
 
   let paging_table = make_metric_table(allocator);
   if (has_activity_before && has_activity_after) {
@@ -1760,7 +1744,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (has_activity_before && has_activity_after)
-    append_titled_table(output, "Paging", paging_table, should_color);
+    append_titled_report_table(output, "Paging", paging_table, should_color);
 
   let scheduler_table = make_metric_table(allocator);
   if (has_activity_after) {
@@ -1783,7 +1767,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (has_activity_after)
-    append_titled_table(output, "Scheduler", scheduler_table, should_color);
+    append_titled_report_table(output, "Scheduler", scheduler_table,
+                               should_color);
 
   let stalls_table = make_metric_table(allocator);
   if (has_activity_before && has_activity_after) {
@@ -1849,7 +1834,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   if (has_activity_before && has_activity_after)
-    append_titled_table(output, "Pressure stalls", stalls_table, should_color);
+    append_titled_report_table(output, "Pressure stalls", stalls_table,
+                               should_color);
 
   if (!disk_after.disks.is_empty() || FLAG_EVILIO_CUMULATIVE.is_enabled()) {
     let disk_rows = make_disk_io_rows(
@@ -1924,7 +1910,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                    swap_after.is_encrypted ? "enabled" : "disabled");
     }
   }
-  append_titled_table(output, "Swap", swap_table, should_color);
+  append_titled_report_table(output, "Swap", swap_table, should_color);
 
   ec.print_to_stdout(output);
   return 0;

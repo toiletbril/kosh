@@ -30,20 +30,6 @@ namespace koshka::koshkit {
 
 namespace {
 
-fn append_titled_table(String &output, StringView title,
-                       const ReportTable &table, bool should_color) throws
-    -> void
-{
-  if (!output.is_empty()) {
-    while (!output.is_empty() && output.back() == '\n')
-      output.truncate(output.length() - 1);
-    output += "\n\n";
-  }
-  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
-  output += table.to_string(should_color, "  ").view();
-}
-
 struct disk_row
 {
   String source{heap_allocator()};
@@ -395,8 +381,8 @@ fn EvilDisk::execute(
     cells.push({row.target.view(), colors::ansi::BOLD_GREEN});
     capacity_table.add_row(cells);
   }
-  append_titled_table(output, "Filesystem capacity", capacity_table,
-                      should_color);
+  append_titled_report_table(output, "Filesystem capacity", capacity_table,
+                             should_color);
 
   let disk_snapshot = os::read_disk_io_snapshot(allocator);
   disk_snapshot.disks.sort(
@@ -458,7 +444,8 @@ fn EvilDisk::execute(
       }
       table.add_row(cells);
     }
-    append_titled_table(output, "Disk failure counters", table, should_color);
+    append_titled_report_table(output, "Disk failure counters", table,
+                               should_color);
   }
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
@@ -497,8 +484,8 @@ fn EvilDisk::execute(
         cells.push({row.uuid, colors::ansi::DIM});
         table.add_row(cells);
       }
-      append_titled_table(output, "Filesystem identities", table,
-                          should_color);
+      append_titled_report_table(output, "Filesystem identities", table,
+                                 should_color);
     }
 
     let table = ReportTable{allocator};
@@ -576,7 +563,8 @@ fn EvilDisk::execute(
       cells.push({recorded_error_count.view(), colors::ansi::RESET});
       table.add_row(cells);
     }
-    append_titled_table(output, "Filesystem integrity", table, should_color);
+    append_titled_report_table(output, "Filesystem integrity", table,
+                               should_color);
   }
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
@@ -614,7 +602,7 @@ fn EvilDisk::execute(
                         row.warning_statistics);
         }
       }
-      append_titled_table(output, "SMART data", table, should_color);
+      append_titled_report_table(output, "SMART data", table, should_color);
     }
   }
 
@@ -630,7 +618,8 @@ fn EvilDisk::execute(
       cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
       table.add_row(cells);
     }
-    append_titled_table(output, "Unavailable sections", table, should_color);
+    append_titled_report_table(output, "Unavailable sections", table,
+                               should_color);
   }
 
   ec.print_to_stdout(output);

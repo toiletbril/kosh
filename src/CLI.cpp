@@ -1246,6 +1246,20 @@ fn ReportTable::to_string() const throws -> String
   return to_string(false);
 }
 
+fn append_titled_report_table(String &output, StringView title,
+                              const ReportTable &table,
+                              bool should_color) throws -> void
+{
+  if (!output.is_empty()) {
+    while (!output.is_empty() && output.back() == '\n')
+      output.truncate(output.length() - 1);
+    output += "\n\n";
+  }
+  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+  output += table.to_string(should_color, "  ").view();
+}
+
 static pure fn report_indentation_width(StringView indentation) wontthrow
     -> usize
 {
