@@ -63,6 +63,7 @@ static constexpr static_string_entry<find_predicate_kind>
         {SSK("-mindepth"), find_predicate_kind::MinimumDepth},
 };
 static constexpr StaticStringMap FIND_PREDICATES{FIND_PREDICATE_ENTRIES};
+constexpr usize FIND_OUTPUT_BUFFER_BYTE_COUNT = 64 * 1024;
 
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
                              const find_options &options,
@@ -127,6 +128,9 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
                     char known_type_letter = 0) throws
     -> void
 {
+  let const directory_scratch = cxt.scratch_mark();
+  defer { cxt.scratch_release(directory_scratch); };
+
   /* The stat reads the symlink, not its target, and a failed stat yields the
      marker '\0' that matches no -type filter and is not descended. */
   os::file_status queried_status{};
@@ -149,6 +153,10 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
   if (find_entry_matches(type_letter, filename, depth, options, allocator)) {
     output += display;
     output += '\n';
+    if (output.length() >= FIND_OUTPUT_BUFFER_BYTE_COUNT) {
+      ec.print_to_stdout(output);
+      output.clear();
+    }
   }
 
   let const should_descend =
@@ -222,6 +230,8 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
   for (usize index = 0; index < children->count(); index++) {
     if (os::INTERRUPT_REQUESTED) return;
 
+    let const child_scratch = cxt.scratch_mark();
+    defer { cxt.scratch_release(child_scratch); };
     let const &child_entry = (*children)[index];
     String child_display{allocator, display};
     if (!child_display.is_empty() && child_display.back() != '/') {
@@ -407,7 +417,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const results = batch.execute();
 
-  let output = String{allocator};
+  let output = String{heap_allocator()};
   i32 status = 0;
   for (usize root_index = 0; root_index < roots.count(); root_index++) {
     let const root = roots[root_index];
