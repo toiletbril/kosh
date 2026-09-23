@@ -1347,6 +1347,153 @@ fn append_runtime_evidence_report(
   append_titled_table(output, "Container runtimes", table, should_color);
 }
 
+fn append_container_report(
+    String &output, bool should_color, bool should_show_detail,
+    const ArrayList<process_cgroup_snapshot> &snapshot,
+    Allocator allocator) throws -> void
+{
+  struct container_summary_row
+  {
+    String runtime;
+    String identifier;
+    usize process_count{0};
+
+    explicit container_summary_row(Allocator allocator)
+        : runtime(allocator), identifier(allocator)
+    {
+    }
+  };
+  struct container_detail_row
+  {
+    String runtime;
+    String identifier;
+    i64 process_id_value{0};
+    String process_id;
+    String name;
+    String role;
+    String cgroup;
+
+    explicit container_detail_row(Allocator allocator)
+        : runtime(allocator), identifier(allocator), process_id(allocator),
+          name(allocator), role(allocator), cgroup(allocator)
+    {
+    }
+  };
+
+  let summary_rows = ArrayList<container_summary_row>{allocator};
+  let detail_rows = ArrayList<container_detail_row>{allocator};
+  let const self_process_id = os::get_current_process_id();
+  for (let const &process : snapshot) {
+    for (usize index = 0; index < process.evidence.count(); index++) {
+      let const &evidence = process.evidence[index];
+      if (evidence.container_id == "-") continue;
+      bool is_process_duplicate = false;
+      for (usize known_index = 0; known_index < index; known_index++) {
+        let const &known = process.evidence[known_index];
+        if (known.runtime == evidence.runtime &&
+            known.container_id == evidence.container_id)
+        {
+          is_process_duplicate = true;
+          break;
+        }
+      }
+      if (!is_process_duplicate) {
+        bool is_known = false;
+        for (let &row : summary_rows) {
+          if (row.runtime != evidence.runtime ||
+              row.identifier != evidence.container_id)
+            continue;
+          row.process_count++;
+          is_known = true;
+          break;
+        }
+        if (!is_known) {
+          let row = container_summary_row{allocator};
+          row.runtime = evidence.runtime.clone();
+          row.identifier = evidence.container_id.clone();
+          row.process_count = 1;
+          summary_rows.push(steal(row));
+        }
+      }
+
+      if (!should_show_detail) continue;
+      bool is_detail_duplicate = false;
+      for (usize known_index = 0; known_index < index; known_index++) {
+        let const &known = process.evidence[known_index];
+        if (known.runtime == evidence.runtime &&
+            known.container_id == evidence.container_id &&
+            known.path == evidence.path)
+        {
+          is_detail_duplicate = true;
+          break;
+        }
+      }
+      if (is_detail_duplicate) continue;
+      let row = container_detail_row{allocator};
+      row.runtime = evidence.runtime.clone();
+      row.identifier = evidence.container_id.clone();
+      row.process_id_value = process.process_id;
+      row.process_id = String::from(process.process_id, allocator);
+      row.name = process.name.clone();
+      row.role = process.process_id == self_process_id ? "self" : "other";
+      row.cgroup = evidence.path.clone();
+      detail_rows.push(steal(row));
+    }
+  }
+  summary_rows.sort([](const container_summary_row &left,
+                       const container_summary_row &right) {
+    if (left.runtime != right.runtime) return left.runtime < right.runtime;
+    return left.identifier < right.identifier;
+  });
+  detail_rows.sort([](const container_detail_row &left,
+                      const container_detail_row &right) {
+    if (left.runtime != right.runtime) return left.runtime < right.runtime;
+    if (left.identifier != right.identifier)
+      return left.identifier < right.identifier;
+    if (left.process_id_value != right.process_id_value)
+      return left.process_id_value < right.process_id_value;
+    return left.cgroup < right.cgroup;
+  });
+
+  let table = ReportTable{allocator};
+  table.add_column("RUNTIME", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("CONTAINER", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  if (!should_show_detail) {
+    table.add_column("PROCESSES", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    for (let const &row : summary_rows) {
+      let count = String::from(row.process_count, allocator);
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
+      cells.push({row.identifier.view(), colors::ansi::CYAN});
+      cells.push({count.view(), colors::ansi::YELLOW});
+      table.add_row(cells);
+    }
+  } else {
+    table.add_column("PID", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("NAME", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("ROLE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("CGROUP", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    for (let const &row : detail_rows) {
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
+      cells.push({row.identifier.view(), colors::ansi::CYAN});
+      cells.push({row.process_id.view(), colors::ansi::YELLOW});
+      cells.push({row.name.view(), colors::ansi::RESET});
+      cells.push({row.role.view(), colors::ansi::BOLD_MAGENTA});
+      cells.push({row.cgroup.view(), colors::ansi::RESET});
+      table.add_row(cells);
+    }
+  }
+  append_titled_table(output, "Containers", table, should_color);
+}
+
 fn append_runtime_report(String &output, bool should_color, bool show_runtime,
                          bool show_kubernetes, bool show_container,
                          bool should_show_detail,
@@ -1358,120 +1505,9 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
     append_runtime_evidence_report(output, should_color, should_show_detail,
                                    snapshot, output.allocator());
 
-  if (show_container) {
-    struct container_row
-    {
-      String runtime{heap_allocator()};
-      String identifier{heap_allocator()};
-      usize process_count{0};
-    };
-    let rows = ArrayList<container_row>{heap_allocator()};
-    for (let const &process : snapshot) {
-      for (usize index = 0; index < process.evidence.count(); index++) {
-        let const &evidence = process.evidence[index];
-        if (evidence.container_id == "-") continue;
-        bool is_duplicate = false;
-        for (usize known_index = 0; known_index < index; known_index++) {
-          let const &known = process.evidence[known_index];
-          if (known.runtime == evidence.runtime &&
-              known.container_id == evidence.container_id)
-          {
-            is_duplicate = true;
-            break;
-          }
-        }
-        if (is_duplicate) continue;
-        bool is_known = false;
-        for (let &row : rows) {
-          if (row.runtime != evidence.runtime ||
-              row.identifier != evidence.container_id)
-            continue;
-          row.process_count++;
-          is_known = true;
-          break;
-        }
-        if (!is_known) {
-          rows.push({evidence.runtime.clone(), evidence.container_id.clone(),
-                     1});
-        }
-      }
-    }
-    rows.sort([](const container_row &left, const container_row &right) {
-      if (left.runtime != right.runtime) return left.runtime < right.runtime;
-      return left.identifier < right.identifier;
-    });
-    let table = ReportTable{heap_allocator()};
-    table.add_column("RUNTIME", report_table_alignment::Left,
-                     colors::ansi::BOLD_CYAN);
-    table.add_column("CONTAINER", report_table_alignment::Left,
-                     colors::ansi::BOLD_CYAN);
-    if (!should_show_detail) {
-      table.add_column("PROCESSES", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      for (let const &row : rows) {
-        let count = String::from(row.process_count, heap_allocator());
-        let cells = ArrayList<report_table_cell_view>{heap_allocator()};
-        cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
-        cells.push({row.identifier.view(), colors::ansi::CYAN});
-        cells.push({count.view(), colors::ansi::YELLOW});
-        table.add_row(cells);
-      }
-    } else {
-      table.add_column("PID", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("NAME", report_table_alignment::Left,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("ROLE", report_table_alignment::Left,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("CGROUP", report_table_alignment::Left,
-                       colors::ansi::BOLD_CYAN);
-      for (let const &process : snapshot) {
-        for (usize index = 0; index < process.evidence.count(); index++) {
-          let const &evidence = process.evidence[index];
-          if (evidence.container_id == "-") continue;
-          bool is_duplicate = false;
-          for (usize known_index = 0; known_index < index; known_index++) {
-            let const &known = process.evidence[known_index];
-            if (known.runtime == evidence.runtime &&
-                known.container_id == evidence.container_id &&
-                known.path == evidence.path)
-            {
-              is_duplicate = true;
-              break;
-            }
-          }
-          if (is_duplicate) continue;
-          let process_id =
-              String::from(process.process_id, heap_allocator());
-          let cells = ArrayList<report_table_cell_view>{heap_allocator()};
-          cells.push({evidence.runtime.view(), colors::ansi::BOLD_GREEN});
-          cells.push({evidence.container_id.view(), colors::ansi::CYAN});
-          cells.push({process_id.view(), colors::ansi::YELLOW});
-          cells.push({process.name.view(), colors::ansi::RESET});
-          cells.push({process.process_id == self_process_id ? StringView{"self"}
-                                                           : StringView{"other"},
-                      colors::ansi::BOLD_MAGENTA});
-          cells.push({evidence.path.view(), colors::ansi::RESET});
-          table.add_row(cells);
-        }
-      }
-    }
-    if (rows.is_empty()) {
-      let cells = ArrayList<report_table_cell_view>{heap_allocator()};
-      cells.push({"-", colors::ansi::RESET});
-      cells.push({"-", colors::ansi::RESET});
-      if (!should_show_detail) {
-        cells.push({"0", colors::ansi::YELLOW});
-      } else {
-        cells.push({"-", colors::ansi::RESET});
-        cells.push({"-", colors::ansi::RESET});
-        cells.push({"host", colors::ansi::BOLD_MAGENTA});
-        cells.push({"None detected", colors::ansi::BOLD_YELLOW});
-      }
-      table.add_row(cells);
-    }
-    append_titled_table(output, "Containers", table, should_color);
-  }
+  if (show_container)
+    append_container_report(output, should_color, should_show_detail, snapshot,
+                            output.allocator());
 
   if (!show_kubernetes) return;
   let const kubernetes =
