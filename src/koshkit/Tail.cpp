@@ -73,6 +73,7 @@ struct regular_tail_state
   u64 next_end{0};
   u64 start_offset{0};
   u64 remaining_newline_count{0};
+  usize read_byte_count{0};
   bool is_byte_mode{false};
   bool has_boundary{false};
   bool is_done{false};
@@ -123,10 +124,7 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
       let const block_size = state.next_end > TAIL_BLOCK_BYTE_COUNT
                                  ? TAIL_BLOCK_BYTE_COUNT
                                  : static_cast<usize>(state.next_end);
-      state.buffer.clear();
-      state.buffer.reserve(block_size);
-      for (usize byte_index = 0; byte_index < block_size; byte_index++)
-        state.buffer.push(0);
+      state.read_byte_count = block_size;
 
       let const block_offset = state.next_end - block_size;
       batch.add(os::batch_operation::read(
@@ -154,7 +152,7 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
         continue;
       }
 
-      let const block_size = state.buffer.count();
+      let const block_size = state.read_byte_count;
       let const block_offset = state.next_end - block_size;
       let block = String{allocator};
       block.append(StringView{state.buffer.begin(), transferred});
@@ -209,6 +207,7 @@ struct forward_tail_state
   u64 file_size{0};
   u64 next_offset{0};
   u64 skipped_newlines{0};
+  usize read_byte_count{0};
   bool is_byte_mode{false};
   bool is_done{false};
   bool has_error{false};
@@ -250,10 +249,7 @@ static fn read_regular_forward_tails(
       let const block_size = remaining > TAIL_BLOCK_BYTE_COUNT
                                  ? TAIL_BLOCK_BYTE_COUNT
                                  : static_cast<usize>(remaining);
-      state.buffer.clear();
-      state.buffer.reserve(block_size);
-      for (usize byte_index = 0; byte_index < block_size; byte_index++)
-        state.buffer.push(0);
+      state.read_byte_count = block_size;
       batch.add(os::batch_operation::read(
           state.descriptor, state.buffer.begin(), block_size,
           state.next_offset));
@@ -298,7 +294,7 @@ static fn read_regular_forward_tails(
             state.buffer.begin() + append_start, transferred - append_start});
 
       state.next_offset += transferred;
-      if (transferred < state.buffer.count() ||
+      if (transferred < state.read_byte_count ||
           state.next_offset >= state.file_size)
         state.is_done = true;
     }
@@ -415,6 +411,9 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.buffer = ArrayList<char>{allocator};
       state.blocks = ArrayList<tail_block>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
+      for (usize byte_index = 0; byte_index < TAIL_BLOCK_BYTE_COUNT;
+           byte_index++)
+        state.buffer.push(0);
       state.blocks.reserve(2);
       regular_states.push(steal(state));
 
@@ -461,6 +460,9 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
           !is_byte_mode && count > 0 ? static_cast<u64>(count - 1) : 0;
       state.buffer = ArrayList<char>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
+      for (usize byte_index = 0; byte_index < TAIL_BLOCK_BYTE_COUNT;
+           byte_index++)
+        state.buffer.push(0);
       forward_states.push(steal(state));
 
       if (forward_states.count() == TAIL_ACTIVE_SOURCE_COUNT) {
