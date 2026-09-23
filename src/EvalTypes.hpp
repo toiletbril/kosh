@@ -247,6 +247,14 @@ struct job
   bool has_unreported_state_change{false};
 };
 
+struct job_table_snapshot
+{
+  Maybe<i64> last_background_pid;
+  ArrayList<job> jobs;
+  ArrayList<os::process> detached_job_processes;
+  i32 next_job_id;
+};
+
 class JobTable
 {
   friend class EvalContext;
@@ -274,6 +282,8 @@ public:
   fn forget_done_jobs() throws -> void;
   fn remove_job(i32 id) throws -> bool;
   fn format_done_job_notifications(StringView line_ending) throws -> String;
+  fn take_snapshot() throws -> job_table_snapshot;
+  fn restore_snapshot(job_table_snapshot snapshot) throws -> void;
 
 private:
   Maybe<i64> m_last_background_pid{};

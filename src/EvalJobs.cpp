@@ -27,6 +27,36 @@ fn JobTable::set_last_background_pid(i64 pid) wontthrow -> void
   m_last_background_pid = pid;
 }
 
+fn JobTable::take_snapshot() throws -> job_table_snapshot
+{
+  let snapshot = job_table_snapshot{m_last_background_pid, steal(m_jobs),
+                                    steal(m_detached_job_processes),
+                                    m_next_job_id};
+  m_next_job_id = 1;
+  return snapshot;
+}
+
+fn JobTable::restore_snapshot(job_table_snapshot snapshot) throws -> void
+{
+  m_last_background_pid = snapshot.last_background_pid;
+
+  for (let const &child_job : m_jobs) {
+    if (child_job.is_primary_process_active)
+      m_detached_job_processes.push(child_job.pid);
+    for (let const process : child_job.earlier_pipeline_processes)
+      m_detached_job_processes.push(process);
+  }
+  snapshot.detached_job_processes.reserve(
+      snapshot.detached_job_processes.count() +
+      m_detached_job_processes.count());
+  for (let const process : m_detached_job_processes)
+    snapshot.detached_job_processes.push(process);
+
+  m_jobs = steal(snapshot.jobs);
+  m_detached_job_processes = steal(snapshot.detached_job_processes);
+  m_next_job_id = snapshot.next_job_id;
+}
+
 fn EvalContext::register_job(os::process pid, StringView command,
                              i64 process_group_id) throws -> i32
 {

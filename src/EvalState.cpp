@@ -783,16 +783,12 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_shell_option_mutations,
       m_local_scopes,
       m_local_scope_depth,
-      m_job_table.m_last_background_pid,
+      m_job_table.take_snapshot(),
       m_getopts_char_index,
       m_getopts_last_optind,
       m_terminal_exec_allowed,
-      steal(m_job_table.m_jobs),
-      steal(m_job_table.m_detached_job_processes),
-      m_job_table.m_next_job_id,
       m_coprocess_read_fd,
       m_coprocess_write_fd};
-  m_job_table.m_next_job_id = 1;
   return snapshot;
 }
 
@@ -853,26 +849,10 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_shell_option_mutations = snapshot.option_mutations;
   m_local_scopes = steal(snapshot.local_scopes);
   m_local_scope_depth = snapshot.local_scope_depth;
-  m_job_table.m_last_background_pid = snapshot.last_background_pid;
+  m_job_table.restore_snapshot(steal(snapshot.job_state));
   m_getopts_char_index = snapshot.getopts_char_index;
   m_getopts_last_optind = snapshot.getopts_last_optind;
   m_terminal_exec_allowed = snapshot.terminal_exec_allowed;
-
-  for (let &child_job : m_job_table.m_jobs) {
-    if (child_job.is_primary_process_active)
-      m_job_table.m_detached_job_processes.push(child_job.pid);
-    for (let const process : child_job.earlier_pipeline_processes)
-      m_job_table.m_detached_job_processes.push(process);
-  }
-  snapshot.detached_job_processes.reserve(
-      snapshot.detached_job_processes.count() +
-      m_job_table.m_detached_job_processes.count());
-  for (let const process : m_job_table.m_detached_job_processes)
-    snapshot.detached_job_processes.push(process);
-  m_job_table.m_jobs = steal(snapshot.jobs);
-  m_job_table.m_detached_job_processes =
-      steal(snapshot.detached_job_processes);
-  m_job_table.m_next_job_id = snapshot.next_job_id;
   m_coprocess_read_fd = snapshot.coprocess_read_fd;
   m_coprocess_write_fd = snapshot.coprocess_write_fd;
 

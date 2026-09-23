@@ -99,13 +99,10 @@ struct eval_state_snapshot
   shell_option_mutations option_mutations;
   ArrayList<ArrayList<local_binding>> local_scopes;
   usize local_scope_depth;
-  Maybe<i64> last_background_pid;
+  job_table_snapshot job_state;
   usize getopts_char_index;
   i64 getopts_last_optind;
   bool terminal_exec_allowed;
-  ArrayList<job> jobs;
-  ArrayList<os::process> detached_job_processes;
-  i32 next_job_id;
   /* The shell descriptors of the live coprocess ride the snapshot, so a
      coprocess started inside a subshell leaves the outer record alone. */
   i32 coprocess_read_fd;
