@@ -501,57 +501,82 @@ fn EvilDisk::execute(
                           should_color);
     }
 
-    struct failure_row
-    {
-      StringView mount;
-      os::filesystem_error_counters counters{};
-    };
-    let failure_rows = ArrayList<failure_row>{allocator};
+    let table = ReportTable{allocator};
+    table.add_column("MOUNT", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("TYPE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("STATUS", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("READ", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("WRITE", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("FLUSH", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("CORRUPTION", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("GENERATION", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("RECORDED ERRORS", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    constexpr StringView SUPPORTED_TYPES[] = {"btrfs", "ext4", "ntfs",
+                                              "ntfs3"};
     for (let const &filesystem : filesystems) {
-      os::filesystem_error_counters counters{};
-      if (!os::read_filesystem_error_counters(filesystem.target.view(),
-                                              counters))
-        continue;
-      failure_rows.push(failure_row{filesystem.target.view(), counters});
-    }
-    if (failure_rows.is_empty()) {
-      unavailable_sections.push("Filesystem failure counters");
-    } else {
-      let table = ReportTable{allocator};
-      table.add_column("MOUNT", report_table_alignment::Left,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("READ", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("WRITE", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("FLUSH", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("CORRUPTION", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      table.add_column("GENERATION", report_table_alignment::Right,
-                       colors::ansi::BOLD_CYAN);
-      for (let const &row : failure_rows) {
-        let const read_count = String::from(row.counters.read_count, allocator);
-        let const write_count =
-            String::from(row.counters.write_count, allocator);
-        let const flush_count =
-            String::from(row.counters.flush_count, allocator);
-        let const corruption_count =
-            String::from(row.counters.corruption_count, allocator);
-        let const generation_count =
-            String::from(row.counters.generation_count, allocator);
-        let cells = ArrayList<report_table_cell_view>{allocator};
-        cells.push({row.mount, colors::ansi::BOLD_GREEN});
-        cells.push({read_count.view(), colors::ansi::RESET});
-        cells.push({write_count.view(), colors::ansi::RESET});
-        cells.push({flush_count.view(), colors::ansi::RESET});
-        cells.push({corruption_count.view(), colors::ansi::RESET});
-        cells.push({generation_count.view(), colors::ansi::RESET});
-        table.add_row(cells);
+      let status = StringView{"unsupported"};
+      let read_count = String{allocator, "-"};
+      let write_count = String{allocator, "-"};
+      let flush_count = String{allocator, "-"};
+      let corruption_count = String{allocator, "-"};
+      let generation_count = String{allocator, "-"};
+      let recorded_error_count = String{allocator, "-"};
+      if (let const evidence = os::read_filesystem_integrity_evidence(
+              filesystem.target.view());
+          evidence.has_value())
+      {
+        switch (evidence->kind) {
+        case os::filesystem_integrity_kind::BtrfsDeviceErrorCounters:
+          status = "device counters";
+          read_count = String::from(evidence->counters.read_count, allocator);
+          write_count =
+              String::from(evidence->counters.write_count, allocator);
+          flush_count = String::from(evidence->counters.flush_count, allocator);
+          corruption_count =
+              String::from(evidence->counters.corruption_count, allocator);
+          generation_count =
+              String::from(evidence->counters.generation_count, allocator);
+          break;
+        case os::filesystem_integrity_kind::Ext4RecordedErrors:
+          status = "recorded errors";
+          recorded_error_count =
+              String::from(evidence->recorded_error_count, allocator);
+          break;
+        case os::filesystem_integrity_kind::NtfsDirtyFlag:
+          status = evidence->is_dirty ? StringView{"dirty"}
+                                      : StringView{"clean"};
+          break;
+        }
+      } else {
+        for (let const type : SUPPORTED_TYPES) {
+          if (filesystem.type.view() != type) continue;
+          status = "unavailable";
+          break;
+        }
       }
-      append_titled_table(output, "Filesystem failure counters", table,
-                          should_color);
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({filesystem.target.view(), colors::ansi::BOLD_GREEN});
+      cells.push({filesystem.type.view(), colors::ansi::BOLD_MAGENTA});
+      cells.push({status, status == "dirty" ? colors::ansi::BOLD_RED
+                                             : colors::ansi::RESET});
+      cells.push({read_count.view(), colors::ansi::RESET});
+      cells.push({write_count.view(), colors::ansi::RESET});
+      cells.push({flush_count.view(), colors::ansi::RESET});
+      cells.push({corruption_count.view(), colors::ansi::RESET});
+      cells.push({generation_count.view(), colors::ansi::RESET});
+      cells.push({recorded_error_count.view(), colors::ansi::RESET});
+      table.add_row(cells);
     }
+    append_titled_table(output, "Filesystem integrity", table, should_color);
   }
 
   if (FLAG_EVILDISK_ALL.is_enabled()) {
