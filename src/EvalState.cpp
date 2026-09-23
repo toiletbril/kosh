@@ -783,16 +783,16 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_shell_option_mutations,
       m_local_scopes,
       m_local_scope_depth,
-      m_last_background_pid,
+      m_job_table.m_last_background_pid,
       m_getopts_char_index,
       m_getopts_last_optind,
       m_terminal_exec_allowed,
-      steal(m_jobs),
-      steal(m_detached_job_processes),
-      m_next_job_id,
+      steal(m_job_table.m_jobs),
+      steal(m_job_table.m_detached_job_processes),
+      m_job_table.m_next_job_id,
       m_coprocess_read_fd,
       m_coprocess_write_fd};
-  m_next_job_id = 1;
+  m_job_table.m_next_job_id = 1;
   return snapshot;
 }
 
@@ -853,25 +853,26 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_shell_option_mutations = snapshot.option_mutations;
   m_local_scopes = steal(snapshot.local_scopes);
   m_local_scope_depth = snapshot.local_scope_depth;
-  m_last_background_pid = snapshot.last_background_pid;
+  m_job_table.m_last_background_pid = snapshot.last_background_pid;
   m_getopts_char_index = snapshot.getopts_char_index;
   m_getopts_last_optind = snapshot.getopts_last_optind;
   m_terminal_exec_allowed = snapshot.terminal_exec_allowed;
 
-  for (let &child_job : m_jobs) {
+  for (let &child_job : m_job_table.m_jobs) {
     if (child_job.is_primary_process_active)
-      m_detached_job_processes.push(child_job.pid);
+      m_job_table.m_detached_job_processes.push(child_job.pid);
     for (let const process : child_job.earlier_pipeline_processes)
-      m_detached_job_processes.push(process);
+      m_job_table.m_detached_job_processes.push(process);
   }
   snapshot.detached_job_processes.reserve(
       snapshot.detached_job_processes.count() +
-      m_detached_job_processes.count());
-  for (let const process : m_detached_job_processes)
+      m_job_table.m_detached_job_processes.count());
+  for (let const process : m_job_table.m_detached_job_processes)
     snapshot.detached_job_processes.push(process);
-  m_jobs = steal(snapshot.jobs);
-  m_detached_job_processes = steal(snapshot.detached_job_processes);
-  m_next_job_id = snapshot.next_job_id;
+  m_job_table.m_jobs = steal(snapshot.jobs);
+  m_job_table.m_detached_job_processes =
+      steal(snapshot.detached_job_processes);
+  m_job_table.m_next_job_id = snapshot.next_job_id;
   m_coprocess_read_fd = snapshot.coprocess_read_fd;
   m_coprocess_write_fd = snapshot.coprocess_write_fd;
 
@@ -1257,15 +1258,15 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   if (m_has_execution_string)
     append_subshell_bootstrap_text(body, m_execution_string.view());
   append_subshell_bootstrap_text(body, m_last_argument.view());
-  body.push(static_cast<char>(m_last_background_pid.has_value()));
-  if (m_last_background_pid.has_value())
-    append_subshell_bootstrap_i64(body, *m_last_background_pid);
+  body.push(static_cast<char>(m_job_table.m_last_background_pid.has_value()));
+  if (m_job_table.m_last_background_pid.has_value())
+    append_subshell_bootstrap_i64(body, *m_job_table.m_last_background_pid);
   append_subshell_bootstrap_u64(body, m_random_state);
   append_subshell_bootstrap_i64(body, m_shell_start_time);
   append_subshell_bootstrap_i64(body, m_seconds_base);
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_getopts_char_index));
   append_subshell_bootstrap_i64(body, m_getopts_last_optind);
-  append_subshell_bootstrap_i32(body, m_next_job_id);
+  append_subshell_bootstrap_i32(body, m_job_table.m_next_job_id);
   append_subshell_bootstrap_runtime(body, RuntimeState::capture(*this));
   append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
   append_subshell_bootstrap_u64(body, m_shopt_option_values);
@@ -1327,8 +1328,9 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     return process_index;
   };
 
-  append_subshell_bootstrap_u32(body, static_cast<u32>(m_jobs.count()));
-  for (let const &child_job : m_jobs) {
+  append_subshell_bootstrap_u32(
+      body, static_cast<u32>(m_job_table.m_jobs.count()));
+  for (let const &child_job : m_job_table.m_jobs) {
     append_subshell_bootstrap_i32(body, child_job.id);
     append_subshell_bootstrap_text(body, child_job.command.view());
     append_subshell_bootstrap_i64(body, child_job.process_id);
@@ -1349,8 +1351,8 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   }
 
   append_subshell_bootstrap_u32(
-      body, static_cast<u32>(m_detached_job_processes.count()));
-  for (let const process : m_detached_job_processes)
+      body, static_cast<u32>(m_job_table.m_detached_job_processes.count()));
+  for (let const process : m_job_table.m_detached_job_processes)
     append_subshell_bootstrap_u32(body, do_reference_process(process));
 
   append_subshell_bootstrap_u64(body, m_startup_ignored_signals);
@@ -1666,7 +1668,7 @@ fn EvalContext::apply_subshell_bootstrap(
   m_has_execution_string = has_execution_string;
   m_execution_string = steal(execution_string);
   m_last_argument = steal(last_argument);
-  m_last_background_pid = last_background_pid;
+  m_job_table.m_last_background_pid = last_background_pid;
   m_random_state = random_state;
   m_shell_start_time = shell_start_time;
   m_seconds_base = seconds_base;
@@ -1690,10 +1692,10 @@ fn EvalContext::apply_subshell_bootstrap(
   }
   m_completion_specs = steal(completion_specs);
   m_default_completion_spec = steal(default_completion_spec);
-  m_jobs = steal(jobs);
-  m_detached_job_processes = steal(detached_processes);
+  m_job_table.m_jobs = steal(jobs);
+  m_job_table.m_detached_job_processes = steal(detached_processes);
   bootstrap.release_process_ownership();
-  m_next_job_id = next_job_id;
+  m_job_table.m_next_job_id = next_job_id;
 }
 
 fn EvalContext::option_flags_string() const throws -> String

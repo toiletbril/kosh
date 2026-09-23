@@ -374,8 +374,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     case '?': return String::from(m_last_exit_status, heap_allocator());
     case '$': return String::from(os::get_shell_process_id(), heap_allocator());
     case '!':
-      return m_last_background_pid
-                 ? String::from(*m_last_background_pid, heap_allocator())
+      return m_job_table.m_last_background_pid
+                 ? String::from(*m_job_table.m_last_background_pid,
+                                heap_allocator())
                  : String{heap_allocator()};
     case '-': return option_flags_string();
     case '#':

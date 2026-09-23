@@ -19,23 +19,23 @@ namespace koshka {
 
 fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
 {
-  m_last_background_pid = pid;
+  m_job_table.m_last_background_pid = pid;
 }
 
 fn EvalContext::register_job(os::process pid, StringView command,
                              i64 process_group_id) throws -> i32
 {
   let new_job = job{};
-  new_job.id = m_next_job_id++;
+  new_job.id = m_job_table.m_next_job_id++;
   new_job.pid = pid;
   new_job.process_id = os::process_id_of(pid);
   new_job.process_group_id = process_group_id;
   new_job.command = command;
   new_job.state = job::State::Running;
-  m_jobs.push(steal(new_job));
-  ASSERT(!m_jobs.is_empty());
-  LOG(Info, "registered job %d", m_jobs.back().id);
-  return m_jobs.back().id;
+  m_job_table.m_jobs.push(steal(new_job));
+  ASSERT(!m_job_table.m_jobs.is_empty());
+  LOG(Info, "registered job %d", m_job_table.m_jobs.back().id);
+  return m_job_table.m_jobs.back().id;
 }
 
 fn EvalContext::register_pipeline_job(const ArrayList<os::process> &processes,
@@ -44,7 +44,7 @@ fn EvalContext::register_pipeline_job(const ArrayList<os::process> &processes,
                                       i64 process_group_id) throws -> i32
 {
   let new_job = job{};
-  new_job.id = m_next_job_id++;
+  new_job.id = m_job_table.m_next_job_id++;
   new_job.pid = primary_process;
   new_job.process_id = os::process_id_of(primary_process);
   new_job.process_group_id = process_group_id;
@@ -59,10 +59,10 @@ fn EvalContext::register_pipeline_job(const ArrayList<os::process> &processes,
     new_job.earlier_pipeline_processes.push(process);
   }
 
-  m_jobs.push(steal(new_job));
-  ASSERT(!m_jobs.is_empty());
-  LOG(Info, "registered pipeline job %d", m_jobs.back().id);
-  return m_jobs.back().id;
+  m_job_table.m_jobs.push(steal(new_job));
+  ASSERT(!m_job_table.m_jobs.is_empty());
+  LOG(Info, "registered pipeline job %d", m_job_table.m_jobs.back().id);
+  return m_job_table.m_jobs.back().id;
 }
 
 fn EvalContext::register_stopped_job(os::process pid, StringView command,
@@ -70,7 +70,7 @@ fn EvalContext::register_stopped_job(os::process pid, StringView command,
     -> i32
 {
   let const id = register_job(pid, command, process_group_id);
-  job &registered = m_jobs.back();
+  job &registered = m_job_table.m_jobs.back();
   registered.state = job::State::Stopped;
   registered.stopped_status = status;
   return id;
@@ -102,9 +102,9 @@ static fn poll_owned_processes(ArrayList<os::process> &processes) wontthrow
 
 fn EvalContext::update_jobs() throws -> void
 {
-  unused(poll_owned_processes(m_detached_job_processes));
+  unused(poll_owned_processes(m_job_table.m_detached_job_processes));
 
-  for (job &job : m_jobs) {
+  for (job &job : m_job_table.m_jobs) {
     if (job.state == job::State::Done) continue;
 
     let const earlier_stopped_status =
@@ -229,18 +229,21 @@ fn EvalContext::wait_for_job_processes(job &job, bool *was_stopped) throws
   }
 }
 
-fn EvalContext::jobs() wontthrow -> ArrayList<job> & { return m_jobs; }
+fn EvalContext::jobs() wontthrow -> ArrayList<job> &
+{
+  return m_job_table.m_jobs;
+}
 
 fn EvalContext::find_job(i32 id) wontthrow -> job *
 {
-  for (job &job : m_jobs)
+  for (job &job : m_job_table.m_jobs)
     if (job.id == id) return &job;
   return nullptr;
 }
 
 fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
 {
-  if (m_jobs.is_empty()) return koshka::None;
+  if (m_job_table.m_jobs.is_empty()) return koshka::None;
 
   StringView body = spec;
   if (!body.is_empty() && body[0] == '%') {
@@ -248,14 +251,16 @@ fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
   }
 
   if (body.is_empty() || body == "+" || body == "%") {
-    return m_jobs.count() - 1;
+    return m_job_table.m_jobs.count() - 1;
   }
   if (body == "-")
-    return m_jobs.count() >= 2 ? m_jobs.count() - 2 : m_jobs.count() - 1;
+    return m_job_table.m_jobs.count() >= 2 ? m_job_table.m_jobs.count() - 2
+                                           : m_job_table.m_jobs.count() - 1;
 
   if (let const parsed_value = body.to<i64>(); !parsed_value.is_error()) {
-    for (usize i = 0; i < m_jobs.count(); i++)
-      if (static_cast<i64>(m_jobs[i].id) == parsed_value.value()) return i;
+    for (usize i = 0; i < m_job_table.m_jobs.count(); i++)
+      if (static_cast<i64>(m_job_table.m_jobs[i].id) == parsed_value.value())
+        return i;
 
     return koshka::None;
   }
@@ -265,10 +270,11 @@ fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
 
   if (body.is_empty()) return koshka::None;
 
-  for (usize i = 0; i < m_jobs.count(); i++) {
+  for (usize i = 0; i < m_job_table.m_jobs.count(); i++) {
     if (wants_substring_match) {
-      if (m_jobs[i].command.find_substring(body).has_value()) return i;
-    } else if (m_jobs[i].command.starts_with(body)) {
+      if (m_job_table.m_jobs[i].command.find_substring(body).has_value())
+        return i;
+    } else if (m_job_table.m_jobs[i].command.starts_with(body)) {
       return i;
     }
   }
@@ -279,7 +285,7 @@ fn EvalContext::find_job_index_by_spec(StringView spec) throws -> Maybe<usize>
 fn EvalContext::find_job_by_spec(StringView spec) throws -> job *
 {
   if (let const index = find_job_index_by_spec(spec); index.has_value())
-    return &m_jobs[*index];
+    return &m_job_table.m_jobs[*index];
   return nullptr;
 }
 
@@ -287,9 +293,10 @@ fn EvalContext::most_recent_job() wontthrow -> job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a running or stopped job
      rather than a dead pid. */
-  for (usize i = m_jobs.count(); i > 0; i--) {
-    ASSERT(i - 1 < m_jobs.count());
-    if (m_jobs[i - 1].state != job::State::Done) return &m_jobs[i - 1];
+  for (usize i = m_job_table.m_jobs.count(); i > 0; i--) {
+    ASSERT(i - 1 < m_job_table.m_jobs.count());
+    if (m_job_table.m_jobs[i - 1].state != job::State::Done)
+      return &m_job_table.m_jobs[i - 1];
   }
   return nullptr;
 }
@@ -297,41 +304,42 @@ fn EvalContext::most_recent_job() wontthrow -> job *
 fn EvalContext::forget_done_jobs() throws -> void
 {
   let kept = ArrayList<job>{heap_allocator()};
-  for (job &job : m_jobs) {
+  for (job &job : m_job_table.m_jobs) {
     if (job.state == job::State::Done) continue;
     kept.push(steal(job));
   }
   LOG(Debug, "dropping finished jobs, keeping %zu of %zu", kept.count(),
-      m_jobs.count());
-  m_jobs = steal(kept);
+      m_job_table.m_jobs.count());
+  m_job_table.m_jobs = steal(kept);
 }
 
 fn EvalContext::remove_job(i32 id) throws -> bool
 {
   let removed_index = Maybe<usize>{None};
-  for (usize position = 0; position < m_jobs.count(); position++)
-    if (m_jobs[position].id == id) {
+  for (usize position = 0; position < m_job_table.m_jobs.count(); position++)
+    if (m_job_table.m_jobs[position].id == id) {
       removed_index = position;
       break;
     }
   if (!removed_index.has_value()) return false;
 
-  let &removed = m_jobs[*removed_index];
+  let &removed = m_job_table.m_jobs[*removed_index];
   let const detached_count = removed.earlier_pipeline_processes.count() +
                              (removed.is_primary_process_active ? 1 : 0);
   let kept = ArrayList<job>{heap_allocator()};
-  kept.reserve(m_jobs.count() - 1);
-  m_detached_job_processes.reserve(m_detached_job_processes.count() +
-                                   detached_count);
+  kept.reserve(m_job_table.m_jobs.count() - 1);
+  m_job_table.m_detached_job_processes.reserve(
+      m_job_table.m_detached_job_processes.count() + detached_count);
 
   if (removed.is_primary_process_active)
-    m_detached_job_processes.push(removed.pid);
+    m_job_table.m_detached_job_processes.push(removed.pid);
   for (let const process : removed.earlier_pipeline_processes)
-    m_detached_job_processes.push(process);
-  for (usize position = 0; position < m_jobs.count(); position++)
-    if (position != *removed_index) kept.push(steal(m_jobs[position]));
+    m_job_table.m_detached_job_processes.push(process);
+  for (usize position = 0; position < m_job_table.m_jobs.count(); position++)
+    if (position != *removed_index)
+      kept.push(steal(m_job_table.m_jobs[position]));
 
-  m_jobs = steal(kept);
+  m_job_table.m_jobs = steal(kept);
   return true;
 }
 
@@ -341,14 +349,14 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
   update_jobs();
 
   let out = String{heap_allocator()};
-  for (usize i = 0; i < m_jobs.count(); i++) {
-    let const &job = m_jobs[i];
+  for (usize i = 0; i < m_job_table.m_jobs.count(); i++) {
+    let const &job = m_job_table.m_jobs[i];
     if (job.state != job::State::Done) continue;
 
     char marker = ' ';
-    if (i == m_jobs.count() - 1) {
+    if (i == m_job_table.m_jobs.count() - 1) {
       marker = '+';
-    } else if (i == m_jobs.count() - 2) {
+    } else if (i == m_job_table.m_jobs.count() - 2) {
       marker = '-';
     }
 

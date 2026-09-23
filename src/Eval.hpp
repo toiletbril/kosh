@@ -2104,7 +2104,6 @@ protected:
      pushd appends the current directory, popd drops the back and moves to it.
    */
   ArrayList<String> m_directory_stack{heap_allocator()};
-  Maybe<i64> m_last_background_pid{};
   StringMap<FunctionBodyHandle> m_functions{heap_allocator()};
   HashSet m_readonly_functions{heap_allocator()};
   usize m_subshell_depth{0};
@@ -2287,9 +2286,7 @@ protected:
   ArrayList<const String *> m_function_call_sources{heap_allocator()};
   bool m_is_script_run{false};
 
-  ArrayList<job> m_jobs{heap_allocator()};
-  ArrayList<os::process> m_detached_job_processes{heap_allocator()};
-  i32 m_next_job_id{1};
+  JobTable m_job_table{heap_allocator()};
   bool m_shell_is_interactive;
 
   fn option_flags_string() const throws -> String;

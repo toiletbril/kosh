@@ -5,7 +5,8 @@
  * This file defines lightweight evaluator enums and value records for
  * argument lifetimes, execution modes, status propagation, restrictions, and
  * glob fields. It also names the value the exported set stores beside each
- * name. It prevents common evaluator types from depending on Eval.hpp.
+ * name and owns the grouped job state kept by EvalContext. It prevents common
+ * evaluator types from depending on Eval.hpp.
  */
 
 #pragma once
@@ -244,6 +245,23 @@ struct job
   State state{State::Running};
   bool is_primary_process_active{true};
   bool has_unreported_state_change{false};
+};
+
+class JobTable
+{
+  friend class EvalContext;
+
+public:
+  explicit JobTable(Allocator allocator)
+      : m_jobs(allocator), m_detached_job_processes(allocator)
+  {
+  }
+
+private:
+  Maybe<i64> m_last_background_pid{};
+  ArrayList<job> m_jobs;
+  ArrayList<os::process> m_detached_job_processes;
+  i32 m_next_job_id{1};
 };
 
 struct environment_undo_entry
