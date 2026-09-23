@@ -118,8 +118,8 @@ static fn expand_posix_class(StringView set, usize position,
   return scan + 2 - position;
 }
 
-static fn expand_set(StringView set, Allocator allocator, bool &is_valid) throws
-    -> String
+static fn expand_set(StringView set, Allocator allocator) throws
+    -> Maybe<String>
 {
   String expanded{allocator};
   usize i = 0;
@@ -137,8 +137,7 @@ static fn expand_set(StringView set, Allocator allocator, bool &is_valid) throws
     if (after < set.length && set[after] == '-' && after + 1 < set.length) {
       let const second = decode_escaped_char(set, after + 1);
       if (first.byte > second.byte) {
-        is_valid = false;
-        return expanded;
+        return None;
       }
 
       for (int c = first.byte; c <= second.byte; c++)
@@ -177,26 +176,26 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
                            "Supply SET1 and SET2, or use `-d` with one set"};
   }
 
-  bool is_valid_set1 = true;
   let const set1 =
-      expand_set(operands[0].view(), cxt.scratch_allocator(), is_valid_set1);
-  if (!is_valid_set1) {
+      expand_set(operands[0].view(), cxt.scratch_allocator());
+  if (!set1.has_value()) {
     KOSHKIT_REPORT_ERROR_AT(
         operand_locations[0], "reverse range in set '" + operands[0] + "'",
         "order the endpoints from the lower byte to the higher byte");
     return 1;
   }
 
-  bool is_valid_set2 = true;
-  let const set2 = is_deleting
-                       ? String{cxt.scratch_allocator()}
-                       : expand_set(operands[1].view(), cxt.scratch_allocator(),
-                                    is_valid_set2);
-  if (!is_valid_set2) {
-    KOSHKIT_REPORT_ERROR_AT(
-        operand_locations[1], "reverse range in set '" + operands[1] + "'",
-        "order the endpoints from the lower byte to the higher byte");
-    return 1;
+  let set2 = String{cxt.scratch_allocator()};
+  if (!is_deleting) {
+    let expanded_set2 =
+        expand_set(operands[1].view(), cxt.scratch_allocator());
+    if (!expanded_set2.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[1], "reverse range in set '" + operands[1] + "'",
+          "order the endpoints from the lower byte to the higher byte");
+      return 1;
+    }
+    set2 = steal(*expanded_set2);
   }
 
   static constexpr usize BYTE_VALUE_COUNT = 256;
@@ -205,8 +204,8 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize i = 0; i < BYTE_VALUE_COUNT; i++)
     translation[i] = static_cast<unsigned char>(i);
 
-  for (usize i = 0; i < set1.count(); i++) {
-    let const from = static_cast<unsigned char>(set1.view()[i]);
+  for (usize i = 0; i < set1->count(); i++) {
+    let const from = static_cast<unsigned char>(set1->view()[i]);
     is_in_set1[from] = true;
     if (!is_deleting && set2.count() > 0) {
       let const index = i < set2.count() ? i : set2.count() - 1;
