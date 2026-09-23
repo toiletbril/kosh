@@ -561,6 +561,71 @@ static fn read_volume_identity(mounted_filesystem &filesystem) wontthrow -> void
 
 #endif
 
+#if defined __linux__
+
+static fn decode_udev_filename(StringView filename, Allocator allocator) throws
+    -> String
+{
+  let decoded = String{allocator};
+  decoded.reserve(filename.length);
+  for (usize position = 0; position < filename.length; position++) {
+    if (filename[position] != '\\' || position + 3 >= filename.length ||
+        filename[position + 1] != 'x')
+    {
+      decoded.push(filename[position]);
+      continue;
+    }
+
+    let const high = utils::hex_digit_value(filename[position + 2]);
+    let const low = utils::hex_digit_value(filename[position + 3]);
+    if (!high.has_value() || !low.has_value()) {
+      decoded.push(filename[position]);
+      continue;
+    }
+
+    decoded.push(static_cast<char>(*high * 16 + *low));
+    position += 3;
+  }
+
+  return decoded;
+}
+
+static fn populate_linux_volume_identity(
+    ArrayList<mounted_filesystem> &filesystems,
+    const ArrayList<Path> &canonical_sources, StringView directory,
+    bool is_uuid) throws -> void
+{
+  let const allocator = heap_allocator();
+  let const identity_directory = Path{directory, allocator};
+  let const entries = Path::read_directory(identity_directory, allocator);
+  if (!entries.has_value()) return;
+
+  for (let const &entry : *entries) {
+    let identity_path = identity_directory.clone();
+    identity_path.append(entry.view());
+    let const canonical_identity = canonical_path(identity_path);
+    if (!canonical_identity.has_value()) continue;
+
+    for (usize index = 0; index < filesystems.count(); index++) {
+      if (canonical_sources[index].is_empty() ||
+          canonical_sources[index] != *canonical_identity)
+      {
+        continue;
+      }
+
+      if (is_uuid) {
+        if (filesystems[index].volume_uuid.is_empty())
+          filesystems[index].volume_uuid = entry.clone();
+      } else if (filesystems[index].volume_name.is_empty()) {
+        filesystems[index].volume_name =
+            decode_udev_filename(entry.view(), allocator);
+      }
+    }
+  }
+}
+
+#endif
+
 static fn
 append_mounted_filesystems(ArrayList<mounted_filesystem> &result) throws -> void
 {
@@ -583,6 +648,19 @@ append_mounted_filesystems(ArrayList<mounted_filesystem> &result) throws -> void
       filesystem.volume_name = String{source.substring(6)};
     result.push(steal(filesystem));
   }
+
+  let canonical_sources = ArrayList<Path>{heap_allocator()};
+  canonical_sources.reserve(result.count());
+  for (let const &filesystem : result) {
+    let const canonical_source = canonical_path(Path{filesystem.source.view()});
+    canonical_sources.push(canonical_source.has_value()
+                               ? steal(*canonical_source)
+                               : Path{});
+  }
+  populate_linux_volume_identity(result, canonical_sources,
+                                 "/dev/disk/by-label", false);
+  populate_linux_volume_identity(result, canonical_sources,
+                                 "/dev/disk/by-uuid", true);
 #elif defined __APPLE__ || defined BSD
   struct statfs *entries = nullptr;
   let const entry_count = getmntinfo(&entries, MNT_NOWAIT);
