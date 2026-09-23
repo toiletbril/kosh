@@ -2027,6 +2027,23 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
        memory_status_field::SwapTotal},
       {"SwapFree", &memory_status::swap_free_kib,
        memory_status_field::SwapFree},
+      {"Buffers", &memory_status::buffer_kib, memory_status_field::Buffers},
+      {"Cached", &memory_status::cached_kib, memory_status_field::Cached},
+      {"SReclaimable", &memory_status::reclaimable_slab_kib,
+       memory_status_field::ReclaimableSlab},
+      {"Shmem", &memory_status::shared_kib, memory_status_field::Shared},
+      {"Slab", &memory_status::slab_kib, memory_status_field::Slab},
+      {"Active", &memory_status::active_kib, memory_status_field::Active},
+      {"Inactive", &memory_status::inactive_kib,
+       memory_status_field::Inactive},
+      {"CommitLimit", &memory_status::commit_limit_kib,
+       memory_status_field::CommitLimit},
+      {"Committed_AS", &memory_status::committed_kib,
+       memory_status_field::Committed},
+      {"HugePages_Total", &memory_status::huge_page_total_count,
+       memory_status_field::HugePagesTotal},
+      {"HugePages_Free", &memory_status::huge_page_free_count,
+       memory_status_field::HugePagesFree},
   };
 
   char buffer[8192];

@@ -688,6 +688,17 @@ enum class memory_status_field : u32
   Free = 1u << 2,
   SwapTotal = 1u << 3,
   SwapFree = 1u << 4,
+  Buffers = 1u << 5,
+  Cached = 1u << 6,
+  ReclaimableSlab = 1u << 7,
+  Shared = 1u << 8,
+  Slab = 1u << 9,
+  Active = 1u << 10,
+  Inactive = 1u << 11,
+  CommitLimit = 1u << 12,
+  Committed = 1u << 13,
+  HugePagesTotal = 1u << 14,
+  HugePagesFree = 1u << 15,
 };
 
 struct memory_status
@@ -697,6 +708,17 @@ struct memory_status
   u64 free_kib{0};
   u64 swap_total_kib{0};
   u64 swap_free_kib{0};
+  u64 buffer_kib{0};
+  u64 cached_kib{0};
+  u64 reclaimable_slab_kib{0};
+  u64 shared_kib{0};
+  u64 slab_kib{0};
+  u64 active_kib{0};
+  u64 inactive_kib{0};
+  u64 commit_limit_kib{0};
+  u64 committed_kib{0};
+  u64 huge_page_total_count{0};
+  u64 huge_page_free_count{0};
   u32 available_fields{0};
 
   pure fn has_field(memory_status_field field) const wontthrow -> bool

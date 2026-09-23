@@ -575,6 +575,19 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     append_report_field(output, "Memory", memory_line.view(),
                         colors::ansi::BOLD_CYAN, should_color);
     if (FLAG_EVIL_ALL.is_enabled()) {
+      let const do_append_memory_size =
+          [&](StringView name, os::memory_status_field field,
+              u64 value_kib) throws -> void {
+        if (!memory.has_field(field)) return;
+
+        let const value_bytes = value_kib > UINT64_MAX / 1024
+                                    ? UINT64_MAX
+                                    : value_kib * 1024;
+        append_report_field(
+            output, name, format_human_size(value_bytes, allocator).view(),
+            colors::ansi::BOLD_CYAN, should_color);
+      };
+
       if (memory.has_field(os::memory_status_field::Available)) {
         append_report_field(
             output, "Memory available",
@@ -585,6 +598,43 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
         append_report_field(
             output, "Memory free",
             format_human_size(memory.free_kib * 1024, allocator).view(),
+            colors::ansi::BOLD_CYAN, should_color);
+      }
+
+      do_append_memory_size("Memory buffers",
+                            os::memory_status_field::Buffers,
+                            memory.buffer_kib);
+      do_append_memory_size("Memory page cache",
+                            os::memory_status_field::Cached,
+                            memory.cached_kib);
+      do_append_memory_size("Memory reclaimable slab",
+                            os::memory_status_field::ReclaimableSlab,
+                            memory.reclaimable_slab_kib);
+      do_append_memory_size("Memory shared", os::memory_status_field::Shared,
+                            memory.shared_kib);
+      do_append_memory_size("Memory slab", os::memory_status_field::Slab,
+                            memory.slab_kib);
+      do_append_memory_size("Memory active", os::memory_status_field::Active,
+                            memory.active_kib);
+      do_append_memory_size("Memory inactive",
+                            os::memory_status_field::Inactive,
+                            memory.inactive_kib);
+      do_append_memory_size("Memory commit limit",
+                            os::memory_status_field::CommitLimit,
+                            memory.commit_limit_kib);
+      do_append_memory_size("Memory committed",
+                            os::memory_status_field::Committed,
+                            memory.committed_kib);
+      if (memory.has_field(os::memory_status_field::HugePagesTotal)) {
+        append_report_field(
+            output, "Huge pages total",
+            String::from(memory.huge_page_total_count, allocator).view(),
+            colors::ansi::BOLD_CYAN, should_color);
+      }
+      if (memory.has_field(os::memory_status_field::HugePagesFree)) {
+        append_report_field(
+            output, "Huge pages free",
+            String::from(memory.huge_page_free_count, allocator).view(),
             colors::ansi::BOLD_CYAN, should_color);
       }
     }

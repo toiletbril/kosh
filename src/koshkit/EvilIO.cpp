@@ -1648,6 +1648,52 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
       add_metric_row(memory_table, "Free memory",
                      format_human_size(free_bytes, allocator), allocator);
     }
+    if (FLAG_EVILIO_ALL.is_enabled()) {
+      let const do_add_memory_size =
+          [&](StringView name, os::memory_status_field field,
+              u64 value_kib) throws -> void {
+        if (!memory.has_field(field)) return;
+
+        let const value_bytes = value_kib > UINT64_MAX / 1024
+                                    ? UINT64_MAX
+                                    : value_kib * 1024;
+        add_metric_row(memory_table, name,
+                       format_human_size(value_bytes, allocator), allocator);
+      };
+
+      do_add_memory_size("Buffer memory", os::memory_status_field::Buffers,
+                         memory.buffer_kib);
+      do_add_memory_size("Page cache memory", os::memory_status_field::Cached,
+                         memory.cached_kib);
+      do_add_memory_size("Reclaimable slab memory",
+                         os::memory_status_field::ReclaimableSlab,
+                         memory.reclaimable_slab_kib);
+      do_add_memory_size("Shared memory", os::memory_status_field::Shared,
+                         memory.shared_kib);
+      do_add_memory_size("Slab memory", os::memory_status_field::Slab,
+                         memory.slab_kib);
+      do_add_memory_size("Active memory", os::memory_status_field::Active,
+                         memory.active_kib);
+      do_add_memory_size("Inactive memory",
+                         os::memory_status_field::Inactive,
+                         memory.inactive_kib);
+      do_add_memory_size("Commit limit",
+                         os::memory_status_field::CommitLimit,
+                         memory.commit_limit_kib);
+      do_add_memory_size("Committed virtual memory",
+                         os::memory_status_field::Committed,
+                         memory.committed_kib);
+      if (memory.has_field(os::memory_status_field::HugePagesTotal)) {
+        add_metric_row(
+            memory_table, "Huge pages total",
+            String::from(memory.huge_page_total_count, allocator), allocator);
+      }
+      if (memory.has_field(os::memory_status_field::HugePagesFree)) {
+        add_metric_row(
+            memory_table, "Huge pages free",
+            String::from(memory.huge_page_free_count, allocator), allocator);
+      }
+    }
   }
   if (has_activity_before && has_activity_after) {
     if (activity_before.has_field(os::system_activity_field::PageScan) &&
