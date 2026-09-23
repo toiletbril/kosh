@@ -1263,7 +1263,8 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
   return right < left ? 1 : 0;
 }
 
-fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
+static fn windows_system_configuration_value(
+    system_configuration_key key) wontthrow -> Maybe<i64>
 {
   SYSTEM_INFO system_info{};
   GetSystemInfo(&system_info);
@@ -1387,7 +1388,17 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
   return None;
 }
 
-fn path_configuration(StringView path, path_configuration_key key) wontthrow
+fn query_system_configuration(system_configuration_key key) wontthrow
+    -> numeric_configuration_result
+{
+  let const value = windows_system_configuration_value(key);
+  if (!value.has_value())
+    return {configuration_query_status::Undefined, 0};
+  return {configuration_query_status::Value, *value};
+}
+
+static fn windows_path_configuration_value(
+    StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>
 {
   let const path_text = utf8_to_wide(path, heap_allocator());
@@ -1438,10 +1449,24 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
   return None;
 }
 
-fn string_configuration(string_configuration_key, Allocator) throws
-    -> Maybe<String>
+fn query_path_configuration(StringView path,
+                            path_configuration_key key) wontthrow
+    -> numeric_configuration_result
 {
-  return None;
+  SetLastError(ERROR_SUCCESS);
+  let const value = windows_path_configuration_value(path, key);
+  if (value.has_value())
+    return {configuration_query_status::Value, *value};
+  if (GetLastError() != ERROR_SUCCESS)
+    return {configuration_query_status::Error, 0};
+  return {configuration_query_status::Undefined, 0};
+}
+
+fn query_string_configuration(string_configuration_key,
+                              Allocator allocator) throws
+    -> StringConfigurationResult
+{
+  return StringConfigurationResult{allocator};
 }
 
 fn path_component_length(StringView component) wontthrow -> Maybe<usize>

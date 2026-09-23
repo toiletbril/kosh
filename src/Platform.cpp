@@ -34,6 +34,29 @@ pure fn evildisk_tools() wontthrow -> evildisk_platform_tools
 #endif
 }
 
+fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
+{
+  let const result = query_system_configuration(key);
+  if (result.status != configuration_query_status::Value) return None;
+  return result.value;
+}
+
+fn path_configuration(StringView path, path_configuration_key key) wontthrow
+    -> Maybe<i64>
+{
+  let const result = query_path_configuration(path, key);
+  if (result.status != configuration_query_status::Value) return None;
+  return result.value;
+}
+
+fn string_configuration(string_configuration_key key,
+                        Allocator allocator) throws -> Maybe<String>
+{
+  let result = query_string_configuration(key, allocator);
+  if (result.status != configuration_query_status::Value) return None;
+  return steal(result.value);
+}
+
 static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
 
 } /* namespace os */

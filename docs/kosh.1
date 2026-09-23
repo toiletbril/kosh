@@ -1651,6 +1651,19 @@ and
 .B \-u
 options are supported.
 .TP
+.B getconf
+System and string variables take one name. Path variables also take a path.
+An undefined or unsupported variable prints
+.BR undefined .
+A platform query failure prints a diagnostic and returns a nonzero status. The
+.BR \-a ,
+.B \-\-all
+option prints every known variable as a name and value, using the current
+directory for path variables unless a path is supplied. The
+.BR \-v ,
+.B \-\-specification
+option selects a supported POSIX environment.
+.TP
 .B grep
 Regular-expression matches are printed. The
 .B \-i

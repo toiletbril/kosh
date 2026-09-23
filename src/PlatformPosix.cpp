@@ -2649,16 +2649,23 @@ static constexpr int SYSTEM_CONFIGURATION_KEYS[] = {
 static_assert(countof(SYSTEM_CONFIGURATION_KEYS) ==
               static_cast<usize>(system_configuration_key::Count));
 
-fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
+fn query_system_configuration(system_configuration_key key) wontthrow
+    -> numeric_configuration_result
 {
-  if (key == system_configuration_key::Count) return None;
+  if (key == system_configuration_key::Count)
+    return {configuration_query_status::Undefined, 0};
   let const native_key = SYSTEM_CONFIGURATION_KEYS[static_cast<usize>(key)];
-  if (native_key < 0) return None;
+  if (native_key < 0)
+    return {configuration_query_status::Undefined, 0};
 
   errno = 0;
   let const value = sysconf(native_key);
-  if (value == -1 && errno != 0) return None;
-  return static_cast<i64>(value);
+  if (value == -1) {
+    return {errno == 0 ? configuration_query_status::Undefined
+                       : configuration_query_status::Error,
+            0};
+  }
+  return {configuration_query_status::Value, static_cast<i64>(value)};
 }
 
 static constexpr int STRING_CONFIGURATION_KEYS[] = {
@@ -2715,33 +2722,44 @@ static constexpr int STRING_CONFIGURATION_KEYS[] = {
 static_assert(countof(STRING_CONFIGURATION_KEYS) ==
               static_cast<usize>(string_configuration_key::Count));
 
-fn string_configuration(string_configuration_key key,
-                        Allocator allocator) throws -> Maybe<String>
+fn query_string_configuration(string_configuration_key key,
+                              Allocator allocator) throws
+    -> StringConfigurationResult
 {
-  if (key == string_configuration_key::Count) return None;
+  let result = StringConfigurationResult{allocator};
+  if (key == string_configuration_key::Count) return result;
   let const native_key = STRING_CONFIGURATION_KEYS[static_cast<usize>(key)];
-  if (native_key < 0) return None;
+  if (native_key < 0) return result;
 
   errno = 0;
   usize required_size = confstr(native_key, nullptr, 0);
-  if (required_size == 0) return None;
+  if (required_size == 0) {
+    if (errno != 0) result.status = configuration_query_status::Error;
+    return result;
+  }
 
   ArrayList<char> buffer{allocator};
   for (usize attempt_count = 0; attempt_count < 4; attempt_count++) {
     buffer.reserve(required_size);
     errno = 0;
     let const actual_size = confstr(native_key, buffer.begin(), required_size);
-    if (actual_size == 0) return None;
+    if (actual_size == 0) {
+      if (errno != 0) result.status = configuration_query_status::Error;
+      return result;
+    }
     if (actual_size > required_size) {
       required_size = actual_size;
       continue;
     }
 
-    return String{
-        allocator, StringView{buffer.begin(), actual_size - 1}
-    };
+    result.status = configuration_query_status::Value;
+    result.value = String{allocator,
+                          StringView{buffer.begin(), actual_size - 1}};
+    return result;
   }
-  return None;
+  errno = EAGAIN;
+  result.status = configuration_query_status::Error;
+  return result;
 }
 
 static constexpr int PATH_CONFIGURATION_KEYS[] = {
@@ -2784,18 +2802,25 @@ static constexpr int PATH_CONFIGURATION_KEYS[] = {
 static_assert(countof(PATH_CONFIGURATION_KEYS) ==
               static_cast<usize>(path_configuration_key::Count));
 
-fn path_configuration(StringView path, path_configuration_key key) wontthrow
-    -> Maybe<i64>
+fn query_path_configuration(StringView path,
+                            path_configuration_key key) wontthrow
+    -> numeric_configuration_result
 {
-  if (key == path_configuration_key::Count) return None;
+  if (key == path_configuration_key::Count)
+    return {configuration_query_status::Undefined, 0};
   let const native_key = PATH_CONFIGURATION_KEYS[static_cast<usize>(key)];
-  if (native_key < 0) return None;
+  if (native_key < 0)
+    return {configuration_query_status::Undefined, 0};
 
   let const path_text = String{heap_allocator(), path};
   errno = 0;
   let const value = pathconf(path_text.c_str(), native_key);
-  if (value == -1 && errno != 0) return None;
-  return static_cast<i64>(value);
+  if (value == -1) {
+    return {errno == 0 ? configuration_query_status::Undefined
+                       : configuration_query_status::Error,
+            0};
+  }
+  return {configuration_query_status::Value, static_cast<i64>(value)};
 }
 
 fn path_component_length(StringView component) wontthrow -> Maybe<usize>

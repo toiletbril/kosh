@@ -1153,6 +1153,37 @@ enum class string_configuration_key : u8
   Count,
 };
 
+enum class configuration_query_status : u8
+{
+  Value,
+  Undefined,
+  Error,
+};
+
+struct numeric_configuration_result
+{
+  configuration_query_status status{configuration_query_status::Undefined};
+  i64 value{0};
+};
+
+class StringConfigurationResult
+{
+public:
+  explicit StringConfigurationResult(Allocator allocator) : value(allocator) {}
+
+  configuration_query_status status{configuration_query_status::Undefined};
+  String value;
+};
+
+fn query_system_configuration(system_configuration_key key) wontthrow
+    -> numeric_configuration_result;
+fn query_path_configuration(StringView path,
+                            path_configuration_key key) wontthrow
+    -> numeric_configuration_result;
+fn query_string_configuration(string_configuration_key key,
+                              Allocator allocator) throws
+    -> StringConfigurationResult;
+
 fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>;
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>;

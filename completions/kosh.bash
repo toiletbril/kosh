@@ -192,6 +192,9 @@ _koshkit_util_flags ()
       echo \
         "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only"
     ;;
+    getconf)
+      echo "-a --all -v --specification"
+    ;;
     evil)
       echo "-a --all -s --short -u --users"
     ;;

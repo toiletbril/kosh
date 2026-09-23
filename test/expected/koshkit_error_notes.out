@@ -324,7 +324,7 @@ note: use increasing positive columns separated by commas or blanks.
      1 |  koshkit date 2026
        |               ^~~~
 === getconf variable location ===
-1:17: error: getconf: unknown variable 'KOSH_MISSING_CONFIGURATION'.
+1:17: error: getconf: Unknown variable 'KOSH_MISSING_CONFIGURATION'.
      1 |  koshkit getconf KOSH_MISSING_CONFIGURATION
        |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
 === locale name location ===
