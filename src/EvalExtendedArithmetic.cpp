@@ -895,7 +895,7 @@ fn ArithmeticValue::add(const ArithmeticValue &left,
   } else {
     let const ordering = compare_limbs(left_magnitude, right_magnitude);
     if (ordering == 0)
-      return from_magnitude(NULL, 0, false, decimal_scale, arena);
+      return from_magnitude(nullptr, 0, false, decimal_scale, arena);
     if (ordering > 0) {
       result = subtract_limbs(left_magnitude, right_magnitude, allocator);
       is_negative = left.is_negative();
@@ -938,7 +938,7 @@ fn ArithmeticValue::multiply(const ArithmeticValue &left,
   let const decimal_scale =
       left.get_decimal_scale() + right.get_decimal_scale();
   if (left.is_zero() || right.is_zero())
-    return from_magnitude(NULL, 0, false, decimal_scale, arena);
+    return from_magnitude(nullptr, 0, false, decimal_scale, arena);
   if (!left.is_promoted() && !right.is_promoted()) {
     i128 result;
     if (!did_signed_multiply_overflow(left.inline_value(), right.inline_value(),

@@ -134,8 +134,8 @@ fn Man::execute(const ExecContext &ec, EvalContext &cxt,
           let name = entry.view().substring_of_length(0, entry.length() - 2);
           let lowered_name = String{cxt.scratch_allocator(), name};
           lowered_name.lowercase_ascii();
-          if (std::strstr(searchable.c_str(), keyword.c_str()) == NULL &&
-              std::strstr(lowered_name.c_str(), keyword.c_str()) == NULL)
+          if (std::strstr(searchable.c_str(), keyword.c_str()) == nullptr &&
+              std::strstr(lowered_name.c_str(), keyword.c_str()) == nullptr)
             continue;
           let const newline = content->view().find_character('\n');
           let const summary = content->view().substring_of_length(

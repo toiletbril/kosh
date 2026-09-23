@@ -59,9 +59,9 @@ static fn parse_touch_time(StringView text, i64 &parsed_time) throws -> bool
   }
   if (main_length != 8 && main_length != 10 && main_length != 12) return false;
 
-  let const now = std::time(NULL);
+  let const now = std::time(nullptr);
   let const *current = std::localtime(&now);
-  if (current == NULL) throw Error{"cannot read the current time"};
+  if (current == nullptr) throw Error{"cannot read the current time"};
 
   struct tm value = *current;
   usize position = 0;
@@ -201,7 +201,7 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const now = static_cast<i64>(std::time(NULL));
+    let const now = static_cast<i64>(std::time(nullptr));
     let const selected_access_time =
         FLAG_TOUCH_REFERENCE.is_set() ? reference_status.access_time
         : requested_time.has_value()  ? *requested_time

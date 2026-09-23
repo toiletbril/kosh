@@ -148,7 +148,7 @@ fn More::execute(const ExecContext &ec, EvalContext &cxt,
               String{cxt.scratch_allocator(),
                      remaining.substring_of_length(0, line_length)};
           if (FLAG_MORE_CASE.is_enabled()) searchable.lowercase_ascii();
-          if (std::strstr(searchable.c_str(), pattern.c_str()) != NULL) {
+          if (std::strstr(searchable.c_str(), pattern.c_str()) != nullptr) {
             output_start = search_position;
             break;
           }

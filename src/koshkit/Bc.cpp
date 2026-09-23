@@ -201,7 +201,7 @@ static fn bc_translate_expression(StringView expression, u32 input_base,
         let variable_name = String{allocator, "__bc_"};
         variable_name += name;
         translated += variable_name.view();
-        if (cxt.lookup_shell_variable(variable_name.view()) == NULL)
+        if (cxt.lookup_shell_variable(variable_name.view()) == nullptr)
           cxt.set_shell_variable(variable_name.view(), "0");
       }
       continue;
@@ -573,7 +573,7 @@ static fn bc_find_function(bc_runtime &runtime, StringView name) wontthrow
   for (let &function : runtime.functions) {
     if (function.name.view() == name) return &function;
   }
-  return NULL;
+  return nullptr;
 }
 
 static fn bc_define_function(StringView statement, bc_runtime &runtime,
@@ -658,7 +658,7 @@ static fn bc_define_function(StringView statement, bc_runtime &runtime,
     function.parameters.push(steal(parsed));
   }
 
-  if (let *existing = bc_find_function(runtime, name); existing != NULL)
+  if (let *existing = bc_find_function(runtime, name); existing != nullptr)
     *existing = steal(function);
   else
     runtime.functions.push(steal(function));
@@ -715,7 +715,7 @@ static fn bc_evaluate_function_call(StringView statement, const ExecContext &ec,
   let const name =
       statement.substring_of_length(name_start, position - name_start);
   let *function = bc_find_function(runtime, name);
-  if (function == NULL) return {};
+  if (function == nullptr) return {};
   while (position < statement.length &&
          (statement[position] == ' ' || statement[position] == '\t'))
     position++;
@@ -781,7 +781,7 @@ static fn bc_evaluate_function_call(StringView statement, const ExecContext &ec,
       let translated = String{cxt.scratch_allocator(), "__bc_"};
       translated += source_name;
       if (let const *array = cxt.lookup_indexed_array(translated.view());
-          array != NULL)
+          array != nullptr)
         argument.array = array->clone();
     } else {
       argument.scalar = bc_evaluate_text(source, cxt, runtime, ec);
@@ -834,7 +834,7 @@ static fn bc_expand_function_calls(StringView expression, const ExecContext &ec,
            (expression[opening_position] == ' ' ||
             expression[opening_position] == '\t'))
       opening_position++;
-    if (bc_find_function(runtime, name) == NULL ||
+    if (bc_find_function(runtime, name) == nullptr ||
         opening_position >= expression.length ||
         expression[opening_position] != '(')
     {

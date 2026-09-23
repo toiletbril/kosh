@@ -215,10 +215,10 @@ struct builtin_rule_entry
 
 constexpr builtin_rule_entry BUILTIN_RULE_ENTRIES[] = {
     {".c",   {"$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<", nullptr, nullptr, nullptr}},
-    {".f",   {"$(FC) $(FFLAGS) $(LDFLAGS) -o $@ $<", NULL, NULL, NULL}         },
+    {".f",   {"$(FC) $(FFLAGS) $(LDFLAGS) -o $@ $<", nullptr, nullptr, nullptr}},
     {".sh",  {"cp $< $@", "chmod a+x $@", nullptr, nullptr}                    },
     {".c.o", {"$(CC) $(CFLAGS) -c $<", nullptr, nullptr, nullptr}              },
-    {".f.o", {"$(FC) $(FFLAGS) -c $<", NULL, NULL, NULL}                       },
+    {".f.o", {"$(FC) $(FFLAGS) -c $<", nullptr, nullptr, nullptr}              },
     {".y.o",
      {"$(YACC) $(YFLAGS) $<", "$(CC) $(CFLAGS) -c y.tab.c", "rm -f y.tab.c",
       "mv y.tab.o $@"}                                                         },
@@ -231,7 +231,8 @@ constexpr builtin_rule_entry BUILTIN_RULE_ENTRIES[] = {
      {"$(CC) -c $(CFLAGS) $<", "$(AR) $(ARFLAGS) $@ $*.o", "rm -f $*.o",
       nullptr}                                                                 },
     {".f.a",
-     {"$(FC) -c $(FFLAGS) $<", "$(AR) $(ARFLAGS) $@ $*.o", "rm -f $*.o", NULL} },
+     {"$(FC) -c $(FFLAGS) $<", "$(AR) $(ARFLAGS) $@ $*.o", "rm -f $*.o",
+      nullptr}                                                                   },
 };
 
 enum class make_variable_origin : u8
@@ -347,9 +348,9 @@ struct makefile
 
   fn find_variable_record(StringView name) const throws -> const make_variable *
   {
-    if (let const *index = variable_index.find(name); index != NULL)
+    if (let const *index = variable_index.find(name); index != nullptr)
       return &variables[*index];
-    return NULL;
+    return nullptr;
   }
 
   fn find_rule(StringView target) const throws -> const make_rule *
@@ -375,7 +376,7 @@ struct makefile
   fn remove_variable(StringView name) throws -> void
   {
     let const *stored_index = variable_index.find(name);
-    if (stored_index == NULL) return;
+    if (stored_index == nullptr) return;
     let const index = *stored_index;
     let const last_index = variables.count() - 1;
     variable_index.erase(name);
@@ -747,9 +748,9 @@ static fn lookup_make_variable(EvalContext &cxt, const makefile &mk,
     lookup.flavor = variable.flavor;
   };
 
-  if (mk.command_variable_names.find(name) != NULL)
+  if (mk.command_variable_names.find(name) != nullptr)
     if (const make_variable *variable = mk.find_variable_record(name);
-        variable != NULL)
+        variable != nullptr)
     {
       do_use_stored(*variable);
       return lookup;
@@ -760,7 +761,8 @@ static fn lookup_make_variable(EvalContext &cxt, const makefile &mk,
   {
     let const base_name = name.substring_of_length(0, 1);
     if (const make_variable *variable = mk.find_variable_record(base_name);
-        variable != NULL && variable->origin == make_variable_origin::Automatic)
+        variable != nullptr &&
+        variable->origin == make_variable_origin::Automatic)
     {
       lookup.set_owned_value(automatic_path_part(
           variable->value.view(), name[1] == 'F', cxt.scratch_allocator()));
@@ -779,7 +781,7 @@ static fn lookup_make_variable(EvalContext &cxt, const makefile &mk,
 
   if (name == StringView{"SHELL"}) {
     if (const make_variable *variable = mk.find_variable_record(name);
-        variable != NULL)
+        variable != nullptr)
     {
       do_use_stored(*variable);
       return lookup;
@@ -801,7 +803,7 @@ static fn lookup_make_variable(EvalContext &cxt, const makefile &mk,
     }
 
   if (const make_variable *variable = mk.find_variable_record(name);
-      variable != NULL)
+      variable != nullptr)
   {
     do_use_stored(*variable);
     return lookup;
@@ -1048,7 +1050,7 @@ static fn save_make_variable(const makefile &mk, StringView name,
   make_variable_snapshot snapshot{allocator};
   snapshot.name = String{allocator, name};
   if (const make_variable *variable = mk.find_variable_record(name);
-      variable != NULL)
+      variable != nullptr)
   {
     snapshot.value = String{allocator, variable->value.view()};
     snapshot.origin = variable->origin;
@@ -1062,7 +1064,7 @@ static fn set_scoped_make_variable(makefile &mk, StringView name,
                                    StringView value, Allocator allocator) throws
     -> void
 {
-  if (let const *index = mk.variable_index.find(name); index != NULL) {
+  if (let const *index = mk.variable_index.find(name); index != nullptr) {
     make_variable &variable = mk.variables[*index];
     variable.value = String{allocator, value};
     variable.origin = make_variable_origin::Automatic;
@@ -1088,7 +1090,7 @@ static fn restore_make_variable(makefile &mk,
   }
 
   let const *index = mk.variable_index.find(snapshot.name.view());
-  ASSERT(index != NULL);
+  ASSERT(index != nullptr);
   make_variable &variable = mk.variables[*index];
   variable.value = String{allocator, snapshot.value.view()};
   variable.origin = snapshot.origin;
@@ -2512,7 +2514,7 @@ static fn parse_makefile(EvalContext &cxt,
   }
   mk.pattern_rules = steal(retained_pattern_rules);
 
-  if (mk.find_variable_record(".DEFAULT_GOAL") != NULL)
+  if (mk.find_variable_record(".DEFAULT_GOAL") != nullptr)
     mk.default_goal = expand_variable(cxt, mk, ".DEFAULT_GOAL", 0);
   make_runtime_flags makefile_flags;
   if (const String *makeflags = mk.find_variable("MAKEFLAGS");
@@ -2562,7 +2564,7 @@ static fn is_make_target_supplyable(EvalContext &cxt, makefile &mk,
     -> bool
 {
   if (active_targets.find(goal) != nullptr) return false;
-  if (let const *cached = supplyability_cache.find(goal); cached != NULL)
+  if (let const *cached = supplyability_cache.find(goal); cached != nullptr)
     return *cached;
   if (Path{goal}.exists() || mk.find_rule(goal) != nullptr) {
     supplyability_cache.set(goal, true);
@@ -3646,7 +3648,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
     let const is_command_variable =
         mk.command_variable_names.find(variable.name.view()) != nullptr;
     let const is_command_line_variable =
-        command_line_variable_names.find(variable.name.view()) != NULL;
+        command_line_variable_names.find(variable.name.view()) != nullptr;
     let const is_exported_variable =
         mk.exported_variable_names.find(variable.name.view()) != nullptr;
     if (!is_command_line_variable && !is_exported_variable &&

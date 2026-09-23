@@ -254,7 +254,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let entries = read_frecency_store(cxt.scratch_allocator());
   let const now = now_epoch_seconds();
 
-  const frecency_entry *best = NULL;
+  const frecency_entry *best = nullptr;
   let best_score = -1.0;
   for (let const &entry : entries) {
     if (!query.is_empty() &&
@@ -272,7 +272,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  if (best == NULL)
+  if (best == nullptr)
     throw make_error_for_arg(
         ec, 1, StringView{"No matching directory for '"} + query + "'");
 

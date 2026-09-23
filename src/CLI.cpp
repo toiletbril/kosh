@@ -802,7 +802,7 @@ fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
 {
   let operand_locations = ArrayList<SourceLocation>{allocator};
   let operands =
-      parse_flags_vec(flags, args, 0, NULL, arg_locations, &operand_locations,
+      parse_flags_vec(flags, args, 0, nullptr, arg_locations, &operand_locations,
                       {}, should_accept_negative_number_operand,
                       should_allow_options_after_operands,
                       should_accept_unknown_flag_operand, allocator);
