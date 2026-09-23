@@ -456,8 +456,7 @@ fn render_children(String &output, ArrayList<tree_node> &nodes, i64 parent_pid,
   }
 }
 
-fn read_process_nodes(Allocator allocator, bool should_read_resources,
-                      usize line_width_limit) throws
+fn read_process_nodes(Allocator allocator, bool should_read_resources) throws
     -> ArrayList<tree_node>
 {
   let const processes = os::enumerate_processes(
@@ -474,18 +473,6 @@ fn read_process_nodes(Allocator allocator, bool should_read_resources,
     node.owner_id = process.owner_id;
     node.name = String{allocator, process.name.view()};
     node.command_line = String{allocator, process.command_line.view()};
-    if (line_width_limit != 0 && line_width_limit != SIZE_MAX &&
-        toiletline::get_display_width(node.command_line.view()) >
-            line_width_limit)
-    {
-      const StringView text = node.command_line.view();
-      usize actual_cells = 0;
-      let const kept_bytes =
-          toiletline::get_byte_offset_at_or_before_display_cell(
-          text, line_width_limit - 3, actual_cells);
-      node.command_line.truncate(kept_bytes);
-      node.command_line += "...";
-    }
     nodes.push(steal(node));
   }
 
@@ -897,8 +884,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let const window_nanoseconds =
         static_cast<u64>(cumulative_interval_seconds * 1000000000.0);
     let history = ArrayList<live_process_cpu_row>{live_allocator};
-    let nodes = read_process_nodes(live_allocator, should_read_resources,
-                                   line_width_limit);
+    let nodes = read_process_nodes(live_allocator, should_read_resources);
     u64 last_sample_nanoseconds = os::monotonic_nanos();
     u64 last_refresh_nanoseconds =
         last_sample_nanoseconds > refresh_interval_nanoseconds
@@ -960,8 +946,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
             live_line_width_limit = terminal_columns;
           unused(terminal_rows);
         }
-        nodes = read_process_nodes(live_allocator, should_read_resources,
-                                   live_line_width_limit);
+        nodes = read_process_nodes(live_allocator, should_read_resources);
         if (should_sample_cpu)
           update_cpu_history(nodes, history, now, window_nanoseconds);
         last_sample_nanoseconds = now;
@@ -1032,8 +1017,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  let nodes = read_process_nodes(allocator, should_read_resources,
-                                 line_width_limit);
+  let nodes = read_process_nodes(allocator, should_read_resources);
   bool is_sampled = false;
   if (FLAG_EVILPS_CUMULATIVE.is_enabled()) {
     let history = ArrayList<live_process_cpu_row>{allocator};
@@ -1047,8 +1031,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       os::INTERRUPT_REQUESTED = 0;
       return 130;
     }
-    nodes = read_process_nodes(allocator, should_read_resources,
-                               line_width_limit);
+    nodes = read_process_nodes(allocator, should_read_resources);
     let const after_nanoseconds = os::monotonic_nanos();
     if (should_sample_cpu)
       update_cpu_history(nodes, history, after_nanoseconds,
