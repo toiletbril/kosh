@@ -50,6 +50,20 @@ namespace koshka::koshkit {
 
 namespace {
 
+fn append_titled_table(String &output, StringView title,
+                       const ReportTable &table, bool should_color) throws
+    -> void
+{
+  if (!output.is_empty()) {
+    while (!output.is_empty() && output.back() == '\n')
+      output.truncate(output.length() - 1);
+    output += "\n\n";
+  }
+  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+  output += table.to_string(should_color, "  ").view();
+}
+
 struct namespace_process
 {
   i64 process_id{0};
@@ -247,7 +261,7 @@ fn append_namespace_report(String &output, bool should_color,
       cells.push({relation.role, colors::ansi::BOLD_MAGENTA});
       table.add_row(cells);
     }
-    output += table.to_string(should_color, "").view();
+    append_titled_table(output, "Namespaces", table, should_color);
     return;
   }
 
@@ -273,7 +287,7 @@ fn append_namespace_report(String &output, bool should_color,
     table.add_row(cells);
     relation_index = group_end;
   }
-  output += table.to_string(should_color, "").view();
+  append_titled_table(output, "Namespaces", table, should_color);
 }
 
 struct cgroup_membership
@@ -620,7 +634,7 @@ fn append_cgroup_report(String &output, bool should_color,
   }
   if (!self_index.has_value()) {
     table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
-    output += table.to_string(should_color, "");
+    append_titled_table(output, "Cgroup membership", table, should_color);
     return;
   }
 
@@ -701,7 +715,7 @@ fn append_cgroup_report(String &output, bool should_color,
     cells.push({row.role, colors::ansi::BOLD_MAGENTA});
     report.add_row(cells);
   }
-  output += report.to_string(should_color, "");
+  append_titled_table(output, "Cgroup membership", report, should_color);
 }
 
 fn eviliso_sessions() throws -> ArrayList<os::user_session>
@@ -789,7 +803,7 @@ fn append_session_report(String &output, bool should_color,
     }
     table.add_row(cells);
   }
-  output += table.to_string(should_color, "").view();
+  append_titled_table(output, "Sessions", table, should_color);
 }
 
 pure fn remote_state_name(os::network_socket_state state) wontthrow
@@ -862,7 +876,7 @@ fn append_remote_report(String &output, bool should_color,
   let table = ReportTable{heap_allocator()};
   if (!os::has_network_socket_listing()) {
     table.add("Sockets", "unavailable", colors::ansi::BOLD_CYAN);
-    output += table.to_string(should_color, "");
+    append_titled_table(output, "Socket summary", table, should_color);
     return;
   }
 
@@ -922,7 +936,7 @@ fn append_remote_report(String &output, bool should_color,
   table.add("Total sockets",
             String::from(socket_count, heap_allocator()).view(),
             colors::ansi::BOLD_CYAN);
-  output += table.to_string(should_color, "");
+  append_titled_table(output, "Socket summary", table, should_color);
   if (!should_show_rows) return;
 
   struct remote_peer_row
@@ -1210,7 +1224,7 @@ fn append_remote_report(String &output, bool should_color,
     }
     peer_table.add_row(cells);
   }
-  output += peer_table.to_string(should_color, "").view();
+  append_titled_table(output, "Remote peers", peer_table, should_color);
 }
 
 fn append_runtime_report(String &output, bool should_color, bool show_runtime,
@@ -1321,11 +1335,10 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
       cells.push({"None detected", colors::ansi::BOLD_YELLOW});
       table.add_row(cells);
     }
-    output += table.to_string(should_color, "").view();
+    append_titled_table(output, "Container runtimes", table, should_color);
   }
 
   if (show_container) {
-    if (!output.is_empty()) output += '\n';
     struct container_row
     {
       String runtime{heap_allocator()};
@@ -1437,11 +1450,10 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
       }
       table.add_row(cells);
     }
-    output += table.to_string(should_color, "").view();
+    append_titled_table(output, "Containers", table, should_color);
   }
 
   if (!show_kubernetes) return;
-  if (!output.is_empty()) output += '\n';
   let const kubernetes =
       os::get_environment_variable("KUBERNETES_SERVICE_HOST");
   let const namespace_file =
@@ -1501,7 +1513,7 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
     cells.push({"Not detected", colors::ansi::BOLD_YELLOW});
     evidence_table.add_row(cells);
   }
-  output += evidence_table.to_string(should_color, "").view();
+  append_titled_table(output, "Kubernetes", evidence_table, should_color);
 
   struct kubernetes_row
   {
@@ -1551,7 +1563,6 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
     if (left.runtime != right.runtime) return left.runtime < right.runtime;
     return left.container_id < right.container_id;
   });
-  output += '\n';
   let workload_table = ReportTable{heap_allocator()};
   workload_table.add_column("SOURCE", report_table_alignment::Left,
                             colors::ansi::BOLD_CYAN);
@@ -1620,7 +1631,8 @@ fn append_runtime_report(String &output, bool should_color, bool show_runtime,
       }
     }
   }
-  output += workload_table.to_string(should_color, "").view();
+  append_titled_table(output, "Kubernetes workloads", workload_table,
+                      should_color);
 }
 
 } // namespace
