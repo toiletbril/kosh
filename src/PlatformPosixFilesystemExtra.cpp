@@ -1518,11 +1518,32 @@ static fn io_uring_supports(const io_uring_probe &probe, u8 opcode) wontthrow
   return false;
 }
 
-static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
+enum class io_uring_open_result : u8
+{
+  Opened,
+  TransientFailure,
+  Unavailable,
+};
+
+static pure fn classify_io_uring_open_failure(i32 error_number) wontthrow
+    -> io_uring_open_result
+{
+  switch (error_number) {
+  case EACCES:
+  case EINVAL:
+  case ENOSYS:
+  case EOPNOTSUPP:
+  case EPERM: return io_uring_open_result::Unavailable;
+  default: return io_uring_open_result::TransientFailure;
+  }
+}
+
+static fn open_io_uring_batch(io_uring_batch &ring) wontthrow
+    -> io_uring_open_result
 {
   ring.descriptor = static_cast<i32>(
       ::syscall(SYS_io_uring_setup, IO_URING_ENTRY_COUNT, &ring.parameters));
-  if (ring.descriptor < 0) return false;
+  if (ring.descriptor < 0) return classify_io_uring_open_failure(errno);
   ring.owner_process_id = get_current_process_id();
 
   alignas(io_uring_probe)
@@ -1533,8 +1554,9 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
       ::syscall(SYS_io_uring_register, ring.descriptor, IORING_REGISTER_PROBE,
                 &probe, static_cast<u32>(IORING_OP_LAST + 1));
   if (probe_result < 0) {
+    let const error_number = errno;
     close_io_uring_batch(ring);
-    return false;
+    return classify_io_uring_open_failure(error_number);
   }
   ring.has_read = io_uring_supports(probe, IORING_OP_READ);
   ring.has_write = io_uring_supports(probe, IORING_OP_WRITE);
@@ -1559,7 +1581,7 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
              MAP_SHARED, ring.descriptor, IORING_OFF_SQ_RING);
   if (ring.submission_mapping == MAP_FAILED) {
     close_io_uring_batch(ring);
-    return false;
+    return io_uring_open_result::TransientFailure;
   }
 
   if (ring.has_shared_mapping) {
@@ -1570,7 +1592,7 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
                MAP_SHARED, ring.descriptor, IORING_OFF_CQ_RING);
     if (ring.completion_mapping == MAP_FAILED) {
       close_io_uring_batch(ring);
-      return false;
+      return io_uring_open_result::TransientFailure;
     }
   }
 
@@ -1579,7 +1601,7 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
              MAP_SHARED, ring.descriptor, IORING_OFF_SQES);
   if (ring.entry_mapping == MAP_FAILED) {
     close_io_uring_batch(ring);
-    return false;
+    return io_uring_open_result::TransientFailure;
   }
 
   let *submission_bytes = static_cast<u8 *>(ring.submission_mapping);
@@ -1608,8 +1630,11 @@ static fn open_io_uring_batch(io_uring_batch &ring) wontthrow -> bool
 
   let const is_usable = *ring.submission_count >= IO_URING_ENTRY_COUNT &&
                         *ring.completion_count >= IO_URING_ENTRY_COUNT;
-  if (!is_usable) close_io_uring_batch(ring);
-  return is_usable;
+  if (!is_usable) {
+    close_io_uring_batch(ring);
+    return io_uring_open_result::Unavailable;
+  }
+  return io_uring_open_result::Opened;
 }
 
 static fn io_uring_batch_supports_operations(const io_uring_batch &ring,
@@ -1677,10 +1702,19 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
   }
 
   static thread_local io_uring_batch ring{};
+  static thread_local i64 unavailable_process_id = -1;
   let const process_id = get_current_process_id();
   if (ring.descriptor >= 0 && ring.owner_process_id != process_id)
     close_io_uring_batch(ring);
-  if (ring.descriptor < 0 && !open_io_uring_batch(ring)) return false;
+  if (ring.descriptor < 0) {
+    if (unavailable_process_id == process_id) return false;
+
+    let const open_result = open_io_uring_batch(ring);
+    if (open_result == io_uring_open_result::Unavailable)
+      unavailable_process_id = process_id;
+    if (open_result != io_uring_open_result::Opened) return false;
+    unavailable_process_id = -1;
+  }
   if (!io_uring_batch_supports_operations(ring, operations, operation_count))
     return false;
 
