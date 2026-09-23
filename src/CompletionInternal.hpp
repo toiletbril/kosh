@@ -13,6 +13,7 @@
 #include "Arena.hpp"
 #include "Completion.hpp"
 #include "Containers.hpp"
+#include "Eval.hpp"
 #include "HashSet.hpp"
 #include "String.hpp"
 #include "StringView.hpp"

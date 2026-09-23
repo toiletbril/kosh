@@ -2,24 +2,63 @@
  *    This file is a part of the Koshka shell, (c) toiletbril, 2026
  *    See the top-level LICENSE file for the licensing information.
  *
- * This file declares completion results, matching modes, lexical construct
- * state, highlight spans, and the incremental highlight cache. The editor and
- * language server share this interface. Individual providers remain private.
+ * This file declares completion results, matching and tab-selector modes,
+ * selector-name conversion, lexical construct state, highlight spans, and the
+ * incremental highlight cache. The editor and language server share this
+ * interface. Individual providers remain private.
  */
 
 #pragma once
 
 #include "Arena.hpp"
 #include "Common.hpp"
-#include "Eval.hpp"
 #include "HashSet.hpp"
 #include "Highlight.hpp"
+#include "Maybe.hpp"
 #include "Path.hpp"
+#include "StaticStringMap.hpp"
 #include "String.hpp"
 #include "StringMap.hpp"
 #include "StringView.hpp"
 
 namespace koshka {
+
+class EvalContext;
+
+/* The presentation the editor uses when a completion has several candidates.
+   Interactive draws the shell's own bounded menu under the prompt. External
+   launches the configured selector program. Plain prints the candidate list the
+   way a terminal shell without an editor does. */
+enum class tab_selector_mode : u8
+{
+  Interactive,
+  External,
+  Plain,
+};
+
+inline pure fn parse_tab_selector_name(StringView name) throws
+    -> Maybe<tab_selector_mode>
+{
+  static constexpr static_string_entry<tab_selector_mode>
+      TAB_SELECTOR_ENTRIES[] = {
+          {SSK("interactive"), tab_selector_mode::Interactive},
+          {SSK("external"),    tab_selector_mode::External   },
+          {SSK("plain"),       tab_selector_mode::Plain      },
+  };
+  static constexpr StaticStringMap TAB_SELECTORS{TAB_SELECTOR_ENTRIES};
+  return TAB_SELECTORS.find(name);
+}
+
+inline pure fn tab_selector_name(tab_selector_mode selector) wontthrow
+    -> StringView
+{
+  switch (selector) {
+  case tab_selector_mode::Interactive: return "interactive";
+  case tab_selector_mode::External: return "external";
+  case tab_selector_mode::Plain: return "plain";
+  }
+  return "interactive";
+}
 
 namespace completion {
 

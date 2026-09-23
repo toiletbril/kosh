@@ -16,13 +16,13 @@
 #include "Bitset.hpp"
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "Completion.hpp"
 #include "Containers.hpp"
 #include "Errors.hpp"
 #include "Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "TabSelector.hpp"
 
 namespace koshka {
 

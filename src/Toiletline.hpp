@@ -9,12 +9,12 @@
  */
 
 #include "ArrayList.hpp"
+#include "Completion.hpp"
 #include "Common.hpp"
 #include "ErrorOr.hpp"
 #include "Path.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
-#include "TabSelector.hpp"
 #include "ToiletlineHistory.hpp"
 
 #define TL_HISTORY_MAX_SIZE (1024 * 4)
