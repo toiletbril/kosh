@@ -516,6 +516,129 @@ pure fn disk_failure_total(const os::disk_io_status *before,
   return has_total ? Maybe<u64>{total} : Maybe<u64>{};
 }
 
+fn make_disk_io_row(const os::disk_io_status *before,
+                    const os::disk_io_status &after,
+                    u64 elapsed_nanoseconds, bool is_sampled,
+                    Allocator allocator) throws -> disk_io_row
+{
+  disk_io_row row{};
+  row.name = String{allocator, after.name.view()};
+  if (is_sampled) {
+    if (before != nullptr) {
+      if (before->has_field(os::disk_io_field::ReadBytes) &&
+          after.has_field(os::disk_io_field::ReadBytes))
+      {
+        row.read = counter_delta(before->read_bytes, after.read_bytes);
+      }
+      if (before->has_field(os::disk_io_field::WrittenBytes) &&
+          after.has_field(os::disk_io_field::WrittenBytes))
+      {
+        row.write = counter_delta(before->written_bytes, after.written_bytes);
+      }
+      if (before->has_field(os::disk_io_field::ReadOperations) &&
+          after.has_field(os::disk_io_field::ReadOperations))
+      {
+        row.read_operations = counter_delta(before->read_operation_count,
+                                            after.read_operation_count);
+      }
+      if (before->has_field(os::disk_io_field::WriteOperations) &&
+          after.has_field(os::disk_io_field::WriteOperations))
+      {
+        row.write_operations = counter_delta(before->write_operation_count,
+                                             after.write_operation_count);
+      }
+    }
+  } else {
+    if (after.has_field(os::disk_io_field::ReadBytes))
+      row.read = after.read_bytes;
+    if (after.has_field(os::disk_io_field::WrittenBytes))
+      row.write = after.written_bytes;
+    if (after.has_field(os::disk_io_field::ReadOperations))
+      row.read_operations = after.read_operation_count;
+    if (after.has_field(os::disk_io_field::WriteOperations))
+      row.write_operations = after.write_operation_count;
+  }
+
+  if (is_sampled && before != nullptr && elapsed_nanoseconds != 0) {
+    if (before->has_field(os::disk_io_field::BusyTime) &&
+        after.has_field(os::disk_io_field::BusyTime))
+    {
+      if (let const delta = counter_delta(before->busy_time_nanoseconds,
+                                          after.busy_time_nanoseconds);
+          delta.has_value())
+      {
+        let const busy =
+            *delta < elapsed_nanoseconds ? *delta : elapsed_nanoseconds;
+        row.busy_tenths = static_cast<u64>(static_cast<u128>(busy) * 1000 /
+                                           elapsed_nanoseconds);
+      }
+    } else if (before->has_field(os::disk_io_field::IdleTime) &&
+               after.has_field(os::disk_io_field::IdleTime))
+    {
+      if (let const idle = counter_delta(before->idle_time_nanoseconds,
+                                         after.idle_time_nanoseconds);
+          idle.has_value())
+      {
+        let const busy =
+            *idle < elapsed_nanoseconds ? elapsed_nanoseconds - *idle : 0;
+        row.busy_tenths = static_cast<u64>(static_cast<u128>(busy) * 1000 /
+                                           elapsed_nanoseconds);
+      }
+    }
+
+    if (before->has_field(os::disk_io_field::ReadTime) &&
+        after.has_field(os::disk_io_field::ReadTime) &&
+        before->has_field(os::disk_io_field::ReadOperations) &&
+        after.has_field(os::disk_io_field::ReadOperations))
+    {
+      let const time = counter_delta(before->read_time_nanoseconds,
+                                     after.read_time_nanoseconds);
+      let const operations = counter_delta(before->read_operation_count,
+                                           after.read_operation_count);
+      if (time.has_value() && operations.has_value() && *operations != 0) {
+        row.read_latency_nanoseconds = *time / *operations;
+      }
+    }
+    if (before->has_field(os::disk_io_field::WriteTime) &&
+        after.has_field(os::disk_io_field::WriteTime) &&
+        before->has_field(os::disk_io_field::WriteOperations) &&
+        after.has_field(os::disk_io_field::WriteOperations))
+    {
+      let const time = counter_delta(before->write_time_nanoseconds,
+                                     after.write_time_nanoseconds);
+      let const operations = counter_delta(before->write_operation_count,
+                                           after.write_operation_count);
+      if (time.has_value() && operations.has_value() && *operations != 0) {
+        row.write_latency_nanoseconds = *time / *operations;
+      }
+    }
+    if (before->has_field(os::disk_io_field::WeightedBusyTime) &&
+        after.has_field(os::disk_io_field::WeightedBusyTime))
+    {
+      if (let const weighted =
+              counter_delta(before->weighted_busy_time_nanoseconds,
+                            after.weighted_busy_time_nanoseconds);
+          weighted.has_value())
+      {
+        row.average_queue_tenths = static_cast<u64>(
+            static_cast<u128>(*weighted) * 10 / elapsed_nanoseconds);
+      }
+    }
+  }
+
+  if (after.has_field(os::disk_io_field::QueueDepth))
+    row.queue = after.queue_depth;
+  row.errors = disk_failure_total(
+      before, after, is_sampled, os::disk_io_field::ReadErrors,
+      os::disk_io_field::WriteErrors, &os::disk_io_status::read_error_count,
+      &os::disk_io_status::write_error_count);
+  row.retries = disk_failure_total(
+      before, after, is_sampled, os::disk_io_field::ReadRetries,
+      os::disk_io_field::WriteRetries, &os::disk_io_status::read_retry_count,
+      &os::disk_io_status::write_retry_count);
+  return row;
+}
+
 fn make_disk_io_rows(const os::disk_io_snapshot &before_snapshot,
                      const os::disk_io_snapshot &after_snapshot,
                      u64 elapsed_nanoseconds, bool is_sampled,
@@ -525,124 +648,8 @@ fn make_disk_io_rows(const os::disk_io_snapshot &before_snapshot,
   rows.reserve(after_snapshot.disks.count());
   for (let const &after : after_snapshot.disks) {
     let const before = find_disk_io_status(before_snapshot, after.name.view());
-    disk_io_row row{};
-    row.name = String{allocator, after.name.view()};
-    if (is_sampled) {
-      if (before != nullptr) {
-        if (before->has_field(os::disk_io_field::ReadBytes) &&
-            after.has_field(os::disk_io_field::ReadBytes))
-        {
-          row.read = counter_delta(before->read_bytes, after.read_bytes);
-        }
-        if (before->has_field(os::disk_io_field::WrittenBytes) &&
-            after.has_field(os::disk_io_field::WrittenBytes))
-        {
-          row.write = counter_delta(before->written_bytes, after.written_bytes);
-        }
-        if (before->has_field(os::disk_io_field::ReadOperations) &&
-            after.has_field(os::disk_io_field::ReadOperations))
-        {
-          row.read_operations =
-              counter_delta(before->read_operation_count,
-                            after.read_operation_count);
-        }
-        if (before->has_field(os::disk_io_field::WriteOperations) &&
-            after.has_field(os::disk_io_field::WriteOperations))
-        {
-          row.write_operations =
-              counter_delta(before->write_operation_count,
-                            after.write_operation_count);
-        }
-      }
-    } else {
-      if (after.has_field(os::disk_io_field::ReadBytes))
-        row.read = after.read_bytes;
-      if (after.has_field(os::disk_io_field::WrittenBytes))
-        row.write = after.written_bytes;
-      if (after.has_field(os::disk_io_field::ReadOperations))
-        row.read_operations = after.read_operation_count;
-      if (after.has_field(os::disk_io_field::WriteOperations))
-        row.write_operations = after.write_operation_count;
-    }
-
-    if (is_sampled && before != nullptr && elapsed_nanoseconds != 0) {
-      if (before->has_field(os::disk_io_field::BusyTime) &&
-          after.has_field(os::disk_io_field::BusyTime))
-      {
-        if (let const delta = counter_delta(before->busy_time_nanoseconds,
-                                            after.busy_time_nanoseconds);
-            delta.has_value())
-        {
-          let const busy =
-              *delta < elapsed_nanoseconds ? *delta : elapsed_nanoseconds;
-          row.busy_tenths = static_cast<u64>(static_cast<u128>(busy) * 1000 /
-                                             elapsed_nanoseconds);
-        }
-      } else if (before->has_field(os::disk_io_field::IdleTime) &&
-                 after.has_field(os::disk_io_field::IdleTime))
-      {
-        if (let const idle = counter_delta(before->idle_time_nanoseconds,
-                                           after.idle_time_nanoseconds);
-            idle.has_value())
-        {
-          let const busy =
-              *idle < elapsed_nanoseconds ? elapsed_nanoseconds - *idle : 0;
-          row.busy_tenths = static_cast<u64>(static_cast<u128>(busy) * 1000 /
-                                             elapsed_nanoseconds);
-        }
-      }
-
-      if (before->has_field(os::disk_io_field::ReadTime) &&
-          after.has_field(os::disk_io_field::ReadTime) &&
-          before->has_field(os::disk_io_field::ReadOperations) &&
-          after.has_field(os::disk_io_field::ReadOperations))
-      {
-        let const time = counter_delta(before->read_time_nanoseconds,
-                                       after.read_time_nanoseconds);
-        let const operations = counter_delta(before->read_operation_count,
-                                             after.read_operation_count);
-        if (time.has_value() && operations.has_value() && *operations != 0) {
-          row.read_latency_nanoseconds = *time / *operations;
-        }
-      }
-      if (before->has_field(os::disk_io_field::WriteTime) &&
-          after.has_field(os::disk_io_field::WriteTime) &&
-          before->has_field(os::disk_io_field::WriteOperations) &&
-          after.has_field(os::disk_io_field::WriteOperations))
-      {
-        let const time = counter_delta(before->write_time_nanoseconds,
-                                       after.write_time_nanoseconds);
-        let const operations = counter_delta(before->write_operation_count,
-                                             after.write_operation_count);
-        if (time.has_value() && operations.has_value() && *operations != 0) {
-          row.write_latency_nanoseconds = *time / *operations;
-        }
-      }
-      if (before->has_field(os::disk_io_field::WeightedBusyTime) &&
-          after.has_field(os::disk_io_field::WeightedBusyTime))
-      {
-        if (let const weighted =
-                counter_delta(before->weighted_busy_time_nanoseconds,
-                              after.weighted_busy_time_nanoseconds);
-            weighted.has_value())
-        {
-          row.average_queue_tenths = static_cast<u64>(
-              static_cast<u128>(*weighted) * 10 / elapsed_nanoseconds);
-        }
-      }
-    }
-
-    if (after.has_field(os::disk_io_field::QueueDepth))
-      row.queue = after.queue_depth;
-    row.errors = disk_failure_total(
-        before, after, is_sampled, os::disk_io_field::ReadErrors,
-        os::disk_io_field::WriteErrors, &os::disk_io_status::read_error_count,
-        &os::disk_io_status::write_error_count);
-    row.retries = disk_failure_total(
-        before, after, is_sampled, os::disk_io_field::ReadRetries,
-        os::disk_io_field::WriteRetries, &os::disk_io_status::read_retry_count,
-        &os::disk_io_status::write_retry_count);
-    rows.push(steal(row));
+    rows.push(make_disk_io_row(before, after, elapsed_nanoseconds, is_sampled,
+                               allocator));
   }
 
   return rows;
@@ -1000,35 +1007,19 @@ struct live_disk_row
   u64 last_seen_nanoseconds{0};
 };
 
-fn get_disk_window_status(const live_disk_row &row,
-                          u64 window_start_nanoseconds) throws
-    -> os::disk_io_status
+fn make_disk_window_row(const live_disk_row &row,
+                        u64 window_start_nanoseconds,
+                        Allocator allocator) throws -> disk_io_row
 {
   let const oldest = rolling_window_baseline_index(
       row.history_nanoseconds, window_start_nanoseconds);
-  let const &before = row.history[oldest];
-
-  let const &newest = row.history.back();
-  let sampled = newest;
-  sampled.name = String{heap_allocator(), row.name.view()};
-  let const do_sample = [&](u64 os::disk_io_status::*member) {
-    let const delta = counter_delta(before.*member, newest.*member);
-    sampled.*member = delta.has_value() ? *delta : 0;
-  };
-  do_sample(&os::disk_io_status::read_bytes);
-  do_sample(&os::disk_io_status::written_bytes);
-  do_sample(&os::disk_io_status::read_operation_count);
-  do_sample(&os::disk_io_status::write_operation_count);
-  do_sample(&os::disk_io_status::read_time_nanoseconds);
-  do_sample(&os::disk_io_status::write_time_nanoseconds);
-  do_sample(&os::disk_io_status::busy_time_nanoseconds);
-  do_sample(&os::disk_io_status::idle_time_nanoseconds);
-  do_sample(&os::disk_io_status::weighted_busy_time_nanoseconds);
-  do_sample(&os::disk_io_status::read_error_count);
-  do_sample(&os::disk_io_status::write_error_count);
-  do_sample(&os::disk_io_status::read_retry_count);
-  do_sample(&os::disk_io_status::write_retry_count);
-  return sampled;
+  let const oldest_nanoseconds = row.history_nanoseconds[oldest];
+  let const newest_nanoseconds = row.history_nanoseconds.back();
+  let const elapsed_nanoseconds = newest_nanoseconds > oldest_nanoseconds
+                                      ? newest_nanoseconds - oldest_nanoseconds
+                                      : 0;
+  return make_disk_io_row(&row.history[oldest], row.history.back(),
+                          elapsed_nanoseconds, true, allocator);
 }
 
 fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
@@ -1141,26 +1132,13 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
     }
 
     last_refresh_nanoseconds = now;
-    let after_snapshot = os::disk_io_snapshot{};
-    after_snapshot.sampled_at_nanoseconds = 1000000000ULL;
-    after_snapshot.disks.reserve(retained.count());
-    let before_snapshot = os::disk_io_snapshot{};
-    before_snapshot.sampled_at_nanoseconds = 0;
-    before_snapshot.disks.reserve(retained.count());
     let const window_start = last_sample_nanoseconds > falloff_nanoseconds
                                  ? last_sample_nanoseconds - falloff_nanoseconds
                                  : 0;
-    for (let const &row : retained) {
-      let sampled = get_disk_window_status(row, window_start);
-      let baseline = os::disk_io_status{};
-      baseline.name = String{frame_allocator, row.name.view()};
-      baseline.available_fields = sampled.available_fields;
-      before_snapshot.disks.push(steal(baseline));
-      after_snapshot.disks.push(steal(sampled));
-    }
-    let const elapsed_nanoseconds = 1000000000ULL;
-    let rows = make_disk_io_rows(before_snapshot, after_snapshot,
-                                 elapsed_nanoseconds, true, frame_allocator);
+    let rows = ArrayList<disk_io_row>{frame_allocator};
+    rows.reserve(retained.count());
+    for (let const &row : retained)
+      rows.push(make_disk_window_row(row, window_start, frame_allocator));
     sort_disk_rows(rows, sort_key);
 
     let output = String{frame_allocator};
