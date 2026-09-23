@@ -7,6 +7,7 @@
  * totals.
  */
 
+#include "../Arena.hpp"
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
 #include "../Errors.hpp"
@@ -124,6 +125,10 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     return du_size_result{allocated_size_bytes, true};
   }
 
+  let wave_arena = BumpArena{};
+  let const wave_allocator = bump_allocator(wave_arena);
+  let list_arena = BumpArena{};
+  let const list_allocator = bump_allocator(list_arena);
   let frames = ArrayList<du_directory_frame>{allocator};
   let directory_queue = ArrayList<usize>{allocator};
   let stat_work = ArrayList<du_stat_work>{allocator};
@@ -239,7 +244,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       let const allocated_size_bytes = status.blocks * 512;
       if (type == 'd') {
         frames[parent_index].pending_directory_count++;
-        frames.push(du_directory_frame{steal(work.path), work.parent_index,
+        frames.push(du_directory_frame{Path{work.path.view(), allocator},
+                                       work.parent_index,
                                        allocated_size_bytes, 0, 0, false, false,
                                        false});
         directory_queue.push(frames.count() - 1);
@@ -262,7 +268,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       frames[parent_index].pending_stat_count--;
       do_try_complete(parent_index);
     }
+    stat_batch.clear();
     stat_work.clear();
+    wave_arena.reset();
   };
 
   usize directory_index = 0;
@@ -273,9 +281,11 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
             : directory_queue.count();
     for (; directory_index < frontier_end; directory_index++) {
       if (os::INTERRUPT_REQUESTED) return None;
+      let const list_mark = list_arena.mark();
+      defer { list_arena.release(list_mark); };
       let const frame_index = directory_queue[directory_index];
       let children =
-          Path::read_directory_typed(frames[frame_index].path, allocator);
+          Path::read_directory_typed(frames[frame_index].path, list_allocator);
       if (!children.has_value()) {
         report_soft_koshkit_util_error(
             ec, cxt, "du",
@@ -294,7 +304,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       frames[frame_index].pending_stat_count += children->count();
       frames[frame_index].is_enumerated = true;
       for (let const &child : *children) {
-        let child_path = Path{frames[frame_index].path.view(), allocator};
+        let child_path =
+            Path{frames[frame_index].path.view(), wave_allocator};
         child_path.append(child.name.view());
         stat_work.push(du_stat_work{steal(child_path), frame_index});
         if (stat_work.count() == 512) do_flush_stat_work();
