@@ -565,19 +565,31 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
   }
 
   usize rendered_count = 0;
+  let const root_indentation = should_human ? StringView{"  "} : StringView{};
 
-  if (should_human) output += "PID  PPID  CPU  MEM  COMMAND\n";
+  if (should_human) {
+    if (!output.is_empty()) {
+      while (!output.is_empty() && output.back() == '\n')
+        output.truncate(output.length() - 1);
+      output += "\n\n";
+    }
+    append_report_text(output, "Processes", colors::ansi::BOLD_BLUE,
+                       should_color);
+    output += "\n  PID  PPID  CPU  MEM  COMMAND\n";
+  }
 
   if (root_position < nodes.count() && !sort_key.has_value() &&
       (search.is_empty() || nodes[root_position].search_visible)) {
     if (nodes[root_position].search_visible) {
       nodes[root_position].was_rendered = true;
+      output += root_indentation;
       append_label(output, nodes[root_position], allocator, should_color,
                    should_human, sort_key, is_sampled, line_width_limit);
       rendered_count++;
-      render_children(output, nodes, root_pid, String{allocator}, 0, allocator,
-                      should_color, output_limit, rendered_count, should_human,
-                      sort_key, is_sampled, line_width_limit);
+      render_children(output, nodes, root_pid,
+                      String{allocator, root_indentation}, 0, allocator,
+                      should_color, output_limit, rendered_count,
+                      should_human, sort_key, is_sampled, line_width_limit);
     }
     visible_line_count = 1;
     if (viewport_rows != 0) {
@@ -624,11 +636,13 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     if (sort_key.has_value()) {
       nodes[position].was_rendered = true;
+      output += root_indentation;
       append_label(output, nodes[position], allocator, should_color,
                    should_human, sort_key, is_sampled, line_width_limit);
       rendered_count++;
-      render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
-                      allocator, should_color, output_limit, rendered_count,
+      render_children(output, nodes, nodes[position].pid,
+                      String{allocator, root_indentation}, 0, allocator,
+                      should_color, output_limit, rendered_count,
                       should_human, sort_key, is_sampled, line_width_limit);
       continue;
     }
@@ -647,12 +661,14 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (has_visible_parent) continue;
 
     nodes[position].was_rendered = true;
+    output += root_indentation;
     append_label(output, nodes[position], allocator, should_color,
                  should_human, sort_key, is_sampled, line_width_limit);
     rendered_count++;
-    render_children(output, nodes, nodes[position].pid, String{allocator}, 0,
-                    allocator, should_color, output_limit, rendered_count,
-                    should_human, sort_key, is_sampled, line_width_limit);
+    render_children(output, nodes, nodes[position].pid,
+                    String{allocator, root_indentation}, 0, allocator,
+                    should_color, output_limit, rendered_count, should_human,
+                    sort_key, is_sampled, line_width_limit);
   }
 
   visible_line_count = rendered_count;
