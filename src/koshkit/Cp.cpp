@@ -96,7 +96,6 @@ static fn copy_path(const ExecContext &ec, StringView source,
           + "' are the same file"
     };
   }
-  let const source_status = source_file_status(source);
   let const is_source_symlink =
       known_lstat != nullptr
           ? os::file_type_letter(known_lstat->mode) == 'l'
@@ -130,6 +129,12 @@ static fn copy_path(const ExecContext &ec, StringView source,
       return;
     }
   }
+
+  let source_status = Maybe<os::file_status>{};
+  if (known_lstat != nullptr && !is_source_symlink)
+    source_status = *known_lstat;
+  else
+    source_status = source_file_status(source);
 
   /* A symlink is excluded so a link back into the tree does not drive an
      unbounded walk. */
@@ -180,6 +185,7 @@ static fn copy_path(const ExecContext &ec, StringView source,
                 is_recursive, should_force, should_preserve, is_verbose,
                 allocator,
                 entry.has_status ? &entry.status : nullptr);
+      if (os::INTERRUPT_REQUESTED) return;
     }
 
     if (source_status.has_value() &&
