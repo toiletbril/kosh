@@ -18,7 +18,7 @@ namespace koshka {
 class EvalContext;
 class ExecContext;
 
-namespace utilsownership {
+namespace utils {
 
 fn resolve_user_id(StringView text) throws -> Maybe<u32>;
 fn resolve_group_id(StringView text) throws -> Maybe<u32>;
@@ -30,6 +30,6 @@ fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
                          usize follow_position, usize physical_position) throws
     -> bool;
 
-} /* namespace utilsownership */
+} /* namespace utils */
 
 } /* namespace koshka */

@@ -13,7 +13,7 @@
 #include "Koshkit.hpp"
 #include "Platform.hpp"
 
-namespace koshka::utilsownership {
+namespace koshka::utils {
 
 namespace {
 
@@ -232,4 +232,4 @@ fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
       should_follow_argument, should_follow_nested, active_directories);
 }
 
-} /* namespace koshka::utilsownership */
+} /* namespace koshka::utils */
