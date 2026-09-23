@@ -215,6 +215,12 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
       for (usize index = 0; index < unknown_indices.count(); index++) {
         let &kind = (*children)[unknown_indices[index]].kind;
         if (unknown_results[index].error_number != 0) {
+          os::set_last_system_error(unknown_results[index].error_number);
+          report_soft_koshkit_util_error(
+              ec, cxt, "find",
+              "'" + unknown_paths[index].text() + "': " +
+                  os::last_system_error_message());
+          exit_status = 1;
           kind = Path::entry_kind::Other;
           continue;
         }
