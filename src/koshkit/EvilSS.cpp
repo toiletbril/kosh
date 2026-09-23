@@ -132,8 +132,8 @@ pure fn is_listening(const os::network_socket_entry &socket) wontthrow -> bool
 
 fn append_network_socket_report(String &output,
                                 const network_socket_report_options &options,
-                                Allocator allocator, bool should_color,
-                                StringView indentation) throws -> bool
+                                Allocator allocator, bool should_color) throws
+    -> bool
 {
   let sockets = os::network_sockets(options.should_show_processes);
   sockets.sort([](const os::network_socket_entry &left,
@@ -275,8 +275,11 @@ fn append_network_socket_report(String &output,
     if (row.owner.length() > owner_width) owner_width = row.owner.length();
   }
 
+  append_report_text(output, "Sockets", colors::ansi::BOLD_BLUE,
+                     should_color);
+  output += '\n';
   if (options.should_show_header) {
-    output += indentation;
+    output += "  ";
     append_report_column(output, "Netid", 5, false, colors::ansi::BOLD_CYAN,
                          should_color);
     output += "  ";
@@ -309,7 +312,7 @@ fn append_network_socket_report(String &output,
   }
 
   for (let const &row : rows) {
-    output += indentation;
+    output += "  ";
     append_report_column(output, row.protocol.view(), 5, false,
                          colors::ansi::BOLD_MAGENTA, should_color);
     output += "  ";
@@ -390,7 +393,7 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
           .should_show_processes = FLAG_EVILSS_PROCESSES.is_enabled(),
           .should_show_header = !FLAG_EVILSS_NO_HEADER.is_enabled(),
       },
-      allocator, should_color, {});
+      allocator, should_color);
 
   ec.print_to_stdout(output);
   return 0;
