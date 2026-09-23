@@ -225,9 +225,12 @@ fn read_smart_rows(EvalContext &cxt,
 {
   let rows = ArrayList<smart_row>{allocator};
   let const smartctl = resolve_util_program(cxt, "smartctl");
-#if defined __APPLE__
-  let const diskutil = resolve_util_program(cxt, "diskutil");
-#endif
+  let const platform_tools = os::evildisk_tools();
+  let const smart_fallback =
+      platform_tools.smart_fallback_program.is_empty()
+          ? Maybe<Path>{}
+          : resolve_util_program(cxt,
+                                 platform_tools.smart_fallback_program);
 
   for (let const &filesystem : filesystems) {
     let row = smart_row{};
@@ -242,18 +245,16 @@ fn read_smart_rows(EvalContext &cxt,
         has_row = parse_smart_report(report->view(), filesystem.source.view(),
                                      row, allocator);
     }
-#if defined __APPLE__
-    if (!has_row && diskutil.has_value()) {
+    if (!has_row && smart_fallback.has_value()) {
       let arguments = ArrayList<String>{heap_allocator()};
-      arguments.push(String{"info"});
+      arguments.push(String{platform_tools.smart_fallback_subcommand});
       arguments.push(filesystem.target.clone());
       let const report = capture_util_program_output(
-          *diskutil, steal(arguments), 10'000'000'000);
+          *smart_fallback, steal(arguments), 10'000'000'000);
       if (report.has_value())
         has_row = parse_smart_report(report->view(), filesystem.source.view(),
                                      row, allocator);
     }
-#endif
     if (!has_row) continue;
 
     bool is_duplicate = false;

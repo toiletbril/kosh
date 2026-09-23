@@ -184,6 +184,14 @@ struct goodcore_platform_tools
 
 pure fn goodcore_tools() wontthrow -> goodcore_platform_tools;
 
+struct evildisk_platform_tools
+{
+  StringView smart_fallback_program;
+  StringView smart_fallback_subcommand;
+};
+
+pure fn evildisk_tools() wontthrow -> evildisk_platform_tools;
+
 enum class process_detail : u8
 {
   Basic,

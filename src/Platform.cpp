@@ -25,6 +25,15 @@ pure fn goodcore_tools() wontthrow -> goodcore_platform_tools
 #endif
 }
 
+pure fn evildisk_tools() wontthrow -> evildisk_platform_tools
+{
+#if defined __APPLE__
+  return {"diskutil", "info"};
+#else
+  return {{}, {}};
+#endif
+}
+
 static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
 
 } /* namespace os */
