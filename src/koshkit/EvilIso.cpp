@@ -1494,20 +1494,54 @@ fn append_container_report(
   append_titled_table(output, "Containers", table, should_color);
 }
 
+constexpr usize KUBERNETES_METADATA_BYTE_LIMIT = 256;
+
+fn sanitize_kubernetes_metadata(StringView text, Allocator allocator) throws
+    -> String
+{
+  let result = String{allocator};
+  let const byte_count = text.length < KUBERNETES_METADATA_BYTE_LIMIT
+                             ? text.length
+                             : KUBERNETES_METADATA_BYTE_LIMIT;
+  result.reserve(byte_count);
+  for (usize index = 0; index < byte_count; index++) {
+    let const byte = text[index];
+    if (byte == '\r' || byte == '\n') break;
+    result.push(static_cast<unsigned char>(byte) < 32 || byte == 127 ? ' '
+                                                                    : byte);
+  }
+  return String{allocator, result.view().trim_blanks()};
+}
+
+fn read_kubernetes_metadata(StringView name, Allocator allocator) throws
+    -> String
+{
+  let const path = kubernetes_service_account_path(name, allocator);
+  let const descriptor = os::open_file_descriptor(path.view(),
+                                                   os::file_open_mode::Read);
+  if (!descriptor.has_value()) return String{allocator};
+  defer { unused(os::close_fd(*descriptor)); };
+
+  char bytes[KUBERNETES_METADATA_BYTE_LIMIT]{};
+  let const read_count = os::read_fd(*descriptor, bytes, sizeof(bytes));
+  if (!read_count.has_value() || *read_count == 0) return String{allocator};
+  return sanitize_kubernetes_metadata(StringView{bytes, *read_count},
+                                      allocator);
+}
+
 fn append_kubernetes_report(
     String &output, bool should_color, bool should_show_detail,
     const ArrayList<process_cgroup_snapshot> &snapshot,
     Allocator allocator) throws -> void
 {
   let const self_process_id = os::get_current_process_id();
-  let const kubernetes =
-      os::get_environment_variable("KUBERNETES_SERVICE_HOST");
-  let const namespace_file =
-      Path{kubernetes_service_account_path("namespace", allocator), allocator}
-          .read_entire_file();
+  let kubernetes_host = String{allocator};
+  if (let const value =
+          os::get_environment_variable("KUBERNETES_SERVICE_HOST");
+      value.has_value())
+    kubernetes_host = sanitize_kubernetes_metadata(value->view(), allocator);
   let namespace_name = String{allocator};
-  if (namespace_file.has_value())
-    namespace_name = String{allocator, namespace_file->view().trim_blanks()};
+  namespace_name = read_kubernetes_metadata("namespace", allocator);
   bool has_kubepods = false;
   for (let const &process : snapshot) {
     for (let const &evidence : process.evidence)
@@ -1522,10 +1556,10 @@ fn append_kubernetes_report(
                             colors::ansi::BOLD_CYAN);
   evidence_table.add_column("EVIDENCE", report_table_alignment::Left,
                             colors::ansi::BOLD_CYAN);
-  if (kubernetes.has_value()) {
+  if (!kubernetes_host.is_empty()) {
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({"environment", colors::ansi::RESET});
-    cells.push({kubernetes->view(), colors::ansi::BOLD_GREEN});
+    cells.push({kubernetes_host.view(), colors::ansi::BOLD_GREEN});
     cells.push({namespace_name.is_empty() ? StringView{"-"}
                                          : namespace_name.view(),
                 colors::ansi::RESET});
