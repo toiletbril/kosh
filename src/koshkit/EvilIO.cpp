@@ -382,62 +382,54 @@ fn get_process_window_status(const live_process_row &row,
   return status;
 }
 
+fn append_titled_table(String &output, StringView title,
+                       const ReportTable &table, bool should_color) throws
+    -> void;
+
 fn append_process_io_rate_report(
     String &output, const ArrayList<io_row> &rows, usize row_limit,
     Allocator allocator, bool should_color, StringView duration_suffix,
     const ArrayList<u64> *idle_nanoseconds_list) throws -> void
 {
   unused(idle_nanoseconds_list);
-  append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
-                       should_color);
-  output += "  ";
-  append_report_column(output, String{"READ"} + duration_suffix, 10, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, String{"WRITE"} + duration_suffix, 10, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, String{"READ OPS"} + duration_suffix, 10, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_column(output, String{"WRITE OPS"} + duration_suffix, 11, true,
-                       colors::ansi::BOLD_CYAN, should_color);
-  output += "  ";
-  append_report_text(output, "COMMAND", colors::ansi::BOLD_CYAN, should_color);
-  output += "\n";
+  let table = ReportTable{allocator};
+  table.add_column("PID", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column(String{"READ"} + duration_suffix,
+                   report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column(String{"WRITE"} + duration_suffix,
+                   report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column(String{"READ OPS"} + duration_suffix,
+                   report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column(String{"WRITE OPS"} + duration_suffix,
+                   report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column("COMMAND", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
 
   let const shown_count = rows.count() < row_limit ? rows.count() : row_limit;
   for (usize index = 0; index < shown_count; index++) {
     let const &row = rows[index];
-    append_report_column(output, String::from(row.pid, allocator).view(), 8,
-                         true, colors::ansi::BOLD_MAGENTA, should_color);
-    output += "  ";
-    append_report_column(
-        output, format_human_size(row.status.read_bytes, allocator).view(), 10,
-        true, colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(
-        output, format_human_size(row.status.written_bytes, allocator).view(),
-        10, true, colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(
-        output,
+    let const pid = String::from(row.pid, allocator);
+    let const read = format_human_size(row.status.read_bytes, allocator);
+    let const write = format_human_size(row.status.written_bytes, allocator);
+    let const read_operations =
         row.status.has_operation_counts
-            ? String::from(row.status.read_operation_count, allocator).view()
-            : StringView{"-"},
-        10, true, {}, should_color);
-    output += "  ";
-    append_report_column(
-        output,
+            ? String::from(row.status.read_operation_count, allocator)
+            : String{allocator, "-"};
+    let const write_operations =
         row.status.has_operation_counts
-            ? String::from(row.status.write_operation_count, allocator).view()
-            : StringView{"-"},
-        11, true, {}, should_color);
-    output += "  ";
-    append_report_text(output, row.name.view(), colors::ansi::BOLD_CYAN,
-                       should_color);
-    output += "\n";
+            ? String::from(row.status.write_operation_count, allocator)
+            : String{allocator, "-"};
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({pid.view(), colors::ansi::BOLD_MAGENTA});
+    cells.push({read.view(), colors::ansi::GREEN});
+    cells.push({write.view(), colors::ansi::GREEN});
+    cells.push({read_operations.view(), {}});
+    cells.push({write_operations.view(), {}});
+    cells.push({row.name.view(), colors::ansi::BOLD_CYAN});
+    table.add_row(cells);
   }
+  append_titled_table(output, "Process I/O", table, should_color);
 }
 
 pure fn find_disk_io_status(const os::disk_io_snapshot &snapshot,
@@ -732,128 +724,124 @@ fn tenths_text(u64 tenths, Allocator allocator,
   return result;
 }
 
+fn append_titled_table(String &output, StringView title,
+                       const ReportTable &table, bool should_color) throws
+    -> void
+{
+  if (!output.is_empty()) {
+    while (!output.is_empty() && output.back() == '\n')
+      output.truncate(output.length() - 1);
+    output += "\n\n";
+  }
+  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+  output += table.to_string(should_color, "  ").view();
+}
+
 fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
-                         bool is_sampled, bool should_include_heading,
-                         Allocator allocator, bool should_color,
+                         bool is_sampled, Allocator allocator, bool should_color,
                          StringView duration_suffix = "/S") throws -> void
 {
   if (rows.is_empty() && !is_sampled) return;
 
-  if (should_include_heading) output += "\n";
-  append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
-                       should_color);
-  let const do_append_header = [&](StringView text, usize width)
-                                   throws -> void {
-    output += "  ";
-    append_report_column(output, text, width, true, colors::ansi::BOLD_CYAN,
-                         should_color);
-  };
-  do_append_header(is_sampled ? String{"READ"} + duration_suffix : "READ", 10);
-  do_append_header(is_sampled ? String{"WRITE"} + duration_suffix : "WRITTEN",
-                   10);
-  do_append_header(
-      is_sampled ? String{"READ OPS"} + duration_suffix : "READ OPS", 11);
-  do_append_header(
-      is_sampled ? String{"WRITE OPS"} + duration_suffix : "WRITE OPS", 12);
+  let table = ReportTable{allocator};
+  table.add_column("DEVICE", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column(is_sampled ? String{"READ"} + duration_suffix : "READ",
+                   report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column(
+      is_sampled ? String{"WRITE"} + duration_suffix : "WRITTEN",
+      report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column(
+      is_sampled ? String{"READ OPS"} + duration_suffix : "READ OPS",
+      report_table_alignment::Right, colors::ansi::BOLD_CYAN);
+  table.add_column(
+      is_sampled ? String{"WRITE OPS"} + duration_suffix : "WRITE OPS",
+      report_table_alignment::Right, colors::ansi::BOLD_CYAN);
   if (is_sampled) {
-    do_append_header("BUSY", 7);
-    do_append_header("READ LAT", 9);
-    do_append_header("WRITE LAT", 9);
-    do_append_header("AVG QUEUE", 9);
+    table.add_column("BUSY", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("READ LATENCY", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("WRITE LATENCY", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("AVERAGE QUEUE", report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
   }
-  do_append_header("QUEUE", 7);
-  do_append_header("ERRORS", 8);
-  do_append_header("RETRIES", 8);
-  output += "\n";
+  table.add_column("QUEUE", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("ERRORS", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("RETRIES", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
 
   for (let const &row : rows) {
-    append_report_column(output, row.name.view(), 16, false,
-                         colors::ansi::BOLD_GREEN, should_color);
-    output += "  ";
-    append_report_column(output,
-                         row.read.has_value()
-                             ? format_human_size(*row.read, allocator).view()
-                             : StringView{"-"},
-                         10, true, colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(output,
-                         row.write.has_value()
-                             ? format_human_size(*row.write, allocator).view()
-                             : StringView{"-"},
-                         10, true, colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(
-        output,
+    let const read = row.read.has_value()
+                          ? format_human_size(*row.read, allocator)
+                          : String{allocator, "-"};
+    let const write = row.write.has_value()
+                           ? format_human_size(*row.write, allocator)
+                           : String{allocator, "-"};
+    let const read_operations =
         row.read_operations.has_value()
-            ? String::from(*row.read_operations, allocator).view()
-            : StringView{"-"},
-        11, true, {}, should_color);
-    output += "  ";
-    append_report_column(
-        output,
+            ? String::from(*row.read_operations, allocator)
+            : String{allocator, "-"};
+    let const write_operations =
         row.write_operations.has_value()
-            ? String::from(*row.write_operations, allocator).view()
-            : StringView{"-"},
-        12, true, {}, should_color);
+            ? String::from(*row.write_operations, allocator)
+            : String{allocator, "-"};
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({row.name.view(), colors::ansi::BOLD_GREEN});
+    cells.push({read.view(), colors::ansi::GREEN});
+    cells.push({write.view(), colors::ansi::GREEN});
+    cells.push({read_operations.view(), {}});
+    cells.push({write_operations.view(), {}});
+    let busy = String{allocator};
+    let read_latency = String{allocator};
+    let write_latency = String{allocator};
+    let average_queue = String{allocator};
     if (is_sampled) {
-      output += "  ";
-      append_report_column(
-          output,
-          row.busy_tenths.has_value()
-              ? tenths_text(*row.busy_tenths, allocator, true).view()
-              : StringView{"-"},
-          7, true, {}, should_color);
-      output += "  ";
-      append_report_column(output,
-                           row.read_latency_nanoseconds.has_value()
-                               ? utils::format_duration_nanoseconds(
-                                     *row.read_latency_nanoseconds, allocator)
-                                     .view()
-                               : StringView{"-"},
-                           9, true, {}, should_color);
-      output += "  ";
-      append_report_column(output,
-                           row.write_latency_nanoseconds.has_value()
-                               ? utils::format_duration_nanoseconds(
-                                     *row.write_latency_nanoseconds, allocator)
-                                     .view()
-                               : StringView{"-"},
-                           9, true, {}, should_color);
-      output += "  ";
-      append_report_column(
-          output,
+      busy = row.busy_tenths.has_value()
+                 ? tenths_text(*row.busy_tenths, allocator, true)
+                 : String{allocator, "-"};
+      read_latency =
+          row.read_latency_nanoseconds.has_value()
+              ? utils::format_duration_nanoseconds(
+                    *row.read_latency_nanoseconds, allocator)
+              : String{allocator, "-"};
+      write_latency =
+          row.write_latency_nanoseconds.has_value()
+              ? utils::format_duration_nanoseconds(
+                    *row.write_latency_nanoseconds, allocator)
+              : String{allocator, "-"};
+      average_queue =
           row.average_queue_tenths.has_value()
-              ? tenths_text(*row.average_queue_tenths, allocator, false).view()
-              : StringView{"-"},
-          9, true, {}, should_color);
+              ? tenths_text(*row.average_queue_tenths, allocator, false)
+              : String{allocator, "-"};
+      cells.push({busy.view(), {}});
+      cells.push({read_latency.view(), {}});
+      cells.push({write_latency.view(), {}});
+      cells.push({average_queue.view(), {}});
     }
-    output += "  ";
-    append_report_column(output,
-                         row.queue.has_value()
-                             ? String::from(*row.queue, allocator).view()
-                             : StringView{"-"},
-                         7, true, {}, should_color);
-    output += "  ";
-    append_report_column(
-        output,
-        row.errors.has_value() ? String::from(*row.errors, allocator).view()
-                               : StringView{"-"},
-        8, true,
-        row.errors.has_value() && *row.errors != 0 ? colors::ansi::BOLD_RED
-                                                   : colors::ansi::GREEN,
-        should_color);
-    output += "  ";
-    append_report_column(
-        output,
-        row.retries.has_value() ? String::from(*row.retries, allocator).view()
-                                : StringView{"-"},
-        8, true,
-        row.retries.has_value() && *row.retries != 0 ? colors::ansi::BOLD_RED
-                                                     : colors::ansi::GREEN,
-        should_color);
-    output += "\n";
+    let const queue = row.queue.has_value()
+                          ? String::from(*row.queue, allocator)
+                          : String{allocator, "-"};
+    let const errors = row.errors.has_value()
+                           ? String::from(*row.errors, allocator)
+                           : String{allocator, "-"};
+    let const retries = row.retries.has_value()
+                            ? String::from(*row.retries, allocator)
+                            : String{allocator, "-"};
+    cells.push({queue.view(), {}});
+    cells.push({errors.view(), row.errors.has_value() && *row.errors != 0
+                                   ? colors::ansi::BOLD_RED
+                                   : colors::ansi::GREEN});
+    cells.push({retries.view(), row.retries.has_value() && *row.retries != 0
+                                    ? colors::ansi::BOLD_RED
+                                    : colors::ansi::GREEN});
+    table.add_row(cells);
   }
-  if (should_include_heading) output += "\n";
+  append_titled_table(output, "Disk I/O", table, should_color);
 }
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        usize row_limit, Maybe<evilio_sort_key> sort_key,
@@ -1145,36 +1133,51 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_disk_io_report(output, rows, true, false, frame_allocator,
-                          should_color,
+    append_disk_io_report(output, rows, true, frame_allocator, should_color,
                           sample_duration_label);
     ec.print_to_stdout(output);
   }
 }
 
-fn append_rate_field(String &body, StringView name, Maybe<u64> rate,
-                     StringView suffix, Allocator allocator,
-                     bool should_color) throws -> void
+fn make_metric_table(Allocator allocator) throws -> ReportTable
+{
+  let table = ReportTable{allocator};
+  table.add_column("METRIC", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("VALUE", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  return table;
+}
+
+fn add_metric_row(ReportTable &table, StringView name, StringView value,
+                  Allocator allocator, StringView style = {}) throws -> void
+{
+  let cells = ArrayList<report_table_cell_view>{allocator};
+  cells.push({name, colors::ansi::BOLD_CYAN});
+  cells.push({value, style});
+  table.add_row(cells);
+}
+
+fn add_rate_row(ReportTable &table, StringView name, Maybe<u64> rate,
+                StringView suffix, Allocator allocator) throws -> void
 {
   if (!rate.has_value()) return;
   let value = String::from(*rate, allocator);
   value += suffix;
-  append_report_field(body, name, value.view(), colors::ansi::BOLD_CYAN,
-                      should_color);
+  add_metric_row(table, name, value.view(), allocator);
 }
 
-fn append_stall_field(String &body, StringView name, Maybe<u64> rate,
-                      Allocator allocator, bool should_color) throws -> void
+fn add_stall_row(ReportTable &table, StringView name, Maybe<u64> rate,
+                 Allocator allocator) throws -> void
 {
   if (!rate.has_value()) return;
   let value = String::from(*rate, allocator);
   value += " us/s (";
   value += percent_text(*rate, 1000000, allocator).view();
   value += ")";
-  append_report_field(body, name, value.view(),
-                      *rate == 0 ? colors::ansi::BOLD_CYAN
-                                 : colors::ansi::BOLD_RED,
-                      should_color);
+  add_metric_row(table, name, value.view(), allocator,
+                 *rate == 0 ? colors::ansi::BOLD_CYAN
+                            : colors::ansi::BOLD_RED);
 }
 
 fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
@@ -1185,83 +1188,69 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
                             bool has_operation_counts, Allocator allocator,
                             bool should_color) throws -> void
 {
-  let summary = String{allocator};
-  append_report_field(summary, "Visible processes",
-                      String::from(rows.count(), allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(summary, "Read",
-                      format_human_size(total_read_bytes, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
-  append_report_field(summary, "Written",
-                      format_human_size(total_written_bytes, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+  let summary_table = make_metric_table(allocator);
+  add_metric_row(summary_table, "Visible processes",
+                 String::from(rows.count(), allocator), allocator);
+  add_metric_row(summary_table, "Total bytes read",
+                 format_human_size(total_read_bytes, allocator), allocator);
+  add_metric_row(summary_table, "Total bytes written",
+                 format_human_size(total_written_bytes, allocator), allocator);
   if (has_operation_counts) {
-    append_report_field(
-        summary, "Read operations",
-        String::from(total_read_operation_count, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(
-        summary, "Write operations",
-        String::from(total_write_operation_count, allocator).view(),
-        colors::ansi::BOLD_CYAN, should_color);
+    add_metric_row(summary_table, "Total read operations",
+                   String::from(total_read_operation_count, allocator),
+                   allocator);
+    add_metric_row(summary_table, "Total write operations",
+                   String::from(total_write_operation_count, allocator),
+                   allocator);
   }
-  append_report_body(output, summary.view(), "");
+  append_titled_table(output, "Process I/O summary", summary_table,
+                      should_color);
 
-  output += "\n";
-  append_report_column(output, "PID", 8, true, colors::ansi::BOLD_CYAN,
-                       should_color);
-  output += "  ";
-  append_report_column(output, "READ", 8, true, colors::ansi::BOLD_CYAN,
-                       should_color);
-  output += "  ";
-  append_report_column(output, "WRITTEN", 8, true, colors::ansi::BOLD_CYAN,
-                       should_color);
+  let process_table = ReportTable{allocator};
+  process_table.add_column("PID", report_table_alignment::Right,
+                           colors::ansi::BOLD_CYAN);
+  process_table.add_column("READ", report_table_alignment::Right,
+                           colors::ansi::BOLD_CYAN);
+  process_table.add_column("WRITTEN", report_table_alignment::Right,
+                           colors::ansi::BOLD_CYAN);
   if (has_operation_counts) {
-    output += "  ";
-    append_report_column(output, "READ OPS", 10, true, colors::ansi::BOLD_CYAN,
-                         should_color);
-    output += "  ";
-    append_report_column(output, "WRITE OPS", 10, true, colors::ansi::BOLD_CYAN,
-                         should_color);
+    process_table.add_column("READ OPS", report_table_alignment::Right,
+                             colors::ansi::BOLD_CYAN);
+    process_table.add_column("WRITE OPS", report_table_alignment::Right,
+                             colors::ansi::BOLD_CYAN);
   }
-  output += "  ";
-  append_report_text(output, "COMMAND", colors::ansi::BOLD_CYAN, should_color);
-  output += "\n";
+  process_table.add_column("COMMAND", report_table_alignment::Left,
+                           colors::ansi::BOLD_CYAN);
 
   let const shown_count = rows.count() < row_limit ? rows.count() : row_limit;
   for (usize index = 0; index < shown_count; index++) {
     let const &row = rows[index];
-    append_report_column(output, String::from(row.pid, allocator).view(), 8,
-                         true, colors::ansi::BOLD_MAGENTA, should_color);
-    output += "  ";
-    append_report_column(
-        output, format_human_size(row.status.read_bytes, allocator).view(), 8,
-        true, colors::ansi::GREEN, should_color);
-    output += "  ";
-    append_report_column(
-        output, format_human_size(row.status.written_bytes, allocator).view(),
-        8, true, colors::ansi::GREEN, should_color);
+    let const pid = String::from(row.pid, allocator);
+    let const read = format_human_size(row.status.read_bytes, allocator);
+    let const written =
+        format_human_size(row.status.written_bytes, allocator);
+    let read_operations = String{allocator};
+    let write_operations = String{allocator};
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({pid.view(), colors::ansi::BOLD_MAGENTA});
+    cells.push({read.view(), colors::ansi::GREEN});
+    cells.push({written.view(), colors::ansi::GREEN});
     if (has_operation_counts) {
-      output += "  ";
-      append_report_column(
-          output,
+      read_operations =
           row.status.has_operation_counts
-              ? String::from(row.status.read_operation_count, allocator).view()
-              : StringView{"-"},
-          10, true, colors::ansi::GREEN, should_color);
-      output += "  ";
-      append_report_column(
-          output,
+              ? String::from(row.status.read_operation_count, allocator)
+              : String{allocator, "-"};
+      write_operations =
           row.status.has_operation_counts
-              ? String::from(row.status.write_operation_count, allocator).view()
-              : StringView{"-"},
-          10, true, colors::ansi::GREEN, should_color);
+              ? String::from(row.status.write_operation_count, allocator)
+              : String{allocator, "-"};
+      cells.push({read_operations.view(), colors::ansi::GREEN});
+      cells.push({write_operations.view(), colors::ansi::GREEN});
     }
-    output += "  ";
-    append_report_text(output, row.name.view(), colors::ansi::BOLD_CYAN,
-                       should_color);
-    output += "\n";
+    cells.push({row.name.view(), colors::ansi::BOLD_CYAN});
+    process_table.add_row(cells);
   }
+  append_titled_table(output, "Processes", process_table, should_color);
 }
 
 } /* namespace */
@@ -1620,29 +1609,26 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
       u64 total = saturated_sum(saturated_sum(*user, *system), *idle);
       if (wait.has_value()) total = saturated_sum(total, *wait);
       if (stolen.has_value()) total = saturated_sum(total, *stolen);
-      let body = String{allocator};
-      append_report_field(body, "User", percent_text(*user, total, allocator),
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(body, "System",
-                          percent_text(*system, total, allocator),
-                          colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(body, "Idle", percent_text(*idle, total, allocator),
-                          colors::ansi::BOLD_CYAN, should_color);
+      let table = make_metric_table(allocator);
+      add_metric_row(table, "User CPU time",
+                     percent_text(*user, total, allocator), allocator);
+      add_metric_row(table, "System CPU time",
+                     percent_text(*system, total, allocator), allocator);
+      add_metric_row(table, "Idle CPU time",
+                     percent_text(*idle, total, allocator), allocator);
       if (wait.has_value()) {
-        append_report_field(body, "Wait", percent_text(*wait, total, allocator),
-                            colors::ansi::BOLD_CYAN, should_color);
+        add_metric_row(table, "I/O wait CPU time",
+                       percent_text(*wait, total, allocator), allocator);
       }
       if (stolen.has_value()) {
-        append_report_field(body, "Stolen",
-                            percent_text(*stolen, total, allocator),
-                            colors::ansi::BOLD_CYAN, should_color);
+        add_metric_row(table, "Stolen CPU time",
+                       percent_text(*stolen, total, allocator), allocator);
       }
-      append_report_body(output, body.view(), "");
-      output += "\n";
+      append_titled_table(output, "Processor activity", table, should_color);
     }
   }
 
-  let memory_body = String{allocator};
+  let memory_table = make_metric_table(allocator);
   if (has_memory_status) {
     let const total_bytes = memory.total_kib > UINT64_MAX / 1024
                                 ? UINT64_MAX
@@ -1661,80 +1647,74 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     status += " (";
     status += percent_text(used_bytes, total_bytes, allocator).view();
     status += ")";
-    append_report_field(memory_body, "Used", status.view(),
-                        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(memory_body, "Available",
-                        format_human_size(available_bytes, allocator),
-                        colors::ansi::BOLD_CYAN, should_color);
-    append_report_field(memory_body, "Free",
-                        format_human_size(free_bytes, allocator),
-                        colors::ansi::BOLD_CYAN, should_color);
+    add_metric_row(memory_table, "Used memory", status.view(), allocator);
+    add_metric_row(memory_table, "Available memory",
+                   format_human_size(available_bytes, allocator), allocator);
+    add_metric_row(memory_table, "Free memory",
+                   format_human_size(free_bytes, allocator), allocator);
   }
   if (has_activity_before && has_activity_after) {
     if (activity_before.has_field(os::system_activity_field::PageScan) &&
         activity_after.has_field(os::system_activity_field::PageScan))
     {
-      append_rate_field(memory_body, "Pages scanned",
-                        counter_rate(activity_before.page_scan_count,
-                                     activity_after.page_scan_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(memory_table, "Pages scanned",
+                   counter_rate(activity_before.page_scan_count,
+                                activity_after.page_scan_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
     if (activity_before.has_field(os::system_activity_field::PageSteal) &&
         activity_after.has_field(os::system_activity_field::PageSteal))
     {
-      append_rate_field(memory_body, "Pages reclaimed",
-                        counter_rate(activity_before.page_steal_count,
-                                     activity_after.page_steal_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(memory_table, "Pages reclaimed",
+                   counter_rate(activity_before.page_steal_count,
+                                activity_after.page_steal_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
     if (activity_before.has_field(os::system_activity_field::DirectReclaim) &&
         activity_after.has_field(os::system_activity_field::DirectReclaim))
     {
-      append_rate_field(memory_body, "Direct reclaim stalls",
-                        counter_rate(activity_before.direct_reclaim_count,
-                                     activity_after.direct_reclaim_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(memory_table, "Direct reclaim stalls",
+                   counter_rate(activity_before.direct_reclaim_count,
+                                activity_after.direct_reclaim_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
     if (activity_before.has_field(os::system_activity_field::CompactionStall) &&
         activity_after.has_field(os::system_activity_field::CompactionStall))
     {
-      append_rate_field(memory_body, "Compaction stalls",
-                        counter_rate(activity_before.compaction_stall_count,
-                                     activity_after.compaction_stall_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(memory_table, "Compaction stalls",
+                   counter_rate(activity_before.compaction_stall_count,
+                                activity_after.compaction_stall_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
     if (activity_before.has_field(os::system_activity_field::OomKills) &&
         activity_after.has_field(os::system_activity_field::OomKills))
     {
-      append_rate_field(memory_body, "OOM kills",
-                        counter_rate(activity_before.oom_kill_count,
-                                     activity_after.oom_kill_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(memory_table, "Out-of-memory kills",
+                   counter_rate(activity_before.oom_kill_count,
+                                activity_after.oom_kill_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
     if (activity_after.has_field(os::system_activity_field::DirtyPages)) {
-      append_report_field(
-          memory_body, "Dirty pages",
-          String::from(activity_after.dirty_page_count, allocator),
-          colors::ansi::BOLD_CYAN, should_color);
+      add_metric_row(memory_table, "Dirty pages",
+                     String::from(activity_after.dirty_page_count, allocator),
+                     allocator);
     }
     if (activity_after.has_field(os::system_activity_field::WritebackPages)) {
-      append_report_field(
-          memory_body, "Writeback pages",
+      add_metric_row(
+          memory_table, "Writeback pages",
           String::from(activity_after.writeback_page_count, allocator),
-          colors::ansi::BOLD_CYAN, should_color);
+          allocator);
     }
   }
-  if (!memory_body.is_empty()) {
-    append_report_body(output, memory_body.view(), "");
-    output += "\n";
-  }
+  if (has_memory_status || (has_activity_before && has_activity_after))
+    append_titled_table(output, "Memory", memory_table, should_color);
 
-  let paging_body = String{allocator};
+  let paging_table = make_metric_table(allocator);
   if (has_activity_before && has_activity_after) {
     if (activity_before.has_field(os::system_activity_field::PageInput) &&
         activity_after.has_field(os::system_activity_field::PageInput))
@@ -1743,9 +1723,9 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
           counter_rate(activity_before.page_input_bytes,
                        activity_after.page_input_bytes, elapsed_nanoseconds);
       if (rate.has_value()) {
-        append_report_field(paging_body, "Input",
-                            (format_human_size(*rate, allocator) + "/s").view(),
-                            colors::ansi::BOLD_CYAN, should_color);
+        add_metric_row(paging_table, "Page input rate",
+                       (format_human_size(*rate, allocator) + "/s").view(),
+                       allocator);
       }
     }
     if (activity_before.has_field(os::system_activity_field::PageOutput) &&
@@ -1755,36 +1735,34 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
           counter_rate(activity_before.page_output_bytes,
                        activity_after.page_output_bytes, elapsed_nanoseconds);
       if (rate.has_value()) {
-        append_report_field(paging_body, "Output",
-                            (format_human_size(*rate, allocator) + "/s").view(),
-                            colors::ansi::BOLD_CYAN, should_color);
+        add_metric_row(paging_table, "Page output rate",
+                       (format_human_size(*rate, allocator) + "/s").view(),
+                       allocator);
       }
     }
     if (activity_before.has_field(os::system_activity_field::Faults) &&
         activity_after.has_field(os::system_activity_field::Faults))
     {
-      append_rate_field(paging_body, "Faults",
-                        counter_rate(activity_before.page_fault_count,
-                                     activity_after.page_fault_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(paging_table, "Page faults",
+                   counter_rate(activity_before.page_fault_count,
+                                activity_after.page_fault_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
     if (activity_before.has_field(os::system_activity_field::MajorFaults) &&
         activity_after.has_field(os::system_activity_field::MajorFaults))
     {
-      append_rate_field(paging_body, "Major faults",
-                        counter_rate(activity_before.major_page_fault_count,
-                                     activity_after.major_page_fault_count,
-                                     elapsed_nanoseconds),
-                        "/s", allocator, should_color);
+      add_rate_row(paging_table, "Major page faults",
+                   counter_rate(activity_before.major_page_fault_count,
+                                activity_after.major_page_fault_count,
+                                elapsed_nanoseconds),
+                   "/s", allocator);
     }
   }
-  if (!paging_body.is_empty()) {
-    append_report_body(output, paging_body.view(), "");
-    output += "\n";
-  }
+  if (has_activity_before && has_activity_after)
+    append_titled_table(output, "Paging", paging_table, should_color);
 
-  let scheduler_body = String{allocator};
+  let scheduler_table = make_metric_table(allocator);
   if (has_activity_after) {
     if (activity_after.has_field(os::system_activity_field::Runnable)) {
       let runnable =
@@ -1794,88 +1772,84 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
           String::from(os::get_processor_counts().online_count, allocator)
               .view();
       runnable += " processors";
-      append_report_field(scheduler_body, "Runnable", runnable.view(),
-                          colors::ansi::BOLD_CYAN, should_color);
+      add_metric_row(scheduler_table, "Runnable processes", runnable.view(),
+                     allocator);
     }
     if (activity_after.has_field(os::system_activity_field::Blocked)) {
-      append_report_field(
-          scheduler_body, "I/O blocked",
+      add_metric_row(
+          scheduler_table, "I/O-blocked processes",
           String::from(activity_after.blocked_process_count, allocator),
-          colors::ansi::BOLD_CYAN, should_color);
+          allocator);
     }
   }
-  if (!scheduler_body.is_empty()) {
-    append_report_body(output, scheduler_body.view(), "");
-    output += "\n";
-  }
+  if (has_activity_after)
+    append_titled_table(output, "Scheduler", scheduler_table, should_color);
 
-  let stalls = String{allocator};
+  let stalls_table = make_metric_table(allocator);
   if (has_activity_before && has_activity_after) {
     if (activity_before.has_field(os::system_activity_field::CpuSomeStall) &&
         activity_after.has_field(os::system_activity_field::CpuSomeStall))
     {
-      append_stall_field(
-          stalls, "CPU some",
+      add_stall_row(
+          stalls_table, "CPU partial pressure stall",
           counter_rate(activity_before.cpu_some_stall_microseconds,
                        activity_after.cpu_some_stall_microseconds,
                        elapsed_nanoseconds),
-          allocator, should_color);
+          allocator);
     }
     if (activity_before.has_field(os::system_activity_field::CpuFullStall) &&
         activity_after.has_field(os::system_activity_field::CpuFullStall))
     {
-      append_stall_field(
-          stalls, "CPU full",
+      add_stall_row(
+          stalls_table, "CPU full pressure stall",
           counter_rate(activity_before.cpu_full_stall_microseconds,
                        activity_after.cpu_full_stall_microseconds,
                        elapsed_nanoseconds),
-          allocator, should_color);
+          allocator);
     }
     if (activity_before.has_field(os::system_activity_field::MemorySomeStall) &&
         activity_after.has_field(os::system_activity_field::MemorySomeStall))
     {
-      append_stall_field(
-          stalls, "Memory some",
+      add_stall_row(
+          stalls_table, "Memory partial pressure stall",
           counter_rate(activity_before.memory_some_stall_microseconds,
                        activity_after.memory_some_stall_microseconds,
                        elapsed_nanoseconds),
-          allocator, should_color);
+          allocator);
     }
     if (activity_before.has_field(os::system_activity_field::MemoryFullStall) &&
         activity_after.has_field(os::system_activity_field::MemoryFullStall))
     {
-      append_stall_field(
-          stalls, "Memory full",
+      add_stall_row(
+          stalls_table, "Memory full pressure stall",
           counter_rate(activity_before.memory_full_stall_microseconds,
                        activity_after.memory_full_stall_microseconds,
                        elapsed_nanoseconds),
-          allocator, should_color);
+          allocator);
     }
     if (activity_before.has_field(os::system_activity_field::IoSomeStall) &&
         activity_after.has_field(os::system_activity_field::IoSomeStall))
     {
-      append_stall_field(
-          stalls, "I/O some",
+      add_stall_row(
+          stalls_table, "I/O partial pressure stall",
           counter_rate(activity_before.io_some_stall_microseconds,
                        activity_after.io_some_stall_microseconds,
                        elapsed_nanoseconds),
-          allocator, should_color);
+          allocator);
     }
     if (activity_before.has_field(os::system_activity_field::IoFullStall) &&
         activity_after.has_field(os::system_activity_field::IoFullStall))
     {
-      append_stall_field(
-          stalls, "I/O full",
+      add_stall_row(
+          stalls_table, "I/O full pressure stall",
           counter_rate(activity_before.io_full_stall_microseconds,
                        activity_after.io_full_stall_microseconds,
                        elapsed_nanoseconds),
-          allocator, should_color);
+          allocator);
     }
   }
-  if (!stalls.is_empty()) {
-    append_report_body(output, stalls.view(), "");
-    output += "\n";
-  }
+  if (has_activity_before && has_activity_after)
+    append_titled_table(output, "Pressure stalls", stalls_table, should_color);
 
   if (!disk_after.disks.is_empty() || FLAG_EVILIO_CUMULATIVE.is_enabled()) {
     let disk_rows = make_disk_io_rows(
@@ -1886,8 +1860,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     append_disk_io_report(output, disk_rows,
                           FLAG_EVILIO_ALL.is_enabled() ||
                               FLAG_EVILIO_CUMULATIVE.is_enabled(),
-                          !FLAG_EVILIO_CUMULATIVE.is_enabled(), allocator,
-                          should_color, sample_duration_label.view());
+                          allocator, should_color,
+                          sample_duration_label.view());
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {
@@ -1895,19 +1869,12 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
 
-  let swap_table = ReportTable{allocator};
-  swap_table.add_column("SECTION", report_table_alignment::Left,
-                        colors::ansi::BOLD_CYAN);
-  swap_table.add_column("STATUS", report_table_alignment::Left,
-                        colors::ansi::BOLD_CYAN);
+  let swap_table = make_metric_table(allocator);
   let add_swap_row = [&](StringView section, StringView status) throws -> void {
-    let cells = ArrayList<report_table_cell_view>{allocator};
-    cells.push({section, colors::ansi::BOLD_CYAN});
-    cells.push({status, {}});
-    swap_table.add_row(cells);
+    add_metric_row(swap_table, section, status, allocator);
   };
   if (!has_swap_after) {
-    add_swap_row("Swap", "unavailable");
+    add_swap_row("Status", "Unavailable");
   } else {
     let utilization = String::from(
         swap_after.total_bytes == 0
@@ -1924,7 +1891,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     status += "), ";
     status += format_human_size(swap_after.free_bytes, allocator).view();
     status += " free";
-    add_swap_row("Swap", status.view());
+    add_swap_row("Usage", status.view());
     if (FLAG_EVILIO_ALL.is_enabled() && swap_after.has_activity) {
       let activity = String{allocator};
       if (FLAG_EVILIO_ALL.is_enabled() && has_swap_before &&
@@ -1950,14 +1917,14 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
             format_human_size(swap_after.output_bytes, allocator).view();
         activity += " out";
       }
-      add_swap_row("Activity", activity.view());
+      add_swap_row("Input/output activity", activity.view());
     }
     if (swap_after.has_encryption_state) {
-      add_swap_row("Encryption",
+      add_swap_row("Encryption status",
                    swap_after.is_encrypted ? "enabled" : "disabled");
     }
   }
-  output += swap_table.to_string(should_color, "").view();
+  append_titled_table(output, "Swap", swap_table, should_color);
 
   ec.print_to_stdout(output);
   return 0;
