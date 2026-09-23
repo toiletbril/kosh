@@ -379,22 +379,29 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   os::tcp_statistics statistics{};
   if (!os::read_tcp_statistics(statistics)) return false;
 
-  let body = String{allocator};
+  let table = ReportTable{allocator};
+  table.add_column("GROUP", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("METRIC", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("COUNT", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  let cells = ArrayList<report_table_cell_view>{allocator};
+  cells.reserve(3);
+  bool has_rows = false;
   let const do_append_group =
       [&](StringView title, const StringView *names, const u64 *values,
           const os::tcp_statistics_field *fields, usize field_count) throws {
-        let value = String{allocator};
         for (usize index = 0; index < field_count; index++) {
           if (!statistics.has_field(fields[index])) continue;
-          if (!value.is_empty()) value += ", ";
-          value += names[index];
-          value += " ";
-          value += String::from(values[index], allocator).view();
+          let const value = String::from(values[index], allocator);
+          cells.clear();
+          cells.push({title, colors::ansi::BOLD_CYAN});
+          cells.push({names[index], colors::ansi::RESET});
+          cells.push({value.view(), colors::ansi::RESET});
+          table.add_row(cells);
+          has_rows = true;
         }
-        if (value.is_empty()) return;
-        append_report_inline_field(body, title, value.view(),
-                                   colors::ansi::BOLD_CYAN, should_color);
-        body += "\n";
       };
   constexpr StringView OPEN_NAMES[] = {"active", "passive"};
   const u64 open_values[] = {statistics.active_open_count,
@@ -478,7 +485,7 @@ fn append_tcp_report(String &output, ArrayList<String> &warnings,
   };
   do_append_group("Failures", FAILURE_NAMES, failure_values, FAILURE_FIELDS,
                   countof(FAILURE_NAMES));
-  append_report_body(output, body.view(), "");
+  if (has_rows) append_titled_report_table(output, "TCP", table, should_color);
 
   constexpr StringView WARNING_NAMES[] = {
       "failed connections",
