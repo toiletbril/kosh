@@ -168,16 +168,16 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
       now_nanoseconds > window_nanoseconds ? now_nanoseconds - window_nanoseconds
                                            : 0;
   for (let &node : nodes) {
-    live_process_cpu_row *row = nullptr;
-    for (let &candidate : history) {
-      if (candidate.pid != node.pid ||
-          candidate.start_token != node.start_token)
+    let row_index = Maybe<usize>{None};
+    for (usize index = 0; index < history.count(); index++) {
+      if (history[index].pid != node.pid ||
+          history[index].start_token != node.start_token)
         continue;
-      row = &candidate;
+      row_index = index;
       break;
     }
 
-    if (row == nullptr) {
+    if (!row_index.has_value()) {
       live_process_cpu_row fresh{history.allocator()};
       fresh.pid = node.pid;
       fresh.start_token = node.start_token;
@@ -188,20 +188,21 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
       continue;
     }
 
-    if (node.cpu_milliseconds < row->history_milliseconds.back()) {
-      row->history_milliseconds.clear();
-      row->history_nanoseconds.clear();
+    let &row = history[*row_index];
+    if (node.cpu_milliseconds < row.history_milliseconds.back()) {
+      row.history_milliseconds.clear();
+      row.history_nanoseconds.clear();
     }
-    row->history_milliseconds.push(node.cpu_milliseconds);
-    row->history_nanoseconds.push(now_nanoseconds);
-    row->last_seen_nanoseconds = now_nanoseconds;
-    while (row->history_nanoseconds.count() > 2 &&
-           row->history_nanoseconds[1] <= window_start_nanoseconds)
+    row.history_milliseconds.push(node.cpu_milliseconds);
+    row.history_nanoseconds.push(now_nanoseconds);
+    row.last_seen_nanoseconds = now_nanoseconds;
+    while (row.history_nanoseconds.count() > 2 &&
+           row.history_nanoseconds[1] <= window_start_nanoseconds)
     {
-      row->history_milliseconds.remove(0);
-      row->history_nanoseconds.remove(0);
+      row.history_milliseconds.remove(0);
+      row.history_nanoseconds.remove(0);
     }
-    set_cpu_percentage(node, *row, window_start_nanoseconds, now_nanoseconds);
+    set_cpu_percentage(node, row, window_start_nanoseconds, now_nanoseconds);
   }
 
   for (usize index = history.count(); index > 0; index--) {
