@@ -2287,6 +2287,12 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
   status.available_kib = status.free_kib;
   status.swap_total_kib = memory.ullTotalPageFile / 1024;
   status.swap_free_kib = memory.ullAvailPageFile / 1024;
+  status.available_fields =
+      static_cast<u32>(memory_status_field::Total) |
+      static_cast<u32>(memory_status_field::Available) |
+      static_cast<u32>(memory_status_field::Free) |
+      static_cast<u32>(memory_status_field::SwapTotal) |
+      static_cast<u32>(memory_status_field::SwapFree);
   return true;
 }
 

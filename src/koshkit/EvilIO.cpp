@@ -1614,28 +1614,40 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
   let memory_table = make_metric_table(allocator);
   if (has_memory_status) {
-    let const total_bytes = memory.total_kib > UINT64_MAX / 1024
-                                ? UINT64_MAX
-                                : memory.total_kib * 1024;
-    let const available_bytes = memory.available_kib > UINT64_MAX / 1024
-                                    ? UINT64_MAX
-                                    : memory.available_kib * 1024;
-    let const free_bytes = memory.free_kib > UINT64_MAX / 1024
-                               ? UINT64_MAX
-                               : memory.free_kib * 1024;
-    let const used_bytes =
-        total_bytes > available_bytes ? total_bytes - available_bytes : 0;
-    let status = format_human_size(used_bytes, allocator);
-    status += " / ";
-    status += format_human_size(total_bytes, allocator).view();
-    status += " (";
-    status += percent_text(used_bytes, total_bytes, allocator).view();
-    status += ")";
-    add_metric_row(memory_table, "Used memory", status.view(), allocator);
-    add_metric_row(memory_table, "Available memory",
-                   format_human_size(available_bytes, allocator), allocator);
-    add_metric_row(memory_table, "Free memory",
-                   format_human_size(free_bytes, allocator), allocator);
+    if (memory.has_field(os::memory_status_field::Total) &&
+        (memory.has_field(os::memory_status_field::Available) ||
+         memory.has_field(os::memory_status_field::Free)))
+    {
+      let const total_bytes = memory.total_kib > UINT64_MAX / 1024
+                                  ? UINT64_MAX
+                                  : memory.total_kib * 1024;
+      let const available_bytes = memory.available_kib > UINT64_MAX / 1024
+                                      ? UINT64_MAX
+                                      : memory.available_kib * 1024;
+      let const used_bytes =
+          total_bytes > available_bytes ? total_bytes - available_bytes : 0;
+      let status = format_human_size(used_bytes, allocator);
+      status += " / ";
+      status += format_human_size(total_bytes, allocator).view();
+      status += " (";
+      status += percent_text(used_bytes, total_bytes, allocator).view();
+      status += ")";
+      add_metric_row(memory_table, "Used memory", status.view(), allocator);
+    }
+    if (memory.has_field(os::memory_status_field::Available)) {
+      let const available_bytes = memory.available_kib > UINT64_MAX / 1024
+                                      ? UINT64_MAX
+                                      : memory.available_kib * 1024;
+      add_metric_row(memory_table, "Available memory",
+                     format_human_size(available_bytes, allocator), allocator);
+    }
+    if (memory.has_field(os::memory_status_field::Free)) {
+      let const free_bytes = memory.free_kib > UINT64_MAX / 1024
+                                 ? UINT64_MAX
+                                 : memory.free_kib * 1024;
+      add_metric_row(memory_table, "Free memory",
+                     format_human_size(free_bytes, allocator), allocator);
+    }
   }
   if (has_activity_before && has_activity_after) {
     if (activity_before.has_field(os::system_activity_field::PageScan) &&

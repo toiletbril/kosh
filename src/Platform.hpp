@@ -681,6 +681,15 @@ fn sync_filesystems() wontthrow -> bool;
 
 fn sync_path(StringView path, bool is_data_only) wontthrow -> bool;
 
+enum class memory_status_field : u32
+{
+  Total = 1u << 0,
+  Available = 1u << 1,
+  Free = 1u << 2,
+  SwapTotal = 1u << 3,
+  SwapFree = 1u << 4,
+};
+
 struct memory_status
 {
   u64 total_kib{0};
@@ -688,6 +697,12 @@ struct memory_status
   u64 free_kib{0};
   u64 swap_total_kib{0};
   u64 swap_free_kib{0};
+  u32 available_fields{0};
+
+  pure fn has_field(memory_status_field field) const wontthrow -> bool
+  {
+    return (available_fields & static_cast<u32>(field)) != 0;
+  }
 };
 
 fn read_memory_status(memory_status &status) wontthrow -> bool;

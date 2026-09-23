@@ -1972,6 +1972,7 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
                      0) != 0)
     return false;
   status.total_kib = memory_bytes / 1024;
+  status.available_fields |= static_cast<u32>(memory_status_field::Total);
 
   let const host_port = mach_host_self();
   vm_size_t page_bytes = 0;
@@ -1993,6 +1994,9 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
                             static_cast<u64>(vm_stats.inactive_count) +
                             static_cast<u64>(vm_stats.purgeable_count)) *
                            page_kib;
+    status.available_fields |=
+        static_cast<u32>(memory_status_field::Free) |
+        static_cast<u32>(memory_status_field::Available);
   }
 
   struct xsw_usage swap{};
@@ -2000,6 +2004,9 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
   if (::sysctlbyname("vm.swapusage", &swap, &swap_length, nullptr, 0) == 0) {
     status.swap_total_kib = swap.xsu_total / 1024;
     status.swap_free_kib = swap.xsu_avail / 1024;
+    status.available_fields |=
+        static_cast<u32>(memory_status_field::SwapTotal) |
+        static_cast<u32>(memory_status_field::SwapFree);
   }
 
   return true;
@@ -2008,14 +2015,18 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
   {
     StringView name;
     u64 memory_status::*field;
+    memory_status_field availability;
   };
 
   static constexpr meminfo_field MEMINFO_FIELDS[] = {
-      {"MemTotal",     &memory_status::total_kib     },
-      {"MemFree",      &memory_status::free_kib      },
-      {"MemAvailable", &memory_status::available_kib },
-      {"SwapTotal",    &memory_status::swap_total_kib},
-      {"SwapFree",     &memory_status::swap_free_kib },
+      {"MemTotal", &memory_status::total_kib, memory_status_field::Total},
+      {"MemFree", &memory_status::free_kib, memory_status_field::Free},
+      {"MemAvailable", &memory_status::available_kib,
+       memory_status_field::Available},
+      {"SwapTotal", &memory_status::swap_total_kib,
+       memory_status_field::SwapTotal},
+      {"SwapFree", &memory_status::swap_free_kib,
+       memory_status_field::SwapFree},
   };
 
   char buffer[8192];
@@ -2035,15 +2046,19 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
 
       if (let const parsed =
               leading_digits(line, *colon_position + 1).to<u64>();
-          !parsed.is_error())
+          !parsed.is_error()) {
         status.*known.field = parsed.value();
+        status.available_fields |= static_cast<u32>(known.availability);
+      }
 
       break;
     }
   }
 
-  if (status.available_kib == 0) status.available_kib = status.free_kib;
-  return status.total_kib != 0;
+  if (!status.has_field(memory_status_field::Available) &&
+      status.has_field(memory_status_field::Free))
+    status.available_kib = status.free_kib;
+  return status.has_field(memory_status_field::Total);
 #else
   unused(status);
   return false;
@@ -2082,6 +2097,9 @@ fn read_swap_status(swap_status &status) wontthrow -> bool
 #elif defined __linux__
   memory_status memory{};
   if (!read_memory_status(memory)) return false;
+  if (!memory.has_field(memory_status_field::SwapTotal) ||
+      !memory.has_field(memory_status_field::SwapFree))
+    return false;
   status.total_bytes = memory.swap_total_kib * 1024;
   status.free_bytes = memory.swap_free_kib * 1024;
   status.used_bytes = status.total_bytes > status.free_bytes

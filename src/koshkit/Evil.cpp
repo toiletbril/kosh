@@ -327,10 +327,18 @@ fn append_procfs_report(String &output, bool should_color,
   }
 
   os::memory_status memory{};
-  if (os::read_memory_status(memory)) {
-    let memory_line = String::from(memory.available_kib, allocator) +
-                      " KiB available of " +
-                      String::from(memory.total_kib, allocator).view() + " KiB";
+  if (os::read_memory_status(memory) &&
+      memory.has_field(os::memory_status_field::Total))
+  {
+    let memory_line = String{allocator};
+    if (memory.has_field(os::memory_status_field::Available) ||
+        memory.has_field(os::memory_status_field::Free))
+    {
+      memory_line = String::from(memory.available_kib, allocator);
+      memory_line += " KiB available of ";
+    }
+    memory_line += String::from(memory.total_kib, allocator).view();
+    memory_line += " KiB";
     append_report_field(output, "Memory", memory_line.view(),
                         colors::ansi::BOLD_CYAN, should_color);
   }
@@ -549,27 +557,42 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
                       colors::ansi::BOLD_CYAN, should_color);
 
   os::memory_status memory{};
-  if (os::read_memory_status(memory) && memory.total_kib > 0) {
-    let const used_kib = memory.total_kib > memory.available_kib
-                             ? memory.total_kib - memory.available_kib
-                             : 0;
-    let memory_line = format_human_size(used_kib * 1024, allocator);
-    memory_line += " used of ";
+  if (os::read_memory_status(memory) &&
+      memory.has_field(os::memory_status_field::Total) &&
+      memory.total_kib > 0)
+  {
+    let memory_line = String{allocator};
+    if (memory.has_field(os::memory_status_field::Available) ||
+        memory.has_field(os::memory_status_field::Free))
+    {
+      let const used_kib = memory.total_kib > memory.available_kib
+                               ? memory.total_kib - memory.available_kib
+                               : 0;
+      memory_line = format_human_size(used_kib * 1024, allocator);
+      memory_line += " used of ";
+    }
     memory_line += format_human_size(memory.total_kib * 1024, allocator).view();
     append_report_field(output, "Memory", memory_line.view(),
                         colors::ansi::BOLD_CYAN, should_color);
     if (FLAG_EVIL_ALL.is_enabled()) {
-      append_report_field(
-          output, "Memory available",
-          format_human_size(memory.available_kib * 1024, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
-      append_report_field(
-          output, "Memory free",
-          format_human_size(memory.free_kib * 1024, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
+      if (memory.has_field(os::memory_status_field::Available)) {
+        append_report_field(
+            output, "Memory available",
+            format_human_size(memory.available_kib * 1024, allocator).view(),
+            colors::ansi::BOLD_CYAN, should_color);
+      }
+      if (memory.has_field(os::memory_status_field::Free)) {
+        append_report_field(
+            output, "Memory free",
+            format_human_size(memory.free_kib * 1024, allocator).view(),
+            colors::ansi::BOLD_CYAN, should_color);
+      }
     }
 
-    if (memory.swap_total_kib > 0) {
+    if (memory.has_field(os::memory_status_field::SwapTotal) &&
+        memory.has_field(os::memory_status_field::SwapFree) &&
+        memory.swap_total_kib > 0)
+    {
       let const swap_used_kib =
           memory.swap_total_kib > memory.swap_free_kib
               ? memory.swap_total_kib - memory.swap_free_kib
