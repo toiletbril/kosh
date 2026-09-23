@@ -157,7 +157,7 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt,
   /* Completion is turned off for the REPL and the history swaps to
      ~/.kosh_calc_history. */
   let const was_completion_enabled =
-      should_use_editor && toiletline::completion_is_enabled();
+      should_use_editor && toiletline::is_completion_enabled();
   if (should_use_editor) {
     toiletline::enter_raw_mode();
     toiletline::disable_completion();
@@ -243,7 +243,7 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt,
     if (line->view().is_empty()) continue;
 
     if (should_use_editor)
-      unused(toiletline::history_append_event(line->view()));
+      unused(toiletline::append_history_event(line->view()));
 
     try {
       if (try_define(cxt, line->view())) continue;

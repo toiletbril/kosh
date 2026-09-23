@@ -427,7 +427,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HISTORY_CLEAR.is_enabled()) {
     LOG(Debug, "history clearing the list");
-    if (let const result = toiletline::history_clear(); result.is_error()) {
+    if (let const result = toiletline::clear_history(); result.is_error()) {
       report_history_file_failure(ec, cxt, "clear", result.error().message());
       return 1;
     }
@@ -505,7 +505,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       import_state.imported_prefix.append(source_text->view());
     }
 
-    if (let const result = toiletline::history_read(); result.is_error()) {
+    if (let const result = toiletline::read_history(); result.is_error()) {
       report_history_file_failure(ec, cxt, "read", result.error().message());
       return 1;
     }
@@ -532,7 +532,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         return 1;
       }
     } else if (FLAG_HISTORY_WRITE.is_enabled()) {
-      if (let const result = toiletline::history_write(); result.is_error()) {
+      if (let const result = toiletline::write_history(); result.is_error()) {
         report_history_file_failure(ec, cxt, "write", result.error().message());
         return 1;
       }
@@ -574,8 +574,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
          index-- > selection->first_index;)
     {
       let const &event = events[index];
-      if (!toiletline::history_rewrite_event(event.number, event.command.view(),
-                                             ""))
+      if (!toiletline::rewrite_history_event(event.number,
+                                             event.command.view(), ""))
       {
         report_soft_builtin_error(ec, cxt, FLAG_HISTORY_DELETE.value_location(),
                                   "Unable to delete the history event");
@@ -594,7 +594,7 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         event.append(args[index].view());
       }
 
-      if (!toiletline::history_append_event(event.view()).has_value()) {
+      if (!toiletline::append_history_event(event.view()).has_value()) {
         report_soft_builtin_error(ec, cxt, ec.source_location(),
                                   "Unable to store the history event");
         return 1;

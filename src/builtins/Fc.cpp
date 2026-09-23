@@ -179,7 +179,7 @@ static fn remember_fc_command(
   let const replacement_index =
       active_index.has_value() ? *active_index : events.count() - 1;
   let const &replaced = events[replacement_index];
-  if (!toiletline::history_rewrite_event(replaced.number,
+  if (!toiletline::rewrite_history_event(replaced.number,
                                          replaced.command.view(), command))
   {
     return false;
@@ -410,7 +410,8 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
 
   if (should_replace_active) {
     let const &active = events[*active_index];
-    if (!toiletline::history_rewrite_event(active.number, active.command.view(),
+    if (!toiletline::rewrite_history_event(active.number,
+                                           active.command.view(),
                                            recorded_commands))
     {
       report_soft_builtin_error(ec, cxt, ec.source_location(),

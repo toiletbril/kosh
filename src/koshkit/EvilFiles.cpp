@@ -459,12 +459,12 @@ fn EvilFiles::execute(
   for (let const &row : rows) {
     output += "  ";
     let command = String{allocator, row.command.view()};
-    if (toiletline::display_width(command.view()) > widths.command &&
+    if (toiletline::get_display_width(command.view()) > widths.command &&
         widths.command > 3)
     {
       usize actual_cells = 0;
       let const kept_bytes =
-          toiletline::byte_offset_at_or_before_display_cell(
+          toiletline::get_byte_offset_at_or_before_display_cell(
               command.view(), widths.command - 3, actual_cells);
       command.truncate(kept_bytes);
       command += "...";
@@ -513,14 +513,14 @@ fn EvilFiles::execute(
           widths.descriptor + 2 + widths.type + 2 + widths.mode + 2 +
           widths.state + 2 + widths.device + 2 + widths.size + 2 +
           widths.offset + 2 + widths.node + 2 + widths.endpoint + 2;
-      if (used_width + toiletline::display_width(row.name.view()) >
+      if (used_width + toiletline::get_display_width(row.name.view()) >
           line_width_limit)
       {
         if (line_width_limit > used_width + 4) {
           String name = String{allocator, row.name.view()};
           usize actual_cells = 0;
           let const kept_bytes =
-              toiletline::byte_offset_at_or_before_display_cell(
+              toiletline::get_byte_offset_at_or_before_display_cell(
                   name.view(), line_width_limit - used_width - 3,
                   actual_cells);
           name.truncate(kept_bytes);

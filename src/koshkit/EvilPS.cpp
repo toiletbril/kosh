@@ -300,20 +300,21 @@ fn append_bounded_command(String &output, StringView command,
   let const current_line = line_start.has_value()
                                ? output.view().substring(*line_start + 1)
                                : output.view();
-  let const current_width = toiletline::display_width(current_line);
+  let const current_width = toiletline::get_display_width(current_line);
   if (current_width >= line_width_limit) return;
   let const available = line_width_limit - current_width - 1;
   if (available == 0) return;
 
   output += " ";
-  if (toiletline::display_width(command) <= available) {
+  if (toiletline::get_display_width(command) <= available) {
     append_report_text(output, command, colors::ansi::DIM, should_color);
     return;
   }
 
   if (available <= 3) {
     usize actual_cells = 0;
-    let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+    let const kept_bytes =
+        toiletline::get_byte_offset_at_or_before_display_cell(
         command, available, actual_cells);
     append_report_text(output, command.substring_of_length(0, kept_bytes),
                        colors::ansi::DIM, should_color);
@@ -321,7 +322,7 @@ fn append_bounded_command(String &output, StringView command,
   }
 
   usize actual_cells = 0;
-  let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+  let const kept_bytes = toiletline::get_byte_offset_at_or_before_display_cell(
       command, available - 3, actual_cells);
   append_report_text(output, command.substring_of_length(0, kept_bytes),
                      colors::ansi::DIM, should_color);
@@ -474,11 +475,13 @@ fn read_process_nodes(Allocator allocator, bool should_read_resources,
     node.name = String{allocator, process.name.view()};
     node.command_line = String{allocator, process.command_line.view()};
     if (line_width_limit != 0 && line_width_limit != SIZE_MAX &&
-        toiletline::display_width(node.command_line.view()) > line_width_limit)
+        toiletline::get_display_width(node.command_line.view()) >
+            line_width_limit)
     {
       const StringView text = node.command_line.view();
       usize actual_cells = 0;
-      let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+      let const kept_bytes =
+          toiletline::get_byte_offset_at_or_before_display_cell(
           text, line_width_limit - 3, actual_cells);
       node.command_line.truncate(kept_bytes);
       node.command_line += "...";

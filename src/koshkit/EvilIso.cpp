@@ -941,9 +941,10 @@ fn remote_table_text(StringView text, usize maximum_cells,
     result.push((static_cast<unsigned char>(byte) < 32 || byte == 127) ? ' '
                                                                        : byte);
   }
-  if (toiletline::display_width(result.view()) > maximum_cells) {
+  if (toiletline::get_display_width(result.view()) > maximum_cells) {
     usize actual_cells = 0;
-    let const kept_bytes = toiletline::byte_offset_at_or_before_display_cell(
+    let const kept_bytes =
+        toiletline::get_byte_offset_at_or_before_display_cell(
         result.view(), maximum_cells - 3, actual_cells);
     result.truncate(kept_bytes);
     result += "...";

@@ -1111,7 +1111,7 @@ fn append_report_column(String &output, StringView text, usize width,
                         bool is_right_aligned, StringView style,
                         bool should_color) throws -> void
 {
-  let const text_width = toiletline::display_width(text);
+  let const text_width = toiletline::get_display_width(text);
   let const padding_length = text_width < width ? width - text_width : 0;
   if (is_right_aligned) output.append_repeated(' ', padding_length);
 
@@ -1189,13 +1189,13 @@ static fn append_report_grid(String &output,
 {
   let widths = ArrayList<usize>{columns.allocator()};
   widths.reserve(columns.count());
-  for (let const &column : columns) widths.push(toiletline::display_width(
+  for (let const &column : columns) widths.push(toiletline::get_display_width(
       column.heading.view()));
 
   for (let const &row : rows) {
     for (usize index = 0; index < columns.count(); index++) {
       if (index >= row.count()) continue;
-      let const width = toiletline::display_width(row[index].text.view());
+      let const width = toiletline::get_display_width(row[index].text.view());
       if (widths[index] < width) widths[index] = width;
     }
   }
@@ -1203,7 +1203,7 @@ static fn append_report_grid(String &output,
   let const append_grid_column = [&](String &target, StringView text,
                                      usize width, bool is_right_aligned,
                                      StringView style) throws -> void {
-    let const text_width = toiletline::display_width(text);
+    let const text_width = toiletline::get_display_width(text);
     let const padding_length = text_width < width ? width - text_width : 0;
     if (is_right_aligned) target.append_repeated(' ', padding_length);
     append_report_text(target, text, style, should_color);

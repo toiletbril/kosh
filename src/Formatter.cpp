@@ -548,7 +548,7 @@ public:
   {
     start_line();
     let const separator_length = m_line_has_text ? 1u : 0u;
-    let const token_width = toiletline::display_width(token);
+    let const token_width = toiletline::get_display_width(token);
     if (m_should_wrap &&
         m_column + separator_length + token_width > MAX_LINE_WIDTH &&
         m_line_has_text)
@@ -567,7 +567,8 @@ public:
         break;
       }
     if (last_newline.has_value())
-      m_column = toiletline::display_width(token.substring(*last_newline + 1));
+      m_column =
+          toiletline::get_display_width(token.substring(*last_newline + 1));
     else
       m_column += token_width;
     m_line_has_text = true;
@@ -588,7 +589,7 @@ public:
   {
     start_line();
     m_output.append(token);
-    m_column += toiletline::display_width(token);
+    m_column += toiletline::get_display_width(token);
     m_line_has_text = true;
   }
 
@@ -604,12 +605,13 @@ public:
       start_line();
       m_output.append(text);
       m_line_has_text = !text.is_empty();
-      m_column += toiletline::display_width(text);
+      m_column += toiletline::get_display_width(text);
       return;
     }
     if (m_line_has_text) m_output.push(' ');
     m_output.append(comment);
-    m_column += toiletline::display_width(comment) + (m_line_has_text ? 1 : 0);
+    m_column +=
+        toiletline::get_display_width(comment) + (m_line_has_text ? 1 : 0);
     m_line_has_text = true;
   }
 
@@ -710,7 +712,7 @@ static fn measure_word_layout(StringView word) throws -> word_layout
     if (word[position] == '\\' && position + 1 < word.length &&
         word[position + 1] == '\n')
     {
-      measure.display_length += toiletline::display_width(
+      measure.display_length += toiletline::get_display_width(
           word.substring_of_length(segment_start, position - segment_start));
       measure.display_length++;
       position += 2;
@@ -722,7 +724,7 @@ static fn measure_word_layout(StringView word) throws -> word_layout
     if (word[position] == '\n') measure.has_hard_newline = true;
     position++;
   }
-  measure.display_length += toiletline::display_width(
+  measure.display_length += toiletline::get_display_width(
       word.substring_of_length(segment_start, word.length - segment_start));
 
   return measure;
@@ -757,7 +759,8 @@ fn collect_option_wrap_positions(const ArrayList<format_piece> &pieces) throws
       }
 
       if (!has_multiline_word && line_width > FormatWriter::MAX_LINE_WIDTH) {
-        let const continuation_offset = toiletline::display_width(command) + 1;
+        let const continuation_offset =
+            toiletline::get_display_width(command) + 1;
         for (usize index = segment_start + 1; index < segment_end; index++)
           if (word_looks_like_option(pieces[index].text))
             positions.push(option_wrap_position{index, continuation_offset});
@@ -790,7 +793,8 @@ fn append_long_string_warnings(StringView source,
   for (let const &piece : pieces) {
     if (piece.kind != format_piece_kind::Word ||
         !word_is_unbreakable(piece.text) ||
-        toiletline::display_width(piece.text) <= FormatWriter::MAX_LINE_WIDTH)
+        toiletline::get_display_width(piece.text) <=
+            FormatWriter::MAX_LINE_WIDTH)
       continue;
 
     usize line = 1;

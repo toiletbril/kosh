@@ -522,7 +522,7 @@ fn enable_completion(koshka::EvalContext &context) -> void { unused(context); }
 
 fn disable_completion() -> void {}
 
-fn completion_is_enabled() -> bool { return false; }
+fn is_completion_enabled() -> bool { return false; }
 
 fn set_space_after_completion(bool enabled) -> void { unused(enabled); }
 
@@ -537,7 +537,7 @@ fn get_history_path() -> koshka::Maybe<koshka::Path>
 
 /* Every event is appended to the file as it is stored. A write only has to
    drop the leading records the bounded list no longer reaches. */
-fn history_write() -> koshka::ErrorOr<koshka::Ok>
+fn write_history() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
@@ -586,7 +586,7 @@ fn history_write() -> koshka::ErrorOr<koshka::Ok>
   return koshka::Success;
 }
 
-fn history_read() -> koshka::ErrorOr<koshka::Ok>
+fn read_history() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
@@ -607,7 +607,7 @@ fn sync_history() -> koshka::ErrorOr<koshka::Ok>
   return koshka::internal::load_no_editor_history(*path, true);
 }
 
-fn history_clear() -> koshka::ErrorOr<koshka::Ok>
+fn clear_history() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
@@ -753,7 +753,7 @@ fn get_containing_history_event(koshka::Allocator allocator, StringView text,
       });
 }
 
-fn history_append_event(StringView command) -> koshka::Maybe<usize>
+fn append_history_event(StringView command) -> koshka::Maybe<usize>
 {
   if (command.is_empty() ||
       command.length > koshka::internal::NO_EDITOR_HISTORY_ENTRY_MAX_BYTE_COUNT)
@@ -878,16 +878,16 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   return event_number;
 }
 
-fn history_rewrite_event(usize number, StringView expected,
+fn rewrite_history_event(usize number, StringView expected,
                          StringView replacement) -> bool
 {
   let replacements = koshka::ArrayList<String>{koshka::heap_allocator()};
   if (!replacement.is_empty())
     replacements.push(String{koshka::heap_allocator(), replacement});
-  return history_rewrite_event(number, expected, replacements);
+  return rewrite_history_event(number, expected, replacements);
 }
 
-fn history_rewrite_event(usize number, StringView expected,
+fn rewrite_history_event(usize number, StringView expected,
                          const koshka::ArrayList<koshka::String> &replacements)
     -> bool
 {
@@ -941,9 +941,9 @@ fn exit_raw_mode() -> void {}
 
 fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 
-fn debug_allocation_failure() -> bool { return true; }
+fn did_debug_allocation_fail() -> bool { return true; }
 
-fn default_prompt_template() -> String
+fn get_default_prompt_template() -> String
 {
   let template_string = String{koshka::heap_allocator()};
   let const should_use_color = koshka::colors::stdout_wants_color();

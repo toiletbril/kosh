@@ -269,8 +269,8 @@ cold static fn get_context_pointing_to(
   let const caret_text = display_line.substring_of_length(
       expanded_caret_byte_position,
       expanded_caret_end_byte_position - expanded_caret_byte_position);
-  let const caret_column = toiletline::display_width(caret_prefix);
-  let const caret_width = toiletline::display_width(caret_text);
+  let const caret_column = toiletline::get_display_width(caret_prefix);
+  let const caret_width = toiletline::get_display_width(caret_text);
 
   let generated_highlights = ArrayList<highlight_span>{heap_allocator()};
   const ArrayList<highlight_span> *source_highlights = &generated_highlights;
@@ -300,7 +300,7 @@ cold static fn get_context_pointing_to(
     }
     line_highlights = &expanded_highlights;
   }
-  let const display_cells = toiletline::display_width(display_line);
+  let const display_cells = toiletline::get_display_width(display_line);
 
   usize window_start = 0;
   usize window_end = display_cells;
@@ -345,9 +345,9 @@ cold static fn get_context_pointing_to(
   usize window_start_byte = 0;
   usize window_end_byte = display_line.length;
   if (has_left_ellipsis || has_right_ellipsis) {
-    window_start_byte = toiletline::byte_offset_at_or_before_display_cell(
+    window_start_byte = toiletline::get_byte_offset_at_or_before_display_cell(
         display_line, window_start, window_start);
-    window_end_byte = toiletline::byte_offset_at_or_before_display_cell(
+    window_end_byte = toiletline::get_byte_offset_at_or_before_display_cell(
         display_line, window_end, window_end);
   }
 
@@ -513,8 +513,8 @@ fn ErrorWithLocation::to_string(StringView source,
   let const line_position =
       utils::source_line_position_at(source, byte_position);
   const usize line_byte_position =
-      toiletline::utf8_strnlen(source.data + line_position.line_start,
-                               byte_position - line_position.line_start) +
+      toiletline::get_utf8_length(source.data + line_position.line_start,
+                                  byte_position - line_position.line_start) +
       1;
   let const color = diagnostic_colors_for(severity);
 
@@ -644,9 +644,9 @@ cold fn DetailsWithLocation::to_string(StringView source,
   let const details_line_position =
       utils::source_line_position_at(source, byte_position);
   const usize details_line_byte_position =
-      toiletline::utf8_strnlen(source.data + details_line_position.line_start,
-                               byte_position -
-                                   details_line_position.line_start) +
+      toiletline::get_utf8_length(
+          source.data + details_line_position.line_start,
+          byte_position - details_line_position.line_start) +
       1;
 
   let const severity = get_severity();

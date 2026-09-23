@@ -35,8 +35,8 @@ enum class edit_mode : u8
   Vi,
 };
 
-fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
-                            usize codepoint_index) -> usize;
+fn get_codepoint_byte_offset(const char *bytes, usize byte_length,
+                             usize codepoint_index) -> usize;
 
 } /* namespace toiletline */
 
@@ -560,7 +560,7 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
     let line = koshka::StringView{buffer, byte_length};
 
     const usize byte_cursor =
-        toiletline::byte_offset_of_codepoint(buffer, byte_length, cursor);
+        toiletline::get_codepoint_byte_offset(buffer, byte_length, cursor);
 
     /* A completion diagnostic is armed to break onto its own line, then
        disarmed so a later command's message is unaffected. */
@@ -1010,7 +1010,7 @@ fn get_history_path() -> koshka::Maybe<koshka::Path>
 
 /* Every entry is appended to the file as it is stored. A write only has to
    drop the leading records the bounded list no longer reaches. */
-fn history_write() -> koshka::ErrorOr<koshka::Ok>
+fn write_history() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
@@ -1220,7 +1220,7 @@ static fn update_history_rewrite_safety_after_append(
   }
 }
 
-fn history_read() -> koshka::ErrorOr<koshka::Ok>
+fn read_history() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
@@ -1240,7 +1240,7 @@ fn sync_history() -> koshka::ErrorOr<koshka::Ok>
   return load_history(*path, true);
 }
 
-fn history_clear() -> koshka::ErrorOr<koshka::Ok>
+fn clear_history() -> koshka::ErrorOr<koshka::Ok>
 {
   let const path = get_history_file_path();
   if (!path.has_value()) return koshka::Error{"the path is unavailable"};
@@ -1401,7 +1401,7 @@ fn get_containing_history_event(koshka::Allocator allocator, StringView text,
                             });
 }
 
-fn history_append_event(StringView command) -> koshka::Maybe<usize>
+fn append_history_event(StringView command) -> koshka::Maybe<usize>
 {
   if (command.is_empty() || command.length > ITL_HISTORY_ENTRY_MAX_BYTES ||
       !is_history_contents_valid(command))
@@ -1436,11 +1436,11 @@ fn history_append_event(StringView command) -> koshka::Maybe<usize>
   return ::itl_g_last_history_event_number;
 }
 
-fn history_rewrite_event(usize number, StringView expected,
+fn rewrite_history_event(usize number, StringView expected,
                          const koshka::ArrayList<koshka::String> &replacements)
     -> bool;
 
-fn history_rewrite_event(usize number, StringView expected,
+fn rewrite_history_event(usize number, StringView expected,
                          StringView replacement) -> bool
 {
   let replacements =
@@ -1448,10 +1448,10 @@ fn history_rewrite_event(usize number, StringView expected,
   if (!replacement.is_empty())
     replacements.push(koshka::String{koshka::heap_allocator(), replacement});
 
-  return history_rewrite_event(number, expected, replacements);
+  return rewrite_history_event(number, expected, replacements);
 }
 
-fn history_rewrite_event(usize number, StringView expected,
+fn rewrite_history_event(usize number, StringView expected,
                          const koshka::ArrayList<koshka::String> &replacements)
     -> bool
 {
@@ -1818,7 +1818,7 @@ fn disable_completion() -> void
   ::tl_set_history_select_callback(nullptr);
 }
 
-fn completion_is_enabled() -> bool { return COMPLETION_CONTEXT != nullptr; }
+fn is_completion_enabled() -> bool { return COMPLETION_CONTEXT != nullptr; }
 
 fn enable_job_notifications(koshka::EvalContext &context) -> void
 {
@@ -1951,7 +1951,7 @@ fn get_input(const String &prompt) -> input_result
 #if !defined NDEBUG
   let const cwd_capture_count_before = DEBUG_COMPLETION_CWD_CAPTURE_COUNT;
 #endif
-  if (completion_is_enabled()) {
+  if (is_completion_enabled()) {
     HIGHLIGHT_COLOR_ENABLED = colors::stdout_wants_color();
     HIGHLIGHT_STYLED_UNDERLINES_ENABLED =
         colors::terminal_supports_styled_underlines();
@@ -2132,7 +2132,7 @@ fn emit_newlines(StringView buffer) -> void
                         koshka::os::last_system_error_message()};
 }
 
-fn debug_allocation_failure() -> bool
+fn did_debug_allocation_fail() -> bool
 {
   let const allocation = tl_arena_malloc(static_cast<usize>(-1));
   if (allocation != NULL) return false;
@@ -2399,7 +2399,7 @@ scan_prompt_template_inputs(StringView text,
   return true;
 }
 
-fn default_prompt_template() -> String
+fn get_default_prompt_template() -> String
 {
   let template_string = String{koshka::heap_allocator()};
   let const should_use_color = colors::stdout_wants_color();
@@ -2533,7 +2533,7 @@ fn build_prompt(EvalContext &context) -> String
       ps1.has_value() && !ps1->is_empty())
     ps1_template = steal(*ps1);
   else
-    ps1_template = default_prompt_template();
+    ps1_template = get_default_prompt_template();
 
   /* The raw template expands before the backslash escapes are decoded, so the
      escape-inserted cwd and user are literal and never re-expanded. A directory

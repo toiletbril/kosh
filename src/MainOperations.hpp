@@ -128,7 +128,8 @@ static fn run_debug_highlight_driver(StringView driver_line,
 static fn run_debug_toiletline_allocation_driver() throws -> i32
 {
   print("allocation-failure=" +
-        String::from(toiletline::debug_allocation_failure(), heap_allocator()) +
+        String::from(toiletline::did_debug_allocation_fail(),
+                     heap_allocator()) +
         "\n");
   flush();
   return 0;

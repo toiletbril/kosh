@@ -29,7 +29,7 @@ namespace toiletline {
 using koshka::String;
 using koshka::StringView;
 
-String default_prompt_template();
+String get_default_prompt_template();
 
 String build_prompt(koshka::EvalContext &context);
 
@@ -42,7 +42,7 @@ String render_ps0(koshka::EvalContext &context);
 void enable_completion(koshka::EvalContext &context);
 void disable_completion();
 
-bool completion_is_enabled();
+bool is_completion_enabled();
 
 void enter_calc_history();
 void leave_calc_history();
@@ -50,10 +50,10 @@ void leave_calc_history();
 koshka::Maybe<koshka::Path> get_history_path();
 bool is_history_contents_valid(StringView contents);
 void encode_history_record(String &output, StringView command);
-koshka::ErrorOr<koshka::Ok> history_write();
-koshka::ErrorOr<koshka::Ok> history_read();
+koshka::ErrorOr<koshka::Ok> write_history();
+koshka::ErrorOr<koshka::Ok> read_history();
 koshka::ErrorOr<koshka::Ok> sync_history();
-koshka::ErrorOr<koshka::Ok> history_clear();
+koshka::ErrorOr<koshka::Ok> clear_history();
 void set_history_enabled(bool is_enabled);
 void set_history_limit(usize entry_count);
 
@@ -81,10 +81,10 @@ koshka::Maybe<history_event> get_prefixed_history_event(
 koshka::Maybe<history_event> get_containing_history_event(
     koshka::Allocator allocator, StringView text,
     koshka::Maybe<usize> before_event_number = koshka::None);
-koshka::Maybe<usize> history_append_event(StringView command);
-bool history_rewrite_event(usize number, StringView expected,
+koshka::Maybe<usize> append_history_event(StringView command);
+bool rewrite_history_event(usize number, StringView expected,
                            StringView replacement);
-bool history_rewrite_event(usize number, StringView expected,
+bool rewrite_history_event(usize number, StringView expected,
                            const koshka::ArrayList<String> &replacements);
 
 void enable_job_notifications(koshka::EvalContext &context);
@@ -107,18 +107,18 @@ void set_edit_mode(edit_mode mode);
 
 void set_tab_selector(koshka::tab_selector_mode selector);
 
-usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
+usize get_utf8_length(const String &string,
+                      usize byte_count = static_cast<usize>(-1));
 
-usize utf8_strnlen(const char *bytes, usize byte_count);
+usize get_utf8_length(const char *bytes, usize byte_count);
 
-usize byte_offset_of_codepoint(const char *bytes, usize byte_length,
-                               usize codepoint_index);
+usize get_codepoint_byte_offset(const char *bytes, usize byte_length,
+                                usize codepoint_index);
 
-usize display_width(StringView text);
+usize get_display_width(StringView text);
 
-usize byte_offset_at_or_before_display_cell(StringView text,
-                                            usize cell_position,
-                                            usize &actual_cell_position);
+usize get_byte_offset_at_or_before_display_cell(
+    StringView text, usize cell_position, usize &actual_cell_position);
 
 bool is_active();
 
@@ -146,6 +146,6 @@ void exit_raw_mode();
 
 void emit_newlines(StringView buffer);
 
-bool debug_allocation_failure();
+bool did_debug_allocation_fail();
 
 } /* namespace toiletline */

@@ -875,7 +875,8 @@ fn kosh_main(int argc, char **argv) -> int
      falls back to its own default. */
   if (should_be_interactive) {
     if (!koshka::os::has_environment_variable("PS1"))
-      context.set_shell_variable("PS1", toiletline::default_prompt_template());
+      context.set_shell_variable("PS1",
+                                 toiletline::get_default_prompt_template());
   }
 
   if (!koshka::os::has_environment_variable("PS2"))
@@ -966,7 +967,8 @@ fn kosh_main(int argc, char **argv) -> int
   }
 
   if (should_be_interactive && !context.get_variable_value("PS1").has_value())
-    context.set_shell_variable("PS1", toiletline::default_prompt_template());
+    context.set_shell_variable("PS1",
+                               toiletline::get_default_prompt_template());
 
   context.set_startup_finished();
 
@@ -1412,7 +1414,7 @@ fn kosh_main(int argc, char **argv) -> int
         !script_contents.is_empty())
     {
       history_event_number =
-          toiletline::history_append_event(script_contents.view());
+          toiletline::append_history_event(script_contents.view());
     }
     if (!should_execute_history_expansion) continue;
 

@@ -271,14 +271,14 @@ fn encode_history_record(String &output, StringView command) -> void
   output.push('\n');
 }
 
-fn utf8_strlen(const koshka::String &string, usize byte_count) -> usize
+fn get_utf8_length(const koshka::String &string, usize byte_count) -> usize
 {
   let const limited_length =
       byte_count < string.length() ? byte_count : string.length();
-  return utf8_strnlen(string.c_str(), limited_length);
+  return get_utf8_length(string.c_str(), limited_length);
 }
 
-fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
+fn get_utf8_length(const char *bytes, usize byte_count) -> usize
 {
   usize codepoint_count = 0;
   for (usize byte_offset = 0;
@@ -290,8 +290,8 @@ fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
   return codepoint_count;
 }
 
-fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
-                            usize codepoint_index) -> usize
+fn get_codepoint_byte_offset(const char *bytes, usize byte_length,
+                             usize codepoint_index) -> usize
 {
   usize byte_offset = 0;
   usize seen_codepoints = 0;
@@ -307,14 +307,14 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
   return byte_offset;
 }
 
-fn display_width(StringView text) -> usize
+fn get_display_width(StringView text) -> usize
 {
   return koshka::internal::display_width_walk(text, static_cast<usize>(-1),
                                               nullptr);
 }
 
-fn byte_offset_at_or_before_display_cell(StringView text, usize cell_position,
-                                         usize &actual_cell_position) -> usize
+fn get_byte_offset_at_or_before_display_cell(
+    StringView text, usize cell_position, usize &actual_cell_position) -> usize
 {
   usize byte_offset = 0;
   actual_cell_position =
