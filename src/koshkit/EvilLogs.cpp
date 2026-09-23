@@ -274,6 +274,7 @@ fn append_core_dump_report(String &output, Allocator allocator,
                                 : static_cast<usize>(DEFAULT_DUMP_COUNT);
     for (usize index = 0; index < shown_count; index++) {
       let const &dump = dumps[index];
+      output += "  ";
       append_report_column(output,
                            format_human_size(dump.size, allocator).view(), 10,
                            false, colors::ansi::GREEN, should_color);
@@ -483,6 +484,7 @@ fn append_log_report(String &output, Allocator allocator,
                                 : static_cast<usize>(DEFAULT_LOG_ENTRY_COUNT);
     for (usize index = 0; index < shown_count; index++) {
       let const &entry = entries[index];
+      output += "  ";
       append_report_column(output,
                            format_human_size(entry.size, allocator).view(), 10,
                            false, colors::ansi::GREEN, should_color);
