@@ -444,27 +444,35 @@ pure fn scoped_container_id(StringView component, StringView prefix) wontthrow
 pure fn normalized_pod_uid(StringView component, Allocator allocator) throws
     -> String
 {
-  usize start = 0;
-  if (component.starts_with("pod")) {
-    start = 3;
-  } else if (let const marker = component.find_substring("-pod");
-             marker.has_value())
+  struct pod_component_form
   {
-    start = *marker + 4;
-  } else {
-    return String{allocator, "-"};
+    StringView prefix;
+    StringView suffix;
+  };
+  static constexpr pod_component_form FORMS[] = {
+      {"pod",                       ""      },
+      {"kubepods-pod",              ".slice"},
+      {"kubepods-burstable-pod",    ".slice"},
+      {"kubepods-besteffort-pod",   ".slice"},
+  };
+  let identifier = StringView{};
+  for (let const &form : FORMS) {
+    if (component.length != form.prefix.length + 36 + form.suffix.length ||
+        !component.starts_with(form.prefix) ||
+        !has_suffix(component, form.suffix))
+      continue;
+    identifier = component.substring_of_length(form.prefix.length, 36);
+    break;
   }
-  let end = component.length;
-  if (has_suffix(component, ".slice")) end -= 6;
-  if (end - start != 36) return String{allocator, "-"};
+  if (identifier.is_empty()) return String{allocator, "-"};
+
   let result = String{allocator};
   result.reserve(36);
-  for (usize index = start; index < end; index++) {
-    let byte = component[index];
+  for (usize index = 0; index < identifier.length; index++) {
+    let byte = identifier[index];
     if (byte == '_') byte = '-';
-    let const uid_index = index - start;
-    let const should_be_separator = uid_index == 8 || uid_index == 13 ||
-                                     uid_index == 18 || uid_index == 23;
+    let const should_be_separator = index == 8 || index == 13 || index == 18 ||
+                                     index == 23;
     let const is_valid = should_be_separator
                              ? byte == '-'
                              : (byte >= '0' && byte <= '9') ||
@@ -535,16 +543,17 @@ fn parse_cgroup_identity(StringView path, Allocator allocator) throws
       result.container_id = String{allocator, component};
 
     let pod_uid = normalized_pod_uid(component, allocator);
-    if (pod_uid != "-") result.pod_uid = steal(pod_uid);
+    let const has_pod_uid = pod_uid != "-";
+    if (has_pod_uid) result.pod_uid = steal(pod_uid);
     if (component == "burstable" ||
-        component.find_substring("-burstable-").has_value() ||
-        component == "kubepods-burstable.slice")
+        component == "kubepods-burstable.slice" ||
+        (has_pod_uid && component.starts_with("kubepods-burstable-pod")))
       result.qos = "burstable";
     if (component == "besteffort" ||
-        component.find_substring("-besteffort-").has_value() ||
-        component == "kubepods-besteffort.slice")
+        component == "kubepods-besteffort.slice" ||
+        (has_pod_uid && component.starts_with("kubepods-besteffort-pod")))
       result.qos = "besteffort";
-    if (component == "kubepods" || component.starts_with("kubepods-")) {
+    if (component == "kubepods" || component == "kubepods.slice") {
       result.is_kubernetes = true;
       has_kubernetes_component = true;
     }
