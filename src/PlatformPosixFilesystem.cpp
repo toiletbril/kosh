@@ -228,10 +228,9 @@ fn path_is_writable(StringView path) wontthrow -> bool
   return ::access(path_string.c_str(), W_OK) == 0;
 }
 
-fn path_is_executable(StringView path) wontthrow -> bool
+fn path_is_executable(const Path &path) wontthrow -> bool
 {
-  const String path_string{path};
-  return ::access(path_string.c_str(), X_OK) == 0;
+  return ::access(path.c_str(), X_OK) == 0;
 }
 
 cold fn read_current_directory() throws -> Path

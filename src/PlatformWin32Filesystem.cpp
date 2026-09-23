@@ -520,10 +520,10 @@ fn path_is_writable(StringView path) wontthrow -> bool
   return wide_path.has_value() && _waccess(wide_path->begin(), 2) == 0;
 }
 
-fn path_is_executable(StringView path) wontthrow -> bool
+fn path_is_executable(const Path &path) wontthrow -> bool
 {
   /* Windows has no execute permission bit, so an existing file is runnable. */
-  return path_is_regular_file(path);
+  return path_is_regular_file(path.view());
 }
 
 cold fn read_current_directory() throws -> Path

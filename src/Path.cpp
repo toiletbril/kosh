@@ -389,7 +389,7 @@ fn Path::is_writable() const wontthrow -> bool
 
 fn Path::is_executable() const wontthrow -> bool
 {
-  return os::path_is_executable(m_text.view());
+  return os::path_is_executable(*this);
 }
 
 cold fn Path::current_directory() throws -> Path

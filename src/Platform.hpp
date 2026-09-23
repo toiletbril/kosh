@@ -1410,7 +1410,7 @@ fn path_is_newer_than(StringView first, StringView second) wontthrow -> bool;
 fn path_is_older_than(StringView first, StringView second) wontthrow -> bool;
 fn path_is_readable(StringView path) wontthrow -> bool;
 fn path_is_writable(StringView path) wontthrow -> bool;
-fn path_is_executable(StringView path) wontthrow -> bool;
+fn path_is_executable(const Path &path) wontthrow -> bool;
 cold fn read_current_directory() throws -> Path;
 fn change_current_directory(StringView path) throws -> ErrorOr<Ok>;
 fn reference_current_directory() wontthrow -> DirectoryReference;
