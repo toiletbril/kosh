@@ -1969,11 +1969,13 @@ printed as user and terminal rows. With
 each row also includes its login time; an unavailable timestamp is shown
 explicitly. The
 .B \-\-remote
-option lists each remote peer with its protocol, state, queues, local and peer
-endpoints, socket identifier, process, owner, network namespace, orchestrator,
-runtime, container, and cgroup memberships. Command lines, process names, and
-cgroup memberships are shortened to keep the table usable. A dash marks
-information that disappeared or could not be read.
+option selects a remote-peer table with protocol, state, queues, local and peer
+endpoints, and socket identifiers. With
+.B \-\-all ,
+the same rows add process, owner, network namespace, orchestrator, runtime,
+container, and cgroup columns. Command lines, process names, and cgroup
+memberships are shortened to keep the table usable. A dash marks information
+that disappeared or could not be read.
 Otherwise
 .BR -n , -c , -s ,
 and

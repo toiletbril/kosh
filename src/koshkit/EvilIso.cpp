@@ -33,15 +33,15 @@ FLAG(EVILISO_NAMESPACES, Bool, 'n', "namespaces", "Report process namespaces.");
 FLAG(EVILISO_CGROUPS, Bool, 'c', "cgroups", "Report cgroup membership.");
 FLAG(EVILISO_SESSIONS, Bool, 's', "sessions", "Report login sessions.");
 FLAG(EVILISO_REMOTE, Bool, 'r', "remote",
-     "List remote peers and their owning processes.");
+     "Select remote peers and socket summary.");
 FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
      "Report container runtime evidence.");
 FLAG(EVILISO_KUBERNETES, Bool, '\0', "kubernetes",
-     "Report Kubernetes runtime evidence.");
+     "Report Kubernetes evidence.");
 FLAG(EVILISO_CONTAINER, Bool, '\0', "container",
-     "Report container runtime evidence.");
+     "Report detected containers.");
 FLAG(EVILISO_CONTAINERS, Bool, '\0', "containers",
-     "Report container runtime evidence.");
+     "Report detected containers.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilIso);
@@ -1865,8 +1865,7 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
   let const show_sessions = !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
   let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
-  let const should_show_remote_detail =
-      FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_ALL.is_enabled();
+  let const should_show_remote_detail = FLAG_EVILISO_ALL.is_enabled();
   let const show_runtime =
       !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const show_kubernetes =
@@ -1914,7 +1913,7 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   if (show_sessions)
     append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
   if (show_remote)
-    append_remote_report(output, should_color, should_show_remote_detail,
+    append_remote_report(output, should_color, true,
                          should_show_remote_detail, process_cgroups,
                          cxt.scratch_allocator());
   if (show_runtime)
