@@ -422,9 +422,10 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize root_index = 0; root_index < roots.count(); root_index++) {
     let const root = roots[root_index];
     if (results[root_index].error_number != 0) {
+      os::set_last_system_error(results[root_index].error_number);
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),
                                      "'" + String{allocator, root} +
-                                         "': no such file or directory");
+                                         "': " + os::last_system_error_message());
       status = 1;
       continue;
     }
