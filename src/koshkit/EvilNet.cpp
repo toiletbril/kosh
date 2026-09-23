@@ -53,18 +53,6 @@ namespace koshka::koshkit {
 
 namespace {
 
-fn append_table_title(String &output, StringView title,
-                      bool should_color) throws -> void
-{
-  if (!output.is_empty()) {
-    while (!output.is_empty() && output.back() == '\n')
-      output.truncate(output.length() - 1);
-    output += "\n\n";
-  }
-  append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
-}
-
 enum class evilnet_sort_key : u8
 {
   Name,
@@ -220,17 +208,10 @@ fn append_network_traffic_statistics_report(
     bool should_color, StringView duration_suffix,
     const Maybe<String> &default_interface) throws -> usize
 {
-  append_table_title(output, "Network traffic", should_color);
-  usize name_width = 4;
-  for (let const &entry : statistics) {
-    if (entry.interface_name.length() > name_width) {
-      name_width = entry.interface_name.length();
-    }
-  }
-
-  output += "  ";
-  append_report_column(output, "NAME", name_width, false,
-                       colors::ansi::BOLD_CYAN, should_color);
+  let table = ReportTable{allocator};
+  table.set_column_gap(3);
+  table.add_column("NAME", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
   let receive_header = String{allocator, "RX"};
   let transmit_header = String{allocator, "TX"};
   let receive_packets_header = String{allocator, "RX PACKETS"};
@@ -255,36 +236,24 @@ fn append_network_traffic_statistics_report(
       "RX CAP",                     "TX CAP",
       "TX QUEUE",                   "TX LIMIT",
   };
-  constexpr usize WIDTHS[] = {9, 9, 12, 12, 10, 10, 9, 9, 9, 9, 10, 10};
-  for (usize index = 0; index < countof(HEADERS); index++) {
-    output += "   ";
-    append_report_column(output, HEADERS[index], WIDTHS[index], true,
-                         colors::ansi::BOLD_CYAN, should_color);
-  }
-  output += "\n";
+  for (let const heading : HEADERS)
+    table.add_column(heading, report_table_alignment::Right,
+                     colors::ansi::BOLD_CYAN);
+
+  let cells = ArrayList<report_table_cell_view>{allocator};
+  cells.reserve(countof(HEADERS) + 1);
   for (let const &entry : statistics) {
-    output += "  ";
     let const is_default = default_interface.has_value() &&
                            entry.interface_name.view() ==
                                default_interface->view();
-    append_report_column(output, entry.interface_name.view(), name_width, false,
-                         is_default ? colors::ansi::BOLD_GREEN
-                                    : colors::ansi::GREEN,
-                         should_color);
-    output += "   ";
-    append_report_column(
-        output,
-        entry.has_field(os::network_statistics_field::ReceiveBytes)
-            ? format_human_size(entry.receive_bytes, allocator).view()
-            : StringView{"-"},
-        9, true, colors::ansi::GREEN, should_color);
-    output += "   ";
-    append_report_column(
-        output,
-        entry.has_field(os::network_statistics_field::TransmitBytes)
-            ? format_human_size(entry.transmit_bytes, allocator).view()
-            : StringView{"-"},
-        9, true, colors::ansi::GREEN, should_color);
+    let values = ArrayList<String>{allocator};
+    values.reserve(countof(HEADERS));
+    values.push(entry.has_field(os::network_statistics_field::ReceiveBytes)
+                    ? format_human_size(entry.receive_bytes, allocator)
+                    : String{allocator, "-"});
+    values.push(entry.has_field(os::network_statistics_field::TransmitBytes)
+                    ? format_human_size(entry.transmit_bytes, allocator)
+                    : String{allocator, "-"});
     const u64 counters[] = {entry.receive_packet_count,
                             entry.transmit_packet_count,
                             entry.receive_error_count,
@@ -308,8 +277,7 @@ fn append_network_traffic_statistics_report(
         os::network_statistics_field::TransmitQueueLimit,
     };
     for (usize index = 0; index < countof(counters); index++) {
-      output += "   ";
-      let value = String{allocator};
+      let value = String{allocator, "-"};
       if (entry.has_field(FIELDS[index])) {
         if (index == 6 || index == 7) {
           value = format_human_size(counters[index], allocator);
@@ -318,12 +286,16 @@ fn append_network_traffic_statistics_report(
           value = String::from(counters[index], allocator);
         }
       }
-      append_report_column(output,
-                           entry.has_field(FIELDS[index]) ? value.view()
-                                                          : StringView{"-"},
-                           WIDTHS[index + 2], true, {}, should_color);
+      values.push(steal(value));
     }
-    output += "\n";
+
+    cells.clear();
+    cells.push({entry.interface_name.view(),
+                is_default ? colors::ansi::BOLD_GREEN : colors::ansi::GREEN});
+    for (usize index = 0; index < values.count(); index++)
+      cells.push({values[index].view(),
+                  index < 2 ? colors::ansi::GREEN : colors::ansi::RESET});
+    table.add_row(cells);
 
     let warning = String{allocator};
     let const do_append_nonzero =
@@ -356,6 +328,8 @@ fn append_network_traffic_statistics_report(
       warnings.push(steal(message));
     }
   }
+
+  append_titled_report_table(output, "Network traffic", table, should_color);
 
   return statistics.count();
 }

@@ -427,6 +427,10 @@ public:
   {
     m_should_show_header = should_show_header;
   }
+  fn set_column_gap(usize space_count) wontthrow -> void
+  {
+    m_column_gap_space_count = space_count;
+  }
   fn add_row(const ArrayList<report_table_cell_view> &cells) throws -> void;
   fn to_string() const throws -> String;
   fn to_string(bool should_color, StringView indentation = "  ") const throws
@@ -437,6 +441,7 @@ private:
   ArrayList<report_table_column> m_columns;
   ArrayList<ArrayList<report_table_cell>> m_grid_rows;
   bool m_should_show_header{true};
+  usize m_column_gap_space_count{2};
 };
 fn append_titled_report_table(String &output, StringView title,
                               const ReportTable &table,

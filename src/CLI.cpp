@@ -1185,7 +1185,8 @@ static fn append_report_grid(String &output,
                              const ArrayList<report_table_column> &columns,
                              const ArrayList<ArrayList<report_table_cell>> &rows,
                              bool should_color, StringView indentation,
-                             bool should_show_header) throws
+                             bool should_show_header,
+                             usize column_gap_space_count) throws
     -> void
 {
   let widths = ArrayList<usize>{columns.allocator()};
@@ -1222,7 +1223,8 @@ static fn append_report_grid(String &output,
       append_grid_column(
           output, text, widths[index],
           columns[index].alignment == report_table_alignment::Right, style);
-      if (index + 1 < columns.count()) output += "  ";
+      if (index + 1 < columns.count())
+        output.append_repeated(' ', column_gap_space_count);
     }
     output += '\n';
   };
@@ -1243,7 +1245,8 @@ fn ReportTable::to_string(bool should_color,
   let output = String{m_rows.allocator()};
   if (!m_columns.is_empty()) {
     append_report_grid(output, m_columns, m_grid_rows, should_color,
-                       indentation, m_should_show_header);
+                       indentation, m_should_show_header,
+                       m_column_gap_space_count);
     return output;
   }
   append_report_table(output, m_rows, should_color, indentation);
