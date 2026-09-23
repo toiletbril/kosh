@@ -143,7 +143,8 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
   }
 
   let const files =
-      os::list_process_open_files(os::get_current_process_id(), allocator);
+      os::list_process_open_files(os::get_current_process_id(), allocator,
+                                  true);
   let families = ArrayList<mapped_library_family>{allocator};
   usize findings = 0;
   for (let const &file : files) {

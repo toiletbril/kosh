@@ -2304,7 +2304,8 @@ fn has_process_open_file_listing() wontthrow -> bool
 #endif
 }
 
-fn list_process_open_files(i64 pid, Allocator allocator) throws
+fn list_process_open_files(i64 pid, Allocator allocator,
+                           bool should_include_mappings) throws
     -> ArrayList<process_open_file>
 {
   ArrayList<process_open_file> files{allocator};
@@ -2325,6 +2326,7 @@ fn list_process_open_files(i64 pid, Allocator allocator) throws
   };
 
 #if defined __APPLE__
+  unused(should_include_mappings);
   let const process_id = static_cast<pid_t>(pid);
   struct proc_vnodepathinfo vnode_paths{};
   if (::proc_pidinfo(process_id, PROC_PIDVNODEPATHINFO, 0, &vnode_paths,
@@ -2429,6 +2431,84 @@ fn list_process_open_files(i64 pid, Allocator allocator) throws
     do_push(target->view(), -1, 0, 0, 0, 0, reference.use, 'r', false, {});
   }
 
+  if (should_include_mappings) {
+    let maps_path = String{allocator, process_path};
+    maps_path += "/maps";
+    if (let maps_descriptor =
+            open_file_descriptor(maps_path.view(), file_open_mode::Read);
+        maps_descriptor.has_value())
+    {
+      defer { close_fd(*maps_descriptor); };
+      if (let maps = read_fd_to_string(*maps_descriptor, allocator);
+          maps.has_value())
+      {
+        usize line_position = 0;
+        while (line_position < maps->length()) {
+          let const line = each_line(maps->view(), line_position);
+          usize field_position = 0;
+          u64 file_id = 0;
+          bool is_valid = true;
+          for (usize field_index = 0; field_index < 5; field_index++) {
+            while (field_position < line.length &&
+                   (line[field_position] == ' ' ||
+                    line[field_position] == '\t'))
+              field_position++;
+            let const field_start = field_position;
+            while (field_position < line.length &&
+                   line[field_position] != ' ' && line[field_position] != '\t')
+              field_position++;
+            if (field_start == field_position) {
+              is_valid = false;
+              break;
+            }
+            if (field_index == 4) {
+              let const parsed =
+                  line.substring_of_length(field_start,
+                                           field_position - field_start)
+                      .to<u64>();
+              if (parsed.is_error()) {
+                is_valid = false;
+                break;
+              }
+              file_id = parsed.value();
+            }
+          }
+          if (!is_valid) continue;
+          while (field_position < line.length &&
+                 (line[field_position] == ' ' || line[field_position] == '\t'))
+            field_position++;
+          if (field_position == line.length) continue;
+
+          let path = line.substring(field_position);
+          if (path[0] == '[') continue;
+
+          constexpr StringView DELETED_SUFFIX = " (deleted)";
+          let const is_deleted = path.length >= DELETED_SUFFIX.length &&
+                                  path.substring(path.length -
+                                                 DELETED_SUFFIX.length) ==
+                                      DELETED_SUFFIX;
+          if (is_deleted)
+            path = path.substring_of_length(
+                0, path.length - DELETED_SUFFIX.length);
+
+          bool is_duplicate = false;
+          for (let const &file : files) {
+            if (file.use == process_file_use::Mapped &&
+                file.file_id == file_id && file.path.view() == path)
+            {
+              is_duplicate = true;
+              break;
+            }
+          }
+          if (is_duplicate) continue;
+
+          do_push(path, -1, 0, file_id, 0, 0, process_file_use::Mapped, 'r',
+                  is_deleted, {});
+        }
+      }
+    }
+  }
+
   let const descriptor_root = String{process_path} + "/fd";
   DIR *descriptor_directory = ::opendir(descriptor_root.c_str());
   if (descriptor_directory == nullptr) {
@@ -2524,6 +2604,7 @@ fn list_process_open_files(i64 pid, Allocator allocator) throws
   return files;
 #else
   unused(pid);
+  unused(should_include_mappings);
   return files;
 #endif
 }

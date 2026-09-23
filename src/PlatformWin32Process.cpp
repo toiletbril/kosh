@@ -2453,10 +2453,12 @@ fn processor_model_name(Allocator allocator) throws -> Maybe<String>
 
 fn has_process_open_file_listing() wontthrow -> bool { return false; }
 
-fn list_process_open_files(i64 pid, Allocator allocator) throws
+fn list_process_open_files(i64 pid, Allocator allocator,
+                           bool should_include_mappings) throws
     -> ArrayList<process_open_file>
 {
   unused(pid);
+  unused(should_include_mappings);
   return ArrayList<process_open_file>{allocator};
 }
 

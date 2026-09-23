@@ -580,7 +580,8 @@ struct process_open_file
 };
 
 fn has_process_open_file_listing() wontthrow -> bool;
-fn list_process_open_files(i64 pid, Allocator allocator) throws
+fn list_process_open_files(i64 pid, Allocator allocator,
+                           bool should_include_mappings = false) throws
     -> ArrayList<process_open_file>;
 
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
